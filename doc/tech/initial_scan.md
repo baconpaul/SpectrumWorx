@@ -33,11 +33,14 @@ and `basic_installer`-based packaging).
 Windows / Linux, C++20, no VST2, JUCE 8 for the GUI, submoduled dependencies,
 embedded binary assets, `basic_installer` packaging.
 
-**One open question** — how the host layer gets there. §1.4/§1.5 cost a standard
-JUCE `AudioProcessor` port; **§1.6 argues the alternative** (port the existing
-plugin framework to native CLAP and use clap-wrapper for VST3/AUv2/standalone),
-which the code turns out to fit rather better. That decision is not settled
-here; §9 phase 2b proposes a one-week spike to settle it.
+**The host-layer route has been decided: native CLAP + clap-wrapper.** §1.4/§1.5
+cost a standard JUCE `AudioProcessor` port for comparison; **§1.6 makes the case
+for the route actually taken** — port the existing plugin framework to a native
+CLAP backend and use [clap-wrapper](https://github.com/free-audio/clap-wrapper)
+to emit VST3, AUv2 and standalone, with JUCE used only for the GUI.
+
+This document is the analysis. The staged, codeable plan that follows from it
+lives in **[`implementation_sequence.md`](implementation_sequence.md)**.
 
 Date of scan: 2026-07-27. All file/line counts below were measured against the
 tree at commit `3fd37b5`.
@@ -285,13 +288,15 @@ unusual.
 Schedule is roughly a wash; the CLAP route discards ~2.3 k fewer lines and stops
 fighting the parameter model.
 
-#### 1.6.5 Recommendation
+#### 1.6.5 Decision
 
-**Spike it before committing.** The entire bet is that
-`Plugin2HostInteropControler` is a clean CLAP adapter target. Writing that one
-backend against the existing interface answers the question in about a week, and
-is not wasted effort either way — the interface has to be understood before any
-host-layer work begins.
+**Taken: native CLAP + clap-wrapper.** The bet is that
+`Plugin2HostInteropControler` is a clean CLAP adapter target, and the mapping in
+§1.6.1 is close enough to one-to-one to make that a good bet. The consequences
+are worked through in
+[`implementation_sequence.md`](implementation_sequence.md): the CLAP backend
+lands in stage 5 there, and stage 1 proves the whole toolchain end-to-end with a
+stub plugin before any of it is written.
 
 ---
 
@@ -665,9 +670,13 @@ EULA, ReadMe.rtf, the User's Guide PDF.
 
 ### 7.3 Fix
 
-- `juce_add_binary_data(BinaryData SOURCES ...)` for the skin PNGs (exactly what
-  OB-Xf does in `assets/CMakeLists.txt`) → `initializePaths()`, the `.paths`
-  file, `boost::mmap` and `resourcesPath()` all disappear.
+- Embed the skin PNGs in the binary → `initializePaths()`, the `.paths` file,
+  `boost::mmap` and `resourcesPath()` all disappear. Note: **not**
+  `juce_add_binary_data`. Under the CLAP-first route JUCE is consumed in
+  `JUCE_MODULES_ONLY` mode (that is what `add_clap_juce_shim` sets), and JUCE's
+  top-level `CMakeLists.txt` returns before `include(JUCEUtils.cmake)` in that
+  mode, so `juce_add_binary_data` is not defined. Use CMakeRC, as shortcircuit
+  does.
 - Factory presets and samples: ship via the installer to a user data dir
   discovered by `sst-plugininfra`'s path helpers, not by a `.paths` file.
 - `juce_add_plugin` generates the bundles and plists.
@@ -811,44 +820,20 @@ know whether swapping the FFT or the SIMD backend changed the sound.
 
 ---
 
-## 9. Suggested phasing
+## 9. Where the plan lives
 
-| Phase | Content | Est. |
-|---|---|---|
-| **0. Triage** | Delete nt2, audioio, LibTom\*, VST2/AU/fmod/unity wrappers, licenser, `_unfinished`, VST2 SDK headers, private key. Rewrite file headers to GPL-3.0, convert to UTF-8. **Then the `git filter-repo` history purge (§8.1) — do it here, while the repo is still 4 commits with no forks.** Nothing needs to compile yet. | 1 wk |
-| **1. Skeleton** | Top-level CMake modelled on OB-Xf. `libs/` submodules (JUCE 8, clap-juce-extensions, sst-*, simde, Boost as a stopgap). `src/` layout. CI workflows. `juce_add_plugin` producing an empty VST3/AU/CLAP that loads. | 1.5–2.5 wk |
-| **2. DSP first** | Get `le/spectrumworx/engine` + `effects` + `le/math` compiling standalone against C++20 + Accelerate/juce::dsp/sst-basic-blocks, behind a Catch2 target. **Write golden-value tests here.** Keeps Boost.Fusion for now. | 3–5 wk |
-| **2b. Format spike** | One week, in parallel: write a native CLAP backend against the existing `Plugin2HostInteropControler` interface (§1.6.5) to decide the host-layer route. Not wasted either way. | 1 wk |
-| **3. Host layer** | *Either* rewrite `spectrumWorx.cpp` as a JUCE `AudioProcessor` (delete `le/plugins` **and** `core/host_interop`), *or* finish the native CLAP backend and add clap-wrapper for VST3/AUv2/standalone (keep `core/host_interop`). See §1.6. First audible sound in a DAW. | 3–4 wk / 2.5–4 wk |
-| **4. GUI** | Port `source/gui` to JUCE 8; embed the skin as BinaryData; collapse the owned-window model into child components; delete `gui.mm`, `.paths`, `boost::mmap`. | 4–6 wk |
-| **5. De-Boost** | Tier 1 mechanical swaps, then the Fusion/MPL parameter system. Golden tests from phase 2 protect you. | 5–8 wk |
-| **6. Ship** | `basic_installer`, notarisation, Linux, arm64, docs. | 1–2 wk |
-| | **Total** | **~20–30 engineer-weeks** (+1–2 wk if the CLAP route's thread-discipline work is taken on, §1.6.3) |
+The staging plan that used to sit here has moved to
+**[`implementation_sequence.md`](implementation_sequence.md)**, rewritten around
+the CLAP-first decision (§1.6). It carries the stage-by-stage sequence,
+submodule list, CMake shape, exit criteria per stage, the parallelism graph and
+the risk register.
 
-Phases 2 and 4 can run in parallel with different people. Phase 5 can be
-deferred indefinitely — a Boost-dependent build is not a blocker for shipping.
+Two things from this document are time-sensitive and worth repeating here:
 
-### Highest-risk items
-
-1. **Plugin-format decision (§1.6).** JUCE `AudioProcessor` vs native CLAP +
-   clap-wrapper. It is hard to reverse once the host layer is written, and the
-   dynamic parameter model (§8.3) argues against the JUCE route. Resolve it with
-   the phase-2b spike, not by assumption.
-2. **Boost.Fusion parameter system (§5.3a).** It's the spine of the codebase and
-   it drives GUI generation and preset serialisation. Do not touch it before
-   golden tests exist.
-3. **Owned-window GUI model (§6.2).** Not a port; a redesign. Scope it as one.
-4. **NT2 removal changing DSP output (§5.3b).** Only detectable with tests.
-5. **Preset backward compatibility.** Decide early; it constrains 2 and 4.
-
-### Time-sensitive
-
-The **`git filter-repo` purge (§8.1)** is the only item on this list that gets
-*harder* the longer it waits. It rewrites every commit hash, so it has to land
-before the repo accumulates forks, clones or open PRs. Right now that cost is
-approximately zero.
-
-### Lowest-hanging fruit
-
-The licence manager (§3, ~4 days), the dead-code deletion (§8.2, ~1 week), and
-the top-level CMake (§4) are all independent and can start immediately.
+- **The `git filter-repo` purge (§8.1)** is the only item in the whole project
+  that gets *harder* the longer it waits — it rewrites every commit hash, so it
+  has to land before the repo accumulates forks, clones or open PRs. It is
+  stage 0, step 1.
+- **Preset backward compatibility (§8.3)** has to be decided before the
+  parameter-system refactor, not after; it constrains what that refactor is
+  allowed to change.
