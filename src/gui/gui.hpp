@@ -164,6 +164,13 @@ class ReferenceCountedGUIInitializationGuard
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+/// \note SUPERSEDED by gui/resources.hpp, which reads the same bitmaps out of
+/// the binary instead of off disk, numbers them with plain integers instead of
+/// multi-character literals, and has a cache that can be released. `enum
+/// ResourceBitmaps` above and everything in this block go when this file
+/// compiles again (stage 6.1) -- both exist only because this one does not
+/// compile yet and resources.hpp does. Do not add a call site here.
+///                                       (28.07.2026.) (SW port)
 juce::Image resourceBitmap(char const (&bitmapNumber)[2 + 1]);
 
 template <int bitmapID>
@@ -886,9 +893,12 @@ class LE_NOVTABLE Knob : public WidgetBase<juce::Slider>
 
   protected: // juce::Component overrides
     void startedDragging() noexcept override;
-#ifndef NDEBUG
+    /// \note Was declared and defined only under !NDEBUG, but
+    /// EditorKnob::stoppedDragging calls it unconditionally -- an undefined
+    /// symbol in every release build. The body is nothing but an assertion, so
+    /// it costs nothing to exist: LE_ASSERT compiles away on its own.
+    ///                                       (28.07.2026.) (SW port)
     void stoppedDragging() noexcept override;
-#endif // NDEBUG
 
     LE_IMPLEMENT_ASYNC_REPAINT
 

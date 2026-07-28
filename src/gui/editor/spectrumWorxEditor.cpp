@@ -1836,20 +1836,25 @@ SpectrumWorxEditor::Settings::Settings() /// \throws std::bad_alloc Out of memor
 
       fftSize_(enginePage_, xMargin, yMargin + yStep * 0, (Engine ::FFTSize *)(0)),
       overlapFactor_(enginePage_, xMargin, yMargin + yStep * 1, (Engine ::OverlapFactor *)(0)),
-      windowFunction_(enginePage_, xMargin, yMargin + yStep * 2, (Engine ::WindowFunction *)(0)),
+      windowFunction_(enginePage_, xMargin, yMargin + yStep * 2, (Engine ::WindowFunction *)(0))
+/// \note pRegistrationData_(0) came last here; the member itself went with the
+/// licence manager in stage 0 and the initialiser did not, so nothing has
+/// compiled this constructor since. It was also the only unconditional entry
+/// after this point, which is why every conditional one above it could end in a
+/// comma. Leading commas instead, so that all four combinations of
+/// LE_SW_ENGINE_WINDOW_PRESUM and LE_SW_ENGINE_INPUT_MODE are well formed.
+///                                       (28.07.2026.) (SW port)
 #if LE_SW_ENGINE_WINDOW_PRESUM
-      windowSizeFactor_(enginePage_, xMargin, yMargin + yStep * 3,
-                        (Engine ::WindowSizeFactor *)(0)),
+      ,
+      windowSizeFactor_(enginePage_, xMargin, yMargin + yStep * 3, (Engine ::WindowSizeFactor *)(0))
 #if LE_SW_ENGINE_INPUT_MODE >= 1
-      inputMode_(enginePage_, xMargin, yMargin + yStep * 4, (GlobalParameters::InputMode *)(0)),
+      ,
+      inputMode_(enginePage_, xMargin, yMargin + yStep * 4, (GlobalParameters::InputMode *)(0))
 #endif // LE_SW_ENGINE_INPUT_MODE
-#else
-#if LE_SW_ENGINE_INPUT_MODE >= 1
-      inputMode_(enginePage_, xMargin, yMargin + yStep * 3, (GlobalParameters::InputMode *)(0)),
-#endif
+#elif LE_SW_ENGINE_INPUT_MODE >= 1
+      ,
+      inputMode_(enginePage_, xMargin, yMargin + yStep * 3, (GlobalParameters::InputMode *)(0))
 #endif // LE_SW_ENGINE_WINDOW_PRESUM
-
-      pRegistrationData_(0)
 {
     this->setSize(resourceBitmap<SettingsEngineBg>().getWidth(), editor().getHeight());
 

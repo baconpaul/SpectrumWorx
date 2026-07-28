@@ -1503,7 +1503,6 @@ void Knob::startedDragging() noexcept
     LE_ASSERT(mouseSource.canDoUnboundedMovement());
 }
 
-#ifndef NDEBUG
 void Knob::stoppedDragging() noexcept
 {
     LE_ASSERT(juce::Desktop::getInstance().getNumMouseSources() == 1);
@@ -1517,7 +1516,6 @@ void Knob::stoppedDragging() noexcept
     //juce::Desktop::setMousePosition( juce::Desktop::getLastMouseDownPosition() );
     //juce::Desktop::setMousePosition( this->localPointToGlobal( this->getBounds().getCentre() ) );
 }
-#endif // NDEBUG
 
 void Knob::removeValueListeners(juce::Slider &slider, juce::ValueListener &valueListener)
 {
