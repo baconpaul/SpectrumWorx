@@ -10,6 +10,12 @@
 //------------------------------------------------------------------------------
 #include "moduleParameters.hpp"
 
+// \note For parameterInfos(), which this file calls twice. It used to be a
+// non-inline definition in moduleImpl.hpp that only factory.cpp's translation
+// unit emitted, and every other caller borrowed at link time.
+//                                            (28.07.2026.) (SW port)
+#include "moduleImpl.hpp"
+
 #include "le/parameters/conversion.hpp"
 #include "le/parameters/parametersUtilities.hpp"
 #include "le/parameters/runtimeInformation.hpp"

@@ -9,6 +9,9 @@
 
 add_executable(sw-tests
         effects/effectsListTests.cpp
+        goldens/engineHarness.cpp
+        goldens/goldenDigest.cpp
+        goldens/goldenTests.cpp
         math/fftTests.cpp
         math/scalarTests.cpp
         math/vectorTests.cpp
@@ -18,9 +21,12 @@ add_executable(sw-tests
 
 target_link_libraries(sw-tests PRIVATE sw-dsp Catch2::Catch2WithMain)
 
-# The assert handler routes to LE::Utility::assertionFailed, which
-# assertionHandler.cpp defines. A failing assert in a test aborts the runner,
-# which is what we want: the checked build is the interesting one.
-target_compile_definitions(sw-tests PRIVATE LE_CHECKED_BUILD=1)
+# \note LE_CHECKED_BUILD is deliberately *not* forced here. It decides whether
+# NDEBUG survives, and forcing it on for the test objects only would leave them
+# calling an assertionFailed() that a release libsw-dsp.a does not define. The
+# test runner follows CMAKE_BUILD_TYPE like everything else: Debug runs the
+# ~1200 asserts, Release renders the goldens at shipping speed.
+target_compile_definitions(sw-tests PRIVATE
+        SW_GOLDEN_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/goldens/data")
 
 catch_discover_tests(sw-tests)

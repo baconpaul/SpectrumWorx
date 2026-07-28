@@ -13,6 +13,7 @@
 #include "automatedModuleImpl.inl"
 
 #include "le/utility/parentFromMember.hpp"
+#include "core/modules/factory.hpp"
 #include "le/spectrumworx/engine/moduleNode.hpp" // for intrusive_ptr_release_deleter
 #include "gui/editor/spectrumWorxEditor.hpp"
 
@@ -202,7 +203,7 @@ void LE_NOINLINE intrusive_ptr_release_deleter(ModuleNode const *LE_RESTRICT con
     if (!module.gui() || const_cast<Module &>(module).destroyGUI())
     {
         LE_ASSUME(module.referenceCount_ == 0);
-        delete &module;
+        ModuleFactory::destroy(module);
     }
     else
     {

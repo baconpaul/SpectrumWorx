@@ -46,21 +46,6 @@ class LE_NOVTABLE ModuleDSP : public Engine::ModuleDSP, public AutomatedModuleIm
 #endif // _MSC_ver
 }; // class _MSC_VER
 
-//...mrmlj...for TalkBox4Unity
-#if !LE_SW_GUI
-namespace Engine
-{
-/// \note Not inline, in a header, so every translation unit that included it
-/// emitted the symbol. Only ever compiled for a single-TU Unity build before.
-///                                       (28.07.2026.) (SW port)
-inline void intrusive_ptr_release_deleter(ModuleNode const *LE_RESTRICT const pModuleNode)
-{
-    auto const &module(actualModule<SW::ModuleDSP>(*pModuleNode));
-    delete &module;
-}
-} // namespace Engine
-#endif // !LE_SW_GUI
-
 //------------------------------------------------------------------------------
 } // namespace SW
 //------------------------------------------------------------------------------

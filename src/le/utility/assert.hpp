@@ -17,7 +17,7 @@
 //------------------------------------------------------------------------------
 #include "abi.hpp"
 
-#ifdef LE_ENABLE_ASSERT_HANDLER
+#if defined(LE_ENABLE_ASSERT_HANDLER) && !defined(NDEBUG)
 #include <source_location>
 #else
 #include <cassert>
@@ -30,7 +30,15 @@ namespace Utility
 {
 //------------------------------------------------------------------------------
 
-#ifdef LE_ENABLE_ASSERT_HANDLER
+/// \note LE_ASSERT compiles away under NDEBUG, which the handler branch used
+/// not to do. The tree assumes it does, in two ways that only a release build
+/// reveals: moduleChainImpl.cpp declares an assert's operand inside
+/// `#ifndef NDEBUG`, and ModuleNode is only polymorphic under !NDEBUG, so the
+/// dynamic_cast in an assert three lines further down does not even compile
+/// without it. LE_VERIFY still evaluates its expression -- that is the whole
+/// difference between the two.
+///                                       (28.07.2026.) (SW port)
+#if defined(LE_ENABLE_ASSERT_HANDLER) && !defined(NDEBUG)
 
 /// Defined in assertionHandler.cpp. Never returns unless the user chooses to
 /// ignore, which only the Windows and JUCE message boxes offer.
@@ -48,17 +56,19 @@ void assertionFailed(char const *expression, char const *message,
 #define LE_VERIFY LE_ASSERT
 #define LE_VERIFY_MSG LE_ASSERT_MSG
 
-#else // LE_ENABLE_ASSERT_HANDLER
+#elif defined(NDEBUG)
+
+#define LE_ASSERT(expression) static_cast<void>(0)
+#define LE_ASSERT_MSG(expression, message) static_cast<void>(0)
+#define LE_VERIFY(expression) static_cast<void>(expression)
+#define LE_VERIFY_MSG(expression, message) LE_VERIFY(expression)
+
+#else // no handler, checked build
 
 #define LE_ASSERT assert
 #define LE_ASSERT_MSG(expression, message) assert((expression) && (message))
-#ifdef NDEBUG
-#define LE_VERIFY(expression) ((void)(expression))
-#define LE_VERIFY_MSG(expression, message) LE_VERIFY(expression)
-#else
 #define LE_VERIFY(expression) assert(expression)
 #define LE_VERIFY_MSG(expression, message) LE_VERIFY((expression) && (message))
-#endif // NDEBUG
 
 #endif // LE_ENABLE_ASSERT_HANDLER
 

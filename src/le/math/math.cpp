@@ -197,7 +197,18 @@ float modulo(float const dividend, float const divisor)
     // mod result and will thus differ from the std::fmod() result so we skip
     // the below sanity check for those cases.
     //                                        (05.01.2011.) (Domagoj Saric)
-    LE_ASSERT_MSG(nearEqual(mod, std::fmod(dividend, divisor)) ||
+    /// \note The reference used to be std::fmod, which truncates towards zero
+    /// where this floors -- so the two differ by exactly `divisor` for every
+    /// negative dividend, and the assert fired on all of them. Flooring is
+    /// deliberate here (it is what makes this usable for phase mapping into
+    /// [0, 2pi)), so the reference is the floored modulo, not fmod.
+    /// Phasevolution was the first effect to feed it a negative dividend.
+    ///                                       (28.07.2026.) (SW port)
+    LE_ASSERT_MSG(nearEqual(mod, static_cast<float>(std::fmod(dividend, divisor) +
+                                                    ((std::fmod(dividend, divisor) != 0) &&
+                                                             ((dividend < 0) != (divisor < 0))
+                                                         ? divisor
+                                                         : 0))) ||
                       (static_cast<int>(static_cast<float>(static_cast<float>(dividend) /
                                                            static_cast<float>(divisor))) !=
                        static_cast<int>(static_cast<double>(static_cast<double>(dividend) /
@@ -736,6 +747,21 @@ void LE_COLD rngSeed()
 
     //include the CRT version for 3rd party code?
     //std::srand( static_cast<unsigned int>( std::time( 0 ) ) );
+}
+
+void LE_COLD rngSeed(std::uint64_t const seed)
+{
+    // splitmix64, so that a small seed still fills both words. Neither may be
+    // zero: xorshift128+ cannot leave the all-zero state.
+    auto next([state = seed]() mutable {
+        state += 0x9E3779B97F4A7C15ull;
+        auto z(state);
+        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+        z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+        return z ^ (z >> 31);
+    });
+    rng_state[0] = next() | 1;
+    rng_state[1] = next() | 1;
 }
 
 std::uint32_t rangedRand(std::uint32_t const maximum) { return rangedRand<std::uint32_t>(maximum); }

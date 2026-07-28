@@ -134,6 +134,27 @@ template <class ModuleInterface> struct ModuleConstructor
     char storage[];
 }; // struct ModuleConstructor
 
+////////////////////////////////////////////////////////////////////////////
+/// \internal
+/// \struct ModuleDestroyer
+////////////////////////////////////////////////////////////////////////////
+
+template <class ModuleInterface> struct ModuleDestroyer
+{
+    using result_type = void;
+
+    template <class EffectIndex> result_type operator()(EffectIndex) const
+    {
+        using EffectImplementation = typename Effects::ImplForIndex<EffectIndex::value>::type;
+        using ModuleImplementation = typename ModuleInterface::template Impl<EffectImplementation>;
+        auto *const pModule(static_cast<ModuleImplementation *>(pInterface));
+        pModule->~ModuleImplementation();
+        std::free(pModule);
+    }
+
+    ModuleInterface *pInterface;
+}; // struct ModuleDestroyer
+
 #pragma warning(pop)
 } // anonymous namespace
 
@@ -182,14 +203,53 @@ LE::Utility::IntrusivePtr<ModuleInterface> ModuleFactory::create(std::int8_t con
         assert_no_default_case<typename Constructor::result_type>());
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// ModuleFactory::destroy()
+// ------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+
+template <class ModuleInterface> void ModuleFactory::destroy(ModuleInterface const &module)
+{
+    using namespace boost;
+
+    auto const effectIndex(module.effectTypeIndex());
+    using Destroyer = ModuleDestroyer<ModuleInterface>;
+    switch_<Effects::ValidIndices>(effectIndex, Destroyer{const_cast<ModuleInterface *>(&module)},
+                                   assert_no_default_case<typename Destroyer::result_type>());
+}
+
 #if LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
 template LE::Utility::IntrusivePtr<SW::Module> ModuleFactory::create(std::int8_t effectIndex);
+template void ModuleFactory::destroy(SW::Module const &);
 #else
 template LE::Utility::IntrusivePtr<SW::ModuleDSP> ModuleFactory::create(std::int8_t effectIndex);
+template void ModuleFactory::destroy(SW::ModuleDSP const &);
 #if LE_SW_GUI
 template LE::Utility::IntrusivePtr<SW::ModuleGUI> ModuleFactory::create(std::int8_t effectIndex);
+template void ModuleFactory::destroy(SW::ModuleGUI const &);
 #endif
 #endif
+
+/// \note The definition lived in moduleDSP.hpp, under a
+/// "//...mrmlj...for TalkBox4Unity" comment and with no `inline`. Every
+/// translation unit that included the header emitted the symbol, which suited
+/// a single-TU Unity build; making it inline instead just moved the problem,
+/// because a release build inlines it everywhere and emits no out-of-line copy
+/// for module.cpp and moduleChainImpl.cpp to call. It is an ordinary function
+/// in one translation unit now, which is what moduleDSPAndGUI.cpp does for the
+/// GUI build.
+///                                       (28.07.2026.) (SW port)
+#if !LE_SW_GUI
+namespace Engine
+{
+void intrusive_ptr_release_deleter(ModuleNode const *LE_RESTRICT const pModuleNode)
+{
+    ModuleFactory::destroy(actualModule<SW::ModuleDSP>(*pModuleNode));
+}
+} // namespace Engine
+#endif // !LE_SW_GUI
 
 //------------------------------------------------------------------------------
 } // namespace SW

@@ -554,8 +554,10 @@ template <class Effect> class ModuleDSP::Impl final : public ModuleEffectImpl<Ef
 #endif // _MSC_VER
 }; // class ModuleDSP::Impl
 
-//...mrmlj...assummes single inclusion...
-ModuleParameters::ParameterInfos const &ModuleParameters::parameterInfos()
+/// \note The comment here used to read "assummes single inclusion", and the
+/// assumption held only while core/modules/factory.cpp was the sole includer.
+///                                           (28.07.2026.) (SW port)
+inline ModuleParameters::ParameterInfos const &ModuleParameters::parameterInfos()
 {
     return Engine::Detail::ParametersInformation<ModuleParameters::BaseParameters>::data;
 }

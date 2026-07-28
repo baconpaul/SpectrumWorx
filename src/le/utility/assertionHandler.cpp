@@ -7,7 +7,12 @@
 /// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
-#if (!defined(NDEBUG) || defined(LE_PUBLIC_BUILD)) && defined(LE_ENABLE_ASSERT_HANDLER)
+/// \note Was ( !NDEBUG || LE_PUBLIC_BUILD ) && LE_ENABLE_ASSERT_HANDLER, but
+/// assert.hpp only declares assertionFailed() when the asserts themselves are
+/// live, which NDEBUG now decides. A public build that wants its asserts back
+/// asks for them with LE_CHECKED_BUILD=1.
+///                                           (28.07.2026.) (SW port)
+#if !defined(NDEBUG) && defined(LE_ENABLE_ASSERT_HANDLER)
 //------------------------------------------------------------------------------
 #include "platformSpecifics.hpp"
 #include "tchar.hpp"
@@ -33,6 +38,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <source_location>
 //------------------------------------------------------------------------------
 namespace LE
 {

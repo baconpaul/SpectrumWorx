@@ -703,7 +703,7 @@ and the `intrusive_ptr_add_ref`/`intrusive_ptr_release`/
 
 ---
 
-### Stage 3 — DSP core builds and is measured (macOS first) — *in progress*
+### Stage 3 — DSP core builds and is measured (macOS first) ✅
 
 **3–5 weeks.** The first stage where SpectrumWorx code compiles.
 
@@ -807,11 +807,76 @@ here, because the compiler confirms every single site.
   discarded one, where the hint can attach to nothing at all — are deleted
   everywhere.
 
-**3.6 — Golden fixtures.** For every one of the 57 effects, at two FFT sizes ×
+**✅ 3.6 — Golden fixtures.** For every one of the 57 effects, at two FFT sizes ×
 two overlap factors, render a fixed set of test signals (impulse, log sweep,
 pink noise, one short real excerpt) and commit the output. Store a compressed
 float dump plus a spectral summary; assert exact on same-platform and ~1e-4
 relative cross-platform.
+
+*Done: 464 fixtures — 58 chains (57 effects plus a bypassed one) × 4 signals ×
+2 configurations — in `tests/goldens/data/goldens.txt`, reproducing bit-exactly
+across runs. Three deviations, all deliberate.*
+
+- **A digest, not a float dump.** The raw matrix is ~30 MB of binary nobody can
+  review. Each row is an FNV-1a hash over the sample bits — the same-platform
+  contract — plus peak, RMS, DC offset, a non-finite count and eight
+  log-spaced band energies in dB, which is what a different architecture is
+  held to. 76 KB, and a diff that says *which* effect moved and roughly how.
+- **The fourth signal is synthetic.** "One short real excerpt" needs an audio
+  file this repository has no licence for, so `Voice` is a 40-harmonic stack
+  with three formants and 5 Hz vibrato: dense partials over a moving pitch,
+  which is what the pitch and phase-vocoder effects actually have to cope with.
+- **They render in a release build.** See below.
+
+#### What the golden harness found
+
+The engine cannot be instantiated without a derived class —
+`Engine::Processor::modules()` downcasts to `SpectrumWorxCore` — so 3.6 began
+by building one. Everything below is something that had to be fixed before a
+single effect would render, and none of it was reachable from the unit tests.
+
+- **The module deleter freed `malloc`'d storage with `delete`, on a base class
+  with a non-virtual destructor.** `ModuleFactory::create` `malloc`s and
+  placement-news the *derived* `Impl<Effect>`; both
+  `intrusive_ptr_release_deleter` overloads said `delete &module`. Mismatched
+  allocator, and the derived destructor would not have run either. There is a
+  matching `ModuleFactory::destroy` now, dispatched through the same
+  `switch_<ValidIndices>` the constructor uses. **This fires the moment any
+  module is removed from a chain**, which is to say constantly.
+- **The release build had never been compiled.** `LE_ASSERT` did not honour
+  `NDEBUG` on the handler path, and the tree assumes it does — in
+  `moduleChainImpl.cpp` an assert's operand is declared inside
+  `#ifndef NDEBUG`, and three lines below it a `dynamic_cast` operates on a
+  `ModuleNode` that is only polymorphic under `!NDEBUG`. `math.hpp` included
+  `span.hpp` under `#ifndef NDEBUG` while declaring functions over `Span`
+  unconditionally.
+- **`ModuleParameters::parameterInfos()` was a non-inline definition in a
+  header** — the comment above it read "assummes single inclusion" — and
+  `intrusive_ptr_release_deleter` was the same. Making the latter `inline`
+  papered over it in debug and broke in release, where it is inlined
+  everywhere and no out-of-line copy survives for `module.cpp` to call. Both
+  are ordinary functions in one translation unit now.
+- **`Math::modulo`'s sanity assert was wrong for every negative dividend.** It
+  compared against `std::fmod`, which truncates towards zero, while `modulo`
+  floors — deliberately, because that is what makes it usable for phase
+  mapping into [0, 2π). The two therefore differ by exactly `divisor` whenever
+  the dividend is negative. Phasevolution is the first effect to feed it one.
+- **The RNG could not be seeded reproducibly.** `rngSeed()` takes the clock and
+  a stack address, and `initialise()` and `reset()` both call it, so Freqverb
+  and Whisperer rendered differently every run. There is a
+  `rngSeed(std::uint64_t)` overload now — useful well beyond the tests, for any
+  reproducible render.
+
+> **One numerical weakness is recorded rather than fixed, and it is why the
+> goldens are a release-build artifact.** `Math::symmetricMovingAverage` keeps
+> a running sum across thousands of bins; over pink noise the accumulated
+> rounding drifts a hair below zero, so Smoother hands `amph2DFT()` a negative
+> "amplitude" and the debug verification assert fires. The audible effect is a
+> sign flip on a near-silent bin. Fixing it — a Kahan sum, or recomputing the
+> window periodically — changes DSP output, which is exactly what must not
+> happen in the commit that mints the baseline, and it belongs with the vector
+> primitives in **stage 4** regardless. Until then `[golden]` skips in a
+> checked build with that explanation, and the other 47 tests still run there.
 
 > **A caveat worth stating plainly:** these goldens capture *2016 source as
 > compiled by a 2026 toolchain*, not the behaviour of the 2016 binaries. Any
@@ -1177,7 +1242,7 @@ B takes 2 and 6 (Boost sweep, then GUI) and joins A on 7.
 | 0 | Purge and amputate ✅ | 1 |
 | 1 | Walking skeleton ✅ (CI, installers and signing deferred) | 1.5–2.5 |
 | 2 | Boost tier-1 sweep ✅ (CI wiring deferred) | 1–2 |
-| 3 | DSP core + goldens (3.1–3.4 ✅, sw-dsp builds) | 3–5 |
+| 3 | DSP core + goldens ✅ | 3–5 |
 | 4 | Portable SIMD/FFT + audio I/O | 2–3 |
 | 5 | CLAP host layer | 2.5–4 |
 | 6 | GUI | 4–6 |

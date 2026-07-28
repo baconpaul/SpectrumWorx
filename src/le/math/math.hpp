@@ -22,8 +22,6 @@
 #include "le/utility/intrinsics.hpp"
 #endif // LE_HAS_NT2
 
-#ifndef NDEBUG
-#endif // NDEBUG
 #include "le/utility/staticLog2.hpp"
 
 #if defined(__ARM_NEON__) || defined(__aarch64__)
@@ -33,16 +31,19 @@
 #ifndef BOOST_SIMD_HAS_SSE_SUPPORT
 #include <algorithm>
 #endif // BOOST_SIMD_HAS_SSE_SUPPORT
+/// \note span.hpp and <string> were included only #ifndef NDEBUG, but has()
+/// and verifyFPValues() are declared over Span unconditionally, so this header
+/// had never compiled in a release build.
+///                                           (28.07.2026.) (SW port)
+#include "le/utility/span.hpp"
+
 #include <cfloat>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <source_location>
-#include <type_traits>
-#ifndef NDEBUG
 #include <string>
-#include "le/utility/span.hpp"
-#endif // NDEBUG
+#include <type_traits>
 //------------------------------------------------------------------------------
 #if defined(_MSC_VER)
 namespace std
@@ -202,6 +203,12 @@ struct IsPowerOfTwo : std::integral_constant<bool, (1 << LE::Utility::staticLog2
 inline bool isNormalisedValue(float const value) { return (value >= 0) && (value <= 1); }
 
 void rngSeed();
+/// \brief Seeds deterministically. Five shipped effects draw from this RNG, so
+/// a reproducible render -- a golden fixture, a bug report, an A/B against a
+/// reference build -- needs the sequence pinned. rngSeed() itself takes the
+/// clock and a stack address.
+///                                       (28.07.2026.) (SW port)
+void rngSeed(std::uint64_t seed);
 
 float normalisedRand();
 
