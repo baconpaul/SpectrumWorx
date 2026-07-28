@@ -241,14 +241,14 @@ condition you can check, not a feeling.
 
 ---
 
-### Stage 0 — Purge and amputate
+### Stage 0 — Purge and amputate  🟡 *in progress*
 
 **~1 week. Nothing compiles at the start of this stage and nothing compiles at
 the end. That is the point:** every mechanical, whole-tree change is free while
 the build is already broken and the repo has no forks. Doing any of it later
 costs a rebuild and an unreviewable diff.
 
-**0.1 — Rewrite history. Do this before anything else is committed.**
+**✅ 0.1 — Rewrite history. Do this before anything else is committed.**
 
 ```sh
 git filter-repo --invert-paths \
@@ -261,17 +261,44 @@ Removes the Steinberg VST2 SDK and the committed 4096-bit RSA private key from
 every commit (scan §3.3, §8.1). Force-push. Every stage after this assumes the
 rewritten history — so it genuinely has to be first.
 
-**0.2 — Tag before you delete.** `git tag attic/2016-import` so nothing is
-irrecoverable. Three things in the delete list are worth *reading* first:
+> **Done.** All 6 commits rewritten; `aeffect.h`, `aeffectx.h` and all 7
+> `license_key/` files are absent from every ref. Note that filter-repo removes
+> the `origin` remote as a safety measure — re-add it and `push --force` (both
+> `main` and `--tags`).
+
+**✅ 0.2 — Tag before you delete.** `git tag attic/2016-import` so nothing is
+irrecoverable. Note that filter-repo rewrites tags too, so a tag made before 0.1
+will point at the rewritten commit and will *not* preserve the purged files —
+which is correct, but means the tag is a safety net for the deletions below, not
+for the purge. Three things in the delete list are worth *reading* first:
 `effects/_unfinished` (17 half-built effects, several interesting),
 `nt2/signal/static_fft.hpp` (appears to be Little Endian's own contribution to
 NT2 and may be faster than pffft), and `le/audioio/device/patchedRtAudio`.
 
-**0.3 — Delete.** Per scan §8.2 — nt2, audioio, licenser, license_key,
-`le/plugins/{vst,au,fmod,unity}`, `3rd_party/` entirely,
-`externals/boost/{hash,mmap,filesystem}`, `le/build/*.cmake`, the iOS/Android
-toolchains, the WiX/PackageMaker trees. Roughly 80 % of the files and 90 % of
-the bytes.
+**✅ 0.3 — Delete.** Per scan §8.2 — nt2, audioio, licenser, license_key,
+`3rd_party/` entirely, `externals/boost/{hash,mmap,filesystem}`,
+`le/build/*.cmake`, the iOS/Android toolchains, the WiX/PackageMaker trees.
+Roughly 80 % of the files and 90 % of the bytes.
+
+> **Done — 12,918 tracked files → 875.** Three deliberate retentions against the
+> list above:
+>
+> - **`le/plugins/{vst,au,fmod,unity}` kept for now.** They are the reference
+>   for the CLAP backend in stage 5 — `vst/2.4/plugin.inl` and `au/plugin.hpp`
+>   between them show how the framework's `ParameterIndex` and `ParameterID`
+>   selectors are wired, which is exactly what 5.1–5.4 have to reproduce. Delete
+>   them once `le/plugins/clap/` works.
+> - **`effects/_unfinished` kept** — 17 half-built effects, several worth
+>   finishing rather than discarding.
+> - **`nt2/signal/static_fft.hpp` and its six `details/` headers kept**, moved to
+>   `source/externals/nt2_static_fft/` with the `nt2/signal/…` include path
+>   preserved so `le/math/dft/fft.cpp` still resolves. Its header reads
+>   "Copyright 2012 - 2015 Domagoj Saric, Little Endian Ltd." over the LASMEA/LRI
+>   base under BSL-1.0, so it is substantially LE's own work and may well beat
+>   pffft. Its 286-line unit test came along too — currently the only test in the
+>   repository. It does **not** compile standalone (it still wants
+>   `boost/simd/*`); it is retained as source material for stage 4, not as a
+>   build target.
 
 **0.4 — Excise the licence manager** (scan §3.2) — it is `#if`-gated with a
 working `#else`, so this is mostly deleting branches. Includes removing the
@@ -762,28 +789,40 @@ B takes 2 and 6 (Boost sweep, then GUI) and joins A on 7.
 ## First week, concretely
 
 ```sh
-# 1. the irreversible thing, first
-git filter-repo --invert-paths \
+# ✅ 0. safety net — mirror backup, plus origin still holds the old history
+#       until you force-push
+git tag attic/2016-import
+git clone --mirror . ../SpectrumWorx-prefilter.git
+
+# ✅ 1. the irreversible thing
+git filter-repo --force --invert-paths \
   --path source/externals/le/plugins/vst/2.4/aeffect.h \
   --path source/externals/le/plugins/vst/2.4/aeffectx.h \
   --path-glob 'source/externals/le/license_key/*'
-git push --force-with-lease
+# filter-repo removes the remote; re-add before pushing
+git remote add origin git@github.com:baconpaul/SpectrumWorx
+git push --force origin main
+git push --force --tags
 
-# 2. safety net
-git tag attic/2016-import && git push --tags
+# ✅ 2. retain what's worth retaining out of the delete list
+git mv source/externals/nt2/modules/core/signal/include/nt2/signal/static_fft.hpp \
+       source/externals/nt2_static_fft/nt2/signal/
+# … plus details/, the unit test and the bench
 
-# 3. one commit per line, roughly
-git rm -r source/externals/nt2 source/externals/le/audioio 3rd_party
-git rm -r source/externals/le/{licenser,license_key}
-git rm -r source/externals/le/plugins/{vst,au,fmod,unity}
-git rm -r source/externals/boost installer/resources
-# … then §3.2's licence-manager excision, then the git mv to src/
+# ✅ 3. delete
+git rm -r source/externals/nt2 source/externals/le/audioio
+git rm -r source/externals/le/licenser source/externals/boost
+git rm -r 3rd_party installer/resources
+git rm    source/externals/le/build/*.cmake source/externals/le/build/iOSUniversalBuild.sh
+# le/plugins/{vst,au,fmod,unity} deliberately retained until stage 5
 
-# 4. mechanical sweeps, one commit each
+# 4. next: §3.2's licence-manager excision (0.4), then the git mv to src/ (0.5)
+
+# 5. mechanical sweeps, one commit each (0.6)
 scripts/to_utf8.sh ; scripts/fix_file_comments.py ; scripts/strip_pragma_once.sh
 clang-format -i $(git ls-files '*.cpp' '*.hpp' '*.inl')
 
-# 5. stage 1 starts
+# 6. stage 1 starts
 git submodule add https://github.com/juce-framework/JUCE libs/JUCE
 git -C libs/JUCE checkout 8.0.12
 ```

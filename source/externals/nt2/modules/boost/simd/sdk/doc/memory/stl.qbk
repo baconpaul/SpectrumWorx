@@ -1,7 +1,0 @@
-[section STL Compatibility]
-
-[include stl/new.qbk]
-[include stl/allocator.qbk]
-[include stl/iterator.qbk]
-[include stl/algorithm.qbk]
-[endsect]

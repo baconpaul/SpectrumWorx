@@ -1,8 +1,0 @@
-[part Getting Started
-  [quickbook 1.5]
-]
-
-[#getting_started]
-[xinclude started/setup.xml]
-[xinclude started/tutorial.xml]
-

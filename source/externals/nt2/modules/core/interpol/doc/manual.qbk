@@ -1,9 +1,0 @@
-[library Interpolation Toolbox
-  [quickbook 1.5]
-]
-
-[section Overview]
-This module provides implementation of various interpolation functions.
-[endsect]
-
-[xinclude reference.xml]
