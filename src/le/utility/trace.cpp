@@ -196,14 +196,14 @@ bool Tracer::setJavaCallback(JNIEnv &jni, jobject const callbackObject,
     userMessageMethod = jni.GetMethodID(callbackClass, callbackMethodName, "(Ljava/lang/String;)V");
     LE_ASSERT(userMessageMethod);
     userMessageObject = JNI::globalReference(callbackObject);
-    return LE_LIKELY(userMessageObject != nullptr);
+    return userMessageObject != nullptr;
 }
 #elif TARGET_OS_IPHONE
 bool Tracer::setObjCCallback(void (^newCallback)(NSString *message))
 {
     Block_release(userMessageCallback);
     userMessageCallback = Block_copy(newCallback);
-    return LE_LIKELY(userMessageCallback != nullptr);
+    return userMessageCallback != nullptr;
 }
 #endif // os
 

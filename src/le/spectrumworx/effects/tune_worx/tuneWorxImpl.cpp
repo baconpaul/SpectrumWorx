@@ -15,7 +15,6 @@
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
 #include "le/parameters/uiElements.hpp"
-#include "le/utility/ignoreUnused.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -102,7 +101,8 @@ namespace Detail
 {
 LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
-void LE_COLD TuneWorxBaseImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
+void LE_COLD TuneWorxBaseImpl::setup(IndexRange const &,
+                                     [[maybe_unused]] Engine::Setup const &engineSetup)
 {
     // Tones:
     {
@@ -213,7 +213,6 @@ void LE_COLD TuneWorxBaseImpl::setup(IndexRange const &, Engine::Setup const &en
 
         std::int8_t const userBypassedTones(pos - userNumTones);
 #else
-        LE::Utility::ignoreUnused(engineSetup);
         if (parameters().get<Semi01>())
         {
             userTones[pos++] = 0;
@@ -324,11 +323,7 @@ LE_HOT TuneWorxBaseImpl::findNewPitchScale(Engine::ChannelData_AmPh const &data,
     if (userScale_.numberOfTones() == 0)
         return pitchShift_ * vibratoPitch;
 
-// Current pitch:
-#ifdef LE_MELODIFY_SDK_BUILD
-    LE::Utility::ignoreUnused(data);
-    LE::Utility::ignoreUnused(engineSetup);
-#endif // LE_MELODIFY_SDK_BUILD
+    // Current pitch:
     float const pitch(
 #if defined(LE_MELODIFY_SDK_BUILD)
         Detail::melodifyFixedPitch

@@ -502,9 +502,9 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
             return true;
         }
 
-        if (LE_LIKELY(
-                this->allocateStorage(factors, channelStatesHolder_.sizeOfChannelState,
-                                      channelStatesHolder_.channelStateRequiredStorage(factors))))
+        if (this->allocateStorage(factors, channelStatesHolder_.sizeOfChannelState,
+                                  channelStatesHolder_.channelStateRequiredStorage(factors)))
+            [[likely]]
         {
             channelStatesHolder_.resize(this->storage(), factors);
             ModuleEffectImpl<Effect, Base>::reset();

@@ -14,7 +14,6 @@
 #include "platformSpecifics.hpp"
 
 #include "assert.hpp"
-#include "ignoreUnused.hpp"
 
 #include <atomic>
 #include <cstdint>
@@ -60,7 +59,6 @@ struct ReferenceCount : Detail::counter_t
     {
         auto const result(fetch_sub(1, std::memory_order_acq_rel) - 1);
         LE_ASSUME(result >= 0);
-        LE_UNLIKELY(result == 0);
         return static_cast<std::uint8_t>(result);
     }
 #ifdef __clang__
@@ -70,10 +68,9 @@ struct ReferenceCount : Detail::counter_t
 #pragma warning(pop)
 #endif // _MSC_VER
 
-    void verifyCountEqual(value_type const value)
+    void verifyCountEqual([[maybe_unused]] value_type const value)
     {
         LE_ASSERT(this->load(std::memory_order_seq_cst) == value);
-        LE::Utility::ignoreUnused(value);
     }
 }; // class ReferenceCount
 

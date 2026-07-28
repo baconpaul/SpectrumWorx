@@ -28,7 +28,6 @@
 #include "le/utility/stackBuffer.hpp"
 
 #include "le/utility/assert.hpp"
-#include "le/utility/ignoreUnused.hpp"
 
 #if defined(_WIN32) && !defined(_XBOX)
 #include <windows.h> // CRITICAL_SECTION
@@ -334,8 +333,9 @@ bool SpectrumWorxCore::checkChannelConfiguration(std::uint8_t const numberOfInpu
     return canDoIt;
 }
 
-void SpectrumWorxCore::updateInputModeForIOConfig(std::uint8_t const numberOfMainChannels,
-                                                  std::uint8_t const numberOfSideChannels)
+void SpectrumWorxCore::updateInputModeForIOConfig(
+    [[maybe_unused]] std::uint8_t const numberOfMainChannels,
+    [[maybe_unused]] std::uint8_t const numberOfSideChannels)
 {
 #if LE_SW_ENGINE_INPUT_MODE >= 1
     InputMode &inputMode(parameters().get<InputMode>());
@@ -356,8 +356,6 @@ void SpectrumWorxCore::updateInputModeForIOConfig(std::uint8_t const numberOfMai
     default: /*custom*/
         break;
     }
-#else
-    LE::Utility::ignoreUnused(numberOfMainChannels, numberOfSideChannels);
 #endif
 }
 

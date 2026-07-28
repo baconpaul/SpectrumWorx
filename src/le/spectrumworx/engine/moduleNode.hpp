@@ -72,7 +72,7 @@ void intrusive_ptr_release_deleter(ModuleNode const *);
 inline void intrusive_ptr_release(ModuleNode const *LE_RESTRICT const pModuleNode)
 {
     LE_ASSUME(pModuleNode);
-    if (LE_UNLIKELY(!--pModuleNode->referenceCount_))
+    if (!--pModuleNode->referenceCount_) [[unlikely]]
     {
 #if LE_SW_SEPARATED_DSP_GUI
         static_assert(__has_virtual_destructor(ModuleNode),

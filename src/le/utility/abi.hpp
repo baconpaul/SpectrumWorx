@@ -41,8 +41,6 @@
 #define LE_LIKELY(expression) (expression)
 #define LE_UNLIKELY(expression) (expression)
 
-#define LE_CURRENT_FUNCTION __FUNCSIG__
-
 #elif defined(__GNUC__)
 
 #if __cplusplus < 201103L
@@ -70,8 +68,6 @@
 #define LE_LIKELY(expression) __builtin_expect(!!(expression), 1)
 #define LE_UNLIKELY(expression) __builtin_expect(!!(expression), 0)
 
-#define LE_CURRENT_FUNCTION __PRETTY_FUNCTION__
-
 #else
 
 #error LE unsupported compiler
@@ -80,11 +76,10 @@
 
 // Byte order, previously taken from boost/detail/endian.hpp. Preprocessor
 // macros rather than std::endian because the call sites are #if's.
-#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-#define LE_BIG_ENDIAN
-#else
-#define LE_LITTLE_ENDIAN
-#endif
+/// \note LE_BIG_ENDIAN and LE_LITTLE_ENDIAN used to be defined here, from
+/// __BYTE_ORDER__. The four sites that consulted them now use std::endian,
+/// which does not need every one of them to be a preprocessor branch.
+///                                           (28.07.2026.) (SW port)
 
 // Language feature detection, previously taken from boost/config.hpp.
 #if !defined(__cpp_exceptions) && !defined(_CPPUNWIND) && !defined(__EXCEPTIONS)

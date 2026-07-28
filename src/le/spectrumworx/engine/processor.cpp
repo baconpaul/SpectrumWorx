@@ -442,7 +442,7 @@ void Processor::processSingleChannel(ProcessParameters const &processParameters)
 #ifndef LE_SW_PURE_ANALYSIS
         std::uint16_t const availableOutputData(channelBuffers.readyOutputDataSize());
         std::uint16_t const sizeToProduce(sizeToConsume);
-        if (LE_UNLIKELY(sizeToProduce > availableOutputData))
+        if (sizeToProduce > availableOutputData) [[unlikely]]
         {
             // We have just started processing and the latency time has not yet
             // passed so we do not have enough data and therefore simply zero

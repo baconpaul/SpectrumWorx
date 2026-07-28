@@ -14,6 +14,7 @@
 #include "le/math/constants.hpp"
 #include "le/utility/intrinsics.hpp"
 
+#include <bit>
 #include <cmath>
 //------------------------------------------------------------------------------
 namespace LE
@@ -31,13 +32,13 @@ LE_IMPL_NAMESPACE_BEGIN(Math)
 bool makeBool(unsigned int const boolean)
 {
     LE_ASSERT_MSG(boolean == 0 || boolean == 1, "Boolean value not exactly 0 or 1");
-#if defined(LE_LITTLE_ENDIAN)
-    bool const &result(reinterpret_cast<bool const &>(boolean));
-#elif defined(LE_BIG_ENDIAN)
-    typedef unsigned char bytes[sizeof(boolean)];
-    bytes const &input_bytes(reinterpret_cast<bytes const &>(boolean));
-    bool const &result(reinterpret_cast<bool const &>(input_bytes[sizeof(boolean) - 1]));
-#endif // LE_LITTLE_ENDIAN
+    /// \note Was #if LE_LITTLE_ENDIAN / #elif LE_BIG_ENDIAN, which left the
+    /// result uninitialised on a hypothetical third answer.
+    ///                                   (28.07.2026.) (SW port)
+    using Bytes = unsigned char[sizeof(boolean)];
+    auto const &bytes(reinterpret_cast<Bytes const &>(boolean));
+    bool const &result(reinterpret_cast<bool const &>(
+        bytes[(std::endian::native == std::endian::little) ? 0 : sizeof(boolean) - 1]));
     LE_ASSERT(static_cast<unsigned int>(result) == boolean);
     return result;
 }

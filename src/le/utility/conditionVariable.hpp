@@ -160,7 +160,7 @@ class ConditionVariable
         auto const result(::pthread_cond_timedwait(&cv_, &lock.mutex_, &timeout));
 #endif
         LE_ASSERT(result == 0 || result == ETIMEDOUT);
-        return LE_LIKELY(result == 0);
+        return result == 0;
     }
 
   private:
@@ -207,7 +207,7 @@ class WaitableWithSharedLock
         }
         bool const result(signaled_);
         signaled_ = false;
-        return LE_LIKELY(result);
+        return result;
     }
 
   private:

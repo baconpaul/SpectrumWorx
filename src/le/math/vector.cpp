@@ -155,9 +155,8 @@ LE_FAST_MATH_ON()
 // unsigned int so we assert here that it is safe to do a pointer
 // reinterpret_cast.
 //                                        (17.05.2011.) (Domagoj Saric)
-#ifdef LE_BIG_ENDIAN
-static_assert(sizeof(unsigned int) == sizeof(int), "Unexpected data sizes");
-#endif // LE_LITTLE_ENDIAN
+static_assert((std::endian::native == std::endian::little) || (sizeof(unsigned int) == sizeof(int)),
+              "Unexpected data sizes");
 
 #if (TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR || (__MAC_OS_X_VERSION_MAX_ALLOWED >= __MAC_10_9))
 #include "Accelerate/Accelerate.h"
@@ -177,6 +176,7 @@ static_assert(sizeof(unsigned int) == sizeof(int), "Unexpected data sizes");
 #include "le/utility/assert.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <functional>
 #include <numeric>

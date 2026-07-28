@@ -28,7 +28,6 @@
 
 #if defined(__ARM_NEON__) || defined(__aarch64__)
 #include "arm_neon.h"
-#include "le/utility/ignoreUnused.hpp"
 #endif // __ARM_NEON__
 
 #ifndef BOOST_SIMD_HAS_SSE_SUPPORT
@@ -38,6 +37,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <source_location>
 #include <type_traits>
 #ifndef NDEBUG
 #include <string>
@@ -414,44 +414,42 @@ template <unsigned FPClasses> unsigned int has(LE::Utility::Span<float const> co
 }
 
 template <unsigned FPClasses>
-void verifyFPValues(float const *const pRange, std::size_t const rangeSize,
-                    char const *const valueName, char const *const function, char const *const file,
-                    long const line)
+void verifyFPValues(
+    [[maybe_unused]] float const *const pRange, [[maybe_unused]] std::size_t const rangeSize,
+    [[maybe_unused]] char const *const valueName,
+    [[maybe_unused]] std::source_location const &location = std::source_location::current())
 {
-#ifdef NDEBUG
-    LE::Utility::ignoreUnused(pRange && rangeSize && valueName);
-#else
+#ifndef NDEBUG
 #ifdef LE_ENABLE_ASSERT_HANDLER
 #define LE_AUX_VERIFY_FP_VALUES_FAILURE(...) LE::Utility::assertionFailed(__VA_ARGS__)
 #else
-#define LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, errorString, function, file, line)              \
+#define LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, errorString, location)                          \
     LE_ASSERT_MSG(false, (std::string(errorString " @ ") + valueName).c_str())
 #endif // LE_ENABLE_ASSERT_HANDLER
     unsigned int const fpClasses(has<FPClasses>(pRange, rangeSize));
     if (fpClasses & FPClasses & NaN)
-        LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, "NaN value found", function, file, line);
+        LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, "NaN value found", location);
     if (fpClasses & FPClasses & Infinity)
-        LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, "Infinite value found", function, file, line);
+        LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, "Infinite value found", location);
     if (fpClasses & FPClasses & Positive)
-        LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, "Positive value found", function, file, line);
+        LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, "Positive value found", location);
     if (fpClasses & FPClasses & Negative)
-        LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, "Negative value found", function, file, line);
+        LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, "Negative value found", location);
     if (fpClasses & FPClasses & Normalised)
-        LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, "Normalised value found", function, file, line);
+        LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, "Normalised value found", location);
     if (fpClasses & FPClasses & Denormalised)
-        LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, "Denormalised value found", function, file,
-                                        line);
+        LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, "Denormalised value found", location);
     if (fpClasses & FPClasses & Zero)
-        LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, "Zero value found", function, file, line);
+        LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, "Zero value found", location);
 #undef LE_AUX_VERIFY_FP_VALUES_FAILURE
 #endif // NDEBUG
 }
 
 template <unsigned FPClasses>
 void verifyFPValues(LE::Utility::Span<float const> const &range, char const *const valueName,
-                    char const *const function, char const *const file, long const line)
+                    std::source_location const &location = std::source_location::current())
 {
-    return verifyFPValues<FPClasses>(range.begin(), range.size(), valueName, function, file, line);
+    return verifyFPValues<FPClasses>(range.begin(), range.size(), valueName, location);
 }
 
 #ifdef NDEBUG
@@ -460,8 +458,7 @@ void verifyFPValues(LE::Utility::Span<float const> const &range, char const *con
 #endif // LE_MATH_VERIFY_VALUES
 #else
 #define LE_MATH_VERIFY_VALUES(fpClasses, range, valueName)                                         \
-    /*::LE::*/ Math::verifyFPValues<fpClasses>(range, valueName, LE_CURRENT_FUNCTION, __FILE__,    \
-                                               __LINE__)
+    /*::LE::*/ Math::verifyFPValues<fpClasses>(range, valueName)
 #endif // NDEBUG
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -629,7 +626,7 @@ LE_FORCEINLINE std::int32_t round(float const floatingPointValue)
 #if 1
     std::int32_t const integerValue(floatingPointValue +
                                     __builtin_copysignf(0.5f, floatingPointValue));
-#elif 0 && defined(LE_LITTLE_ENDIAN)
+#elif 0 // was: little endian magic-number rounding
     double constexpr magic(
         (1ULL << 52) *
         1.5); //...mrmlj...float( 1<<23 ) should work/be enough for positive numbers...
@@ -667,7 +664,7 @@ LE_FORCEINLINE int round(double const floatingPointValue)
     return static_cast<int>(::__builtin_lrint(floatingPointValue));
 #elif defined(_XBOX)
     return __frnd(floatingPointValue);
-#elif defined(LE_LITTLE_ENDIAN)
+#elif 1 //...mrmlj...was LE_LITTLE_ENDIAN; the union below is byte-order dependent
     double const magic((1ULL << 52) * 1.5);
     union
     {

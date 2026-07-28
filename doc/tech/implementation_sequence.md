@@ -656,15 +656,15 @@ ship unexamined.**
 
 | Added | Sites | Should become | Stage |
 |---|---:|---|---|
-| `le/utility/ignoreUnused.hpp` | 50 | `[[maybe_unused]]` on the declaration; `static_cast<void>()` for the two odr-use sites | 3 |
+| `le/utility/ignoreUnused.hpp` | 50 | `[[maybe_unused]]` on the declaration; `static_cast<void>()` for the two odr-use sites | 3 ✅ in `sw-dsp`, 5–6 elsewhere |
 | `le/utility/span.hpp` | ~90 | `std::span` | 3–4 |
-| `le/utility/staticLog2.hpp` | 20 | `std::bit_width(x) - 1` inline at the call sites | 3 |
+| `le/utility/staticLog2.hpp` | 20 | **keep** — it defines `0 → 0`, which `IsPowerOfTwo<0>` needs and `std::bit_width` does not | — |
 | `le/utility/polymorphicDowncast.hpp` | 15 | probably stays | — |
 | `le/utility/intrusivePtr.hpp` | 30 | *see below* — not obviously `std::shared_ptr` | 5 |
-| `LE_LIKELY` / `LE_UNLIKELY` (abi.hpp) | 50 | `[[likely]]`/`[[unlikely]]` where the site is a statement, delete where it is a no-op | 3 |
-| `LE_CURRENT_FUNCTION` (abi.hpp) | 2 | `std::source_location` in the assert handler | 3 |
+| `LE_LIKELY` / `LE_UNLIKELY` (abi.hpp) | 50 | `[[likely]]`/`[[unlikely]]` where the site is a statement, delete where it is a no-op | 3 ✅ in `sw-dsp`, 5–6 elsewhere |
+| `LE_CURRENT_FUNCTION` (abi.hpp) | 2 | `std::source_location` in the assert handler | 3 ✅ |
 | `le/utility/stackBuffer.hpp` | 18 files | keep — alloca has no standard spelling | — |
-| `LE_LITTLE_ENDIAN` / `LE_BIG_ENDIAN` (abi.hpp) | 7 | `if constexpr (std::endian::native == …)`; the sites are `#if` only because Boost's were | 3 |
+| `LE_LITTLE_ENDIAN` / `LE_BIG_ENDIAN` (abi.hpp) | 7 | `if constexpr (std::endian::native == …)`; the sites are `#if` only because Boost's were | 3 ✅ |
 | `LE_NO_RTTI` / `LE_NO_EXCEPTIONS` (abi.hpp) | few | keep; they are compiler feature detection, not a Boost artefact | — |
 | `LE_ASSERT` family (assert.hpp) | ~1200 | keep; revisit only if the handler should route to the DAW log | 9 |
 
@@ -773,12 +773,39 @@ generated and so no longer consistent by construction.*
 > `"N/A"`, which is not a usable preset key. Stage 7 owns giving them the real
 > names, which are sitting commented out beside each.
 
-**3.5b — Retire the stage 2 shims that first compile validates.** Per §2.1:
+**✅ 3.5b — Retire the stage 2 shims that first compile validates.** Per §2.1:
 `ignoreUnused` → `[[maybe_unused]]`, `staticLog2` → `std::bit_width`,
 `LE_LIKELY`/`LE_UNLIKELY` → `[[likely]]`/`[[unlikely]]` or nothing,
 `LE_{LITTLE,BIG}_ENDIAN` → `if constexpr (std::endian::native …)`,
 `LE_CURRENT_FUNCTION` → `std::source_location`. Each is cheap here and only
 here, because the compiler confirms every single site.
+
+*Done, with two revisions to §2.1 that only the compiler could have prompted.*
+
+- **`LE_CURRENT_FUNCTION` and the endianness macros are gone outright.**
+  `assertionFailed` and `Math::verifyFPValues` now take a defaulted
+  `std::source_location`, which subsumes `__FILE__` and `__LINE__` as well —
+  and firing an assert deliberately proves the whole path works, which is not
+  something that could be said of it before this stage.
+  `makeBool`'s `#if LE_LITTLE_ENDIAN / #elif LE_BIG_ENDIAN` left `result`
+  *uninitialised* on any third answer; it now indexes with `std::endian`.
+- **`staticLog2` stays, and §2.1 was wrong to say otherwise.** Inlining
+  `std::bit_width(x) - 1` at the twenty call sites would drop the `0 → 0` case
+  that `IsPowerOfTwo<0>` depends on — `bit_width(0) - 1` is `-1`, and the shift
+  that follows is UB — and it would need every argument widened by hand. The
+  shim is a better API than the expression it wraps: it names the operation and
+  defines the edge. Keep it.
+- **`ignoreUnused` and the branch hints are done where the compiler can see
+  them, and only there.** The justification for doing this in 3.5b was
+  "the compiler confirms every single site", and that holds for the ~60% of
+  sites inside `sw-dsp`'s translation units. It does not hold for
+  `le/plugins/{vst,au,fmod,unity}`, `gui/`, `filesystemAndroid.cpp`,
+  `presets.cpp` or the three unshipped effects, none of which compile yet.
+  Converting those blind is exactly the mistake stage 2 warned about, so the
+  two headers stay and **stages 5 and 6 finish them as their files start
+  compiling.** The no-op uses — the macro wrapping a `return` expression or a
+  discarded one, where the hint can attach to nothing at all — are deleted
+  everywhere.
 
 **3.6 — Golden fixtures.** For every one of the 57 effects, at two FFT sizes ×
 two overlap factors, render a fixed set of test signals (impulse, log sweep,

@@ -163,7 +163,7 @@ LE_HOT void TalkingWindImpl::process(Engine::MainSideChannelData_AmPh data,
     }
 #endif // NDEBUG
 
-    if (LE_LIKELY(skippedLeadingBins == 0 && data.endBin() > 1))
+    if (skippedLeadingBins == 0 && data.endBin() > 1) [[likely]]
     {
         /// \note Avoid passing the DC through. This primitive approach is far
         /// from ideal as the DC component can leak into the neighbouring bins

@@ -20,7 +20,6 @@
 #include "le/parameters/parameter.hpp" //...mrmlj...for Default
 
 #include "le/utility/assert.hpp"
-#include "le/utility/ignoreUnused.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -63,10 +62,9 @@ template <bool defaultValue = false> struct BooleanParameterTraits
 
     static unsigned char const discreteValueDistance = 1;
 
-    static bool isValidValue(value_type const value)
+    static bool isValidValue([[maybe_unused]] value_type const value)
     {
         LE_ASSERT((value == false) || (value == true));
-        LE::Utility::ignoreUnused(value);
         return true;
     }
 

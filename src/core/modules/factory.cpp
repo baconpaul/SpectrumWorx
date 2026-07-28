@@ -172,7 +172,7 @@ LE::Utility::IntrusivePtr<ModuleInterface> ModuleFactory::create(std::int8_t con
         effectIndex, SizeGetter(), assert_no_default_case<typename SizeGetter::result_type>()));
     void *const pStorage(std::malloc(storageSize));
 
-    if (LE_UNLIKELY(!pStorage))
+    if (!pStorage) [[unlikely]]
         return nullptr;
 
     using Constructor = ModuleConstructor<ModuleInterface>;

@@ -159,7 +159,7 @@ Plugins::AutomatedParameterValue getAutomatedLFOParameter(std::uint8_t const par
                                                           ModuleParameters const &module)
 {
     //...mrmlj...LE_ASSUME( parameterIndex < ( Constants::maxNumberOfParametersPerModule - 1 /*Bypass*/ ) );
-    if (LE_UNLIKELY(parameterIndex >= module.numberOfLFOControledParameters()))
+    if (parameterIndex >= module.numberOfLFOControledParameters()) [[unlikely]]
         return getDefaultAutomatedLFOParameter<AutomatedParameter>(lfoParameterIndex);
 
     return LE::Parameters::invokeFunctorOnIndexedParameter(

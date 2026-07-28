@@ -14,9 +14,6 @@
 #include "trace.hpp"
 
 #include "assert.hpp"
-#ifdef LE_PUBLIC_BUILD
-#include "ignoreUnused.hpp"
-#endif // LE_PUBLIC_BUILD
 
 #if defined(__ANDROID__)
 #include "android/log.h"
@@ -153,10 +150,13 @@ void breakIntoDebugger()
     disable                                                                                        \
     : 4996) // 'itoa': The POSIX name for this item is deprecated. Instead, use the ISO C++ conformant name: _itoa.
 
-static LE_NOINLINE void assertionFailedMsgAux(char const *const expression,
-                                              char const *const message, char const *const function,
-                                              char const *const file, long const line)
+static
+    LE_NOINLINE void assertionFailedMsgAux([[maybe_unused]] char const *const expression,
+                                           char const *const message,
+                                           [[maybe_unused]] char const *const function,
+                                           [[maybe_unused]] char const *const file, long const line)
 {
+
     bool ignore;
 
     char fullMessage[4096] = {0};
@@ -164,9 +164,6 @@ static LE_NOINLINE void assertionFailedMsgAux(char const *const expression,
 #ifdef LE_PUBLIC_BUILD // not to leak too much information to beta testers...
     std::strcpy(fullMessage, message);
     std::strcat(fullMessage, " (");
-    LE::Utility::ignoreUnused(expression);
-    LE::Utility::ignoreUnused(function);
-    LE::Utility::ignoreUnused(file);
 #else
     if (message != expression)
     {
@@ -222,16 +219,13 @@ namespace LE
 namespace Utility
 {
 LE_WEAK_FUNCTION void assertionFailed(char const *const expression, char const *const message,
-                                      char const *const function, char const *const file,
-                                      long const line)
+                                      std::source_location const &location)
 {
 #ifdef LE_PUBLIC_BUILD // not to leak too much information to beta testers...
-    assertionFailedMsgAux(nullptr, message, nullptr, nullptr, line);
-    LE::Utility::ignoreUnused(expression);
-    LE::Utility::ignoreUnused(function);
-    LE::Utility::ignoreUnused(file);
+    assertionFailedMsgAux(nullptr, message, nullptr, nullptr, location.line());
 #else
-    assertionFailedMsgAux(expression, message, function, file, line);
+    assertionFailedMsgAux(expression, message, location.function_name(), location.file_name(),
+                          location.line());
 #endif // LE_PUBLIC_BUILD
 }
 } // namespace Utility

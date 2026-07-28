@@ -9,7 +9,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #include "shared.hpp"
-#include "le/utility/ignoreUnused.hpp"
 //------------------------------------------------------------------------------
 #include "le/math/constants.hpp"
 #include "le/math/conversion.hpp"
@@ -296,13 +295,12 @@ void LE_NOINLINE PitchShifter::process(ChannelState &channelState,
 
 namespace
 {
-void verifyDCPhase(float const phase)
+void verifyDCPhase([[maybe_unused]] float const phase)
 {
     // Implementation note:
     //   Valid phases for the DC bin are 0, Pi and - Pi.
     //                                    (04.06.2010.) (Domagoj Saric)
     LE_ASSERT_MSG(phase == 0 || phase == Math::Constants::pi, "Invalid DC phase.");
-    LE::Utility::ignoreUnused(phase);
 }
 
 float LE_FORCEINLINE mapTo2PiInterval(float const &phase)

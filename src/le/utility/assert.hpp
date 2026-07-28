@@ -17,7 +17,9 @@
 //------------------------------------------------------------------------------
 #include "abi.hpp"
 
-#ifndef LE_ENABLE_ASSERT_HANDLER
+#ifdef LE_ENABLE_ASSERT_HANDLER
+#include <source_location>
+#else
 #include <cassert>
 #endif // LE_ENABLE_ASSERT_HANDLER
 //------------------------------------------------------------------------------
@@ -32,13 +34,16 @@ namespace Utility
 
 /// Defined in assertionHandler.cpp. Never returns unless the user chooses to
 /// ignore, which only the Windows and JUCE message boxes offer.
-void assertionFailed(char const *expression, char const *message, char const *function,
-                     char const *file, long line);
+///
+/// \note The function, file and line used to be LE_CURRENT_FUNCTION, __FILE__
+/// and __LINE__ threaded through the macro. std::source_location::current()
+/// captures all three at the call site as a defaulted argument.
+///                                       (28.07.2026.) (SW port)
+void assertionFailed(char const *expression, char const *message,
+                     std::source_location const &location = std::source_location::current());
 
 #define LE_ASSERT_MSG(expression, message)                                                         \
-    (LE_LIKELY(expression) ? static_cast<void>(0)                                                  \
-                           : ::LE::Utility::assertionFailed(                                       \
-                                 #expression, message, LE_CURRENT_FUNCTION, __FILE__, __LINE__))
+    ((expression) ? static_cast<void>(0) : ::LE::Utility::assertionFailed(#expression, message))
 #define LE_ASSERT(expression) LE_ASSERT_MSG(expression, #expression)
 #define LE_VERIFY LE_ASSERT
 #define LE_VERIFY_MSG LE_ASSERT_MSG
