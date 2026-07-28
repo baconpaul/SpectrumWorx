@@ -17,6 +17,11 @@ set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" PARENT_SCOPE)
 add_library(simde INTERFACE)
 target_include_directories(simde INTERFACE simde)
 
+# TEMPORARY — the preset parser until stage 8 swaps it for tinyxml2. Header
+# only, vendored; see rapidxml/README.md.
+add_library(rapidxml INTERFACE)
+target_include_directories(rapidxml INTERFACE rapidxml)
+
 add_subdirectory(fmt EXCLUDE_FROM_ALL)
 
 add_subdirectory(clap/clap EXCLUDE_FROM_ALL)

@@ -58,5 +58,6 @@ message(STATUS "SpectrumWorx version: ${GIT_IMPLIED_DISPLAY_VERSION} (${GIT_BRAN
 set(JUCE_PATH "${CMAKE_SOURCE_DIR}/libs/JUCE")
 
 add_subdirectory(libs)
+include(temporary-boost) # delete with stage 7 — see the file
 add_subdirectory(src)
 add_subdirectory(src/clap-first)
