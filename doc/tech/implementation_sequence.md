@@ -104,12 +104,15 @@ src/
     plugins/{plugin.hpp, clap/}
   nt2_static_fft/           retained NT2 static_fft (reference for stage 4)
 assets/
-  skin/                     67 PNGs, was installer/ProgramFolder/Resources
+  CMakeLists.txt            cmrc_add_resource_library(sw-skin) — stage 6.3
+  skin/                     59 PNGs + 2 fonts, was installer/…/Resources
   presets/                  15 factory banks
   samples/
 tests/
   CMakeLists.txt            sw-tests (Catch2)
   golden/                   committed DSP fixtures
+tools/
+  show-ui/                  sw-show-ui, the stage 6 GUI harness
 scripts/
 doc/
   tech/                     these documents
@@ -1083,6 +1086,36 @@ VST3, AUv2 and standalone all behave identically.
 **4–6 weeks.** The largest stage, and the one that is identical under either
 plugin-format decision.
 
+**6.0 — The harness, first.** `tools/show-ui/` — `sw-show-ui`, a desktop window
+that hosts GUI code with no plugin, no host and no audio under it. Everything
+else in this stage is built and looked at through it, which is what keeps the
+stage off the critical path (see "Sequencing", below: 6 runs against stage 1,
+not stage 5).
+
+Pages self-register from their own translation unit, so a widget becomes
+viewable when *it* compiles rather than when the editor does, and a page whose
+sources are not ready is simply left out of the target:
+
+```sh
+sw-show-ui                          # the default page, in a window
+sw-show-ui --list                   # what there is
+sw-show-ui skin                     # a named page
+sw-show-ui --render skin out.png    # offscreen; no window server needed
+```
+
+`--render` is not a convenience. CI has no display and neither does a sandboxed
+agent, and a GUI you cannot look at is a GUI you cannot review: it paints the
+page into a `juce::Image` and writes a PNG, which is also the hook a rendering
+regression test will need later.
+
+Deliberately **not** `juce_add_gui_app()`: `add_clap_juce_shim()` sets
+`JUCE_MODULES_ONLY`, under which JUCE's top-level `CMakeLists.txt` returns
+before `JUCEUtils.cmake` is included, so none of the `juce_add_*` helpers exist
+on this route. A plain `add_executable` plus `START_JUCE_APPLICATION` is all a
+JUCE GUI app actually is. `main()` is written out rather than left to the macro,
+so that `--render` can run before `JUCEApplicationBase::main()` creates an
+`NSApplication` it does not need.
+
 **6.1** JUCE 8 API drift, per scan §1.3 — `String::empty`, `Image::null`,
 `ScopedPointer`, `ButtonListener`/`SliderListener`, the deprecated `Font`
 constructors. A few days of grinding; the volume is small.
@@ -1090,11 +1123,59 @@ constructors. A few days of grinding; the volume is small.
 **6.2** `class Theme : juce::LookAndFeel` → `LookAndFeel_V4`. `LookAndFeel` has
 eight pure virtuals in JUCE 8 and is no longer directly derivable.
 
-**6.3 — Assets.** `assets/skin/*.png` → a CMakeRC resource library;
-`resourceBitmap()` reads from `cmrc` instead of disk. This deletes
-`GUI::initializePaths()`, `SpectrumWorx.paths`, `mapPathsFile()`, `boost::mmap`
-and `resourcesPath()` — i.e. the plugin stops requiring the installer to have
-run in order to start.
+**6.3 — Assets.** ✅ *complete*. `assets/skin/*` is a CMakeRC resource library
+(`sw::skin`, rooted at `assets/` so stage 8's presets and samples can join it),
+and `src/gui/resources.{hpp,cpp}` is the new accessor. `sw-gui-resources` is the
+first of three GUI layers; the other two are `sw-gui-widgets` and `sw-gui`.
+
+Four things changed beyond "read from memory instead of disk":
+
+- **The enum values were multi-character literals.** `EditorBackground = '01'`,
+  taken apart by `boost::mpl::string` to recover the two digits of the file
+  name. Multi-character literals have an implementation-defined value and the
+  only thing ever wanted from them was the number, so they are the number now.
+  Call sites are unchanged. This is the same problem as 7.3's `Unit<' dB'>`,
+  and one of the two `boost/mpl` uses outside `le/parameters`.
+- **The list is an X-macro** (`LE_SW_RESOURCE_BITMAP_LIST`), like
+  `LE_SW_EFFECT_LIST`, so `tests/gui/skinTests.cpp` can walk it and assert every
+  named bitmap is in the binary. A mistyped number was previously a blank widget
+  nobody notices until someone looks at a screenshot.
+- **The cache is releasable.** 2016 kept one function-local `static juce::Image`
+  per template instantiation — ~57 images that could not be freed and outlived
+  the JUCE that allocated them. It is one array now, plus
+  `releaseCachedResources()`. JUCE's leak detector catches the difference
+  immediately, which is how this was found.
+- **The macOS gamma correction is gone.** The loader ran an in-place
+  `pow(x, 2.2/1.8)` over every byte of every bitmap on macOS, converting artwork
+  authored for a PC's 2.2 gamma to the Mac's 1.8. Apple moved macOS to 2.2 in
+  Snow Leopard, in 2009 — so it was already wrong when this shipped, and it
+  darkens the skin on every Mac since while Windows, which never did it, does
+  not. It also walked the buffer a byte at a time with no regard for pixel
+  stride, gamma-correcting the *alpha* channel along with the colour. **This
+  changes how the plugin looks on macOS**, to what the artwork says.
+
+Fonts stopped being an OS concern entirely: 2016 registered `Vera.ttf` /
+`VeraBd.ttf` with the system (`AddFontResourceEx` on Windows,
+`CTFontManagerRegisterFontsForURL` on macOS) and then referred to them by family
+name — which needed a file on disk, leaked the registration if the plugin was
+unloaded abruptly, and let a system font of the same name win. JUCE 8's
+`Typeface::createSystemTypefaceFor(void const *, size_t)` takes the bytes. That
+also deletes `makeCFURLFromPath`, `makeFSRefFromPath` and the
+`ATSFontContainerRef` typedef.
+
+Eight bitmaps were deleted rather than embedded: **19, 25, 26, 29, 36, 37, 38,
+39** are the licence manager's artwork — "Authorize…", "Buy Now", "This copy of
+SpectrumWorx is licensed to:" — orphaned when stage 0 removed the licence
+manager, and referenced by nothing.
+
+> **Still outstanding from 6.3.** `initializePaths()` / `mapPathsFile()` /
+> `rootPath()` / `presetsFolder()` are *not* gone — the skin was only one of
+> their consumers. The rest (presets, samples, `SpectrumWorx.dat`, the User's
+> Guide PDF) belongs to stage 8, and the callers are `spectrumWorx.cpp`,
+> `spectrumWorxSharedImpl.inl`, `presets.cpp`, `presetBrowser.cpp` and
+> `spectrumWorxEditor.cpp`. Note they cannot compile as they stand regardless:
+> they are written on `boost::mmap`, which the stage 3 scaffold does not fetch
+> and which is not in the tree.
 
 **6.4 — Collapse the owned-window model** (scan §6.2). The preset browser and
 settings panel become ordinary child `Component`s of the editor, overlaid or in
@@ -1129,6 +1210,69 @@ nothing. If any does, hold the construction behind an explicit flag on
 **Done when:** the full editor works in CLAP, VST3, AUv2 and standalone on all
 three OSes; open/close cycles leak nothing; no separate desktop window exists
 anywhere in the process; 6.7 is resolved one way or the other.
+
+#### What reading the GUI for 6.0 turned up
+
+Four things that change the shape of the work, none of which the estimate above
+knew about.
+
+**1. `PopupMenu` is not a port. It reinterprets JUCE's private members.**
+`gui.cpp:1081-1138` defines a `JuceHackery::MenuItemInfo` that is a bit-for-bit
+copy of a JUCE-internal struct, and reaches `juce::PopupMenu::items` — which is
+`private` in JUCE 8 (`juce_PopupMenu.h:1068`) and no longer has that layout. It
+exists to iterate and mutate menu items after the fact: current selection, tick
+state, item sizes. **Every** `GUI::PopupMenu` / `PopupMenuWithSelection`
+accessor is built on it, and both `ComboBox` and the module menu are built on
+those. Rewrite against the public API (`PopupMenu::Item`, `MenuItemIterator`,
+`addItem(Item)`), which means keeping the selection state in *our* wrapper
+rather than reading it back out of JUCE. Budget days, not hours, and do it early
+— the module menu is how you put an effect in a slot, so nothing else is
+testable until it works.
+
+**2. `juceLexicalCast.cpp` was deleted, not ported.** It redefined
+`NumberToStringConverters`, which lives inside `juce_String.cpp` in JUCE 8, and
+added explicit specialisations of `CharacterFunctions::getIntValue` /
+`readDoubleValue` that are templates defined inline in the JUCE 8 header — so
+the specialisations had nothing to attach to. It also `#define`d `noexcept` to
+`throw()`. The whole file was a patch against the patched JUCE fork that stage 0
+deleted: it substituted LE's `lexical_cast` for JUCE's own number formatting, a
+micro-optimisation with no behavioural content.
+
+**3. The editor cannot be handed a mock, because it is not given anything.**
+`SpectrumWorxEditor()` takes no arguments; it finds the plugin by pointer
+arithmetic from `this` (`Utility::ParentFromOptionalMember`, via
+`SpectrumWorx::effect(Editor&)` at `spectrumWorx.cpp:1176`). `ModuleUI`,
+`PresetBrowser` and `Settings` do the same. Six parent-from-member
+relationships hold *by memory layout*, so a harness cannot substitute for the
+plugin — it has to **be** the plugin, i.e. own the editor as a member at the
+same offset. Everything the editor asks of the plugin funnels through six
+accessors (`spectrumWorxEditor.cpp:319-345`), so that is the seam, and it is a
+small one.
+
+The harness should therefore compile a `LE_SW_GUI=1` core (`sw-dsp` is
+`LE_SW_GUI=0`, and the only difference in the core headers is one typedef at
+`spectrumWorxCore.hpp:172` plus the two chain-notification functions in
+`plugin2Host.cpp`) and mock only `Plugin2HostInteropControler`'s eleven pure
+virtuals — the layer that genuinely does not exist until stage 5. Real effects,
+real parameter metadata, real LFOs and real presets all come for free, because
+they are already in `sw-dsp`.
+
+Build it with `LE_SW_DISABLE_SIDE_CHANNEL` defined: that compiles out
+`SampleArea` and every `sample_` reference, which removes `external_audio/` and
+the raw-`pthread` `BackgroundThread` from the harness in one flag.
+
+**4. Two bugs that block the first compile, found by reading:**
+- `spectrumWorxEditor.cpp:1852` initialises `pRegistrationData_(0)` in
+  `Settings::Settings()`. No such member exists — it went with the licence
+  manager and the initialiser did not. **The GUI does not compile until this is
+  deleted**, harness or no harness.
+- `gui.hpp:889-891` declares `Knob::stoppedDragging()` only under `#ifndef
+  NDEBUG`, while `EditorKnob::stoppedDragging` (`gui.cpp:1700`) calls
+  `Knob::stoppedDragging()` unconditionally — a release-only link error, the
+  same class of thing stage 3 found in `math.hpp`.
+
+Also worth knowing: `OwnedWindow<>` has exactly two instantiations, `PresetBrowser`
+and `SpectrumWorxEditor::Settings`, which bounds 6.4 usefully.
 
 ---
 
@@ -1231,7 +1375,10 @@ CI, with no manual steps.
   standalone JUCE harness app that instantiates the editor against a mock
   controller, then wire it to the real plugin after stage 5. This keeps the
   single biggest stage off the critical path, which is the main reason the whole
-  project can be two people rather than one person for eight months.
+  project can be two people rather than one person for eight months. The harness
+  is `tools/show-ui` (6.0); note that "mock controller" turned out to mean
+  mocking only the eleven-method host-interop vtable over a real core, not
+  mocking the core — see the findings under stage 6.
 - **7 needs 5 and 6** — you want a working plugin before refactoring its spine.
 
 **Two-person split:** A takes 0, 1, 3, 4, 5, 8, 9 (build, DSP, host layer);
