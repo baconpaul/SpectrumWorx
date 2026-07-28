@@ -209,8 +209,7 @@ FMODEditorBase::Host2EditorCallbacks const FMODEditor<Impl>::host2PluginCallback
     /*printParameterValue  =*/&FMODEditor ::printParameterValue,
 };
 
-template <class Impl>
-LE_NOTHROW FMOD_RESULT F_CALLBACK FMODEditor<Impl>::create(void **const ppEditor)
+template <class Impl> FMOD_RESULT F_CALLBACK FMODEditor<Impl>::create(void **const ppEditor)
 {
     try
     {
@@ -226,8 +225,7 @@ LE_NOTHROW FMOD_RESULT F_CALLBACK FMODEditor<Impl>::create(void **const ppEditor
     }
 }
 
-template <class Impl>
-LE_NOTHROW FMOD_RESULT F_CALLBACK FMODEditor<Impl>::destroy(void *const pEditor)
+template <class Impl> FMOD_RESULT F_CALLBACK FMODEditor<Impl>::destroy(void *const pEditor)
 {
     OptionalEditor *const pOptionalEditor(
         optionalEditorFromBase(static_cast<FMODEditorBase *>(pEditor), true));
@@ -236,10 +234,9 @@ LE_NOTHROW FMOD_RESULT F_CALLBACK FMODEditor<Impl>::destroy(void *const pEditor)
 }
 
 template <class Impl>
-LE_NOTHROW FMOD_RESULT F_CALLBACK FMODEditor<Impl>::show(void *const pEditor,
-                                                         int const parentWindowHandle,
-                                                         void const *const pState,
-                                                         unsigned int const stateSize)
+FMOD_RESULT F_CALLBACK FMODEditor<Impl>::show(void *const pEditor, int const parentWindowHandle,
+                                              void const *const pState,
+                                              unsigned int const stateSize)
 {
     OptionalEditor &editor(*optionalEditorFromBase(static_cast<FMODEditorBase *>(pEditor), true));
     FMODEditorBase::WindowHandle const parentWindow(
@@ -262,9 +259,8 @@ LE_NOTHROW FMOD_RESULT F_CALLBACK FMODEditor<Impl>::show(void *const pEditor,
 }
 
 template <class Impl>
-LE_NOTHROW FMOD_RESULT F_CALLBACK FMODEditor<Impl>::getLocalState(void *const pEditor,
-                                                                  void **const ppState,
-                                                                  unsigned int *const pStateSize)
+FMOD_RESULT F_CALLBACK FMODEditor<Impl>::getLocalState(void *const pEditor, void **const ppState,
+                                                       unsigned int *const pStateSize)
 {
     OptionalEditor &editor(*optionalEditorFromBase(static_cast<FMODEditorBase *>(pEditor), true));
     LE_ASSERT_MSG(editor.has_value(), "Editor not yet shown");
@@ -273,7 +269,7 @@ LE_NOTHROW FMOD_RESULT F_CALLBACK FMODEditor<Impl>::getLocalState(void *const pE
 }
 
 template <class Impl>
-LE_NOTHROW FMOD_RESULT F_CALLBACK FMODEditor<Impl>::updateParameterValue(
+FMOD_RESULT F_CALLBACK FMODEditor<Impl>::updateParameterValue(
     void *const pEditor, int const index, AutomatedParameterValue const *LE_RESTRICT const pValue)
 {
     OptionalEditor &editor(*optionalEditorFromBase(static_cast<FMODEditorBase *>(pEditor), true));
@@ -298,15 +294,15 @@ LE_NOTHROW FMOD_RESULT F_CALLBACK FMODEditor<Impl>::updateParameterValue(
 }
 
 template <class Impl>
-LE_NOTHROW FMOD_RESULT F_CALLBACK
-FMODEditor<Impl>::updateSharedState(void * /*const pEditor*/, void const * /*const pSharedState*/,
-                                    unsigned int /*const sharedStateSize*/)
+FMOD_RESULT F_CALLBACK FMODEditor<Impl>::updateSharedState(void * /*const pEditor*/,
+                                                           void const * /*const pSharedState*/,
+                                                           unsigned int /*const sharedStateSize*/)
 {
     return FMOD_ERR_UNIMPLEMENTED;
 }
 
 template <class Impl>
-LE_NOTHROW FMOD_RESULT F_CALLBACK
+FMOD_RESULT F_CALLBACK
 FMODEditor<Impl>::printParameterValue(void *const pEditor, unsigned int const parameterIndex,
                                       FMOD::PLUGIN_PARAMETER_VALUE const &value,
                                       FMOD::StudioAudioPlugin::ParameterValueStringBuffer &buffer)

@@ -53,10 +53,10 @@ namespace Detail
 class PImplTerminator
 {
   protected:
-    LE_NOTHROW PImplTerminator() {}
-    LE_NOTHROW PImplTerminator(PImplTerminator const &) {}
+    PImplTerminator() {}
+    PImplTerminator(PImplTerminator const &) {}
 #ifndef NDEBUG
-    LE_NOTHROW ~PImplTerminator() {}
+    ~PImplTerminator() {}
 #endif // NDEBUG
 
   private: // noncopyable
@@ -77,7 +77,7 @@ template <class Interface, class BaseInterface = Detail::PImplTerminator>
 class PImpl : public BaseInterface
 {
   protected:
-    LE_NOTHROWNOALIAS ~PImpl();
+    ~PImpl();
 }; // class PImpl
 
 template <class Interface, std::size_t storageSize, std::size_t alignment = sizeof(void *),
@@ -85,10 +85,10 @@ template <class Interface, std::size_t storageSize, std::size_t alignment = size
 class StackPImpl : public Detail::StackPImplBase<Interface, BaseInterface>::type
 {
   protected:
-    LE_NOTHROWNOALIAS StackPImpl();
-    LE_NOTHROWNOALIAS StackPImpl(StackPImpl &&);
-    LE_NOTHROWNOALIAS StackPImpl(Interface &&);
-    template <typename T> LE_NOTHROWNOALIAS StackPImpl(T &&);
+    StackPImpl();
+    StackPImpl(StackPImpl &&);
+    StackPImpl(Interface &&);
+    template <typename T> StackPImpl(T &&);
 
     typedef StackPImpl<Interface, storageSize, alignment, BaseInterface> ConcreteStackPimpl;
 
@@ -114,15 +114,15 @@ class HeapPImpl : public PImpl<Interface, BaseInterface>
     typedef LE::Utility::IntrusivePtr<Interface> Ptr;
     typedef LE::Utility::IntrusivePtr<Interface const> CPtr;
 
-    LE_NOTHROWNOALIAS static Ptr create();
-    LE_NOTHROWNOALIAS static void operator delete(void *); ///< \internal
+    static Ptr create();
+    static void operator delete(void *); ///< \internal
 
   private:
-    LE_NOTHROWNOALIAS HeapPImpl(); ///< \internal
+    HeapPImpl(); ///< \internal
 
   private: // LE::Utility::IntrusivePtr required section
-    friend void LE_NOTHROWNOALIAS intrusive_ptr_add_ref(Interface const *);
-    friend void LE_NOTHROW intrusive_ptr_release(Interface const *);
+    friend void intrusive_ptr_add_ref(Interface const *);
+    friend void intrusive_ptr_release(Interface const *);
 }; // class HeapPImpl
 
 //------------------------------------------------------------------------------

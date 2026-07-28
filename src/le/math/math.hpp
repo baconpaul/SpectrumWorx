@@ -166,17 +166,17 @@ unsigned int round(unsigned int);
 std::uint8_t log2(unsigned int);
 } // namespace PowerOfTwo
 
-LE_CONST_FUNCTION float log2(float value);
-LE_CONST_FUNCTION std::uint8_t log2(int value);
-LE_CONST_FUNCTION std::uint8_t log2(unsigned int value);
-LE_CONST_FUNCTION std::uint8_t log2(unsigned long value);
+float log2(float value);
+std::uint8_t log2(int value);
+std::uint8_t log2(unsigned int value);
+std::uint8_t log2(unsigned long value);
 
-LE_CONST_FUNCTION float ln(float);
-LE_CONST_FUNCTION float log10(float);
-LE_CONST_FUNCTION float exp(float);
-LE_CONST_FUNCTION float exp2(float);
+float ln(float);
+float log10(float);
+float exp(float);
+float exp2(float);
 
-LE_NOTHROWNOALIAS void addPolar(float amp1, float phase1, float &amp2, float &phase2);
+void addPolar(float amp1, float phase1, float &amp2, float &phase2);
 
 float clamp(float value, float lowerBound, float upperBound);
 std::uint64_t clamp(std::int64_t value, std::uint64_t lowerBound, std::uint64_t upperBound);

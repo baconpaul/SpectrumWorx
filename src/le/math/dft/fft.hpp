@@ -62,31 +62,29 @@ class FFT_float_real_1D
 #endif // __APPLE__
 
     // real
-    LE_NOTHROW void transform(float *data /*inplace: in time     , out DFT reals*/,
-                              DataRange const &imaginaryTargetSubRange, bool doFFTShift) const;
-    LE_NOTHROW void inverseTransform(float *data /*inplace: in DFT reals, out time     */,
-                                     ReadOnlyDataRange const &imaginarySourceSubRange,
-                                     bool doFFTShift) const;
+    void transform(float *data /*inplace: in time     , out DFT reals*/,
+                   DataRange const &imaginaryTargetSubRange, bool doFFTShift) const;
+    void inverseTransform(float *data /*inplace: in DFT reals, out time     */,
+                          ReadOnlyDataRange const &imaginarySourceSubRange, bool doFFTShift) const;
 
-    LE_NOTHROW void transform(float *data /*inplace: in time     , out DFT reals*/,
-                              float *imaginaryTargetSubRange, std::uint16_t size) const;
-    LE_NOTHROW void inverseTransform(float *data /*inplace: in DFT reals, out time     */,
-                                     float const *imaginarySourceSubRange,
-                                     std::uint16_t size) const;
+    void transform(float *data /*inplace: in time     , out DFT reals*/,
+                   float *imaginaryTargetSubRange, std::uint16_t size) const;
+    void inverseTransform(float *data /*inplace: in DFT reals, out time     */,
+                          float const *imaginarySourceSubRange, std::uint16_t size) const;
 
     // complex
-    LE_NOTHROW void transform(float *pReals, float *pImags) const;
-    LE_NOTHROW void inverseTransform(float *pReals, float *pImags) const;
+    void transform(float *pReals, float *pImags) const;
+    void inverseTransform(float *pReals, float *pImags) const;
 
 #ifdef LE_PURE_REAL_FFT_TEST
-    LE_NOTHROW void transform(float const *pTimeDomainData, float const *pWindow, float *pReals,
-                              DataRange const &imags) const;
-    LE_NOTHROW void inverseTransform(float *pTimeDomainData, float const *pReals,
-                                     ReadOnlyDataRange const &imags) const;
-    LE_NOTHROW void inverseTransform(DataRange const &reals, DataRange const &imags) const;
+    void transform(float const *pTimeDomainData, float const *pWindow, float *pReals,
+                   DataRange const &imags) const;
+    void inverseTransform(float *pTimeDomainData, float const *pReals,
+                          ReadOnlyDataRange const &imags) const;
+    void inverseTransform(DataRange const &reals, DataRange const &imags) const;
 #endif // LE_PURE_REAL_FFT_TEST
 
-    LE_NOTHROW void resize(SW::Engine::StorageFactors const &factors, SW::Engine::Storage &);
+    void resize(SW::Engine::StorageFactors const &factors, SW::Engine::Storage &);
 
     std::uint16_t size() const { return size_; } //...mrmlj...actually "maximum allowed size"...
 
@@ -121,7 +119,7 @@ class FFT_float_real_1D
     mutable WorkBuffer workBuffer_;
 
   public:
-    static LE_CONST_FUNCTION std::uint32_t requiredStorage(SW::Engine::StorageFactors const &);
+    static std::uint32_t requiredStorage(SW::Engine::StorageFactors const &);
 }; // class FFT_float_real_1D
 
 //------------------------------------------------------------------------------

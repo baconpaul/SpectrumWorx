@@ -338,30 +338,29 @@ template <class ImplParam> class Plugin<ImplParam, Protocol::FMOD> : public FMOD
     }
 
   private: // Callbacks.
-    LE_NOTHROW static FMOD_RESULT F_CALLBACK create(FMOD_DSP_STATE *);
-    LE_NOTHROW static FMOD_RESULT F_CALLBACK release(FMOD_DSP_STATE *);
-    LE_NOTHROW static FMOD_RESULT F_CALLBACK reset(FMOD_DSP_STATE *);
-    LE_NOTHROW static FMOD_RESULT F_CALLBACK read(FMOD_DSP_STATE *, float *inBuffer,
-                                                  float *outBuffer, unsigned int length,
-                                                  int inChannels, int *pOutChannels);
-    LE_NOTHROW static FMOD_RESULT F_CALLBACK setTimePosition(FMOD_DSP_STATE *, unsigned int pos);
-    LE_NOTHROW static FMOD_RESULT F_CALLBACK canProcess(FMOD_DSP_STATE *, FMOD_BOOL inputidle,
-                                                        unsigned int length, FMOD_CHANNELMASK,
-                                                        int inChannels, FMOD_SPEAKERMODE);
+    static FMOD_RESULT F_CALLBACK create(FMOD_DSP_STATE *);
+    static FMOD_RESULT F_CALLBACK release(FMOD_DSP_STATE *);
+    static FMOD_RESULT F_CALLBACK reset(FMOD_DSP_STATE *);
+    static FMOD_RESULT F_CALLBACK read(FMOD_DSP_STATE *, float *inBuffer, float *outBuffer,
+                                       unsigned int length, int inChannels, int *pOutChannels);
+    static FMOD_RESULT F_CALLBACK setTimePosition(FMOD_DSP_STATE *, unsigned int pos);
+    static FMOD_RESULT F_CALLBACK canProcess(FMOD_DSP_STATE *, FMOD_BOOL inputidle,
+                                             unsigned int length, FMOD_CHANNELMASK, int inChannels,
+                                             FMOD_SPEAKERMODE);
 
     template <typename T>
-    LE_NOTHROW static FMOD_RESULT F_CALLBACK getParameter(FMOD_DSP_STATE *, int index, T *value,
-                                                          char *valuestr);
+    static FMOD_RESULT F_CALLBACK getParameter(FMOD_DSP_STATE *, int index, T *value,
+                                               char *valuestr);
     template <typename T>
-    LE_NOTHROW static FMOD_RESULT F_CALLBACK setParameter(FMOD_DSP_STATE *, int index, T value);
+    static FMOD_RESULT F_CALLBACK setParameter(FMOD_DSP_STATE *, int index, T value);
 
-    LE_NOTHROW static FMOD_RESULT F_CALLBACK getParameter(FMOD_DSP_STATE *, int index, void **data,
-                                                          unsigned int *length, char *valuestr);
-    LE_NOTHROW static FMOD_RESULT F_CALLBACK setParameter(FMOD_DSP_STATE *, int index, void *data,
-                                                          unsigned int length);
+    static FMOD_RESULT F_CALLBACK getParameter(FMOD_DSP_STATE *, int index, void **data,
+                                               unsigned int *length, char *valuestr);
+    static FMOD_RESULT F_CALLBACK setParameter(FMOD_DSP_STATE *, int index, void *data,
+                                               unsigned int length);
 
   public:
-    LE_NOTHROW static FMOD_DSP_DESCRIPTION *getDescription();
+    static FMOD_DSP_DESCRIPTION *getDescription();
 
 #ifndef NDEBUG
   private:

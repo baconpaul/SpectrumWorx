@@ -57,7 +57,7 @@ Plugin<Impl, Protocol::Unity>::Plugin(ConstructionParameter const constructionPa
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class Impl>
-LE_NOTHROW LE_COLD UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
+LE_COLD UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
 Plugin<Impl, Protocol::Unity>::create(UnityAudioEffectState *LE_RESTRICT const pState)
 {
 #ifndef NDEBUG
@@ -90,7 +90,7 @@ Plugin<Impl, Protocol::Unity>::create(UnityAudioEffectState *LE_RESTRICT const p
 }
 
 template <class Impl>
-LE_NOTHROW LE_COLD UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
+LE_COLD UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
 Plugin<Impl, Protocol::Unity>::release(UnityAudioEffectState *const pState)
 {
     delete &impl(pState);
@@ -98,7 +98,7 @@ Plugin<Impl, Protocol::Unity>::release(UnityAudioEffectState *const pState)
 }
 
 template <class Impl>
-LE_NOTHROW LE_COLD UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
+LE_COLD UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
 Plugin<Impl, Protocol::Unity>::reset(UnityAudioEffectState *const pState)
 {
     impl(pState).reset();
@@ -106,7 +106,7 @@ Plugin<Impl, Protocol::Unity>::reset(UnityAudioEffectState *const pState)
 }
 
 template <class Impl>
-LE_NOTHROW UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK Plugin<Impl, Protocol::Unity>::process(
+UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK Plugin<Impl, Protocol::Unity>::process(
     UnityAudioEffectState *LE_RESTRICT const pState, float *LE_RESTRICT const inBuffer,
     float *LE_RESTRICT const outBuffer, unsigned int const length, int const inChannels,
     int const outChannels)
@@ -144,9 +144,8 @@ LE_NOTHROW UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK Plugin<Impl, Protocol::
 }
 
 template <class Impl>
-LE_NOTHROW LE_COLD UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
-Plugin<Impl, Protocol::Unity>::setPosition(UnityAudioEffectState *const pState,
-                                           unsigned int const positionInSamples)
+LE_COLD UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK Plugin<Impl, Protocol::Unity>::setPosition(
+    UnityAudioEffectState *const pState, unsigned int const positionInSamples)
 {
     impl(pState).setPosition(positionInSamples);
     return Success;
@@ -160,9 +159,8 @@ Plugin<Impl, Protocol::Unity>::setPosition(UnityAudioEffectState *const pState,
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class Impl>
-LE_NOTHROW LE_COLD UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
-Plugin<Impl, Protocol::Unity>::setParameter(UnityAudioEffectState *const pState, int const index,
-                                            float const value)
+LE_COLD UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK Plugin<Impl, Protocol::Unity>::setParameter(
+    UnityAudioEffectState *const pState, int const index, float const value)
 {
     return Impl::makeErrorCode(impl(pState).setParameter(
         ParameterIndex{static_cast<ParameterIndex::value_type>(index)}, value));
@@ -176,7 +174,7 @@ Plugin<Impl, Protocol::Unity>::setParameter(UnityAudioEffectState *const pState,
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class Impl>
-LE_NOTHROW LE_COLD UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
+LE_COLD UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
 Plugin<Impl, Protocol::Unity>::getParameter(UnityAudioEffectState *const pState, int const index,
                                             float *const pValue, char *const pValueString)
 {
@@ -198,11 +196,9 @@ Plugin<Impl, Protocol::Unity>::getParameter(UnityAudioEffectState *const pState,
 }
 
 template <class Impl>
-LE_NOTHROW LE_COLD UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
-Plugin<Impl, Protocol::Unity>::getSignal(UnityAudioEffectState *LE_RESTRICT const pState,
-                                         char const *LE_RESTRICT const pName,
-                                         float *LE_RESTRICT const pBuffer,
-                                         int const numberOfSamples)
+LE_COLD UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK Plugin<Impl, Protocol::Unity>::getSignal(
+    UnityAudioEffectState *LE_RESTRICT const pState, char const *LE_RESTRICT const pName,
+    float *LE_RESTRICT const pBuffer, int const numberOfSamples)
 {
     LE::Utility::ignoreUnused(pState, pName, pBuffer, numberOfSamples);
     return Unsupported;

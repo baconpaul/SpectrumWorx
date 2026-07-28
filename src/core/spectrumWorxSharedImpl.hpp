@@ -86,9 +86,9 @@ class LE_NOVTABLE SpectrumWorxSharedImpl
 
     friend class Host2PluginInteropImpl<Impl, Protocol>;
 
-    ErrorCode LE_NOTHROW initialise();
+    ErrorCode initialise();
 
-    void LE_NOTHROW process(float const *const *inputs, float **outputs, std::uint32_t samples);
+    void process(float const *const *inputs, float **outputs, std::uint32_t samples);
 
 #if LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
     typedef SpectrumWorx::Editor Editor;
@@ -151,7 +151,7 @@ class LE_NOVTABLE SpectrumWorxSharedImpl
     ////////////////////////////////////////////////////////////////////////////
 
   private:
-    LE_NOTHROW bool updateTimingInformation();
+    bool updateTimingInformation();
 #endif // LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
 }; // class SpectrumWorxSharedImpl
 

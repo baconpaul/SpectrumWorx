@@ -84,7 +84,7 @@ namespace LE
 #if LE_SW_GUI
 namespace GUI
 {
-void LE_NOTHROW warningMessageBox(std::string_view title, std::string_view message, bool canBlock);
+void warningMessageBox(std::string_view title, std::string_view message, bool canBlock);
 }
 #endif // LE_SW_GUI
 //------------------------------------------------------------------------------
@@ -101,7 +101,7 @@ using PresetModule = SW::Module;
 #endif // LE_SW_SEPARATED_DSP_GUI
 
 #if LE_SW_GUI
-LE_NOTHROW PresetHeader::PresetHeader(juce::String const &commentParam)
+PresetHeader::PresetHeader(juce::String const &commentParam)
 {
     LE_ASSERT(commentParam.length() < _countof(comment) - 1);
 
@@ -184,7 +184,7 @@ Preset::load_result_t Preset::loadFrom(char *const pBuffer)
 #pragma warning(pop)
 
 #if LE_SW_GUI
-LE_NOTHROW Preset::InMemoryPreset Preset::loadIntoMemory(juce::File const &file)
+Preset::InMemoryPreset Preset::loadIntoMemory(juce::File const &file)
 {
     using namespace boost;
     LE_ASSERT(file.exists());
@@ -206,7 +206,7 @@ LE_NOTHROW Preset::InMemoryPreset Preset::loadIntoMemory(juce::File const &file)
 #endif // LE_SW_GUI
 
 #ifndef LE_SW_SDK_BUILD
-LE_NOTHROW unsigned int Preset::saveTo(char *const pBuffer)
+unsigned int Preset::saveTo(char *const pBuffer)
 {
 //...mrmlj...an ugly temporary way to verify that the header was set before saving...
 #ifndef NDEBUG
@@ -245,7 +245,7 @@ void copyAndNullTerminate(Utility::XML::Element const &headerNode,
 }
 } // anonymous namespace
 
-LE_NOTHROW void Preset::getHeader(PresetHeader &header) const
+void Preset::getHeader(PresetHeader &header) const
 {
     auto const &headerNode(root());
     copyAndNullTerminate(headerNode, header.attributeNames.version, header.version);
@@ -266,7 +266,7 @@ LE_NOTHROW void Preset::getHeader(PresetHeader &header) const
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_NOTHROW void Preset::setHeader(PresetHeader const &header)
+void Preset::setHeader(PresetHeader const &header)
 {
     auto &headerNode(root());
     headerNode.attribute(header.attributeNames.version)->value(header.version);
@@ -274,7 +274,7 @@ LE_NOTHROW void Preset::setHeader(PresetHeader const &header)
     headerNode.attribute(header.attributeNames.comment)->value(header.comment);
 }
 
-LE_NOTHROW std::string_view Preset::getComment() const
+std::string_view Preset::getComment() const
 {
     auto const &headerNode(root());
     auto const *const pCommentAttribute(
@@ -345,7 +345,7 @@ std::string_view PresetHandler::unmangleSpaces(char const *const input) const
     return fixSpaces(input, mangledSpace, space);
 }
 
-LE_RESTRICTNOALIAS char *PresetHandler::allocateString(unsigned int const size)
+char *PresetHandler::allocateString(unsigned int const size)
 {
     LE_ASSUME(size);
     return xml().allocate_string(nullptr, size);
@@ -379,7 +379,7 @@ ParametersLoader::ParametersLoader(Preset const &preset)
 #ifdef LE_SW_SDK_BUILD //...mrmlj...
 namespace Engine
 {
-LE_NOTHROWNOALIAS LE::Utility::IntrusivePtr<PresetModule> createModule(std::uint8_t effectIndex);
+LE::Utility::IntrusivePtr<PresetModule> createModule(std::uint8_t effectIndex);
 }
 #define MB_WARNING "SW SDK warning:"
 #define MB_ERROR "SW SDK error:"
@@ -499,7 +499,7 @@ std::string_view ParametersLoader::currentMangledEffectName() const
     return parameters().name();
 }
 
-LE_NOTHROW // sampleAttributeName_ contains no spaces
+// sampleAttributeName_ contains no spaces
 std::string_view ParametersLoader::getSampleFileName()
 {
     LE_ASSERT_MSG(!switchedToModuleParameters(),
@@ -614,7 +614,7 @@ LE_COLD void ParametersLoader::warnAboutMissingParameter(char const *const pPara
 }
 
 #ifndef LE_SW_SDK_BUILD
-LE_NOTHROW PresetWithPreallocatedFixedNodes::PresetWithPreallocatedFixedNodes()
+PresetWithPreallocatedFixedNodes::PresetWithPreallocatedFixedNodes()
     : headerNode_(headerNodeName_), globalParametersNode_(globalParametersNodeName_),
       moduleParametersNode_(moduleParametersNodeName_)
 {
@@ -758,8 +758,8 @@ void ParametersSaver::setSampleFileName(std::string_view const &sampleFileName)
     saveParameter(sampleAttributeName_, sampleFileName);
 }
 
-LE_NOTHROW void savePreset(juce::File const &file, juce::File const &externalSampleFile,
-                           juce::String const &comment, Program const &program)
+void savePreset(juce::File const &file, juce::File const &externalSampleFile,
+                juce::String const &comment, Program const &program)
 {
     LE_ASSERT(file.getParentDirectory().isDirectory());
     Preset::InMemoryPresetBuffer buffer;
@@ -780,8 +780,8 @@ LE_NOTHROW void savePreset(juce::File const &file, juce::File const &externalSam
     }
 }
 
-LE_NOTHROW unsigned int savePreset(char *const data, juce::File const &externalSampleFile,
-                                   juce::String const &comment, Program const &program)
+unsigned int savePreset(char *const data, juce::File const &externalSampleFile,
+                        juce::String const &comment, Program const &program)
 {
     PresetHeader const presetHeader(comment);
     PresetWithPreallocatedFixedNodes preset;

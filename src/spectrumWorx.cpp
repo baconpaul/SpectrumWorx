@@ -53,7 +53,7 @@ namespace SW
 {
 //------------------------------------------------------------------------------
 
-LE_NOTHROW SpectrumWorx::SpectrumWorx(bool const runningAsAU)
+SpectrumWorx::SpectrumWorx(bool const runningAsAU)
     :
 #ifndef LE_SW_DISABLE_SIDE_CHANNEL
       pListenerToNotifyWhenSampleLoaded_(nullptr),
@@ -78,7 +78,7 @@ LE_NOTHROW SpectrumWorx::SpectrumWorx(bool const runningAsAU)
     SpectrumWorxCore::setProgram(programs()[getProgram()]);
 }
 
-LE_NOTHROW SpectrumWorx::~SpectrumWorx()
+SpectrumWorx::~SpectrumWorx()
 {
     //...mrmlj...rethink this...
     if (GUI::havePathsBeenInitialised())
@@ -116,9 +116,10 @@ LE_NOTHROW SpectrumWorx::~SpectrumWorx()
 
 namespace
 {
-LE_NOTHROWNOALIAS float const *LE_RESTRICT
-getChannelDataChunk(Sample::ChannelData const &channelData, std::uint32_t &startingPosition,
-                    std::uint16_t chunkSize, float *LE_RESTRICT const workBuffer)
+float const *LE_RESTRICT getChannelDataChunk(Sample::ChannelData const &channelData,
+                                             std::uint32_t &startingPosition,
+                                             std::uint16_t chunkSize,
+                                             float *LE_RESTRICT const workBuffer)
 {
     auto const dataSize(static_cast<std::uint32_t>(channelData.size()));
     LE_ASSERT(startingPosition <= dataSize);
@@ -151,7 +152,7 @@ getChannelDataChunk(Sample::ChannelData const &channelData, std::uint32_t &start
 #pragma warning(push)
 #pragma warning(disable : 4701) // Potentially uninitialized local variable 'samplePosition' used.
 
-LE_NOTHROWNOALIAS void SpectrumWorx::process /// \throws nothing
+void SpectrumWorx::process /// \throws nothing
     (float const *const *const inputs, float **const outputs, std::uint32_t const samples)
 {
     // Implementation note:
@@ -226,8 +227,8 @@ void SpectrumWorx::resume()
     SpectrumWorxCore::resume();
 }
 
-bool LE_NOTHROW SpectrumWorx::setNumberOfChannelsFromHost(std::uint8_t const numberOfInputChannels,
-                                                          std::uint8_t const numberOfOutputChannels)
+bool SpectrumWorx::setNumberOfChannelsFromHost(std::uint8_t const numberOfInputChannels,
+                                               std::uint8_t const numberOfOutputChannels)
 {
     auto const changeSuccess(
         SpectrumWorxCore::setNumberOfChannels(numberOfInputChannels, numberOfOutputChannels));
@@ -250,8 +251,8 @@ bool LE_NOTHROW SpectrumWorx::setNumberOfChannelsFromHost(std::uint8_t const num
 }
 
 #if LE_SW_ENGINE_INPUT_MODE >= 2
-bool LE_NOTHROW SpectrumWorx::setNumberOfChannelsFromUser(std::uint8_t const numberOfInputChannels,
-                                                          std::uint8_t const numberOfOutputChannels)
+bool SpectrumWorx::setNumberOfChannelsFromUser(std::uint8_t const numberOfInputChannels,
+                                               std::uint8_t const numberOfOutputChannels)
 {
     LE_ASSERT(checkChannelConfiguration(numberOfInputChannels, numberOfOutputChannels));
 
@@ -491,16 +492,15 @@ class GlobalParameterUpdater : public SpectrumWorx
 }; // class GlobalParameterUpdater
 } // anonymous namespace
 
-void LE_NOTHROW SpectrumWorx::resetForGlobalParameters(Parameters const &parameters)
+void SpectrumWorx::resetForGlobalParameters(Parameters const &parameters)
 {
     //...mrmlj...this can possibly cause multiple engine setup updates/memory reallocations...
     //...mrmlj...no error reporting...
     boost::fusion::for_each(parameters, static_cast<GlobalParameterUpdater &>(*this));
 }
 
-bool LE_NOTHROW
-SpectrumWorx::canParameterBeAutomated(ParameterID const parameter,
-                                      Program const *LE_RESTRICT const pProgram) const
+bool SpectrumWorx::canParameterBeAutomated(ParameterID const parameter,
+                                           Program const *LE_RESTRICT const pProgram) const
 {
     bool const staticParameterList(pProgram == nullptr);
     if (staticParameterList)
@@ -549,7 +549,7 @@ bool SpectrumWorx::ModuleInitialiser::operator()(Module &module,
     return false;
 }
 
-LE_NOTHROW SpectrumWorx::ModuleInitialiser SpectrumWorx::moduleInitialiser()
+SpectrumWorx::ModuleInitialiser SpectrumWorx::moduleInitialiser()
 {
     return {SpectrumWorxCore::moduleInitialiser(), gui().operator->()};
 }
@@ -663,9 +663,8 @@ struct SpectrumWorx::PresetConsumer
 
 #pragma warning(push)
 
-LE_NOTHROW bool SpectrumWorx::loadPreset(char *const inMemoryPreset,
-                                         bool const ignoreExternalSample,
-                                         juce::String *const pComment, std::uint8_t const program)
+bool SpectrumWorx::loadPreset(char *const inMemoryPreset, bool const ignoreExternalSample,
+                              juce::String *const pComment, std::uint8_t const program)
 {
     LE_ASSERT(!presetLoadingInProgress());
 
@@ -681,7 +680,7 @@ bool SpectrumWorx::loadPreset(juce::File const &file, bool const ignoreExternalS
 }
 
 #ifndef LE_SW_DISABLE_SIDE_CHANNEL
-bool LE_NOTHROWNOALIAS SpectrumWorx::setNewSampleWorker(juce::File const &newSampleFile)
+bool SpectrumWorx::setNewSampleWorker(juce::File const &newSampleFile)
 {
     bool succeeded(true);
     if (newSampleFile.existsAsFile())
@@ -786,7 +785,7 @@ void SpectrumWorx::deregisterSampleLoadedListener(Editor const &listenerToDeregi
     pListenerToNotifyWhenSampleLoaded_ = nullptr;
 }
 
-LE_NOTHROW void SpectrumWorx::sampleLoadingLoop()
+void SpectrumWorx::sampleLoadingLoop()
 {
     while ((pendingSampleToLoad_ != sample_.sampleFile()) &&
            setNewSampleWorker(pendingSampleToLoad_))
@@ -809,7 +808,7 @@ LE_NOTHROW void SpectrumWorx::sampleLoadingLoop()
 }
 #endif // LE_SW_DISABLE_SIDE_CHANNEL
 
-bool LE_NOTHROW SpectrumWorx::updateEngineSetup()
+bool SpectrumWorx::updateEngineSetup()
 {
     if (SpectrumWorxCore::updateEngineSetup())
     {
@@ -824,7 +823,7 @@ void SpectrumWorx::updatePosition(std::uint32_t const deltaSamples)
     handleTimingInformationChange(updatePositionAndTimingInformation(deltaSamples));
 }
 
-bool LE_NOTHROW SpectrumWorx::initialise()
+bool SpectrumWorx::initialise()
 {
     //if ( !SpectrumWorxCore::initialise() )
     //    return false;
@@ -896,7 +895,7 @@ struct Settings : GUI::Theme::Settings
 }; // struct Settings
 } // namespace
 
-void LE_NOTHROW SpectrumWorx::loadSettings()
+void SpectrumWorx::loadSettings()
 {
     try
     {
@@ -934,7 +933,7 @@ void LE_NOTHROW SpectrumWorx::loadSettings()
     }
 }
 
-void LE_NOTHROW SpectrumWorx::saveSettings()
+void SpectrumWorx::saveSettings()
 {
     using namespace boost;
 
@@ -993,7 +992,7 @@ void SpectrumWorx::setInputModeToSetOnRestart(InputMode const pendingInputMode)
 }
 #endif // LE_SW_ENGINE_INPUT_MODE >= 2
 
-LE_CONST_FUNCTION bool SpectrumWorx::runningAsAU() const
+bool SpectrumWorx::runningAsAU() const
 {
 #ifdef __APPLE__
     return runningAsAU_;
@@ -1028,7 +1027,7 @@ bool SpectrumWorx::haveSideChannel() const
     return sample_ || SpectrumWorxCore::haveSideChannel();
 }
 
-LE_NOTHROW void SpectrumWorx::handleTimingInformationChange(
+void SpectrumWorx::handleTimingInformationChange(
     LFO::Timer::TimingInformationChange const timingInformationChange)
 {
     if (timingInformationChange.timingInfoChanged())

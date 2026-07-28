@@ -62,7 +62,7 @@ namespace Parameters
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_NOTHROWNOALIAS TriggerParameter::value_type TriggerParameter::consumeValue() const
+TriggerParameter::value_type TriggerParameter::consumeValue() const
 {
     value_type const currentValue(getValue());
     const_cast<TriggerParameter &>(*this).reset();
@@ -82,7 +82,7 @@ LE_NOTHROWNOALIAS TriggerParameter::value_type TriggerParameter::consumeValue() 
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_NOTHROWNOALIAS void TriggerParameter::setValue(param_type const value) { value_ |= value; }
+void TriggerParameter::setValue(param_type const value) { value_ |= value; }
 
 //------------------------------------------------------------------------------
 } // namespace Parameters

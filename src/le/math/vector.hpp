@@ -101,30 +101,27 @@ float const &max(float const *pBegin, float const *pEnd);
 void add(float const *pInput, float *pInputOutput, float const *pOutputEnd);
 void add(float const *pInput, float constant, float *pOutput, float const *pOutputEnd);
 
-LE_NOTHROWNOALIAS void multiply(float const *pFirstArray, float const *pSecondArray, float *pOutput,
-                                float const *pOutputEnd);
-LE_NOTHROWNOALIAS void multiply(float const *pInput, float *pInputOutput, float const *pOutputEnd);
-LE_NOTHROWNOALIAS void multiply(float scalar, float const *pInput, float *pOutput,
-                                float const *pOutputEnd);
-LE_NOTHROWNOALIAS void multiply(float scalar, float *pInputOutput, float const *pOutputEnd);
+void multiply(float const *pFirstArray, float const *pSecondArray, float *pOutput,
+              float const *pOutputEnd);
+void multiply(float const *pInput, float *pInputOutput, float const *pOutputEnd);
+void multiply(float scalar, float const *pInput, float *pOutput, float const *pOutputEnd);
+void multiply(float scalar, float *pInputOutput, float const *pOutputEnd);
 
-LE_NOTHROWNOALIAS void addProduct(float const *pInput1, float const *pInput2,
-                                  float *pInput3AndOutput, float const *pOutputEnd);
+void addProduct(float const *pInput1, float const *pInput2, float *pInput3AndOutput,
+                float const *pOutputEnd);
 
 void sine(float const *pInput, float *pOutput, float const *pOutputEnd);
 void cosine(float const *pInput, float *pOutput, float const *pOutputEnd);
 void sinCos(float const *pInput, float const *pInputEnd, float *pSines, float *pCosines);
 
-LE_NOTHROWNOALIAS void amplitudes(float const *pReals, float const *pImags, float *pAmplitudes,
-                                  float const *pAmplitudesEnd);
-LE_NOTHROWNOALIAS void phases(float const *pReals, float const *pImags, float *pPhases,
-                              float const *pPhasesEnd);
+void amplitudes(float const *pReals, float const *pImags, float *pAmplitudes,
+                float const *pAmplitudesEnd);
+void phases(float const *pReals, float const *pImags, float *pPhases, float const *pPhasesEnd);
 
-LE_NOTHROWNOALIAS void polar2rectangular(float const *pAmplitudes, float const *pPhases,
-                                         float *pReals, float *pImags, float const *pImagsEnd);
-LE_NOTHROWNOALIAS void rectangular2polar(float const *pReals, float const *pImags,
-                                         float *pAmplitudes, float *pPhases,
-                                         float const *pPhasesEnd);
+void polar2rectangular(float const *pAmplitudes, float const *pPhases, float *pReals, float *pImags,
+                       float const *pImagsEnd);
+void rectangular2polar(float const *pReals, float const *pImags, float *pAmplitudes, float *pPhases,
+                       float const *pPhasesEnd);
 
 void ln(float const *pInput, float *pOutput, float const *pOutputEnd);
 void ln(float *pInputOutput, float const *pOutputEnd);
@@ -179,12 +176,10 @@ void amplitudes(float const *LE_RESTRICT pReals, float const *LE_RESTRICT pImags
 void phases(float const *LE_RESTRICT pReals, float const *LE_RESTRICT pImags,
             float *LE_RESTRICT pPhases, std::uint16_t numberOfElements);
 
-LE_NOTHROWNOALIAS void polar2rectangular(float const *pAmplitudes, float const *pPhases,
-                                         float *pReals, float *pImags,
-                                         std::uint16_t numberOfElements);
-LE_NOTHROWNOALIAS void rectangular2polar(float const *pReals, float const *pImags,
-                                         float *pAmplitudes, float *pPhases,
-                                         std::uint16_t numberOfElements);
+void polar2rectangular(float const *pAmplitudes, float const *pPhases, float *pReals, float *pImags,
+                       std::uint16_t numberOfElements);
+void rectangular2polar(float const *pReals, float const *pImags, float *pAmplitudes, float *pPhases,
+                       std::uint16_t numberOfElements);
 
 void ln(float const *pInput, float *pOutput, unsigned int numberOfElements);
 void ln(float *pInputOutput, unsigned int numberOfElements);
@@ -211,10 +206,8 @@ LE_OPTIMIZE_FOR_SPEED_BEGIN()
 // http://blog.frama-c.com/index.php?post/2013/10/09/Overflow-float-integer
 // http://stackoverflow.com/questions/9832430/arm-saturate-signed-int-to-unsigned-byte
 // http://stackoverflow.com/questions/24546927/behavior-of-arm-neon-float-integer-conversion-with-overflow
-LE_FORCEINLINE LE_HOT LE_NOTHROWNOALIAS void convertSample(float const LE_GNU_SPECIFIC(&__restrict)
-                                                               input,
-                                                           std::int16_t &LE_GNU_SPECIFIC(__restrict)
-                                                               output)
+LE_FORCEINLINE LE_HOT void convertSample(float const LE_GNU_SPECIFIC(&__restrict) input,
+                                         std::int16_t &LE_GNU_SPECIFIC(__restrict) output)
 {
 #if 0 // slower & not autovectorized
     static auto constexpr scale( static_cast<float>( std::numeric_limits<std::int16_t>::max() ) );
@@ -229,25 +222,23 @@ LE_FORCEINLINE LE_HOT LE_NOTHROWNOALIAS void convertSample(float const LE_GNU_SP
 #endif
 }
 
-LE_FORCEINLINE LE_HOT LE_NOTHROWNOALIAS void
-convertSample(std::int16_t const LE_GNU_SPECIFIC(&__restrict) input,
-              float &LE_GNU_SPECIFIC(__restrict) output)
+LE_FORCEINLINE LE_HOT void convertSample(std::int16_t const LE_GNU_SPECIFIC(&__restrict) input,
+                                         float &LE_GNU_SPECIFIC(__restrict) output)
 {
     static float constexpr scale(-1.0f / std::numeric_limits<std::int16_t>::min());
     output = input * scale;
 }
 
-LE_FORCEINLINE LE_HOT LE_NOTHROWNOALIAS void
-convertSample(std::int32_t const LE_GNU_SPECIFIC(&__restrict) input,
-              float &LE_GNU_SPECIFIC(__restrict) output)
+LE_FORCEINLINE LE_HOT void convertSample(std::int32_t const LE_GNU_SPECIFIC(&__restrict) input,
+                                         float &LE_GNU_SPECIFIC(__restrict) output)
 {
     static float constexpr scale(-1.0f / std::numeric_limits<std::int32_t>::min());
     output = input * scale;
 }
 
 template <typename Input, typename Output>
-LE_HOT LE_NOTHROWNOALIAS void convertSamples(Input const *LE_RESTRICT pInput,
-                                             Output *LE_RESTRICT pOutput, std::uint32_t samples)
+LE_HOT void convertSamples(Input const *LE_RESTRICT pInput, Output *LE_RESTRICT pOutput,
+                           std::uint32_t samples)
 {
 #ifdef __clang__
 #pragma clang loop vectorize(enable) interleave(enable)
@@ -257,9 +248,8 @@ LE_HOT LE_NOTHROWNOALIAS void convertSamples(Input const *LE_RESTRICT pInput,
 }
 
 template <typename Sample>
-LE_HOT LE_NOTHROWNOALIAS void convertSamples(Sample const *LE_RESTRICT const pInput,
-                                             Sample *LE_RESTRICT const pOutput,
-                                             std::uint32_t const samples)
+LE_HOT void convertSamples(Sample const *LE_RESTRICT const pInput,
+                           Sample *LE_RESTRICT const pOutput, std::uint32_t const samples)
 {
     std::copy_n(pInput, samples, pOutput);
 }

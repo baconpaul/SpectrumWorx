@@ -201,7 +201,7 @@ SharedModuleControls::FrequencyRange::FrequencyRange()
 
 #pragma warning(pop)
 
-LE_NOTHROW void SharedModuleControls::FrequencyRange::setValue(float const value)
+void SharedModuleControls::FrequencyRange::setValue(float const value)
 {
     LE_ASSERT(canUseWriteAccessIndex());
     switch (parameterIndexForInternalWriteAccess_)
@@ -216,7 +216,7 @@ LE_NOTHROW void SharedModuleControls::FrequencyRange::setValue(float const value
     }
 }
 
-LE_NOTHROWNOALIAS float SharedModuleControls::FrequencyRange::getValue() const
+float SharedModuleControls::FrequencyRange::getValue() const
 {
     //...mrmlj...see the comment for parameterIndexForInternalWriteAccess_...
     LE_ASSERT(isThisTheGUIThread());
@@ -230,8 +230,8 @@ LE_NOTHROWNOALIAS float SharedModuleControls::FrequencyRange::getValue() const
     }
 }
 
-LE_NOTHROW void
-SharedModuleControls::FrequencyRange::updateForEngineSetupChanges(Engine::Setup const &engineSetup)
+void SharedModuleControls::FrequencyRange::updateForEngineSetupChanges(
+    Engine::Setup const &engineSetup)
 {
     typedef FrequencyRange::param_type value_type;
     value_type const nyquist(engineSetup.sampleRate<value_type>() / 2);

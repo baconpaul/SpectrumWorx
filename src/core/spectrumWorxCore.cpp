@@ -48,7 +48,7 @@ namespace SW
 #if LE_SW_GUI
 namespace GUI
 {
-void LE_NOTHROW warningMessageBox(std::string_view title, std::string_view message, bool canBlock);
+void warningMessageBox(std::string_view title, std::string_view message, bool canBlock);
 } // namespace GUI
 #endif // LE_SW_GUI
 
@@ -73,7 +73,7 @@ char const SpectrumWorxCore::productString[] = "SpectrumWorx (Little Endian Ltd.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_NOTHROW SpectrumWorxCore::SpectrumWorxCore()
+SpectrumWorxCore::SpectrumWorxCore()
 {
 #ifndef NDEBUG
     Utility::Tracer::pTagString = "SW";
@@ -95,7 +95,7 @@ LE_NOTHROW SpectrumWorxCore::SpectrumWorxCore()
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_NOTHROWNOALIAS void SpectrumWorxCore::process /// \throws nothing
+void SpectrumWorxCore::process /// \throws nothing
     (float const *const *pMainChannels, float const *const *const pSideChannels,
      float *const *const outputs, float const &outputGainScale, unsigned int const samples)
 {
@@ -271,7 +271,7 @@ SpectrumWorxCore::ModuleInitialiser SpectrumWorxCore::moduleInitialiser()
 
 std::uint8_t SpectrumWorxCore::numberOfChannels() const { return engineSetup().numberOfChannels(); }
 
-LE_NOTHROW SpectrumWorxCore::IOChangeResult
+SpectrumWorxCore::IOChangeResult
 SpectrumWorxCore::setNumberOfChannels(std::uint8_t const numberOfInputChannels,
                                       std::uint8_t const numberOfOutputChannels)
 {
@@ -289,8 +289,8 @@ SpectrumWorxCore::setNumberOfChannels(std::uint8_t const numberOfInputChannels,
         setNumberOfChannelsImpl(numberOfMainChannels, numberOfSideChannels));
 }
 
-LE_NOTHROW bool SpectrumWorxCore::setNumberOfChannelsImpl(std::uint8_t const numberOfMainChannels,
-                                                          std::uint8_t const numberOfSideChannels)
+bool SpectrumWorxCore::setNumberOfChannelsImpl(std::uint8_t const numberOfMainChannels,
+                                               std::uint8_t const numberOfSideChannels)
 {
     LE_ASSERT(currentThreadOwnsTheProcessLock());
 
@@ -312,9 +312,8 @@ LE_NOTHROW bool SpectrumWorxCore::setNumberOfChannelsImpl(std::uint8_t const num
     return true;
 }
 
-LE_NOTHROW bool
-SpectrumWorxCore::checkChannelConfiguration(std::uint8_t const numberOfInputChannels,
-                                            std::uint8_t const numberOfOutputChannels)
+bool SpectrumWorxCore::checkChannelConfiguration(std::uint8_t const numberOfInputChannels,
+                                                 std::uint8_t const numberOfOutputChannels)
 {
 #ifndef __APPLE__
     /// \note AU hosts can try any IO configuration (the auval tool specifically
@@ -415,7 +414,7 @@ Engine::Setup const &SpectrumWorxCore::uncheckedEngineSetup() const
     return Engine::Processor::engineSetup();
 }
 
-bool LE_NOTHROW SpectrumWorxCore::resize(Engine::StorageFactors const &newfactors)
+bool SpectrumWorxCore::resize(Engine::StorageFactors const &newfactors)
 {
     LE_ASSERT(currentThreadOwnsTheProcessLock());
     return Engine::Processor::resize(
@@ -424,7 +423,7 @@ bool LE_NOTHROW SpectrumWorxCore::resize(Engine::StorageFactors const &newfactor
         sharedStorage_);
 }
 
-LE_NOTHROW bool SpectrumWorxCore::updateEngineSetup()
+bool SpectrumWorxCore::updateEngineSetup()
 {
     using namespace Engine;
 
@@ -584,7 +583,7 @@ void SpectrumWorxCore::resetChannelBuffers()
     Engine::Processor::resetChannelBuffers();
 }
 
-LE_NOTHROW void SpectrumWorxCore::handleTimingInformationChange(
+void SpectrumWorxCore::handleTimingInformationChange(
     LFO::Timer::TimingInformationChange const timingInformationChange)
 {
     /// \note We assume that SpectrumWorxCore is used by protocols that do not
@@ -605,7 +604,7 @@ void SpectrumWorxCore::moveModule(std::uint8_t const sourceIndex, std::uint8_t c
     moduleChain().moveModule(sourceIndex, targetIndex);
 }
 
-Utility::CriticalSectionLock LE_NOTHROW SpectrumWorxCore::getProcessingLock() const
+Utility::CriticalSectionLock SpectrumWorxCore::getProcessingLock() const
 {
     return Utility::CriticalSectionLock(processCriticalSection_);
 }

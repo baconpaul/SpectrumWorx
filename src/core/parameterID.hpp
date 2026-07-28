@@ -113,7 +113,7 @@ ParameterID::BinaryValue parameterIDFromIndex(Plugins::ParameterIndex);
 Plugins::ParameterIndex parameterIndexFromBinaryID(ParameterID::BinaryValue);
 
 template <class Functor, class PluginClass>
-typename Functor::result_type LE_NOTHROW
+typename Functor::result_type
 invokeFunctorOnIdentifiedParameter(ParameterID const parameterID, Functor &&functor,
                                    PluginClass *LE_RESTRICT const pEffect)
 {

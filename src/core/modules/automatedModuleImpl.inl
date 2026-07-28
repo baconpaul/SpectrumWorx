@@ -24,7 +24,7 @@ namespace SW
 //------------------------------------------------------------------------------
 
 template <class Impl>
-Plugins::AutomatedParameterValue LE_NOTHROWNOALIAS
+Plugins::AutomatedParameterValue
 AutomatedModuleImpl<Impl>::getSharedAutomatedParameter(std::uint8_t const parameterIndex,
                                                        bool const normalised) const
 {
@@ -33,8 +33,7 @@ AutomatedModuleImpl<Impl>::getSharedAutomatedParameter(std::uint8_t const parame
 }
 
 template <class Impl>
-Plugins::AutomatedParameterValue LE_NOTHROWNOALIAS
-AutomatedModuleImpl<Impl>::getEffectSpecificAutomatedParameter(
+Plugins::AutomatedParameterValue AutomatedModuleImpl<Impl>::getEffectSpecificAutomatedParameter(
     std::uint8_t const effectSpecificParameterIndex, bool const normalised) const
 {
 #ifdef LE_SW_FMOD //...mrmlj...FMOD has "full range" but completely static parameters...
@@ -46,7 +45,7 @@ AutomatedModuleImpl<Impl>::getEffectSpecificAutomatedParameter(
 }
 
 template <class Impl>
-Plugins::AutomatedParameterValue LE_NOTHROWNOALIAS
+Plugins::AutomatedParameterValue
 AutomatedModuleImpl<Impl>::getAutomatedParameter(std::uint8_t const parameterIndex,
                                                  bool const normalised) const
 {
@@ -60,10 +59,9 @@ AutomatedModuleImpl<Impl>::getAutomatedParameter(std::uint8_t const parameterInd
 }
 
 template <class Impl>
-void LE_NOTHROW
-AutomatedModuleImpl<Impl>::setAutomatedParameter(std::uint8_t const parameterIndex,
-                                                 Plugins::AutomatedParameterValue const value,
-                                                 bool const normalised)
+void AutomatedModuleImpl<Impl>::setAutomatedParameter(std::uint8_t const parameterIndex,
+                                                      Plugins::AutomatedParameterValue const value,
+                                                      bool const normalised)
 {
     //...mrmlj...LE_ASSUME( parameterIndex < SW::Constants::maxNumberOfParametersPerModule );
 
@@ -91,7 +89,7 @@ AutomatedModuleImpl<Impl>::setAutomatedParameter(std::uint8_t const parameterInd
 } // AutomatedModuleImpl<Impl>::setAutomatedParameter()
 
 template <class Impl>
-LE_NOTHROWNOALIAS char const *AutomatedModuleImpl<Impl>::getParameterValueString(
+char const *AutomatedModuleImpl<Impl>::getParameterValueString(
     std::uint8_t const index, LE::Parameters::AutomatedParameterPrinter const &printer) const
 {
     if (index >= impl().numberOfParameters())

@@ -32,7 +32,7 @@ LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 LE_COLD ModuleDSP::~ModuleDSP() {}
 
-LE_NOTHROW LE_COLD void ModuleDSP::preProcess(LFO::Timer const &timer, Setup const &engineSetup)
+LE_COLD void ModuleDSP::preProcess(LFO::Timer const &timer, Setup const &engineSetup)
 {
     if (bypass())
         return;
@@ -81,8 +81,8 @@ bool LE_COLD ModuleDSP::allocateStorage(
 LE_OPTIMIZE_FOR_SIZE_END()
 
 LE_OPTIMIZE_FOR_SPEED_BEGIN()
-LE_NOTHROW void ModuleDSP::process(std::uint8_t const channel, ChannelData &channelData,
-                                   Setup const &engineSetup) const
+void ModuleDSP::process(std::uint8_t const channel, ChannelData &channelData,
+                        Setup const &engineSetup) const
 {
     if (!bypass())
     {
@@ -118,27 +118,27 @@ ModuleDSP::ChannelDataProxy::ChannelDataProxy(ChannelData &data, ModuleDSP const
     amPh2ReIm = false;
 }
 
-LE_NOINLINE LE_NOTHROWNOALIAS ModuleDSP::ChannelDataProxy::operator MainSideChannelData_AmPh() const
+LE_NOINLINE ModuleDSP::ChannelDataProxy::operator MainSideChannelData_AmPh() const
 {
     return MainSideChannelData_AmPh(data_.freshAmPhData(blendRequired_), module_.workingRange());
 }
 
-LE_NOTHROWNOALIAS ModuleDSP::ChannelDataProxy::operator MainSideChannelData_ReIm() const
+ModuleDSP::ChannelDataProxy::operator MainSideChannelData_ReIm() const
 {
     return MainSideChannelData_ReIm(data_.freshReImData(blendRequired_), module_.workingRange());
 }
 
-LE_NOINLINE LE_NOTHROWNOALIAS ModuleDSP::ChannelDataProxy::operator ChannelData_AmPh() const
+LE_NOINLINE ModuleDSP::ChannelDataProxy::operator ChannelData_AmPh() const
 {
     return ChannelData_AmPh(data_.freshAmPhData(blendRequired_).main(), module_.workingRange());
 }
 
-LE_NOINLINE LE_NOTHROWNOALIAS ModuleDSP::ChannelDataProxy::operator ChannelData_ReIm() const
+LE_NOINLINE ModuleDSP::ChannelDataProxy::operator ChannelData_ReIm() const
 {
     return ChannelData_ReIm(data_.freshReImData(blendRequired_).main(), module_.workingRange());
 }
 
-LE_NOTHROWNOALIAS ModuleDSP::ChannelDataProxy::operator ChannelData_AmPh2ReIm() const
+ModuleDSP::ChannelDataProxy::operator ChannelData_AmPh2ReIm() const
 {
     amPh2ReIm_ = true;
     ChannelData::AmPhReImData const bothDomainData(data_.freshAmPh2ReImData(blendRequired_));
@@ -150,7 +150,7 @@ LE_NOTHROWNOALIAS ModuleDSP::ChannelDataProxy::operator ChannelData_AmPh2ReIm() 
     return result;
 }
 
-LE_NOTHROWNOALIAS ModuleDSP::ChannelDataProxy::operator ChannelData_ReIm2AmPh() const
+ModuleDSP::ChannelDataProxy::operator ChannelData_ReIm2AmPh() const
 {
     ChannelData::AmPhReImData const bothDomainData(data_.freshReIm2AmPhData(blendRequired_));
     ChannelData_ReIm2AmPh const result = {
@@ -162,22 +162,20 @@ LE_NOTHROWNOALIAS ModuleDSP::ChannelDataProxy::operator ChannelData_ReIm2AmPh() 
     return result;
 }
 
-LE_NOTHROW LE_CONST_FUNCTION void *
-ModuleDSP::getEffectParameterPtr(std::uint8_t const parameterIndex)
+void *ModuleDSP::getEffectParameterPtr(std::uint8_t const parameterIndex)
 {
     LE_ASSUME(pParameterOffsets_[0] == 0);
     std::uint16_t const parameterOffset(parametersBaseOffset_ + pParameterOffsets_[parameterIndex]);
     return reinterpret_cast<char *>(this) + parameterOffset;
 }
 
-LE_NOTHROW LE_CONST_FUNCTION void const *
-ModuleDSP::getEffectParameterPtr(std::uint8_t const parameterIndex) const
+void const *ModuleDSP::getEffectParameterPtr(std::uint8_t const parameterIndex) const
 {
     return const_cast<ModuleDSP &>(*this).getEffectParameterPtr(parameterIndex);
 }
 
-LE_NOTHROW float ModuleDSP::setEffectParameter(std::uint8_t const parameterIndex, float const value,
-                                               ParameterInfo const &cachedInfo)
+float ModuleDSP::setEffectParameter(std::uint8_t const parameterIndex, float const value,
+                                    ParameterInfo const &cachedInfo)
 {
     LE_ASSERT(&cachedInfo == &effectSpecificParameterInfo(parameterIndex));
     void *LE_RESTRICT const pValue(getEffectParameterPtr(parameterIndex));
@@ -200,18 +198,18 @@ LE_NOTHROW float ModuleDSP::setEffectParameter(std::uint8_t const parameterIndex
     }
 }
 
-LE_NOTHROWNOALIAS void intrusive_ptr_add_ref(ModuleNode const *LE_RESTRICT const pModuleNode)
+void intrusive_ptr_add_ref(ModuleNode const *LE_RESTRICT const pModuleNode)
 {
     LE_ASSUME(pModuleNode);
     ++pModuleNode->referenceCount_;
 }
 
 #ifdef LE_SW_SDK_BUILD // ambiguous overload resolution (implicitly convertible to both ModuleNode and ModuleBase)
-LE_NOTHROWNOALIAS void intrusive_ptr_add_ref(ModuleDSP const *const pModule)
+void intrusive_ptr_add_ref(ModuleDSP const *const pModule)
 {
     return intrusive_ptr_add_ref(static_cast<ModuleNode const *>(pModule));
 }
-LE_NOTHROW void intrusive_ptr_release(ModuleDSP const *const pModule)
+void intrusive_ptr_release(ModuleDSP const *const pModule)
 {
     return intrusive_ptr_release(static_cast<ModuleNode const *>(pModule));
 }
@@ -221,7 +219,7 @@ LE_NOTHROW void intrusive_ptr_release(ModuleDSP const *const pModule)
 // ModuleParameters set/getEffectParameter default implementations
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_NOTHROW float ModuleParameters::getEffectParameter(std::uint8_t const parameterIndex) const
+float ModuleParameters::getEffectParameter(std::uint8_t const parameterIndex) const
 {
     auto &impl(static_cast<ModuleDSP const &>(*this));
     auto const &info(impl.effectSpecificParameterInfo(parameterIndex));
@@ -241,8 +239,7 @@ LE_NOTHROW float ModuleParameters::getEffectParameter(std::uint8_t const paramet
     }
 }
 
-LE_NOTHROW float ModuleParameters::setEffectParameter(std::uint8_t const parameterIndex,
-                                                      float const value)
+float ModuleParameters::setEffectParameter(std::uint8_t const parameterIndex, float const value)
 {
     auto const &info(effectSpecificParameterInfo(parameterIndex));
     return static_cast<ModuleDSP &>(*this).setEffectParameter(parameterIndex, value, info);
@@ -268,36 +265,33 @@ namespace SW
 namespace Engine
 {
 
-LE_NOTHROW LE_PURE_FUNCTION std::uint8_t ModuleBase::numberOfEffectSpecificParameters() const
+std::uint8_t ModuleBase::numberOfEffectSpecificParameters() const
 {
     return static_cast<ModuleDSP const &>(*this)
         .ModuleParameters::numberOfEffectSpecificParameters();
 }
-LE_NOTHROWNOALIAS float ModuleBase::getBaseParameter(std::uint8_t const baseParameterIndex) const
+float ModuleBase::getBaseParameter(std::uint8_t const baseParameterIndex) const
 {
     return static_cast<ModuleDSP const &>(*this).ModuleParameters::getBaseParameter(
         baseParameterIndex);
 }
-LE_NOTHROW float ModuleBase::setBaseParameter(std::uint8_t const baseParameterIndex,
-                                              float const value)
+float ModuleBase::setBaseParameter(std::uint8_t const baseParameterIndex, float const value)
 {
     return static_cast<ModuleDSP &>(*this).ModuleParameters::setBaseParameter(baseParameterIndex,
                                                                               value);
 }
-LE_NOTHROWNOALIAS float
-ModuleBase::getEffectParameter(std::uint8_t const effectParameterIndex) const
+float ModuleBase::getEffectParameter(std::uint8_t const effectParameterIndex) const
 {
     return static_cast<ModuleDSP const &>(*this).ModuleParameters::getEffectParameter(
         effectParameterIndex);
 }
-LE_NOTHROW float ModuleBase::setEffectParameter(std::uint8_t const effectParameterIndex,
-                                                float const value)
+float ModuleBase::setEffectParameter(std::uint8_t const effectParameterIndex, float const value)
 {
     return static_cast<ModuleDSP &>(*this).ModuleParameters::setEffectParameter(
         effectParameterIndex, value);
 }
 
-LE_NOTHROWNOALIAS float ModuleBase::getParameter(std::uint8_t const parameterIndex) const
+float ModuleBase::getParameter(std::uint8_t const parameterIndex) const
 {
     return (parameterIndex < numberOfBaseParameters)
                ? getBaseParameter(parameterIndex)
@@ -305,7 +299,7 @@ LE_NOTHROWNOALIAS float ModuleBase::getParameter(std::uint8_t const parameterInd
                      static_cast<ModuleDSP const &>(*this).effectSpecificParameterIndex(
                          parameterIndex));
 }
-LE_NOTHROW float ModuleBase::setParameter(std::uint8_t const parameterIndex, float const value)
+float ModuleBase::setParameter(std::uint8_t const parameterIndex, float const value)
 {
     return (parameterIndex < numberOfBaseParameters)
                ? setBaseParameter(parameterIndex, value)
@@ -314,7 +308,7 @@ LE_NOTHROW float ModuleBase::setParameter(std::uint8_t const parameterIndex, flo
                      value);
 }
 
-LE_NOTHROWNOALIAS Parameters::LFO &ModuleBase::lfo(std::uint8_t const parameterIndex)
+Parameters::LFO &ModuleBase::lfo(std::uint8_t const parameterIndex)
 {
     auto &impl(static_cast<ModuleDSP &>(*this));
     static_assert(ModuleParameters::numberOfNonLFOBaseParameters ==
@@ -325,27 +319,27 @@ LE_NOTHROWNOALIAS Parameters::LFO &ModuleBase::lfo(std::uint8_t const parameterI
                                       ModuleParameters::numberOfNonLFOBaseParameters);
 }
 
-LE_NOTHROWNOALIAS Parameters::RuntimeInformation const &
+Parameters::RuntimeInformation const &
 ModuleBase::parameterInfo(std::uint8_t const parameterIndex) const
 {
     return static_cast<ModuleDSP const &>(*this).ModuleParameters::parameterInfo(parameterIndex);
 }
 
-LE_NOTHROWRESTRICTNOALIAS char const *ModuleBase::effectName() const
+char const *ModuleBase::effectName() const
 {
     return Effects::effectIndex2TypeName(static_cast<ModuleDSP const &>(*this).effectTypeIndex());
 }
 
-LE_NOTHROWNOALIAS ModuleBase::BaseParameters &ModuleBase::baseParameters()
+ModuleBase::BaseParameters &ModuleBase::baseParameters()
 {
     return static_cast<ModuleDSP &>(*this).baseParameters();
 }
 
-LE_NOTHROWNOALIAS void intrusive_ptr_add_ref(ModuleBase const *const pModuleBase)
+void intrusive_ptr_add_ref(ModuleBase const *const pModuleBase)
 {
     intrusive_ptr_add_ref(&node(*static_cast<ModuleDSP const *>(pModuleBase)));
 }
-LE_NOTHROW void intrusive_ptr_release(ModuleBase const *const pModuleBase)
+void intrusive_ptr_release(ModuleBase const *const pModuleBase)
 {
     intrusive_ptr_release(&node(*static_cast<ModuleDSP const *>(pModuleBase)));
 }

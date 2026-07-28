@@ -47,15 +47,15 @@ namespace Utility
 class RWLock
 {
   public:
-    LE_NOTHROW RWLock() /*: lock_ = { SRWLOCK_INIT }*/ { lock_ = {SRWLOCK_INIT}; }
-    LE_NOTHROW RWLock(RWLock &&other) : lock_(other.lock_) { other.lock_ = {SRWLOCK_INIT}; }
+    RWLock() /*: lock_ = { SRWLOCK_INIT }*/ { lock_ = {SRWLOCK_INIT}; }
+    RWLock(RWLock &&other) : lock_(other.lock_) { other.lock_ = {SRWLOCK_INIT}; }
     ~RWLock() = default;
     RWLock(RWLock const &) = delete;
 
-    LE_NOTHROW void lock() { ::AcquireSRWLockExclusive(&lock_); }
-    LE_NOTHROW void unlock() { ::ReleaseSRWLockExclusive(&lock_); }
+    void lock() { ::AcquireSRWLockExclusive(&lock_); }
+    void unlock() { ::ReleaseSRWLockExclusive(&lock_); }
 
-    LE_NOTHROW bool tryLock() { return ::TryAcquireSRWLockExclusive(&lock_) != FALSE; }
+    bool tryLock() { return ::TryAcquireSRWLockExclusive(&lock_) != FALSE; }
 
   private:
     friend class ConditionVariable;
@@ -68,7 +68,7 @@ class ConditionVariable
     using Lock = RWLock;
 
     ConditionVariable() /*: cv_{ CONDITION_VARIABLE_INIT }*/ { cv_ = {CONDITION_VARIABLE_INIT}; }
-    LE_NOTHROW ConditionVariable(ConditionVariable &&other) : cv_(other.cv_)
+    ConditionVariable(ConditionVariable &&other) : cv_(other.cv_)
     {
         other.cv_ = {CONDITION_VARIABLE_INIT};
     }
@@ -76,10 +76,10 @@ class ConditionVariable
     ~ConditionVariable() = default;
     ConditionVariable(ConditionVariable const &) = delete;
 
-    LE_NOTHROW void signal() { ::WakeAllConditionVariable(&cv_); }
-    LE_NOINLINE LE_NOTHROW void wait(Lock &lock) { LE_VERIFY(wait(lock, INFINITE)); }
+    void signal() { ::WakeAllConditionVariable(&cv_); }
+    LE_NOINLINE void wait(Lock &lock) { LE_VERIFY(wait(lock, INFINITE)); }
 
-    LE_NOTHROW bool wait(Lock &lock, std::uint32_t const milliseconds)
+    bool wait(Lock &lock, std::uint32_t const milliseconds)
     {
         auto const result(::SleepConditionVariableSRW(&cv_, &lock.lock_, milliseconds,
                                                       0 /*CONDITION_VARIABLE_LOCKMODE_SHARED*/));
@@ -105,8 +105,8 @@ class ConditionVariable
   public:
     using Lock = CriticalSection;
 
-    LE_NOTHROW LE_COLD ConditionVariable() : cv_(PTHREAD_COND_INITIALIZER) {}
-    LE_NOTHROW LE_COLD ~ConditionVariable() { LE_VERIFY(::pthread_cond_destroy(&cv_) == 0); }
+    LE_COLD ConditionVariable() : cv_(PTHREAD_COND_INITIALIZER) {}
+    LE_COLD ~ConditionVariable() { LE_VERIFY(::pthread_cond_destroy(&cv_) == 0); }
 
     ConditionVariable(ConditionVariable &&other) noexcept : cv_(other.cv_)
     {
@@ -115,13 +115,10 @@ class ConditionVariable
 
     ConditionVariable(ConditionVariable const &) = delete;
 
-    LE_NOTHROW LE_COLD void signal() { LE_VERIFY(::pthread_cond_broadcast(&cv_) == 0); }
-    LE_NOTHROW LE_COLD void wait(Lock &lock)
-    {
-        LE_VERIFY(::pthread_cond_wait(&cv_, &lock.mutex_) == 0);
-    }
+    LE_COLD void signal() { LE_VERIFY(::pthread_cond_broadcast(&cv_) == 0); }
+    LE_COLD void wait(Lock &lock) { LE_VERIFY(::pthread_cond_wait(&cv_, &lock.mutex_) == 0); }
 
-    LE_NOTHROW LE_COLD bool wait(Lock &lock, std::uint16_t /*const*/ milliseconds)
+    LE_COLD bool wait(Lock &lock, std::uint16_t /*const*/ milliseconds)
     {
 #if defined(HAVE_PTHREAD_COND_TIMEDWAIT_RELATIVE) // deprecated and unavailable in 64bit Android
         //::timespec const timeout = { .tv_sec = 0, .tv_nsec = static_cast<long>( milliseconds * 1000 * 1000 ) };

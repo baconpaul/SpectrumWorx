@@ -108,8 +108,8 @@ FFT_float_real_1D::~FFT_float_real_1D() /// \throws nothing
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_NOTHROW void FFT_float_real_1D::resize(SW::Engine::StorageFactors const &factors,
-                                          SW::Engine::Storage &storage) /// \throws nothing
+void FFT_float_real_1D::resize(SW::Engine::StorageFactors const &factors,
+                               SW::Engine::Storage &storage) /// \throws nothing
 {
     auto const size(factors.fftSize);
 
@@ -154,10 +154,9 @@ LE_NOTHROW void FFT_float_real_1D::resize(SW::Engine::StorageFactors const &fact
 /// Real DFT
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_NOTHROW void
-FFT_float_real_1D::transform(float *LE_RESTRICT const data /*in time, out DFT reals*/,
-                             float *LE_RESTRICT const imaginaryTargetSubRange,
-                             std::uint16_t const size) const
+void FFT_float_real_1D::transform(float *LE_RESTRICT const data /*in time, out DFT reals*/,
+                                  float *LE_RESTRICT const imaginaryTargetSubRange,
+                                  std::uint16_t const size) const
 {
     LE_ASSERT(size <= this->size());
 #if defined(LE_ACC_FFT) || defined(LE_SORENSEN_PURE_REAL_FFT_TEST)
@@ -182,10 +181,9 @@ FFT_float_real_1D::transform(float *LE_RESTRICT const data /*in time, out DFT re
 #endif // LE_ACC_FFT
 }
 
-LE_NOTHROW void
-FFT_float_real_1D::inverseTransform(float *LE_RESTRICT const data /*in DFT reals, out time*/,
-                                    float const *LE_RESTRICT const imaginarySourceSubRange,
-                                    std::uint16_t const size) const
+void FFT_float_real_1D::inverseTransform(float *LE_RESTRICT const data /*in DFT reals, out time*/,
+                                         float const *LE_RESTRICT const imaginarySourceSubRange,
+                                         std::uint16_t const size) const
 {
     LE_ASSERT(size <= this->size());
 #if defined(LE_ACC_FFT) || defined(LE_SORENSEN_PURE_REAL_FFT_TEST)
@@ -210,9 +208,8 @@ FFT_float_real_1D::inverseTransform(float *LE_RESTRICT const data /*in DFT reals
 #pragma warning(push)
 #pragma warning(disable : 4389) // Signed/unsigned mismatch
 #endif                          // _MSC_VER
-LE_NOTHROW void FFT_float_real_1D::transform(float *const timeDomainData,
-                                             DataRange const &imaginarySubRange,
-                                             bool const doFFTShift) const
+void FFT_float_real_1D::transform(float *const timeDomainData, DataRange const &imaginarySubRange,
+                                  bool const doFFTShift) const
 {
     if (doFFTShift)
         fftshift(timeDomainData);
@@ -220,9 +217,9 @@ LE_NOTHROW void FFT_float_real_1D::transform(float *const timeDomainData,
     transform(timeDomainData, imaginarySubRange.begin(), size());
 }
 
-LE_NOTHROW void FFT_float_real_1D::inverseTransform(float *const dftData,
-                                                    ReadOnlyDataRange const &imaginarySubRange,
-                                                    bool const doFFTShift) const
+void FFT_float_real_1D::inverseTransform(float *const dftData,
+                                         ReadOnlyDataRange const &imaginarySubRange,
+                                         bool const doFFTShift) const
 {
     LE_ASSERT(imaginarySubRange.size() == (size() / 2) + 1);
     inverseTransform(dftData, imaginarySubRange.begin(), size());
@@ -237,8 +234,8 @@ LE_NOTHROW void FFT_float_real_1D::inverseTransform(float *const dftData,
 /// Complex DFT
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_NOTHROW void FFT_float_real_1D::transform(float *LE_RESTRICT const pReals,
-                                             float *LE_RESTRICT const pImags) const
+void FFT_float_real_1D::transform(float *LE_RESTRICT const pReals,
+                                  float *LE_RESTRICT const pImags) const
 {
 #if defined(LE_ACC_FFT)
     LE_ASSERT(!"Not implemented!");
@@ -251,8 +248,8 @@ LE_NOTHROW void FFT_float_real_1D::transform(float *LE_RESTRICT const pReals,
 #endif // LE_ACC_FFT
 }
 
-LE_NOTHROW void FFT_float_real_1D::inverseTransform(float *LE_RESTRICT const pReals,
-                                                    float *LE_RESTRICT const pImags) const
+void FFT_float_real_1D::inverseTransform(float *LE_RESTRICT const pReals,
+                                         float *LE_RESTRICT const pImags) const
 {
 #if defined(LE_ACC_FFT)
     LE_ASSERT(!"Not implemented!");
@@ -289,9 +286,8 @@ void unlock(void const *const address, std::size_t const /*size*/)
 }
 } // namespace
 
-LE_NOTHROW void FFT_float_real_1D::transform(float const *const pTimeDomainData,
-                                             float const *const pWindow, float *const pReals,
-                                             DataRange const &imags) const
+void FFT_float_real_1D::transform(float const *const pTimeDomainData, float const *const pWindow,
+                                  float *const pReals, DataRange const &imags) const
 {
     workBuffer_.clear();
     clear(imags);
@@ -317,16 +313,14 @@ LE_NOTHROW void FFT_float_real_1D::transform(float const *const pTimeDomainData,
     unlock(&workBuffer_[size() + 1024], 256);
 }
 
-LE_NOTHROW void FFT_float_real_1D::inverseTransform(float *const pTimeDomainData,
-                                                    float const *pReals,
-                                                    ReadOnlyDataRange const &imags) const
+void FFT_float_real_1D::inverseTransform(float *const pTimeDomainData, float const *pReals,
+                                         ReadOnlyDataRange const &imags) const
 {
     nt2::static_fft<128, 8192, float>::real_inverse_transform(pReals, imags.begin(),
                                                               pTimeDomainData, size());
 }
 
-LE_NOTHROW void FFT_float_real_1D::inverseTransform(DataRange const &reals,
-                                                    DataRange const &imags) const
+void FFT_float_real_1D::inverseTransform(DataRange const &reals, DataRange const &imags) const
 {
     workBuffer_.clear();
     float *pReals(&workBuffer_[0]);
@@ -410,8 +404,7 @@ void FFT_float_real_1D::fftshift(float *const pTimeDomainData) const
 
 float FFT_float_real_1D::maximumAmplitude(float const size) { return std::sqrt(size) / 2; }
 
-LE_COLD LE_CONST_FUNCTION std::uint32_t
-FFT_float_real_1D::requiredStorage(SW::Engine::StorageFactors const &factors)
+LE_COLD std::uint32_t FFT_float_real_1D::requiredStorage(SW::Engine::StorageFactors const &factors)
 {
     return WorkBuffer::requiredStorage(factors);
 }

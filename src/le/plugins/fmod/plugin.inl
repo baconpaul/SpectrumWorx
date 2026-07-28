@@ -68,8 +68,8 @@ Plugin<Impl, Protocol::FMOD>::Plugin(ConstructionParameter const constructionPar
 }
 
 template <class Impl>
-LE_NOTHROW void Plugin<Impl, Protocol::FMOD>::getParameterValueString(unsigned int const index,
-                                                                      char *const pBuffer) const
+void Plugin<Impl, Protocol::FMOD>::getParameterValueString(unsigned int const index,
+                                                           char *const pBuffer) const
 {
     if (pBuffer)
     {
@@ -99,8 +99,7 @@ LE_NOTHROW void Plugin<Impl, Protocol::FMOD>::getParameterValueString(unsigned i
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class Impl>
-LE_NOTHROW FMOD_RESULT F_CALLBACK
-Plugin<Impl, Protocol::FMOD>::create(FMOD_DSP_STATE *LE_RESTRICT const pDSP)
+FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::create(FMOD_DSP_STATE *LE_RESTRICT const pDSP)
 {
     LE_ASSERT(pDSP);
     LE_ASSERT(pDSP->instance);
@@ -134,14 +133,14 @@ Plugin<Impl, Protocol::FMOD>::create(FMOD_DSP_STATE *LE_RESTRICT const pDSP)
 }
 
 template <class Impl>
-LE_NOTHROW FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::release(FMOD_DSP_STATE *const pDSP)
+FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::release(FMOD_DSP_STATE *const pDSP)
 {
     delete &impl(pDSP);
     return FMOD_OK;
 }
 
 template <class Impl>
-LE_NOTHROW FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::reset(FMOD_DSP_STATE *const pDSP)
+FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::reset(FMOD_DSP_STATE *const pDSP)
 {
     impl(pDSP).suspend();
     impl(pDSP).resume();
@@ -149,10 +148,12 @@ LE_NOTHROW FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::reset(FMOD_DSP_S
 }
 
 template <class Impl>
-LE_NOTHROW FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::read(
-    FMOD_DSP_STATE *LE_RESTRICT const pDSP, float *LE_RESTRICT const inBuffer,
-    float *LE_RESTRICT const outBuffer, unsigned int const length, int const inChannels,
-    int *LE_RESTRICT const pOutChannels)
+FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::read(FMOD_DSP_STATE *LE_RESTRICT const pDSP,
+                                                          float *LE_RESTRICT const inBuffer,
+                                                          float *LE_RESTRICT const outBuffer,
+                                                          unsigned int const length,
+                                                          int const inChannels,
+                                                          int *LE_RESTRICT const pOutChannels)
 {
     Impl &impl(Plugin::impl(pDSP));
 
@@ -185,7 +186,7 @@ LE_NOTHROW FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::read(
 }
 
 template <class Impl>
-LE_NOTHROW FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::setTimePosition(
+FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::setTimePosition(
     FMOD_DSP_STATE *const pDSP, unsigned int const positionInSamples)
 {
     impl(pDSP).setPosition(positionInSamples);
@@ -201,8 +202,9 @@ LE_NOTHROW FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::setTimePosition(
 
 template <class Impl>
 template <typename T>
-LE_NOTHROW FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::getParameter(
-    FMOD_DSP_STATE *const pDSP, int const index, T *const pValue, char *const pValueString)
+FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::getParameter(FMOD_DSP_STATE *const pDSP,
+                                                                  int const index, T *const pValue,
+                                                                  char *const pValueString)
 {
     LE_ASSERT(pValue);
     Impl &effect(impl(pDSP));
@@ -212,9 +214,11 @@ LE_NOTHROW FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::getParameter(
 }
 
 template <class Impl>
-LE_NOTHROW FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::getParameter(
-    FMOD_DSP_STATE *const pDSP, int const index, void **const data, unsigned int *const length,
-    char *const pValueString)
+FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::getParameter(FMOD_DSP_STATE *const pDSP,
+                                                                  int const index,
+                                                                  void **const data,
+                                                                  unsigned int *const length,
+                                                                  char *const pValueString)
 {
     LE::Utility::ignoreUnused(pDSP && index && pValueString);
     LE_ASSERT_MSG(index == Impl::maxNumberOfParameters, "Unexpected index for data parameter");
@@ -235,23 +239,24 @@ LE_NOTHROW FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::getParameter(
 
 template <class Impl>
 template <typename T>
-LE_NOTHROW FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::setParameter(
-    FMOD_DSP_STATE *const pDSP, int const index, T const value)
+FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::setParameter(FMOD_DSP_STATE *const pDSP,
+                                                                  int const index, T const value)
 {
     return static_cast<FMOD_RESULT>(impl(pDSP).setParameter(
         ParameterIndex(index), /*...mrmlj...*/ Math::convert<float>(value)));
 }
 
 template <class Impl>
-LE_NOTHROW FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::setParameter(
-    FMOD_DSP_STATE *const pDSP, int const index, void *const data, unsigned int const length)
+FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::setParameter(FMOD_DSP_STATE *const pDSP,
+                                                                  int const index, void *const data,
+                                                                  unsigned int const length)
 {
     LE::Utility::ignoreUnused(pDSP && index && data && length);
     return FMOD_ERR_UNIMPLEMENTED;
 }
 
 template <class Impl>
-LE_NOTHROW FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::canProcess(
+FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::canProcess(
     FMOD_DSP_STATE * /*pDSP*/, FMOD_BOOL /*inputidle*/, unsigned int /*length*/, FMOD_CHANNELMASK,
     int /*inChannels*/, FMOD_SPEAKERMODE)
 {
@@ -261,8 +266,7 @@ LE_NOTHROW FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::canProcess(
 #if LE_SW_GUI
 extern FMOD_DSP_DESCRIPTION const *LE_RESTRICT pUgh;
 #endif
-template <class Impl>
-LE_NOTHROW FMOD_DSP_DESCRIPTION *Plugin<Impl, Protocol::FMOD>::getDescription()
+template <class Impl> FMOD_DSP_DESCRIPTION *Plugin<Impl, Protocol::FMOD>::getDescription()
 {
     bool const useSideChain(true);
 

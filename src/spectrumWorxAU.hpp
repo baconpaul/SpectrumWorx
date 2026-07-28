@@ -43,11 +43,9 @@ class SpectrumWorxAU final : public SpectrumWorxSharedImpl<SpectrumWorxAU, Plugi
     }
     using SpectrumWorx::uninitialise;
 
-    static LE_NOTHROWNOALIAS void
-    getDependentParameters(ParameterID, LE::Utility::Span<::AUDependentParameter> ids,
-                           SpectrumWorxCore const *);
-    static LE_NOTHROWNOALIAS std::uint16_t numberOfDependentParameters(ParameterID,
-                                                                       SpectrumWorxCore const *);
+    static void getDependentParameters(ParameterID, LE::Utility::Span<::AUDependentParameter> ids,
+                                       SpectrumWorxCore const *);
+    static std::uint16_t numberOfDependentParameters(ParameterID, SpectrumWorxCore const *);
 }; // class SpectrumWorxAU;
 
 //------------------------------------------------------------------------------

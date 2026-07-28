@@ -58,7 +58,7 @@ class ChannelBuffers
 
     void reset(std::uint16_t initialSilenceSamples);
     void resize(StorageFactors const &, Storage &);
-    static LE_CONST_FUNCTION std::uint32_t requiredStorage(StorageFactors const &);
+    static std::uint32_t requiredStorage(StorageFactors const &);
 
   private:
     std::uint16_t inputOLAPosition_;
@@ -73,7 +73,7 @@ class ChannelBuffers
 
     struct OutputOLA : Utility::SharedStorageBuffer<real_t>
     {
-        static LE_CONST_FUNCTION std::uint32_t requiredStorage(StorageFactors const &);
+        static std::uint32_t requiredStorage(StorageFactors const &);
 
         void resize(StorageFactors const &factors, Storage &storage)
         {

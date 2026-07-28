@@ -50,7 +50,7 @@ namespace SW
 {
 namespace GUI
 {
-bool LE_NOTHROW warningOkCancelBox(TCHAR const *title, TCHAR const *question);
+bool warningOkCancelBox(TCHAR const *title, TCHAR const *question);
 }
 } // namespace SW
 #endif // LEB_PRECOMPILE_JUCE
@@ -111,7 +111,7 @@ static void printDebugMessage(wchar_t const *const message)
 #if defined(LEB_PRECOMPILE_JUCE) /*...mrmlj...*/ || defined(_WIN32)
 #define LE_ASSERT_HAS_MSGBOX
 
-LE_NOTHROW static bool assertMessageBox(char const *const message)
+static bool assertMessageBox(char const *const message)
 {
 #ifdef LEB_PRECOMPILE_JUCE
     return LE::SW::GUI::warningOkCancelBox(

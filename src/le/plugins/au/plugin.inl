@@ -92,7 +92,7 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
     // Creation and initialisation
     ////////////////////////////////////////////////////////////////////////////
 
-    static OSStatus LE_NOTHROW open(void *const pSelf, ::AudioUnit const componentInstance)
+    static OSStatus open(void *const pSelf, ::AudioUnit const componentInstance)
     {
         LE_ASSUME(componentInstance);
         Impl *LE_RESTRICT const pImpl(new (&instance(pSelf).implPlaceholder)
@@ -101,7 +101,7 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
         return noErr;
     }
 
-    static OSStatus LE_NOTHROW close(void *const pSelf)
+    static OSStatus close(void *const pSelf)
     {
         AudioComponentPlugInInstance &inst(instance(pSelf));
         Impl &impl(inst.impl());
@@ -110,7 +110,7 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
         return noErr;
     }
 
-    static AudioComponentMethod LE_NOTHROW lookup(::SInt16 const selector)
+    static AudioComponentMethod lookup(::SInt16 const selector)
     {
         switch (selector)
         {
@@ -155,7 +155,7 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
         return nullptr;
     }
 
-    static OSStatus LE_NOTHROW AUMethodInitialize(This &LE_RESTRICT instance)
+    static OSStatus AUMethodInitialize(This &LE_RESTRICT instance)
     {
         using namespace Detail;
 
@@ -222,7 +222,7 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
         return noErr;
     }
 
-    static OSStatus LE_NOTHROW AUMethodUninitialize(This &instance)
+    static OSStatus AUMethodUninitialize(This &instance)
     {
         Impl &LE_RESTRICT impl(instance.impl());
 
@@ -246,12 +246,12 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
     // Property access
     ////////////////////////////////////////////////////////////////////////////
 
-    static OSStatus LE_NOTHROW AUMethodGetPropertyInfo(This const &LE_RESTRICT instance,
-                                                       AudioUnitPropertyID const propertyID,
-                                                       AudioUnitScope const scope,
-                                                       AudioUnitElement const element,
-                                                       UInt32 *LE_RESTRICT const pDataSize,
-                                                       Boolean *LE_RESTRICT const pWritable)
+    static OSStatus AUMethodGetPropertyInfo(This const &LE_RESTRICT instance,
+                                            AudioUnitPropertyID const propertyID,
+                                            AudioUnitScope const scope,
+                                            AudioUnitElement const element,
+                                            UInt32 *LE_RESTRICT const pDataSize,
+                                            Boolean *LE_RESTRICT const pWritable)
     {
         // http://developer.apple.com/library/mac/#documentation/AudioUnit/Reference/AudioUnitPropertiesReference/Reference/reference.html
         // http://developer.apple.com/library/mac/#qa/qa1684/_index.html
@@ -279,10 +279,10 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
         return result;
     }
 
-    static OSStatus LE_NOTHROW
-    AUMethodGetProperty(This const &LE_RESTRICT instance, AudioUnitPropertyID const propertyID,
-                        AudioUnitScope const scope, AudioUnitElement const element,
-                        void *const pOutData, UInt32 *LE_RESTRICT const pDataSize)
+    static OSStatus AUMethodGetProperty(This const &LE_RESTRICT instance,
+                                        AudioUnitPropertyID const propertyID,
+                                        AudioUnitScope const scope, AudioUnitElement const element,
+                                        void *const pOutData, UInt32 *LE_RESTRICT const pDataSize)
     {
         if (!pOutData)
         {
@@ -317,11 +317,10 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
         return result;
     }
 
-    static OSStatus LE_NOTHROW AUMethodSetProperty(This &LE_RESTRICT instance,
-                                                   AudioUnitPropertyID const propertyID,
-                                                   AudioUnitScope const scope,
-                                                   AudioUnitElement const element,
-                                                   void const *const pInData, UInt32 const dataSize)
+    static OSStatus AUMethodSetProperty(This &LE_RESTRICT instance,
+                                        AudioUnitPropertyID const propertyID,
+                                        AudioUnitScope const scope, AudioUnitElement const element,
+                                        void const *const pInData, UInt32 const dataSize)
     {
         if (!pInData && !dataSize)
         {
@@ -362,11 +361,10 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
     // Parameters
     ////////////////////////////////////////////////////////////////////////////
 
-    static OSStatus LE_NOTHROW AUMethodGetParameter(This &instance,
-                                                    ::AudioUnitParameterID const parameterID,
-                                                    ::AudioUnitScope const scope,
-                                                    ::AudioUnitElement const element,
-                                                    ::AudioUnitParameterValue &value)
+    static OSStatus AUMethodGetParameter(This &instance, ::AudioUnitParameterID const parameterID,
+                                         ::AudioUnitScope const scope,
+                                         ::AudioUnitElement const element,
+                                         ::AudioUnitParameterValue &value)
     {
         //...mrmlj...SW HARDCODE...
         LE_ASSUME(scope == kAudioUnitScope_Global);
@@ -377,10 +375,11 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
         return noErr;
     }
 
-    static OSStatus LE_NOTHROW
-    AUMethodSetParameter(This &instance, ::AudioUnitParameterID const parameterID,
-                         ::AudioUnitScope const scope, ::AudioUnitElement const element,
-                         ::AudioUnitParameterValue const value, ::UInt32 const bufferOffset)
+    static OSStatus AUMethodSetParameter(This &instance, ::AudioUnitParameterID const parameterID,
+                                         ::AudioUnitScope const scope,
+                                         ::AudioUnitElement const element,
+                                         ::AudioUnitParameterValue const value,
+                                         ::UInt32 const bufferOffset)
     {
         //...mrmlj...SW HARDCODE...
         LE_ASSUME(scope == kAudioUnitScope_Global);
@@ -398,7 +397,7 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
         return noErr;
     }
 
-    static OSStatus LE_NOTHROW
+    static OSStatus
     AUMethodScheduleParameters(This &instance,
                                ::AudioUnitParameterEvent const *LE_RESTRICT const pEvents,
                                ::UInt32 const numberOfEvents)
@@ -435,33 +434,32 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
     // Callbacks
     ////////////////////////////////////////////////////////////////////////////
 
-    static OSStatus LE_NOTHROW
-    AUMethodAddPropertyListener(This &instance, ::AudioUnitPropertyID const propertyID,
-                                ::AudioUnitPropertyListenerProc const callback,
-                                void *const pUserData)
+    static OSStatus AUMethodAddPropertyListener(This &instance,
+                                                ::AudioUnitPropertyID const propertyID,
+                                                ::AudioUnitPropertyListenerProc const callback,
+                                                void *const pUserData)
     {
         return instance.impl().host().addPropertyListener(propertyID, callback, pUserData);
     }
 
 #if !__LP64__
-    static OSStatus
-        LE_NOTHROW AUMethodRemovePropertyListener(This &instance,
-                                                  ::AudioUnitPropertyID const propertyID,
-                                                  ::AudioUnitPropertyListenerProc const callback)
+    static OSStatus AUMethodRemovePropertyListener(This &instance,
+                                                   ::AudioUnitPropertyID const propertyID,
+                                                   ::AudioUnitPropertyListenerProc const callback)
     {
         return instance.impl().host().removePropertyListener(propertyID, callback, nullptr);
     }
 #endif
 
-    static OSStatus LE_NOTHROW AUMethodRemovePropertyListenerWithUserData(
+    static OSStatus AUMethodRemovePropertyListenerWithUserData(
         This &instance, ::AudioUnitPropertyID const propertyID,
         ::AudioUnitPropertyListenerProc const callback, void *const pUserData)
     {
         return instance.impl().host().removePropertyListener(propertyID, callback, pUserData);
     }
 
-    static OSStatus LE_NOTHROW
-    AUMethodAddRenderNotify(This &instance, AURenderCallback const callback, void *const pUserData)
+    static OSStatus AUMethodAddRenderNotify(This &instance, AURenderCallback const callback,
+                                            void *const pUserData)
     {
         LE_ASSERT(callback);
         ::AURenderCallbackStruct const renderDelegate = {callback, pUserData};
@@ -469,9 +467,8 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
             instance.impl().renderNotificationCallbacks_.push_back(renderDelegate));
     }
 
-    static OSStatus LE_NOTHROW AUMethodRemoveRenderNotify(This &instance,
-                                                          AURenderCallback const callback,
-                                                          void const *const pUserData)
+    static OSStatus AUMethodRemoveRenderNotify(This &instance, AURenderCallback const callback,
+                                               void const *const pUserData)
     {
         LE_ASSERT(callback);
         ::AURenderCallbackStruct const renderDelegate = {callback, const_cast<void *>(pUserData)};
@@ -483,10 +480,11 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
     // Processing
     ////////////////////////////////////////////////////////////////////////////
 
-    static OSStatus LE_NOTHROW AUMethodRender(
-        This &LE_RESTRICT instance, ::AudioUnitRenderActionFlags *LE_RESTRICT const pIOActionFlags,
-        ::AudioTimeStamp const *LE_RESTRICT const pTimeStamp, ::UInt32 const outputBusNumber,
-        ::UInt32 const numberOfSamples, ::AudioBufferList *LE_RESTRICT const pIOData)
+    static OSStatus AUMethodRender(This &LE_RESTRICT instance,
+                                   ::AudioUnitRenderActionFlags *LE_RESTRICT const pIOActionFlags,
+                                   ::AudioTimeStamp const *LE_RESTRICT const pTimeStamp,
+                                   ::UInt32 const outputBusNumber, ::UInt32 const numberOfSamples,
+                                   ::AudioBufferList *LE_RESTRICT const pIOData)
     {
         // AUBase::DoRender
         // SymbiosisComponent::render
@@ -645,19 +643,20 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
         return mainRenderResult;
     }
 
-    static OSStatus LE_NOTHROW
-    AUMethodComplexRender(This & /*instance*/, AudioUnitRenderActionFlags * /*ioActionFlags*/,
-                          AudioTimeStamp const * /*inTimeStamp*/, UInt32 /*outputBusNumber*/,
-                          UInt32 /*inNumberOfPackets*/, UInt32 * /*outNumberOfPackets*/,
-                          AudioStreamPacketDescription * /*outPacketDescriptions*/,
-                          AudioBufferList * /*ioData*/, void * /*outMetadata*/,
-                          UInt32 * /*outMetadataByteSize*/)
+    static OSStatus AUMethodComplexRender(This & /*instance*/,
+                                          AudioUnitRenderActionFlags * /*ioActionFlags*/,
+                                          AudioTimeStamp const * /*inTimeStamp*/,
+                                          UInt32 /*outputBusNumber*/, UInt32 /*inNumberOfPackets*/,
+                                          UInt32 * /*outNumberOfPackets*/,
+                                          AudioStreamPacketDescription * /*outPacketDescriptions*/,
+                                          AudioBufferList * /*ioData*/, void * /*outMetadata*/,
+                                          UInt32 * /*outMetadataByteSize*/)
     {
         LE_UNREACHABLE_CODE();
         return kAudio_UnimplementedError;
     }
 
-    static OSStatus LE_NOTHROW
+    static OSStatus
     AUMethodProcess(This &LE_RESTRICT /*instance      */,
                     AudioUnitRenderActionFlags *LE_RESTRICT const /*pIOActionFlags*/,
                     AudioTimeStamp const *LE_RESTRICT const /*pTimeStamp    */,
@@ -674,8 +673,7 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
         return kAudio_UnimplementedError;
     }
 
-    static OSStatus LE_NOTHROW AUMethodReset(This &instance, AudioUnitScope /*const scope*/,
-                                             AudioUnitElement)
+    static OSStatus AUMethodReset(This &instance, AudioUnitScope /*const scope*/, AudioUnitElement)
     {
         Impl &LE_RESTRICT impl(instance.impl());
         //...mrmlj...n-Track calls this on all scopes (causes redundant resets)...
@@ -732,7 +730,7 @@ Parameter const &parameter(::ComponentParameters *LE_RESTRICT const pParameters,
 } // anonymous namespace
 
 template <class Impl>
-::ComponentResult LE_NOTHROW Plugin<Impl, Protocol::AU>::componentManagerEntry(
+::ComponentResult Plugin<Impl, Protocol::AU>::componentManagerEntry(
     ::ComponentParameters *LE_RESTRICT const pParameters, ::Handle const userDataHandle)
 {
     // https://developer.apple.com/library/mac/#documentation/Carbon/reference/Component_Manager/Reference/reference.html

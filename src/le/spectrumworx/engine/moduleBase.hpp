@@ -76,23 +76,23 @@ class ModuleBase
   public:
     /// \name Hz based/non-normalised accessors for frequency range parameters
     /// @{
-    LE_NOTHROW void setStartFrequencyInHz(float frequency, ModuleProcessor const &processor);
-    LE_NOTHROWNOALIAS float getStartFrequencyInHz(ModuleProcessor const &processor) const;
-    LE_NOTHROW void setStartFrequencyInHz(float frequency, std::uint32_t sampleRate);
-    LE_NOTHROWNOALIAS float getStartFrequencyInHz(std::uint32_t sampleRate) const;
+    void setStartFrequencyInHz(float frequency, ModuleProcessor const &processor);
+    float getStartFrequencyInHz(ModuleProcessor const &processor) const;
+    void setStartFrequencyInHz(float frequency, std::uint32_t sampleRate);
+    float getStartFrequencyInHz(std::uint32_t sampleRate) const;
 
-    LE_NOTHROW void setStopFrequencyInHz(float frequency, ModuleProcessor const &processor);
-    LE_NOTHROWNOALIAS float getStopFrequencyInHz(ModuleProcessor const &processor) const;
-    LE_NOTHROW void setStopFrequencyInHz(float frequency, std::uint32_t sampleRate);
-    LE_NOTHROWNOALIAS float getStopFrequencyInHz(std::uint32_t sampleRate) const;
+    void setStopFrequencyInHz(float frequency, ModuleProcessor const &processor);
+    float getStopFrequencyInHz(ModuleProcessor const &processor) const;
+    void setStopFrequencyInHz(float frequency, std::uint32_t sampleRate);
+    float getStopFrequencyInHz(std::uint32_t sampleRate) const;
     /// @}
 
   public:
     typedef BaseParameters Parameters;
     typedef LE::Parameters::LFO LFO;
 
-    LE_NOTHROWNOALIAS Parameters &baseParameters();
-    LE_NOTHROWNOALIAS Parameters const &baseParameters() const
+    Parameters &baseParameters();
+    Parameters const &baseParameters() const
     {
         return const_cast<ModuleBase &>(*this).baseParameters();
     }
@@ -110,18 +110,18 @@ class ModuleBase
     static std::uint8_t const numberOfLFOBaseParameters =
         numberOfBaseParameters - numberOfNonLFOBaseParameters;
 
-    LE_NOTHROW LE_PURE_FUNCTION std::uint8_t numberOfParameters() const
+    std::uint8_t numberOfParameters() const
     {
         return numberOfEffectSpecificParameters() + numberOfBaseParameters;
     } ///< total number of parameters (base + effect specific)
-    LE_NOTHROW LE_PURE_FUNCTION std::uint8_t numberOfEffectSpecificParameters()
+    std::uint8_t numberOfEffectSpecificParameters()
         const; ///< number of extra parameters specific to the instantiated effect
-    LE_NOTHROW LE_PURE_FUNCTION std::uint8_t numberOfLFOControledParameters() const
+    std::uint8_t numberOfLFOControledParameters() const
     {
         return numberOfEffectSpecificParameters() + numberOfLFOBaseParameters;
     } ///< total number of parameters that can be LFO-ed
 
-    LE_NOTHROWNOALIAS ParameterInfo const &parameterInfo(std::uint8_t parameterIndex) const;
+    ParameterInfo const &parameterInfo(std::uint8_t parameterIndex) const;
 
     /// @}
 
@@ -131,21 +131,21 @@ class ModuleBase
     /// rounded).
     /// @{
 
-    LE_NOTHROWNOALIAS float getParameter(std::uint8_t parameterIndex) const;
-    LE_NOTHROW float setParameter(std::uint8_t parameterIndex, float value);
+    float getParameter(std::uint8_t parameterIndex) const;
+    float setParameter(std::uint8_t parameterIndex, float value);
 
-    LE_NOTHROWNOALIAS float getBaseParameter(std::uint8_t baseParameterIndex) const;
-    LE_NOTHROW float setBaseParameter(std::uint8_t baseParameterIndex, float value);
+    float getBaseParameter(std::uint8_t baseParameterIndex) const;
+    float setBaseParameter(std::uint8_t baseParameterIndex, float value);
 
-    LE_NOTHROWNOALIAS float getEffectParameter(std::uint8_t effectParameterIndex) const;
-    LE_NOTHROW float setEffectParameter(std::uint8_t effectParameterIndex, float value);
+    float getEffectParameter(std::uint8_t effectParameterIndex) const;
+    float setEffectParameter(std::uint8_t effectParameterIndex, float value);
 
     /// @}
 
     /// \name Parameter LFO accessors
     /// @{
-    LE_NOTHROWNOALIAS LFO &lfo(std::uint8_t parameterIndex);
-    LE_NOTHROWNOALIAS LFO const &lfo(std::uint8_t const parameterIndex) const
+    LFO &lfo(std::uint8_t parameterIndex);
+    LFO const &lfo(std::uint8_t const parameterIndex) const
     {
         return const_cast<ModuleBase &>(*this).lfo(parameterIndex);
     }
@@ -153,7 +153,7 @@ class ModuleBase
 
     /// \name Effect runtime metadata
     /// @{
-    LE_NOTHROWRESTRICTNOALIAS char const *effectName() const;
+    char const *effectName() const;
     /// @}
 
   public:
@@ -174,21 +174,21 @@ class ModuleBase
     /// failure).
     ////////////////////////////////////////////////////////////////////////////
 
-    static LE_NOTHROWNOALIAS Ptr create(char const *effectName);
+    static Ptr create(char const *effectName);
 
     /// @}
 
   protected: /// \internal
-    LE_NOTHROW ModuleBase() {}
-    LE_NOTHROW ~ModuleBase(){};
+    ModuleBase() {}
+    ~ModuleBase() {};
 }; // class ModuleBase
 
 typedef ModuleBase::Ptr ModulePtr;   ///< shared pointer to a mutable ModuleBase instance
 typedef ModuleBase::CPtr ModuleCPtr; ///< shared pointer to a const ModuleBase instance
 
 // LE::Utility::IntrusivePtr required details
-LE_NOTHROWNOALIAS void intrusive_ptr_add_ref(ModuleBase const *); ///< \internal
-LE_NOTHROW void intrusive_ptr_release(ModuleBase const *);        ///< \internal
+void intrusive_ptr_add_ref(ModuleBase const *); ///< \internal
+void intrusive_ptr_release(ModuleBase const *); ///< \internal
 
 /// @} // group Engine
 

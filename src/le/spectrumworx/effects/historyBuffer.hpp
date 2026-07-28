@@ -42,8 +42,7 @@ namespace Effects
 template <typename T, std::uint16_t milliSeconds>
 struct HistoryBuffer : public Utility::SharedStorageBuffer<T>
 {
-    LE_NOTHROWNOALIAS LE_NOINLINE static std::uint32_t
-    requiredStorage(Engine::StorageFactors const &factors)
+    LE_NOINLINE static std::uint32_t requiredStorage(Engine::StorageFactors const &factors)
     {
         // Implementation note:
         // N - number of required audio samples per second per channel

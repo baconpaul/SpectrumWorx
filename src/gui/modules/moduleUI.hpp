@@ -372,7 +372,7 @@ class ModuleUI
 
   public:
     ModuleUI();
-    LE_NOTHROW ~ModuleUI();
+    ~ModuleUI();
 
     void setUpForEffect(char const *effectName, char const *effectDescription);
 
@@ -508,15 +508,14 @@ struct EmptyWidgets
     EmptyWidgets(ModuleWidgetConstructionState const &);
     static void setup(WidgetInitialiser const &) {}
 
-    static LE_NOTHROWRESTRICTNOALIAS void *operator new(std::size_t const count,
-                                                        void *LE_RESTRICT const pStorage)
+    static void *operator new(std::size_t const count, void *LE_RESTRICT const pStorage)
     {
         (void)count;
         LE_ASSUME(pStorage);
         return pStorage;
     }
-    static LE_NOTHROWNOALIAS void operator delete(void *LE_RESTRICT const /*pObject*/,
-                                                  void *LE_RESTRICT const /*pStorage*/)
+    static void operator delete(void *LE_RESTRICT const /*pObject*/,
+                                void *LE_RESTRICT const /*pStorage*/)
     {
     }
 }; // struct EmptyWidgets
@@ -646,11 +645,11 @@ template <class Interface> struct ParameterWidgetsVTable
 
 #ifdef _MSC_VER
   private:
-    template <class Implementation> LE_NOALIAS static void createGUI(ModuleUI &uiBase)
+    template <class Implementation> static void createGUI(ModuleUI &uiBase)
     {
         LE::Utility::polymorphicDowncast<Implementation *>(&uiBase.module())->create(uiBase);
     }
-    template <class Implementation> LE_NOTHROWNOALIAS static void destroyGUI(ModuleUI::Module &base)
+    template <class Implementation> static void destroyGUI(ModuleUI::Module &base)
     {
         LE::Utility::polymorphicDowncast<Implementation *>(&base)->destroy();
     }

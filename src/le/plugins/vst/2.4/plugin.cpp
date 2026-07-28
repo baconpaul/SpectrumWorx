@@ -139,9 +139,9 @@ void VSTHost24Proxy::automatedParameterEndEdit(ParameterIndex const parameterInd
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-VstIntPtr LE_NOTHROW LE_COLD VSTHost24Proxy::call(VstInt32 const opCode, VstInt32 const index,
-                                                  VstIntPtr const value, void *const ptr,
-                                                  float const opt) const
+VstIntPtr LE_COLD VSTHost24Proxy::call(VstInt32 const opCode, VstInt32 const index,
+                                       VstIntPtr const value, void *const ptr,
+                                       float const opt) const
 {
 #ifdef _DEBUG
     // Properly typed opcode for better visualization to aid in debugging.
@@ -254,7 +254,7 @@ bool VSTHost24Proxy::updateDisplay() const
     return success;
 }
 
-void LE_NOTHROW VSTHost24Proxy::allParametersChanged() const
+void VSTHost24Proxy::allParametersChanged() const
 {
     ::AEffect const &effect(aEffect());
     ::AEffectGetParameterProc const getParameter(effect.getParameter);
@@ -285,7 +285,7 @@ void LE_NOTHROW VSTHost24Proxy::allParametersChanged() const
     }
 }
 
-template <> LE_NOTHROWNOALIAS bool VSTHost24Proxy::canDo<AcceptIOChanges>() const
+template <> bool VSTHost24Proxy::canDo<AcceptIOChanges>() const
 {
     LE_ASSERT_MSG(!(assumeIOChangedAlwaysSucceedes && capabilityString<AcceptIOChanges>()),
                   "Host 'gained' ioChanged() support");

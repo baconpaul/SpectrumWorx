@@ -102,19 +102,19 @@ template <class T> class COMPtr
     COMPtr() : pT_(0) {}
     COMPtr(T *const pT) : pT_(pT) {}
 
-    LE_NOTHROWNOALIAS COMPtr(IUnknown &source)
+    COMPtr(IUnknown &source)
     {
         LE_VERIFY(source.QueryInterface(__uuidof(T), reinterpret_cast<void **>(&pT_)) == S_OK);
     }
 
-    LE_NOTHROW COMPtr(COMPtr &&other) : pT_(other.pT_) { other.pT_ = 0; }
-    LE_NOTHROW COMPtr(COMPtr const &other) : pT_(other.pT_)
+    COMPtr(COMPtr &&other) : pT_(other.pT_) { other.pT_ = 0; }
+    COMPtr(COMPtr const &other) : pT_(other.pT_)
     {
         if (pT)
             pT_->AddRef();
     }
 
-    LE_NOTHROWNOALIAS ~COMPtr()
+    ~COMPtr()
     {
         if (pT_)
             pT_->Release();
@@ -237,7 +237,7 @@ class Sample::Impl : private IPin,
     explicit Impl(std::uint32_t allowedSamplerate);
     ~Impl();
 
-    LE_NOTHROWNOALIAS char const *load(juce::String const &sampleFileName, DataHolder &data);
+    char const *load(juce::String const &sampleFileName, DataHolder &data);
 
   private:
     // Implementation note:
@@ -439,7 +439,7 @@ HANDLE openLogFile()
 /// pin. For example, for the WMA read filter we could directly call
 /// pSourceFilter->FindPin( L"Raw Audio 0", &pSourcePin );
 ///                                       (02.07.2010.) (Domagoj Saric)
-LE_NOTHROWNOALIAS COMPtr<IPin> getOutputPin(IBaseFilter &filter, HRESULT &hr)
+COMPtr<IPin> getOutputPin(IBaseFilter &filter, HRESULT &hr)
 {
     COMPtr<IEnumPins> pEnumerator;
     hr = filter.EnumPins(&pEnumerator);
@@ -777,7 +777,7 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::QueryInternalConnections(IPin **const pp
     return S_OK;
 }
 
-LE_NOTHROW HRESULT STDMETHODCALLTYPE Sample::Impl::EndOfStream()
+HRESULT STDMETHODCALLTYPE Sample::Impl::EndOfStream()
 {
     LE_ASSERT(pMyGraph_);
     COMPtr<IMediaEventSink> pEventSink(*pMyGraph_);
@@ -964,8 +964,7 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::Next(ULONG const cPins, IPin **const ppP
     return S_OK;
 }
 
-LE_NOTHROWNOALIAS char const *Sample::Impl::load(juce::String const &sampleFileName,
-                                                 Sample::DataHolder &data)
+char const *Sample::Impl::load(juce::String const &sampleFileName, Sample::DataHolder &data)
 {
     HRESULT hr;
     if (((hr = pGraphBuilder_.createInstance(CLSID_FilterGraphNoThread)) != S_OK) ||
@@ -1144,9 +1143,8 @@ juce::String Sample::supportedFormats()
     return "*.aif;*.aiff;*.au;*.mpa;*.mp3;*.snd;*.wav;*.wma";
 }
 
-LE_NOTHROWNOALIAS char const *Sample::doLoad(juce::String const &sampleFileName,
-                                             unsigned int const desiredSampleRate,
-                                             Sample::DataHolder &data)
+char const *Sample::doLoad(juce::String const &sampleFileName, unsigned int const desiredSampleRate,
+                           Sample::DataHolder &data)
 {
     {
         // Implementation note:

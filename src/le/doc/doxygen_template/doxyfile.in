@@ -2045,8 +2045,8 @@ INCLUDE_FILE_PATTERNS  =
 
 PREDEFINED             = NDEBUG \
                          LE_SW_SDK_BUILD \
-                         LE_NOTHROW= \
-                         LE_NOTHROWNOALIAS= \
+                         = \
+                         = \
                          LE_SW_SDK_VISIBILITY= \
                          LE_MSVC_SPECIFIC()= \
                          __cplusplus \
@@ -2056,8 +2056,8 @@ PREDEFINED             = NDEBUG \
                          DOXYGEN_ONLY \
                          LE_GNU_SPECIFIC()= \
                          LE_CLANG_SPECIFIC()= \
-                         LE_NOTHROWRESTRICTNOALIAS= \
-                         LE_PURE_FUNCTION= \
+                         = \
+                         = \
                          LE_RESTRICT= \
                          = \
                          BOOST_CONSTEXPR= \

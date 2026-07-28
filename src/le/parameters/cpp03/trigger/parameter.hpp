@@ -37,8 +37,8 @@ class TriggerParameter : public Boolean
   public:
     TriggerParameter(param_type const initialValue = false) : Boolean(initialValue) {}
 
-    LE_NOTHROWNOALIAS value_type consumeValue() const;
-    LE_NOTHROWNOALIAS void setValue(param_type);
+    value_type consumeValue() const;
+    void setValue(param_type);
 
   private:
     operator value_type const &() const;

@@ -55,9 +55,8 @@ class ExtAudioFileGuard
 };
 } // anonymous namespace
 
-LE_NOTHROWNOALIAS char const *Sample::doLoad(juce::String const &sampleFileName,
-                                             unsigned int const desiredSampleRate,
-                                             Sample::DataHolder &data)
+char const *Sample::doLoad(juce::String const &sampleFileName, unsigned int const desiredSampleRate,
+                           Sample::DataHolder &data)
 {
     FSRef const samplePath(SW::GUI::makeFSRefFromPath(sampleFileName));
 

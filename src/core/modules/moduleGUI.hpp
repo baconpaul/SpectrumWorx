@@ -39,7 +39,7 @@ class LE_NOVTABLE ModuleGUI : public GUI::ModuleUI,
 {
   public: // Automation
     template <class AutomatedParameter>
-    std::optional<std::pair<std::uint_fast8_t, LFO::value_type>> LE_NOTHROW
+    std::optional<std::pair<std::uint_fast8_t, LFO::value_type>>
     setAutomatedLFOParameter(std::uint_fast8_t const parameterIndex,
                              std::uint_fast8_t const lfoParameterIndex,
                              Plugins::AutomatedParameterValue const value)
@@ -50,14 +50,12 @@ class LE_NOVTABLE ModuleGUI : public GUI::ModuleUI,
         return result;
     }
 
-    LE_NOTHROW float getSharedParameter(std::uint_fast8_t sharedParameterIndex) const;
-    LE_NOTHROW void setSharedParameter(std::uint_fast8_t sharedParameterIndex,
-                                       float parameterValue);
+    float getSharedParameter(std::uint_fast8_t sharedParameterIndex) const;
+    void setSharedParameter(std::uint_fast8_t sharedParameterIndex, float parameterValue);
 
-    LE_NOTHROW float
-    getEffectParameter(std::uint_fast8_t effectParameterIndex) const override final;
-    LE_NOTHROW float setEffectParameter(std::uint_fast8_t effectParameterIndex,
-                                        float parameterValue) override final;
+    float getEffectParameter(std::uint_fast8_t effectParameterIndex) const override final;
+    float setEffectParameter(std::uint_fast8_t effectParameterIndex,
+                             float parameterValue) override final;
 
   public:
     static ModuleGUI &fromGUI(GUI::ModuleUI &moduleUI)

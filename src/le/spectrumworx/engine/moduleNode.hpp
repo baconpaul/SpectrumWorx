@@ -53,7 +53,7 @@ class LE_NOVTABLE ModuleNode
     /// GUI and DSP modules in separated-DSP-and-GUI builds.
     ///                                       (18.03.2015.) (Domagoj Saric)
   public:
-    LE_NOTHROW virtual ~ModuleNode(){} /* = 0*/;
+    virtual ~ModuleNode() {} /* = 0*/;
 #elif !defined(NDEBUG)
   protected:
     ~ModuleNode() = default;
@@ -64,12 +64,12 @@ class LE_NOVTABLE ModuleNode
     ModuleNode(ModuleNode &&) = delete;
 }; // class ModuleNode
 
-LE_NOTHROWNOALIAS void intrusive_ptr_add_ref(ModuleNode const *);
+void intrusive_ptr_add_ref(ModuleNode const *);
 #if !LE_SW_SEPARATED_DSP_GUI
-LE_NOTHROW void intrusive_ptr_release_deleter(ModuleNode const *);
+void intrusive_ptr_release_deleter(ModuleNode const *);
 #endif // LE_SW_SEPARATED_DSP_GUI
 
-inline LE_NOTHROW void intrusive_ptr_release(ModuleNode const *LE_RESTRICT const pModuleNode)
+inline void intrusive_ptr_release(ModuleNode const *LE_RESTRICT const pModuleNode)
 {
     LE_ASSUME(pModuleNode);
     if (LE_UNLIKELY(!--pModuleNode->referenceCount_))

@@ -60,11 +60,11 @@ LE_IMPL_NAMESPACE_BEGIN(Math)
 //                                            (07.07.2011.) (Domagoj Saric)
 ////////////////////////////////////////////////////////////////////////////////
 
-template <typename Target> LE_CONST_FUNCTION Target convert(float const source)
+template <typename Target> Target convert(float const source)
 {
     return static_cast<Target>(Math::round(source));
 }
-template <typename Target> LE_CONST_FUNCTION Target convert(double const source)
+template <typename Target> Target convert(double const source)
 {
     return static_cast<Target>(Math::round(source));
 }
@@ -175,35 +175,35 @@ Target convert(Source const source, typename Source::value_type const * = nullpt
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_CONST_FUNCTION float dB2NormalisedLinear(float dBValue);
-LE_CONST_FUNCTION float dB2NormalisedLinear(std::int8_t dBValue);
-LE_CONST_FUNCTION float dB2NormalisedLinear(std::uint8_t dBValue);
-LE_CONST_FUNCTION float dB2NormalisedLinear(std::int16_t dBValue);
-LE_CONST_FUNCTION float dB2NormalisedLinear(std::uint16_t dBValue);
+float dB2NormalisedLinear(float dBValue);
+float dB2NormalisedLinear(std::int8_t dBValue);
+float dB2NormalisedLinear(std::uint8_t dBValue);
+float dB2NormalisedLinear(std::int16_t dBValue);
+float dB2NormalisedLinear(std::uint16_t dBValue);
 inline float dB2NormalisedLinear(std::int32_t dBValue)
 {
     return dB2NormalisedLinear(static_cast<std::int16_t>(dBValue));
 }
 
-LE_CONST_FUNCTION float normalisedLinear2dB(float linearNormalisedValue);
-LE_CONST_FUNCTION double normalisedLinear2dB(double linearNormalisedValue);
+float normalisedLinear2dB(float linearNormalisedValue);
+double normalisedLinear2dB(double linearNormalisedValue);
 
-LE_CONST_FUNCTION float normalisedPower2dB(float linearNormalisedValue);
-LE_CONST_FUNCTION float dB2NormalisedPower(float dBValue);
+float normalisedPower2dB(float linearNormalisedValue);
+float dB2NormalisedPower(float dBValue);
 
-LE_CONST_FUNCTION float normalisedLinear2Percentage(float normalisedFloatValue);
-LE_CONST_FUNCTION double normalisedLinear2Percentage(double normalisedFloatValue);
+float normalisedLinear2Percentage(float normalisedFloatValue);
+double normalisedLinear2Percentage(double normalisedFloatValue);
 
 template <typename T> float percentage2NormalisedLinear(T const percentage)
 {
     return LE_MSVC_SPECIFIC(convert<float>)(percentage) / 100.0f;
 }
 
-LE_CONST_FUNCTION float semitone2Interval12TET(float semitones);
-LE_CONST_FUNCTION float cents2Interval12TET(float cents);
-LE_CONST_FUNCTION float cents2Interval12TET(std::int16_t cents);
-LE_CONST_FUNCTION float octaves2Interval12TET(std::int8_t octaves);
-LE_CONST_FUNCTION float interval12TET2Semitone(float interval);
+float semitone2Interval12TET(float semitones);
+float cents2Interval12TET(float cents);
+float cents2Interval12TET(std::int16_t cents);
+float octaves2Interval12TET(std::int8_t octaves);
+float interval12TET2Semitone(float interval);
 
 ////////////////////////////////////////////////////////////////////////////////
 //

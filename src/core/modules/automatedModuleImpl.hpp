@@ -25,20 +25,19 @@ namespace SW
 template <class InterfaceImpl> class LE_NOVTABLE AutomatedModuleImpl
 {
   public: // Parameters
-    Plugins::AutomatedParameterValue LE_NOALIAS
-    getSharedAutomatedParameter(std::uint8_t parameterIndex, bool normalised) const;
-    Plugins::AutomatedParameterValue LE_NOALIAS
+    Plugins::AutomatedParameterValue getSharedAutomatedParameter(std::uint8_t parameterIndex,
+                                                                 bool normalised) const;
+    Plugins::AutomatedParameterValue
     getEffectSpecificAutomatedParameter(std::uint8_t effectSpecificParameterIndex,
                                         bool normalised) const;
-    Plugins::AutomatedParameterValue LE_NOALIAS getAutomatedParameter(std::uint8_t parameterIndex,
-                                                                      bool normalised) const;
+    Plugins::AutomatedParameterValue getAutomatedParameter(std::uint8_t parameterIndex,
+                                                           bool normalised) const;
 
     void setAutomatedParameter(std::uint8_t parameterIndex, Plugins::AutomatedParameterValue,
                                bool normalised);
 
-    LE_NOTHROWNOALIAS char const *
-    getParameterValueString(std::uint8_t parameterIndex,
-                            LE::Parameters::AutomatedParameterPrinter const &) const;
+    char const *getParameterValueString(std::uint8_t parameterIndex,
+                                        LE::Parameters::AutomatedParameterPrinter const &) const;
 
   private:
     InterfaceImpl &impl() { return *static_cast<InterfaceImpl *LE_RESTRICT>(this); }

@@ -274,7 +274,7 @@ bool setAppContext(::JNIEnv &__restrict jni, ::jobject const __restrict activity
     return setAppContext(jni, activity, localAssetManager);
 }
 
-LE_CONST_FUNCTION ::AAssetManager &resourceManager()
+::AAssetManager &resourceManager()
 {
     LE_ASSERT_MSG(pAssetManager, "Android app context not set");
     return *pAssetManager;

@@ -55,8 +55,7 @@ namespace
 JNI::GlobalRef<> userMessageObject = nullptr;
 jmethodID userMessageMethod = nullptr;
 
-LE_NOTHROWNOALIAS LE_COLD void userMessage(char const *const pFormatString,
-                                           va_list /*const*/ arglist)
+LE_COLD void userMessage(char const *const pFormatString, va_list /*const*/ arglist)
 {
     if (!userMessageMethod)
         return;
@@ -71,7 +70,7 @@ LE_NOTHROWNOALIAS LE_COLD void userMessage(char const *const pFormatString,
 #elif TARGET_OS_IPHONE
 void (^userMessageCallback)(NSString *message) = nullptr;
 
-LE_NOTHROWNOALIAS LE_COLD void iOSLog(char const *const pFormatString, va_list /*const*/ arglist)
+LE_COLD void iOSLog(char const *const pFormatString, va_list /*const*/ arglist)
 {
     // https://developer.apple.com/library/ios/documentation/Cocoa/Conceptual/MemoryMgmt/Articles/mmAutoreleasePools.html
     @autoreleasepool
@@ -113,7 +112,7 @@ void *Tracer_setUserMessageMethod(void *const opaquePtr)
 void *Tracer_setUserMessageMethod(void * /*const opaquePtr*/) { return nullptr; }
 #endif // OS
 
-LE_NOTHROWNOALIAS void Tracer::error(char const *const pFormatString, ...)
+void Tracer::error(char const *const pFormatString, ...)
 {
     va_list arglist;
     va_start(arglist, pFormatString);
@@ -153,7 +152,7 @@ LE_NOTHROWNOALIAS void Tracer::error(char const *const pFormatString, ...)
     va_end(arglist);
 }
 
-LE_NOTHROWNOALIAS void Tracer::message(char const *const pFormatString, ...)
+void Tracer::message(char const *const pFormatString, ...)
 {
     va_list arglist;
     va_start(arglist, pFormatString);
@@ -185,8 +184,8 @@ LE_NOTHROWNOALIAS void Tracer::message(char const *const pFormatString, ...)
 }
 
 #ifdef __ANDROID__
-LE_NOTHROW bool Tracer::setJavaCallback(JNIEnv &jni, jobject const callbackObject,
-                                        char const *const callbackMethodName)
+bool Tracer::setJavaCallback(JNIEnv &jni, jobject const callbackObject,
+                             char const *const callbackMethodName)
 {
     jclass const callbackClass(jni.GetObjectClass(callbackObject));
     LE_ASSERT(callbackClass);
@@ -196,7 +195,7 @@ LE_NOTHROW bool Tracer::setJavaCallback(JNIEnv &jni, jobject const callbackObjec
     return LE_LIKELY(userMessageObject != nullptr);
 }
 #elif TARGET_OS_IPHONE
-LE_NOTHROW bool Tracer::setObjCCallback(void (^newCallback)(NSString *message))
+bool Tracer::setObjCCallback(void (^newCallback)(NSString *message))
 {
     Block_release(userMessageCallback);
     userMessageCallback = Block_copy(newCallback);

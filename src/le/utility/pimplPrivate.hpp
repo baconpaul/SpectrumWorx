@@ -120,7 +120,7 @@ impl(HeapPImpl<Interface, BaseInterface> const &anInterface)
 //...mrmlj...empty PImpl::~PImpl() specializations for those cases)
 //...mrmlj...the pimpl framework should be improved to handle this cleaner...
 template <class Interface, class BaseInterface>
-LE_NOTHROWNOALIAS LE_FORCEINLINE PImpl<Interface, BaseInterface>::~PImpl()
+LE_FORCEINLINE PImpl<Interface, BaseInterface>::~PImpl()
 {
     using Implementation = typename Implementation<Interface>::type;
     impl(*this).Implementation::~Implementation();
@@ -169,8 +169,7 @@ struct AssertStorageAlignment
 } // namespace Detail
 
 template <class Interface, std::size_t storageSize, std::size_t alignment, class BaseInterface>
-LE_NOTHROWNOALIAS LE_FORCEINLINE
-StackPImpl<Interface, storageSize, alignment, BaseInterface>::StackPImpl()
+LE_FORCEINLINE StackPImpl<Interface, storageSize, alignment, BaseInterface>::StackPImpl()
 {
     using Implementation = typename Implementation<Interface>::type;
 
@@ -183,7 +182,7 @@ StackPImpl<Interface, storageSize, alignment, BaseInterface>::StackPImpl()
 }
 
 template <class Interface, std::size_t storageSize, std::size_t alignment, class BaseInterface>
-LE_NOTHROWNOALIAS LE_FORCEINLINE
+LE_FORCEINLINE
 StackPImpl<Interface, storageSize, alignment, BaseInterface>::StackPImpl(StackPImpl &&other)
 {
     using Implementation = typename Implementation<Interface>::type;
@@ -198,7 +197,7 @@ StackPImpl<Interface, storageSize, alignment, BaseInterface>::StackPImpl(StackPI
 }
 
 template <class Interface, std::size_t storageSize, std::size_t alignment, class BaseInterface>
-LE_NOTHROWNOALIAS LE_FORCEINLINE
+LE_FORCEINLINE
 StackPImpl<Interface, storageSize, alignment, BaseInterface>::StackPImpl(Interface &&other)
 {
     using Implementation = typename Implementation<Interface>::type;
@@ -214,7 +213,7 @@ StackPImpl<Interface, storageSize, alignment, BaseInterface>::StackPImpl(Interfa
 
 template <class Interface, std::size_t storageSize, std::size_t alignment, class BaseInterface>
 template <typename T>
-LE_NOTHROWNOALIAS LE_FORCEINLINE
+LE_FORCEINLINE
 StackPImpl<Interface, storageSize, alignment, BaseInterface>::StackPImpl(T &&constructionArgument)
 {
     using Implementation = typename Implementation<Interface>::type;
@@ -229,13 +228,13 @@ StackPImpl<Interface, storageSize, alignment, BaseInterface>::StackPImpl(T &&con
 }
 
 template <class Interface, class BaseInterface>
-LE_NOTHROWNOALIAS void HeapPImpl<Interface, BaseInterface>::operator delete(void *const pInterface)
+void HeapPImpl<Interface, BaseInterface>::operator delete(void *const pInterface)
 {
     ::operator delete(pInterface);
 }
 
 template <class Interface, class BaseInterface>
-LE_NOTHROWNOALIAS LE::Utility::IntrusivePtr<Interface> HeapPImpl<Interface, BaseInterface>::create()
+LE::Utility::IntrusivePtr<Interface> HeapPImpl<Interface, BaseInterface>::create()
 {
     using Implementation = typename Implementation<Interface>::type;
     Implementation *LE_RESTRICT const pImplementation(new (std::nothrow) Implementation);

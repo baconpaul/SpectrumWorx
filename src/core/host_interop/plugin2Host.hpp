@@ -71,7 +71,7 @@ class Program;
 
 namespace GUI
 {
-LE_NOTHROWNOALIAS bool isThisTheGUIThread();
+bool isThisTheGUIThread();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -125,24 +125,23 @@ class LE_NOVTABLE Plugin2HostInteropControler
 
   public: // Protocol specific functionality to be implemented by derived classes.
     // notifications
-    virtual LE_NOTHROW void automatedParameterBeginEdit(ParameterID) const = 0;
-    virtual LE_NOTHROW void automatedParameterEndEdit(ParameterID) const = 0;
-    virtual LE_NOTHROW void gestureBegin(char const *description) const = 0;
-    virtual LE_NOTHROW void gestureEnd() const = 0;
-    virtual LE_NOTHROW void automatedParameterChanged(ParameterID,
-                                                      ParameterValueForAutomation) const = 0;
-    virtual LE_NOTHROW void moduleChanged(std::uint8_t moduleIndex, Module const *) const = 0;
-    virtual LE_NOTHROW bool parameterListChanged() const = 0;
-    virtual LE_NOTHROW void presetChangeBegin() const = 0;
-    virtual LE_NOTHROW void presetChangeEnd() const = 0;
-    virtual LE_NOTHROW bool latencyChanged() = 0;
+    virtual void automatedParameterBeginEdit(ParameterID) const = 0;
+    virtual void automatedParameterEndEdit(ParameterID) const = 0;
+    virtual void gestureBegin(char const *description) const = 0;
+    virtual void gestureEnd() const = 0;
+    virtual void automatedParameterChanged(ParameterID, ParameterValueForAutomation) const = 0;
+    virtual void moduleChanged(std::uint8_t moduleIndex, Module const *) const = 0;
+    virtual bool parameterListChanged() const = 0;
+    virtual void presetChangeBegin() const = 0;
+    virtual void presetChangeEnd() const = 0;
+    virtual bool latencyChanged() = 0;
 
     // queries
 #if LE_SW_ENGINE_INPUT_MODE >= 2
   public:
-    virtual LE_NOTHROW bool hostTryIOConfigurationChange(std::uint8_t numberOfMainChannels,
-                                                         std::uint8_t numberOfSideChannels) = 0;
-    virtual LE_NOTHROWNOALIAS bool hostSupportsIOConfigurationChanges() const = 0;
+    virtual bool hostTryIOConfigurationChange(std::uint8_t numberOfMainChannels,
+                                              std::uint8_t numberOfSideChannels) = 0;
+    virtual bool hostSupportsIOConfigurationChanges() const = 0;
 #endif // LE_SW_ENGINE_INPUT_MODE >= 2
 
   private:
@@ -175,15 +174,12 @@ class LE_NOVTABLE Plugin2HostPassiveInteropController
     ////////////////////////////////////////////////////////////////////////////
 
   public: // Parameter info
-    //static LE_NOALIAS void getParameterDisplay( ParameterID, LE::Utility::Span<char> text , Engine::Setup const &, Plugins::AutomatedParameterValue const * pOptionalValue, Program const & );
-    static LE_NOALIAS void getParameterLabel(ParameterID, LE::Utility::Span<char> label,
-                                             Program const *);
-    static LE_NOALIAS void getParameterName(ParameterID, LE::Utility::Span<char> name,
-                                            Program const *);
-    static LE_NOALIAS void getParameterIDs(LE::Utility::Span<Plugins::ParameterID> ids,
-                                           Program const *);
+    //static void getParameterDisplay( ParameterID, LE::Utility::Span<char> text , Engine::Setup const &, Plugins::AutomatedParameterValue const * pOptionalValue, Program const & );
+    static void getParameterLabel(ParameterID, LE::Utility::Span<char> label, Program const *);
+    static void getParameterName(ParameterID, LE::Utility::Span<char> name, Program const *);
+    static void getParameterIDs(LE::Utility::Span<Plugins::ParameterID> ids, Program const *);
 
-    static LE_NOALIAS std::uint16_t numberOfParameters(Program const *);
+    static std::uint16_t numberOfParameters(Program const *);
 
   public: // Indexed parameter functors.
     /// \note

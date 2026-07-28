@@ -250,8 +250,7 @@ float *ChannelBuffers::inputBuffer()
     return mainOLA_.begin();
 }
 
-LE_COLD LE_CONST_FUNCTION std::uint32_t
-ChannelBuffers::requiredStorage(StorageFactors const &factors)
+LE_COLD std::uint32_t ChannelBuffers::requiredStorage(StorageFactors const &factors)
 {
     using Utility::align;
     return ChannelData::requiredStorage(factors) + align(MainOLA ::requiredStorage(factors)) +
@@ -268,8 +267,7 @@ LE_COLD void ChannelBuffers::resize(StorageFactors const &factors, Storage &stor
     outputOLA_.resize(factors, storage);
 }
 
-LE_COLD LE_CONST_FUNCTION std::uint32_t
-ChannelBuffers::OutputOLA::requiredStorage(StorageFactors const &factors)
+LE_COLD std::uint32_t ChannelBuffers::OutputOLA::requiredStorage(StorageFactors const &factors)
 {
     // Implementation note:
     //   In addition to the full window size we need windowSize - overlapSize

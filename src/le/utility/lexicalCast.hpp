@@ -32,15 +32,15 @@ namespace Utility
 // Binary -> String
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_NOTHROWNOALIAS unsigned int lexical_cast(std::int32_t, char *);
-LE_NOTHROWNOALIAS unsigned int lexical_cast(long, char *);
-LE_NOTHROWNOALIAS unsigned int lexical_cast(std::uint32_t, char *);
-LE_NOTHROWNOALIAS unsigned int lexical_cast(unsigned long, char *);
-LE_NOTHROWNOALIAS unsigned int lexical_cast(float, char *);
-LE_NOTHROWNOALIAS unsigned int lexical_cast(double, char *);
+unsigned int lexical_cast(std::int32_t, char *);
+unsigned int lexical_cast(long, char *);
+unsigned int lexical_cast(std::uint32_t, char *);
+unsigned int lexical_cast(unsigned long, char *);
+unsigned int lexical_cast(float, char *);
+unsigned int lexical_cast(double, char *);
 
-LE_NOTHROWNOALIAS unsigned int lexical_cast(float, std::uint8_t decimalPlaces, char *);
-LE_NOTHROWNOALIAS unsigned int lexical_cast(double, std::uint8_t decimalPlaces, char *);
+unsigned int lexical_cast(float, std::uint8_t decimalPlaces, char *);
+unsigned int lexical_cast(double, std::uint8_t decimalPlaces, char *);
 
 inline unsigned int lexical_cast(std::int8_t const value, char *const pBuffer)
 {

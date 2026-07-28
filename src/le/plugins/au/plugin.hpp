@@ -130,27 +130,18 @@ class AudioBuffers
     void aliasFrom(::AudioBufferList const &);
     void copyTo(::AudioBufferList &) const;
 
-    ::AudioBufferList &bufferList() LE_NOTHROW LE_PURE_FUNCTION
+    ::AudioBufferList &bufferList()
     {
         return *static_cast<::AudioBufferList *>(__builtin_assume_aligned(pIOBuffers_, 16));
     }
-    ::AudioBufferList const &bufferList() const LE_NOTHROW LE_PURE_FUNCTION
+    ::AudioBufferList const &bufferList() const
     {
         return const_cast<AudioBuffers &>(*this).bufferList();
     }
 
-    ::AudioBufferList *__restrict operator->() const LE_NOTHROW LE_PURE_FUNCTION
-    {
-        return pIOBuffers_;
-    }
-    operator ::AudioBufferList * __restrict() const LE_NOTHROW LE_PURE_FUNCTION
-    {
-        return pIOBuffers_;
-    }
-    operator ::AudioBufferList & __restrict() const LE_NOTHROW LE_PURE_FUNCTION
-    {
-        return *pIOBuffers_;
-    }
+    ::AudioBufferList *__restrict operator->() const { return pIOBuffers_; }
+    operator ::AudioBufferList * __restrict() const { return pIOBuffers_; }
+    operator ::AudioBufferList & __restrict() const { return *pIOBuffers_; }
 
     explicit operator bool() const { return pIOBuffers_; }
 
@@ -452,16 +443,15 @@ class AUHostProxy
     bool reportNewLatencyInSeconds(float seconds) const;
 
   public: // Parameter automation.
-    bool LE_NOTHROW propertyChanged(::AudioUnitPropertyID, ::AudioUnitScope,
-                                    ::AudioUnitElement) const;
-    bool LE_NOTHROW globalPropertyChanged(::AudioUnitPropertyID) const;
+    bool propertyChanged(::AudioUnitPropertyID, ::AudioUnitScope, ::AudioUnitElement) const;
+    bool globalPropertyChanged(::AudioUnitPropertyID) const;
 
     //http://www.rawmaterialsoftware.com/viewtopic.php?f=8&t=2705
-    void LE_NOTHROW automatedParameterChanged(ParameterID, float newValue) const;
-    void LE_NOTHROW automatedParameterBeginEdit(ParameterID) const;
-    void LE_NOTHROW automatedParameterEndEdit(ParameterID) const;
+    void automatedParameterChanged(ParameterID, float newValue) const;
+    void automatedParameterBeginEdit(ParameterID) const;
+    void automatedParameterEndEdit(ParameterID) const;
 
-    bool LE_NOTHROW parameterListChanged() const;
+    bool parameterListChanged() const;
 
     bool canTryDynamicParameterList() const { return canTryDynamicParameterList_; }
 
@@ -980,7 +970,7 @@ template <class ImplParam> class Plugin<ImplParam, Protocol::AU> : public AUPlug
   private: // ComponentManager interface
     //friend ::ComponentResult ::lePluginAUEntry( ::ComponentParameters *, ::Handle ); // entry function
   public:
-    static ::ComponentResult LE_NOTHROW componentManagerEntry(::ComponentParameters *, ::Handle);
+    static ::ComponentResult componentManagerEntry(::ComponentParameters *, ::Handle);
 }; // class Plugin<Impl, Protocol::AU>
 
 //------------------------------------------------------------------------------

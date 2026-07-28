@@ -109,7 +109,7 @@ class SpectrumWorxEditor
 
   public:
     SpectrumWorxEditor();
-    LE_NOTHROW ~SpectrumWorxEditor();
+    ~SpectrumWorxEditor();
 
 #if defined(_WIN32)
     void attachToHostWindow(HWND parentWindow);
@@ -126,8 +126,8 @@ class SpectrumWorxEditor
 #endif // platform
 
   public:
-    static LE_PURE_FUNCTION SpectrumWorxEditor &fromChild(juce::Component const &);
-    static LE_PURE_FUNCTION SpectrumWorxEditor &fromPresetBrowser(PresetBrowser &);
+    static SpectrumWorxEditor &fromChild(juce::Component const &);
+    static SpectrumWorxEditor &fromPresetBrowser(PresetBrowser &);
 
     Engine::Setup const &engineSetup() const;
     AutomatedModuleChain &moduleChain();
@@ -253,8 +253,8 @@ class SpectrumWorxEditor
     void mainKnobDragStopped(std::uint8_t parameterIndex) const;
 
     template <class Parameter>
-    LE_NOTHROW bool globalParameterChanged(typename Parameter::value_type const value,
-                                           bool const asDiscreteGesture)
+    bool globalParameterChanged(typename Parameter::value_type const value,
+                                bool const asDiscreteGesture)
     {
         if (!setGlobalParameter<Parameter>(value))
             return false;
@@ -271,7 +271,7 @@ class SpectrumWorxEditor
     template <class Parameter> void updateGlobalParameterWidget();
 
   public:
-    LE_NOTHROW void updateActiveControlValue();
+    void updateActiveControlValue();
 
 #ifndef LE_SW_DISABLE_SIDE_CHANNEL
     void updateSampleName();
@@ -303,8 +303,8 @@ class SpectrumWorxEditor
     void updateModuleParameterAndNotifyHost(ModuleUI &, std::uint_fast8_t moduleParameterIndex,
                                             float parameterValue) const;
 
-    void LE_NOTHROW createChainGUIs(AutomatedModuleChain &);
-    void LE_NOTHROW destroyChainGUIs(AutomatedModuleChain &);
+    void createChainGUIs(AutomatedModuleChain &);
+    void destroyChainGUIs(AutomatedModuleChain &);
 
     void moduleRemoved() { setLastModulePosition(nextAvailableModuleSlot_ - 1); }
     void moduleAdded() { setLastModulePosition(nextAvailableModuleSlot_ + 1); }
@@ -398,7 +398,7 @@ class SpectrumWorxEditor
     {
       public:
         Gradient(juce::Component &parent);
-        LE_NOTHROW ~Gradient() {}
+        ~Gradient() {}
 
       private: // JUCE component overrides.
         void paint(juce::Graphics &) override;
@@ -420,7 +420,7 @@ class SpectrumWorxEditor
         void mouseUp(juce::MouseEvent const &) override;
 
       private:
-        LE_NOTHROW LE_PURE_FUNCTION SpectrumWorxEditor &editor();
+        SpectrumWorxEditor &editor();
     }; // class SampleArea
 #endif // LE_SW_DISABLE_SIDE_CHANNEL
 
@@ -447,7 +447,7 @@ class SpectrumWorxEditor
 
           private: // JUCE component overrides.
             friend class LFODisplay;
-            double LE_NOTHROW snapValue(double attemptedValue, bool userIsDragging)
+            double snapValue(double attemptedValue, bool userIsDragging)
                 LE_GNU_SPECIFIC(noexcept) override;
 
           private:
@@ -459,7 +459,7 @@ class SpectrumWorxEditor
 
       public:
         LFODisplay();
-        LE_NOTHROW ~LFODisplay();
+        ~LFODisplay();
 
         void setupForControl(ModuleControlBase &, double minimum, double maximum, double interval);
 
@@ -484,12 +484,12 @@ class SpectrumWorxEditor
         LE_IMPLEMENT_ASYNC_REPAINT
 
       private:
-        LE_NOTHROWNOALIAS void updateAllControls();
-        LE_NOTHROWNOALIAS void updateAutomatableControls();
-        LE_NOTHROWNOALIAS void updatePeriodControl();
-        LE_NOTHROWNOALIAS void updateRangeControl();
-        LE_NOTHROWNOALIAS void updateSnapControls();
-        LE_NOTHROWNOALIAS void updateLFOAndHostFromPeriodControl();
+        void updateAllControls();
+        void updateAutomatableControls();
+        void updatePeriodControl();
+        void updateRangeControl();
+        void updateSnapControls();
+        void updateLFOAndHostFromPeriodControl();
 
         void automatedParameterChanged(std::uint8_t lfoParameterIndex, float parameterValue) const;
         template <class LFOParameter, typename T>
@@ -511,13 +511,10 @@ class SpectrumWorxEditor
 
         std::uint8_t moduleIndex() const;
 
-        LE_NOTHROW LE_PURE_FUNCTION SpectrumWorxEditor &editor();
+        SpectrumWorxEditor &editor();
         SpectrumWorxEditor const &editor() const;
 
-        LE_NOINLINE LE_NOTHROW LE_PURE_FUNCTION ModuleControlBase::LFO &lfo()
-        {
-            return control().lfo();
-        }
+        LE_NOINLINE ModuleControlBase::LFO &lfo() { return control().lfo(); }
         ModuleControlBase &control()
         {
             LE_ASSERT(pModuleControl_);
@@ -556,13 +553,13 @@ class SpectrumWorxEditor
     {
       public:
         Settings();
-        LE_NOTHROW ~Settings();
+        ~Settings();
 
         void updateEnginePage();
 
         static void comboBoxValueChanged(ComboBox const &);
 
-        LE_NOTHROW LE_PURE_FUNCTION SpectrumWorxEditor &editor();
+        SpectrumWorxEditor &editor();
         juce::Component &window()
         {
             return *this;

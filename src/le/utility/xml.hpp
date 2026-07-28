@@ -98,37 +98,31 @@ using Object = rapidxml::xml_base<>;
 /// \brief All XML objects <em>are</em> <VAR>XML::Object</VAR>s making these
 /// functions usable with both Elements and Attributes.
 /// @{
-LE_NOTHROWNOALIAS inline string_view name(Object const &object)
-{
-    return {object.name(), object.name_size()};
-}
-LE_NOTHROWNOALIAS inline string_view value(Object const &object)
-{
-    return {object.value(), object.value_size()};
-}
+inline string_view name(Object const &object) { return {object.name(), object.name_size()}; }
+inline string_view value(Object const &object) { return {object.value(), object.value_size()}; }
 /// @}
 
 /// XML element node
 class Element : public rapidxml::xml_node<>
 {
   public:
-    LE_NOTHROWNOALIAS Element();
-    LE_NOTHROWNOALIAS Element(string_view name);
+    Element();
+    Element(string_view name);
 
     /// @{
     /// \name Name/value access
     string_view name() const { return XML::name(*this); }
     string_view value() const { return XML::value(*this); }
 
-    LE_NOTHROWNOALIAS void setName(string_view);
-    LE_NOTHROWNOALIAS void setValue(string_view);
+    void setName(string_view);
+    void setValue(string_view);
     /// @}
 
     /// @{
     /// \name Subelement access
-    LE_NOTHROWNOALIAS Element const *child(string_view name) const;
-    LE_NOTHROWNOALIAS Attribute const *attribute(string_view name) const;
-    LE_NOTHROWNOALIAS Attribute *attribute(string_view name);
+    Element const *child(string_view name) const;
+    Attribute const *attribute(string_view name) const;
+    Attribute *attribute(string_view name);
     /// @}
 }; // class Node
 
@@ -138,7 +132,7 @@ class Document : public rapidxml::xml_document<>
   public:
     void parse(char *string);
 
-    LE_NOTHROWNOALIAS Element const *element(string_view name) const;
+    Element const *element(string_view name) const;
 
     string_view copyString(string_view) const;
 
@@ -151,7 +145,7 @@ class Document : public rapidxml::xml_document<>
     }
 #endif // LE_NO_EXCEPTIONS
 
-    LE_NOTHROW char *print(char *pBuffer, std::uint16_t bufferLength) const;
+    char *print(char *pBuffer, std::uint16_t bufferLength) const;
 }; // class Document
 
 //------------------------------------------------------------------------------

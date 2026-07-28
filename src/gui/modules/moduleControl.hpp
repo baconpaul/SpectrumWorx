@@ -102,12 +102,12 @@ class LE_NOVTABLE ModuleControlBase
     //                                        (14.11.2011.) (Domagoj Saric)
 
   public:
-    virtual LE_NOTHROW void setValue(float) = 0;
-    virtual LE_NOTHROWNOALIAS float getValue() const = 0;
+    virtual void setValue(float) = 0;
+    virtual float getValue() const = 0;
 
-    virtual LE_NOTHROW void lfoStateChanged() = 0;
+    virtual void lfoStateChanged() = 0;
 
-    virtual LE_NOTHROW void updateForEngineSetupChanges(Engine::Setup const &) {}
+    virtual void updateForEngineSetupChanges(Engine::Setup const &) {}
 
     // Implementation note:
     //   The names (and signatures) of these two functions were chosen to match
@@ -163,7 +163,7 @@ class LE_NOVTABLE ModuleControlBase
 
   protected:
     bool reportActiveControl(double minimum, double maximum, double interval);
-    bool LE_NOTHROW reportInactiveControl() const;
+    bool reportInactiveControl() const;
 
     void configureControl(bool mouseClickCanGrabFocus);
 
@@ -182,7 +182,7 @@ class LE_NOVTABLE ModuleControlBase
     bool isASharedModuleControl() const;
 
   private:
-    bool LE_NOTHROW tryActivateControl() const;
+    bool tryActivateControl() const;
 
   private:
     std::uint8_t parameterIndex_;
@@ -220,22 +220,19 @@ class ModuleControlImpl final : public ModuleControlBase, public ImplWidget
     using ImplWidget::getValue;
     using ImplWidget::setValue;
 
-    LE_NOTHROW void setValue(float const value) override
+    void setValue(float const value) override
     {
         return ImplWidget::setValue(Math::convert<typename BaseWidget::param_type>(value));
     }
-    LE_NOTHROWNOALIAS float getValue() const override
-    {
-        return Math::convert<float>(ImplWidget::getValue());
-    }
+    float getValue() const override { return Math::convert<float>(ImplWidget::getValue()); }
 
-    LE_NOTHROW void updateForEngineSetupChanges(Engine::Setup const &engineSetup) override
+    void updateForEngineSetupChanges(Engine::Setup const &engineSetup) override
     {
         ImplWidget::updateForEngineSetupChanges(engineSetup);
     }
 
   private:
-    LE_NOTHROW void lfoStateChanged() override { ImplWidget::lfoStateChanged(); }
+    void lfoStateChanged() override { ImplWidget::lfoStateChanged(); }
 
     void reportActiveControl()
     {

@@ -155,8 +155,8 @@ class ResourceFile
     class MemoryMapping;
     class Stream;
 
-    static LE_NOTHROWNOALIAS MemoryMapping map(char const *relativeFilePath);
-    static LE_NOTHROWNOALIAS Stream open(char const *relativeFilePath);
+    static MemoryMapping map(char const *relativeFilePath);
+    static Stream open(char const *relativeFilePath);
 }; // class ResourceFile
 #endif // __ANDROID__
 
@@ -179,11 +179,10 @@ class File
     class Stream;
 
     template <SpecialLocations location>
-    static LE_NOTHROWNOALIAS typename Impl<location>::type::MemoryMapping
-    map(char const *relativeFilePath);
+    static typename Impl<location>::type::MemoryMapping map(char const *relativeFilePath);
     template <SpecialLocations location>
-    static LE_NOTHROWNOALIAS typename Impl<location>::type::Stream
-    open(char const *relativeFilePath, std::uint32_t flags);
+    static typename Impl<location>::type::Stream open(char const *relativeFilePath,
+                                                      std::uint32_t flags);
 }; // class ResourceFile
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -199,30 +198,27 @@ class File::MemoryMapping : public std::pair<char const *, char const *>
 
     typedef std::pair<value_type *, value_type *> Range;
 
-    LE_NOTHROWNOALIAS MemoryMapping();
-    LE_NOTHROW MemoryMapping(MemoryMapping &&) LE_NOEXCEPT;
-    LE_NOTHROW ~MemoryMapping();
+    MemoryMapping();
+    MemoryMapping(MemoryMapping &&) noexcept;
+    ~MemoryMapping();
 
-    LE_NOTHROWNOALIAS value_type *begin() const { return first; }
-    LE_NOTHROWNOALIAS value_type *end() const { return second; }
+    value_type *begin() const { return first; }
+    value_type *end() const { return second; }
 
-    LE_NOTHROWNOALIAS std::uint32_t size() const
-    {
-        return static_cast<std::uint32_t>(end() - begin());
-    }
+    std::uint32_t size() const { return static_cast<std::uint32_t>(end() - begin()); }
 
-    LE_NOTHROWNOALIAS value_type operator[](std::uint32_t const index) const
+    value_type operator[](std::uint32_t const index) const
     {
         assert(index < size());
         return begin()[index];
     }
 
-    LE_NOTHROW MemoryMapping &operator=(MemoryMapping &&) LE_NOEXCEPT;
+    MemoryMapping &operator=(MemoryMapping &&) noexcept;
 
 #if !(defined(_MSC_VER) && (_MSC_VER < 1800))
     explicit
 #endif // old MSVC
-    operator bool() const LE_NOEXCEPT
+    operator bool() const noexcept
     {
         return begin() != nullptr;
     }
@@ -231,7 +227,7 @@ class File::MemoryMapping : public std::pair<char const *, char const *>
 
   private:
     friend class File;
-    LE_NOTHROWNOALIAS explicit MemoryMapping(Range const &);
+    explicit MemoryMapping(Range const &);
 
   private:
 #if defined(_MSC_VER) && (_MSC_VER < 1800)
@@ -255,29 +251,29 @@ class File::MemoryMapping : public std::pair<char const *, char const *>
 class File::Stream
 {
   public:
-    LE_NOTHROWNOALIAS Stream();
-    LE_NOTHROW Stream(Stream &&) LE_NOEXCEPT;
-    LE_NOTHROW ~Stream();
+    Stream();
+    Stream(Stream &&) noexcept;
+    ~Stream();
 
-    LE_NOTHROWNOALIAS std::uint32_t read(void *pBuffer, std::uint32_t numberOfBytesToRead);
-    LE_NOTHROWNOALIAS std::uint32_t write(void const *pBuffer, std::uint32_t numberOfBytesToWrite);
+    std::uint32_t read(void *pBuffer, std::uint32_t numberOfBytesToRead);
+    std::uint32_t write(void const *pBuffer, std::uint32_t numberOfBytesToWrite);
 
-    LE_NOTHROWNOALIAS std::uint32_t size() const;
-    LE_NOTHROWNOALIAS std::uint32_t position() const;
-    LE_NOTHROWNOALIAS bool seek(std::int32_t offset, std::uint8_t whence);
+    std::uint32_t size() const;
+    std::uint32_t position() const;
+    bool seek(std::int32_t offset, std::uint8_t whence);
 
-    LE_NOTHROWNOALIAS int asPOSIXFile(::off_t &startOffset, std::size_t &size) const;
+    int asPOSIXFile(::off_t &startOffset, std::size_t &size) const;
 
-    LE_NOTHROW void close();
+    void close();
 
-    LE_NOTHROW Stream &operator=(Stream &&) LE_NOEXCEPT;
-    LE_NOTHROWNOALIAS bool operator!() const;
+    Stream &operator=(Stream &&) noexcept;
+    bool operator!() const;
 
     int nativeHandle() const { return handle_; }
 
   private:
     friend class File;
-    LE_NOTHROWNOALIAS Stream(int);
+    Stream(int);
 
 #if defined(_MSC_VER) && (_MSC_VER < 1800)
   private:
@@ -301,22 +297,22 @@ class File::Stream
 class ResourceFile::MemoryMapping
 {
   public:
-    LE_NOTHROWNOALIAS MemoryMapping();
-    LE_NOTHROW MemoryMapping(MemoryMapping &&) LE_NOEXCEPT;
-    LE_NOTHROW ~MemoryMapping();
+    MemoryMapping();
+    MemoryMapping(MemoryMapping &&) noexcept;
+    ~MemoryMapping();
 
     using value_type = char const;
 
-    LE_NOTHROWNOALIAS value_type *begin() const;
-    LE_NOTHROWNOALIAS value_type *end() const;
+    value_type *begin() const;
+    value_type *end() const;
 
-    LE_NOTHROWNOALIAS std::uint32_t size() const;
+    std::uint32_t size() const;
 
-    LE_NOTHROWNOALIAS char operator[](std::uint32_t index) const;
+    char operator[](std::uint32_t index) const;
 
-    LE_NOTHROW MemoryMapping &operator=(MemoryMapping &&) LE_NOEXCEPT;
-    LE_NOTHROWNOALIAS bool operator!() const;
-    LE_NOTHROWNOALIAS explicit operator bool() const;
+    MemoryMapping &operator=(MemoryMapping &&) noexcept;
+    bool operator!() const;
+    explicit operator bool() const;
 
   private:
     friend class ResourceFile;
@@ -336,21 +332,21 @@ class ResourceFile::MemoryMapping
 class ResourceFile::Stream
 {
   public:
-    LE_NOTHROWNOALIAS Stream();
-    LE_NOTHROW Stream(Stream &&);
-    LE_NOTHROW ~Stream();
+    Stream();
+    Stream(Stream &&);
+    ~Stream();
 
-    LE_NOTHROWNOALIAS std::uint32_t read(void *pBuffer, std::uint32_t numberOfBytesToRead);
+    std::uint32_t read(void *pBuffer, std::uint32_t numberOfBytesToRead);
 
-    LE_NOTHROWNOALIAS std::uint32_t size() const;
-    LE_NOTHROWNOALIAS std::uint32_t position() const;
-    LE_NOTHROWNOALIAS bool seek(std::int32_t offset, std::uint8_t whence);
+    std::uint32_t size() const;
+    std::uint32_t position() const;
+    bool seek(std::int32_t offset, std::uint8_t whence);
 
-    LE_NOTHROWNOALIAS int asPOSIXFile(::off_t &startOffset, std::size_t &size) const;
+    int asPOSIXFile(::off_t &startOffset, std::size_t &size) const;
 
-    LE_NOTHROW Stream &operator=(Stream &&) LE_NOEXCEPT;
-    LE_NOTHROWNOALIAS bool operator!() const;
-    LE_NOTHROWNOALIAS explicit operator bool() const;
+    Stream &operator=(Stream &&) noexcept;
+    bool operator!() const;
+    explicit operator bool() const;
 
   private:
     friend class ResourceFile;
@@ -366,13 +362,13 @@ template <> struct File::Impl<Resources>
     using type = ResourceFile;
 };
 template <>
-LE_NOTHROWNOALIAS inline typename File::Impl<Resources>::type::MemoryMapping
+inline typename File::Impl<Resources>::type::MemoryMapping
 File::map<Resources>(char const *const relativeFilePath)
 {
     return ResourceFile::map(relativeFilePath);
 }
 template <>
-LE_NOTHROWNOALIAS inline typename File::Impl<Resources>::type::Stream
+inline typename File::Impl<Resources>::type::Stream
 File::open<Resources>(char const *const relativeFilePath, std::uint32_t /*flags*/)
 {
     return ResourceFile::open(relativeFilePath);
@@ -383,11 +379,11 @@ File::open<Resources>(char const *const relativeFilePath, std::uint32_t /*flags*
 class ResourceFile : public File
 {
   public:
-    static LE_NOTHROWNOALIAS MemoryMapping map(char const *const relativeFilePath)
+    static MemoryMapping map(char const *const relativeFilePath)
     {
         return File::map<Resources>(relativeFilePath);
     }
-    static LE_NOTHROWNOALIAS Stream open(char const *const relativeFilePath)
+    static Stream open(char const *const relativeFilePath)
     {
         return File::open<Resources>(relativeFilePath, O_RDONLY);
     }
@@ -395,10 +391,9 @@ class ResourceFile : public File
 
 #endif // __ANDROID__ || DOXYGEN_ONLY
 
-template <SpecialLocations location>
-LE_NOTHROWNOALIAS char const *fullPath(char const *relativeFilePath);
+template <SpecialLocations location> char const *fullPath(char const *relativeFilePath);
 
-template <SpecialLocations location, bool writeAccess> LE_NOTHROWNOALIAS bool accessible();
+template <SpecialLocations location, bool writeAccess> bool accessible();
 
 #if defined(__ANDROID__) || defined(DOXYGEN_ONLY)
 /// \addtogroup Android Android specific
@@ -415,15 +410,15 @@ template <SpecialLocations location, bool writeAccess> LE_NOTHROWNOALIAS bool ac
 /// objects and, as a courtesy, the LE.Utility library tries to cover all use
 /// cases. The choice of which setAppContext() overload to use is solely one of
 /// user preference.
-LE_NOTHROW bool setAppContext(::JNIEnv &, ::jobject activity, ::jobject assetManager);
-LE_NOTHROW bool setAppContext(::JNIEnv &, ::jobject activity); ///< \overload
-LE_NOTHROW bool setAppContext(::ANativeActivity const &);      ///< \overload
-LE_NOTHROW bool setAppContext(::ANativeActivity const &,
-                              ::ndk_helper::JNIHelper const &); ///< \overload
+bool setAppContext(::JNIEnv &, ::jobject activity, ::jobject assetManager);
+bool setAppContext(::JNIEnv &, ::jobject activity); ///< \overload
+bool setAppContext(::ANativeActivity const &);      ///< \overload
+bool setAppContext(::ANativeActivity const &,
+                   ::ndk_helper::JNIHelper const &); ///< \overload
 
 /// <B>Effect:</B> Returns the app's native AssetManager instance.<BR>
 /// <B>Preconditions:</B> a successful call to setAppContext().
-LE_NOTHROW LE_CONST_FUNCTION ::AAssetManager &resourceManager();
+::AAssetManager &resourceManager();
 /// @}  // group Android
 #endif // __ANDROID__
 

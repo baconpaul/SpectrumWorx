@@ -256,43 +256,43 @@ class ModuleChainBase :
     using const_iterator = chain_const_iterator;
 
   public:
-    LE_NOTHROWNOALIAS ModuleChainBase();
-    LE_NOTHROW ModuleChainBase(ModuleChainBase &&);
-    LE_NOTHROW ~ModuleChainBase();
+    ModuleChainBase();
+    ModuleChainBase(ModuleChainBase &&);
+    ~ModuleChainBase();
 
-    LE_NOTHROW ModuleChainBase &operator=(ModuleChainBase &&);
+    ModuleChainBase &operator=(ModuleChainBase &&);
 
-    LE_NOTHROWNOALIAS std::uint8_t getIndexForModule(Node const &) const;
+    std::uint8_t getIndexForModule(Node const &) const;
     template <class Module> std::uint8_t getIndexForModule(Module const &chainedModule) const
     {
         return getIndexForModule(node(chainedModule));
     }
 
-    LE_NOTHROWNOALIAS iterator module(std::uint8_t index);
-    LE_NOTHROWNOALIAS const_iterator module(std::uint8_t index) const;
+    iterator module(std::uint8_t index);
+    const_iterator module(std::uint8_t index) const;
 
     void moveModule(std::uint8_t sourceIndex, std::uint8_t targetIndex);
 
-    LE_NOTHROWNOALIAS std::uint8_t size() const;
+    std::uint8_t size() const;
 
-    LE_NOTHROWNOALIAS bool empty() const;
+    bool empty() const;
 
     void clear();
 
-    static LE_NOTHROWNOALIAS iterator iterator_to(Node &);
-    static LE_NOTHROWNOALIAS const_iterator iterator_to(Node const &);
+    static iterator iterator_to(Node &);
+    static const_iterator iterator_to(Node const &);
 
-    LE_NOTHROWNOALIAS iterator begin();
-    LE_NOTHROWNOALIAS const_iterator begin() const;
+    iterator begin();
+    const_iterator begin() const;
 
-    LE_NOTHROWNOALIAS iterator end();
-    LE_NOTHROWNOALIAS const_iterator end() const;
+    iterator end();
+    const_iterator end() const;
 
-    template <class Iterator> LE_NOTHROWNOALIAS bool isEnd(Iterator const &pModule) const
+    template <class Iterator> bool isEnd(Iterator const &pModule) const
     {
         return isEnd(static_cast<Node const *>(LE::Utility::getPointer(pModule)));
     }
-    LE_NOTHROWNOALIAS bool isEnd(Node const *) const;
+    bool isEnd(Node const *) const;
 
     void push_back(Node &);
 
@@ -354,12 +354,11 @@ class ModuleChainImpl : public ModuleChainBase
 #endif // _MSC_VER
     using ModuleChainBase::operator=;
 
-    void LE_NOTHROW preProcessAll(Parameters::LFOImpl::Timer const &, Setup const &);
+    void preProcessAll(Parameters::LFOImpl::Timer const &, Setup const &);
 
-    void LE_NOTHROW resetAll();
+    void resetAll();
 
-    bool LE_NOTHROW resizeAll(StorageFactors const &newfactors,
-                              StorageFactors const &currentFactors);
+    bool resizeAll(StorageFactors const &newfactors, StorageFactors const &currentFactors);
 }; // class ModuleChainImpl
 
 //------------------------------------------------------------------------------

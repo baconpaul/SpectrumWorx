@@ -38,10 +38,10 @@ namespace SW
 {
 namespace GUI
 {
-void LE_NOTHROW warningMessageBox(std::string_view title, std::string_view message, bool canBlock);
-bool LE_NOTHROW warningOkCancelBox(TCHAR const *title, TCHAR const *question);
-float LE_NOTHROWNOALIAS displayScale();
-bool LE_NOTHROWNOALIAS isGUIInitialised();
+void warningMessageBox(std::string_view title, std::string_view message, bool canBlock);
+bool warningOkCancelBox(TCHAR const *title, TCHAR const *question);
+float displayScale();
+bool isGUIInitialised();
 } // namespace GUI
 } // namespace SW
 
@@ -146,7 +146,7 @@ template <class Impl> unsigned int Plugin<Impl, Protocol::VST24>::pluginInstance
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class Impl>
-LE_NOTHROW Plugin<Impl, Protocol::VST24>::Plugin(
+Plugin<Impl, Protocol::VST24>::Plugin(
     ConstructionParameter const constructionParameter) /// \throws nothing
     : VSTPluginBase(constructionParameter)
 #ifndef NDEBUG
@@ -245,9 +245,11 @@ template <class Impl> Plugin<Impl, Protocol::VST24>::~Plugin()
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class Impl>
-::VstIntPtr LE_NOTHROW Plugin<Impl, Protocol::VST24>::dispatcher(
-    ::AEffect *LE_RESTRICT const pEffect, ::VstInt32 const opCode, ::VstInt32 const index,
-    ::VstIntPtr const integerParam, void *const pData, float const floatParam)
+::VstIntPtr Plugin<Impl, Protocol::VST24>::dispatcher(::AEffect *LE_RESTRICT const pEffect,
+                                                      ::VstInt32 const opCode,
+                                                      ::VstInt32 const index,
+                                                      ::VstIntPtr const integerParam,
+                                                      void *const pData, float const floatParam)
 {
     LE_ASSERT_MSG(_MM_GET_ROUNDING_MODE() == _MM_ROUND_NEAREST, "Unexpected rounding mode.");
 
@@ -955,9 +957,8 @@ template <class Impl>
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class Impl>
-float LE_NOTHROWNOALIAS
-Plugin<Impl, Protocol::VST24>::getParameter(::AEffect *LE_RESTRICT const pEffect,
-                                            ::VstInt32 const index) /// \throws nothing
+float Plugin<Impl, Protocol::VST24>::getParameter(::AEffect *LE_RESTRICT const pEffect,
+                                                  ::VstInt32 const index) /// \throws nothing
 {
     LE_ASSERT_MSG(_MM_GET_ROUNDING_MODE() == _MM_ROUND_NEAREST, "Unexpected rounding mode.");
     auto const &impl(Plugin::impl(pEffect));
@@ -977,9 +978,9 @@ Plugin<Impl, Protocol::VST24>::getParameter(::AEffect *LE_RESTRICT const pEffect
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class Impl>
-void LE_NOTHROW Plugin<Impl, Protocol::VST24>::setParameter(::AEffect *LE_RESTRICT const pEffect,
-                                                            ::VstInt32 const index,
-                                                            float const value) /// \throws nothing
+void Plugin<Impl, Protocol::VST24>::setParameter(::AEffect *LE_RESTRICT const pEffect,
+                                                 ::VstInt32 const index,
+                                                 float const value) /// \throws nothing
 {
     LE_ASSERT_MSG(_MM_GET_ROUNDING_MODE() == _MM_ROUND_NEAREST, "Unexpected rounding mode.");
     LE_ASSUME(std::isfinite(value));

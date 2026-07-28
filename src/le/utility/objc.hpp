@@ -28,11 +28,11 @@ namespace ObjC
 {
 //------------------------------------------------------------------------------
 
-LE_NOTHROW NSString *asciiString(char const *c_str);
-LE_NOTHROW NSString *utf8String(char const *c_str);
+NSString *asciiString(char const *c_str);
+NSString *utf8String(char const *c_str);
 
-LE_NOTHROW NSString *copyASCIIString(char const *c_str);
-LE_NOTHROW NSString *copyUTF8String(char const *c_str);
+NSString *copyASCIIString(char const *c_str);
+NSString *copyUTF8String(char const *c_str);
 
 //------------------------------------------------------------------------------
 } // namespace ObjC

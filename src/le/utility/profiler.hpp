@@ -28,16 +28,16 @@ namespace Utility
 class DSPProfiler
 {
   public:
-    LE_NOTHROWNOALIAS DSPProfiler();
+    DSPProfiler();
 
-    LE_NOTHROWNOALIAS void setSignalSampleRate(std::uint32_t sampleRate);
-    LE_NOTHROWNOALIAS void reset();
+    void setSignalSampleRate(std::uint32_t sampleRate);
+    void reset();
 
-    LE_NOTHROWNOALIAS void beginInterval();
+    void beginInterval();
 
-    LE_NOTHROWNOALIAS void endInterval(std::uint32_t intervalLengthInSampleFrames);
+    void endInterval(std::uint32_t intervalLengthInSampleFrames);
 
-    LE_NOTHROWNOALIAS float cpuUsagePercentage() const;
+    float cpuUsagePercentage() const;
 
     static DSPProfiler &singleton() { return singleton_; }
 

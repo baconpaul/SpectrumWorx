@@ -188,7 +188,7 @@ SpectrumWorxEditor::SpectrumWorxEditor()
 
 #pragma warning(pop)
 
-LE_NOTHROW SpectrumWorxEditor::~SpectrumWorxEditor()
+SpectrumWorxEditor::~SpectrumWorxEditor()
 {
     LE_ASSERT(GUI::isThisTheGUIThread());
 
@@ -268,8 +268,7 @@ void SpectrumWorxEditor::attachToHostWindow(WindowRef const parentWindow)
 #endif // 32 bit only Carbon support
 #endif // platform
 
-LE_NOTHROW
-LE_PURE_FUNCTION SpectrumWorxEditor &SpectrumWorxEditor::fromChild(juce::Component const &widget)
+SpectrumWorxEditor &SpectrumWorxEditor::fromChild(juce::Component const &widget)
 {
     LE_ASSERT(widget.getParentComponent());
     juce::Component *pParent(widget.getParentComponent());
@@ -278,8 +277,7 @@ LE_PURE_FUNCTION SpectrumWorxEditor &SpectrumWorxEditor::fromChild(juce::Compone
     return *LE::Utility::polymorphicDowncast<SpectrumWorxEditor *>(pParent);
 }
 
-LE_NOTHROW LE_PURE_FUNCTION SpectrumWorxEditor &
-SpectrumWorxEditor::fromPresetBrowser(PresetBrowser &presetBrowser)
+SpectrumWorxEditor &SpectrumWorxEditor::fromPresetBrowser(PresetBrowser &presetBrowser)
 {
     return Utility::ParentFromOptionalMember<SpectrumWorxEditor, PresetBrowser,
                                              &SpectrumWorxEditor::presetBrowser_, false>()(
@@ -341,7 +339,7 @@ SpectrumWorxEditor::Host const &SpectrumWorxEditor::host() const { return effect
 Program &SpectrumWorxEditor::program() { return effect().program(); }
 Program const &SpectrumWorxEditor::program() const { return effect().program(); }
 
-Utility::CriticalSectionLock LE_NOTHROW SpectrumWorxEditor::getProcessingLock() const
+Utility::CriticalSectionLock SpectrumWorxEditor::getProcessingLock() const
 {
     return effect().getProcessingLock();
 }
@@ -589,7 +587,7 @@ void SpectrumWorxEditor::setActiveControlValue(juce::String const &newValue)
     updateString(activeControlValue, controlValueVerticalOffset, textBoxHeight, newValue);
 }
 
-LE_NOTHROW void SpectrumWorxEditor::updateActiveControlValue()
+void SpectrumWorxEditor::updateActiveControlValue()
 {
     try
     {
@@ -644,7 +642,7 @@ void SpectrumWorxEditor::newSampleFileSelected(juce::File const &file)
 }
 #endif // LE_SW_DISABLE_SIDE_CHANNEL
 
-void LE_NOTHROW SpectrumWorxEditor::removeModule(ModuleUI &moduleUI)
+void SpectrumWorxEditor::removeModule(ModuleUI &moduleUI)
 {
     static_assert(ModuleUI::width % 2 == 0, "Only even width modules supported.");
     static_assert(ModuleUI::distance % 2 == 0, "Only even width modules supported.");
@@ -669,9 +667,8 @@ void LE_NOTHROW SpectrumWorxEditor::removeModule(ModuleUI &moduleUI)
     host().gestureEnd();
 }
 
-void LE_NOTHROW SpectrumWorxEditor::moveModules(ModuleUI &targetSlotUI,
-                                                std::uint8_t numberOfModules,
-                                                std::int16_t const offset)
+void SpectrumWorxEditor::moveModules(ModuleUI &targetSlotUI, std::uint8_t numberOfModules,
+                                     std::int16_t const offset)
 {
     //...mrmlj...
     typedef Engine::ModuleNode ModuleNode;
@@ -689,14 +686,14 @@ void LE_NOTHROW SpectrumWorxEditor::moveModules(ModuleUI &targetSlotUI,
     }
 }
 
-std::pair<LE::Utility::IntrusivePtr<SpectrumWorxEditor::Module>, std::int8_t> LE_NOTHROW
+std::pair<LE::Utility::IntrusivePtr<SpectrumWorxEditor::Module>, std::int8_t>
 SpectrumWorxEditor::setModuleInSlot(std::uint8_t const slotIndex, std::int8_t const effectIndex)
 {
     return moduleChainOwner().moduleChain().setParameter(slotIndex, effectIndex,
                                                          moduleChainOwner().moduleInitialiser());
 }
 
-void LE_NOTHROW SpectrumWorxEditor::addUserAddedModule(std::uint8_t const effectIndex)
+void SpectrumWorxEditor::addUserAddedModule(std::uint8_t const effectIndex)
 {
     // Implementation note:
     //   This is certainly executed from the GUI thread so this function expects
@@ -1025,7 +1022,7 @@ void SpectrumWorxEditor::mainKnobDragStopped(std::uint8_t const index) const
     host().automatedParameterEndEdit(parameterID);
 }
 
-void LE_NOTHROW SpectrumWorxEditor::createChainGUIs(AutomatedModuleChain &chain)
+void SpectrumWorxEditor::createChainGUIs(AutomatedModuleChain &chain)
 {
 #if LE_SW_SEPARATED_DSP_GUI
     LE::Utility::ignoreUnused(chain);
@@ -1037,7 +1034,7 @@ void LE_NOTHROW SpectrumWorxEditor::createChainGUIs(AutomatedModuleChain &chain)
 #endif
 }
 
-void LE_NOTHROW SpectrumWorxEditor::destroyChainGUIs(AutomatedModuleChain &chain)
+void SpectrumWorxEditor::destroyChainGUIs(AutomatedModuleChain &chain)
 {
 #if LE_SW_SEPARATED_DSP_GUI
     LE::Utility::ignoreUnused(chain);
@@ -1081,7 +1078,7 @@ void SpectrumWorxEditor::updateMainKnobs()
 }
 #endif
 
-void LE_NOTHROW SpectrumWorxEditor::updateForGlobalParameterChange()
+void SpectrumWorxEditor::updateForGlobalParameterChange()
 {
     updateMainKnobs();
     updateSettings();
@@ -1162,8 +1159,9 @@ void SpectrumWorxEditor::updateLFO(ModuleUI const &moduleUI, std::uint8_t const 
     holdLFODisplay_ = false;
 }
 
-LE_NOTHROW void SpectrumWorxEditor::updateModuleParameterAndNotifyHost(
-    ModuleUI &moduleUI, std::uint8_t const moduleParameterIndex, float parameterValue) const
+void SpectrumWorxEditor::updateModuleParameterAndNotifyHost(ModuleUI &moduleUI,
+                                                            std::uint8_t const moduleParameterIndex,
+                                                            float parameterValue) const
 {
     auto &module(moduleUI.module());
     std::uint8_t const moduleIndex(moduleChain().getIndexForModule(module));
@@ -1324,7 +1322,7 @@ SpectrumWorxEditor::LFODisplay::LFODisplay()
 
 #pragma warning(pop)
 
-LE_NOTHROW SpectrumWorxEditor::LFODisplay::~LFODisplay() { editor().setDefaultFocusHandling(); }
+SpectrumWorxEditor::LFODisplay::~LFODisplay() { editor().setDefaultFocusHandling(); }
 
 void SpectrumWorxEditor::LFODisplay::setupForControl(ModuleControlBase &control,
                                                      double const minimum, double const maximum,
@@ -1616,7 +1614,7 @@ void SpectrumWorxEditor::LFODisplay::sliderValueChanged(juce::Slider *const pSli
     }
 }
 
-LE_NOTHROW void SpectrumWorxEditor::LFODisplay::updateForNewTimingInfo()
+void SpectrumWorxEditor::LFODisplay::updateForNewTimingInfo()
 {
     updatePeriodControl();
     updateSnapControls();
@@ -1624,7 +1622,7 @@ LE_NOTHROW void SpectrumWorxEditor::LFODisplay::updateForNewTimingInfo()
     repaint();
 }
 
-LE_NOTHROW void SpectrumWorxEditor::LFODisplay::updateForChangedParameters(
+void SpectrumWorxEditor::LFODisplay::updateForChangedParameters(
     ModuleUI const &moduleUI, std::uint8_t const parameterIndex,
     std::uint8_t const lfoParameterIndex, Plugins::AutomatedParameterValue /*const value*/)
 {
@@ -1639,7 +1637,7 @@ LE_NOTHROW void SpectrumWorxEditor::LFODisplay::updateForChangedParameters(
     verifyGUIAndLFOConsistency();
 }
 
-LE_NOTHROWNOALIAS void SpectrumWorxEditor::LFODisplay::updateAllControls()
+void SpectrumWorxEditor::LFODisplay::updateAllControls()
 {
     updateAutomatableControls();
     updateSnapControls();
@@ -1647,7 +1645,7 @@ LE_NOTHROWNOALIAS void SpectrumWorxEditor::LFODisplay::updateAllControls()
     verifyGUIAndLFOConsistency();
 }
 
-LE_NOTHROWNOALIAS void SpectrumWorxEditor::LFODisplay::updateAutomatableControls()
+void SpectrumWorxEditor::LFODisplay::updateAutomatableControls()
 {
     updatePeriodControl();
     updateRangeControl();
@@ -1656,7 +1654,7 @@ LE_NOTHROWNOALIAS void SpectrumWorxEditor::LFODisplay::updateAutomatableControls
     phase_.setValue(lfo.phase(), juce::dontSendNotification);
 }
 
-LE_NOTHROWNOALIAS void SpectrumWorxEditor::LFODisplay::updatePeriodControl()
+void SpectrumWorxEditor::LFODisplay::updatePeriodControl()
 {
     auto &lfo(this->lfo());
 
@@ -1679,7 +1677,7 @@ LE_NOTHROWNOALIAS void SpectrumWorxEditor::LFODisplay::updatePeriodControl()
     verifyGUIAndLFOConsistency();
 }
 
-LE_NOTHROWNOALIAS void SpectrumWorxEditor::LFODisplay::updateRangeControl()
+void SpectrumWorxEditor::LFODisplay::updateRangeControl()
 {
     auto &lfo(this->lfo());
     range_.setMaxValue(lfoValueToRangeSliderValue(range_, lfo.upperBound()),
@@ -1688,7 +1686,7 @@ LE_NOTHROWNOALIAS void SpectrumWorxEditor::LFODisplay::updateRangeControl()
                        juce::dontSendNotification, false);
 }
 
-LE_NOTHROWNOALIAS void SpectrumWorxEditor::LFODisplay::updateSnapControls()
+void SpectrumWorxEditor::LFODisplay::updateSnapControls()
 {
     if (LFO::Timer::hasTempoInformation())
     {
@@ -1705,7 +1703,7 @@ LE_NOTHROWNOALIAS void SpectrumWorxEditor::LFODisplay::updateSnapControls()
     }
 }
 
-LE_NOTHROWNOALIAS void SpectrumWorxEditor::LFODisplay::updateLFOAndHostFromPeriodControl()
+void SpectrumWorxEditor::LFODisplay::updateLFOAndHostFromPeriodControl()
 {
     updateParameterAndNotifyHost<LFO::PeriodScale>(period_.getValue());
 }
@@ -1746,7 +1744,7 @@ std::uint8_t SpectrumWorxEditor::LFODisplay::moduleIndex() const
     return moduleIndex;
 }
 
-LE_NOTHROW LE_PURE_FUNCTION SpectrumWorxEditor &SpectrumWorxEditor::LFODisplay::editor()
+SpectrumWorxEditor &SpectrumWorxEditor::LFODisplay::editor()
 {
     SpectrumWorxEditor &editor(
         Utility::ParentFromOptionalMember<SpectrumWorxEditor, LFODisplay,
@@ -1816,7 +1814,7 @@ void SpectrumWorxEditor::SampleArea::mouseUp(juce::MouseEvent const &event)
     }
 }
 
-LE_NOTHROW LE_PURE_FUNCTION SpectrumWorxEditor &SpectrumWorxEditor::SampleArea::editor()
+SpectrumWorxEditor &SpectrumWorxEditor::SampleArea::editor()
 {
     return Utility::ParentFromMember<SpectrumWorxEditor, SampleArea,
                                      &SpectrumWorxEditor::sampleArea_>()(*this);
@@ -2219,7 +2217,7 @@ juce::TabBarButton *SpectrumWorxEditor::Settings::createTabButton(juce::String c
     return new SettingsTab(tabName, getTabbedButtonBar(), images);
 }
 
-LE_NOTHROW LE_PURE_FUNCTION SpectrumWorxEditor &SpectrumWorxEditor::Settings::editor()
+SpectrumWorxEditor &SpectrumWorxEditor::Settings::editor()
 {
     return Utility::ParentFromOptionalMember<SpectrumWorxEditor, Settings,
                                              &SpectrumWorxEditor::settings_, false>()(*this);

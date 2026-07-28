@@ -160,7 +160,7 @@ ReferenceCountedGUIInitializationGuard::~ReferenceCountedGUIInitializationGuard(
     }
 }
 
-LE_NOTHROWNOALIAS bool ReferenceCountedGUIInitializationGuard::isGUIInitialised()
+bool ReferenceCountedGUIInitializationGuard::isGUIInitialised()
 {
 #if LE_SW_GUI
     return guiInitializationReferenceCount != 0;
@@ -182,7 +182,7 @@ LE_NOTHROWNOALIAS bool ReferenceCountedGUIInitializationGuard::isGUIInitialised(
 
 namespace
 {
-bool LE_NOTHROW useJUCEAlertBox(bool const canBlock)
+bool useJUCEAlertBox(bool const canBlock)
 {
     return ReferenceCountedGUIInitializationGuard::isGUIInitialised() &&
            (canBlock || isThisTheGUIThread());
@@ -192,8 +192,8 @@ bool LE_NOTHROW useJUCEAlertBox(bool const canBlock)
 #pragma warning(push)
 #pragma warning(disable : 4127) // Conditional expression is constant.
 
-void LE_NOTHROW warningMessageBox(std::string_view const title, std::string_view const message,
-                                  bool const canBlock)
+void warningMessageBox(std::string_view const title, std::string_view const message,
+                       bool const canBlock)
 {
     LE_ASSERT(ReferenceCountedGUIInitializationGuard::isGUIInitialised() || canBlock);
     JUCE_AUTORELEASEPOOL
@@ -222,7 +222,7 @@ void LE_NOTHROW warningMessageBox(std::string_view const title, std::string_view
 
 #pragma warning(pop)
 
-bool LE_NOTHROW warningOkCancelBox(TCHAR const *const title, TCHAR const *const question)
+bool warningOkCancelBox(TCHAR const *const title, TCHAR const *const question)
 {
     JUCE_AUTORELEASEPOOL
     {
@@ -301,7 +301,7 @@ unsigned int getBinaryPath(path_t &path)
 
 #ifdef LE_SW_FMOD
 
-bool LE_NOTHROW initializePaths()
+bool initializePaths()
 {
     try
     {
@@ -366,7 +366,7 @@ boost::mmap::mapped_view<char> mapPathsFile(unsigned int const desiredSize)
         boost::mmap::map_file(getPathsFilePath(path), desiredSize));
 }
 
-bool LE_NOTHROW initializePaths()
+bool initializePaths()
 {
     try
     {
@@ -434,21 +434,21 @@ bool LE_NOTHROW initializePaths()
 }
 #endif // LE_SW_FMOD
 
-bool LE_NOTHROW havePathsBeenInitialised() { return pluginRootPath != juce::File::nonexistent; }
+bool havePathsBeenInitialised() { return pluginRootPath != juce::File::nonexistent; }
 
-LE_NOTHROWNOALIAS juce::File const &rootPath()
+juce::File const &rootPath()
 {
     LE_ASSERT_MSG((pluginRootPath != juce::File::nonexistent), "Not initialized.");
     return pluginRootPath;
 }
 
-LE_NOTHROWNOALIAS juce::File &presetsFolder()
+juce::File &presetsFolder()
 {
     LE_ASSERT_MSG((mruPresetsFolder != juce::File::nonexistent), "Not initialized.");
     return mruPresetsFolder;
 }
 
-LE_NOALIAS juce::File resourcesPath() { return rootPath().getChildFile("Resources"); }
+juce::File resourcesPath() { return rootPath().getChildFile("Resources"); }
 
 #ifdef __APPLE__
 ::FSRef makeFSRefFromPath(juce::String const &path)
@@ -538,13 +538,12 @@ juce::Image resourceBitmap(char const (&bitmapNumber)[2 + 1])
 #endif // NDEBUG
 }
 
-void LE_NOTHROW paintImage(juce::Graphics &graphics, juce::Image const &image)
+void paintImage(juce::Graphics &graphics, juce::Image const &image)
 {
     paintImage(graphics, image, 0, 0);
 }
 
-void LE_NOTHROW paintImage(juce::Graphics &graphics, juce::Image const &image, int const x,
-                           int const y)
+void paintImage(juce::Graphics &graphics, juce::Image const &image, int const x, int const y)
 {
     graphics.drawImage(image, x, y, image.getWidth(), image.getHeight(), 0, 0, image.getWidth(),
                        image.getHeight());
@@ -560,8 +559,8 @@ void addToParentAndShow(juce::Component &parent, juce::Component &childToBe)
     parent.addAndMakeVisible(&childToBe);
 }
 
-LE_NOTHROW void fadeOutComponent(juce::Component &component, float const finalAlpha,
-                                 unsigned int const duration, bool const useProxyComponent)
+void fadeOutComponent(juce::Component &component, float const finalAlpha,
+                      unsigned int const duration, bool const useProxyComponent)
 {
     try
     {
@@ -575,7 +574,7 @@ LE_NOTHROW void fadeOutComponent(juce::Component &component, float const finalAl
     }
 }
 
-LE_NOTHROWNOALIAS LE_NOINLINE bool LE_COLD isThisTheGUIThread()
+LE_NOINLINE bool LE_COLD isThisTheGUIThread()
 {
 #if LE_SW_GUI
 #ifndef NDEBUG
@@ -593,12 +592,12 @@ LE_NOTHROWNOALIAS LE_NOINLINE bool LE_COLD isThisTheGUIThread()
 #endif // LE_SW_GUI
 }
 
-LE_NOTHROWNOALIAS bool LE_COLD isGUIInitialised()
+bool LE_COLD isGUIInitialised()
 {
     return ReferenceCountedGUIInitializationGuard::isGUIInitialised();
 }
 
-LE_NOTHROWNOALIAS float LE_COLD displayScale()
+float LE_COLD displayScale()
 {
     auto const &desktop(juce::Desktop::getInstance());
     auto const scale(desktop.getGlobalScaleFactor());
@@ -611,7 +610,7 @@ LE_NOTHROWNOALIAS float LE_COLD displayScale()
 
 namespace Detail
 {
-LE_NOTHROW LE_COLD void setName(juce::Component &widget, juce::String const &newName)
+LE_COLD void setName(juce::Component &widget, juce::String const &newName)
 {
     widget.juce::Component::setName(newName);
 }
@@ -1140,7 +1139,7 @@ static unsigned int getItemIndexForItemID(juce::PopupMenu &menu, int const itemI
 
 bool PopupMenu::menuActive_(false);
 
-LE_NOTHROW PopupMenu::PopupMenu() : menuHeight_(0), menuWidth_(0) {}
+PopupMenu::PopupMenu() : menuHeight_(0), menuWidth_(0) {}
 
 void PopupMenu::addItem(ItemID const newItemId, char const *const newItemText,
                         juce::Image const &icon, bool const enabled)
@@ -1520,7 +1519,7 @@ void Knob::stoppedDragging() noexcept
 }
 #endif // NDEBUG
 
-LE_NOTHROW void Knob::removeValueListeners(juce::Slider &slider, juce::ValueListener &valueListener)
+void Knob::removeValueListeners(juce::Slider &slider, juce::ValueListener &valueListener)
 {
     //...mrmlj...Slider::valueListener() is protected so we cannot access it here...
     //juce::ValueListener & valueListener( slider.valueListener() );
@@ -1530,7 +1529,7 @@ LE_NOTHROW void Knob::removeValueListeners(juce::Slider &slider, juce::ValueList
     slider.getMaxValueObject().removeListener(&valueListener);
 }
 
-void LE_NOINLINE LE_NOTHROWNOALIAS Knob::setValue(param_type const newValue)
+void LE_NOINLINE Knob::setValue(param_type const newValue)
 {
 #ifndef NDEBUG
 #if LE_SW_SEPARATED_DSP_GUI
@@ -1670,7 +1669,7 @@ void EditorKnob::paint(juce::Graphics &graphics)
                             juce::Justification::centred, 1, 0.1f);
 }
 
-LE_NOTHROW void EditorKnob::valueChanged() noexcept
+void EditorKnob::valueChanged() noexcept
 {
     using LE::Parameters::IndexOf;
     using namespace GlobalParameters;

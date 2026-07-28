@@ -101,10 +101,9 @@ void ChannelData::clearSideChannelData()
     Math::clear(dftData().mutableSide().jointView());
 }
 
-LE_NOTHROW void ChannelData::time2DFT(float const *const pInputData, FullChannelData_ReIm &dftData,
-                                      ReadOnlyDataRange const &window,
-                                      Math::FFT_float_real_1D const &fft,
-                                      std::uint8_t windowSizeFactor)
+void ChannelData::time2DFT(float const *const pInputData, FullChannelData_ReIm &dftData,
+                           ReadOnlyDataRange const &window, Math::FFT_float_real_1D const &fft,
+                           std::uint8_t windowSizeFactor)
 {
 #if !LE_SW_ENGINE_WINDOW_PRESUM
     LE_ASSUME(windowSizeFactor == 1);
@@ -176,7 +175,7 @@ void ChannelData::amph2DFT(FullChannelData_AmPh const &amPhData, FullChannelData
     LE_MATH_VERIFY_VALUES(InvalidOrSlow, reImData.imags(), "imags");
 }
 
-LE_NOTHROW void ChannelData::updateAmPhData()
+void ChannelData::updateAmPhData()
 {
     LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow, dftData().main().reals(), "reals");
     LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow, dftData().main().imags(), "imags");
@@ -194,7 +193,7 @@ LE_NOTHROW void ChannelData::updateAmPhData()
     }
 }
 
-LE_NOTHROW void ChannelData::updateReImData()
+void ChannelData::updateReImData()
 {
     if (dftDataFreshness_ < amphDataFreshness_)
     {

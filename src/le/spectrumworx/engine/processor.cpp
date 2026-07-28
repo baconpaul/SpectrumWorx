@@ -40,7 +40,7 @@ namespace SW
 LE_IMPL_NAMESPACE_BEGIN(Engine)
 //------------------------------------------------------------------------------
 
-LE_NOTHROW void Processor::preProcess() { modules().preProcessAll(lfoTimer(), engineSetup()); }
+void Processor::preProcess() { modules().preProcessAll(lfoTimer(), engineSetup()); }
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -125,7 +125,7 @@ class Processor::ProcessParameters
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_NOTHROWNOALIAS void Processor::process /// \throws nothing
+void Processor::process /// \throws nothing
     (InputData const mainInputs, InputData const sideInputs, OutputData const outputs,
      std::uint32_t const samples, float const outputGain, float const mixAmount)
 {
@@ -197,7 +197,7 @@ float **makeDeinterLeaveBuffers(LE::Utility::Span<float> const deinterLeavedData
                                 resultPointer##DeinterLeavedDataPointers, size, numberOfChannels)
 } // anonymous namespace
 
-LE_NOTHROWNOALIAS void Processor::process /// \throws nothing
+void Processor::process /// \throws nothing
     (InterleavedInputData interleavedMainInputs, InterleavedInputData interleavedSideInputs,
      InterleavedOutputData interleavedOutputs, std::uint32_t samples, float const outputGain,
      float const mixAmount)
@@ -316,8 +316,7 @@ LE_NOTHROWNOALIAS void Processor::process /// \throws nothing
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_NOTHROW void
-Processor::processSingleChannel(ProcessParameters const &processParameters) /// \throws nothing
+void Processor::processSingleChannel(ProcessParameters const &processParameters) /// \throws nothing
 {
     auto const stepSize(engineSetup().stepSize<std::uint16_t>());
     auto const windowSizeFactor(engineSetup().windowSizeFactor());
@@ -728,8 +727,7 @@ LE_COLD void Processor::setNumberOfChannels(std::uint8_t const numberOfMainChann
     engineSetup().setNumberOfChannels(numberOfMainChannels, numberOfSideChannels);
 }
 
-LE_COLD LE_NOTHROW bool Processor::setSampleRate(float const sampleRate,
-                                                 StorageFactors &currentStorageFactors)
+LE_COLD bool Processor::setSampleRate(float const sampleRate, StorageFactors &currentStorageFactors)
 {
     float const currentSampleRate(engineSetup().sampleRate<float>());
     //...mrmlj...assert that we are in a non-processing state...
@@ -888,7 +886,7 @@ Processor const &Processor::fromEngineSetup(Setup const &engineSetup)
     return fromEngineSetup(const_cast<Setup &>(engineSetup));
 }
 
-LE_COLD LE_CONST_FUNCTION std::uint32_t Processor::requiredStorage(StorageFactors const &factors)
+LE_COLD std::uint32_t Processor::requiredStorage(StorageFactors const &factors)
 {
     return Math::FFT_float_real_1D::requiredStorage(factors) +
            FFTWindow ::requiredStorage(factors) + // analysis
@@ -906,8 +904,7 @@ LE_COLD void Processor::resize(StorageFactors const &factors, Storage &storage)
     synthesisWindowBackup_.alias(synthesisWindow_);
 }
 
-LE_COLD LE_CONST_FUNCTION std::uint32_t
-Processor::Channels::requiredStorage(StorageFactors const &factors)
+LE_COLD std::uint32_t Processor::Channels::requiredStorage(StorageFactors const &factors)
 {
     using Utility::align;
     std::uint16_t const channelBuffersBaseSize(sizeof(value_type));
@@ -974,7 +971,7 @@ void Processor::setPosition(std::uint32_t const absolutePositionInSamples)
     lfoTimer().setPosition(absolutePositionInSamples, engineSetup().sampleRate<float>());
 }
 
-LE_NOTHROW void Processor::updatePosition(std::uint32_t const deltaSamples)
+void Processor::updatePosition(std::uint32_t const deltaSamples)
 {
     handleTimingInformationChange(lfoTimer().updatePositionAndTimingInformation(
         deltaSamples, engineSetup().sampleRate<float>()));
@@ -999,7 +996,7 @@ Processor::updatePositionAndTimingInformation(std::uint32_t const deltaNumberOfS
     return timingChange;
 }
 
-LE_NOTHROW void Processor::handleTimingInformationChange(
+void Processor::handleTimingInformationChange(
     LFO::Timer::TimingInformationChange const timingInformationChange)
 {
     if (timingInformationChange.timingInfoChanged())

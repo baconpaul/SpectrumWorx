@@ -64,7 +64,7 @@ union Float32
 }; // union Float32
 } // namespace
 
-LE_NOTHROWNOALIAS bool makeBool(unsigned int boolean);
+bool makeBool(unsigned int boolean);
 
 std::uint8_t abs(bool const value)
 {
@@ -405,7 +405,7 @@ bool isNegative(int const value)
 bool isNegative(unsigned int /*value*/) { return false; }
 
 #ifndef LE_HAS_NT2 // disabled: NT2 implementation@vector.cpp
-LE_CONST_FUNCTION float log2(float const value)
+float log2(float const value)
 {
 #if defined(__GNUC__) && !defined(__ANDROID__)
     return ::__builtin_log2f(value);
@@ -413,18 +413,18 @@ LE_CONST_FUNCTION float log2(float const value)
     return /*std*/ ::log2(value) / LE::Math::Constants::ln2;
 #endif
 }
-LE_CONST_FUNCTION float exp2(float const value) { return std::exp2(value); }
+float exp2(float const value) { return std::exp2(value); }
 #endif // disabled
 
-LE_CONST_FUNCTION std::uint8_t log2(int const value)
+std::uint8_t log2(int const value)
 {
     LE_ASSERT_MSG(!isNegative(value), "Invalid input");
     return log2(static_cast<unsigned long>(value));
 }
 
-LE_CONST_FUNCTION std::uint8_t log2(unsigned int const value) { return firstSetBit(value); }
+std::uint8_t log2(unsigned int const value) { return firstSetBit(value); }
 
-LE_CONST_FUNCTION std::uint8_t log2(unsigned long const value)
+std::uint8_t log2(unsigned long const value)
 {
     LE_ASSERT_MSG(static_cast<unsigned int>(value) == value,
                   "Value out of range."); //...mrmlj...

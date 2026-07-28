@@ -46,7 +46,7 @@ namespace SW
 template <class Effect> class LE_NOVTABLE ModuleWidgets
 {
   public: // Module GUI interface implementation.
-    LE_NOALIAS void create(GUI::ModuleUI &uiBase)
+    void create(GUI::ModuleUI &uiBase)
     {
 #if !LE_SW_SEPARATED_DSP_GUI
         LE_ASSERT(!uiBase.module().gui());
@@ -55,7 +55,7 @@ template <class Effect> class LE_NOVTABLE ModuleWidgets
         parameterWidgets_.construct(uiBase);
     }
 
-    LE_NOTHROWNOALIAS void destroy()
+    void destroy()
     {
 #if !LE_SW_SEPARATED_DSP_GUI
         //LE_ASSERT( !uiBase.module().gui() );
@@ -127,7 +127,7 @@ template <class Effect> class ModuleGUI::Impl final : public ModuleGUI, public M
     {
         ModuleWidgets::create(*gui());
     }
-    LE_NOTHROW ~Impl() override /*final*/ { ModuleWidgets::destroy(); }
+    ~Impl() override /*final*/ { ModuleWidgets::destroy(); }
 
   private: //...mrmlj...duplicated from ModuleEffectImpl@moduleImpl.hpp
     using LFOStorage =

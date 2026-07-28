@@ -50,8 +50,7 @@ class LE_NOVTABLE ModuleDSP : public Engine::ModuleDSP, public AutomatedModuleIm
 #if !LE_SW_GUI
 namespace Engine
 {
-LE_NOTHROWNOALIAS void
-intrusive_ptr_release_deleter(ModuleNode const *LE_RESTRICT const pModuleNode)
+void intrusive_ptr_release_deleter(ModuleNode const *LE_RESTRICT const pModuleNode)
 {
     auto const &module(actualModule<SW::ModuleDSP>(*pModuleNode));
     delete &module;

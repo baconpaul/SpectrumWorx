@@ -53,7 +53,7 @@ namespace JNI
 ////////////////////////////////////////////////////////////////////////////////
 
 template <typename JavaType>
-LE_NOTHROW bool operator==( GlobalRef<JavaType> const & right, GlobalRef<JavaType> const & left ) { env()->IsSameObject( right.get(), left.get() ); }
+bool operator==( GlobalRef<JavaType> const & right, GlobalRef<JavaType> const & left ) { env()->IsSameObject( right.get(), left.get() ); }
 #endif
 
 namespace Detail
@@ -78,7 +78,7 @@ void LocalRefDeleter ::operator()(::jobject const pObject) const
     preAttachedEnv().DeleteLocalRef(pObject);
 }
 
-LE_NOTHROW LE_COLD void EnvDeleter::operator()(::JNIEnv *const pJNI) const
+LE_COLD void EnvDeleter::operator()(::JNIEnv *const pJNI) const
 {
     LE_ASSERT(pJNI);
     if (LE_UNLIKELY(detach))
@@ -89,13 +89,13 @@ LE_NOTHROW LE_COLD void EnvDeleter::operator()(::JNIEnv *const pJNI) const
 }
 } // namespace Detail
 
-LE_NOTHROW LE_COLD void setVM(::JNIEnv &jni)
+LE_COLD void setVM(::JNIEnv &jni)
 {
     LE_ASSERT_MSG(!Detail::pJVM, "JVM singleton already set");
     LE_VERIFY(jni.GetJavaVM(const_cast<JavaVM **>(&Detail::pJVM)) == JNI_OK);
 }
 
-LE_NOTHROW LE_PURE_FUNCTION LE_COLD JNIEnv &preAttachedEnv()
+LE_COLD JNIEnv &preAttachedEnv()
 {
     JNIEnv *pJNI;
     LE_VERIFY_MSG(vm().GetEnv(reinterpret_cast<void **>(&pJNI), JNI_VERSION_1_6) == JNI_OK,
@@ -105,7 +105,6 @@ LE_NOTHROW LE_PURE_FUNCTION LE_COLD JNIEnv &preAttachedEnv()
 
 namespace Detail
 {
-LE_NOTHROW LE_PURE_FUNCTION
 LE_COLD /*EnvPtr...mrmlj...libc++ vs libstdc++ std::unique_ptr incompatibility*/
 std::pair<JNIEnv *, EnvDeleter>
 env()

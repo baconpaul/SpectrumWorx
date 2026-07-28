@@ -34,9 +34,8 @@ LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 using BaseParameters = Effects::BaseParameters::Parameters;
 
-LE_NOTHROWNOALIAS char const *getParameterValueString(std::uint8_t const index,
-                                                      ParameterPrinter const &printer,
-                                                      ModuleParameters const &module)
+char const *getParameterValueString(std::uint8_t const index, ParameterPrinter const &printer,
+                                    ModuleParameters const &module)
 {
     if (index >= module.numberOfParameters())
     {
@@ -51,8 +50,8 @@ LE_NOTHROWNOALIAS char const *getParameterValueString(std::uint8_t const index,
                      module.effectSpecificParameterIndex(index), printer);
 }
 
-LE_NOTHROWNOALIAS char const *getParameterUnit(std::uint8_t const parameterIndex,
-                                               ModuleParameters const *LE_RESTRICT const pModule)
+char const *getParameterUnit(std::uint8_t const parameterIndex,
+                             ModuleParameters const *LE_RESTRICT const pModule)
 {
     if (parameterIndex < BaseParameters::static_size)
     {

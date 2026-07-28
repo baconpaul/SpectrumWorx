@@ -589,7 +589,7 @@ void PresetBrowser::selectedRowsChanged(int const lastRowSelected)
     ignoreSelectionChange_ = false;
 }
 
-LE_NOTHROW int PresetBrowser::getNumRows() noexcept { return files_.size() + addOneRow_; }
+int PresetBrowser::getNumRows() noexcept { return files_.size() + addOneRow_; }
 
 void PresetBrowser::refresh()
 {

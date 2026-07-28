@@ -291,8 +291,8 @@ struct MakeChannelStateHolder
             return ChannelState::requiredStorage(factors);
         }
 
-        LE_FORCEINLINE LE_NOTHROWNOALIAS LE_COLD void resize(Engine::Storage storage,
-                                                             Engine::StorageFactors const &factors)
+        LE_FORCEINLINE LE_COLD void resize(Engine::Storage storage,
+                                           Engine::StorageFactors const &factors)
         {
             LE_ASSUME(factors.numberOfChannels <= 16);
             char *const pChannelStatesBegin(storage.begin());
@@ -352,9 +352,9 @@ struct MakeEmptyChannelStateHolder
 #endif // __clang__
 template <class Parameters> struct EffectParameterPrinter
 {
-    LE_NOTHROWNOALIAS LE_COLD static char const *LE_GNU_SPECIFIC(/*mrmlj clang crash*/ __fastcall)
-        LE_MSVC_SPECIFIC() print(std::uint8_t const parameterIndex,
-                                 LE::Parameters::AutomatedParameterPrinter const &printer)
+    LE_COLD static char const *LE_GNU_SPECIFIC(/*mrmlj clang crash*/ __fastcall) LE_MSVC_SPECIFIC()
+        print(std::uint8_t const parameterIndex,
+              LE::Parameters::AutomatedParameterPrinter const &printer)
     {
         LE_ASSUME(parameterIndex < Parameters::static_size);
         return LE::Parameters::invokeFunctorOnIndexedParameter<Parameters>(
@@ -471,7 +471,7 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
     ChannelStatesHolder const &channelStatesHolder() const { return channelStatesHolder_; }
 
   protected: // Module process interface implementation.
-    LE_NOTHROWNOALIAS LE_FORCEINLINE LE_COLD void doPreProcess(Setup const &engineSetup) override
+    LE_FORCEINLINE LE_COLD void doPreProcess(Setup const &engineSetup) override
     {
         effect().setup(ModuleDSP::workingRange(), engineSetup);
 #ifndef NDEBUG
@@ -479,9 +479,9 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
 #endif
     }
 
-    LE_NOTHROWNOALIAS LE_FORCEINLINE LE_HOT void
-    doProcess(std::uint8_t const channel, Engine::ModuleDSP::ChannelDataProxy const data,
-              Setup const &setup) const override
+    LE_FORCEINLINE LE_HOT void doProcess(std::uint8_t const channel,
+                                         Engine::ModuleDSP::ChannelDataProxy const data,
+                                         Setup const &setup) const override
     {
         LE_ASSERT(setupCalled_);
         channelStatesHolder_.callProcess(effect(), channel, data, setup);
@@ -489,13 +489,10 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
 
     LE_OPTIMIZE_FOR_SIZE_BEGIN()
   public: //...mrmlj...
-    LE_NOINLINE LE_NOTHROWNOALIAS LE_COLD void reset() override final
-    {
-        channelStatesHolder_.callReset();
-    }
+    LE_NOINLINE LE_COLD void reset() override final { channelStatesHolder_.callReset(); }
 
   private:
-    LE_NOTHROWNOALIAS LE_COLD bool resize(StorageFactors const &factors) override final
+    LE_COLD bool resize(StorageFactors const &factors) override final
     {
         //...mrmlj...au uninitialise...LE_ASSERT( factors.complete() );
 

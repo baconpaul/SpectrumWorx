@@ -127,12 +127,12 @@ class ChannelData
         return const_cast<ChannelData &>(*this).currentReImData();
     }
 
-    LE_NOTHROW FullMainSideChannelData_AmPh &freshAmPhData(bool saveForDryWetBlending);
-    LE_NOTHROW FullMainSideChannelData_ReIm &freshReImData(bool saveForDryWetBlending);
+    FullMainSideChannelData_AmPh &freshAmPhData(bool saveForDryWetBlending);
+    FullMainSideChannelData_ReIm &freshReImData(bool saveForDryWetBlending);
 
     using AmPhReImData = std::pair<FullMainSideChannelData_AmPh &, FullMainSideChannelData_ReIm &>;
-    LE_NOTHROW AmPhReImData freshAmPh2ReImData(bool saveForDryWetBlending);
-    LE_NOTHROW AmPhReImData freshReIm2AmPhData(bool saveForDryWetBlending);
+    AmPhReImData freshAmPh2ReImData(bool saveForDryWetBlending);
+    AmPhReImData freshReIm2AmPhData(bool saveForDryWetBlending);
 
     void blendWithPreviousData(float currentDataWeight, bool amPh2ReIm);
     void amplifyCurrentData(float gain);
@@ -179,19 +179,16 @@ class ChannelData
     };
 
   private:
-    LE_NOTHROW static void time2DFT(float const *pInputData, FullChannelData_ReIm &dftData,
-                                    ReadOnlyDataRange const &window,
-                                    Math::FFT_float_real_1D const &fft,
-                                    std::uint8_t windowSizeFactor);
+    static void time2DFT(float const *pInputData, FullChannelData_ReIm &dftData,
+                         ReadOnlyDataRange const &window, Math::FFT_float_real_1D const &fft,
+                         std::uint8_t windowSizeFactor);
 
-    LE_NOTHROW static void dft2AmPh(FullChannelData_ReIm const &input,
-                                    FullChannelData_AmPh &output);
+    static void dft2AmPh(FullChannelData_ReIm const &input, FullChannelData_AmPh &output);
 
-    LE_NOTHROW static void amph2DFT(FullChannelData_AmPh const &input,
-                                    FullChannelData_ReIm &output);
+    static void amph2DFT(FullChannelData_AmPh const &input, FullChannelData_ReIm &output);
 
-    LE_NOTHROW void updateAmPhData();
-    LE_NOTHROW void updateReImData();
+    void updateAmPhData();
+    void updateReImData();
 
     void saveCurrentReImDataForBlending();
 

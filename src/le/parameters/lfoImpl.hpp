@@ -74,7 +74,7 @@ class LFOImpl : public LFO
     {
       public:
         SyncTypes() : type(default_()) {}
-        static LE_NOTHROWNOALIAS value_type default_();
+        static value_type default_();
         using type::operator=;
     }; // class SyncTypes
 
@@ -111,10 +111,10 @@ class LFOImpl : public LFO
     {
         using Tag = Parameters::DynamicRangeParameterTag;
 
-        static LE_NOTHROWNOALIAS value_type minimum();
-        static LE_NOTHROWNOALIAS value_type maximum();
+        static value_type minimum();
+        static value_type maximum();
 
-        static LE_NOTHROWNOALIAS bool isValidValue(param_type value);
+        static bool isValidValue(param_type value);
     }; // struct PeriodScaleParameterTraits
 
   public:
@@ -203,9 +203,9 @@ class LFOImpl : public LFO
     }; // class Timer
 #endif // LE_NO_LFOs
   public:
-    LE_NOTHROWNOALIAS LFOImpl();
+    LFOImpl();
 
-    value_type LE_NOTHROWNOALIAS getValue(Timer const &) const;
+    value_type getValue(Timer const &) const;
 
     /// \todo These synchronization type altering functions do not automatically
     /// cause period scale resnapping. Reconsider this.
@@ -215,8 +215,8 @@ class LFOImpl : public LFO
 
     void updateForNewTimingInformation(Timer::TimingInformationChange const &);
 
-    static value_type LE_NOTHROWNOALIAS currentPeriodScaleMinimum();
-    static value_type LE_NOTHROWNOALIAS currentPeriodScaleMaximum();
+    static value_type currentPeriodScaleMinimum();
+    static value_type currentPeriodScaleMaximum();
 
     static SnappedPeriod snapPeriodScale(value_type periodScale, std::uint8_t syncTypes);
 
@@ -258,8 +258,7 @@ class LFOImpl : public LFO
     static value_type clampFreePeriod(value_type absolutePeriod);
     static SnappedPeriod snapSyncedPeriod(value_type periodScale, std::uint8_t syncTypes);
 
-    value_type LE_NOTHROWNOALIAS getWaveformAmplitudeForPosition(value_type position,
-                                                                 bool newPeriodBegun) const;
+    value_type getWaveformAmplitudeForPosition(value_type position, bool newPeriodBegun) const;
 
     bool isValueInBounds(value_type) const;
     static bool isValueInRange(value_type);

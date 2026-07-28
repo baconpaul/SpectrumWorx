@@ -53,11 +53,8 @@ class LE_NOVTABLE Host2PluginInteropControler
   public:
     class AutomationBlocker;
 
-    LE_PURE_FUNCTION bool blockAutomation() const { return blockAutomation_; }
-    LE_PURE_FUNCTION bool presetLoadingInProgress() const
-    {
-        return blockAutomation();
-    } //...mrmlj...
+    bool blockAutomation() const { return blockAutomation_; }
+    bool presetLoadingInProgress() const { return blockAutomation(); } //...mrmlj...
 
   private:
     mutable bool blockAutomation_;
@@ -102,7 +99,7 @@ class Host2PluginInteropControler::AutomationBlocker
 
 //...mrmlj...orphan...
 template <typename Char>
-LE_NOTHROWNOALIAS char *copyToBuffer(Char const *string, LE::Utility::Span<char> const &buffer);
+char *copyToBuffer(Char const *string, LE::Utility::Span<char> const &buffer);
 
 template <typename Char, std::size_t N>
 char *copyToBuffer(Char const *const string, std::array<char, N> &buffer)

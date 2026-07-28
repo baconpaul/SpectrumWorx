@@ -554,9 +554,8 @@ void squareRoot(InputOutputRange const data) { squareRoot(data.begin(), data.end
 
 float rms(InputRange const &data) { return rms(data.begin(), data.end()); }
 
-LE_NOTHROW void mix(InputRange const &amps, InputRange const &phases,
-                    InputOutputRange const &realsParam, InputOutputRange const &imagsParam,
-                    float const amPhGain, float const reImGain)
+void mix(InputRange const &amps, InputRange const &phases, InputOutputRange const &realsParam,
+         InputOutputRange const &imagsParam, float const amPhGain, float const reImGain)
 {
     //...mrmlj...use vForce...
     // https://developer.apple.com/library/mac/#documentation/Performance/Conceptual/vecLib/Reference/reference.html
@@ -750,7 +749,7 @@ void negate(float *pBegin, float const *const pEnd)
 #endif
 }
 
-LE_NOTHROW void reverse(float *LE_RESTRICT const pBegin, float const *const pEnd)
+void reverse(float *LE_RESTRICT const pBegin, float const *const pEnd)
 {
     LE_ASSERT_MSG(pBegin <= pEnd, "Invalid range.");
     //...mrmlj...ACC vDSP_vrvrs seems slower/non-vectorized so we use NT2 whenever possible...
@@ -888,9 +887,8 @@ void add(float const *const pInputData, float const scalar, float *const pOutput
 #endif // LE_MATH_USE_NT2
 }
 
-LE_NOINLINE_NT2 LE_NOTHROWNOALIAS void multiply(float const *const pFirstArray,
-                                                float const *const pSecondArray,
-                                                float *const pOutput, float const *const pOutputEnd)
+LE_NOINLINE_NT2 void multiply(float const *const pFirstArray, float const *const pSecondArray,
+                              float *const pOutput, float const *const pOutputEnd)
 {
 #if defined(LE_MATH_NATIVE_POINTER_SIZE_INTERFACE)
     multiply(pFirstArray, pSecondArray, pOutput, static_cast<unsigned int>(pOutputEnd - pOutput));
@@ -909,8 +907,8 @@ LE_NOINLINE_NT2 LE_NOTHROWNOALIAS void multiply(float const *const pFirstArray,
 #endif // LE_MATH_USE_NT2
 }
 
-LE_NOINLINE_NT2 LE_NOTHROWNOALIAS void
-multiply(float const *const pInputData, float *const pInputOutput, float const *const pOutputEnd)
+LE_NOINLINE_NT2 void multiply(float const *const pInputData, float *const pInputOutput,
+                              float const *const pOutputEnd)
 {
 #if defined(LE_MATH_NATIVE_POINTER_SIZE_INTERFACE)
     multiply(pInputData, pInputOutput, static_cast<unsigned int>(pOutputEnd - pInputOutput));
@@ -927,10 +925,9 @@ multiply(float const *const pInputData, float *const pInputOutput, float const *
 #endif // LE_MATH_USE_NT2
 }
 
-LE_NOINLINE_NT2 LE_NOTHROWNOALIAS void multiply(float const scalar,
-                                                float const *LE_RESTRICT const pInputData,
-                                                float *LE_RESTRICT const pOutput,
-                                                float const *LE_RESTRICT const pOutputEnd)
+LE_NOINLINE_NT2 void multiply(float const scalar, float const *LE_RESTRICT const pInputData,
+                              float *LE_RESTRICT const pOutput,
+                              float const *LE_RESTRICT const pOutputEnd)
 {
 #if defined(LE_MATH_NATIVE_POINTER_SIZE_INTERFACE)
     multiply(pInputData, scalar, pOutput, static_cast<unsigned int>(pOutputEnd - pOutput));
@@ -965,9 +962,8 @@ LE_NOINLINE_NT2 LE_NOTHROWNOALIAS void multiply(float const scalar,
 #endif // LE_MATH_USE_NT2
 }
 
-LE_NOINLINE_NT2 LE_NOTHROWNOALIAS void multiply(float const scalar,
-                                                float *LE_RESTRICT const pInputOutput,
-                                                float const *LE_RESTRICT const pOutputEnd)
+LE_NOINLINE_NT2 void multiply(float const scalar, float *LE_RESTRICT const pInputOutput,
+                              float const *LE_RESTRICT const pOutputEnd)
 {
 #if defined(LE_MATH_NATIVE_POINTER_SIZE_INTERFACE)
     multiply(pInputOutput, scalar, static_cast<unsigned int>(pOutputEnd - pInputOutput));
@@ -988,10 +984,10 @@ LE_NOINLINE_NT2 LE_NOTHROWNOALIAS void multiply(float const scalar,
 #endif // LE_MATH_USE_NT2
 }
 
-LE_NOINLINE_NT2 LE_NOTHROWNOALIAS void addProduct(float const *LE_RESTRICT const pInputData1,
-                                                  float const *LE_RESTRICT const pInputData2,
-                                                  float *LE_RESTRICT pInput3AndOutput,
-                                                  float const *LE_RESTRICT const pOutputEnd)
+LE_NOINLINE_NT2 void addProduct(float const *LE_RESTRICT const pInputData1,
+                                float const *LE_RESTRICT const pInputData2,
+                                float *LE_RESTRICT pInput3AndOutput,
+                                float const *LE_RESTRICT const pOutputEnd)
 {
 #if defined(LE_MATH_NATIVE_POINTER_SIZE_INTERFACE)
     addProduct(pInputData1, pInputData2, pInput3AndOutput,
@@ -1033,11 +1029,9 @@ LE_NOINLINE_NT2 LE_NOTHROWNOALIAS void addProduct(float const *LE_RESTRICT const
 #endif // LE_MATH_USE_NT2
 }
 
-LE_NOTHROWNOALIAS void rectangular2polar(float const *LE_RESTRICT const pReals,
-                                         float const *LE_RESTRICT const pImags,
-                                         float *LE_RESTRICT const pAmplitudes,
-                                         float *LE_RESTRICT const pPhases,
-                                         float const *const pPhasesEnd)
+void rectangular2polar(float const *LE_RESTRICT const pReals, float const *LE_RESTRICT const pImags,
+                       float *LE_RESTRICT const pAmplitudes, float *LE_RESTRICT const pPhases,
+                       float const *const pPhasesEnd)
 {
     rectangular2polar(pReals, pImags, pAmplitudes, pPhases,
                       static_cast<std::uint16_t>(pPhasesEnd - pPhases));
@@ -1270,8 +1264,7 @@ float const &max(float const *const pArray, unsigned int const numberOfElements)
 #endif
 }
 
-LE_NOTHROW void add(float const *const pInput, float *const pInputOutput,
-                    unsigned int const numberOfElements)
+void add(float const *const pInput, float *const pInputOutput, unsigned int const numberOfElements)
 {
 #if defined(LE_MATH_USE_ACC)
     vDSP_vadd(pInput, 1, pInputOutput, 1, pInputOutput, 1, numberOfElements);
@@ -1280,8 +1273,8 @@ LE_NOTHROW void add(float const *const pInput, float *const pInputOutput,
 #endif // LE_MATH_USE_ACC
 }
 
-LE_NOTHROW void add(float const *const pInput, float const constant, float *const pOutput,
-                    unsigned int const numberOfElements)
+void add(float const *const pInput, float const constant, float *const pOutput,
+         unsigned int const numberOfElements)
 {
 #if defined(LE_MATH_USE_ACC)
     vDSP_vsadd(const_cast<float *>(pInput), 1, const_cast<float *>(&constant), pOutput, 1,
@@ -1301,8 +1294,8 @@ void multiply(float const *const pFirstArray, float const *const pSecondArray, f
 #endif // LE_MATH_USE_ACC
 }
 
-LE_NOTHROW void multiply(float const *const pInput, float *const pInputOutput,
-                         unsigned int const numberOfElements)
+void multiply(float const *const pInput, float *const pInputOutput,
+              unsigned int const numberOfElements)
 {
 #if defined(LE_MATH_USE_ACC)
     multiply(pInput, pInputOutput, pInputOutput, numberOfElements);
@@ -1311,8 +1304,8 @@ LE_NOTHROW void multiply(float const *const pInput, float *const pInputOutput,
 #endif // LE_MATH_USE_ACC
 }
 
-LE_NOTHROW void multiply(float const *const pInput, float const scalar, float *const pOutput,
-                         unsigned int const numberOfElements)
+void multiply(float const *const pInput, float const scalar, float *const pOutput,
+              unsigned int const numberOfElements)
 {
 #if defined(LE_MATH_USE_ACC)
     vDSP_vsmul(pInput, 1, &scalar, pOutput, 1, numberOfElements);
@@ -1321,8 +1314,7 @@ LE_NOTHROW void multiply(float const *const pInput, float const scalar, float *c
 #endif // LE_MATH_USE_ACC
 }
 
-LE_NOTHROW void multiply(float *const pInputOutput, float const scalar,
-                         unsigned int const numberOfElements)
+void multiply(float *const pInputOutput, float const scalar, unsigned int const numberOfElements)
 {
 #if defined(LE_MATH_USE_ACC)
     multiply(pInputOutput, scalar, pInputOutput, numberOfElements);
@@ -1331,8 +1323,8 @@ LE_NOTHROW void multiply(float *const pInputOutput, float const scalar,
 #endif // LE_MATH_USE_ACC
 }
 
-LE_NOTHROW void addProduct(float const *const pInput1, float const *const pInput2,
-                           float *const pInput3AndOutput, unsigned int const numberOfElements)
+void addProduct(float const *const pInput1, float const *const pInput2,
+                float *const pInput3AndOutput, unsigned int const numberOfElements)
 {
 #if defined(LE_MATH_USE_ACC)
     vDSP_vma(const_cast<float *>(pInput1), 1, const_cast<float *>(pInput2), 1, pInput3AndOutput, 1,
@@ -1342,11 +1334,9 @@ LE_NOTHROW void addProduct(float const *const pInput1, float const *const pInput
 #endif // LE_MATH_USE_ACC
 }
 
-LE_NOTHROWNOALIAS void rectangular2polar(float const *LE_RESTRICT const pReals,
-                                         float const *LE_RESTRICT const pImags,
-                                         float *LE_RESTRICT const pAmplitudes,
-                                         float *LE_RESTRICT const pPhases,
-                                         std::uint16_t const numberOfElements)
+void rectangular2polar(float const *LE_RESTRICT const pReals, float const *LE_RESTRICT const pImags,
+                       float *LE_RESTRICT const pAmplitudes, float *LE_RESTRICT const pPhases,
+                       std::uint16_t const numberOfElements)
 {
 #ifdef LE_MATH_USE_NT2
     // Implementation note:
@@ -1407,10 +1397,8 @@ LE_NOTHROWNOALIAS void rectangular2polar(float const *LE_RESTRICT const pReals,
                           "phases");
 }
 
-LE_NOTHROWNOALIAS void amplitudes(float const *LE_RESTRICT const pReals,
-                                  float const *LE_RESTRICT const pImags,
-                                  float *LE_RESTRICT const pAmplitudes,
-                                  float const *LE_RESTRICT const pAmplitudesEnd)
+void amplitudes(float const *LE_RESTRICT const pReals, float const *LE_RESTRICT const pImags,
+                float *LE_RESTRICT const pAmplitudes, float const *LE_RESTRICT const pAmplitudesEnd)
 {
 #ifdef LE_MATH_USE_NT2
     EdgeRestoredAlignedRange const amplitudes(pAmplitudes, pAmplitudesEnd);
@@ -1491,11 +1479,9 @@ void LE_HOT polar2rectangular(Polar2rectangularData const *LE_RESTRICT const pDa
 } // anonymous namespace
 #endif // LE_MATH_USE_NT2
 
-LE_NOTHROWNOALIAS void polar2rectangular(float const *LE_RESTRICT const pAmplitudes,
-                                         float const *LE_RESTRICT const pPhases,
-                                         float *LE_RESTRICT const pReals,
-                                         float *LE_RESTRICT const pImags,
-                                         std::uint16_t const numberOfElements)
+void polar2rectangular(float const *LE_RESTRICT const pAmplitudes,
+                       float const *LE_RESTRICT const pPhases, float *LE_RESTRICT const pReals,
+                       float *LE_RESTRICT const pImags, std::uint16_t const numberOfElements)
 {
 #ifdef LE_MATH_USE_NT2
     EdgeRestoredAlignedRange const reals(pReals, pReals + numberOfElements);
@@ -1756,57 +1742,50 @@ LE_IMPL_NAMESPACE_BEGIN(Math)
 #endif
 
 // https://github.com/MetaScale/nt2/issues/374 Fast pow2 and log2 implementations
-LE_CONST_FUNCTION float ln(float const value) { return LE_MATH_CRT_IMPL_NAMESPACE::log(value); }
-LE_CONST_FUNCTION float log2(float const value)
+float ln(float const value) { return LE_MATH_CRT_IMPL_NAMESPACE::log(value); }
+float log2(float const value)
 {
     return LE_MATH_CRT_IMPL_NAMESPACE::log2(value);
 } //::__builtin_log2f
-LE_CONST_FUNCTION float log10(float const value)
-{
-    return LE_MATH_CRT_IMPL_NAMESPACE::log10(value);
-}
-LE_CONST_FUNCTION float exp(float const value) { return LE_MATH_CRT_IMPL_NAMESPACE::exp(value); }
-LE_CONST_FUNCTION float exp2(float const value) { return LE_MATH_CRT_IMPL_NAMESPACE::exp2(value); }
+float log10(float const value) { return LE_MATH_CRT_IMPL_NAMESPACE::log10(value); }
+float exp(float const value) { return LE_MATH_CRT_IMPL_NAMESPACE::exp(value); }
+float exp2(float const value) { return LE_MATH_CRT_IMPL_NAMESPACE::exp2(value); }
 
 #if !defined(__APPLE__) /*Denoiser assertion failures!?*/
-LE_CONST_FUNCTION float dB2NormalisedLinear(float const dBValue) { return nt2::db2mag(dBValue); }
-LE_CONST_FUNCTION float dB2NormalisedLinear(std::int8_t const dBValue)
+float dB2NormalisedLinear(float const dBValue) { return nt2::db2mag(dBValue); }
+float dB2NormalisedLinear(std::int8_t const dBValue)
 {
     return /*nt2::db2mag( dBValue );*/ dB2NormalisedLinear(static_cast<float>(dBValue));
 }
-LE_CONST_FUNCTION float dB2NormalisedLinear(std::uint8_t const dBValue)
+float dB2NormalisedLinear(std::uint8_t const dBValue)
 {
     return /*nt2::db2mag( dBValue );*/ dB2NormalisedLinear(static_cast<std::int8_t>(dBValue));
 }
-LE_CONST_FUNCTION float dB2NormalisedLinear(std::int16_t const dBValue)
+float dB2NormalisedLinear(std::int16_t const dBValue)
 {
     return /*nt2::db2mag( dBValue );*/ dB2NormalisedLinear(static_cast<std::int8_t>(dBValue));
 }
-LE_CONST_FUNCTION float dB2NormalisedLinear(std::uint16_t const dBValue)
+float dB2NormalisedLinear(std::uint16_t const dBValue)
 {
     return /*nt2::db2mag( dBValue );*/ dB2NormalisedLinear(static_cast<std::int8_t>(dBValue));
 }
-LE_CONST_FUNCTION float normalisedLinear2dB(float const linearNormalisedValue)
+float normalisedLinear2dB(float const linearNormalisedValue)
 {
     return nt2::mag2db(linearNormalisedValue);
 }
-LE_CONST_FUNCTION double normalisedLinear2dB(double const linearNormalisedValue)
+double normalisedLinear2dB(double const linearNormalisedValue)
 {
     return nt2::mag2db(linearNormalisedValue);
 }
-LE_CONST_FUNCTION float normalisedPower2dB(float const linearPowerValue)
-{
-    return nt2::pow2db(linearPowerValue);
-}
-LE_CONST_FUNCTION float dB2NormalisedPower(float const dBValue)
+float normalisedPower2dB(float const linearPowerValue) { return nt2::pow2db(linearPowerValue); }
+float dB2NormalisedPower(float const dBValue)
 {
     return nt2::db2pow(dBValue / 5);
 } // https://github.com/jfalcou/nt2/issues/983
 #endif // !__APPLE__!?
 
-LE_NOTHROWNOALIAS void addPolar(float const amp1, float const phase1,
-                                float &LE_GNU_SPECIFIC(__restrict) amp2,
-                                float &LE_GNU_SPECIFIC(__restrict) phase2)
+void addPolar(float const amp1, float const phase1, float &LE_GNU_SPECIFIC(__restrict) amp2,
+              float &LE_GNU_SPECIFIC(__restrict) phase2)
 {
     float real1;
     float imag1(nt2::sinecosine<nt2::small_>(phase1, real1));

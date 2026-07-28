@@ -28,8 +28,7 @@ namespace Utility
 
 DSPProfiler DSPProfiler::singleton_;
 
-LE_NOTHROWNOALIAS LE_COLD DSPProfiler::DSPProfiler()
-    : totalSamples_(0), sampleRate_(0), totalCPUTime_(0), lastTime_()
+LE_COLD DSPProfiler::DSPProfiler() : totalSamples_(0), sampleRate_(0), totalCPUTime_(0), lastTime_()
 {
 #if defined(_MSC_VER)
     static_assert(sizeof(totalCPUTime_) == sizeof(std::uint64_t), "");
@@ -37,29 +36,25 @@ LE_NOTHROWNOALIAS LE_COLD DSPProfiler::DSPProfiler()
 #endif // MSVC version
 }
 
-LE_NOTHROWNOALIAS LE_COLD void DSPProfiler::setSignalSampleRate(std::uint32_t const sampleRate)
+LE_COLD void DSPProfiler::setSignalSampleRate(std::uint32_t const sampleRate)
 {
     LE_ASSUME(sampleRate < 200000);
     sampleRate_ = static_cast<float>(sampleRate);
     reset();
 }
 
-LE_NOTHROWNOALIAS LE_COLD void DSPProfiler::reset()
+LE_COLD void DSPProfiler::reset()
 {
     totalSamples_ = 0;
     totalCPUTime_ = totalCPUTime_.zero();
 }
 
-LE_NOTHROWNOALIAS LE_HOT void DSPProfiler::beginInterval()
-{
-    lastTime_ = std::chrono::steady_clock::now();
-}
+LE_HOT void DSPProfiler::beginInterval() { lastTime_ = std::chrono::steady_clock::now(); }
 
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wassume"
 #endif // __clang__
-LE_NOTHROWNOALIAS
 LE_HOT void DSPProfiler::endInterval(std::uint32_t const intervalLengthInSampleFrames)
 {
     auto const newTimeStamp(std::chrono::steady_clock::now());
@@ -76,7 +71,7 @@ LE_HOT void DSPProfiler::endInterval(std::uint32_t const intervalLengthInSampleF
 #pragma clang diagnostic pop
 #endif // __clang__
 
-LE_NOTHROWNOALIAS float DSPProfiler::cpuUsagePercentage() const
+float DSPProfiler::cpuUsagePercentage() const
 {
     using namespace std::chrono;
     auto const totalSignalTime(totalSamples_ / sampleRate_);

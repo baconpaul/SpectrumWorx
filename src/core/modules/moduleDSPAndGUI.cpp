@@ -31,9 +31,9 @@ namespace SW
 //   This is required to prevent Clang from inlining the base destructor into
 // each ModuleDSP<> destructor.
 //                                            (13.12.2011.) (Domagoj Saric)
-LE_NOINLINE LE_NOTHROW LE_COLD Module::~Module() { LE_ASSUME(!ui_.has_value()); }
+LE_NOINLINE LE_COLD Module::~Module() { LE_ASSUME(!ui_.has_value()); }
 
-void LE_NOTHROW Module::createGUI(GUI::SpectrumWorxEditor &editor, std::uint8_t const moduleIndex)
+void Module::createGUI(GUI::SpectrumWorxEditor &editor, std::uint8_t const moduleIndex)
 {
     /// \note This used to be a Boost.Optional typed in-place factory, whose
     /// apply() ran the widget construction below before the optional marked
@@ -95,7 +95,7 @@ void LE_NOTHROW Module::createGUI(GUI::SpectrumWorxEditor &editor, std::uint8_t 
     }
 }
 
-bool LE_NOTHROW Module::destroyGUI()
+bool Module::destroyGUI()
 {
     // Implementation note:
     //   The current module has to be removed from the processing chain before
@@ -131,8 +131,7 @@ bool LE_NOTHROW Module::destroyGUI()
     return true;
 }
 
-LE_NOTHROW float Module::setBaseParameter(std::uint8_t const sharedParameterIndex,
-                                          float const parameterValue)
+float Module::setBaseParameter(std::uint8_t const sharedParameterIndex, float const parameterValue)
 {
     float const setValue(ModuleDSP::setBaseParameter(sharedParameterIndex, parameterValue));
     if (gui())
@@ -140,8 +139,8 @@ LE_NOTHROW float Module::setBaseParameter(std::uint8_t const sharedParameterInde
     return setValue;
 }
 
-LE_NOTHROW float Module::setEffectParameter(std::uint8_t const effectParameterIndex,
-                                            float const parameterValue)
+float Module::setEffectParameter(std::uint8_t const effectParameterIndex,
+                                 float const parameterValue)
 {
     float const setValue(ModuleDSP::setEffectParameter(effectParameterIndex, parameterValue));
     LE_ASSERT(
@@ -153,8 +152,7 @@ LE_NOTHROW float Module::setEffectParameter(std::uint8_t const effectParameterIn
     return setValue;
 }
 
-LE_NOTHROW float Module::setParameterValueFromUI(std::uint8_t const parameterIndex,
-                                                 float const value)
+float Module::setParameterValueFromUI(std::uint8_t const parameterIndex, float const value)
 {
     LE_ASSERT_MSG((parameterIndex == 0) || !lfo(parameterIndex - 1).enabled(),
                   "Parameter changed from the GUI while its LFO is enabled?");
@@ -163,8 +161,8 @@ LE_NOTHROW float Module::setParameterValueFromUI(std::uint8_t const parameterInd
                : ModuleDSP::setEffectParameter(effectSpecificParameterIndex(parameterIndex), value);
 }
 
-LE_NOTHROW void Module::setBaseParameterFromLFO(std::uint8_t const sharedParameterIndex,
-                                                LFO::value_type const lfoValue)
+void Module::setBaseParameterFromLFO(std::uint8_t const sharedParameterIndex,
+                                     LFO::value_type const lfoValue)
 {
     auto const parameterValue(
         ModuleParameters::setBaseParameterFromLFOAux(sharedParameterIndex, lfoValue));
@@ -172,8 +170,8 @@ LE_NOTHROW void Module::setBaseParameterFromLFO(std::uint8_t const sharedParamet
         gui()->setBaseParameter(sharedParameterIndex, parameterValue, GUI::ModuleUI::LFOValue);
 }
 
-LE_NOTHROW void Module::setEffectParameterFromLFO(std::uint8_t const effectParameterIndex,
-                                                  LFO::value_type const lfoValue)
+void Module::setEffectParameterFromLFO(std::uint8_t const effectParameterIndex,
+                                       LFO::value_type const lfoValue)
 {
     auto const parameterValue(
         ModuleParameters::setEffectParameterFromLFOAux(effectParameterIndex, lfoValue));
@@ -198,8 +196,7 @@ Module &Module::fromGUI(GUI::ModuleUI &gui)
 
 namespace Engine
 {
-void LE_NOTHROW LE_NOINLINE
-intrusive_ptr_release_deleter(ModuleNode const *LE_RESTRICT const pModuleNode)
+void LE_NOINLINE intrusive_ptr_release_deleter(ModuleNode const *LE_RESTRICT const pModuleNode)
 {
     auto const &module(actualModule<Module>(*pModuleNode));
     if (!module.gui() || const_cast<Module &>(module).destroyGUI())

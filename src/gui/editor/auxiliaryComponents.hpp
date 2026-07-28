@@ -47,21 +47,21 @@ class SharedModuleControls : public WidgetBase<>
         typedef float value_type;
         typedef float param_type;
 
-        value_type LE_NOTHROWNOALIAS getStartValue() const
+        value_type getStartValue() const
         {
             return static_cast<value_type>(juce::Slider::getMinValue());
         }
-        void LE_NOTHROW setStartValue(param_type const newValue)
+        void setStartValue(param_type const newValue)
         {
             juce::Slider::setMinValue(static_cast<value_type>(newValue), juce::dontSendNotification,
                                       false);
         }
 
-        value_type LE_NOTHROWNOALIAS getStopValue() const
+        value_type getStopValue() const
         {
             return static_cast<value_type>(juce::Slider::getMaxValue());
         }
-        void LE_NOTHROW setStopValue(param_type const newValue)
+        void setStopValue(param_type const newValue)
         {
             juce::Slider::setMaxValue(static_cast<value_type>(newValue), juce::dontSendNotification,
                                       false);
@@ -73,10 +73,10 @@ class SharedModuleControls : public WidgetBase<>
         ModuleControlBase &stopControl();
 
       protected: // ModuleControlBase overrides
-        LE_NOTHROW void lfoStateChanged() override {}
+        void lfoStateChanged() override {}
 
-        LE_NOTHROW void setValue(float value) override;
-        LE_NOTHROWNOALIAS float getValue() const override;
+        void setValue(float value) override;
+        float getValue() const override;
 
       private:
         void focusGained(juce::Component::FocusChangeType) override;

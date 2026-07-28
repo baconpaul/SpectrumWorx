@@ -40,7 +40,7 @@ using CriticalSection = std::mutex;
 class CriticalSection
 {
   public:
-    LE_NOTHROW LE_COLD CriticalSection()
+    LE_COLD CriticalSection()
 #ifdef PTHREAD_RECURSIVE_MUTEX_INITIALIZER
         : mutex_(PTHREAD_RECURSIVE_MUTEX_INITIALIZER)
     {
@@ -53,18 +53,18 @@ class CriticalSection
         LE_VERIFY(::pthread_mutex_init(&mutex_, &attributes) == 0);
     }
 #endif // PTHREAD_RECURSIVE_MUTEX_INITIALIZER
-    LE_NOTHROW LE_COLD ~CriticalSection() { LE_VERIFY(::pthread_mutex_destroy(&mutex_) == 0); }
+    LE_COLD ~CriticalSection() { LE_VERIFY(::pthread_mutex_destroy(&mutex_) == 0); }
 
-    LE_NOTHROW void lock() { LE_VERIFY(::pthread_mutex_lock(&mutex_) == 0); }
-    LE_NOTHROW void unlock() { LE_VERIFY(::pthread_mutex_unlock(&mutex_) == 0); }
+    void lock() { LE_VERIFY(::pthread_mutex_lock(&mutex_) == 0); }
+    void unlock() { LE_VERIFY(::pthread_mutex_unlock(&mutex_) == 0); }
 
-    LE_NOTHROW bool try_lock() { return ::pthread_mutex_trylock(&mutex_) == 0; }
+    bool try_lock() { return ::pthread_mutex_trylock(&mutex_) == 0; }
 
     enum RecursiveType
     {
         NonRecursive
     }; //...mrmlj...
-    LE_NOTHROW LE_COLD explicit CriticalSection(RecursiveType)
+    LE_COLD explicit CriticalSection(RecursiveType)
 #ifdef NDEBUG
         : mutex_(PTHREAD_MUTEX_INITIALIZER){}
 #else
@@ -96,17 +96,16 @@ class CriticalSectionLock
 
 #if defined(__GNUC__) || _MSC_VER >= 1900 //...mrmlj...no 'RVO@compiletime'...
   public:
-    explicit LE_NOTHROW CriticalSectionLock(CriticalSection &cs) : pCriticalSection_(&cs)
+    explicit CriticalSectionLock(CriticalSection &cs) : pCriticalSection_(&cs)
     {
         pCriticalSection_->lock();
     }
-    LE_NOTHROW ~CriticalSectionLock()
+    ~CriticalSectionLock()
     {
         if (pCriticalSection_)
             pCriticalSection_->unlock();
     }
-    LE_NOTHROW CriticalSectionLock(CriticalSectionLock &&lock)
-        : pCriticalSection_(lock.pCriticalSection_)
+    CriticalSectionLock(CriticalSectionLock &&lock) : pCriticalSection_(lock.pCriticalSection_)
     {
         lock.pCriticalSection_ = nullptr;
     }
@@ -115,11 +114,11 @@ class CriticalSectionLock
     CriticalSection *LE_RESTRICT pCriticalSection_;
 #else
   public:
-    explicit LE_NOTHROW CriticalSectionLock(CriticalSection &cs) : criticalSection_(cs)
+    explicit CriticalSectionLock(CriticalSection &cs) : criticalSection_(cs)
     {
         criticalSection_.lock();
     }
-    LE_NOTHROW ~CriticalSectionLock() { criticalSection_.unlock(); }
+    ~CriticalSectionLock() { criticalSection_.unlock(); }
 
   private:
     CriticalSection &criticalSection_;

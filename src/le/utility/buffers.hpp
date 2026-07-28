@@ -253,14 +253,14 @@ template <typename T> class SharedStorageBuffer : public Span<T>
 
     using Range = Span<T>;
 
-    LE_NOINLINE LE_NOTHROWNOALIAS LE_COLD void clear()
+    LE_NOINLINE LE_COLD void clear()
     {
         static_assert(__has_trivial_constructor(T) || std::is_scalar<T>::value,
                       "SharedStorageBuffer supports only primitive types");
         std::memset(Range::begin(), 0, size() * sizeof(T));
     }
 
-    LE_NOINLINE LE_NOTHROW LE_COLD void resize(std::uint32_t const newSize, Storage &storage)
+    LE_NOINLINE LE_COLD void resize(std::uint32_t const newSize, Storage &storage)
     {
         LE_ASSERT_MSG(newSize % sizeof(T) == 0, "Invalid size.");
         LE_ASSERT_MSG(static_cast<std::size_t>(storage.size()) >= newSize,

@@ -51,7 +51,7 @@ std::uint8_t const lowerBoundIndex(IndexOf<LFO::Parameters, LFO::LowerBound>::va
 std::uint8_t const upperBoundIndex(IndexOf<LFO::Parameters, LFO::UpperBound>::value);
 } // anonymous namespace
 
-LE_NOTHROWNOALIAS void SpectrumWorxAU::getDependentParameters(
+void SpectrumWorxAU::getDependentParameters(
     ParameterID const parameterID,
     LE::Utility::Span<::AUDependentParameter> const dependentParameters,
     SpectrumWorxCore const *LE_RESTRICT const pEffect)
@@ -162,7 +162,7 @@ LE_NOTHROWNOALIAS void SpectrumWorxAU::getDependentParameters(
     LE_ASSERT(pDependentParameter == dependentParameters.end());
 }
 
-LE_NOTHROWNOALIAS std::uint16_t
+std::uint16_t
 SpectrumWorxAU::numberOfDependentParameters(ParameterID const parameterID,
                                             SpectrumWorxCore const *LE_RESTRICT const pEffect)
 {

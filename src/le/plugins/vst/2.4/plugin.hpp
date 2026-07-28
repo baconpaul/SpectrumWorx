@@ -329,11 +329,11 @@ class VSTHost24Proxy : private Detail::AEffectWrapper
     static bool const threadSafeEventSystem = false;
     static bool const pluginCanChangeIOConfiguration = true;
 
-    template <HostCapability capability> bool LE_NOTHROWNOALIAS canDo() const
+    template <HostCapability capability> bool canDo() const
     {
         return canDo(capabilityString<capability>());
     }
-    bool LE_NOTHROWNOALIAS canDo(char const *const hostCapability) const
+    bool canDo(char const *const hostCapability) const
     {
         return call(audioMasterCanDo, 0, 0, const_cast<char *>(hostCapability)) == 1;
     }
@@ -490,8 +490,8 @@ class VSTHost24Proxy : private Detail::AEffectWrapper
     ::AEffect const &aEffect() const { return const_cast<VSTHost24Proxy &>(*this).aEffect(); }
 
   private:
-    LE_NOTHROW VstIntPtr LE_COLD call(VstInt32 opCode, VstInt32 index, VstIntPtr value, void *ptr,
-                                      float opt) const;
+    VstIntPtr LE_COLD call(VstInt32 opCode, VstInt32 index, VstIntPtr value, void *ptr,
+                           float opt) const;
 
     VstIntPtr LE_COLD call(VstInt32 const opCode, VstInt32 const index, VstIntPtr const value,
                            void *const ptr) const
@@ -554,7 +554,7 @@ class VSTHost24Proxy : private Detail::AEffectWrapper
     static bool supportsDynamicParameterLists;
 }; // class VSTHost24Proxy
 
-template <> LE_NOTHROWNOALIAS bool VSTHost24Proxy::canDo<AcceptIOChanges>() const;
+template <> bool VSTHost24Proxy::canDo<AcceptIOChanges>() const;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -878,15 +878,15 @@ template <class ImplParam> class Plugin<ImplParam, Protocol::VST24> : public VST
     class HostProxy : public VSTPluginBase::HostProxy
     {
       public:
-        bool LE_NOTHROW LE_COLD parameterListChanged() const
+        bool LE_COLD parameterListChanged() const
         {
             auto &inspectedParameters(Plugin::inspectedParameters());
             inspectedParameters.reset();
             updateDisplay();
             return inspectedParameters.all();
         }
-        void LE_NOTHROW LE_COLD presetChangeBegin() const {}
-        void LE_NOTHROW LE_COLD presetChangeEnd() const
+        void LE_COLD presetChangeBegin() const {}
+        void LE_COLD presetChangeEnd() const
         {
             if (!parameterListChanged())
             {
@@ -954,8 +954,8 @@ template <class ImplParam> class Plugin<ImplParam, Protocol::VST24> : public VST
         name[0] = '\0';
     }
 
-    LE_NOTHROWNOALIAS AutomatedParameterValue getParameter(ParameterIndex);
-    LE_NOTHROW void setParameter(ParameterIndex, AutomatedParameterValue);
+    AutomatedParameterValue getParameter(ParameterIndex);
+    void setParameter(ParameterIndex, AutomatedParameterValue);
 
     static bool getParameterProperties(ParameterIndex, ParameterInformation &, Plugin const *)
     {
@@ -1161,13 +1161,13 @@ template <class ImplParam> class Plugin<ImplParam, Protocol::VST24> : public VST
 
     template <PluginCapability pluginCapability> CanDoAnswer queryImplementationCapability() const;
 
-    LE_COLD LE_NOTHROWNOALIAS bool useDynamicParameterLists() const
+    LE_COLD bool useDynamicParameterLists() const
     {
         return host().knownToSupportDynamicParameterLists() ||
                VSTPluginBase::allParametersInspected_;
     }
 
-    LE_COLD LE_NOTHROW void inspectedParameter(ParameterIndex const index) const
+    LE_COLD void inspectedParameter(ParameterIndex const index) const
     {
         auto &inspectedParameters(this->inspectedParameters());
         LE_ASSERT(index < Impl::maxNumberOfParameters);
@@ -1182,39 +1182,35 @@ template <class ImplParam> class Plugin<ImplParam, Protocol::VST24> : public VST
     {
 #if defined(__APPLE__) && (!defined(_LIBCPP_VERSION) || (__GLIBCXX__ < 20110325))
       public:
-        bool LE_NOTHROW all() const { return this->count() == this->size(); }
+        bool all() const { return this->count() == this->size(); }
 #endif
     }; // class InspectedParameters
-    LE_COLD LE_NOTHROWNOALIAS static InspectedParameters &inspectedParameters()
+    LE_COLD static InspectedParameters &inspectedParameters()
     {
         static InspectedParameters inspectedParameters_;
         return inspectedParameters_;
     }
 
   private: // Callbacks.
-    LE_NOTHROW static VstIntPtr LE_CDECL dispatcher(::AEffect *, ::VstInt32 opCode,
-                                                    ::VstInt32 index, ::VstIntPtr integerParam,
-                                                    void *pData, float floatParam);
+    static VstIntPtr LE_CDECL dispatcher(::AEffect *, ::VstInt32 opCode, ::VstInt32 index,
+                                         ::VstIntPtr integerParam, void *pData, float floatParam);
 
-    LE_NOTHROWNOALIAS static float LE_CDECL getParameter(::AEffect *, ::VstInt32 index);
-    LE_NOTHROW static void LE_CDECL setParameter(::AEffect *, ::VstInt32 index, float value);
+    static float LE_CDECL getParameter(::AEffect *, ::VstInt32 index);
+    static void LE_CDECL setParameter(::AEffect *, ::VstInt32 index, float value);
 
-    LE_NOTHROW static void LE_CDECL processAccumulating(::AEffect *const /*pEffect*/,
-                                                        float **const /*inputs*/,
-                                                        float **const /*outputs*/,
-                                                        ::VstInt32 const /*sampleFrames */)
+    static void LE_CDECL processAccumulating(::AEffect *const /*pEffect*/, float **const /*inputs*/,
+                                             float **const /*outputs*/,
+                                             ::VstInt32 const /*sampleFrames */)
     {
         LE_ASSERT(!"Unsupported/Should not get called for VST 2.4 plugins.");
     }
-    LE_NOTHROW static void LE_CDECL processReplacing(::AEffect *const pEffect, float **const inputs,
-                                                     float **const outputs,
-                                                     ::VstInt32 const sampleFrames)
+    static void LE_CDECL processReplacing(::AEffect *const pEffect, float **const inputs,
+                                          float **const outputs, ::VstInt32 const sampleFrames)
     {
         impl(pEffect).process(inputs, outputs, sampleFrames);
     }
-    LE_NOTHROW static void LE_CDECL processReplacing(::AEffect *const pEffect,
-                                                     double **const inputs, double **const outputs,
-                                                     ::VstInt32 const sampleFrames)
+    static void LE_CDECL processReplacing(::AEffect *const pEffect, double **const inputs,
+                                          double **const outputs, ::VstInt32 const sampleFrames)
     {
         impl(pEffect).process(inputs, outputs, sampleFrames);
     }

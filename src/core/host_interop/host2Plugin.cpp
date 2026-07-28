@@ -24,8 +24,7 @@ LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 //...mrmlj...orphan...
 template <typename Char>
-LE_NOTHROWNOALIAS LE_COLD char *copyToBuffer(Char const *const string,
-                                             LE::Utility::Span<char> const &buffer)
+LE_COLD char *copyToBuffer(Char const *const string, LE::Utility::Span<char> const &buffer)
 {
     //std::strncpy( buffer.begin(), string, buffer.size() - 1 );
     Char const *LE_RESTRICT pSourceCharacter(string);
@@ -70,10 +69,9 @@ LE_NOTHROWNOALIAS LE_COLD char *copyToBuffer(Char const *const string,
 
 #pragma warning(pop)
 
-template LE_NOTHROWNOALIAS char *copyToBuffer<char>(char const *, LE::Utility::Span<char> const &);
+template char *copyToBuffer<char>(char const *, LE::Utility::Span<char> const &);
 #ifdef _WIN32
-template
-    LE_NOTHROWNOALIAS char *copyToBuffer<wchar_t>(wchar_t const *, LE::Utility::Span<char> const &);
+template char *copyToBuffer<wchar_t>(wchar_t const *, LE::Utility::Span<char> const &);
 #endif // _WIN32
 
 LE_OPTIMIZE_FOR_SIZE_END()

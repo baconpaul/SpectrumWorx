@@ -48,38 +48,37 @@ string_view Document::copyString(string_view const source) const
             source.length()};
 }
 
-LE_NOTHROWNOALIAS Element const *Document::element(string_view const name) const
+Element const *Document::element(string_view const name) const
 {
     return static_cast<Element const &>(static_cast<rapidxml::xml_node<> const &>(*this))
         .child(name);
 }
 
-LE_NOTHROWNOALIAS Element const *Element::child(string_view const name) const
+Element const *Element::child(string_view const name) const
 {
     return static_cast<Element const *>(first_node(name.begin(), name.length()));
 }
-LE_NOTHROWNOALIAS Attribute *Element::attribute(string_view const name)
+Attribute *Element::attribute(string_view const name)
 {
     return static_cast<Attribute *>(first_attribute(name.begin(), name.length()));
 }
-LE_NOTHROWNOALIAS Attribute const *Element::attribute(string_view const name) const
+Attribute const *Element::attribute(string_view const name) const
 {
     return const_cast<Element &>(*this).attribute(name);
 }
 
-LE_NOTHROWNOALIAS void Element::setName(string_view const name)
+void Element::setName(string_view const name)
 {
     static_cast<Object &>(*this).name(name.begin(), name.size());
 }
-LE_NOTHROWNOALIAS void Element::setValue(string_view const value)
+void Element::setValue(string_view const value)
 {
     static_cast<Object &>(*this).value(value.begin(), value.size());
 }
 
-LE_NOTHROWNOALIAS Element::Element() : rapidxml::xml_node<>(rapidxml::node_element) {}
+Element::Element() : rapidxml::xml_node<>(rapidxml::node_element) {}
 
-LE_NOTHROWNOALIAS Element::Element(string_view const name)
-    : rapidxml::xml_node<>(rapidxml::node_element)
+Element::Element(string_view const name) : rapidxml::xml_node<>(rapidxml::node_element)
 {
     LE_ASSERT(*name.end() == '\0');
     Object::name(name.begin(), name.size());

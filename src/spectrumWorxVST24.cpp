@@ -29,7 +29,7 @@ namespace SW
 
 #pragma warning(push)
 #pragma warning(disable : 4389) // Signed/unsigned mismatch.
-bool LE_NOTHROW SpectrumWorxVST24::initialise()
+bool SpectrumWorxVST24::initialise()
 {
     bool success(Base::initialise() == Success);
     LE_ASSERT(success);

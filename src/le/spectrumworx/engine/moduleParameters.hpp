@@ -63,15 +63,15 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
         numberOfBaseParameters - numberOfNonLFOBaseParameters;
 
   public:
-    LE_PURE_FUNCTION std::uint8_t numberOfParameters() const
+    std::uint8_t numberOfParameters() const
     {
         return numberOfEffectSpecificParameters() + numberOfBaseParameters;
     }
-    LE_PURE_FUNCTION std::uint8_t numberOfEffectSpecificParameters() const
+    std::uint8_t numberOfEffectSpecificParameters() const
     {
         return metaData_.numberOfExtraParameters;
     }
-    LE_PURE_FUNCTION std::uint8_t numberOfLFOControledParameters() const
+    std::uint8_t numberOfLFOControledParameters() const
     {
         return numberOfEffectSpecificParameters() + numberOfLFOBaseParameters;
     }
@@ -107,13 +107,11 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
 #define LE_AUX_VIRTUAL_GET
 #define LE_AUX_VIRTUAL_SET
 #endif
-    LE_NOTHROW float getBaseParameter(std::uint8_t baseParameterIndex) const;
-    LE_AUX_VIRTUAL_SET LE_NOTHROW float setBaseParameter(std::uint8_t baseParameterIndex,
-                                                         float value);
+    float getBaseParameter(std::uint8_t baseParameterIndex) const;
+    LE_AUX_VIRTUAL_SET float setBaseParameter(std::uint8_t baseParameterIndex, float value);
 
-    LE_AUX_VIRTUAL_GET LE_NOTHROW float getEffectParameter(std::uint8_t effectParameterIndex) const;
-    LE_AUX_VIRTUAL_SET LE_NOTHROW float setEffectParameter(std::uint8_t effectParameterIndex,
-                                                           float value);
+    LE_AUX_VIRTUAL_GET float getEffectParameter(std::uint8_t effectParameterIndex) const;
+    LE_AUX_VIRTUAL_SET float setEffectParameter(std::uint8_t effectParameterIndex, float value);
 #undef LE_AUX_VIRTUAL_GET
 #undef LE_AUX_VIRTUAL_SET
   public: // LFO section
@@ -200,7 +198,7 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
 #endif // _MSC_VER
 
   protected:
-    LE_NOTHROW ModuleParameters(
+    ModuleParameters(
         //std::uint8_t moduleSlotIndex,
         EffectMetaData const &metadata
 #ifndef LE_NO_LFOs
@@ -233,19 +231,19 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
 #else
 #define LE_AUX_VIRTUAL
 #endif
-    LE_AUX_VIRTUAL LE_NOTHROW void setBaseParameterFromLFO(std::uint8_t const parameterIndex,
-                                                           LFO::value_type const value)
+    LE_AUX_VIRTUAL void setBaseParameterFromLFO(std::uint8_t const parameterIndex,
+                                                LFO::value_type const value)
     {
         setBaseParameterFromLFOAux(parameterIndex, value);
     }
-    LE_AUX_VIRTUAL LE_NOTHROW void setEffectParameterFromLFO(std::uint8_t const parameterIndex,
-                                                             LFO::value_type const value)
+    LE_AUX_VIRTUAL void setEffectParameterFromLFO(std::uint8_t const parameterIndex,
+                                                  LFO::value_type const value)
     {
         setEffectParameterFromLFOAux(parameterIndex, value);
     }
 #undef LE_AUX_VIRTUAL
 
-    LE_NOTHROWNOALIAS LFO *constructLFOs(LFOPlaceholder *) const;
+    LFO *constructLFOs(LFOPlaceholder *) const;
 #endif // LE_NO_LFOs
 
   private:

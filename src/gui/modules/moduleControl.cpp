@@ -91,7 +91,7 @@ bool ModuleControlBase::reportActiveControl(double const minimum, double const m
     return false;
 }
 
-bool LE_NOTHROW ModuleControlBase::reportInactiveControl() const
+bool ModuleControlBase::reportInactiveControl() const
 {
     if (isActive() && !Detail::hasDirectFocus(widget()))
     {

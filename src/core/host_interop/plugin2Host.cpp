@@ -21,7 +21,7 @@ namespace LE
 {
 
 template <typename Char>
-LE_NOTHROWNOALIAS char *copyToBuffer(Char const *string, LE::Utility::Span<char> const &buffer);
+char *copyToBuffer(Char const *string, LE::Utility::Span<char> const &buffer);
 
 namespace Parameters
 {
@@ -62,9 +62,8 @@ namespace SW
 using LFO = Parameters::LFOImpl;
 
 #if LE_SW_GUI
-LE_NOTHROW void
-Plugin2HostInteropControler::moduleChangedByUser(std::uint8_t const chainParameterIndex,
-                                                 Module const *LE_RESTRICT const pModule) const
+void Plugin2HostInteropControler::moduleChangedByUser(std::uint8_t const chainParameterIndex,
+                                                      Module const *LE_RESTRICT const pModule) const
 {
     LE_ASSERT(GUI::isThisTheGUIThread());
 
@@ -83,9 +82,10 @@ Plugin2HostInteropControler::moduleChangedByUser(std::uint8_t const chainParamet
 }
 #endif // LE_SW_GUI
 
-LE_NOTHROW void Plugin2HostInteropControler::automatedParameterChanged(
-    Module const &module, std::uint8_t const moduleIndex, std::uint8_t const moduleParameterIndex,
-    float const parameterValue) const
+void Plugin2HostInteropControler::automatedParameterChanged(Module const &module,
+                                                            std::uint8_t const moduleIndex,
+                                                            std::uint8_t const moduleParameterIndex,
+                                                            float const parameterValue) const
 {
     //LE_ASSERT( moduleParameterID.moduleParameterIndex < Constants::maxNumberOfParametersPerModule ); //...mrmlj...TuneWorx...
     /// \todo Consider a smarter place to put this check (currently needed only
@@ -103,9 +103,8 @@ LE_NOTHROW void Plugin2HostInteropControler::automatedParameterChanged(
     automatedParameterChanged(parameterID, automationValue);
 }
 
-LE_NOTHROW void
-Plugin2HostInteropControler::automatedParameterChanged(ParameterID::LFO const lfoParameterID,
-                                                       float const value) const
+void Plugin2HostInteropControler::automatedParameterChanged(ParameterID::LFO const lfoParameterID,
+                                                            float const value) const
 {
     using namespace SW::Constants;
     using namespace ParameterCounts;
@@ -121,7 +120,7 @@ Plugin2HostInteropControler::automatedParameterChanged(ParameterID::LFO const lf
     automatedParameterChanged(parameterID, automationValue);
 }
 
-LE_NOTHROW void Plugin2HostInteropControler::globalParameterChanged(
+void Plugin2HostInteropControler::globalParameterChanged(
     std::uint8_t const index, ParameterValueForAutomation::value_type const fullRange,
     ParameterValueForAutomation::value_type const normalised,
     bool const
@@ -140,10 +139,9 @@ LE_NOTHROW void Plugin2HostInteropControler::globalParameterChanged(
 }
 
 #if LE_SW_GUI
-LE_NOTHROW void
-Plugin2HostInteropControler::modulesChanged(AutomatedModuleChain const &chain,
-                                            std::uint8_t /*const*/ firstModuleIndex,
-                                            std::uint8_t /*const*/ lastModuleIndex) const
+void Plugin2HostInteropControler::modulesChanged(AutomatedModuleChain const &chain,
+                                                 std::uint8_t /*const*/ firstModuleIndex,
+                                                 std::uint8_t /*const*/ lastModuleIndex) const
 {
     //...mrmlj...LE_ASSERT( firstModuleIndex <= lastModuleIndex );
 
@@ -202,10 +200,9 @@ struct Plugin2HostPassiveInteropController::ParameterNameGetter
 }; // struct Plugin2HostPassiveInteropController
 #pragma warning(pop)
 
-LE_NOTHROWNOALIAS void
-Plugin2HostPassiveInteropController::getParameterLabel(ParameterID const parameterID,
-                                                       LE::Utility::Span<char> const label,
-                                                       Program const *LE_RESTRICT const pProgram)
+void Plugin2HostPassiveInteropController::getParameterLabel(
+    ParameterID const parameterID, LE::Utility::Span<char> const label,
+    Program const *LE_RESTRICT const pProgram)
 {
     LE_ASSERT(label[0] == 0);
     char const *const pUnit(
@@ -218,7 +215,6 @@ Plugin2HostPassiveInteropController::getParameterLabel(ParameterID const paramet
 }
 
 #if 0
-LE_NOTHROWNOALIAS
 void Plugin2HostPassiveInteropController::getParameterDisplay( ParameterID const parameterID, LE::Utility::Span<char> const text, Engine::Setup const & engineSetup, Plugins::AutomatedParameterValue const * LE_RESTRICT const pValue, Program const & program )
 {
 #ifdef _WIN32
@@ -230,17 +226,16 @@ void Plugin2HostPassiveInteropController::getParameterDisplay( ParameterID const
 }
 #endif
 
-LE_NOTHROWNOALIAS void
-Plugin2HostPassiveInteropController::getParameterName(ParameterID const parameterID,
-                                                      LE::Utility::Span<char> const name,
-                                                      Program const *LE_RESTRICT const pProgram)
+void Plugin2HostPassiveInteropController::getParameterName(
+    ParameterID const parameterID, LE::Utility::Span<char> const name,
+    Program const *LE_RESTRICT const pProgram)
 {
     ParameterNameGetter const getter = {name};
     invokeFunctorOnIdentifiedParameter(parameterID, std::forward<ParameterNameGetter const>(getter),
                                        pProgram);
 }
 
-LE_NOTHROWNOALIAS void Plugin2HostPassiveInteropController::getParameterIDs(
+void Plugin2HostPassiveInteropController::getParameterIDs(
     LE::Utility::Span<Plugins::ParameterID> const ids, Program const *LE_RESTRICT const pProgram)
 {
     //...mrmlj...parameter IDs used only by AU which doesn't use InputMode...
@@ -339,7 +334,7 @@ LE_NOTHROWNOALIAS void Plugin2HostPassiveInteropController::getParameterIDs(
     LE_ASSERT(pParameterID == ids.end());
 }
 
-LE_NOTHROWNOALIAS std::uint16_t
+std::uint16_t
 Plugin2HostPassiveInteropController::numberOfParameters(Program const *LE_RESTRICT const pProgram)
 {
     //...mrmlj...verify that this is used only by AU/"non-InputMode-aware" code...
@@ -699,7 +694,7 @@ void ParameterID::verify() const
 #endif // NDEBUG
 }
 
-LE_NOTHROW LE_NOINLINE ParameterID::BinaryValue
+LE_NOINLINE ParameterID::BinaryValue
 parameterIDFromIndex(Plugins::ParameterIndex const parameterIndex)
 {
     using Parameters = GlobalParameters::Parameters;
@@ -759,7 +754,7 @@ parameterIDFromIndex(Plugins::ParameterIndex const parameterIndex)
     return parameterID.binaryValue;
 } // parameterIndex2ID()
 
-LE_NOTHROW LE_NOINLINE Plugins::ParameterIndex
+LE_NOINLINE Plugins::ParameterIndex
 parameterIndexFromBinaryID(ParameterID::BinaryValue const parameterIDValue)
 {
     using Parameters = GlobalParameters::Parameters;

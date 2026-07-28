@@ -49,15 +49,15 @@ void unmap(File::MemoryMapping::Range const &rangePair)
 }
 } // namespace
 
-LE_NOTHROWNOALIAS File::MemoryMapping::MemoryMapping() {}
-LE_NOTHROWNOALIAS File::MemoryMapping::MemoryMapping(Range const &range) : Range(range) {}
-LE_NOTHROW File::MemoryMapping::MemoryMapping(MemoryMapping &&other) : Range(other)
+File::MemoryMapping::MemoryMapping() {}
+File::MemoryMapping::MemoryMapping(Range const &range) : Range(range) {}
+File::MemoryMapping::MemoryMapping(MemoryMapping &&other) : Range(other)
 {
     static_cast<Range &>(other) = Range();
 }
-LE_NOTHROW File::MemoryMapping::~MemoryMapping() { unmap(*this); }
+File::MemoryMapping::~MemoryMapping() { unmap(*this); }
 
-LE_NOTHROW File::MemoryMapping &File::MemoryMapping::operator=(File::MemoryMapping &&other)
+File::MemoryMapping &File::MemoryMapping::operator=(File::MemoryMapping &&other)
 {
     unmap(*this);
     static_cast<Range &>(*this) = static_cast<Range const &>(other);
@@ -70,12 +70,12 @@ namespace
 int const invalidHandle(-1);
 } // anonymous namespace
 
-LE_NOTHROWNOALIAS File::Stream::Stream() : handle_(invalidHandle) {}
-LE_NOTHROWNOALIAS File::Stream::Stream(int const fileDescriptor) : handle_(fileDescriptor) {}
-LE_NOTHROW File::Stream::Stream(Stream &&other) : handle_(other.handle_) { other.handle_ = -1; }
-LE_NOTHROW File::Stream::~Stream() { close(); }
+File::Stream::Stream() : handle_(invalidHandle) {}
+File::Stream::Stream(int const fileDescriptor) : handle_(fileDescriptor) {}
+File::Stream::Stream(Stream &&other) : handle_(other.handle_) { other.handle_ = -1; }
+File::Stream::~Stream() { close(); }
 
-LE_NOTHROW LE_COLD void File::Stream::close()
+LE_COLD void File::Stream::close()
 {
     if (handle_ != invalidHandle)
     {
@@ -84,9 +84,9 @@ LE_NOTHROW LE_COLD void File::Stream::close()
     }
 }
 
-LE_NOTHROWNOALIAS bool File::Stream::operator!() const { return handle_ == invalidHandle; }
+bool File::Stream::operator!() const { return handle_ == invalidHandle; }
 
-LE_NOTHROW File::Stream &File::Stream::operator=(File::Stream &&other)
+File::Stream &File::Stream::operator=(File::Stream &&other)
 {
     close();
     this->handle_ = other.handle_;
@@ -94,15 +94,14 @@ LE_NOTHROW File::Stream &File::Stream::operator=(File::Stream &&other)
     return *this;
 }
 
-LE_NOTHROWNOALIAS std::uint32_t File::Stream::read(void *pBuffer, std::uint32_t numberOfBytesToRead)
+std::uint32_t File::Stream::read(void *pBuffer, std::uint32_t numberOfBytesToRead)
 {
     LE_ASSERT_MSG(handle_ != invalidHandle, "No file open");
     auto const result(::read(handle_, pBuffer, numberOfBytesToRead));
     LE_TRACE_IF(result < 0, "File read error (%d).", errno);
     return static_cast<std::uint32_t>(std::max(0, static_cast<std::int32_t>(result)));
 }
-LE_NOTHROWNOALIAS std::uint32_t File::Stream::write(void const *pBuffer,
-                                                    std::uint32_t numberOfBytesToWrite)
+std::uint32_t File::Stream::write(void const *pBuffer, std::uint32_t numberOfBytesToWrite)
 {
     LE_ASSERT_MSG(handle_ != invalidHandle, "No file open");
     auto const result(::write(handle_, pBuffer, numberOfBytesToWrite));
@@ -111,22 +110,19 @@ LE_NOTHROWNOALIAS std::uint32_t File::Stream::write(void const *pBuffer,
 }
 
 #ifdef _MSC_VER
-LE_NOTHROWNOALIAS std::uint32_t File::Stream::position() const
-{
-    return static_cast<std::uint32_t>(::tell(handle_));
-}
+std::uint32_t File::Stream::position() const { return static_cast<std::uint32_t>(::tell(handle_)); }
 #else  //...mrmlj...no tell on android or ios...
-LE_NOTHROWNOALIAS std::uint32_t File::Stream::position() const
+std::uint32_t File::Stream::position() const
 {
     return static_cast<std::uint32_t>(::lseek(handle_, 0, SEEK_CUR));
 }
 #endif // _MSC_VER
-LE_NOTHROWNOALIAS bool File::Stream::seek(std::int32_t const offset, std::uint8_t const whence)
+bool File::Stream::seek(std::int32_t const offset, std::uint8_t const whence)
 {
     return ::lseek(handle_, offset, whence) != -1;
 }
 
-LE_NOTHROWNOALIAS std::uint32_t File::Stream::size() const
+std::uint32_t File::Stream::size() const
 {
 #ifdef _MSC_VER
     return static_cast<std::uint32_t>(/*std*/ ::_filelength(handle_));
@@ -137,7 +133,7 @@ LE_NOTHROWNOALIAS std::uint32_t File::Stream::size() const
 #endif // _MSC_VER
 }
 
-LE_NOTHROWNOALIAS int File::Stream::asPOSIXFile(::off_t &startOffset, std::size_t &size) const
+int File::Stream::asPOSIXFile(::off_t &startOffset, std::size_t &size) const
 {
     int const newDescriptor(::dup(handle_));
     if (newDescriptor == -1)

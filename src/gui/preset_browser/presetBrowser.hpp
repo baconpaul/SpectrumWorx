@@ -61,7 +61,7 @@ class PresetBrowser final : public BackgroundImage,
     void textEditorFocusLost(juce::TextEditor &) override;
 
   private: // JUCE ListBoxModel overrides.
-    LE_NOTHROW int getNumRows() noexcept override;
+    int getNumRows() noexcept override;
     void paintListBoxItem(int rowNumber, juce::Graphics &, int width, int height,
                           bool rowIsSelected) override;
     void listBoxItemDoubleClicked(int row, juce::MouseEvent const &) override;

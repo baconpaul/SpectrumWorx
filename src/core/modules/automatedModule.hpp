@@ -55,18 +55,17 @@ using ModuleParameters = Engine::ModuleParameters;
 using AutoAdjustedLFOParameter = std::pair<std::uint8_t, LFO::value_type>;
 
 template <class AutomatedParameter>
-Plugins::AutomatedParameterValue LE_NOTHROWNOALIAS
-getAutomatedLFOParameter(std::uint8_t parameterIndex, std::uint8_t lfoParameterIndex,
-                         ModuleParameters const &);
+Plugins::AutomatedParameterValue getAutomatedLFOParameter(std::uint8_t parameterIndex,
+                                                          std::uint8_t lfoParameterIndex,
+                                                          ModuleParameters const &);
 
 template <class AutomatedParameter>
-std::optional<AutoAdjustedLFOParameter> LE_NOTHROW
+std::optional<AutoAdjustedLFOParameter>
 setAutomatedLFOParameter(std::uint8_t parameterIndex, std::uint8_t lfoParameterIndex,
                          Plugins::AutomatedParameterValue, ModuleParameters &);
 
 template <class AutomatedParameter>
-Plugins::AutomatedParameterValue LE_NOTHROWNOALIAS
-getDefaultAutomatedLFOParameter(std::uint8_t lfoParameterIndex);
+Plugins::AutomatedParameterValue getDefaultAutomatedLFOParameter(std::uint8_t lfoParameterIndex);
 
 Plugins::AutomatedParameterValue internal2AutomatedValue(std::uint8_t parameterIndex,
                                                          float internalValue, bool normalised,
@@ -89,11 +88,9 @@ float effectAutomated2InternalValue(std::uint8_t effectParameterIndex,
                                     Plugins::AutomatedParameterValue automatedValue,
                                     bool normalised, ModuleParameters const &);
 
-LE_NOTHROWNOALIAS char const *getParameterValueString(std::uint8_t parameterIndex,
-                                                      ParameterPrinter const &,
-                                                      ModuleParameters const &);
-LE_NOTHROWNOALIAS char const *getParameterUnit(std::uint8_t parameterIndex,
-                                               ModuleParameters const *);
+char const *getParameterValueString(std::uint8_t parameterIndex, ParameterPrinter const &,
+                                    ModuleParameters const &);
+char const *getParameterUnit(std::uint8_t parameterIndex, ModuleParameters const *);
 
 namespace Detail
 {
@@ -157,9 +154,9 @@ template <class AutomatedParameter> class LFOParameterGetter : public AutomatedP
 } // namespace Detail
 
 template <class AutomatedParameter>
-Plugins::AutomatedParameterValue LE_NOTHROWNOALIAS
-getAutomatedLFOParameter(std::uint8_t const parameterIndex, std::uint8_t const lfoParameterIndex,
-                         ModuleParameters const &module)
+Plugins::AutomatedParameterValue getAutomatedLFOParameter(std::uint8_t const parameterIndex,
+                                                          std::uint8_t const lfoParameterIndex,
+                                                          ModuleParameters const &module)
 {
     //...mrmlj...LE_ASSUME( parameterIndex < ( Constants::maxNumberOfParametersPerModule - 1 /*Bypass*/ ) );
     if (LE_UNLIKELY(parameterIndex >= module.numberOfLFOControledParameters()))
@@ -171,7 +168,7 @@ getAutomatedLFOParameter(std::uint8_t const parameterIndex, std::uint8_t const l
 }
 
 template <class AutomatedParameter>
-Plugins::AutomatedParameterValue LE_NOTHROWNOALIAS
+Plugins::AutomatedParameterValue
 getDefaultAutomatedLFOParameter(std::uint8_t const lfoParameterIndex)
 {
     if (AutomatedParameter::normalised)
@@ -184,7 +181,7 @@ getDefaultAutomatedLFOParameter(std::uint8_t const lfoParameterIndex)
 }
 
 template <class AutomatedParameter>
-std::optional<AutoAdjustedLFOParameter> LE_NOTHROW
+std::optional<AutoAdjustedLFOParameter>
 setAutomatedLFOParameter(std::uint8_t const parameterIndex, std::uint8_t const lfoParameterIndex,
                          Plugins::AutomatedParameterValue const value, ModuleParameters &module)
 {

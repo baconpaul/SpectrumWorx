@@ -40,9 +40,9 @@ AUHostProxy::AUHostProxy(::AudioUnit const auInstance)
     canTryDynamicParameterList_ = false;
 }
 
-bool LE_NOTHROW LE_COLD AUHostProxy::propertyChanged(::AudioUnitPropertyID const propertyID,
-                                                     ::AudioUnitScope const scope,
-                                                     ::AudioUnitElement const element) const
+bool LE_COLD AUHostProxy::propertyChanged(::AudioUnitPropertyID const propertyID,
+                                          ::AudioUnitScope const scope,
+                                          ::AudioUnitElement const element) const
 {
     // http://list-archives.org/2013/02/07/coreaudio-api-lists-apple-com/kaudiounitproperty_latency-not-working-in-logic/f/2245281181
 
@@ -65,8 +65,7 @@ bool LE_NOTHROW LE_COLD AUHostProxy::propertyChanged(::AudioUnitPropertyID const
     return true;
 }
 
-bool LE_NOTHROW LE_COLD
-AUHostProxy::globalPropertyChanged(::AudioUnitPropertyID const propertyID) const
+bool LE_COLD AUHostProxy::globalPropertyChanged(::AudioUnitPropertyID const propertyID) const
 {
     return propertyChanged(propertyID, kAudioUnitScope_Global, 0);
 }

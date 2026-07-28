@@ -49,7 +49,7 @@ namespace SW
 ///                                           (06.03.2013.) (Domagoj Saric)
 
 template <class Impl, class Protocol>
-LE_NOTHROW SpectrumWorxSharedImpl<Impl, Protocol>::SpectrumWorxSharedImpl(
+SpectrumWorxSharedImpl<Impl, Protocol>::SpectrumWorxSharedImpl(
     typename PluginPlatform::ConstructionParameter const pluginBaseParam)
     : PluginPlatform(pluginBaseParam)
 #ifndef LE_SW_FMOD
@@ -69,7 +69,7 @@ LE_NOTHROW SpectrumWorxSharedImpl<Impl, Protocol>::SpectrumWorxSharedImpl(
 }
 
 template <class Impl, class Protocol>
-typename Plugins::ErrorCode<Protocol>::value_type LE_NOTHROW
+typename Plugins::ErrorCode<Protocol>::value_type
 SpectrumWorxSharedImpl<Impl, Protocol>::initialise()
 {
 #ifdef __APPLE__
@@ -84,9 +84,9 @@ SpectrumWorxSharedImpl<Impl, Protocol>::initialise()
 
 #if LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
 template <class Impl, class Protocol>
-void LE_NOTHROW SpectrumWorxSharedImpl<Impl, Protocol>::process(float const *const *const inputs,
-                                                                float **const outputs,
-                                                                std::uint32_t const samples)
+void SpectrumWorxSharedImpl<Impl, Protocol>::process(float const *const *const inputs,
+                                                     float **const outputs,
+                                                     std::uint32_t const samples)
 {
     if (!updateTimingInformation())
         this->updatePosition(samples);
@@ -95,7 +95,7 @@ void LE_NOTHROW SpectrumWorxSharedImpl<Impl, Protocol>::process(float const *con
 }
 
 template <class Impl, class Protocol>
-bool LE_NOTHROW SpectrumWorxSharedImpl<Impl, Protocol>::updateTimingInformation()
+bool SpectrumWorxSharedImpl<Impl, Protocol>::updateTimingInformation()
 {
     using namespace Plugins::Protocol;
     using TimingInfo = typename PluginPlatform::TimingInformation;

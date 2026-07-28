@@ -37,12 +37,12 @@ class SpectrumWorxVST24 final
     typedef PluginPlatform::AutomatedParameter AutomatedParameter;
 
   public: // Plugin framework interface
-    LE_NOTHROW SpectrumWorxVST24(PluginPlatform::ConstructionParameter const pluginBaseParam)
+    SpectrumWorxVST24(PluginPlatform::ConstructionParameter const pluginBaseParam)
         : Base(pluginBaseParam)
     {
     }
 
-    bool LE_NOTHROW initialise();
+    bool initialise();
 
     bool setSpeakerArrangement(::VstSpeakerArrangement const &input,
                                ::VstSpeakerArrangement const &output);

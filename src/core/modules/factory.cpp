@@ -99,7 +99,7 @@ template <class ModuleInterface> struct ModuleConstructor
 {
     using result_type = ModuleInterface *LE_RESTRICT;
 
-    template <class EffectIndex> LE_NOTHROWNOALIAS result_type operator()(EffectIndex)
+    template <class EffectIndex> result_type operator()(EffectIndex)
     {
         using EffectImplementation = typename Effects::ImplForIndex<EffectIndex::value>::type;
         using ModuleImplementation = typename ModuleInterface::template Impl<EffectImplementation>;
@@ -113,7 +113,7 @@ template <class ModuleInterface> struct ModuleConstructor
     // where we want the Wet parameter to default to 50%.
     //                                        (12.12.2011.) (Domagoj Saric)
     using ArmonizerIndex = std::integral_constant<unsigned int, 52>;
-    LE_NOTHROWNOALIAS result_type operator()(ArmonizerIndex)
+    result_type operator()(ArmonizerIndex)
     {
         typedef typename Effects::ImplForIndex<ArmonizerIndex::value>::type EffectImplementation;
         typedef typename ModuleInterface::template Impl<EffectImplementation> ModuleImplementation;
@@ -145,8 +145,7 @@ template <class ModuleInterface> struct ModuleConstructor
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class ModuleInterface>
-LE_NOTHROW LE::Utility::IntrusivePtr<ModuleInterface>
-ModuleFactory::create(std::int8_t const effectIndex)
+LE::Utility::IntrusivePtr<ModuleInterface> ModuleFactory::create(std::int8_t const effectIndex)
 {
     std::int8_t const noModule(-1);
     if (effectIndex == noModule)
@@ -184,14 +183,11 @@ ModuleFactory::create(std::int8_t const effectIndex)
 }
 
 #if LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
-template
-    LE_NOTHROW LE::Utility::IntrusivePtr<SW::Module> ModuleFactory::create(std::int8_t effectIndex);
+template LE::Utility::IntrusivePtr<SW::Module> ModuleFactory::create(std::int8_t effectIndex);
 #else
-template LE_NOTHROW LE::Utility::IntrusivePtr<SW::ModuleDSP>
-ModuleFactory::create(std::int8_t effectIndex);
+template LE::Utility::IntrusivePtr<SW::ModuleDSP> ModuleFactory::create(std::int8_t effectIndex);
 #if LE_SW_GUI
-template LE_NOTHROW LE::Utility::IntrusivePtr<SW::ModuleGUI>
-ModuleFactory::create(std::int8_t effectIndex);
+template LE::Utility::IntrusivePtr<SW::ModuleGUI> ModuleFactory::create(std::int8_t effectIndex);
 #endif
 #endif
 

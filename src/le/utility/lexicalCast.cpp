@@ -43,38 +43,38 @@ LE_OPTIMIZE_FOR_SIZE_BEGIN()
 // http://www.dreamincode.net/code/snippet2482.htm
 // http://www.piumarta.com/software/fcvt
 
-LE_NOTHROWNOALIAS LE_COLD unsigned int lexical_cast(std::int32_t const value, char *const buffer)
+LE_COLD unsigned int lexical_cast(std::int32_t const value, char *const buffer)
 {
     return LE_INT_SPRINTFA(buffer, "%d", value);
 }
-LE_NOTHROWNOALIAS LE_COLD unsigned int lexical_cast(long const value, char *const buffer)
+LE_COLD unsigned int lexical_cast(long const value, char *const buffer)
 {
     return lexical_cast(static_cast<std::int32_t>(value), buffer);
 }
-LE_NOTHROWNOALIAS LE_COLD unsigned int lexical_cast(std::uint32_t const value, char *const buffer)
+LE_COLD unsigned int lexical_cast(std::uint32_t const value, char *const buffer)
 {
     return LE_INT_SPRINTFA(buffer, "%u", value);
 }
-LE_NOTHROWNOALIAS LE_COLD unsigned int lexical_cast(unsigned long const value, char *const buffer)
+LE_COLD unsigned int lexical_cast(unsigned long const value, char *const buffer)
 {
     return lexical_cast(static_cast<std::uint32_t>(value), buffer);
 }
 
-LE_NOTHROWNOALIAS LE_COLD unsigned int lexical_cast(float const value, char *const buffer)
+LE_COLD unsigned int lexical_cast(float const value, char *const buffer)
 {
     return lexical_cast(value, 4, buffer);
 }
-LE_NOTHROWNOALIAS LE_COLD unsigned int lexical_cast(double const value, char *const buffer)
+LE_COLD unsigned int lexical_cast(double const value, char *const buffer)
 {
     return lexical_cast(value, 9, buffer);
 }
-LE_NOTHROWNOALIAS LE_COLD unsigned int
-lexical_cast(float const value, std::uint8_t const decimalPlaces, char *const buffer)
+LE_COLD unsigned int lexical_cast(float const value, std::uint8_t const decimalPlaces,
+                                  char *const buffer)
 {
     return lexical_cast(static_cast<double>(value), decimalPlaces, buffer);
 }
-LE_NOTHROWNOALIAS LE_COLD LE_NOINLINE unsigned int
-lexical_cast(double const value, std::uint8_t const decimalPlaces, char *const buffer)
+LE_COLD LE_NOINLINE unsigned int lexical_cast(double const value, std::uint8_t const decimalPlaces,
+                                              char *const buffer)
 {
     char const format[] = {'%', '.', static_cast<char>('0' + decimalPlaces), 'f', '\0'};
     unsigned int totalCharactersWritten(std::sprintf(buffer, format, value));

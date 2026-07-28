@@ -131,16 +131,15 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
     static SpectrumWorxCore const &fromEngineSetup(Engine::Setup const &);
 
   protected:
-    LE_NOTHROW SpectrumWorxCore();
+    SpectrumWorxCore();
 #ifndef NDEBUG
-    LE_NOTHROW ~SpectrumWorxCore() {}
+    ~SpectrumWorxCore() {}
 #endif // NDEBUG
 
-    void LE_NOTHROWNOALIAS process(float const *const *inputs, float const *const *pSideChannels,
-                                   float *const *outputs, float const &outputGainScale,
-                                   unsigned int samples);
+    void process(float const *const *inputs, float const *const *pSideChannels,
+                 float *const *outputs, float const &outputGainScale, unsigned int samples);
 
-    bool LE_NOTHROW updateEngineSetup();
+    bool updateEngineSetup();
 
   public:
     using LFO = LE::Parameters::LFOImpl;
@@ -220,10 +219,10 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
     void setReportedNumberOfChannels(std::uint8_t numberOfMainChannels,
                                      std::uint8_t numberOfSideChannels);
 
-    static bool LE_NOTHROW checkChannelConfiguration(std::uint8_t numberOfInputChannels,
-                                                     std::uint8_t numberOfOutputChannels);
-    bool LE_NOTHROW setNumberOfChannelsImpl(std::uint8_t numberOfMainChannels,
-                                            std::uint8_t numberOfSideChannels);
+    static bool checkChannelConfiguration(std::uint8_t numberOfInputChannels,
+                                          std::uint8_t numberOfOutputChannels);
+    bool setNumberOfChannelsImpl(std::uint8_t numberOfMainChannels,
+                                 std::uint8_t numberOfSideChannels);
 
     bool haveSideChannel() const;
 
@@ -250,8 +249,7 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
 #pragma warning(push)
 #pragma warning(disable : 4389)              // Signed/unsigned mismatch.
     template <class Parameter, class SWImpl> //...mrmlj...ugly duplication workaround...
-    static bool
-        LE_NOTHROW setGlobalParameter(SWImpl &swImpl, typename Parameter::param_type const newValue)
+    static bool setGlobalParameter(SWImpl &swImpl, typename Parameter::param_type const newValue)
     {
         Parameter &parameter(swImpl.parameters().template get<Parameter>());
         typename Parameter::value_type const oldValue(parameter);
@@ -302,9 +300,9 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
 
     void resetChannelBuffers();
 
-    void LE_NOTHROW handleTimingInformationChange(LFO::Timer::TimingInformationChange);
+    void handleTimingInformationChange(LFO::Timer::TimingInformationChange);
 
-    bool LE_NOTHROW resize(Engine::StorageFactors const &newfactors);
+    bool resize(Engine::StorageFactors const &newfactors);
 
   private:
     friend class Engine::Processor;
@@ -399,7 +397,7 @@ class SpectrumWorxCore::ProcessLockUnlocker
         : processCriticalSectionGuard_(effect.processCriticalSection_)
     {
     }
-    LE_NOTHROWNOALIAS ~ProcessLockUnlocker() { processCriticalSectionGuard_.unlock(); }
+    ~ProcessLockUnlocker() { processCriticalSectionGuard_.unlock(); }
 
   private:
     Utility::CriticalSection &processCriticalSectionGuard_;

@@ -22,7 +22,7 @@ namespace Utility
 {
 //------------------------------------------------------------------------------
 
-LE_NOTHROWNOALIAS void sleep(unsigned int const seconds)
+void sleep(unsigned int const seconds)
 {
 #ifdef _WIN32
     ::Sleep(seconds * 1000);

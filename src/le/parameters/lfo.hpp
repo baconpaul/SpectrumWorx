@@ -109,38 +109,38 @@ class LFO
 #endif // _MSC_VER
 
   public:
-    LE_NOTHROW void setEnabled(bool value); ///< \brief enable/disable the LFO
-    LE_NOTHROW void setPhase(
+    void setEnabled(bool value); ///< \brief enable/disable the LFO
+    void setPhase(
         float
             phase); ///< \brief set the (waveform's) phase offset (as a normalised percentage value [-0.5,+0.5])
-    LE_NOTHROW void setWaveform(Waveform); ///< \brief set the desired waveform
+    void setWaveform(Waveform); ///< \brief set the desired waveform
     /// \brief constrain the allowed range of values the LFO can set a parameter to
     /// \details a normalised [0, 1] value later automatically mapped to the range of the parameter the LFO is connected to
     /// \return true if the upper bound had to be adjusted in order to make sure that the upper-bound >= lower-bound condition always holds
-    LE_NOTHROW bool setLowerBound(float lowerBound);
+    bool setLowerBound(float lowerBound);
     /// \brief constrain the allowed range of values the LFO can set a parameter to
     /// \details a normalised [0, 1] value later automatically mapped to the range of the parameter the LFO is mapped to
     /// \return true if the lower bound had to be adjusted in order to make sure that the upper-bound >= lower-bound condition always holds
-    LE_NOTHROW bool setUpperBound(float upperBound);
+    bool setUpperBound(float upperBound);
 
-    LE_NOTHROW std::uint16_t setPeriodInMilliseconds(
+    std::uint16_t setPeriodInMilliseconds(
         std::uint16_t
             periodInMilliseconds); ///< set the LFO period in milliseconds \return the actually applied value (autoadjusted/'clamped' to the values allowed by the currently configured sync types)
-    LE_NOTHROW float setPeriodInSeconds(
+    float setPeriodInSeconds(
         float
             periodInSeconds); ///< set the LFO period in seconds \return the actually applied value (autoadjusted/'clamped' to the values allowed by the currently configured sync types)<BR> \overload
 
-    LE_NOTHROWNOALIAS bool enabled() const;           ///< is LFO enabled?
-    LE_NOTHROWNOALIAS float period() const;           ///< retrieve the current period
-    LE_NOTHROWNOALIAS float phase() const;            ///< retrieve the "phase offset" parameter
-    LE_NOTHROWNOALIAS float lowerBound() const;       ///< retrieve the "lower bound" parameter
-    LE_NOTHROWNOALIAS float upperBound() const;       ///< retrieve the "upper bound" parameter
-    LE_NOTHROWNOALIAS Waveform waveForm() const;      ///< retrieve the "Waveform" parameter
-    LE_NOTHROWNOALIAS std::uint8_t syncTypes() const; ///< retrieve the syncTypes
+    bool enabled() const;           ///< is LFO enabled?
+    float period() const;           ///< retrieve the current period
+    float phase() const;            ///< retrieve the "phase offset" parameter
+    float lowerBound() const;       ///< retrieve the "lower bound" parameter
+    float upperBound() const;       ///< retrieve the "upper bound" parameter
+    Waveform waveForm() const;      ///< retrieve the "Waveform" parameter
+    std::uint8_t syncTypes() const; ///< retrieve the syncTypes
 
-    LE_NOTHROW void addSyncType(SyncType);                 ///< add/enable a specific SyncType
-    LE_NOTHROW void removeSyncType(SyncType);              ///< remove/disable a specific SyncType
-    LE_NOTHROWNOALIAS bool hasEnabledSync(SyncType) const; ///< is a specific SyncType enabled?
+    void addSyncType(SyncType);          ///< add/enable a specific SyncType
+    void removeSyncType(SyncType);       ///< remove/disable a specific SyncType
+    bool hasEnabledSync(SyncType) const; ///< is a specific SyncType enabled?
 
   protected:
 #if _MSC_VER < 1800

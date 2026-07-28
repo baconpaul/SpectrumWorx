@@ -87,7 +87,7 @@ struct PresetHeader
 {
     static unsigned int const maxCommentLength = 256;
 
-    LE_NOTHROW PresetHeader(juce::String const &comment);
+    PresetHeader(juce::String const &comment);
 
     char version[8];
     char timeStamp[64];
@@ -124,7 +124,7 @@ class Preset
     typedef bool load_result_t;
 #endif // LE_EXCEPTION_ON
 
-    LE_NOTHROW Preset() { setMemoryAllocationTracer(); }
+    Preset() { setMemoryAllocationTracer(); }
 #ifdef LE_EXCEPTION_ON
     Preset(char *const pBuffer)
     {
@@ -134,12 +134,12 @@ class Preset
 #endif // LE_EXCEPTION_ON
 
     load_result_t loadFrom(char *pBuffer);
-    LE_NOTHROW unsigned int saveTo(char *pBuffer);
+    unsigned int saveTo(char *pBuffer);
 
-    LE_NOTHROW void getHeader(PresetHeader &) const;
-    LE_NOTHROW void setHeader(PresetHeader const &);
+    void getHeader(PresetHeader &) const;
+    void setHeader(PresetHeader const &);
 
-    LE_NOTHROW std::string_view getComment() const;
+    std::string_view getComment() const;
 
     Utility::XML::Document &xml() { return preset_; }
     Utility::XML::Document const &xml() const { return preset_; }
@@ -150,7 +150,7 @@ class Preset
     void reset() { xml().clear(); }
 
     using InMemoryPreset = std::unique_ptr<char[]>;
-    static LE_NOTHROW InMemoryPreset loadIntoMemory(juce::File const &);
+    static InMemoryPreset loadIntoMemory(juce::File const &);
 
     static void reportPresetLoadingError();
 
@@ -176,7 +176,7 @@ class PresetHandler
     std::string_view mangleSpaces(char const *input) const;
     std::string_view unmangleSpaces(char const *input) const;
 
-    LE_RESTRICTNOALIAS char *allocateString(unsigned int size);
+    char *allocateString(unsigned int size);
 
     Preset &preset() { return preset_; }
     Preset const &preset() const { return preset_; }
@@ -355,7 +355,7 @@ class PresetWithPreallocatedFixedNodes : public Preset
     using ModuleNodes = std::array<Utility::XML::Element, Constants::maxNumberOfModules>;
 
   public:
-    LE_NOTHROW PresetWithPreallocatedFixedNodes();
+    PresetWithPreallocatedFixedNodes();
 
     void setHeader(PresetHeader const &);
 
@@ -397,14 +397,13 @@ class ParametersSaver : private PresetHandler
     using result_type = void;
     using const_qualified_lfo_t = LFO const;
 
-    template <class Parameter> void LE_NOTHROWNOALIAS operator()(Parameter const &parameter) const
+    template <class Parameter> void operator()(Parameter const &parameter) const
     {
         const_cast<ParametersSaver &>(*this). //...mrmlj...because of boost::fusion::for_each...
             saveParameter<typename Parameter::param_type>(LE::Parameters::Name<Parameter>::string_,
                                                           parameter.getValue());
     }
-    template <class Parameter>
-    void LE_NOTHROWNOALIAS operator()(Parameter const &parameter, LFO const &lfo) const
+    template <class Parameter> void operator()(Parameter const &parameter, LFO const &lfo) const
     {
         const_cast<ParametersSaver &>(*this). //...mrmlj...because of boost::fusion::for_each...
             saveParameter<typename Parameter::param_type>(LE::Parameters::Name<Parameter>::string_,
@@ -475,7 +474,6 @@ using char_t = char;
 #endif
 
 template <class PresetConsumer>
-LE_NOTHROW
 LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignoreExternalSample,
                         juce::String *LE_RESTRICT const pComment, PresetConsumer const consumer)
 {
@@ -617,10 +615,10 @@ bool LE_COLD loadPreset(juce::File const &presetFile, bool const ignoreExternalS
 }
 
 class Program;
-LE_NOTHROW void savePreset(juce::File const &, juce::File const &externalSampleFile,
-                           juce::String const &comment, Program const &);
-LE_NOTHROW unsigned int savePreset(char *const data, juce::File const &externalSampleFile,
-                                   juce::String const &comment, Program const &);
+void savePreset(juce::File const &, juce::File const &externalSampleFile,
+                juce::String const &comment, Program const &);
+unsigned int savePreset(char *const data, juce::File const &externalSampleFile,
+                        juce::String const &comment, Program const &);
 #endif // !LE_SW_SDK_BUILD
 
 LE_OPTIMIZE_FOR_SIZE_END()

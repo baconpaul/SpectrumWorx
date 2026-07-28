@@ -143,7 +143,7 @@ enum ResourceBitmaps
 class ReferenceCountedGUIInitializationGuard
 {
   public:
-    static LE_NOTHROWNOALIAS bool isGUIInitialised();
+    static bool isGUIInitialised();
 
   protected:
     ReferenceCountedGUIInitializationGuard();
@@ -168,9 +168,7 @@ juce::Image resourceBitmap(char const (&bitmapNumber)[2 + 1]);
 
 template <int bitmapID>
 #ifdef __clang__
-LE_NOALIAS
 #else
-LE_PURE_FUNCTION
 #endif // __clang__
 juce::Image const &resourceBitmap()
 {
@@ -188,10 +186,10 @@ void setSizeFromImage(juce::Component &, juce::Image const &);
 
 class SpectrumWorxEditor;
 
-LE_NOTHROWNOALIAS bool isThisTheGUIThread();
-LE_NOTHROWNOALIAS bool isGUIInitialised();
+bool isThisTheGUIThread();
+bool isGUIInitialised();
 
-LE_NOTHROWNOALIAS float displayScale();
+float displayScale();
 
 ////////////////////////////////////////////////////////////////////////////////
 // Global paths.
@@ -201,12 +199,12 @@ LE_NOTHROWNOALIAS float displayScale();
 boost::mmap::mapped_view<char const> mapPathsFile();
 boost::mmap::mapped_view<char> mapPathsFile(unsigned int desiredSize);
 
-bool LE_NOTHROW initializePaths();
-bool LE_NOTHROW havePathsBeenInitialised();
+bool initializePaths();
+bool havePathsBeenInitialised();
 
-LE_NOTHROWNOALIAS juce::File const &rootPath();
-LE_NOTHROWNOALIAS juce::File &presetsFolder();
-LE_NOALIAS juce::File resourcesPath();
+juce::File const &rootPath();
+juce::File &presetsFolder();
+juce::File resourcesPath();
 
 #ifdef __APPLE__
 FSRef makeFSRefFromPath(juce::String const &path);
@@ -307,7 +305,7 @@ class Theme final : public juce::LookAndFeel
 
 namespace Detail
 {
-LE_NOTHROW void setName(juce::Component &widget, juce::String const &newName);
+void setName(juce::Component &widget, juce::String const &newName);
 void setName(juce::Component &widget, char const *const newName);
 
 bool hasDirectFocus(juce::Component const &);
@@ -326,41 +324,34 @@ template <class BaseComponent = juce::Component> class LE_NOVTABLE WidgetBase : 
         setName(componentName);
     }
     WidgetBase(juce::String const &componentName) : BaseComponent(componentName) {}
-    LE_NOTHROW LE_FORCEINLINE ~WidgetBase() {}
+    LE_FORCEINLINE ~WidgetBase() {}
 
   public:
     void setName(char const *const newName) { Detail::setName(*this, newName); }
     using BaseComponent::setName;
 
-    void LE_NOTHROWNOALIAS setVisible() { BaseComponent::setVisible(true); }
-    void LE_NOTHROWNOALIAS setInvisible() { BaseComponent::setVisible(false); }
-    void LE_NOTHROWNOALIAS setIsVisible(bool const isVisible)
-    {
-        BaseComponent::setVisible(isVisible);
-    }
+    void setVisible() { BaseComponent::setVisible(true); }
+    void setInvisible() { BaseComponent::setVisible(false); }
+    void setIsVisible(bool const isVisible) { BaseComponent::setVisible(isVisible); }
 
-    void LE_NOTHROWNOALIAS setEnabled(bool const isEnabled)
-    {
-        BaseComponent::setEnabled(isEnabled);
-    }
+    void setEnabled(bool const isEnabled) { BaseComponent::setEnabled(isEnabled); }
 
-    bool LE_NOTHROWNOALIAS hasDirectFocus() const { return Detail::hasDirectFocus(*this); }
-    bool LE_NOTHROWNOALIAS hasFocus() const { return Detail::hasFocus(*this); }
+    bool hasDirectFocus() const { return Detail::hasDirectFocus(*this); }
+    bool hasFocus() const { return Detail::hasFocus(*this); }
 
-    bool LE_NOTHROWNOALIAS isParentOf(juce::Component const &control) const
+    bool isParentOf(juce::Component const &control) const
     {
         return Detail::isParentOf(*this, control);
     }
 
-    static LE_NOTHROWRESTRICTNOALIAS void *operator new(std::size_t const count,
-                                                        void *LE_RESTRICT const pStorage)
+    static void *operator new(std::size_t const count, void *LE_RESTRICT const pStorage)
     {
         (void)count;
         LE_ASSUME(pStorage);
         return pStorage;
     }
-    static LE_NOTHROWNOALIAS void operator delete(void *LE_RESTRICT const /*pObject*/,
-                                                  void *LE_RESTRICT const /*pStorage*/)
+    static void operator delete(void *LE_RESTRICT const /*pObject*/,
+                                void *LE_RESTRICT const /*pStorage*/)
     {
     }
 
@@ -476,13 +467,13 @@ template <class Window> class OwnedWindow : private OwnedWindowBase
 }; // class OwnedWindow
 #pragma warning(pop)
 
-void LE_NOTHROW warningMessageBox(std::string_view title, std::string_view message, bool canBlock);
-bool LE_NOTHROW warningOkCancelBox(TCHAR const *title, TCHAR const *question);
+void warningMessageBox(std::string_view title, std::string_view message, bool canBlock);
+bool warningOkCancelBox(TCHAR const *title, TCHAR const *question);
 
 void addToParentAndShow(juce::Component &parent, juce::Component &childToBe);
 
-LE_NOTHROW void fadeOutComponent(juce::Component &, float finalAlpha, unsigned int duration,
-                                 bool useProxyComponent);
+void fadeOutComponent(juce::Component &, float finalAlpha, unsigned int duration,
+                      bool useProxyComponent);
 
 class Lock : private juce::MessageManagerLock
 {
@@ -505,7 +496,7 @@ class Message final : public juce::MessageManager::MessageBase
     }
 
   private:
-    LE_NOTHROW LE_COLD void messageCallback() final
+    LE_COLD void messageCallback() final
     {
         if (pGUIHolder_->gui())
             if (!functor_(*pGUIHolder_->gui()))
@@ -523,33 +514,32 @@ template <class Functor> class MessageDirect final : public juce::MessageManager
     MessageDirect(Functor &&functor) : functor_(std::move(functor)) {}
 
   private:
-    LE_NOTHROW LE_COLD void messageCallback() final { functor_(); }
+    LE_COLD void messageCallback() final { functor_(); }
 
   private:
     Functor const functor_;
 }; // class MessageDirect
 
-LE_NOTHROW inline void postMessage(juce::MessageManager::MessageBase *LE_RESTRICT const pMessage)
+inline void postMessage(juce::MessageManager::MessageBase *LE_RESTRICT const pMessage)
 {
     if (pMessage)
         pMessage->post();
 }
 } // namespace Detail
 
-template <class GUIHolder, class Functor>
-LE_NOTHROW void postMessage(GUIHolder &guiHolder, Functor &&functor)
+template <class GUIHolder, class Functor> void postMessage(GUIHolder &guiHolder, Functor &&functor)
 {
     Detail::postMessage(new (std::nothrow)
                             Detail::Message<GUIHolder, Functor>(guiHolder, std::move(functor)));
 }
 
-template <class Functor> LE_NOTHROW void postMessage(Functor &&functor)
+template <class Functor> void postMessage(Functor &&functor)
 {
     Detail::postMessage(new (std::nothrow) Detail::MessageDirect<Functor>(std::move(functor)));
 }
 
 template <class GUIHolder, class Functor>
-LE_NOTHROW void postOrExecuteMessage(GUIHolder &guiHolder, Functor &&functor)
+void postOrExecuteMessage(GUIHolder &guiHolder, Functor &&functor)
 {
     if (isThisTheGUIThread() && functor(*guiHolder.gui()))
         return;
@@ -624,8 +614,8 @@ class BitmapButton : public WidgetBase<juce::ImageButton>
     static value_type valueRangeMaximum() { return true; }
     static value_type valueRangeQuantum() { return true - false; }
 
-    LE_NOTHROWNOALIAS value_type getValue() const { return getToggleState(); }
-    LE_NOTHROWNOALIAS void setValue(param_type const newValue)
+    value_type getValue() const { return getToggleState(); }
+    void setValue(param_type const newValue)
     {
         setToggleState(newValue, juce::dontSendNotification);
     }
@@ -676,8 +666,8 @@ class PopupMenu
     using OptionalID = std::optional<ItemID>;
 
   public:
-    LE_NOTHROW PopupMenu();
-    LE_NOTHROW ~PopupMenu() {}
+    PopupMenu();
+    ~PopupMenu() {}
 
     void addItem(ItemID, char const *newItemText, juce::Image const &icon = juce::Image::null,
                  bool enabled = true);
@@ -865,11 +855,11 @@ class LE_NOVTABLE Knob : public WidgetBase<juce::Slider>
     typedef double value_type;
     typedef float param_type;
 
-    LE_COLD value_type LE_NOALIAS getValue() const
+    LE_COLD value_type getValue() const
     {
         return static_cast<value_type>(juce::Slider::getValue());
     }
-    LE_COLD void LE_NOALIAS setValue(param_type);
+    LE_COLD void setValue(param_type);
 
     param_type getNormalisedValue() const;
 

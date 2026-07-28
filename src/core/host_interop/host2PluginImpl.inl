@@ -252,7 +252,7 @@ template <class Impl, class Protocol> class Host2PluginInteropImpl<Impl, Protoco
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class Impl, class Protocol>
-typename Plugins::ErrorCode<Protocol>::value_type LE_NOTHROW
+typename Plugins::ErrorCode<Protocol>::value_type
 Host2PluginInteropImpl<Impl, Protocol>::setParameter(ParameterID const parameterID,
                                                      Plugins::AutomatedParameterValue const value)
 {

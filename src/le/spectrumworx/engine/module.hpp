@@ -69,14 +69,14 @@ class LE_NOVTABLE ModuleDSP :
       public:
         ChannelDataProxy(ChannelData &, ModuleDSP const &, bool doBlend, bool &amPh2ReIm);
 
-        LE_NOTHROWNOALIAS operator MainSideChannelData_AmPh() const;
-        LE_NOTHROWNOALIAS operator MainSideChannelData_ReIm() const;
+        operator MainSideChannelData_AmPh() const;
+        operator MainSideChannelData_ReIm() const;
 
-        LE_NOTHROWNOALIAS operator ChannelData_AmPh() const;
-        LE_NOTHROWNOALIAS operator ChannelData_ReIm() const;
+        operator ChannelData_AmPh() const;
+        operator ChannelData_ReIm() const;
 
-        LE_NOTHROWNOALIAS operator ChannelData_AmPh2ReIm() const;
-        LE_NOTHROWNOALIAS operator ChannelData_ReIm2AmPh() const;
+        operator ChannelData_AmPh2ReIm() const;
+        operator ChannelData_ReIm2AmPh() const;
 
       private:
         ModuleDSP const &module_;
@@ -94,12 +94,12 @@ class LE_NOVTABLE ModuleDSP :
     using ModuleParameters::baseParameters;
     using ModuleParameters::setEffectParameter;
 
-    LE_NOTHROW void initialise(Setup const &engineSetup) { setup(engineSetup); }
-    LE_NOTHROW void preProcess(LFO::Timer const &, Setup const &);
-    LE_NOTHROW void process(std::uint8_t channel, ChannelData &, Setup const &) const;
+    void initialise(Setup const &engineSetup) { setup(engineSetup); }
+    void preProcess(LFO::Timer const &, Setup const &);
+    void process(std::uint8_t channel, ChannelData &, Setup const &) const;
 
-    virtual LE_NOTHROWNOALIAS void reset() = 0;
-    virtual LE_NOTHROWNOALIAS bool resize(StorageFactors const &) = 0;
+    virtual void reset() = 0;
+    virtual bool resize(StorageFactors const &) = 0;
 
   protected:
     ModuleDSP(ModuleParameters::EffectMetaData const &metaData,
@@ -120,11 +120,11 @@ class LE_NOVTABLE ModuleDSP :
 
 #ifdef LE_SW_SDK_BUILD //...mrmlj...reinvestigate this...
   public:
-    LE_NOTHROW virtual ~ModuleDSP();
+    virtual ~ModuleDSP();
 
   protected:
 #else
-    LE_NOTHROW ~ModuleDSP();
+    ~ModuleDSP();
 #endif
 
     void setup(Setup const &);
@@ -136,14 +136,13 @@ class LE_NOVTABLE ModuleDSP :
     Effects::IndexRange const &workingRange() const { return workingRange_; }
 
   private:
-    virtual LE_NOTHROWNOALIAS void doPreProcess(Setup const &) = 0;
-    virtual LE_NOTHROWNOALIAS void doProcess(std::uint8_t channel, ChannelDataProxy,
-                                             Setup const &) const = 0;
+    virtual void doPreProcess(Setup const &) = 0;
+    virtual void doProcess(std::uint8_t channel, ChannelDataProxy, Setup const &) const = 0;
 
 #ifdef LE_SW_SDK_BUILD
   private: // LE::Utility::IntrusivePtr required section
-    friend LE_NOTHROWNOALIAS void intrusive_ptr_add_ref(ModuleBase const *);
-    friend LE_NOTHROW void intrusive_ptr_release(ModuleBase const *);
+    friend void intrusive_ptr_add_ref(ModuleBase const *);
+    friend void intrusive_ptr_release(ModuleBase const *);
 #endif // LE_SW_SDK_BUILD
 
   private:
@@ -151,8 +150,8 @@ class LE_NOVTABLE ModuleDSP :
     float setEffectParameter(std::uint8_t parameterIndex, float value,
                              ParameterInfo const &cachedInfo);
 
-    LE_CONST_FUNCTION void *getEffectParameterPtr(std::uint8_t parameterIndex);
-    LE_CONST_FUNCTION void const *getEffectParameterPtr(std::uint8_t parameterIndex) const;
+    void *getEffectParameterPtr(std::uint8_t parameterIndex);
+    void const *getEffectParameterPtr(std::uint8_t parameterIndex) const;
 
   private:
     mutable Effects::IndexRange workingRange_;

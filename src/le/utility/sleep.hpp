@@ -20,7 +20,7 @@ namespace Utility
 {
 //------------------------------------------------------------------------------
 
-LE_NOTHROWNOALIAS void sleep(unsigned int seconds);
+void sleep(unsigned int seconds);
 
 //------------------------------------------------------------------------------
 } // namespace Utility

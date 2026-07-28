@@ -218,8 +218,7 @@ class LE_NOVTABLE SpectrumWorx : public SpectrumWorxCore, public Plugin2HostInte
 {
   public:
     typedef Plugin2HostInteropControler::ParameterValueForAutomation ParameterValueForAutomation;
-    void LE_NOTHROWNOALIAS process(float const *const *inputs, float **outputs,
-                                   std::uint32_t samples);
+    void process(float const *const *inputs, float **outputs, std::uint32_t samples);
 
     void resume();
 
@@ -237,8 +236,8 @@ class LE_NOVTABLE SpectrumWorx : public SpectrumWorxCore, public Plugin2HostInte
     ModuleInitialiser moduleInitialiser();
 
   protected:
-    LE_NOTHROW SpectrumWorx(bool runningAsAU);
-    LE_NOTHROW ~SpectrumWorx();
+    SpectrumWorx(bool runningAsAU);
+    ~SpectrumWorx();
 
     bool initialise();
 
@@ -265,7 +264,7 @@ class LE_NOVTABLE SpectrumWorx : public SpectrumWorxCore, public Plugin2HostInte
     bool isSampleLoadInProgress() const;
 
   private:
-    bool LE_NOTHROWNOALIAS setNewSampleWorker(juce::File const &);
+    bool setNewSampleWorker(juce::File const &);
     void sampleLoadingLoop();
 
   private:
@@ -282,11 +281,11 @@ class LE_NOVTABLE SpectrumWorx : public SpectrumWorxCore, public Plugin2HostInte
     ////////////////////////////////////////////////////////////////////////////
 
   public:
-    bool LE_NOTHROW setNumberOfChannelsFromHost(std::uint8_t numberOfInputChannels,
-                                                std::uint8_t numberOfOutputChannels);
+    bool setNumberOfChannelsFromHost(std::uint8_t numberOfInputChannels,
+                                     std::uint8_t numberOfOutputChannels);
 #ifndef LE_SW_FMOD
-    bool LE_NOTHROW setNumberOfChannelsFromUser(std::uint8_t numberOfInputChannels,
-                                                std::uint8_t numberOfOutputChannels);
+    bool setNumberOfChannelsFromUser(std::uint8_t numberOfInputChannels,
+                                     std::uint8_t numberOfOutputChannels);
 #endif // LE_SW_FMOD
 
     bool enableSideChannelInput(bool const enable)
@@ -316,7 +315,7 @@ class LE_NOVTABLE SpectrumWorx : public SpectrumWorxCore, public Plugin2HostInte
 
   public:
     void setProgram(std::uint8_t program);
-    LE_PURE_FUNCTION std::uint8_t getProgram() const { return currentProgram_; }
+    std::uint8_t getProgram() const { return currentProgram_; }
 
     void setProgramName(char const *name);
     void setProgramName(std::uint8_t program, char const *name);
@@ -325,10 +324,10 @@ class LE_NOVTABLE SpectrumWorx : public SpectrumWorxCore, public Plugin2HostInte
 
     char const *currentProgramName() const;
 
-    LE_NOTHROW bool loadPreset(juce::File const &, bool ignoreExternalSample,
-                               juce::String *pComment, char_t const *presetName);
-    LE_NOTHROW bool loadPreset(char *data, bool ignoreExternalSample, juce::String *pComment,
-                               std::uint8_t program);
+    bool loadPreset(juce::File const &, bool ignoreExternalSample, juce::String *pComment,
+                    char_t const *presetName);
+    bool loadPreset(char *data, bool ignoreExternalSample, juce::String *pComment,
+                    std::uint8_t program);
 
     bool loadProgramState(std::uint8_t programIndex, char const *pProgramName, void const *pData,
                           std::uint32_t dataSize);
@@ -444,15 +443,15 @@ class LE_NOVTABLE SpectrumWorx : public SpectrumWorxCore, public Plugin2HostInte
     bool completelyDisableIOChanges() const { return runningAsAU(); }
 
   protected:
-    void LE_NOTHROW loadSettings();
-    void LE_NOTHROW saveSettings();
+    void loadSettings();
+    void saveSettings();
 
     static juce::File lastSessionPresetFile();
     static juce::File settingsFile();
 
   private:
   protected: //...mrmlj...GlobalParameterUpdater
-    LE_CONST_FUNCTION bool runningAsAU() const;
+    bool runningAsAU() const;
 
   private:
 #if LE_SW_ENGINE_INPUT_MODE >= 1

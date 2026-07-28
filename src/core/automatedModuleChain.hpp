@@ -82,19 +82,18 @@ class AutomatedModuleChain : public Engine::ModuleChainImpl
 
     ModuleChainParameter getParameterForIndex(std::uint8_t moduleIndex) const;
 
-    LE_NOTHROWNOALIAS ModulePtr module(std::uint8_t index);
-    LE_NOTHROWNOALIAS ModuleCPtr module(std::uint8_t index) const;
+    ModulePtr module(std::uint8_t index);
+    ModuleCPtr module(std::uint8_t index) const;
 
     template <class ActualModule>
-    LE_NOTHROWNOALIAS LE::Utility::IntrusivePtr<ActualModule> moduleAs(std::uint8_t const index)
+    LE::Utility::IntrusivePtr<ActualModule> moduleAs(std::uint8_t const index)
     {
         auto const pModule(ModuleChainImpl::module(index));
         return (!isEnd(pModule)) ? &Engine::actualModule<ActualModule>(*pModule) : nullptr;
     }
 
     template <class ActualModule>
-    LE_NOTHROWNOALIAS LE::Utility::IntrusivePtr<ActualModule const>
-    moduleAs(std::uint8_t const index) const
+    LE::Utility::IntrusivePtr<ActualModule const> moduleAs(std::uint8_t const index) const
     {
         auto const pModule(ModuleChainImpl::module(index));
         return (!isEnd(pModule))
@@ -104,7 +103,7 @@ class AutomatedModuleChain : public Engine::ModuleChainImpl
     }
 
     template <class ModuleInitialiser>
-    std::pair<LE::Utility::IntrusivePtr<typename ModuleInitialiser::Module>, std::int8_t> LE_NOTHROW
+    std::pair<LE::Utility::IntrusivePtr<typename ModuleInitialiser::Module>, std::int8_t>
     setParameter(std::uint8_t const moduleIndex, std::int8_t const newValue,
                  ModuleInitialiser const &initialise)
     {

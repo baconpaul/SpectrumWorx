@@ -31,7 +31,7 @@ namespace Engine
 //...mrmlj...these should go into engine/buffers.cpp...
 namespace Detail
 {
-LE_NOTHROWNOALIAS DataRange resize(DataRange const &range, IndexRange const &workingRange)
+DataRange resize(DataRange const &range, IndexRange const &workingRange)
 {
 #ifndef NDEBUG
     if (!workingRange)
@@ -40,9 +40,10 @@ LE_NOTHROWNOALIAS DataRange resize(DataRange const &range, IndexRange const &wor
     return DataRange(&range[workingRange.begin()], &range[workingRange.end() - 1] + 1);
 }
 
-LE_WEAK_FUNCTION LE_NOTHROW LE_CONST_FUNCTION LE_COLD std::uint16_t
-fftBufferSize(std::uint8_t const a, std::uint8_t const b, std::uint8_t const c,
-              std::uint8_t const sizeOfT, std::uint16_t const fftSize)
+LE_WEAK_FUNCTION LE_COLD std::uint16_t fftBufferSize(std::uint8_t const a, std::uint8_t const b,
+                                                     std::uint8_t const c,
+                                                     std::uint8_t const sizeOfT,
+                                                     std::uint16_t const fftSize)
 {
     using Utility::Constants::vectorAlignment;
     LE_ASSERT_MSG(fftSize * a / b < std::numeric_limits<std::uint16_t>::max(),

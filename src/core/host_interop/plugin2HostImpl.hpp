@@ -51,7 +51,7 @@ class LE_NOVTABLE Plugin2HostPassiveInteropImpl : public Plugin2HostPassiveInter
 
     using AutomatedParameter = typename Plugins::AutomatedParameterFor<Protocol>::type;
 
-    Plugins::AutomatedParameterValue LE_NOTHROWNOALIAS getParameter(ParameterID) const;
+    Plugins::AutomatedParameterValue getParameter(ParameterID) const;
 
     static bool getParameterProperties(ParameterID, Plugins::ParameterInformation<Protocol> &,
                                        Program const *);
@@ -101,9 +101,8 @@ class LE_NOVTABLE Plugin2HostPassiveInteropImpl : public Plugin2HostPassiveInter
     }; // struct ParameterValueStringGetter
 #pragma warning(pop)
 
-    LE_NOTHROWNOALIAS void
-    getParameterDisplay(ParameterID const parameterID, LE::Utility::Span<char> const text,
-                        Plugins::AutomatedParameterValue const *LE_RESTRICT const pValue) const
+    void getParameterDisplay(ParameterID const parameterID, LE::Utility::Span<char> const text,
+                             Plugins::AutomatedParameterValue const *LE_RESTRICT const pValue) const
     {
         //...mrmlj...duplicated in SpectrumWorxEditorFMOD as a quick-hack around fmod ugliness
         //...mrmlj...(printing required both in the DSP and UI)...
@@ -167,8 +166,8 @@ class LE_NOVTABLE Plugin2HostActiveInteropImpl : public Base
     }
 
   protected:
-    void LE_NOTHROW automatedParameterChanged(ParameterID const parameterID,
-                                              Plugins::AutomatedParameterValue const newValue) const
+    void automatedParameterChanged(ParameterID const parameterID,
+                                   Plugins::AutomatedParameterValue const newValue) const
     {
         impl().host().automatedParameterChanged(
             Plugin2HostInteropControler::make<typename Impl::ParameterSelector>(parameterID),
@@ -183,43 +182,36 @@ class LE_NOVTABLE Plugin2HostActiveInteropImpl : public Base
   protected: // Plugin2HostInteropControler virtual overrides
     friend class Host2PluginInteropImpl<Impl, Protocol>;
     typedef Plugin2HostInteropControler::ParameterValueForAutomation ParameterValueForAutomation;
-    LE_NOTHROW void automatedParameterBeginEdit(ParameterID const parameterID) const override final
+    void automatedParameterBeginEdit(ParameterID const parameterID) const override final
     {
         return impl().host().automatedParameterBeginEdit(
             Plugin2HostInteropControler::make<typename Impl::ParameterSelector>(parameterID));
     }
-    LE_NOTHROW void automatedParameterEndEdit(ParameterID const parameterID) const override final
+    void automatedParameterEndEdit(ParameterID const parameterID) const override final
     {
         return impl().host().automatedParameterEndEdit(
             Plugin2HostInteropControler::make<typename Impl::ParameterSelector>(parameterID));
     }
-    LE_NOTHROW void gestureBegin(char const *const description) const override final
+    void gestureBegin(char const *const description) const override final
     {
         return impl().host().gestureBegin(description);
     }
-    LE_NOTHROW void gestureEnd() const override final { return impl().host().gestureEnd(); }
-    LE_NOTHROW void automatedParameterChanged(ParameterID,
-                                              ParameterValueForAutomation) const override final;
-    LE_NOTHROW void moduleChanged(std::uint8_t moduleIndex,
-                                  Plugin2HostInteropControler::Module const *) const override final;
-    LE_NOTHROW bool parameterListChanged() const override final
+    void gestureEnd() const override final { return impl().host().gestureEnd(); }
+    void automatedParameterChanged(ParameterID, ParameterValueForAutomation) const override final;
+    void moduleChanged(std::uint8_t moduleIndex,
+                       Plugin2HostInteropControler::Module const *) const override final;
+    bool parameterListChanged() const override final
     {
         return impl().host().parameterListChanged();
     }
-    LE_NOTHROW void presetChangeBegin() const override final
-    {
-        return impl().host().presetChangeBegin();
-    }
-    LE_NOTHROW void presetChangeEnd() const override final
-    {
-        return impl().host().presetChangeEnd();
-    }
-    LE_NOTHROW bool latencyChanged() override final;
+    void presetChangeBegin() const override final { return impl().host().presetChangeBegin(); }
+    void presetChangeEnd() const override final { return impl().host().presetChangeEnd(); }
+    bool latencyChanged() override final;
 
 #if LE_SW_ENGINE_INPUT_MODE >= 2
-    LE_NOTHROW bool hostTryIOConfigurationChange(std::uint8_t numberOfMainChannels,
-                                                 std::uint8_t numberOfSideChannels) override final;
-    LE_NOTHROWNOALIAS bool hostSupportsIOConfigurationChanges() const override final;
+    bool hostTryIOConfigurationChange(std::uint8_t numberOfMainChannels,
+                                      std::uint8_t numberOfSideChannels) override final;
+    bool hostSupportsIOConfigurationChanges() const override final;
 #endif // LE_SW_ENGINE_INPUT_MODE
 }; // class Plugin2HostActiveInteropImpl
 

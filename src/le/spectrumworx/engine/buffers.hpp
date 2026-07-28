@@ -111,9 +111,8 @@ using Storage = Utility::Storage;
 
 namespace Detail
 {
-LE_NOTHROW LE_CONST_FUNCTION std::uint16_t fftBufferSize(std::uint8_t a, std::uint8_t b,
-                                                         std::uint8_t c, std::uint8_t sizeoOfT,
-                                                         std::uint16_t fftSize);
+std::uint16_t fftBufferSize(std::uint8_t a, std::uint8_t b, std::uint8_t c, std::uint8_t sizeoOfT,
+                            std::uint16_t fftSize);
 } // namespace Detail
 
 template <typename T, int a = 1, int b = 1, int c = 0>
@@ -122,7 +121,7 @@ class SharedStorageFFTBasedBuffer : public Utility::SharedStorageBuffer<T>
   public:
     SharedStorageFFTBasedBuffer() {}
 
-    LE_COLD LE_CONST_FUNCTION static std::uint16_t requiredStorage(StorageFactors const &factors)
+    LE_COLD static std::uint16_t requiredStorage(StorageFactors const &factors)
     {
         auto const storageBytes(Engine::Detail::fftBufferSize(a, b, c, sizeof(T), factors.fftSize));
         return storageBytes;
@@ -150,7 +149,7 @@ template <typename T = real_t> struct DoubleFFTBuffer : SharedStorageFFTBasedBuf
 template <typename T = real_t> class WindowBuffer : public Utility::SharedStorageBuffer<T>
 {
   public:
-    LE_COLD LE_CONST_FUNCTION static std::uint16_t requiredStorage(StorageFactors const &factors)
+    LE_COLD static std::uint16_t requiredStorage(StorageFactors const &factors)
     {
 #if LE_SW_ENGINE_WINDOW_PRESUM
         std::uint8_t const windowSizeFactor(factors.windowSizeFactor);
@@ -220,7 +219,7 @@ namespace Detail
 //...mrmlj...template so that it can be specialized...reinvestigate and fix
 //...mrmlj...this problematic design...
 template <class Data, class FullData>
-LE_NOTHROWNOALIAS Data makeData(FullData &fullData, IndexRange const &workingRange)
+Data makeData(FullData &fullData, IndexRange const &workingRange)
 {
     return Data(fullData, workingRange);
 }
@@ -303,7 +302,7 @@ template <class Data> class SharedStorageDataPairImpl : public DataPairImpl<Data
 #endif // __APPLE__
 
   public:
-    LE_COLD LE_CONST_FUNCTION static std::uint32_t requiredStorage(StorageFactors const &factors)
+    LE_COLD static std::uint32_t requiredStorage(StorageFactors const &factors)
     {
         auto const dataElements(std::tuple_size<typename DataPairImpl<Data>::DataArray>::value);
         auto const requiredStorageBytes(Utility::align(Data::requiredStorage(factors)) *
@@ -457,11 +456,11 @@ class SharedStorageHalfFFTBufferPair : public SharedStorageDataPairImpl<HalfFFTB
 
 namespace Detail
 {
-LE_NOTHROWNOALIAS DataRange resize(DataRange const &range, IndexRange const &workingRange);
+DataRange resize(DataRange const &range, IndexRange const &workingRange);
 
 template <>
-inline LE_NOTHROWNOALIAS DataRange makeData<DataRange, HalfFFTBuffer<float>>(
-    HalfFFTBuffer<float> &fullData, IndexRange const &workingRange)
+inline DataRange makeData<DataRange, HalfFFTBuffer<float>>(HalfFFTBuffer<float> &fullData,
+                                                           IndexRange const &workingRange)
 {
     return DataRange(resize(fullData, workingRange));
 }

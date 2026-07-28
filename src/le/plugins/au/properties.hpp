@@ -298,9 +298,9 @@ inline AudioUnitScope adjustScope<kAudioUnitProperty_SampleRate>(AudioUnitScope 
 
 #define LE_AU_PROPERTIES_SELECT_FUNCTION(propertiesSequence)                                       \
     template <class Impl, class Functor>                                                           \
-    OSStatus LE_FORCEINLINE LE_NOTHROW handleProperty(                                             \
-        Impl &impl, AudioUnitPropertyID const propertyID, AudioUnitScope const scope,              \
-        AudioUnitElement const element, Functor &functor)                                          \
+    OSStatus LE_FORCEINLINE handleProperty(Impl &impl, AudioUnitPropertyID const propertyID,       \
+                                           AudioUnitScope const scope,                             \
+                                           AudioUnitElement const element, Functor &functor)       \
     {                                                                                              \
         LE_AU_PROPERTY_DEBUGGER_INIT(functor);                                                     \
         switch (propertyID)                                                                        \

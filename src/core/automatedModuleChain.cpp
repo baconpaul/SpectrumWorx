@@ -28,13 +28,11 @@ AutomatedModuleChain::getParameterForIndex(std::uint8_t const moduleIndex) const
                                     : noModule);
 }
 
-AutomatedModuleChain::ModulePtr LE_NOTHROWNOALIAS
-AutomatedModuleChain::module(std::uint8_t const index)
+AutomatedModuleChain::ModulePtr AutomatedModuleChain::module(std::uint8_t const index)
 {
     return moduleAs<Module>(index);
 }
-AutomatedModuleChain::ModuleCPtr LE_NOTHROWNOALIAS
-AutomatedModuleChain::module(std::uint8_t const index) const
+AutomatedModuleChain::ModuleCPtr AutomatedModuleChain::module(std::uint8_t const index) const
 {
     return moduleAs<Module const>(index);
 }

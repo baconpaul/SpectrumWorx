@@ -43,12 +43,12 @@ class LE_NOVTABLE Module : public Engine::ModuleDSP,
                            private GUI::ParameterWidgetsVTable<Module>
 {
   public: // GUI
-    LE_NOTHROW void createGUI(GUI::SpectrumWorxEditor &, std::uint8_t moduleIndex);
-    LE_NOTHROW bool destroyGUI();
+    void createGUI(GUI::SpectrumWorxEditor &, std::uint8_t moduleIndex);
+    bool destroyGUI();
 
   public: // Automation
     template <class AutomatedParameter>
-    std::optional<std::pair<std::uint8_t, LFO::value_type>> LE_NOTHROW
+    std::optional<std::pair<std::uint8_t, LFO::value_type>>
     setAutomatedLFOParameter(std::uint8_t const parameterIndex,
                              std::uint8_t const lfoParameterIndex,
                              Plugins::AutomatedParameterValue const value)

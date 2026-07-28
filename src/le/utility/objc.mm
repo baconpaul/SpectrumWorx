@@ -45,20 +45,20 @@ NSString *copyString(char const *__restrict const c_str, std::uint32_t const enc
 }
 } // anonymous namespace
 
-LE_NOTHROW NSString *asciiString(char const *__restrict const c_str)
+NSString *asciiString(char const *__restrict const c_str)
 {
     return wrapString(c_str, kCFStringEncodingASCII);
 }
-LE_NOTHROW NSString *utf8String(char const *__restrict const c_str)
+NSString *utf8String(char const *__restrict const c_str)
 {
     return wrapString(c_str, kCFStringEncodingUTF8);
 }
 
-LE_NOTHROW NSString *copyASCIIString(char const *__restrict const c_str)
+NSString *copyASCIIString(char const *__restrict const c_str)
 {
     return copyString(c_str, NSASCIIStringEncoding);
 }
-LE_NOTHROW NSString *copyUTF8String(char const *__restrict const c_str)
+NSString *copyUTF8String(char const *__restrict const c_str)
 {
     return copyString(c_str, NSUTF8StringEncoding);
 }

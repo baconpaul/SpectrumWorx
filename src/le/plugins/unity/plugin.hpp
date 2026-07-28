@@ -321,23 +321,23 @@ class LE_ALIGN(16) Plugin<ImplParam, Protocol::Unity> : public UnityPluginBase
     }
 
   private: // Callbacks.
-    LE_NOTHROW static UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
-    create(UnityAudioEffectState *pState);
-    LE_NOTHROW static UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
-    release(UnityAudioEffectState *pState);
-    LE_NOTHROW static UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
-    reset(UnityAudioEffectState *pState);
-    LE_NOTHROW static UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
-    process(UnityAudioEffectState *pState, float *inbuffer, float *outbuffer, unsigned int length,
-            int inchannels, int outchannels);
-    LE_NOTHROW static UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
-    setPosition(UnityAudioEffectState *pState, unsigned int position);
-    LE_NOTHROW static UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
-    setParameter(UnityAudioEffectState *pState, int index, float value);
-    LE_NOTHROW static UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
-    getParameter(UnityAudioEffectState *pState, int index, float *value, char *valuestr);
-    LE_NOTHROW static UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
-    getSignal(UnityAudioEffectState *pState, char const *name, float *buffer, int numsamples);
+    static UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK create(UnityAudioEffectState *pState);
+    static UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK release(UnityAudioEffectState *pState);
+    static UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK reset(UnityAudioEffectState *pState);
+    static UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK process(UnityAudioEffectState *pState,
+                                                                 float *inbuffer, float *outbuffer,
+                                                                 unsigned int length,
+                                                                 int inchannels, int outchannels);
+    static UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK setPosition(UnityAudioEffectState *pState,
+                                                                     unsigned int position);
+    static UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK setParameter(UnityAudioEffectState *pState,
+                                                                      int index, float value);
+    static UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK getParameter(UnityAudioEffectState *pState,
+                                                                      int index, float *value,
+                                                                      char *valuestr);
+    static UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK getSignal(UnityAudioEffectState *pState,
+                                                                   char const *name, float *buffer,
+                                                                   int numsamples);
 
   private:
     // http://objectmix.com/c/39865-how-fix-program-depends-friend-injection.html

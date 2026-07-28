@@ -41,8 +41,8 @@ namespace Utility
 
 struct Tracer
 {
-    static LE_NOTHROWNOALIAS void message(char const *pFormatString, ...);
-    static LE_NOTHROWNOALIAS void error(char const *pFormatString, ...);
+    static void message(char const *pFormatString, ...);
+    static void error(char const *pFormatString, ...);
 
     static char const
         *pTagString; ///< Tag or prefix string to be displayed before every log message.
@@ -53,8 +53,7 @@ struct Tracer
     /// \details The callback method must be a non-static member with the
     /// following signature: <VAR>void (String)</VAR>
     /// \return false if out-of-memory, true otherwise
-    static LE_NOTHROW bool setJavaCallback(JNIEnv &, jobject callbackObject,
-                                           char const *callbackMethodName);
+    static bool setJavaCallback(JNIEnv &, jobject callbackObject, char const *callbackMethodName);
 #endif // __ANDROID__
 
 #if (defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__) && defined(__OBJC__)) ||              \
@@ -64,7 +63,7 @@ struct Tracer
     /// \details The callback method must be a non-static member with the
     /// following signature: <VAR>void (String)</VAR>
     /// \return false if out-of-memory, true otherwise
-    static LE_NOTHROW bool setObjCCallback(void (^)(NSString *message));
+    static bool setObjCCallback(void (^)(NSString *message));
 #endif // iOS
 }; // struct Tracer
 

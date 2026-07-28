@@ -56,27 +56,27 @@ template <class AutomatedParameter> struct ParameterGetterBase
 {
     typedef Plugins::AutomatedParameterValue result_type;
 
-    result_type LE_NOTHROWNOALIAS operator()(ParameterID::Global const parameterID,
-                                             Program const *LE_RESTRICT const pProgram) const
+    result_type operator()(ParameterID::Global const parameterID,
+                           Program const *LE_RESTRICT const pProgram) const
     {
         return LE::Parameters::invokeFunctorOnIndexedParameter(
             pProgram->parameters(), parameterID.index, typename AutomatedParameter::Getter());
     }
 
-    result_type LE_NOTHROWNOALIAS operator()(ParameterID::ModuleChain const parameterID,
-                                             Program const *LE_RESTRICT const pProgram) const
+    result_type operator()(ParameterID::ModuleChain const parameterID,
+                           Program const *LE_RESTRICT const pProgram) const
     {
         return AutomatedParameter::convertParameterToAutomationValue(
             pProgram->moduleChain().getParameterForIndex(parameterID.moduleIndex));
     }
 
-    result_type LE_NOTHROWNOALIAS operator()(ParameterID::LFO const parameterID,
-                                             Program const *LE_RESTRICT const pProgram) const
+    result_type operator()(ParameterID::LFO const parameterID,
+                           Program const *LE_RESTRICT const pProgram) const
     {
         return (*this)(parameterID, pProgram->moduleChain().module(parameterID.moduleIndex).get());
     }
 
-    result_type LE_NOTHROWNOALIAS
+    result_type
     operator()(ParameterID::LFO const parameterID,
                Plugin2HostInteropControler::Module const *LE_RESTRICT const pModule) const
     {
@@ -95,8 +95,8 @@ struct ParameterGetter : ParameterGetterBase<AutomatedParameter>
     using result_type = typename Base::result_type;
     using Base::operator();
 
-    result_type LE_NOTHROWNOALIAS operator()(ParameterID::Module const parameterID,
-                                             Program const *LE_RESTRICT const pProgram) const
+    result_type operator()(ParameterID::Module const parameterID,
+                           Program const *LE_RESTRICT const pProgram) const
     {
         LE_ASSUME(parameterID.moduleParameterIndex < Constants::maxNumberOfModuleParameters);
         return (*this)(
@@ -104,8 +104,8 @@ struct ParameterGetter : ParameterGetterBase<AutomatedParameter>
             pProgram->moduleChain().moduleAs<ActualModule>(parameterID.moduleIndex).get());
     }
 
-    result_type LE_NOTHROWNOALIAS operator()(ParameterID::Module const parameterID,
-                                             ActualModule const *LE_RESTRICT const pModule) const
+    result_type operator()(ParameterID::Module const parameterID,
+                           ActualModule const *LE_RESTRICT const pModule) const
     {
         // Implementation note:
         //   If chunks are not used/supported and/or the host generated UI is
@@ -243,7 +243,7 @@ template <class Protocol> class ParameterInfoGetter : public Plugins::ParameterI
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class Impl, class Protocol>
-Plugins::AutomatedParameterValue LE_NOTHROWNOALIAS
+Plugins::AutomatedParameterValue
 Plugin2HostPassiveInteropImpl<Impl, Protocol>::getParameter(ParameterID const parameterID) const
 {
     return invokeFunctorOnIdentifiedParameter(
@@ -309,7 +309,7 @@ bool Plugin2HostPassiveInteropImpl<Impl, Protocol>::getParameterProperties(
 
 #if LE_SW_ENGINE_INPUT_MODE >= 2
 template <class Impl, class Protocol, class Base>
-LE_NOTHROW bool Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::hostTryIOConfigurationChange(
+bool Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::hostTryIOConfigurationChange(
     std::uint8_t const numberOfMainChannels, std::uint8_t const numberOfSideChannels)
 {
     return impl().host().reportNewNumberOfIOChannels(numberOfMainChannels, numberOfSideChannels,
@@ -317,8 +317,7 @@ LE_NOTHROW bool Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::hostTryIOCon
 }
 
 template <class Impl, class Protocol, class Base>
-LE_NOTHROWNOALIAS bool
-Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::hostSupportsIOConfigurationChanges() const
+bool Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::hostSupportsIOConfigurationChanges() const
 {
     return impl().host().template canDo<Plugins::AcceptIOChanges>();
 }
@@ -341,7 +340,7 @@ Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::hostSupportsIOConfigurationC
 #endif                          // _MSC_VER
 
 template <class Impl, class Protocol, class Base>
-bool LE_NOTHROW Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::latencyChanged()
+bool Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::latencyChanged()
 {
     /// \note Up to SVN revision 8346 this function tried to perform this
     /// notification asynchronously (posting it to the GUI thread) in order to
@@ -374,7 +373,7 @@ bool LE_NOTHROW Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::latencyChang
 #endif // _MSC_VER
 
 template <class Impl, class Protocol, class Base>
-void LE_NOTHROW Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::moduleChanged(
+void Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::moduleChanged(
     std::uint8_t const moduleIndex,
     Plugin2HostInteropControler::Module const *LE_RESTRICT const pModuleBase) const
 {
@@ -431,7 +430,7 @@ void LE_NOTHROW Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::moduleChange
 }
 
 template <class Impl, class Protocol, class Base>
-void LE_NOTHROW Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::automatedParameterChanged(
+void Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::automatedParameterChanged(
     ParameterID const parameterID, ParameterValueForAutomation const value) const
 {
     bool const normalised(AutomatedParameter::normalised

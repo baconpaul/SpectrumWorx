@@ -61,17 +61,17 @@ namespace boost
 {
 namespace simd
 {
-LE_NOTHROW BOOST_SIMD_MALLOC void *custom_malloc_fn(std::size_t /*const*/ sz)
+BOOST_SIMD_MALLOC void *custom_malloc_fn(std::size_t /*const*/ sz)
 {
     return LE::Plugins::Detail::pAlloc(static_cast<unsigned int>(sz), FMOD_MEMORY_PLUGIN, nullptr);
 }
-LE_NOTHROW /*BOOST_SIMD_MALLOC*/ void *custom_realloc_fn(void * /*const*/ ptr,
-                                                         std::size_t /*const*/ sz, std::size_t)
+/*BOOST_SIMD_MALLOC*/ void *custom_realloc_fn(void * /*const*/ ptr, std::size_t /*const*/ sz,
+                                              std::size_t)
 {
     return LE::Plugins::Detail::pRealloc(ptr, static_cast<unsigned int>(sz), FMOD_MEMORY_PLUGIN,
                                          nullptr);
 }
-LE_NOTHROW void custom_free_fn(void * /*const*/ ptr, std::size_t /*const   sz*/)
+void custom_free_fn(void * /*const*/ ptr, std::size_t /*const   sz*/)
 {
     return LE::Plugins::Detail::pFree(ptr, FMOD_MEMORY_PLUGIN, nullptr);
 }

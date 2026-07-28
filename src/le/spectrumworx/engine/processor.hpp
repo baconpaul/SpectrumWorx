@@ -49,10 +49,10 @@ class Processor
     using InterleavedInputData = float const *LE_RESTRICT;
     using InterleavedOutputData = float *LE_RESTRICT;
 
-    LE_NOTHROWNOALIAS void process // separated channel data
+    void process // separated channel data
         (InputData mainInputs, InputData sideChannels, OutputData outputs, std::uint32_t samples,
          float outputGain, float mixAmount);
-    LE_NOTHROWNOALIAS void process // interleaved channel data
+    void process // interleaved channel data
         (InterleavedInputData mainInputs, InterleavedInputData sideChannels,
          InterleavedOutputData outputs, std::uint32_t samples, float outputGain, float mixAmount);
 
@@ -86,7 +86,7 @@ class Processor
     static Processor const &fromEngineSetup(Setup const &);
 
   public: //...mrmlj...SDK and plugin shared functionality (cleanup and extract)...
-    bool LE_NOTHROW setSampleRate(float const sampleRate, StorageFactors &currentStorageFactors);
+    bool setSampleRate(float const sampleRate, StorageFactors &currentStorageFactors);
     bool resize(StorageFactors &currentStorageFactors, StorageFactors const &newStorageFactors,
                 Setup::Window window, Engine::HeapSharedStorage &sharedStorage);
 
@@ -142,7 +142,7 @@ class Processor
 
     struct Channels : Utility::SharedStorageBuffer<ChannelBuffers>
     {
-        static LE_CONST_FUNCTION std::uint32_t requiredStorage(StorageFactors const &);
+        static std::uint32_t requiredStorage(StorageFactors const &);
 
         void resize(StorageFactors const &factors, Storage &storage);
     }; // struct Channels
@@ -163,7 +163,7 @@ class Processor
     FFTWindow synthesisWindowBackup_;
 
   public:
-    static LE_CONST_FUNCTION std::uint32_t requiredStorage(StorageFactors const &);
+    static std::uint32_t requiredStorage(StorageFactors const &);
 
     void resize(StorageFactors const &, Storage &);
 }; // class Processor

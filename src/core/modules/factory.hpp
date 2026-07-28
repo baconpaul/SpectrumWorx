@@ -26,7 +26,7 @@ namespace SW
 struct ModuleFactory
 {
     template <class ModuleInterface>
-    static LE_NOTHROW LE::Utility::IntrusivePtr<ModuleInterface> create(std::int8_t effectIndex);
+    static LE::Utility::IntrusivePtr<ModuleInterface> create(std::int8_t effectIndex);
 }; // struct ModuleFactory
 
 //------------------------------------------------------------------------------

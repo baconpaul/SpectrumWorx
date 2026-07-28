@@ -28,7 +28,7 @@ LE_IMPL_NAMESPACE_BEGIN(Math)
 #pragma optimize("s", off)
 #pragma optimize("t", on)
 #endif // _MSC_VER
-LE_NOTHROWNOALIAS bool makeBool(unsigned int const boolean)
+bool makeBool(unsigned int const boolean)
 {
     LE_ASSERT_MSG(boolean == 0 || boolean == 1, "Boolean value not exactly 0 or 1");
 #if defined(LE_LITTLE_ENDIAN)
@@ -147,7 +147,7 @@ float dB2NormalisedPower(float const dBValue) { return std::pow(10, dBValue / 10
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_CONST_FUNCTION float normalisedLinear2Percentage(float const normalisedFloatValue)
+float normalisedLinear2Percentage(float const normalisedFloatValue)
 {
     // Implementation note:
     //   We do not assert that the passed 'normalisedFloatValue' is indeed
@@ -157,12 +157,12 @@ LE_CONST_FUNCTION float normalisedLinear2Percentage(float const normalisedFloatV
     return 100 * normalisedFloatValue;
 }
 
-LE_CONST_FUNCTION double normalisedLinear2Percentage(double const normalisedFloatValue)
+double normalisedLinear2Percentage(double const normalisedFloatValue)
 {
     return 100 * normalisedFloatValue;
 }
 
-LE_CONST_FUNCTION float semitone2Interval12TET(float const semitones)
+float semitone2Interval12TET(float const semitones)
 {
     //float const tonesPerOctave                        (  8 );
     float const semitonesPerOctave(12);
@@ -170,19 +170,19 @@ LE_CONST_FUNCTION float semitone2Interval12TET(float const semitones)
     return Math::exp2(semitones / semitonesPerOctave);
 }
 
-LE_CONST_FUNCTION float cents2Interval12TET(float const cents) { return Math::exp2(cents / 1200); }
-LE_CONST_FUNCTION float cents2Interval12TET(std::int16_t const cents)
+float cents2Interval12TET(float const cents) { return Math::exp2(cents / 1200); }
+float cents2Interval12TET(std::int16_t const cents)
 {
     return cents2Interval12TET(static_cast<float>(cents));
 }
 
-LE_CONST_FUNCTION float octaves2Interval12TET(std::int8_t const octaves)
+float octaves2Interval12TET(std::int8_t const octaves)
 {
     float const pitchScale(convert<float>(1 << abs(octaves)));
     return (octaves < 0) ? (1 / pitchScale) : (pitchScale);
 }
 
-LE_CONST_FUNCTION float interval12TET2Semitone(float const interval) { return 12 * log2(interval); }
+float interval12TET2Semitone(float const interval) { return 12 * log2(interval); }
 
 /*
     Linear 2 Log:

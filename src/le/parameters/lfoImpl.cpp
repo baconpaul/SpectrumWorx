@@ -159,32 +159,29 @@ void LFO::removeSyncType(SyncType const syncType)
     parameters.set<SyncTypes>(parameters.get<SyncTypes>().getValue() & ~syncType);
 }
 
-LE_NOTHROWNOALIAS bool LFO::hasEnabledSync(SyncType const syncType) const
-{
-    return (syncTypes() & syncType) != 0;
-}
+bool LFO::hasEnabledSync(SyncType const syncType) const { return (syncTypes() & syncType) != 0; }
 
-LE_NOTHROWNOALIAS bool LFO::enabled() const
+bool LFO::enabled() const
 {
     return static_cast<LFOImpl const &>(*this).parameters().get<Enabled>();
 }
-LE_NOTHROWNOALIAS std ::uint8_t LFO::syncTypes() const
+std ::uint8_t LFO::syncTypes() const
 {
     return static_cast<LFOImpl const &>(*this).parameters().get<SyncTypes>();
 }
-LE_NOTHROWNOALIAS LFOImpl::value_type LFO::phase() const
+LFOImpl::value_type LFO::phase() const
 {
     return static_cast<LFOImpl const &>(*this).parameters().get<Phase>();
 }
-LE_NOTHROWNOALIAS LFOImpl::value_type LFO::lowerBound() const
+LFOImpl::value_type LFO::lowerBound() const
 {
     return static_cast<LFOImpl const &>(*this).parameters().get<LowerBound>();
 }
-LE_NOTHROWNOALIAS LFOImpl::value_type LFO::upperBound() const
+LFOImpl::value_type LFO::upperBound() const
 {
     return static_cast<LFOImpl const &>(*this).parameters().get<UpperBound>();
 }
-LE_NOTHROWNOALIAS LFO ::Waveform LFO::waveForm() const
+LFO ::Waveform LFO::waveForm() const
 {
     return static_cast<LFO::Waveform>(
         static_cast<LFOImpl const &>(*this).parameters().get<LFOImpl::Waveform>().getValue());
@@ -211,12 +208,12 @@ void LFOImpl::setPeriodScale(value_type const newPeriodScale)
     parameters().set<PeriodScale>(newPeriodScale);
 }
 
-LFOImpl::value_type LE_NOTHROWNOALIAS LFOImpl::currentPeriodScaleMinimum()
+LFOImpl::value_type LFOImpl::currentPeriodScaleMinimum()
 {
     return (2.0f / 3.0f /*for triplets    */) / LFOImpl::minimumPeriodAsMaximumBeatDenominator /
            LFOImpl::Timer::measureNumeratorFloat();
 }
-LFOImpl::value_type LE_NOTHROWNOALIAS LFOImpl::currentPeriodScaleMaximum()
+LFOImpl::value_type LFOImpl::currentPeriodScaleMaximum()
 {
     return (3.0f / 2.0f /*for dotted notes*/) * LFOImpl::maximumPeriodInNumberOfBars;
 }
@@ -354,19 +351,19 @@ GetWaveformAmplitudeForPosition const lfoFunctions[] = {
     &randomHold, &randomSlide, &randomWhacko, &dirac,           &diracUpsideDown};
 } // anonymous namespace
 
-LE_NOTHROWNOALIAS LFOImpl::LFOImpl()
+LFOImpl::LFOImpl()
 {
     state_[0] = minimumValue;
     state_[1] = 0;
 }
 
-LFOImpl::value_type LE_NOTHROWNOALIAS
-LFOImpl::getWaveformAmplitudeForPosition(value_type const position, bool const newPeriodBegun) const
+LFOImpl::value_type LFOImpl::getWaveformAmplitudeForPosition(value_type const position,
+                                                             bool const newPeriodBegun) const
 {
     return lfoFunctions[waveForm()](position, state_, newPeriodBegun);
 }
 
-LFOImpl::value_type LE_NOTHROWNOALIAS LFOImpl::getValue(Timer const &timer) const
+LFOImpl::value_type LFOImpl::getValue(Timer const &timer) const
 {
     value_type const periodScale(this->periodScale());
 
@@ -786,20 +783,20 @@ bool LFOImpl::Timer::TimingInformationChange::barDurationChanged() const
     return !Math::is<1>(barDurationChangeRatio_);
 }
 
-LE_NOTHROWNOALIAS LFOImpl::SyncTypes::value_type LFOImpl::SyncTypes::default_()
+LFOImpl::SyncTypes::value_type LFOImpl::SyncTypes::default_()
 {
     return LFOImpl::Timer::hasTempoInformation() ? LFO::Quarter : LFO::Free;
 }
 //...mrmlj...a 'dynamic' (bounds) parameter...
-LE_NOTHROWNOALIAS LFOImpl::value_type LFOImpl::PeriodScaleParameterTraits::minimum()
+LFOImpl::value_type LFOImpl::PeriodScaleParameterTraits::minimum()
 {
     return LFOImpl::currentPeriodScaleMinimum();
 }
-LE_NOTHROWNOALIAS LFOImpl::value_type LFOImpl::PeriodScaleParameterTraits::maximum()
+LFOImpl::value_type LFOImpl::PeriodScaleParameterTraits::maximum()
 {
     return LFOImpl::currentPeriodScaleMaximum();
 }
-LE_NOTHROWNOALIAS bool LFOImpl::PeriodScaleParameterTraits::isValidValue(param_type value)
+bool LFOImpl::PeriodScaleParameterTraits::isValidValue(param_type value)
 {
     return Math::isValueInRange<param_type>(value, minimum(), maximum());
 }

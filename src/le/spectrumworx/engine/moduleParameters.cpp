@@ -33,7 +33,7 @@ using LFO = Parameters::LFOImpl;
 
 LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
-LE_COLD LE_NOTHROW ModuleParameters::ModuleParameters(
+LE_COLD ModuleParameters::ModuleParameters(
     //std::uint8_t           const moduleSlotIndex,
     EffectMetaData const &metadata
 #ifndef LE_NO_LFOs
@@ -57,7 +57,7 @@ LE_COLD LE_NOTHROW ModuleParameters::ModuleParameters(
 }
 #endif // LE_NO_LFOs
 
-      LE_COLD LE_NOTHROW bool ModuleParameters::bypass() const
+      LE_COLD bool ModuleParameters::bypass() const
 {
     return baseParameters().get<Effects::BaseParameters::Bypass>();
 }
@@ -73,8 +73,7 @@ struct ValueGetter
     }
 }; // struct ValueGetter
 } // namespace
-LE_COLD LE_NOTHROW float
-ModuleParameters::getBaseParameter(std::uint8_t const baseParameterIndex) const
+LE_COLD float ModuleParameters::getBaseParameter(std::uint8_t const baseParameterIndex) const
 {
     return LE::Parameters::invokeFunctorOnIndexedParameter(baseParameters(), baseParameterIndex,
                                                            ValueGetter());
@@ -99,8 +98,8 @@ struct ValueSetter
     float const value_;
 }; // struct ValueSetter
 } // anonymous namespace
-LE_COLD LE_NOTHROW float ModuleParameters::setBaseParameter(std::uint8_t const baseParameterIndex,
-                                                            float const parameterValue)
+LE_COLD float ModuleParameters::setBaseParameter(std::uint8_t const baseParameterIndex,
+                                                 float const parameterValue)
 {
     return LE::Parameters::invokeFunctorOnIndexedParameter(baseParameters(), baseParameterIndex,
                                                            ValueSetter(parameterValue));
@@ -110,7 +109,7 @@ LE_COLD LE_NOTHROW float ModuleParameters::setBaseParameter(std::uint8_t const b
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wassume"
 #endif // __clang__
-LE_COLD LE_NOTHROW ParameterInfo const &
+LE_COLD ParameterInfo const &
 ModuleParameters::parameterInfo(std::uint8_t const parameterIndex) const
 {
     LE_ASSUME(parameterIndex < numberOfParameters());
@@ -130,7 +129,7 @@ ModuleParameters::parameterInfo(std::uint8_t const parameterIndex) const
     return pParameterInfos[index];
 }
 
-LE_COLD LE_NOTHROW ParameterInfo const &
+LE_COLD ParameterInfo const &
 ModuleParameters::effectSpecificParameterInfo(std::uint8_t const parameterIndex) const
 {
     LE_ASSUME(parameterIndex < numberOfEffectSpecificParameters());
@@ -140,7 +139,7 @@ ModuleParameters::effectSpecificParameterInfo(std::uint8_t const parameterIndex)
 #pragma clang diagnostic pop
 #endif // __clang__
 
-LE_COLD LE_NOTHROW std::uint8_t
+LE_COLD std::uint8_t
 ModuleParameters::effectSpecificParameterIndex(std::uint8_t const parameterIndex)
 {
     LE_ASSUME(parameterIndex >= numberOfBaseParameters);
@@ -148,7 +147,7 @@ ModuleParameters::effectSpecificParameterIndex(std::uint8_t const parameterIndex
 }
 
 #ifndef LE_NO_LFOs
-LE_COLD LE_NOTHROW void
+LE_COLD void
 ModuleParameters::updateLFOs(LFO::Timer::TimingInformationChange const timingInformationChange)
 {
     LE_ASSERT_MSG(timingInformationChange.timingInfoChanged(), "No need to call this.");
@@ -157,21 +156,21 @@ ModuleParameters::updateLFOs(LFO::Timer::TimingInformationChange const timingInf
         lfo.updateForNewTimingInformation(timingInformationChange);
 }
 
-LE_COLD LE_NOTHROW LFO &ModuleParameters::lfo(std::uint8_t const lfoableParameterIndex)
+LE_COLD LFO &ModuleParameters::lfo(std::uint8_t const lfoableParameterIndex)
 {
     return lfos()[lfoableParameterIndex];
 }
-LE_COLD LE_NOTHROW LFO const &ModuleParameters::lfo(std::uint8_t const lfoableParameterIndex) const
+LE_COLD LFO const &ModuleParameters::lfo(std::uint8_t const lfoableParameterIndex) const
 {
     return const_cast<ModuleParameters &>(*this).lfo(lfoableParameterIndex);
 }
 
-LE_COLD LE_NOTHROW ModuleParameters::LFOs ModuleParameters::lfos() const
+LE_COLD ModuleParameters::LFOs ModuleParameters::lfos() const
 {
     return LFOs(pLFOs_, pLFOs_ + numberOfLFOControledParameters());
 }
 
-LE_COLD LE_NOTHROW void ModuleParameters::updateBaseParametersFromLFOs(LFO::Timer const &timer)
+LE_COLD void ModuleParameters::updateBaseParametersFromLFOs(LFO::Timer const &timer)
 {
     LE_DISABLE_LOOP_UNROLLING()
     for (std::uint8_t baseParameter(numberOfNonLFOBaseParameters);
@@ -207,7 +206,7 @@ LE_COLD LE_NOTHROW void ModuleParameters::updateBaseParametersFromLFOs(LFO::Time
 ///  - slower (e.g. generic value conversion without compile-time range
 ///    information, many more virtual function calls...).
 ///                                           (07.02.2014.) (Domagoj Saric)
-LE_COLD LE_NOTHROW void ModuleParameters::updateEffectParametersFromLFOs(LFO::Timer const &timer)
+LE_COLD void ModuleParameters::updateEffectParametersFromLFOs(LFO::Timer const &timer)
 {
     auto const numberOfEffectSpecificParameters(this->numberOfEffectSpecificParameters());
     for (std::uint8_t effectParameter(0); effectParameter < numberOfEffectSpecificParameters;
@@ -222,7 +221,7 @@ LE_COLD LE_NOTHROW void ModuleParameters::updateEffectParametersFromLFOs(LFO::Ti
     }
 }
 
-LE_COLD LE_NOTHROW parameter_value_t ModuleParameters::setBaseParameterFromLFOAux(
+LE_COLD parameter_value_t ModuleParameters::setBaseParameterFromLFOAux(
     std::uint8_t const parameterIndex, LFO::value_type const lfoValue)
 {
     static_assert(LFO::minimumValue == 0 && LFO::maximumValue == 1,
@@ -232,7 +231,7 @@ LE_COLD LE_NOTHROW parameter_value_t ModuleParameters::setBaseParameterFromLFOAu
     return setBaseParameter(parameterIndex, parameterValue);
 }
 
-LE_COLD LE_NOTHROW parameter_value_t ModuleParameters::setEffectParameterFromLFOAux(
+LE_COLD parameter_value_t ModuleParameters::setEffectParameterFromLFOAux(
     std::uint8_t const parameterIndex, LFO::value_type const lfoValue)
 {
     static_assert(LFO::minimumValue == 0 && LFO::maximumValue == 1,
@@ -242,14 +241,14 @@ LE_COLD LE_NOTHROW parameter_value_t ModuleParameters::setEffectParameterFromLFO
     return setEffectParameter(parameterIndex, parameterValue);
 }
 
-LE_COLD LE_NOTHROW LFO::value_type
+LE_COLD LFO::value_type
 ModuleParameters::normalisedToParameterValue(parameter_value_t const normalisedValue,
                                              ParameterInfo const &parameterInfo)
 {
     return Math::convertLinearRange<float, float, 0, 1, 1>(normalisedValue, parameterInfo.minimum,
                                                            parameterInfo.maximum);
 }
-LE_COLD LE_NOTHROW parameter_value_t ModuleParameters::parameterToNormalisedValue(
+LE_COLD parameter_value_t ModuleParameters::parameterToNormalisedValue(
     LFO::value_type const parameterValue, ParameterInfo const &parameterInfo)
 {
     return Math::convertLinearRange<float, 0, 1, 1, float>(parameterValue, parameterInfo.minimum,
@@ -261,9 +260,9 @@ LE_COLD LE_NOTHROW parameter_value_t ModuleParameters::parameterToNormalisedValu
 namespace
 {
 using LFO = Parameters::LFOImpl;
-LE_COLD LE_NOTHROW std::optional<float>
-getParameterValueWithoutLFO(ParametersLoader const &parameterLoader,
-                            ParameterInfo const &parameterInfo, LFO &parameterLFO)
+LE_COLD std::optional<float> getParameterValueWithoutLFO(ParametersLoader const &parameterLoader,
+                                                         ParameterInfo const &parameterInfo,
+                                                         LFO &parameterLFO)
 {
     auto const parameterValueWithoutLFO(
         parameterLoader.getLFOParameterValue<float>(parameterInfo.name, parameterLFO));
@@ -274,8 +273,7 @@ getParameterValueWithoutLFO(ParametersLoader const &parameterLoader,
         return std::nullopt;
 }
 } // anonymous namespace
-LE_COLD LE_NOTHROW void
-ModuleParameters::loadPresetParameters(ParametersLoader const &parameterLoader)
+LE_COLD void ModuleParameters::loadPresetParameters(ParametersLoader const &parameterLoader)
 {
     //LE_ASSERT_MSG
     //(
@@ -310,8 +308,7 @@ ModuleParameters::loadPresetParameters(ParametersLoader const &parameterLoader)
 }
 
 #ifndef LE_SW_SDK_BUILD
-LE_COLD
-LE_NOTHROW void ModuleParameters::savePresetParameters(ParametersSaver const &parameterSaver) const
+LE_COLD void ModuleParameters::savePresetParameters(ParametersSaver const &parameterSaver) const
 {
     ParametersSaver &saver(const_cast<ParametersSaver &>(parameterSaver)); //...mrmlj...
 

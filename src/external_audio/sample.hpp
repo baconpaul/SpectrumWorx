@@ -84,8 +84,8 @@ class Sample
 
   private:
     // To be implemented for each platform separately.
-    LE_NOTHROWNOALIAS static char const *doLoad(juce::String const &sampleFileName,
-                                                unsigned int desiredSampleRate, DataHolder &data);
+    static char const *doLoad(juce::String const &sampleFileName, unsigned int desiredSampleRate,
+                              DataHolder &data);
 
   private:
     DataHolder data_;

@@ -216,7 +216,7 @@ void ModuleKnob::valueChanged() noexcept
     moduleParameterChanged();
 }
 
-LE_NOTHROW void ModuleKnob::lfoStateChanged()
+void ModuleKnob::lfoStateChanged()
 {
     bool dontcare;
     double const defaultValue(getDoubleClickReturnValue(dontcare));
@@ -224,7 +224,7 @@ LE_NOTHROW void ModuleKnob::lfoStateChanged()
     syncMouseWheelAndLFOState();
 }
 
-LE_NOTHROW void ModuleKnob::updateForEngineSetupChanges(Engine::Setup const &engineSetup)
+void ModuleKnob::updateForEngineSetupChanges(Engine::Setup const &engineSetup)
 {
     ModuleKnob::param_type quantization;
     switch (quantization_)
@@ -343,7 +343,7 @@ ModuleUI::ModuleUI()
 
 #pragma warning(pop)
 
-LE_NOTHROW ModuleUI::~ModuleUI()
+ModuleUI::~ModuleUI()
 {
     LE_ASSERT(isThisTheGUIThread() ||
               juce::MessageManager::getInstance()->currentThreadHasLockedMessageManager());
@@ -515,9 +515,8 @@ void setParameterControl(ModuleControlBase &control, float const parameterValue,
 }
 } // anonymous namespace
 
-LE_NOTHROW void ModuleUI::setBaseParameter(std::uint8_t const sharedParameterIndex,
-                                           float const parameterValue,
-                                           ParameterChangeSource const source)
+void ModuleUI::setBaseParameter(std::uint8_t const sharedParameterIndex, float const parameterValue,
+                                ParameterChangeSource const source)
 {
     if (sharedParameterIndex == bypassIndex)
     {
@@ -578,7 +577,7 @@ float ModuleUI::getEffectParameter(std::uint8_t const parameterIndex) const
 bool ModuleUI::bypass() const { return bypass_.getValue(); }
 #endif // LE_SW_SEPARATED_DSP_GUI
 
-LE_NOTHROW LE_COLD void ModuleUI::updateForEngineSetupChanges(Engine::Setup const &engineSetup)
+LE_COLD void ModuleUI::updateForEngineSetupChanges(Engine::Setup const &engineSetup)
 {
     /// \note SharedModuleControls are updated in/by
     /// SpectrumWorxEditor::updateForEngineSetupChanges().

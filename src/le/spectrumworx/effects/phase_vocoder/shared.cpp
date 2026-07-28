@@ -376,9 +376,8 @@ float LE_FORCEINLINE mapToPiInterval(float const phase)
 }
 } // anonymous namespace
 
-void LE_NOINLINE LE_NOTHROWNOALIAS LE_HOT analysis(AnalysisChannelState &state,
-                                                   Engine::FullChannelData_AmPh &data,
-                                                   BaseParameters const &parameters)
+void LE_NOINLINE LE_HOT analysis(AnalysisChannelState &state, Engine::FullChannelData_AmPh &data,
+                                 BaseParameters const &parameters)
 {
     Engine::FullChannelData_AmPh *LE_RESTRICT const pData(&data);
     AnalysisChannelState *LE_RESTRICT const pState(&state);
@@ -579,9 +578,9 @@ float LE_FORCEINLINE reconstructPhase(float const estimatedFrequency, float cons
 }
 } // namespace
 
-void LE_NOINLINE LE_NOTHROWNOALIAS LE_HOT synthesis(SynthesisChannelState &state,
-                                                    DataRange const &anaFreqInSynthPhaseOut,
-                                                    BaseParameters const &parameters)
+void LE_NOINLINE LE_HOT synthesis(SynthesisChannelState &state,
+                                  DataRange const &anaFreqInSynthPhaseOut,
+                                  BaseParameters const &parameters)
 {
     // Implementation note:
     //   We alter phases only for bins that may have non-zero phase (that is,
@@ -720,7 +719,7 @@ static SynthesisChannelState LE_MSVC_SPECIFIC(const) dummySynthesisState;
 } // anonymous namespace
 #endif // LE_PV_USE_TSS
 
-void LE_NOINLINE LE_NOTHROWNOALIAS
+void LE_NOINLINE
 LE_HOT pitchShiftAndScale(Engine::ChannelData_AmPh &data,
                           PitchShiftParameters const &pitchShiftParameters) /// \throws nothing
 {

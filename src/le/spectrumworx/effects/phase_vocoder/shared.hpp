@@ -378,11 +378,10 @@ class PitchShifterBasedEffect
     }
 }; // class PitchShifterBasedEffect
 
-void LE_NOTHROWNOALIAS analysis(AnalysisChannelState &, Engine::FullChannelData_AmPh &,
-                                BaseParameters const &);
-void LE_NOTHROWNOALIAS synthesis(SynthesisChannelState &, DataRange const &anaFreqInSynthPhaseOut,
-                                 BaseParameters const &);
-void LE_NOTHROWNOALIAS pitchShiftAndScale(Engine::ChannelData_AmPh &, PitchShiftParameters const &);
+void analysis(AnalysisChannelState &, Engine::FullChannelData_AmPh &, BaseParameters const &);
+void synthesis(SynthesisChannelState &, DataRange const &anaFreqInSynthPhaseOut,
+               BaseParameters const &);
+void pitchShiftAndScale(Engine::ChannelData_AmPh &, PitchShiftParameters const &);
 
 //------------------------------------------------------------------------------
 } // namespace PhaseVocoderShared

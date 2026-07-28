@@ -28,15 +28,6 @@
 #error LE SDKs require MSVC10 SP1 (Visual Studio 2010) or later
 #endif // _MSC_VER
 
-#define LE_NOTHROW __declspec(nothrow)
-#define LE_NOEXCEPT
-#define LE_NOALIAS __declspec(noalias)
-#define LE_NOTHROWNOALIAS __declspec(nothrow noalias)
-#define LE_RESTRICTNOALIAS __declspec(restrict noalias)
-#define LE_NOTHROWRESTRICTNOALIAS __declspec(nothrow restrict noalias)
-#define LE_CONST_FUNCTION LE_NOALIAS
-#define LE_PURE_FUNCTION LE_NOALIAS
-
 #define LE_CDECL __cdecl
 
 #define LE_RESTRICT __restrict
@@ -57,19 +48,6 @@
 #if __cplusplus < 201103L
 #error LE SDKs require GCC 4.7+ or Clang 3.2+ with enabled C++11 support (-std=c++11)
 #endif // __cplusplus
-
-#define LE_NOTHROW __attribute__((nothrow))
-#ifdef __clang__
-#define LE_NOEXCEPT LE_NOTHROW
-#else
-#define LE_NOEXCEPT noexcept
-#endif             // __clang__
-#define LE_NOALIAS //__declspec( noalias )
-#define LE_NOTHROWNOALIAS LE_NOTHROW LE_NOALIAS
-#define LE_RESTRICTNOALIAS __attribute__((malloc)) LE_NOALIAS
-#define LE_NOTHROWRESTRICTNOALIAS __attribute__((nothrow, malloc)) LE_NOALIAS
-#define LE_CONST_FUNCTION __attribute__((const)) // http://lwn.net/Articles/285332
-#define LE_PURE_FUNCTION __attribute__((pure))
 
 #ifdef __i386__
 #define LE_CDECL __attribute__((cdecl))

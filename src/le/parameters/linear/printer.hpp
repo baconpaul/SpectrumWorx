@@ -33,8 +33,8 @@ namespace Detail
 template <class TraitTag, class Traits, class... DefaultTraits> struct GetTraitDefaulted;
 
 template <typename Source>
-LE_NOTHROWNOALIAS char const *printLinear(char *const buffer, Source const &parameterValue,
-                                          LinearFloatParameterTag const &)
+char const *printLinear(char *const buffer, Source const &parameterValue,
+                        LinearFloatParameterTag const &)
 {
     Utility::lexical_cast(parameterValue, 1, buffer);
     return buffer;

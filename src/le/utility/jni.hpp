@@ -42,21 +42,21 @@ extern ::JavaVM *__restrict pJVM;
 
 struct EnvDeleter
 {
-    LE_NOTHROW void operator()(JNIEnv *) const;
+    void operator()(JNIEnv *) const;
     bool const detach;
 };
 struct GlobalRefDeleter
 {
-    LE_NOTHROW void operator()(jobject) const;
+    void operator()(jobject) const;
 };
 struct LocalRefDeleter
 {
-    LE_NOTHROW void operator()(jobject) const;
+    void operator()(jobject) const;
 };
 
 struct CStrDeleter
 {
-    LE_NOTHROW void operator()(char const *const cString) const
+    void operator()(char const *const cString) const
     {
         cachedEnvironment.ReleaseStringUTFChars(sourceString, cString);
     }
@@ -67,7 +67,7 @@ struct CStrDeleter
 jobject newGlobalReference(JNIEnv &cachedEnv, jobject);
 jobject newLocalReference(JNIEnv &cachedEnv, jobject);
 
-LE_NOTHROW LE_PURE_FUNCTION std::pair<JNIEnv *, EnvDeleter> env();
+std::pair<JNIEnv *, EnvDeleter> env();
 } // namespace Detail
 
 /// \addtogroup JNI Java<->Native interop helpers
@@ -89,7 +89,7 @@ using CStr =
                     Detail::CStrDeleter>; ///< C-string representation of a Java String smart ptr
 
 /// \brief Get a smart ptr to a UTF8 C string from a Java String
-inline LE_NOTHROW CStr c_str(JNIEnv &env, jstring const javaString)
+inline CStr c_str(JNIEnv &env, jstring const javaString)
 {
     return {env.GetStringUTFChars(javaString, nullptr), {env, javaString}};
 }
@@ -109,7 +109,7 @@ inline void setVM(::JavaVM &vm)
     LE_ASSERT_MSG(!Detail::pJVM, "JVM singleton already set");
     Detail::pJVM = &vm;
 }
-LE_NOTHROW void setVM(::JNIEnv &); ///< \brief \overload
+void setVM(::JNIEnv &); ///< \brief \overload
 
 /// \brief Retrieve the JNIEnv instance for the current thread.
 /// \details Tries to attach the thread to the JVM if it is not already
@@ -117,7 +117,7 @@ LE_NOTHROW void setVM(::JNIEnv &); ///< \brief \overload
 /// resources, and return a nullptr). The returned EnvPtr remembers whether the
 /// function had to attach the thread to the JVM and, if so, will detach it in
 /// its destructor.
-LE_NOTHROW LE_PURE_FUNCTION inline EnvPtr env()
+inline EnvPtr env()
 {
     auto const abi_env(Detail::env());
     return {abi_env.first, abi_env.second};
@@ -125,7 +125,7 @@ LE_NOTHROW LE_PURE_FUNCTION inline EnvPtr env()
 
 /// \brief Retrieve the JNIEnv instance for the current thread. The function
 /// assumes the calling thread is already attached to the JVM.
-LE_NOTHROW LE_PURE_FUNCTION JNIEnv &preAttachedEnv();
+JNIEnv &preAttachedEnv();
 
 namespace Detail
 {
