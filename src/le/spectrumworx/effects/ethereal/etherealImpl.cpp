@@ -3,7 +3,8 @@
 /// etherealImpl.cpp
 /// ----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -29,9 +30,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Ethereal::title      [] = "Ethereal";
+char const Ethereal::title[] = "Ethereal";
 char const Ethereal::description[] = "Compare and replace.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -39,16 +39,12 @@ char const Ethereal::description[] = "Compare and replace.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Ethereal::Threshold, "Threshold"      )
-EFFECT_PARAMETER_NAME( Ethereal::Condition, "Swap condition" )
+EFFECT_PARAMETER_NAME(Ethereal::Threshold, "Threshold")
+EFFECT_PARAMETER_NAME(Ethereal::Condition, "Swap condition")
 
-EFFECT_ENUMERATED_PARAMETER_STRINGS
-(
-    Ethereal, Condition,
-    (( DiffHigher, "Main - Side > Thr." ))
-    (( DiffLower , "Main - Side < Thr." ))
-)
-
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Ethereal, Condition,
+                                    ((DiffHigher, "Main - Side > Thr."))((DiffLower,
+                                                                          "Main - Side < Thr.")))
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -57,13 +53,12 @@ EFFECT_ENUMERATED_PARAMETER_STRINGS
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void EtherealImpl::setup( IndexRange const &, Engine::Setup const & )
+void EtherealImpl::setup(IndexRange const &, Engine::Setup const &)
 {
-    threshold_ = Math::dB2NormalisedLinear( parameters().get<Threshold>() );
+    threshold_ = Math::dB2NormalisedLinear(parameters().get<Threshold>());
 
-    mode_.unpack( parameters().get<Mode>() );
+    mode_.unpack(parameters().get<Mode>());
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -72,24 +67,27 @@ void EtherealImpl::setup( IndexRange const &, Engine::Setup const & )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void EtherealImpl::process( Engine::MainSideChannelData_AmPh data, Engine::Setup const & ) const
+void EtherealImpl::process(Engine::MainSideChannelData_AmPh data, Engine::Setup const &) const
 {
-    bool const replaceWhenWeaker( parameters().get<Condition>() == Condition::DiffLower );
+    bool const replaceWhenWeaker(parameters().get<Condition>() == Condition::DiffLower);
 
-    float const threshold( threshold_ );
+    float const threshold(threshold_);
 
-    Engine::MainSideChannelData_AmPh const & constData( data );
-    ReadOnlyDataRange const & ampSource  ( mode_.magnitudes() ? constData.side().amps  () : constData.main().amps  () );
-    ReadOnlyDataRange const & phaseSource( mode_.phases    () ? constData.side().phases() : constData.main().phases() );
+    Engine::MainSideChannelData_AmPh const &constData(data);
+    ReadOnlyDataRange const &ampSource(mode_.magnitudes() ? constData.side().amps()
+                                                          : constData.main().amps());
+    ReadOnlyDataRange const &phaseSource(mode_.phases() ? constData.side().phases()
+                                                        : constData.main().phases());
 
-    while ( data )
+    while (data)
     {
-        bool const sideIsWeaker ( data.side().amps().front() < ( data.main().amps().front() * threshold ) );
-        bool const shouldReplace( sideIsWeaker == replaceWhenWeaker                                       );
+        bool const sideIsWeaker(data.side().amps().front() <
+                                (data.main().amps().front() * threshold));
+        bool const shouldReplace(sideIsWeaker == replaceWhenWeaker);
 
-        if ( shouldReplace )
+        if (shouldReplace)
         {
-            data.main().amps  ().front() = ampSource  .front();
+            data.main().amps().front() = ampSource.front();
             data.main().phases().front() = phaseSource.front();
         }
 

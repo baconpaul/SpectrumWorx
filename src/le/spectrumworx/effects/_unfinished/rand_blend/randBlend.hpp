@@ -3,11 +3,11 @@
 /// \file randBlend.hpp
 /// -------------------
 ///
-/// Copyright (c) 2009. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
-#pragma once
 #ifndef randblend_hpp__5589E986_987D_4CAE_BC67_5D2289C5536E
 #define randblend_hpp__5589E986_987D_4CAE_BC67_5D2289C5536E
 //------------------------------------------------------------------------------
@@ -34,43 +34,40 @@ namespace Algorithms
 
 class RandBlend
 {
-public: // LE::Algorithm required interface.
-
+  public: // LE::Algorithm required interface.
     ////////////////////////////////////////////////////////////////////////////
     // Parameters
     ////////////////////////////////////////////////////////////////////////////
 
-    DISCRETE_VALUES_PARAMETER( Mode, ( Blend   )( BlendInv ) ( Replace ) );
+    DISCRETE_VALUES_PARAMETER(Mode, (Blend)(BlendInv)(Replace));
 
-    DEFINE_PARAMETERS
-    (    
-        ( ( Mode   )                                                                                                            )
-      //( ( Amount )( float        )( MinimumValue<0> )( MaximumValue< 10> )( DefaultValue<  3> )( RangeValuesDenominator<10> ) )         
-        ( ( Amount )( float        )( MinimumValue<0> )( MaximumValue<100> )( DefaultValue< 30> )( DisplayValueSuffix<' %'  > ) )    
-        ( ( Range  )( unsigned int )( MinimumValue<0> )( MaximumValue<100> )( DefaultValue< 50> )( DisplayValueSuffix<' bw%'> ) )
-    );
+    DEFINE_PARAMETERS(
+        ((Mode))
+        //( ( Amount )( float        )( MinimumValue<0> )( MaximumValue< 10> )( DefaultValue<  3> )( RangeValuesDenominator<10> ) )
+        ((Amount)(float)(MinimumValue<0>)(MaximumValue<100>)(DefaultValue<30>)(DisplayValueSuffix<
+                                                                               ' %'>))((
+            Range)(unsigned int)(MinimumValue<0>)(MaximumValue<100>)(DefaultValue<
+                                                                     50>)(DisplayValueSuffix<' bw%'>)));
 
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup( EngineSetup const &, Parameters const & );
-    void process( ChannelData_AmPh & ) const;
+    void setup(EngineSetup const &, Parameters const &);
+    void process(ChannelData_AmPh &) const;
 
-public: // Algorithm traits.
+  public: // Algorithm traits.
     static bool const canUseTwoInputs = false;
 
-public: 
-    static char const title      [];
+  public:
+    static char const title[];
     static char const description[];
 
-private:
+  private:
     unsigned int num_bins_;
-    unsigned int range_   ;    
-    float        amount_  ;
-    Mode::Value  mode_    ;
-
-    
+    unsigned int range_;
+    float amount_;
+    Mode::Value mode_;
 };
 
 //------------------------------------------------------------------------------

@@ -3,13 +3,13 @@
 /// \file moduleMenuHolder.hpp
 /// --------------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef moduleMenuHolder_hpp__B8739940_B004_4435_99BD_39B934BF4DC4
 #define moduleMenuHolder_hpp__B8739940_B004_4435_99BD_39B934BF4DC4
-#pragma once
 //------------------------------------------------------------------------------
 #include "gui/gui.hpp"
 
@@ -50,35 +50,32 @@ namespace GUI
 /// thus menus) is specified directly/hardcoded in the header (to prevent the
 /// inclusion of the moduleList.hpp header) and then compile-time check in the
 /// .cpp file.
-/// 
+///
 ////////////////////////////////////////////////////////////////////////////////
 
 class ModuleMenuHolder : boost::noncopyable
 {
-public:
+  public:
     static unsigned int const minimumEffectsForSubMenus = 15;
-    static bool         const hasSubMenus               = Effects::Constants::numberOfIncludedEffects >= minimumEffectsForSubMenus;
+    static bool const hasSubMenus =
+        Effects::Constants::numberOfIncludedEffects >= minimumEffectsForSubMenus;
 
-    using Menu  = GUI::PopupMenu;
-    using Menus = std::array
-    <
-        Menu,
-        1 + ( hasSubMenus ? Effects::Constants::numberOfGroups : 0 )
-    >;
+    using Menu = GUI::PopupMenu;
+    using Menus = std::array<Menu, 1 + (hasSubMenus ? Effects::Constants::numberOfGroups : 0)>;
 
-public: // Public interface.
+  public: // Public interface.
     ModuleMenuHolder();
 
-    bool         isOwnerOfEntry     ( unsigned int menuEntryID ) const;
-    std::uint8_t effectIndexForEntry( unsigned int menuEntryID ) const;
+    bool isOwnerOfEntry(unsigned int menuEntryID) const;
+    std::uint8_t effectIndexForEntry(unsigned int menuEntryID) const;
 
-    Menu const & topMenu() const { return const_cast<ModuleMenuHolder &>( *this ).topMenu(); }
+    Menu const &topMenu() const { return const_cast<ModuleMenuHolder &>(*this).topMenu(); }
 
-private:
-    Menu & topMenu(                    ) { return menus_.front(); }
-    Menu & subMenu( std::uint8_t index );
+  private:
+    Menu &topMenu() { return menus_.front(); }
+    Menu &subMenu(std::uint8_t index);
 
-private:
+  private:
     Menus menus_;
 }; // class ModuleMenuHolder
 

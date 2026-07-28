@@ -3,7 +3,8 @@
 /// mergerImpl.cpp
 /// --------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -32,9 +33,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Merger::title      [] = "Merger";
+char const Merger::title[] = "Merger";
 char const Merger::description[] = "Conditional combinations.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -42,20 +42,14 @@ char const Merger::description[] = "Conditional combinations.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Merger::Threshold, "Threshold" )
-EFFECT_PARAMETER_NAME( Merger::Operation, "Condition" )
+EFFECT_PARAMETER_NAME(Merger::Threshold, "Threshold")
+EFFECT_PARAMETER_NAME(Merger::Operation, "Condition")
 
-EFFECT_ENUMERATED_PARAMETER_STRINGS
-(
+EFFECT_ENUMERATED_PARAMETER_STRINGS(
     Merger, Operation,
-    (( MainLargerThanSide, "Main>Side" ))
-    (( SideLargerThanMain, "Side>Main" ))
-    (( MainAboveThreshold, "Main>Thr"  ))
-    (( SideAboveThreshold, "Side>Thr"  ))
-    (( MainBelowThreshold, "Main<Thr"  ))
-    (( SideBelowThreshold, "Side<Thr"  ))
-)
-
+    ((MainLargerThanSide, "Main>Side"))((SideLargerThanMain, "Side>Main"))(
+        (MainAboveThreshold, "Main>Thr"))((SideAboveThreshold, "Side>Thr"))(
+        (MainBelowThreshold, "Main<Thr"))((SideBelowThreshold, "Side<Thr")))
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -64,12 +58,12 @@ EFFECT_ENUMERATED_PARAMETER_STRINGS
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void MergerImpl::setup( IndexRange const &, Engine::Setup const & engineSetup )
+void MergerImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
 {
-  //threshold_ = parameters().get<Threshold>();
-    threshold_ = engineSetup.maximumAmplitude() * Math::dB2NormalisedLinear( parameters().get<Threshold>() );
+    //threshold_ = parameters().get<Threshold>();
+    threshold_ =
+        engineSetup.maximumAmplitude() * Math::dB2NormalisedLinear(parameters().get<Threshold>());
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -78,37 +72,55 @@ void MergerImpl::setup( IndexRange const &, Engine::Setup const & engineSetup )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void MergerImpl::process( Engine::MainSideChannelData_AmPh data, Engine::Setup const & ) const
+void MergerImpl::process(Engine::MainSideChannelData_AmPh data, Engine::Setup const &) const
 {
     // Possible threshold value sources
-    ReadOnlyDataRange const &       mainAmps ( static_cast<Engine::ChannelData_AmPh const &>( data.main() ).amps() );
-    ReadOnlyDataRange const &       sideAmps (                                                data.side()  .amps() );
-    ReadOnlyDataRange         const threshold( &threshold_, &threshold_ + 1                                        );
+    ReadOnlyDataRange const &mainAmps(
+        static_cast<Engine::ChannelData_AmPh const &>(data.main()).amps());
+    ReadOnlyDataRange const &sideAmps(data.side().amps());
+    ReadOnlyDataRange const threshold(&threshold_, &threshold_ + 1);
 
-    ReadOnlyDataRange const * pLargerValue ;
-    ReadOnlyDataRange const * pSmallerValue;
-    switch ( parameters().get<Operation>().getValue() )
+    ReadOnlyDataRange const *pLargerValue;
+    ReadOnlyDataRange const *pSmallerValue;
+    switch (parameters().get<Operation>().getValue())
     {
-        case Operation::MainLargerThanSide: pLargerValue = &mainAmps ; pSmallerValue = &sideAmps ; break;
-        case Operation::SideLargerThanMain: pLargerValue = &sideAmps ; pSmallerValue = &mainAmps ; break;
-        case Operation::MainAboveThreshold: pLargerValue = &mainAmps ; pSmallerValue = &threshold; break;
-        case Operation::MainBelowThreshold: pLargerValue = &threshold; pSmallerValue = &mainAmps ; break;
-        case Operation::SideAboveThreshold: pLargerValue = &sideAmps ; pSmallerValue = &threshold; break;
-        case Operation::SideBelowThreshold: pLargerValue = &threshold; pSmallerValue = &sideAmps ; break;
+    case Operation::MainLargerThanSide:
+        pLargerValue = &mainAmps;
+        pSmallerValue = &sideAmps;
+        break;
+    case Operation::SideLargerThanMain:
+        pLargerValue = &sideAmps;
+        pSmallerValue = &mainAmps;
+        break;
+    case Operation::MainAboveThreshold:
+        pLargerValue = &mainAmps;
+        pSmallerValue = &threshold;
+        break;
+    case Operation::MainBelowThreshold:
+        pLargerValue = &threshold;
+        pSmallerValue = &mainAmps;
+        break;
+    case Operation::SideAboveThreshold:
+        pLargerValue = &sideAmps;
+        pSmallerValue = &threshold;
+        break;
+    case Operation::SideBelowThreshold:
+        pLargerValue = &threshold;
+        pSmallerValue = &sideAmps;
+        break;
         LE_DEFAULT_CASE_UNREACHABLE();
     }
 
-    while ( data )
+    while (data)
     {
-        if ( *pLargerValue->begin() > *pSmallerValue->begin() )
+        if (*pLargerValue->begin() > *pSmallerValue->begin())
         {
-            data.main().amps  ().front() = data.side().amps  ().front();
+            data.main().amps().front() = data.side().amps().front();
             data.main().phases().front() = data.side().phases().front();
         }
         ++data;
     }
 }
-
 
 /// \todo Make a new effect out of the code left from Merger.
 ///                                    (05.02.2010.) (Danijel Domazet)

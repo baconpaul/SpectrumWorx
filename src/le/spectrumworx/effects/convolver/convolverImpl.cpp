@@ -3,7 +3,8 @@
 /// convolverImpl.cpp
 /// -----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -32,9 +33,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Convolver::title      [] = "Convolver";
+char const Convolver::title[] = "Convolver";
 char const Convolver::description[] = "Convolution between main and side channels.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -42,24 +42,15 @@ char const Convolver::description[] = "Convolution between main and side channel
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Convolver::ConvolutionType, "Type"    )
-EFFECT_PARAMETER_NAME( Convolver::GrabIR         , "Grab IR" )
-EFFECT_PARAMETER_NAME( Convolver::Phase          , "Phase"   )
+EFFECT_PARAMETER_NAME(Convolver::ConvolutionType, "Type")
+EFFECT_PARAMETER_NAME(Convolver::GrabIR, "Grab IR")
+EFFECT_PARAMETER_NAME(Convolver::Phase, "Phase")
 
-EFFECT_ENUMERATED_PARAMETER_STRINGS
-(
-    Convolver, ConvolutionType,
-    (( Triggered , "Triggered"  ))
-    (( Continuous, "Continuous" ))
-)
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Convolver, ConvolutionType,
+                                    ((Triggered, "Triggered"))((Continuous, "Continuous")))
 
-EFFECT_ENUMERATED_PARAMETER_STRINGS
-(
-    Convolver, Phase,
-    (( Sum , "Sum"  ))
-    (( Side, "Side" ))
-    (( Main, "Main" ))
-)
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Convolver, Phase,
+                                    ((Sum, "Sum"))((Side, "Side"))((Main, "Main")))
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -68,11 +59,10 @@ EFFECT_ENUMERATED_PARAMETER_STRINGS
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void ConvolverImpl::setup( IndexRange const &, Engine::Setup const & )
-{ 
+void ConvolverImpl::setup(IndexRange const &, Engine::Setup const &)
+{
     freeze_ = parameters().get<GrabIR>().consumeValue();
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -81,53 +71,56 @@ void ConvolverImpl::setup( IndexRange const &, Engine::Setup const & )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void ConvolverImpl::process( ChannelState & cs, Engine::MainSideChannelData_AmPh data, Engine::Setup const & ) const
+void ConvolverImpl::process(ChannelState &cs, Engine::MainSideChannelData_AmPh data,
+                            Engine::Setup const &) const
 {
     using namespace Math;
 
     //------------------------------------------------------------------------//
 
-    bool const freeze( freeze_ & !cs.frozenFlagConsumed ); //...mrmlj...quick-workaround for non-deterministic relationship
-    cs.frozenFlagConsumed = freeze_;                       //...mrmlj...between setup() and process() calls...
+    bool const freeze(
+        freeze_ &
+        !cs.frozenFlagConsumed); //...mrmlj...quick-workaround for non-deterministic relationship
+    cs.frozenFlagConsumed = freeze_; //...mrmlj...between setup() and process() calls...
 
-    if ( freeze )
+    if (freeze)
     {
         // Take a snapshot of the Side channel:
-        copy( data.full().side().amps  (), cs.frozenAmps   );
-        copy( data.full().side().phases(), cs.frozenPhases );
+        copy(data.full().side().amps(), cs.frozenAmps);
+        copy(data.full().side().phases(), cs.frozenPhases);
     }
 
     //------------------------------------------------------------------------//
 
-    float const * pSourceAmps  ;
-    float const * pSourcePhases;
-    switch ( parameters().get<ConvolutionType>().getValue() )
+    float const *pSourceAmps;
+    float const *pSourcePhases;
+    switch (parameters().get<ConvolutionType>().getValue())
     {
-        case ConvolutionType::Continuous:
-            pSourceAmps   = data.side().amps  ().begin();
-            pSourcePhases = data.side().phases().begin();
-            break;
+    case ConvolutionType::Continuous:
+        pSourceAmps = data.side().amps().begin();
+        pSourcePhases = data.side().phases().begin();
+        break;
 
-        case ConvolutionType::Triggered:
-            pSourceAmps   = &cs.frozenAmps  [ data.beginBin() ];
-            pSourcePhases = &cs.frozenPhases[ data.beginBin() ];
-            break;
+    case ConvolutionType::Triggered:
+        pSourceAmps = &cs.frozenAmps[data.beginBin()];
+        pSourcePhases = &cs.frozenPhases[data.beginBin()];
+        break;
 
         LE_DEFAULT_CASE_UNREACHABLE();
     }
 
-    multiply( pSourceAmps, data.main().amps().begin(), data.main().amps().end() );
+    multiply(pSourceAmps, data.main().amps().begin(), data.main().amps().end());
 
-    switch ( parameters().get<Phase>().getValue() )
+    switch (parameters().get<Phase>().getValue())
     {
-        case Phase::Sum:
-            add( pSourcePhases, data.main().phases().begin(), data.main().phases().end() );
-            break;
-        case Phase::Main:
-            break;
-        case Phase::Side:
-            copy( data.side().phases(), data.main().phases() );
-            break;
+    case Phase::Sum:
+        add(pSourcePhases, data.main().phases().begin(), data.main().phases().end());
+        break;
+    case Phase::Main:
+        break;
+    case Phase::Side:
+        copy(data.side().phases(), data.main().phases());
+        break;
 
         LE_DEFAULT_CASE_UNREACHABLE();
     }

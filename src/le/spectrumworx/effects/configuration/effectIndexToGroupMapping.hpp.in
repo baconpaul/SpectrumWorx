@@ -3,13 +3,13 @@
 /// \file effectIndexToGroupMapping.hpp
 /// -----------------------------------
 ///
-/// Copyright (c) 2011 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2011 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef effectIndexToGroupMapping_hpp__254A1D12_F9E2_40C8_B703_2E7EF2A152BE
 #define effectIndexToGroupMapping_hpp__254A1D12_F9E2_40C8_B703_2E7EF2A152BE
-#pragma once
 //------------------------------------------------------------------------------
 #include "allEffects.hpp"
 #include "effectGroups.hpp"

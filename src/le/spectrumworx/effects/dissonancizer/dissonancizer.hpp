@@ -5,11 +5,11 @@
 ///
 /// Dissonancizer.
 ///
-/// Copyright (c) 2010. Little Endian. All rights reserved.
+/// Copyright (c) 2010. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
-#pragma once
 #ifndef dissonancizer_hpp__E7B417ED_D7F2_4B45_9F13_ADF61109F4E9
 #define dissonancizer_hpp__E7B417ED_D7F2_4B45_9F13_ADF61109F4E9
 //------------------------------------------------------------------------------
@@ -37,46 +37,42 @@ namespace Algorithms
 
 class Dissonancizer
 {
-public: // LE::Algorithm interface.
+  public: // LE::Algorithm interface.
     ////////////////////////////////////////////////////////////////////////////
     // Parameters
     ////////////////////////////////////////////////////////////////////////////
 
-    DISCRETE_VALUES_PARAMETER( TargetCreation, ( Sum ) ( Avg )( Rep ) );
-    
-    DEFINE_PARAMETERS
-    (
-        ( ( Strength       ) ( float )( MinimumValue<  0> )( MaximumValue< 30> )( DefaultValue< 10> ) ( DisplayValueSuffix<' dB'> ) ) 
-        ( ( RemoveOriginal ) ( bool )( DefaultValue< false > ) )
-        ( ( TargetCreation )                                   )
-    );
+    DISCRETE_VALUES_PARAMETER(TargetCreation, (Sum)(Avg)(Rep));
 
+    DEFINE_PARAMETERS(
+        ((Strength)(float)(MinimumValue<0>)(MaximumValue<30>)(DefaultValue<10>)(DisplayValueSuffix<
+                                                                                ' dB'>))(
+            (RemoveOriginal)(bool)(DefaultValue<false>))((TargetCreation)));
 
-  void setup  ( EngineSetup const &, Parameters const & );
-  void process( ChannelData_AmPh & ) const;
+    void setup(EngineSetup const &, Parameters const &);
+    void process(ChannelData_AmPh &) const;
 
-private: 
-  void dissonancize( ChannelData_AmPh & data, Peak const * ) const;
+  private:
+    void dissonancize(ChannelData_AmPh &data, Peak const *) const;
 
-public: // Algorithm traits.
-  static bool const canUseTwoInputs = false;
+  public: // Algorithm traits.
+    static bool const canUseTwoInputs = false;
 
-public: 
-  static char const title      [];
-  static char const description[];
+  public:
+    static char const title[];
+    static char const description[];
 
-private:
-    unsigned int num_bins_ ;
-    float        strength_ ;
+  private:
+    unsigned int num_bins_;
+    float strength_;
 
     // Implementation note:
     //   The peakDetector instance is an internal implementation detail and
     // does not constitute algorithm state.
     //                                        (25.02.2010.) (Domagoj Saric)
-    mutable peakDetector  pd             ;    
-    bool                  removeOriginal_;
+    mutable peakDetector pd;
+    bool removeOriginal_;
     TargetCreation::Value targetCreation_;
-    
 };
 
 //------------------------------------------------------------------------------
@@ -85,4 +81,3 @@ private:
 } // namespace LE
 //------------------------------------------------------------------------------
 #endif // dissonancizer_hpp
-

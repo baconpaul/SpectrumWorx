@@ -242,7 +242,7 @@ condition you can check, not a feeling.
 
 ---
 
-### Stage 0 — Purge and amputate  🟡 *in progress*
+### Stage 0 — Purge and amputate  ✅ *complete*
 
 **~1 week. Nothing compiles at the start of this stage and nothing compiles at
 the end. That is the point:** every mechanical, whole-tree change is free while
@@ -367,7 +367,7 @@ as a rename:
 > are the authoritative record of what was actually in the build — which is
 > worth having while writing the new CMake.
 
-**0.6 — Whole-tree mechanical hygiene**, each in its own commit:
+**✅ 0.6 — Whole-tree mechanical hygiene**, each in its own commit:
 
 - `iconv -f CP1252 -t UTF-8` every source file (the `©` currently renders as `�`)
 - rewrite file headers to the chosen licence (write `scripts/fix_file_comments.py`;
@@ -381,15 +381,56 @@ as a rename:
 - add `.clang-format` (copy OB-Xf's), run it over the whole tree in one commit,
   and record that commit in `.git-blame-ignore-revs`
 
-**0.7 — Decide preset backward compatibility now.** It is a one-sentence
-decision that constrains stages 7 and 8, and it is much cheaper to make here
-than to discover later. Recommendation: **keep the XML schema exactly**; change
-only the parser. That means the parameter refactor in stage 7 may not rename or
-reorder anything a preset file references.
+> **Done.** 14 CP-1252 files converted; 289 `#pragma once` lines stripped;
+> `LE_OVERRIDE`/`LE_SEALED` → `override`/`final`; `LE_FASTCALL` (579 uses) and
+> `LE_FASTCALL_ABI` (297) deleted along with their definitions; 19 UB-adjacent
+> `LE_ASSUME( this )` removed; 452 file headers rewritten to
+> `SPDX-License-Identifier: GPL-3.0-or-later`; 435 files reformatted.
+>
+> **Verification.** The reformat was checked by lexing every file (comments and
+> whitespace stripped, string/char literals preserved) at `HEAD` with the
+> intended macro edits applied, and comparing against the working tree. All
+> residual differences are accounted for: the hand-edits above, plus
+> clang-format's `SortUsingDeclarations` (reorders sibling using-declarations —
+> inert) and `BreakStringLiterals` (splits long literals into adjacent literals —
+> identical after concatenation). `clang-format --dry-run -Werror` is clean, so
+> the tree is format-stable.
+>
+> Three things worth knowing:
+>
+> - **`SPDX-License-Identifier: GPL-3.0-or-later` is a choice, not a finding.**
+>   It matches the repo's GPL-3.0 LICENSE and SST house style, but §9.3 is still
+>   open — if the JUCE 8 question pushes this to AGPLv3, it is one `sed` away.
+> - **`src/le/spectrumworx/effects/synth/synth.hpp` needed a manual fix.** It had
+>   `Unit< '°' >`, where `°` was a *single* CP-1252 byte (0xB0). Converting to
+>   UTF-8 would silently turn that into a two-byte multicharacter literal with a
+>   different value — and it is a non-type template parameter, so the type
+>   changes with it. Written as `'\xB0'` to preserve the original value. This is
+>   the same hazard as `Unit<' dB'>`, fixed properly in 7.3.
+> - **The two `.m` files are MATLAB, not Objective-C** (`cepstrum.m`,
+>   `phase_locked_vocoder.m` — DSP prototypes). clang-format mangled them as
+>   Objective-C; they are reverted and listed in `.clang-format-ignore`.
+>   `src/nt2_static_fft/` carries its own `DisableFormat: true` so the retained
+>   NT2 code stays diffable against upstream.
+>
+> **Outstanding:** `.git-blame-ignore-revs` cannot be written in the same commit
+> as the reformat, since it must name that commit's hash. It needs a one-line
+> follow-up commit.
+
+**✅ 0.7 — Preset backward compatibility: keep the format.** Decided. The XML
+schema stays exactly as it is; only the parser changes (RapidXML → tinyxml2,
+8.1). The binding consequence is on stage 7: **the parameter-system refactor may
+not rename, reorder or retype anything a preset file references.** 7.0's
+parameter-table snapshot test is what enforces it.
 
 **Done when:** `git ls-files | wc -l` is roughly 1,000 rather than ~13,000; the
 tree contains only code you intend to ship; `git log --all --diff-filter=A --
 '*aeffect*'` is empty.
+
+> **Stage 0 complete** — 875 tracked files, all UTF-8, GPL-3.0 SPDX-headed and
+> clang-format clean. Nothing compiles, which is expected: the build system does
+> not exist yet (stage 1) and `boost/mmap` is still referenced by code that dies
+> in 6.3.
 
 ---
 

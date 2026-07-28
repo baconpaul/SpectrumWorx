@@ -3,7 +3,8 @@
 /// effectTypeNames.cpp
 /// -------------------
 ///
-/// Copyright (c) 2013 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2013 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 #ifdef LE_SW_SDK_BUILD //...mrmlj...not needed for plugin builds and generates dubious compiler errors with msvc10...
@@ -48,13 +49,13 @@ EffectNames const effectTypeNames =
 } // anonymous namespace
 
 LE_COLD
-char const * LE_FASTCALL effectIndex2TypeName( std::uint8_t const effectIndex )
+char const * effectIndex2TypeName( std::uint8_t const effectIndex )
 {
     return effectTypeNames[ effectIndex ];
 }
 
 LE_COLD
-std::uint8_t LE_FASTCALL effectTypeName2Index( boost::string_ref const effectTypeName )
+std::uint8_t effectTypeName2Index( boost::string_ref const effectTypeName )
 {
     EffectTypeNames::const_iterator const pFoundEffectTypeName( boost::find( effectTypeNames, effectTypeName ) );
     //...mrmlj...required by DoxyHelper

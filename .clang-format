@@ -1,0 +1,87 @@
+---
+BasedOnStyle: LLVM
+IndentWidth: 4
+---
+Language: Cpp
+BasedOnStyle: LLVM
+IndentWidth: 4
+AlignAfterOpenBracket: Align
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterCaseLabel:  true
+  AfterClass:      true
+  AfterControlStatement: Always
+  AfterEnum:       true
+  AfterFunction:   true
+  AfterNamespace:  true
+  AfterObjCDeclaration: true
+  AfterStruct:     true
+  AfterUnion:      true
+  AfterExternBlock: true
+  BeforeCatch:     true
+  BeforeElse:      true
+  BeforeLambdaBody: false
+  BeforeWhile:     false
+  IndentBraces:    false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
+ColumnLimit: 100
+SortIncludes: false
+# This tree has order-dependent includes (boost/config/abi_prefix.hpp) and a
+# dense //...mrmlj... comment style worth preserving verbatim.
+ReflowComments: false
+AttributeMacros:
+  - LE_CDECL
+  - LE_COLD
+  - LE_CONST_FUNCTION
+  - LE_DLL_EXPORT
+  - LE_DLL_IMPORT
+  - LE_FORCEINLINE
+  - LE_HOT
+  - LE_NDEBUG_NOVTABLE
+  - LE_NOALIAS
+  - LE_NOEXCEPT
+  - LE_NOINLINE
+  - LE_NOTHROW
+  - LE_NOTHROWNOALIAS
+  - LE_NOTHROWRESTRICTNOALIAS
+  - LE_NOVTABLE
+  - LE_PURE_FUNCTION
+  - LE_RESTRICT
+  - LE_RESTRICTNOALIAS
+  - LE_WEAK_FUNCTION
+  - LE_WEAK_SYMBOL
+  - LE_WEAK_SYMBOL_CONST
+StatementMacros:
+  - LE_DEFAULT_CASE_UNREACHABLE
+  - LE_UNREACHABLE_CODE
+---
+Language: ObjC
+BasedOnStyle: LLVM
+IndentWidth: 4
+AlignAfterOpenBracket: Align
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterCaseLabel:  true
+  AfterClass:      true
+  AfterControlStatement: Always
+  AfterEnum:       true
+  AfterFunction:   true
+  AfterNamespace:  true
+  AfterObjCDeclaration: true
+  AfterStruct:     true
+  AfterUnion:      true
+  AfterExternBlock: true
+  BeforeCatch:     true
+  BeforeElse:      true
+  BeforeLambdaBody: false
+  BeforeWhile:     false
+  IndentBraces:    false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
+ColumnLimit: 100
+SortIncludes: false
+ReflowComments: false
+---

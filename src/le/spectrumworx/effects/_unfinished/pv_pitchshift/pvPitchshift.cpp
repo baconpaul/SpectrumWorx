@@ -3,7 +3,8 @@
 /// pvPitchshift.cpp
 /// ----------------
 ///
-/// Copyright (c) 2009. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -22,9 +23,8 @@ namespace Algorithms
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const PVPitchshift::title      [] = "Pitch Shifter (pvd)";
+char const PVPitchshift::title[] = "Pitch Shifter (pvd)";
 char const PVPitchshift::description[] = "Pitch shift.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -33,11 +33,10 @@ char const PVPitchshift::description[] = "Pitch shift.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void PVPitchshift::setup( EngineSetup const & engineSetup, Parameters const & myParameters )
+void PVPitchshift::setup(EngineSetup const &engineSetup, Parameters const &myParameters)
 {
-    pitchShiftParameters_.setup( myParameters, engineSetup );
+    pitchShiftParameters_.setup(myParameters, engineSetup);
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -46,9 +45,10 @@ void PVPitchshift::setup( EngineSetup const & engineSetup, Parameters const & my
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void PVPitchshift::process( ChannelData_AmPh & data ) const
+void PVPitchshift::process(ChannelData_AmPh &data) const
 {
-    PhaseVocoderShared::pitchShiftAndScale( data.amplitudes.begin(), data.phases.begin(), pitchShiftParameters_ );
+    PhaseVocoderShared::pitchShiftAndScale(data.amplitudes.begin(), data.phases.begin(),
+                                           pitchShiftParameters_);
 }
 
 //------------------------------------------------------------------------------

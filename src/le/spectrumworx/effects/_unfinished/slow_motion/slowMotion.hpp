@@ -3,11 +3,11 @@
 /// \file slowMotion.hpp
 /// --------------------
 ///
-/// Copyright (c) 2009. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
-#pragma once
 #ifndef slowMotion_hpp__2763B150_F757_4976_939E_D3385E0962CE
 #define slowMotion_hpp__2763B150_F757_4976_939E_D3385E0962CE
 //------------------------------------------------------------------------------
@@ -33,20 +33,17 @@ namespace Algorithms
 
 class SlowMotion
 {
-public: // LE::Algorithm required interface.
-
+  public: // LE::Algorithm required interface.
     ////////////////////////////////////////////////////////////////////////////
     // Parameters
     ////////////////////////////////////////////////////////////////////////////
 
-
-    DEFINE_PARAMETERS
-    (
-        ( ( LimitRise ) ( float )( MinimumValue<   0> )( MaximumValue<2000> )( DefaultValue< 50> )( DisplayValueSuffix<'dB/s'> ) )
-        ( ( Threshold ) ( float )( MinimumValue<-120> )( MaximumValue<   0> )( DefaultValue<-60> )( DisplayValueSuffix< ' dB'> ) )  
-        ( ( Step      ) ( float )( MinimumValue<   1> )( MaximumValue<10000> )( DefaultValue<100> ) )  
-    );
-
+    DEFINE_PARAMETERS((
+        (LimitRise)(float)(MinimumValue<0>)(MaximumValue<2000>)(DefaultValue<
+                                                                50>)(DisplayValueSuffix<'dB/s'>))(
+        (Threshold)(float)(MinimumValue<-120>)(MaximumValue<0>)(DefaultValue<
+                                                                -60>)(DisplayValueSuffix<' dB'>))(
+        (Step)(float)(MinimumValue<1>)(MaximumValue<10000>)(DefaultValue<100>)));
 
     ////////////////////////////////////////////////////////////////////////////
     // ChannelState
@@ -54,36 +51,35 @@ public: // LE::Algorithm required interface.
 
     struct ChannelState
     {
-        Common::SSEAlignedHalfFFTBuffer magsPrev  ;
+        Common::SSEAlignedHalfFFTBuffer magsPrev;
         Common::SSEAlignedHalfFFTBuffer magsTarget;
         Common::SSEAlignedHalfFFTBuffer magsTargetNew;
-        bool reached[ LE_CONFIGURATION_MAX_FFT_SIZE / 2 ];
-        
-        bool                            isInitialized;
+        bool reached[LE_CONFIGURATION_MAX_FFT_SIZE / 2];
+
+        bool isInitialized;
 
         void clear();
     };
-
 
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup  ( EngineSetup const &, Parameters const & );
-    void process( ChannelState &, ChannelData_AmPh & ) const;
+    void setup(EngineSetup const &, Parameters const &);
+    void process(ChannelState &, ChannelData_AmPh &) const;
 
-public: // Algorithm traits.
+  public: // Algorithm traits.
     static bool const canUseTwoInputs = false;
 
-public: 
-    static char const title      [];
+  public:
+    static char const title[];
     static char const description[];
 
-private:
-    unsigned int        num_bins_ ;
-    float               limitRise_;
-    float               threshold_;
-    float               step_;
+  private:
+    unsigned int num_bins_;
+    float limitRise_;
+    float threshold_;
+    float step_;
 };
 
 //------------------------------------------------------------------------------

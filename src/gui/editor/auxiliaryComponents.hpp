@@ -3,13 +3,13 @@
 /// \file auxiliaryComponents.hpp
 /// -----------------------------
 ///
-/// Copyright (c) 2011 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2011 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef auxiliaryComponents_hpp__66FD7192_4423_4467_8D99_99BF0FD87CB3
 #define auxiliaryComponents_hpp__66FD7192_4423_4467_8D99_99BF0FD87CB3
-#pragma once
 //------------------------------------------------------------------------------
 #include "gui/modules/moduleControl.hpp"
 #include "gui/modules/moduleUI.hpp"
@@ -32,77 +32,86 @@ namespace GUI
 /// \class SharedModuleControls
 ////////////////////////////////////////////////////////////////////////////////
 
-class SharedModuleControls
-    :
-    public WidgetBase<>
+class SharedModuleControls : public WidgetBase<>
 {
-private:
+  private:
     typedef ModuleControlImpl<ModuleKnob> Knob; //...mrmlj...are these logically "module knobs"?
 
-public:
-    class FrequencyRange final
-        :
-        public ModuleControlBase,
-        public WidgetBase<juce::Slider>
+  public:
+    class FrequencyRange final : public ModuleControlBase, public WidgetBase<juce::Slider>
     {
-    public:
+      public:
         FrequencyRange();
 
-    public: // module control traits
+      public: // module control traits
         typedef float value_type;
         typedef float param_type;
 
-        value_type LE_NOTHROWNOALIAS LE_FASTCALL getStartValue(                           ) const { return static_cast<value_type>( juce::Slider::getMinValue() );                                       }
-        void       LE_NOTHROW        LE_FASTCALL setStartValue( param_type const newValue )       { juce::Slider::setMinValue( static_cast<value_type>( newValue ), juce::dontSendNotification, false ); }
+        value_type LE_NOTHROWNOALIAS getStartValue() const
+        {
+            return static_cast<value_type>(juce::Slider::getMinValue());
+        }
+        void LE_NOTHROW setStartValue(param_type const newValue)
+        {
+            juce::Slider::setMinValue(static_cast<value_type>(newValue), juce::dontSendNotification,
+                                      false);
+        }
 
-        value_type LE_NOTHROWNOALIAS LE_FASTCALL getStopValue (                           ) const { return static_cast<value_type>( juce::Slider::getMaxValue() );                                        }
-        void       LE_NOTHROW        LE_FASTCALL setStopValue ( param_type const newValue )       { juce::Slider::setMaxValue( static_cast<value_type>( newValue ), juce::dontSendNotification, false );  }
+        value_type LE_NOTHROWNOALIAS getStopValue() const
+        {
+            return static_cast<value_type>(juce::Slider::getMaxValue());
+        }
+        void LE_NOTHROW setStopValue(param_type const newValue)
+        {
+            juce::Slider::setMaxValue(static_cast<value_type>(newValue), juce::dontSendNotification,
+                                      false);
+        }
 
-        void LE_FASTCALL updateForEngineSetupChanges( Engine::Setup const & ) override;
+        void updateForEngineSetupChanges(Engine::Setup const &) override;
 
-        ModuleControlBase & startControl();
-        ModuleControlBase & stopControl ();
+        ModuleControlBase &startControl();
+        ModuleControlBase &stopControl();
 
-    protected: // ModuleControlBase overrides
-        LE_NOTHROW void LE_FASTCALL lfoStateChanged() override {}
+      protected: // ModuleControlBase overrides
+        LE_NOTHROW void lfoStateChanged() override {}
 
-        LE_NOTHROW        void  LE_FASTCALL setValue( float value )       override;
-        LE_NOTHROWNOALIAS float LE_FASTCALL getValue(             ) const override;
+        LE_NOTHROW void setValue(float value) override;
+        LE_NOTHROWNOALIAS float getValue() const override;
 
-    private:
-        void focusGained( juce::Component::FocusChangeType ) override;
-        void focusLost  ( juce::Component::FocusChangeType ) override;
+      private:
+        void focusGained(juce::Component::FocusChangeType) override;
+        void focusLost(juce::Component::FocusChangeType) override;
 
-        void mouseDown ( juce::MouseEvent const & ) noexcept override;
-        void mouseUp   ( juce::MouseEvent const & ) noexcept override;
+        void mouseDown(juce::MouseEvent const &) noexcept override;
+        void mouseUp(juce::MouseEvent const &) noexcept override;
 
-        void mouseEnter( juce::MouseEvent const & ) noexcept override;
-        void mouseExit ( juce::MouseEvent const & ) noexcept override;
+        void mouseEnter(juce::MouseEvent const &) noexcept override;
+        void mouseExit(juce::MouseEvent const &) noexcept override;
 
-        void mouseMove( juce::MouseEvent const & ) noexcept override;
+        void mouseMove(juce::MouseEvent const &) noexcept override;
 
         void valueChanged() noexcept override;
 
-        void paint( juce::Graphics & ) override;
+        void paint(juce::Graphics &) override;
 
         LE_IMPLEMENT_ASYNC_REPAINT
 
-    private:
-        void reportActiveControl  ();
+      private:
+        void reportActiveControl();
         void reportInactiveControl();
 
-        void updateSliderSelection( juce::MouseEvent const & );
+        void updateSliderSelection(juce::MouseEvent const &);
 
-        std::uint8_t activeParameterIndex () const;
+        std::uint8_t activeParameterIndex() const;
         std::uint8_t thumbToParameterIndex() const;
         void verifyThumbAndParameterIndicies() const;
 
-        LFO       & lfo();
-        LFO const & lfo() const { return const_cast<FrequencyRange &>( *this ).lfo(); }
+        LFO &lfo();
+        LFO const &lfo() const { return const_cast<FrequencyRange &>(*this).lfo(); }
 
-        SharedModuleControls & parent();
+        SharedModuleControls &parent();
 
-    private:
+      private:
         /// \note DIRTY HACK:
         /// Because the (single) FrequencyRange widget/control actually maps to
         /// two module parameters we need a way to discriminate between the two,
@@ -134,26 +143,26 @@ public:
         bool canUseWriteAccessIndex() const;
     }; // class FrequencyRange
 
-public:
+  public:
     SharedModuleControls();
 
-    void updateForEngineSetupChanges( Engine::Setup const & );
+    void updateForEngineSetupChanges(Engine::Setup const &);
 
     void updateForActiveModule();
 
-    ModuleControlBase & controlForParameter( std::uint8_t parameterIndex );
+    ModuleControlBase &controlForParameter(std::uint8_t parameterIndex);
 
-private:
-    SpectrumWorxEditor       & editor()      ;
-    SpectrumWorxEditor const & editor() const;
+  private:
+    SpectrumWorxEditor &editor();
+    SpectrumWorxEditor const &editor() const;
 
-private: // JUCE Component overrides.
-    void focusLost                   ( FocusChangeType ) override;
-    void focusOfChildComponentChanged( FocusChangeType ) override;
+  private: // JUCE Component overrides.
+    void focusLost(FocusChangeType) override;
+    void focusOfChildComponentChanged(FocusChangeType) override;
 
-private:
-    Knob           gain_          ;
-    Knob           wet_           ;
+  private:
+    Knob gain_;
+    Knob wet_;
     FrequencyRange frequencyRange_;
 }; // class SharedModuleControls
 

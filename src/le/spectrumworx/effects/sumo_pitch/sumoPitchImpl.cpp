@@ -3,7 +3,8 @@
 /// sumoPitchImpl.cpp
 /// -----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -37,9 +38,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const SumoPitch::title      [] = "Sumo Pitch";
+char const SumoPitch::title[] = "Sumo Pitch";
 char const SumoPitch::description[] = "Pitch fight.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -47,9 +47,8 @@ char const SumoPitch::description[] = "Pitch fight.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( SumoPitch::Blend, "Blend amount" )
-EFFECT_PARAMETER_NAME( SumoPitch::Speed, "Speed"        )
-
+EFFECT_PARAMETER_NAME(SumoPitch::Blend, "Blend amount")
+EFFECT_PARAMETER_NAME(SumoPitch::Speed, "Speed")
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -58,15 +57,14 @@ EFFECT_PARAMETER_NAME( SumoPitch::Speed, "Speed"        )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void SumoPitchImpl::setup( IndexRange const &, Engine::Setup const & engineSetup )
+void SumoPitchImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
 {
-    amount_ = 1.0f - Math::percentage2NormalisedLinear( parameters().get<Blend>() );
+    amount_ = 1.0f - Math::percentage2NormalisedLinear(parameters().get<Blend>());
 
     pitchChangeLimitSemitones_ = parameters().get<Speed>() / engineSetup.stepsPerSecond();
 
-    ps_.setup( engineSetup );
+    ps_.setup(engineSetup);
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -77,43 +75,40 @@ void SumoPitchImpl::setup( IndexRange const &, Engine::Setup const & engineSetup
 
 namespace
 {
-    void limitPitchScale( float & pitchScale, float & previousPitchScaleSemitones, float const pitchScaleLimitSemitones )
-    {
-        using namespace Math;
-
-        float const lowerLimit( previousPitchScaleSemitones - pitchScaleLimitSemitones );
-        float const upperLimit( previousPitchScaleSemitones + pitchScaleLimitSemitones );
-        float const pitchScaleSemitones
-        (
-            clamp
-            (
-                interval12TET2Semitone( pitchScale ),
-                lowerLimit,
-                upperLimit
-            )
-        );
-
-        previousPitchScaleSemitones =                         pitchScaleSemitones  ;
-        pitchScale                  = semitone2Interval12TET( pitchScaleSemitones );
-    }
-} // anonymous namespace
-
-void SumoPitchImpl::process( ChannelState & cs, Engine::ChannelData_AmPh2ReIm data, Engine::Setup const & engineSetup ) const
+void limitPitchScale(float &pitchScale, float &previousPitchScaleSemitones,
+                     float const pitchScaleLimitSemitones)
 {
     using namespace Math;
 
-    Engine::MainSideChannelData_AmPh const & amPhData( data.input );
+    float const lowerLimit(previousPitchScaleSemitones - pitchScaleLimitSemitones);
+    float const upperLimit(previousPitchScaleSemitones + pitchScaleLimitSemitones);
+    float const pitchScaleSemitones(
+        clamp(interval12TET2Semitone(pitchScale), lowerLimit, upperLimit));
+
+    previousPitchScaleSemitones = pitchScaleSemitones;
+    pitchScale = semitone2Interval12TET(pitchScaleSemitones);
+}
+} // anonymous namespace
+
+void SumoPitchImpl::process(ChannelState &cs, Engine::ChannelData_AmPh2ReIm data,
+                            Engine::Setup const &engineSetup) const
+{
+    using namespace Math;
+
+    Engine::MainSideChannelData_AmPh const &amPhData(data.input);
 
     float pitchScaleMain;
     float pitchScaleSide;
 
     {
-        float const estimatedPitchMain( PitchDetector::findPitch( amPhData.full().main().amps(), cs.pdState, 70, 7000, engineSetup ) );
-        float const estimatedPitchSide( PitchDetector::findPitch( amPhData.full().side().amps(), cs.pdState, 70, 7000, engineSetup ) );
+        float const estimatedPitchMain(PitchDetector::findPitch(amPhData.full().main().amps(),
+                                                                cs.pdState, 70, 7000, engineSetup));
+        float const estimatedPitchSide(PitchDetector::findPitch(amPhData.full().side().amps(),
+                                                                cs.pdState, 70, 7000, engineSetup));
 
-        if ( estimatedPitchMain && estimatedPitchSide )
+        if (estimatedPitchMain && estimatedPitchSide)
         {
-            float const targetPitch( ( estimatedPitchMain + estimatedPitchSide ) / 2.0f );
+            float const targetPitch((estimatedPitchMain + estimatedPitchSide) / 2.0f);
 
             pitchScaleMain = targetPitch / estimatedPitchMain;
             pitchScaleSide = targetPitch / estimatedPitchSide;
@@ -127,40 +122,41 @@ void SumoPitchImpl::process( ChannelState & cs, Engine::ChannelData_AmPh2ReIm da
             pitchScaleSide = 1.0f;
         }
 
-        limitPitchScale( pitchScaleMain, cs.prevPitchScaleMainSemitones, pitchChangeLimitSemitones_ );
-        limitPitchScale( pitchScaleSide, cs.prevPitchScaleSideSemitones, pitchChangeLimitSemitones_ );
+        limitPitchScale(pitchScaleMain, cs.prevPitchScaleMainSemitones, pitchChangeLimitSemitones_);
+        limitPitchScale(pitchScaleSide, cs.prevPitchScaleSideSemitones, pitchChangeLimitSemitones_);
     }
 
-    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER( workBufferStorage, char, Engine::ChannelData_AmPhStorage::requiredStorage( engineSetup.fftSize<unsigned int>() ) );
-    Engine::ChannelData_AmPhStorage psWorkBuffer( engineSetup.fftSize<unsigned int>(), amPhData.beginBin(), amPhData.endBin(), workBufferStorage );
+    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(
+        workBufferStorage, char,
+        Engine::ChannelData_AmPhStorage::requiredStorage(engineSetup.fftSize<unsigned int>()));
+    Engine::ChannelData_AmPhStorage psWorkBuffer(engineSetup.fftSize<unsigned int>(),
+                                                 amPhData.beginBin(), amPhData.endBin(),
+                                                 workBufferStorage);
 
     { // Pitch shift:
         // Side
-        copy( amPhData.full().side().jointView(), psWorkBuffer.full().jointView() );
-        ps_.process( pitchScaleSide, cs.side, std::forward<Engine::ChannelData_AmPh>( psWorkBuffer ), engineSetup );
+        copy(amPhData.full().side().jointView(), psWorkBuffer.full().jointView());
+        ps_.process(pitchScaleSide, cs.side, std::forward<Engine::ChannelData_AmPh>(psWorkBuffer),
+                    engineSetup);
 
         // Convert pitch shifted side channel to ReIm form and store it directly
         // to output.
-        amph2ReIm
-        (
-            psWorkBuffer.amps  ().begin(),
-            psWorkBuffer.phases().begin(),
-            data.output .reals ().begin(),
-            data.output .imags ().begin(),
-            amPhData.numberOfBins()
-        );
+        amph2ReIm(psWorkBuffer.amps().begin(), psWorkBuffer.phases().begin(),
+                  data.output.reals().begin(), data.output.imags().begin(),
+                  amPhData.numberOfBins());
 
         // Main
-        copy( amPhData.full().main().jointView(), psWorkBuffer.full().jointView() );
-        ps_.process( pitchScaleMain, cs.main, std::forward<Engine::ChannelData_AmPh>( psWorkBuffer ), engineSetup );
+        copy(amPhData.full().main().jointView(), psWorkBuffer.full().jointView());
+        ps_.process(pitchScaleMain, cs.main, std::forward<Engine::ChannelData_AmPh>(psWorkBuffer),
+                    engineSetup);
     }
 
     // Blend:
     //  - psWorkBuffer contains pitch shifted main AmPh data
     //  - data.output  contains pitch shifted side ReIm data
-    mix( psWorkBuffer.amps(), psWorkBuffer.phases(), data.output.reals(), data.output.imags(), amount_ );
+    mix(psWorkBuffer.amps(), psWorkBuffer.phases(), data.output.reals(), data.output.imags(),
+        amount_);
 }
-
 
 void SumoPitchImpl::ChannelState::reset()
 {

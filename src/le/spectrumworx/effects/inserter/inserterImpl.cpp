@@ -3,7 +3,8 @@
 /// inserterImpl.cpp
 /// ----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -32,9 +33,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Inserter::title      [] = "Inserter";
+char const Inserter::title[] = "Inserter";
 char const Inserter::description[] = "Insert side channel into main.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -42,10 +42,9 @@ char const Inserter::description[] = "Insert side channel into main.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Inserter::Destination, "Destination" )
-EFFECT_PARAMETER_NAME( Inserter::Source     , "Source"      )
-EFFECT_PARAMETER_NAME( Inserter::InsertSize , "Size"        )
-
+EFFECT_PARAMETER_NAME(Inserter::Destination, "Destination")
+EFFECT_PARAMETER_NAME(Inserter::Source, "Source")
+EFFECT_PARAMETER_NAME(Inserter::InsertSize, "Size")
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -54,21 +53,20 @@ EFFECT_PARAMETER_NAME( Inserter::InsertSize , "Size"        )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void InserterImpl::setup( IndexRange const & workingRange, Engine::Setup const & engineSetup )
+void InserterImpl::setup(IndexRange const &workingRange, Engine::Setup const &engineSetup)
 {
-    source_     = std::max( workingRange.begin(), engineSetup.frequencyPercentageToBin( parameters().get<Source     >() ) );
-    target_     = std::max( workingRange.begin(), engineSetup.frequencyPercentageToBin( parameters().get<Destination>() ) );
-    source_     = std::min( source_, workingRange.end() );
-    target_     = std::min( target_, workingRange.end() );
-    insertSize_ = std::min
-                  (
-                    static_cast<IndexRange::value_type>( workingRange.end() - std::max( target_, source_ ) ),
-                    engineSetup.frequencyPercentageToBin( parameters().get<InsertSize>() )
-                  );
+    source_ = std::max(workingRange.begin(),
+                       engineSetup.frequencyPercentageToBin(parameters().get<Source>()));
+    target_ = std::max(workingRange.begin(),
+                       engineSetup.frequencyPercentageToBin(parameters().get<Destination>()));
+    source_ = std::min(source_, workingRange.end());
+    target_ = std::min(target_, workingRange.end());
+    insertSize_ = std::min(
+        static_cast<IndexRange::value_type>(workingRange.end() - std::max(target_, source_)),
+        engineSetup.frequencyPercentageToBin(parameters().get<InsertSize>()));
 
-    mode_.unpack( parameters().get<Mode>() );
+    mode_.unpack(parameters().get<Mode>());
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -77,28 +75,20 @@ void InserterImpl::setup( IndexRange const & workingRange, Engine::Setup const &
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void InserterImpl::process( Engine::MainSideChannelData_AmPh data, Engine::Setup const & ) const
+void InserterImpl::process(Engine::MainSideChannelData_AmPh data, Engine::Setup const &) const
 {
-    auto const source    ( source_     );
-    auto const target    ( target_     );
-    auto const insertSize( insertSize_ );
-    if ( mode_.magnitudes() )
+    auto const source(source_);
+    auto const target(target_);
+    auto const insertSize(insertSize_);
+    if (mode_.magnitudes())
     {
-        Math::copy
-        (
-            &data.full().side().amps()[ source ],
-            &data.full().main().amps()[ target ],
-            insertSize
-        );
+        Math::copy(&data.full().side().amps()[source], &data.full().main().amps()[target],
+                   insertSize);
     }
-    if ( mode_.phases() )
+    if (mode_.phases())
     {
-        Math::copy
-        (
-            &data.full().side().phases()[ source ],
-            &data.full().main().phases()[ target ],
-            insertSize
-        );
+        Math::copy(&data.full().side().phases()[source], &data.full().main().phases()[target],
+                   insertSize);
     }
 }
 

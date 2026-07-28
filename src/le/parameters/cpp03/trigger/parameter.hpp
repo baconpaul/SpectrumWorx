@@ -3,13 +3,13 @@
 /// \file trigger/parameter.hpp
 /// ---------------------------
 ///
-/// Copyright (c) 2011 - 2015. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2011 - 2015. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef parameter_hpp__52B1FD32_BCD7_416A_8B25_1A640BF6E636
 #define parameter_hpp__52B1FD32_BCD7_416A_8B25_1A640BF6E636
-#pragma once
 //------------------------------------------------------------------------------
 #include "tag.hpp"
 
@@ -31,17 +31,16 @@ namespace Parameters
 
 class TriggerParameter : public Boolean
 {
-public:
+  public:
     typedef TriggerParameterTag Tag;
 
-public:
-    TriggerParameter( param_type const initialValue = false )
-        : Boolean( initialValue ) {}
+  public:
+    TriggerParameter(param_type const initialValue = false) : Boolean(initialValue) {}
 
-    LE_NOTHROWNOALIAS value_type consumeValue(            ) const;
-    LE_NOTHROWNOALIAS void       setValue    ( param_type );
+    LE_NOTHROWNOALIAS value_type consumeValue() const;
+    LE_NOTHROWNOALIAS void setValue(param_type);
 
-private:
+  private:
     operator value_type const &() const;
     void operator++();
     void operator--();

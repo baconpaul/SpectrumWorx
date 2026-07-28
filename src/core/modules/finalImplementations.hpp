@@ -4,13 +4,13 @@
 ///
 /// Implementations of different module interfaces for a given effect
 ///
-/// Copyright � 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef finalImplementations_hpp__A4E1EEF8_DCF0_4AB1_8A68_6767C135FDC6
 #define finalImplementations_hpp__A4E1EEF8_DCF0_4AB1_8A68_6767C135FDC6
-#pragma once
 //------------------------------------------------------------------------------
 #include "le/parameters/boolean/tag.hpp"
 #include "le/parameters/enumerated/tag.hpp"
@@ -43,36 +43,34 @@ namespace SW
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-template <class Effect>
-class LE_NOVTABLE ModuleWidgets
+template <class Effect> class LE_NOVTABLE ModuleWidgets
 {
-public: // Module GUI interface implementation.
-    LE_NOALIAS void LE_FASTCALL create( GUI::ModuleUI & uiBase )
+  public: // Module GUI interface implementation.
+    LE_NOALIAS void create(GUI::ModuleUI &uiBase)
     {
-    #if !LE_SW_SEPARATED_DSP_GUI
-        BOOST_ASSERT( !uiBase.module().gui() );
-    #endif // LE_SW_SEPARATED_DSP_GUI
-        uiBase.setUpForEffect( Effect::title, Effect::description );
-        parameterWidgets_.construct( uiBase );
+#if !LE_SW_SEPARATED_DSP_GUI
+        BOOST_ASSERT(!uiBase.module().gui());
+#endif // LE_SW_SEPARATED_DSP_GUI
+        uiBase.setUpForEffect(Effect::title, Effect::description);
+        parameterWidgets_.construct(uiBase);
     }
 
-    LE_NOTHROWNOALIAS void LE_FASTCALL destroy()
+    LE_NOTHROWNOALIAS void destroy()
     {
-    #if !LE_SW_SEPARATED_DSP_GUI
+#if !LE_SW_SEPARATED_DSP_GUI
         //BOOST_ASSERT( !uiBase.module().gui() );
-    #endif // LE_SW_SEPARATED_DSP_GUI
+#endif // LE_SW_SEPARATED_DSP_GUI
         parameterWidgets_.destroy();
     }
 
-private:
-    using Parameters       = typename Effect::Parameters      ;
+  private:
+    using Parameters = typename Effect::Parameters;
     using ParameterWidgets = GUI::ParameterWidgets<Parameters>;
 
-private:
+  private:
     ParameterWidgets parameterWidgets_;
 }; // class ModuleWidgets
 #endif // LE_SW_GUI
-
 
 #if LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
 
@@ -83,14 +81,14 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class Effect>
-class Module::Impl LE_SEALED
-    :
-    public Engine::ModuleEffectImpl<Effect, Module>,
-    public ModuleWidgets           <Effect>
+class Module::Impl final : public Engine::ModuleEffectImpl<Effect, Module>,
+                           public ModuleWidgets<Effect>
 {
-public:
+  public:
     template <typename EffectTypeIndex>
-    Impl( EffectTypeIndex ) : Impl::ModuleEffectImpl( EffectTypeIndex(), this ) {}
+    Impl(EffectTypeIndex) : Impl::ModuleEffectImpl(EffectTypeIndex(), this)
+    {
+    }
 }; // class Module::Impl
 
 #else // LE_SW_GUI, LE_SW_SEPARATED_DSP_GUI
@@ -102,15 +100,14 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class Effect>
-class ModuleDSP::Impl LE_SEALED
-    :
-    public Engine::ModuleEffectImpl<Effect, ModuleDSP>
+class ModuleDSP::Impl final : public Engine::ModuleEffectImpl<Effect, ModuleDSP>
 {
-public:
+  public:
     template <typename EffectTypeIndex>
-    Impl( EffectTypeIndex ) : Impl::ModuleEffectImpl( EffectTypeIndex() ) {}
+    Impl(EffectTypeIndex) : Impl::ModuleEffectImpl(EffectTypeIndex())
+    {
+    }
 }; // class ModuleDSP::Impl
-
 
 #if LE_SW_GUI
 ////////////////////////////////////////////////////////////////////////////////
@@ -119,20 +116,23 @@ public:
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-template <class Effect>
-class ModuleGUI::Impl LE_SEALED
-    :
-    public ModuleGUI,
-    public ModuleWidgets<Effect>
+template <class Effect> class ModuleGUI::Impl final : public ModuleGUI, public ModuleWidgets<Effect>
 {
-public:
+  public:
     // http://www.artima.com/cppsource/nevercall.html
     template <typename EffectTypeIndex>
-                Impl( EffectTypeIndex ) : ModuleGUI( Engine::Detail::MakeEffectMetaData<Effect, EffectTypeIndex>::data, lfos_.begin() ) { ModuleWidgets::create ( *gui() ); }
-    LE_NOTHROW ~Impl(                 ) LE_OVERRIDE /*LE_SEALED*/                                                                       { ModuleWidgets::destroy(        ); }
+    Impl(EffectTypeIndex)
+        : ModuleGUI(Engine::Detail::MakeEffectMetaData<Effect, EffectTypeIndex>::data,
+                    lfos_.begin())
+    {
+        ModuleWidgets::create(*gui());
+    }
+    LE_NOTHROW ~Impl() override /*final*/ { ModuleWidgets::destroy(); }
 
-private: //...mrmlj...duplicated from ModuleEffectImpl@moduleImpl.hpp
-    using LFOStorage = std::array<ModuleParameters::LFOPlaceholder, ModuleParameters::numberOfLFOBaseParameters + Effect::Parameters::static_size>;
+  private: //...mrmlj...duplicated from ModuleEffectImpl@moduleImpl.hpp
+    using LFOStorage =
+        std::array<ModuleParameters::LFOPlaceholder,
+                   ModuleParameters::numberOfLFOBaseParameters + Effect::Parameters::static_size>;
     LFOStorage lfos_;
 }; // class ModuleGUI::Impl
 #endif // LE_SW_GUI

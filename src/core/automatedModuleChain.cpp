@@ -3,7 +3,8 @@
 /// automatedModuleChain.cpp
 /// ------------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -18,20 +19,25 @@ namespace SW
 {
 //------------------------------------------------------------------------------
 
-ModuleChainParameter AutomatedModuleChain::getParameterForIndex( std::uint8_t const moduleIndex ) const
+ModuleChainParameter
+AutomatedModuleChain::getParameterForIndex(std::uint8_t const moduleIndex) const
 {
-    auto const pModule( ModuleChainImpl::module( moduleIndex ) );
-    return ModuleChainParameter
-    (
-        !isEnd( pModule )
-            ? Engine::actualModule<Module const>( *pModule ).effectTypeIndex()
-            : noModule
-    );
+    auto const pModule(ModuleChainImpl::module(moduleIndex));
+    return ModuleChainParameter(!isEnd(pModule)
+                                    ? Engine::actualModule<Module const>(*pModule).effectTypeIndex()
+                                    : noModule);
 }
 
-
-AutomatedModuleChain::ModulePtr  LE_NOTHROWNOALIAS AutomatedModuleChain::module( std::uint8_t const index )       { return moduleAs<Module      >( index ); }
-AutomatedModuleChain::ModuleCPtr LE_NOTHROWNOALIAS AutomatedModuleChain::module( std::uint8_t const index ) const { return moduleAs<Module const>( index ); }
+AutomatedModuleChain::ModulePtr LE_NOTHROWNOALIAS
+AutomatedModuleChain::module(std::uint8_t const index)
+{
+    return moduleAs<Module>(index);
+}
+AutomatedModuleChain::ModuleCPtr LE_NOTHROWNOALIAS
+AutomatedModuleChain::module(std::uint8_t const index) const
+{
+    return moduleAs<Module const>(index);
+}
 
 //------------------------------------------------------------------------------
 } // namespace SW

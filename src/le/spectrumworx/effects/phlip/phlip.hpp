@@ -3,14 +3,14 @@
 /// \file phlip.hpp
 /// ---------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef phlip_hpp__5C84E8DC_452A_4397_A386_39F88ADAC1F6
 #define phlip_hpp__5C84E8DC_452A_4397_A386_39F88ADAC1F6
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -35,23 +35,20 @@ namespace Effects
 /// \ingroup Effects
 ///
 /// \brief Inverts the phase.
-/// 
-/// This module flips the phase. The effect is quite variable, depending very 
-/// much on the harmonic content of the incoming signal. Odd harmonics tend to 
-/// result in a more dissonant sound, while even harmonics are more consonant 
-/// and pleasant to the ear. Also, the shorter the frame size the more audible 
-/// effect will be. 
+///
+/// This module flips the phase. The effect is quite variable, depending very
+/// much on the harmonic content of the incoming signal. Odd harmonics tend to
+/// result in a more dissonant sound, while even harmonics are more consonant
+/// and pleasant to the ear. Also, the shorter the frame size the more audible
+/// effect will be.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
 struct Phlip
 {
-    LE_ENUMERATED_PARAMETER( Mode, ( All )( Even )( Odd ) );
+    LE_ENUMERATED_PARAMETER(Mode, (All)(Even)(Odd));
 
-    LE_DEFINE_PARAMETERS
-    (
-        ( ( Mode ) )
-    );
+    LE_DEFINE_PARAMETERS(((Mode)));
 
     /// \typedef Mode
     /// \brief Controls the target harmonics.
@@ -60,10 +57,9 @@ struct Phlip
     ///   - Even: targets only even harmonics.
     ///   - Odd: targets only odd harmonics.
 
-
     static bool const usesSideChannel = false;
-    
-    static char const title      [];
+
+    static char const title[];
     static char const description[];
 };
 

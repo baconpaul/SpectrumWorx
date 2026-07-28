@@ -3,27 +3,27 @@
 /// \file presets.hpp
 /// -----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef presets_hpp__6021812F_90A0_4BFC_A0EF_6413D7485312
 #define presets_hpp__6021812F_90A0_4BFC_A0EF_6413D7485312
-#pragma once
 //------------------------------------------------------------------------------
 #ifndef LE_SW_SDK_BUILD
 #include "configuration/constants.hpp"
 
-#if !defined( _MSC_VER ) && LE_SW_GUI
-    #include "configuration/versionConfiguration.hpp"
-    #include "gui/gui.hpp" // warningMessageBox()
+#if !defined(_MSC_VER) && LE_SW_GUI
+#include "configuration/versionConfiguration.hpp"
+#include "gui/gui.hpp" // warningMessageBox()
 #endif
 #endif // !LE_SW_SDK_BUILD
 
 #ifndef _MSC_VER // for eager compilers
-    #include "le/math/conversion.hpp"
-    #include "le/parameters/fusionAdaptors.hpp"
-    #include "le/spectrumworx/engine/parameters.hpp"
+#include "le/math/conversion.hpp"
+#include "le/parameters/fusionAdaptors.hpp"
+#include "le/spectrumworx/engine/parameters.hpp"
 #endif // _MSC_VER
 #include "le/utility/countof.hpp"
 #include "le/utility/lexicalCast.hpp"
@@ -47,15 +47,19 @@
 #include <type_traits>
 #include <utility> // rvalues
 //------------------------------------------------------------------------------
-namespace juce { class File; class String; }
+namespace juce
+{
+class File;
+class String;
+} // namespace juce
 //------------------------------------------------------------------------------
 namespace LE
 {
 //------------------------------------------------------------------------------
 namespace Parameters
 {
-    class LFOImpl;
-    template <class Parameter> struct Name;
+class LFOImpl;
+template <class Parameter> struct Name;
 } // namespace Parameters
 //------------------------------------------------------------------------------
 namespace SW
@@ -67,9 +71,11 @@ LE_OPTIMIZE_FOR_SIZE_BEGIN()
 class SpectrumWorx;
 
 #if LE_SW_ENGINE_WINDOW_PRESUM
-namespace Engine { struct WindowSizeFactor; }
+namespace Engine
+{
+struct WindowSizeFactor;
+}
 #endif // LE_SW_ENGINE_WINDOW_PRESUM
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -81,22 +87,21 @@ struct PresetHeader
 {
     static unsigned int const maxCommentLength = 256;
 
-    LE_NOTHROW PresetHeader( juce::String const & comment );
+    LE_NOTHROW PresetHeader(juce::String const &comment);
 
-    char version  [                8 ];
-    char timeStamp[               64 ];
-    char comment  [ maxCommentLength ];
+    char version[8];
+    char timeStamp[64];
+    char comment[maxCommentLength];
 
     void setCurrentTime();
 
     struct AttributeNames
     {
-        static char const version  [];
+        static char const version[];
         static char const timeStamp[];
-        static char const comment  [];
+        static char const comment[];
     } attributeNames;
 }; // struct PresetHeader
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -106,49 +111,52 @@ struct PresetHeader
 
 class Preset : boost::noncopyable
 {
-public:
+  public:
     using InMemoryPresetBuffer = std::array<char, 4096>;
 
-public:
+  public:
 #ifdef LE_EXCEPTION_ON
     typedef boost::mpl::true_ load_result_t;
 #else
-    typedef bool              load_result_t;
+    typedef bool load_result_t;
 #endif // LE_EXCEPTION_ON
 
-    LE_NOTHROW Preset(                      ) { setMemoryAllocationTracer();                      }
+    LE_NOTHROW Preset() { setMemoryAllocationTracer(); }
 #ifdef LE_EXCEPTION_ON
-               Preset( char * const pBuffer ) { setMemoryAllocationTracer(); loadFrom( pBuffer ); }
+    Preset(char *const pBuffer)
+    {
+        setMemoryAllocationTracer();
+        loadFrom(pBuffer);
+    }
 #endif // LE_EXCEPTION_ON
 
-               load_result_t loadFrom( char * pBuffer );
-    LE_NOTHROW unsigned int  saveTo  ( char * pBuffer );
+    load_result_t loadFrom(char *pBuffer);
+    LE_NOTHROW unsigned int saveTo(char *pBuffer);
 
-    LE_NOTHROW void getHeader( PresetHeader       & ) const;
-    LE_NOTHROW void setHeader( PresetHeader const & )      ;
+    LE_NOTHROW void getHeader(PresetHeader &) const;
+    LE_NOTHROW void setHeader(PresetHeader const &);
 
     LE_NOTHROW boost::string_ref getComment() const;
 
-    Utility::XML::Document       & xml()       { return preset_; }
-    Utility::XML::Document const & xml() const { return preset_; }
+    Utility::XML::Document &xml() { return preset_; }
+    Utility::XML::Document const &xml() const { return preset_; }
 
-    Utility::XML::Element       & root()      ;
-    Utility::XML::Element const & root() const;
+    Utility::XML::Element &root();
+    Utility::XML::Element const &root() const;
 
     void reset() { xml().clear(); }
 
     using InMemoryPreset = std::unique_ptr<char[]>;
-    static LE_NOTHROW InMemoryPreset loadIntoMemory( juce::File const & );
+    static LE_NOTHROW InMemoryPreset loadIntoMemory(juce::File const &);
 
     static void reportPresetLoadingError();
 
-private:
+  private:
     void setMemoryAllocationTracer();
 
-private:
+  private:
     Utility::XML::Document preset_;
 }; // class Preset
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -158,47 +166,50 @@ private:
 
 class PresetHandler
 {
-protected:
-    PresetHandler( Preset & preset ) : preset_( preset ) {}
+  protected:
+    PresetHandler(Preset &preset) : preset_(preset) {}
 
-protected:
-    boost::string_ref mangleSpaces  ( char const * input ) const;
-    boost::string_ref unmangleSpaces( char const * input ) const;
+  protected:
+    boost::string_ref mangleSpaces(char const *input) const;
+    boost::string_ref unmangleSpaces(char const *input) const;
 
-    LE_RESTRICTNOALIAS char * allocateString( unsigned int size );
+    LE_RESTRICTNOALIAS char *allocateString(unsigned int size);
 
-    Preset       & preset()       { return preset_; }
-    Preset const & preset() const { return preset_; }
+    Preset &preset() { return preset_; }
+    Preset const &preset() const { return preset_; }
 
-    Utility::XML::Document       & xml()       { return preset().xml(); }
-    Utility::XML::Document const & xml() const { return preset().xml(); }
+    Utility::XML::Document &xml() { return preset().xml(); }
+    Utility::XML::Document const &xml() const { return preset().xml(); }
 
     using LFO = Parameters::LFOImpl;
 
-protected:
+  protected:
     friend class LFODataSaver;
 
-    static boost::string_ref const & makeStringRef( boost::string_ref                 const & source ) { return source; }
-    static boost::string_ref         makeStringRef( boost::string_ref::const_iterator         source );
-    template <typename T>
-           boost::string_ref         makeStringRef( T const binarySource )
-           {
-               auto const valueBufferSize( Utility::RequiredStringStorage<T>::value );
-               char * LE_RESTRICT const buffer( allocateString( valueBufferSize ) );
-               unsigned int const numberOfCharacters( Utility::lexical_cast( std::is_enum<T>::value ? static_cast<std::uint8_t>( binarySource ) : binarySource, buffer ) );
-               LE_ASSUME( numberOfCharacters <= valueBufferSize );
-               return boost::string_ref( buffer, numberOfCharacters );
-           }
+    static boost::string_ref const &makeStringRef(boost::string_ref const &source)
+    {
+        return source;
+    }
+    static boost::string_ref makeStringRef(boost::string_ref::const_iterator source);
+    template <typename T> boost::string_ref makeStringRef(T const binarySource)
+    {
+        auto const valueBufferSize(Utility::RequiredStringStorage<T>::value);
+        char *LE_RESTRICT const buffer(allocateString(valueBufferSize));
+        unsigned int const numberOfCharacters(Utility::lexical_cast(
+            std::is_enum<T>::value ? static_cast<std::uint8_t>(binarySource) : binarySource,
+            buffer));
+        LE_ASSUME(numberOfCharacters <= valueBufferSize);
+        return boost::string_ref(buffer, numberOfCharacters);
+    }
 
-private:
-    boost::string_ref fixSpaces( boost::string_ref input, char searchFor, char replaceWith ) const;
+  private:
+    boost::string_ref fixSpaces(boost::string_ref input, char searchFor, char replaceWith) const;
 
-private:
-    Preset & preset_;
+  private:
+    Preset &preset_;
 }; // class PresetHandler
 
-template <> boost::string_ref PresetHandler::makeStringRef<bool>( bool );
-
+template <> boost::string_ref PresetHandler::makeStringRef<bool>(bool);
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -206,23 +217,24 @@ template <> boost::string_ref PresetHandler::makeStringRef<bool>( bool );
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_IMPL_NAMESPACE_BEGIN( Engine )
-    class ModuleChainImpl; class ModuleProcessorImpl;
-LE_IMPL_NAMESPACE_END( Engine )
+LE_IMPL_NAMESPACE_BEGIN(Engine)
+class ModuleChainImpl;
+class ModuleProcessorImpl;
+LE_IMPL_NAMESPACE_END(Engine)
 class AutomatedModuleChain;
 
 class ParametersLoader : private PresetHandler
 {
-public:
-    ParametersLoader( Preset const & );
+  public:
+    ParametersLoader(Preset const &);
 
 #ifdef LE_SW_SDK_BUILD
     typedef Engine::ModuleChainImpl ModuleChain;
 #else
-    typedef AutomatedModuleChain    ModuleChain;
+    typedef AutomatedModuleChain ModuleChain;
 #endif // LE_SW_SDK_BUILD
 
-    ModuleChain loadModuleChain( ModuleChain & currentChain );
+    ModuleChain loadModuleChain(ModuleChain &currentChain);
 
     boost::string_ref getSampleFileName();
 
@@ -231,23 +243,22 @@ public:
     bool isPre27Preset() const;
 
     template <typename T>
-    LE_NOINLINE
-    boost::optional<T> getSimpleParameterValue( char const * const parameterName ) const
+    LE_NOINLINE boost::optional<T> getSimpleParameterValue(char const *const parameterName) const
     {
-        auto const pParameterAttribute( getParameterAttribute( parameterName ) );
-        return getParameterValue<T>( pParameterAttribute, parameterName );
+        auto const pParameterAttribute(getParameterAttribute(parameterName));
+        return getParameterValue<T>(pParameterAttribute, parameterName);
     }
 
     template <typename T>
-    boost::optional<T> getLFOParameterValue( char const * const parameterName, LFO & lfo ) const
+    boost::optional<T> getLFOParameterValue(char const *const parameterName, LFO &lfo) const
     {
-        auto const pParameterNode( getParameterNode( parameterName ) );
-        if ( pParameterNode )
+        auto const pParameterNode(getParameterNode(parameterName));
+        if (pParameterNode)
         {
-            if ( loadLFO( *pParameterNode, lfo ) )
+            if (loadLFO(*pParameterNode, lfo))
                 return boost::none;
             else
-                return getParameterValue<T>( pParameterNode, parameterName );
+                return getParameterValue<T>(pParameterNode, parameterName);
         }
         else
         {
@@ -255,80 +266,82 @@ public:
             //   Fallback to handle old presets where not all module parameters
             // were LFO-able parameters.
             //                                (14.07.2011.) (Domagoj Saric)
-            return getSimpleParameterValue<T>( parameterName );
+            return getSimpleParameterValue<T>(parameterName);
         }
     }
 
-public: // For-each functor interface.
-    using result_type           = void;
-    using const_qualified_lfo_t = LFO ;
+  public: // For-each functor interface.
+    using result_type = void;
+    using const_qualified_lfo_t = LFO;
 
 #if LE_SW_ENGINE_WINDOW_PRESUM
-    result_type operator()( Engine::WindowSizeFactor & ) const;
+    result_type operator()(Engine::WindowSizeFactor &) const;
 #endif // LE_SW_ENGINE_WINDOW_PRESUM
 
-    template <class Parameter>
-    void operator()( Parameter & parameter ) const
+    template <class Parameter> void operator()(Parameter &parameter) const
     {
         using binary_type = typename Parameter::binary_type;
-        boost::optional<binary_type> const parameterValue
-        (
-            getSimpleParameterValue<binary_type>( LE::Parameters::Name<Parameter>::string_ )
-        );
-        if ( parameterValue.is_initialized() && parameter.isValidValue( *parameterValue ) )
-            parameter.setValue( *parameterValue );
+        boost::optional<binary_type> const parameterValue(
+            getSimpleParameterValue<binary_type>(LE::Parameters::Name<Parameter>::string_));
+        if (parameterValue.is_initialized() && parameter.isValidValue(*parameterValue))
+            parameter.setValue(*parameterValue);
     }
 
-    template <class Parameter>
-    void operator()( Parameter & parameter, LFO & lfo ) const
+    template <class Parameter> void operator()(Parameter &parameter, LFO &lfo) const
     {
         using binary_type = typename Parameter::binary_type;
-        boost::optional<binary_type> const parameterValueWithoutLFO
-        (
-            getLFOParameterValue<binary_type>( Parameters::Name<Parameter>::string_, lfo, &parameter )
-        );
-        if ( parameterValueWithoutLFO.is_initialized() && parameter.isValidValue( *parameterValueWithoutLFO ) )
-            parameter.setValue( *parameterValueWithoutLFO );
+        boost::optional<binary_type> const parameterValueWithoutLFO(
+            getLFOParameterValue<binary_type>(Parameters::Name<Parameter>::string_, lfo,
+                                              &parameter));
+        if (parameterValueWithoutLFO.is_initialized() &&
+            parameter.isValidValue(*parameterValueWithoutLFO))
+            parameter.setValue(*parameterValueWithoutLFO);
     }
 
-private:
+  private:
     template <typename T>
-    boost::optional<T> getParameterValue( Utility::XML::Object const * const pXMLElement, char const * const parameterName ) const
+    boost::optional<T> getParameterValue(Utility::XML::Object const *const pXMLElement,
+                                         char const *const parameterName) const
     {
-        if ( pXMLElement )
+        if (pXMLElement)
         {
-            return Utility::lexical_cast<T>( pXMLElement->value() );
+            return Utility::lexical_cast<T>(pXMLElement->value());
         }
-        warnAboutMissingParameter( parameterName );
+        warnAboutMissingParameter(parameterName);
         return boost::none;
     }
 
-    Utility::XML::Attribute const * getParameterAttribute( char const * parameterName ) const;
-    Utility::XML::Element   const * getParameterNode     ( char const * parameterName ) const;
+    Utility::XML::Attribute const *getParameterAttribute(char const *parameterName) const;
+    Utility::XML::Element const *getParameterNode(char const *parameterName) const;
 
-    bool loadLFO( Utility::XML::Element const & parameterNode, LFO & lfo ) const;
+    bool loadLFO(Utility::XML::Element const &parameterNode, LFO &lfo) const;
 
-    static void warnAboutMissingParameter( char const * parameterName );
+    static void warnAboutMissingParameter(char const *parameterName);
 
-    boost::string_ref currentEffectName       () const;
+    boost::string_ref currentEffectName() const;
     boost::string_ref currentMangledEffectName() const;
 
-    Utility::XML::Element const & parameters() const { LE_ASSUME( pParameters_ ); return *pParameters_; }
+    Utility::XML::Element const &parameters() const
+    {
+        LE_ASSUME(pParameters_);
+        return *pParameters_;
+    }
 
     bool switchedToModuleParameters() const;
 
-private:
-    Utility::XML::Element const * LE_RESTRICT pParameters_;
+  private:
+    Utility::XML::Element const *LE_RESTRICT pParameters_;
 
     mutable bool syncedLFOFound_;
 
 #ifdef LE_SW_SDK_BUILD //...mrmlj...ugh...
     friend class Engine::ModuleProcessorImpl;
 #else
-    template <class PresetConsumer> friend bool LE_FASTCALL loadPreset( char * inMemoryPreset, bool ignoreExternalSample, juce::String * pComment, PresetConsumer );
+    template <class PresetConsumer>
+    friend bool loadPreset(char *inMemoryPreset, bool ignoreExternalSample, juce::String *pComment,
+                           PresetConsumer);
 #endif
 }; // class ParametersLoader
-
 
 #ifndef LE_SW_SDK_BUILD
 ////////////////////////////////////////////////////////////////////////////////
@@ -339,29 +352,28 @@ private:
 
 class PresetWithPreallocatedFixedNodes : public Preset
 {
-private:
+  private:
     using ModuleNodes = std::array<Utility::XML::Element, Constants::maxNumberOfModules>;
 
-public:
+  public:
     LE_NOTHROW PresetWithPreallocatedFixedNodes();
 
-    void setHeader( PresetHeader const & );
+    void setHeader(PresetHeader const &);
 
-    Utility::XML::Element & headerNode          () { return headerNode_          ; }
-    Utility::XML::Element & globalParametersNode() { return globalParametersNode_; }
-    Utility::XML::Element & moduleParametersNode() { return moduleParametersNode_; }
+    Utility::XML::Element &headerNode() { return headerNode_; }
+    Utility::XML::Element &globalParametersNode() { return globalParametersNode_; }
+    Utility::XML::Element &moduleParametersNode() { return moduleParametersNode_; }
 
-    ModuleNodes       & moduleNodes()       { return moduleNodes_; }
-    ModuleNodes const & moduleNodes() const { return moduleNodes_; }
+    ModuleNodes &moduleNodes() { return moduleNodes_; }
+    ModuleNodes const &moduleNodes() const { return moduleNodes_; }
 
-private:
-    Utility::XML::Element headerNode_          ;
+  private:
+    Utility::XML::Element headerNode_;
     Utility::XML::Element globalParametersNode_;
     Utility::XML::Element moduleParametersNode_;
 
     ModuleNodes moduleNodes_;
 }; // class PresetWithPreallocatedFixedNodes
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -371,56 +383,69 @@ private:
 
 class ParametersSaver : private PresetHandler
 {
-public:
-    ParametersSaver( PresetWithPreallocatedFixedNodes & );
+  public:
+    ParametersSaver(PresetWithPreallocatedFixedNodes &);
 
-    void saveEffectModuleChain( AutomatedModuleChain const & );
+    void saveEffectModuleChain(AutomatedModuleChain const &);
 
     //...mrmlj...temporarily reverting to old code for the 2.1 release...
     //void setSampleFileName( juce::String const & sampleFileName );
-    void setSampleFileName( boost::string_ref const & sampleFileName );
+    void setSampleFileName(boost::string_ref const &sampleFileName);
 
-    unsigned int saveTo( char * pBuffer );
+    unsigned int saveTo(char *pBuffer);
 
-public: // For-each functor interface.
-    using result_type           = void     ;
+  public: // For-each functor interface.
+    using result_type = void;
     using const_qualified_lfo_t = LFO const;
 
-    template <class Parameter>
-    void LE_NOTHROWNOALIAS operator()( Parameter const & parameter                  ) const
+    template <class Parameter> void LE_NOTHROWNOALIAS operator()(Parameter const &parameter) const
     {
-        const_cast<ParametersSaver &>( *this ). //...mrmlj...because of boost::fusion::for_each...
-        saveParameter<typename Parameter::param_type>( LE::Parameters::Name<Parameter>::string_, parameter.getValue()      );
+        const_cast<ParametersSaver &>(*this). //...mrmlj...because of boost::fusion::for_each...
+            saveParameter<typename Parameter::param_type>(LE::Parameters::Name<Parameter>::string_,
+                                                          parameter.getValue());
     }
     template <class Parameter>
-    void LE_NOTHROWNOALIAS operator()( Parameter const & parameter, LFO const & lfo ) const
+    void LE_NOTHROWNOALIAS operator()(Parameter const &parameter, LFO const &lfo) const
     {
-        const_cast<ParametersSaver &>( *this ). //...mrmlj...because of boost::fusion::for_each...
-        saveParameter<typename Parameter::param_type>( LE::Parameters::Name<Parameter>::string_, parameter.getValue(), lfo );
+        const_cast<ParametersSaver &>(*this). //...mrmlj...because of boost::fusion::for_each...
+            saveParameter<typename Parameter::param_type>(LE::Parameters::Name<Parameter>::string_,
+                                                          parameter.getValue(), lfo);
     }
 
     template <typename T>
-    void LE_NOINLINE LE_FASTCALL saveParameter( char const * const parameterName, T const parameterValue )
+    void LE_NOINLINE saveParameter(char const *const parameterName, T const parameterValue)
     {
-        saveParameter( parameterName, makeStringRef<T>( parameterValue ) );
+        saveParameter(parameterName, makeStringRef<T>(parameterValue));
     }
 
     template <typename T>
-    void LE_NOINLINE LE_FASTCALL saveParameter( char const * const parameterName, T const parameterValue, LFO const & parameterLFO )
+    void LE_NOINLINE saveParameter(char const *const parameterName, T const parameterValue,
+                                   LFO const &parameterLFO)
     {
-        saveParameter( parameterName, makeStringRef<T>( parameterValue ), parameterLFO );
+        saveParameter(parameterName, makeStringRef<T>(parameterValue), parameterLFO);
     }
 
-private:
-    void saveParameter( char const * parameterName, boost::string_ref parameterValue );
-    void saveParameter( char const * parameterName, boost::string_ref parameterValue, LFO const & parameterLFO );
+  private:
+    void saveParameter(char const *parameterName, boost::string_ref parameterValue);
+    void saveParameter(char const *parameterName, boost::string_ref parameterValue,
+                       LFO const &parameterLFO);
 
-    Utility::XML::Element & parameters() { LE_ASSUME( pParametersNode_ ); return *pParametersNode_; }
+    Utility::XML::Element &parameters()
+    {
+        LE_ASSUME(pParametersNode_);
+        return *pParametersNode_;
+    }
 
-    PresetWithPreallocatedFixedNodes       & preset()       { return static_cast<PresetWithPreallocatedFixedNodes &>( PresetHandler::preset() ); }
-    PresetWithPreallocatedFixedNodes const & preset() const { return const_cast<ParametersSaver &>( *this ).preset(); }
+    PresetWithPreallocatedFixedNodes &preset()
+    {
+        return static_cast<PresetWithPreallocatedFixedNodes &>(PresetHandler::preset());
+    }
+    PresetWithPreallocatedFixedNodes const &preset() const
+    {
+        return const_cast<ParametersSaver &>(*this).preset();
+    }
 
-    Utility::XML::Element const * moduleNodesEnd() const
+    Utility::XML::Element const *moduleNodesEnd() const
     {
         /// \note Quick-workaround for 'secure STL' array iterators not being
         /// simple pointers.
@@ -428,147 +453,135 @@ private:
         return &preset().moduleNodes().back() + 1;
     }
 
-private:
-    Utility::XML::Element * LE_RESTRICT pParametersNode_;
+  private:
+    Utility::XML::Element *LE_RESTRICT pParametersNode_;
 }; // class ParametersSaver
 #endif // LE_SW_SDK_BUILD
 
 #ifndef _MSC_VER
-LE_IMPL_NAMESPACE_BEGIN( Engine )
-    class ModuleNode;
-    template <class ActualModule> ActualModule & actualModule( ModuleNode & );
-LE_IMPL_NAMESPACE_END( Engine )
-namespace GlobalParameters { struct Parameters; }
+LE_IMPL_NAMESPACE_BEGIN(Engine)
+class ModuleNode;
+template <class ActualModule> ActualModule &actualModule(ModuleNode &);
+LE_IMPL_NAMESPACE_END(Engine)
+namespace GlobalParameters
+{
+struct Parameters;
+}
 #endif // _MSC_VER
 
 #if LE_SW_GUI
-    using char_t = juce::String::CharPointerType::CharType;
+using char_t = juce::String::CharPointerType::CharType;
 #else
-    using char_t = char;
+using char_t = char;
 #endif
 
-
 template <class PresetConsumer>
-LE_NOTHROW LE_COLD
-bool LE_FASTCALL loadPreset
-(
-    char           * LE_RESTRICT const inMemoryPreset,
-    bool                         const ignoreExternalSample,
-    juce::String   * LE_RESTRICT const pComment,
-    PresetConsumer               const consumer
-)
+LE_NOTHROW
+LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignoreExternalSample,
+                        juce::String *LE_RESTRICT const pComment, PresetConsumer const consumer)
 {
 #ifdef LE_EXCEPTION_ON
     try
     {
 #endif // LE_EXCEPTION_ON
         Preset preset;
-        if ( preset.loadFrom( inMemoryPreset ) != true )
+        if (preset.loadFrom(inMemoryPreset) != true)
         {
             Preset::reportPresetLoadingError();
             return false;
         }
 
-    #if LE_SW_GUI
-        if ( pComment )
+#if LE_SW_GUI
+        if (pComment)
         {
-            auto const comment( preset.getComment() );
-            *pComment = juce::String::fromUTF8( comment.begin(), static_cast<unsigned int>( comment.size() ) );
+            auto const comment(preset.getComment());
+            *pComment =
+                juce::String::fromUTF8(comment.begin(), static_cast<unsigned int>(comment.size()));
         }
-    #else
-        LE_ASSUME( !pComment );
-    #endif
+#else
+    LE_ASSUME(!pComment);
+#endif
 
-        ParametersLoader parametersLoader( preset );
+        ParametersLoader parametersLoader(preset);
 
-        auto loader( consumer.presetLoader( ignoreExternalSample ) );
+        auto loader(consumer.presetLoader(ignoreExternalSample));
 
-    #if defined( LE_SW_DISABLE_SIDE_CHANNEL )
-        if ( !parametersLoader.getSampleFileName().empty() )
+#if defined(LE_SW_DISABLE_SIDE_CHANNEL)
+        if (!parametersLoader.getSampleFileName().empty())
         {
-        #if LE_SW_GUI
-            GUI::warningMessageBox
-            (
-                MB_WARNING,
-                "Loaded preset uses external sample files which are not supported by this edition of SpectrumWorx.",
-                false
-            );
-        #else
-            LE_TRACE
-            (
-                "Preset uses an external sample file which must be manually setup/loaded by the client application."
-            );
-        #endif
+#if LE_SW_GUI
+            GUI::warningMessageBox(MB_WARNING,
+                                   "Loaded preset uses external sample files which are not "
+                                   "supported by this edition of SpectrumWorx.",
+                                   false);
+#else
+            LE_TRACE("Preset uses an external sample file which must be manually setup/loaded by "
+                     "the client application.");
+#endif
         }
-    #else // "normal plugin build"
-        if ( loader.wantsSampleFile() )
-        {
-            // Implementation note:
-            //   The sample file name must be fetched before switching to module
-            // parameters (see the implementation of the
-            // ParametersLoader::getSampleFileName() member function).
-            //                                (15.12.2011.) (Domagoj Saric)
-            /// \todo Clean up this spaghetti.
-            ///                               (15.12.2011.) (Domagoj Saric)
-            loader.setSample( parametersLoader.getSampleFileName() );
-        }
-    #endif // side channel handling
+#else  // "normal plugin build"
+    if (loader.wantsSampleFile())
+    {
+        // Implementation note:
+        //   The sample file name must be fetched before switching to module
+        // parameters (see the implementation of the
+        // ParametersLoader::getSampleFileName() member function).
+        //                                (15.12.2011.) (Domagoj Saric)
+        /// \todo Clean up this spaghetti.
+        ///                               (15.12.2011.) (Domagoj Saric)
+        loader.setSample(parametersLoader.getSampleFileName());
+    }
+#endif // side channel handling
 
         GlobalParameters::Parameters newParameters;
-        boost::fusion::for_each( newParameters, parametersLoader );
-        auto & currentChain( loader.targetChain() );
+        boost::fusion::for_each(newParameters, parametersLoader);
+        auto &currentChain(loader.targetChain());
         //...mrmlj...clang's early template instantiation...AutomatedModuleChain newChain;
-        typename std::remove_reference<decltype( currentChain )>::type newChain;
+        typename std::remove_reference<decltype(currentChain)>::type newChain;
         {
-            auto const lock( loader.processingLock() ); //...mrmlj...
-            newChain = parametersLoader.loadModuleChain( currentChain );
-            boost::ignore_unused_variable_warning( lock );
+            auto const lock(loader.processingLock()); //...mrmlj...
+            newChain = parametersLoader.loadModuleChain(currentChain);
+            boost::ignore_unused_variable_warning(lock);
         }
-    #ifndef LE_SW_SDK_BUILD
-        if ( loader.onlySetParameters() )
+#ifndef LE_SW_SDK_BUILD
+        if (loader.onlySetParameters())
         {
             loader.targetGlobalParameters() = newParameters;
-            currentChain                    = std::move( newChain );
+            currentChain = std::move(newChain);
             return true;
         }
-    #endif // LE_SW_SDK_BUILD
+#endif // LE_SW_SDK_BUILD
 
         {
-            auto const automationBlocker( loader.automationBlocker() );
-            if ( !loader.setNewGlobalParameters( newParameters ) )
+            auto const automationBlocker(loader.automationBlocker());
+            if (!loader.setNewGlobalParameters(newParameters))
             {
                 Preset::reportPresetLoadingError();
                 return false;
             }
-            boost::ignore_unused_variable_warning( automationBlocker );
+            boost::ignore_unused_variable_warning(automationBlocker);
         }
 
-        auto const initialiseModule( loader.moduleInitialiser() );
+        auto const initialiseModule(loader.moduleInitialiser());
 
         using Module = typename PresetConsumer::Module;
-        std::uint8_t moduleIndex( 0 );
-        std::for_each
-        (
-            newChain.begin(),
-            newChain.end  (),
-            [&]( Engine::ModuleNode & module )
-            {
-                if ( !initialiseModule( Engine::actualModule<Module>( module ), moduleIndex++ ) )
-                    newChain.remove( module );
-            }
-        );
+        std::uint8_t moduleIndex(0);
+        std::for_each(newChain.begin(), newChain.end(), [&](Engine::ModuleNode &module) {
+            if (!initialiseModule(Engine::actualModule<Module>(module), moduleIndex++))
+                newChain.remove(module);
+        });
         {
-            auto const lock( loader.processingLock() ); //...mrmlj...
-            currentChain = std::move( newChain );
-            BOOST_ASSERT( newChain    .size() == 0           );
-            BOOST_ASSERT( currentChain.size() == moduleIndex );
-            boost::ignore_unused_variable_warning( lock );
+            auto const lock(loader.processingLock()); //...mrmlj...
+            currentChain = std::move(newChain);
+            BOOST_ASSERT(newChain.size() == 0);
+            BOOST_ASSERT(currentChain.size() == moduleIndex);
+            boost::ignore_unused_variable_warning(lock);
         }
-        loader.moduleChainFinished( moduleIndex, parametersLoader.syncedLFOFound() );
+        loader.moduleChainFinished(moduleIndex, parametersLoader.syncedLFOFound());
         return true;
 #ifdef LE_EXCEPTION_ON
     }
-    catch ( ... )
+    catch (...)
     {
         Preset::reportPresetLoadingError();
         return false;
@@ -581,37 +594,34 @@ bool LE_FASTCALL loadPreset
 
 #ifndef LE_SW_SDK_BUILD
 template <class PresetConsumer>
-bool LE_COLD LE_FASTCALL loadPreset
-(
-    juce::File   const  &       presetFile,
-    bool                  const ignoreExternalSample,
-    juce::String        * const pComment,
-    char_t       const  * const presetName,
-    PresetConsumer              consumer
-)
+bool LE_COLD loadPreset(juce::File const &presetFile, bool const ignoreExternalSample,
+                        juce::String *const pComment, char_t const *const presetName,
+                        PresetConsumer consumer)
 {
-    auto const pPresetData( Preset::loadIntoMemory( presetFile ) );
-    if ( !pPresetData.get() )
+    auto const pPresetData(Preset::loadIntoMemory(presetFile));
+    if (!pPresetData.get())
         return false;
-    consumer.notifyHostAboutPresetChangeBegin(); //...mrmlj...assumes host initiated change != loading from file
-    bool const success( loadPreset( pPresetData.get(), ignoreExternalSample, pComment, consumer ) );
-    if ( success )
+    consumer
+        .notifyHostAboutPresetChangeBegin(); //...mrmlj...assumes host initiated change != loading from file
+    bool const success(loadPreset(pPresetData.get(), ignoreExternalSample, pComment, consumer));
+    if (success)
     {
         /// \note Setting the new preset name can be important with VST2.4 hosts
         /// because of the way preset change notifications are implemented under
         /// that protocol (hosts usually react to audioMasterUpdateDisplay only
         /// if a program's name has changed).
         ///                                   (12.09.2014.) (Domagoj Saric)
-        copyToBuffer( presetName, consumer.program().name() );
+        copyToBuffer(presetName, consumer.program().name());
     }
     consumer.notifyHostAboutPresetChangeEnd();
     return success;
 }
 
-
 class Program;
-LE_NOTHROW void         savePreset( juce::File const &, juce::File const & externalSampleFile, juce::String const & comment, Program const & );
-LE_NOTHROW unsigned int savePreset( char * const data , juce::File const & externalSampleFile, juce::String const & comment, Program const & );
+LE_NOTHROW void savePreset(juce::File const &, juce::File const &externalSampleFile,
+                           juce::String const &comment, Program const &);
+LE_NOTHROW unsigned int savePreset(char *const data, juce::File const &externalSampleFile,
+                                   juce::String const &comment, Program const &);
 #endif // !LE_SW_SDK_BUILD
 
 LE_OPTIMIZE_FOR_SIZE_END()

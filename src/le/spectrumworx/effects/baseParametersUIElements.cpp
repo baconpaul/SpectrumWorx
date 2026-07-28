@@ -3,7 +3,8 @@
 /// baseParametersUIElements.cpp
 /// ----------------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -16,17 +17,18 @@ namespace LE
 //------------------------------------------------------------------------------
 namespace Parameters
 {
-    using namespace SW::Effects;
-    UI_NAME( BaseParameters::Bypass         ) = "Bypass"         ;
-    UI_NAME( BaseParameters::Gain           ) = "Gain"           ;
-    UI_NAME( BaseParameters::Wet            ) = "Wet"            ;
-    UI_NAME( BaseParameters::StartFrequency ) = "Start frequency";
-    UI_NAME( BaseParameters::StopFrequency  ) = "Stop frequency" ;
+using namespace SW::Effects;
+UI_NAME(BaseParameters::Bypass) = "Bypass";
+UI_NAME(BaseParameters::Gain) = "Gain";
+UI_NAME(BaseParameters::Wet) = "Wet";
+UI_NAME(BaseParameters::StartFrequency) = "Start frequency";
+UI_NAME(BaseParameters::StopFrequency) = "Stop frequency";
 
-    float DisplayValueTransformer<BaseParameters::StartFrequency>::transform( float const & value, SW::Engine::Setup const & engineSetup )
-    {
-        return engineSetup.normalisedFrequencyToHz( value );
-    }
+float DisplayValueTransformer<BaseParameters::StartFrequency>::transform(
+    float const &value, SW::Engine::Setup const &engineSetup)
+{
+    return engineSetup.normalisedFrequencyToHz(value);
+}
 } // namespace Parameters
 //------------------------------------------------------------------------------
 } // namespace LE

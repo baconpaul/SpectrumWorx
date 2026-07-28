@@ -3,7 +3,8 @@
 /// shapelessImpl.cpp
 /// -----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -33,7 +34,7 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Shapeless::title      [] = "Shapeless";
+char const Shapeless::title[] = "Shapeless";
 char const Shapeless::description[] = "Spectrum shape transfer.";
 
 /// \note Alex says: "Shapeless is a frequency shaper based on an algorithm.
@@ -50,14 +51,13 @@ char const Shapeless::description[] = "Spectrum shape transfer.";
 ///                                    (08.03.2010.) (Danijel Domazet)
 ///
 
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Shapeless UIElements definitions.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Shapeless::Width, "Shape width" )
+EFFECT_PARAMETER_NAME(Shapeless::Width, "Shape width")
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -66,11 +66,10 @@ EFFECT_PARAMETER_NAME( Shapeless::Width, "Shape width" )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void ShapelessImpl::setup( IndexRange const &, Engine::Setup const & engineSetup )
+void ShapelessImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
 {
-    width_ = engineSetup.frequencyInHzToBin( parameters().get<Width>() );
+    width_ = engineSetup.frequencyInHzToBin(parameters().get<Width>());
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -79,27 +78,29 @@ void ShapelessImpl::setup( IndexRange const &, Engine::Setup const & engineSetup
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void ShapelessImpl::process( Engine::MainSideChannelData_AmPh data, Engine::Setup const & ) const
+void ShapelessImpl::process(Engine::MainSideChannelData_AmPh data, Engine::Setup const &) const
 {
-    auto const width( width_ );
-    if ( !width )
+    auto const width(width_);
+    if (!width)
         return;
 
-    while ( data )
+    while (data)
     {
-        auto const currentWidth( std::min( data.size(), width ) );
-        auto *       LE_RESTRICT pMagnOut     ( data.main().amps().begin() );
-        auto *       LE_RESTRICT pMagnShape   ( data.side().amps().begin() );
-        data.advance_begin( currentWidth );
-        auto * const LE_RESTRICT pMagnOutEnd  ( data.main().amps().begin() );
-        auto * const LE_RESTRICT pMagnShapeEnd( data.side().amps().begin() );
+        auto const currentWidth(std::min(data.size(), width));
+        auto *LE_RESTRICT pMagnOut(data.main().amps().begin());
+        auto *LE_RESTRICT pMagnShape(data.side().amps().begin());
+        data.advance_begin(currentWidth);
+        auto *const LE_RESTRICT pMagnOutEnd(data.main().amps().begin());
+        auto *const LE_RESTRICT pMagnShapeEnd(data.side().amps().begin());
 
-        float const inOut  ( std::accumulate( pMagnOut  , pMagnOutEnd  , std::numeric_limits<float>::epsilon() ) );
-        float const inShape( std::accumulate( pMagnShape, pMagnShapeEnd, std::numeric_limits<float>::epsilon() ) );
+        float const inOut(
+            std::accumulate(pMagnOut, pMagnOutEnd, std::numeric_limits<float>::epsilon()));
+        float const inShape(
+            std::accumulate(pMagnShape, pMagnShapeEnd, std::numeric_limits<float>::epsilon()));
 
-        float const amplt( inOut / inShape );
+        float const amplt(inOut / inShape);
 
-        while ( pMagnOut != pMagnOutEnd )
+        while (pMagnOut != pMagnOutEnd)
         {
             *pMagnOut++ = amplt * *pMagnShape++;
         }

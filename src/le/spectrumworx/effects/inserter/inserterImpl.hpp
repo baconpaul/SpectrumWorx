@@ -3,13 +3,13 @@
 /// \file inserterImpl.hpp
 /// ----------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef inserterImpl_hpp__FBE18C67_5D60_4991_A6F1_5E5AAB7BA9B9
 #define inserterImpl_hpp__FBE18C67_5D60_4991_A6F1_5E5AAB7BA9B9
-#pragma once
 //------------------------------------------------------------------------------
 #include "inserter.hpp"
 
@@ -30,20 +30,19 @@ namespace Effects
 
 class InserterImpl : public EffectImpl<Inserter>
 {
-public: // LE::Effect required interface.
-
+  public: // LE::Effect required interface.
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup( IndexRange const &, Engine::Setup const & );
-    void process( Engine::MainSideChannelData_AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(Engine::MainSideChannelData_AmPh, Engine::Setup const &) const;
 
-private:
-    IndexRange::value_type source_    ;
-    IndexRange::value_type target_    ;
+  private:
+    IndexRange::value_type source_;
+    IndexRange::value_type target_;
     IndexRange::value_type insertSize_;
-    UnpackedMagPhaseMode   mode_      ;
+    UnpackedMagPhaseMode mode_;
 }; // class InserterImpl
 
 //------------------------------------------------------------------------------
@@ -54,4 +53,3 @@ private:
 } // namespace LE
 //------------------------------------------------------------------------------
 #endif // inserterImpl_hpp
-

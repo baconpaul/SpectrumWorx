@@ -3,14 +3,14 @@
 /// \file vaxateer.hpp
 /// ------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef vaxateer_hpp__BE1E8F69_E3AC_444F_91A4_4906B7C669E4
 #define vaxateer_hpp__BE1E8F69_E3AC_444F_91A4_4906B7C669E4
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -36,25 +36,21 @@ namespace Effects
 /// \ingroup Effects
 ///
 /// \brief Spectral composition based on RMS.
-/// 
-/// Conditional replacement of the Main signal with the Side-channel based on 
-/// the RMS value (Root Mean Square) of the target signal (can be Main or 
+///
+/// Conditional replacement of the Main signal with the Side-channel based on
+/// the RMS value (Root Mean Square) of the target signal (can be Main or
 /// Side-channel). If the "Swap condition" is satisfied, Main signal is replaced
-/// with the Side-channel content. There are eight available Swap conditions. 
-/// 
+/// with the Side-channel content. There are eight available Swap conditions.
+///
 ////////////////////////////////////////////////////////////////////////////////
 
 struct Vaxateer
 {
-    LE_ENUMERATED_PARAMETER( RMSTarget, ( MainRMS )( SideRMS )                           );
-    LE_ENUMERATED_PARAMETER( Mode     , ( M1 )( M2 )( M3 )( M4 )( M5 )( M6 )( M7 )( M8 ) );
+    LE_ENUMERATED_PARAMETER(RMSTarget, (MainRMS)(SideRMS));
+    LE_ENUMERATED_PARAMETER(Mode, (M1)(M2)(M3)(M4)(M5)(M6)(M7)(M8));
 
-    LE_DEFINE_PARAMETERS
-    (
-        ( ( RMSTarget ) )
-        ( ( RMSGain   ) ( SymmetricInteger )( MaximumOffset<24> )( Unit<' dB'> ) )  
-        ( ( Mode      ) )
-    );
+    LE_DEFINE_PARAMETERS(
+        ((RMSTarget))((RMSGain)(SymmetricInteger)(MaximumOffset<24>)(Unit<' dB'>))((Mode)));
 
     /// \typedef RMSTarget
     /// \brief Target channel for RMS calculation, can be Main or Side.
@@ -75,7 +71,7 @@ struct Vaxateer
 
     static bool const usesSideChannel = false;
 
-    static char const title      [];
+    static char const title[];
     static char const description[];
 };
 

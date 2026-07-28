@@ -3,14 +3,14 @@
 /// \file denoiser.hpp
 /// ------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef denoiser_hpp__8FEB141B_4DF4_4E5B_ABDE_D546693193E0
 #define denoiser_hpp__8FEB141B_4DF4_4E5B_ABDE_D546693193E0
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -35,23 +35,20 @@ namespace Effects
 ///
 /// \ingroup Effects
 ///
-/// \brief Performs denoising optionally using an external noise footprint. 
+/// \brief Performs denoising optionally using an external noise footprint.
 ///
-/// Applies the standard de-noising formula. Uses the side-channel input as a 
-/// noise footprint or a sum of Main and Side-channel. The main-channel will be 
-/// attenuated when the side-channel contains noise (in the latter case). 
+/// Applies the standard de-noising formula. Uses the side-channel input as a
+/// noise footprint or a sum of Main and Side-channel. The main-channel will be
+/// attenuated when the side-channel contains noise (in the latter case).
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
 struct Denoiser
 {
-    LE_ENUMERATED_PARAMETER( Mode, ( Main )( Side )( Sum ) );
+    LE_ENUMERATED_PARAMETER(Mode, (Main)(Side)(Sum));
 
-    LE_DEFINE_PARAMETERS
-    (
-        ( ( Mode      ) )
-        ( ( Intensity ) ( LinearUnsignedInteger )( Minimum<1> )( Maximum<100> )( Default<5> )( Unit<' %'> ) )
-    );
+    LE_DEFINE_PARAMETERS(((Mode))(
+        (Intensity)(LinearUnsignedInteger)(Minimum<1>)(Maximum<100>)(Default<5>)(Unit<' %'>)));
 
     /// \typedef Mode
     /// \brief Controls the noise footprint.
@@ -62,10 +59,9 @@ struct Denoiser
     /// \typedef Intensity
     /// \brief Controls the intensity of the de-noising algorithm.
 
-
     static bool const usesSideChannel = false;
 
-    static char const title      [];
+    static char const title[];
     static char const description[];
 };
 

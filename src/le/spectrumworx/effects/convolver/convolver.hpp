@@ -3,14 +3,14 @@
 /// \file convolver.hpp
 /// -------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef convolver_hpp__A7F10DAF_A6F4_44E2_B6B4_460805ACC405
 #define convolver_hpp__A7F10DAF_A6F4_44E2_B6B4_460805ACC405
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -35,28 +35,22 @@ namespace Effects
 ///
 /// \ingroup Effects
 ///
-/// \brief Performs multiplications in frequency domain i.e. convolution in 
+/// \brief Performs multiplications in frequency domain i.e. convolution in
 /// time domain.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
 struct Convolver
 {
-public: // LE::Algorithm required interface.
-
+  public: // LE::Algorithm required interface.
     ////////////////////////////////////////////////////////////////////////////
     // Parameters
     ////////////////////////////////////////////////////////////////////////////
 
-    LE_ENUMERATED_PARAMETER( ConvolutionType, ( Triggered )( Continuous ) );
-    LE_ENUMERATED_PARAMETER( Phase          , ( Sum )( Side )( Main )     );
+    LE_ENUMERATED_PARAMETER(ConvolutionType, (Triggered)(Continuous));
+    LE_ENUMERATED_PARAMETER(Phase, (Sum)(Side)(Main));
 
-    LE_DEFINE_PARAMETERS
-    (
-        ( ( ConvolutionType )                     )
-        ( ( GrabIR          )( TriggerParameter ) )
-        ( ( Phase           )                     )
-    );
+    LE_DEFINE_PARAMETERS(((ConvolutionType))((GrabIR)(TriggerParameter))((Phase)));
 
     /// \typedef ConvolutionType
     /// \brief Defines the type of convolution.
@@ -75,7 +69,7 @@ public: // LE::Algorithm required interface.
 
     static bool const usesSideChannel = false;
 
-    static char const title      [];
+    static char const title[];
     static char const description[];
 };
 

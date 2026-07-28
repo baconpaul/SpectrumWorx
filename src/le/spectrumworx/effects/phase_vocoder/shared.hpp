@@ -8,13 +8,13 @@
 /// component (previously every component wanting to use a part of the phase
 /// vocoder functionality had to hold and manage the whole PhaseVocoder object).
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef shared_hpp__7896AB45_1E91_4B7E_97CB_C49BA8FE8D54
 #define shared_hpp__7896AB45_1E91_4B7E_97CB_C49BA8FE8D54
-#pragma once
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/channelStateDynamic.hpp"
 #include "le/spectrumworx/effects/effects.hpp"
@@ -42,10 +42,10 @@ namespace PhaseVocoderShared
 //------------------------------------------------------------------------------
 
 #ifdef LE_PV_USE_TSS
-    #define LE_PV_TSS_DYNAMIC_THRESHOLD
-    #define LE_PV_TSS_SPECIFIC( ... ) __VA_ARGS__
+#define LE_PV_TSS_DYNAMIC_THRESHOLD
+#define LE_PV_TSS_SPECIFIC(...) __VA_ARGS__
 #else
-    #define LE_PV_TSS_SPECIFIC( ... )
+#define LE_PV_TSS_SPECIFIC(...)
 #endif // LE_PV_USE_TSS
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -56,28 +56,25 @@ namespace PhaseVocoderShared
 
 namespace Detail
 {
-    /// \note The analysis channel state uses the Array-of-Structures layout in
-    /// order to reduce the TSS related performance hit on 32 bit x86 targets
-    /// (because their small register file does not permit tracking all the
-    /// pointers that would be required in a SoA layout). Once the PV code is
-    /// vectorized this should be converted back to the SoA layout (as it was
-    /// in revisions up to 6142).
-    ///                                       (17.05.2012.) (Domagoj Saric)
-    struct AnalysisBinStateData
-    {
-        Engine::real_t lastPhase              ;
-    #ifdef LE_PV_USE_TSS
-        Engine::real_t lastLastPhase          ;
-        std::uint8_t   adaptiveThresholdFactor;
-        bool           transient              ;
-        bool           fellBelowThreshold     ;
-    #endif // LE_PV_USE_TSS
-    };
-    LE_NAMED_DYNAMIC_CHANNEL_STATE
-    (
-        AnalysisChannelStateBase,
-        ( ( Engine::HalfFFTBuffer<AnalysisBinStateData> )( binData ) )
-    );
+/// \note The analysis channel state uses the Array-of-Structures layout in
+/// order to reduce the TSS related performance hit on 32 bit x86 targets
+/// (because their small register file does not permit tracking all the
+/// pointers that would be required in a SoA layout). Once the PV code is
+/// vectorized this should be converted back to the SoA layout (as it was
+/// in revisions up to 6142).
+///                                       (17.05.2012.) (Domagoj Saric)
+struct AnalysisBinStateData
+{
+    Engine::real_t lastPhase;
+#ifdef LE_PV_USE_TSS
+    Engine::real_t lastLastPhase;
+    std::uint8_t adaptiveThresholdFactor;
+    bool transient;
+    bool fellBelowThreshold;
+#endif // LE_PV_USE_TSS
+};
+LE_NAMED_DYNAMIC_CHANNEL_STATE(AnalysisChannelStateBase,
+                               ((Engine::HalfFFTBuffer<AnalysisBinStateData>)(binData)));
 } // namespace Detail
 
 struct AnalysisChannelState : Detail::AnalysisChannelStateBase
@@ -85,13 +82,12 @@ struct AnalysisChannelState : Detail::AnalysisChannelStateBase
     void reset()
     {
         AnalysisChannelStateBase::reset();
-        previousScaleFactor = 1   ;
-        reinitializePhases  = true;
+        previousScaleFactor = 1;
+        reinitializePhases = true;
     }
     float previousScaleFactor;
-    bool  reinitializePhases;
+    bool reinitializePhases;
 }; // struct AnalysisChannelState
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -101,11 +97,14 @@ struct AnalysisChannelState : Detail::AnalysisChannelStateBase
 
 struct SynthesisChannelState : Engine::HalfFFTBuffer<Engine::real_t>
 {
-    DataRange const & phaseSum() { return *this; }
-    void reset() { this->clear(); binToReduce = 0; }
+    DataRange const &phaseSum() { return *this; }
+    void reset()
+    {
+        this->clear();
+        binToReduce = 0;
+    }
     std::uint16_t binToReduce;
 }; // struct SynthesisChannelState
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -119,40 +118,39 @@ struct SynthesisChannelState : Engine::HalfFFTBuffer<Engine::real_t>
 
 class BaseParameters
 {
-public:
-    float const & freqPerBin        () const { return     freqPerBin_     ; }
-    float const & expctRate         () const { return     expctRate_      ; }
-    float         deviationFactor   () const { return     deviationFactor_; }
-    float         invDeviationFactor() const { return 1 / deviationFactor_; }
+  public:
+    float const &freqPerBin() const { return freqPerBin_; }
+    float const &expctRate() const { return expctRate_; }
+    float deviationFactor() const { return deviationFactor_; }
+    float invDeviationFactor() const { return 1 / deviationFactor_; }
 #ifdef LE_PV_USE_TSS
 #ifdef LE_PV_TSS_DYNAMIC_THRESHOLD
-    BaseParameters() : tssDynamicThreshold_( 0.5f ) {} //...mrmlj...testing...
-    void setTSSDynamicThreshold( float const & value ) { tssDynamicThreshold_ = value; }
+    BaseParameters() : tssDynamicThreshold_(0.5f) {} //...mrmlj...testing...
+    void setTSSDynamicThreshold(float const &value) { tssDynamicThreshold_ = value; }
     bool tssOff() const { return tssDynamicThreshold_ == 1; }
-    float       tssThreshold           () const { return tssDynamicThreshold_ * tssThresholdFactor_; }
+    float tssThreshold() const { return tssDynamicThreshold_ * tssThresholdFactor_; }
 #else
-    float const & tssThresholdFactor   () const { return tssThresholdFactor_   ; }
+    float const &tssThresholdFactor() const { return tssThresholdFactor_; }
 #endif // LE_PV_TSS_DYNAMIC_THRESHOLD
-    float const & lowerSilenceThreshold() const { return lowerSilenceThreshold_; }
-    float const & upperSilenceThreshold() const { return upperSilenceThreshold_; }
+    float const &lowerSilenceThreshold() const { return lowerSilenceThreshold_; }
+    float const &upperSilenceThreshold() const { return upperSilenceThreshold_; }
 #endif // LE_PV_USE_TSS
 
-    void LE_FASTCALL setup( Engine::Setup const & );
+    void setup(Engine::Setup const &);
 
-private:
-    float  freqPerBin_     ;
-    float  expctRate_      ; ///< The expected rate of phase change per frame.
+  private:
+    float freqPerBin_;
+    float expctRate_; ///< The expected rate of phase change per frame.
     double deviationFactor_;
 #ifdef LE_PV_USE_TSS
-    float tssThresholdFactor_   ;
+    float tssThresholdFactor_;
     float lowerSilenceThreshold_;
     float upperSilenceThreshold_;
 #ifdef LE_PV_TSS_DYNAMIC_THRESHOLD
-    float tssDynamicThreshold_  ;
+    float tssDynamicThreshold_;
 #endif // LE_PV_TSS_DYNAMIC_THRESHOLD
 #endif // LE_PV_USE_TSS
 }; // class BaseParameters
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -162,22 +160,21 @@ private:
 
 class PitchShiftParameters
 {
-public: // Query interface.
-    float const & scale() const { return scale_; }
+  public: // Query interface.
+    float const &scale() const { return scale_; }
 
-    bool LE_FASTCALL skipProcessing() const;
+    bool skipProcessing() const;
 
-public: // Setup interface.
-    void LE_FASTCALL setScalingFactor( float newScale, std::uint16_t numberOfBins );
+  public: // Setup interface.
+    void setScalingFactor(float newScale, std::uint16_t numberOfBins);
 
-public: // Utility interface.
-    static float LE_FASTCALL scaleFromSemiTonesAndCents( float const & semiTones, std::int8_t cents );
-    static float LE_FASTCALL scaleFromSemiTones        ( float         semiTones                    );
+  public: // Utility interface.
+    static float scaleFromSemiTonesAndCents(float const &semiTones, std::int8_t cents);
+    static float scaleFromSemiTones(float semiTones);
 
-private:
+  private:
     float scale_;
 }; // class PitchShiftParameters
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -190,56 +187,51 @@ private:
 
 namespace Detail
 {
-    class StandaloneEffectBase : private BaseParameters
-    {
-    public:
-        using ChannelState = CompoundChannelState<AnalysisChannelState, SynthesisChannelState>;
+class StandaloneEffectBase : private BaseParameters
+{
+  public:
+    using ChannelState = CompoundChannelState<AnalysisChannelState, SynthesisChannelState>;
 
-    public: // LE::Effect interface.
-        using BaseParameters::setup;
+  public: // LE::Effect interface.
+    using BaseParameters::setup;
 
-    protected:
-        BaseParameters       & baseParameters()       { return *this; }
-        BaseParameters const & baseParameters() const { return *this; }
-    };
+  protected:
+    BaseParameters &baseParameters() { return *this; }
+    BaseParameters const &baseParameters() const { return *this; }
+};
 } // namespace Detail
 
 template <class PVDEffect, class SDKBaseClass>
-class StandaloneEffect
-    :
-    private PVDEffect,
-    private Detail::StandaloneEffectBase,
-    public  SDKBaseClass
+class StandaloneEffect : private PVDEffect,
+                         private Detail::StandaloneEffectBase,
+                         public SDKBaseClass
 {
-public:
+  public:
     using Parameters = typename PVDEffect::Parameters;
 
-    using SDKBaseClass::title;
     using SDKBaseClass::description;
+    using SDKBaseClass::title;
     using SDKBaseClass::usesSideChannel;
 
     using PVDEffect::parameters;
 
-    using ChannelState = CompoundChannelState
-    <
-        typename PVDEffect          ::ChannelState,
-        Detail::StandaloneEffectBase::ChannelState
-    >;
+    using ChannelState = CompoundChannelState<typename PVDEffect ::ChannelState,
+                                              Detail::StandaloneEffectBase::ChannelState>;
 
-    void setup( IndexRange const & workingRange, Engine::Setup const & engineSetup )
+    void setup(IndexRange const &workingRange, Engine::Setup const &engineSetup)
     {
-        Detail::StandaloneEffectBase::setup( engineSetup               );
-                PVDEffect           ::setup( workingRange, engineSetup );
+        Detail::StandaloneEffectBase::setup(engineSetup);
+        PVDEffect ::setup(workingRange, engineSetup);
     }
 
-    void process( ChannelState & channelState, Engine::ChannelData_AmPh data, Engine::Setup const & engineSetup ) const
+    void process(ChannelState &channelState, Engine::ChannelData_AmPh data,
+                 Engine::Setup const &engineSetup) const
     {
-        analysis          ( channelState, data.full()         , baseParameters() );
-        PVDEffect::process( channelState, data                , engineSetup      );
-        synthesis         ( channelState, data.full().phases(), baseParameters() );
+        analysis(channelState, data.full(), baseParameters());
+        PVDEffect::process(channelState, data, engineSetup);
+        synthesis(channelState, data.full().phases(), baseParameters());
     }
 }; // class StandaloneEffect
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -262,37 +254,45 @@ public:
 
 namespace Detail
 {
-    BOOST_MPL_HAS_XXX_TRAIT_DEF( ChannelState );
+BOOST_MPL_HAS_XXX_TRAIT_DEF(ChannelState);
 
-    struct DummyChannelStateHolder { struct ChannelState : StaticChannelState { void reset() {} }; };
+struct DummyChannelStateHolder
+{
+    struct ChannelState : StaticChannelState
+    {
+        void reset() {}
+    };
+};
 } // namespace Detail
 
 class PVPitchShifter
 {
-public:
+  public:
     bool skipProcessing() const { return pitchShiftParameters().skipProcessing(); }
 
-public: // LE::Effect interface.
-    void setup( Engine::Setup const & ) {}
+  public: // LE::Effect interface.
+    void setup(Engine::Setup const &) {}
 
-    void LE_FASTCALL process( float pitchScale, Engine::ChannelData_AmPh &&, Engine::Setup const & ) const;
-    void LE_FASTCALL process(                   Engine::ChannelData_AmPh &&                        ) const;
+    void process(float pitchScale, Engine::ChannelData_AmPh &&, Engine::Setup const &) const;
+    void process(Engine::ChannelData_AmPh &&) const;
 
-    void LE_FORCEINLINE process( Engine::ChannelData_AmPh && data, Engine::Setup const & ) const { process( std::forward<Engine::ChannelData_AmPh>( data ) ); }
+    void LE_FORCEINLINE process(Engine::ChannelData_AmPh &&data, Engine::Setup const &) const
+    {
+        process(std::forward<Engine::ChannelData_AmPh>(data));
+    }
 
-public:
-    void LE_FASTCALL setPitchScaleFromSemitones( float semitones, std::uint16_t numberOfBins );
+  public:
+    void setPitchScaleFromSemitones(float semitones, std::uint16_t numberOfBins);
 
-protected:
-    void LE_FASTCALL setDynamicScalingFactor( float newScale, std::uint16_t numberOfBins ) const;
+  protected:
+    void setDynamicScalingFactor(float newScale, std::uint16_t numberOfBins) const;
 
-    PitchShiftParameters const & pitchShiftParameters() const { return pitchShiftParameters_; }
-    PitchShiftParameters       & pitchShiftParameters()       { return pitchShiftParameters_; }
+    PitchShiftParameters const &pitchShiftParameters() const { return pitchShiftParameters_; }
+    PitchShiftParameters &pitchShiftParameters() { return pitchShiftParameters_; }
 
-private:
+  private:
     PitchShiftParameters pitchShiftParameters_;
 }; // class PVPitchShifter
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -304,21 +304,22 @@ private:
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class PitchShifter
-    :
-    public PVPitchShifter,
-    public Detail::StandaloneEffectBase
+class PitchShifter : public PVPitchShifter, public Detail::StandaloneEffectBase
 {
-public: // LE::Effect interface.
+  public: // LE::Effect interface.
     using Detail::StandaloneEffectBase::setup;
 
-    void LE_FASTCALL process( float pitchScale, ChannelState &, Engine::ChannelData_AmPh &&, Engine::Setup const & ) const;
-    void LE_FASTCALL process(                   ChannelState &, Engine::ChannelData_AmPh &&                        ) const;
+    void process(float pitchScale, ChannelState &, Engine::ChannelData_AmPh &&,
+                 Engine::Setup const &) const;
+    void process(ChannelState &, Engine::ChannelData_AmPh &&) const;
 
-  //void LE_FORCEINLINE process( ChannelState & channelState, Engine::ChannelData_AmPh && data, Engine::Setup const & ) const { process( channelState, std::forward<Engine::ChannelData_AmPh>( data ) ); }
-    void LE_FORCEINLINE process( ChannelState & channelState, Engine::ChannelData_AmPh    data, Engine::Setup const & ) const { process( channelState, std::forward<Engine::ChannelData_AmPh>( data ) ); }
+    //void LE_FORCEINLINE process( ChannelState & channelState, Engine::ChannelData_AmPh && data, Engine::Setup const & ) const { process( channelState, std::forward<Engine::ChannelData_AmPh>( data ) ); }
+    void LE_FORCEINLINE process(ChannelState &channelState, Engine::ChannelData_AmPh data,
+                                Engine::Setup const &) const
+    {
+        process(channelState, std::forward<Engine::ChannelData_AmPh>(data));
+    }
 }; // class PitchShifter
-
 
 ////////////////////////////////////////////////////////////////////////////////
 /// \internal
@@ -326,40 +327,29 @@ public: // LE::Effect interface.
 /// \brief Helper for creating combined ChannelState structures.
 ////////////////////////////////////////////////////////////////////////////////
 
-template <class ChannelStateHolder1, bool hasChannelState1, class ChannelStateHolder2, bool hasChannelState2>
-class CombineAndOverrideChannelState
-    :
-    public ChannelStateHolder1,
-    public ChannelStateHolder2
+template <class ChannelStateHolder1, bool hasChannelState1, class ChannelStateHolder2,
+          bool hasChannelState2>
+class CombineAndOverrideChannelState : public ChannelStateHolder1, public ChannelStateHolder2
 {
-private:
-    using ChannelState1 = typename boost::mpl::if_c
-    <
-        hasChannelState1,
-        ChannelStateHolder1,
-        Detail::DummyChannelStateHolder
-    >::type::ChannelState;
+  private:
+    using ChannelState1 =
+        typename boost::mpl::if_c<hasChannelState1, ChannelStateHolder1,
+                                  Detail::DummyChannelStateHolder>::type::ChannelState;
 
-    using ChannelState2 = typename boost::mpl::if_c
-    <
-        hasChannelState2,
-        ChannelStateHolder2,
-        Detail::DummyChannelStateHolder
-    >::type::ChannelState;
+    using ChannelState2 =
+        typename boost::mpl::if_c<hasChannelState2, ChannelStateHolder2,
+                                  Detail::DummyChannelStateHolder>::type::ChannelState;
 
-public:
+  public:
     using ChannelState = CompoundChannelState<ChannelState1, ChannelState2>;
 }; // class CombineAndOverrideChannelState
 
 template <class ChannelStateHolder1, class ChannelStateHolder2>
 class CombineAndOverrideChannelState<ChannelStateHolder1, false, ChannelStateHolder2, false>
-    :
-    public ChannelStateHolder1,
-    public ChannelStateHolder2
+    : public ChannelStateHolder1, public ChannelStateHolder2
 {
     // no channel state
 };
-
 
 ////////////////////////////////////////////////////////////////////////////////
 /// \internal
@@ -374,37 +364,25 @@ class CombineAndOverrideChannelState<ChannelStateHolder1, false, ChannelStateHol
 ///                              or PVPitchShifter).
 ////////////////////////////////////////////////////////////////////////////////
 
-template
-<
-    class EffectBase,
-    class PitchShifterHelper
->
+template <class EffectBase, class PitchShifterHelper>
 class PitchShifterBasedEffect
-    :
-    public CombineAndOverrideChannelState
-    <
-        EffectBase,
-        Detail::has_ChannelState<EffectBase        >::value,
-        PitchShifterHelper,
-        Detail::has_ChannelState<PitchShifterHelper>::value
-    >
+    : public CombineAndOverrideChannelState<EffectBase, Detail::has_ChannelState<EffectBase>::value,
+                                            PitchShifterHelper,
+                                            Detail::has_ChannelState<PitchShifterHelper>::value>
 {
-public:  // LE::Effect interface.
-    void setup
-    (
-        IndexRange    const & workingRange,
-        Engine::Setup const & engineSetup
-    )
+  public: // LE::Effect interface.
+    void setup(IndexRange const &workingRange, Engine::Setup const &engineSetup)
     {
-        PitchShifterHelper::setup( engineSetup               );
-        EffectBase        ::setup( workingRange, engineSetup );
+        PitchShifterHelper::setup(engineSetup);
+        EffectBase ::setup(workingRange, engineSetup);
     }
 }; // class PitchShifterBasedEffect
 
-
-void LE_NOTHROWNOALIAS LE_FASTCALL analysis ( AnalysisChannelState  &, Engine::FullChannelData_AmPh &          , BaseParameters       const & );
-void LE_NOTHROWNOALIAS LE_FASTCALL synthesis( SynthesisChannelState &, DataRange const & anaFreqInSynthPhaseOut, BaseParameters       const & );
-void LE_NOTHROWNOALIAS LE_FASTCALL pitchShiftAndScale( Engine::ChannelData_AmPh &                              , PitchShiftParameters const & );
+void LE_NOTHROWNOALIAS analysis(AnalysisChannelState &, Engine::FullChannelData_AmPh &,
+                                BaseParameters const &);
+void LE_NOTHROWNOALIAS synthesis(SynthesisChannelState &, DataRange const &anaFreqInSynthPhaseOut,
+                                 BaseParameters const &);
+void LE_NOTHROWNOALIAS pitchShiftAndScale(Engine::ChannelData_AmPh &, PitchShiftParameters const &);
 
 //------------------------------------------------------------------------------
 } // namespace PhaseVocoderShared

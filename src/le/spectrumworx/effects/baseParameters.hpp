@@ -5,14 +5,14 @@
 ///
 /// Base parameters included by all effects.
 ///
-/// Copyright (c) 2011 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2011 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef baseParameters_hpp__8696E957_A8FB_469A_9725_CB6F63216163
 #define baseParameters_hpp__8696E957_A8FB_469A_9725_CB6F63216163
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "parameters.hpp"
@@ -46,14 +46,10 @@ namespace BaseParameters
 /// \brief Basic parameters included by all effects
 /// @{
 
-LE_DEFINE_PARAMETERS
-(
-    ( ( Bypass         )( Boolean        )                                                              )
-    ( ( Gain           )( SymmetricFloat )( MaximumOffset<20> )                         ( Unit<' dB'> ) )
-    ( ( Wet            )( LinearFloat    )( Minimum<0> )( Maximum<100> )( Default<100> )( Unit<' %' > ) )
-    ( ( StartFrequency )( LinearFloat    )( Minimum<0> )( Maximum<  1> )( Default<  0> )                )
-    ( ( StopFrequency  )( LinearFloat    )( Minimum<0> )( Maximum<  1> )( Default<  1> )                )
-);
+LE_DEFINE_PARAMETERS(((Bypass)(Boolean))((Gain)(SymmetricFloat)(MaximumOffset<20>)(Unit<' dB'>))(
+    (Wet)(LinearFloat)(Minimum<0>)(Maximum<100>)(Default<100>)(Unit<' %'>))(
+    (StartFrequency)(LinearFloat)(Minimum<0>)(Maximum<1>)(Default<0>))(
+    (StopFrequency)(LinearFloat)(Minimum<0>)(Maximum<1>)(Default<1>)));
 
 /// \typedef Parameters
 /// \brief Basic parameters shared/included by all effects.

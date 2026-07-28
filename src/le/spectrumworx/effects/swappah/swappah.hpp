@@ -3,14 +3,14 @@
 /// \file swappah.hpp
 /// -----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef swappah_hpp__8B69F4EC_B747_4300_B33F_701BABBE80F9
 #define swappah_hpp__8B69F4EC_B747_4300_B33F_701BABBE80F9
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -38,9 +38,9 @@ namespace Effects
 ///
 /// \brief Swaps three spectral bands, low, mid and high.
 ///
-/// Swaps the three frequency bands determined by the band borders. Swap order 
-/// is determined by the Swap order parameter. 
-/// 
+/// Swaps the three frequency bands determined by the band borders. Swap order
+/// is determined by the Swap order parameter.
+///
 ////////////////////////////////////////////////////////////////////////////////
 
 struct Swappah
@@ -50,15 +50,12 @@ struct Swappah
     typedef CommonParameters::Mode Mode;
     /// @}
 
-    LE_ENUMERATED_PARAMETER( BandOrder, ( LowHighMid )( MidLowHigh )( MidHighLow )( HighLowMid )( HighMidLow ) );
-    
-    LE_DEFINE_PARAMETERS
-    (
-        ( ( Mode        ) )
-        ( ( BandOrder   ) )
-        ( ( BandLowMid  )( LinearUnsignedInteger )( Minimum<0> )( Maximum<100> )( Default<33> )( Unit<' bw%'> ) )
-        ( ( BandMidHigh )( LinearUnsignedInteger )( Minimum<0> )( Maximum<100> )( Default<66> )( Unit<' bw%'> ) )
-    );
+    LE_ENUMERATED_PARAMETER(BandOrder,
+                            (LowHighMid)(MidLowHigh)(MidHighLow)(HighLowMid)(HighMidLow));
+
+    LE_DEFINE_PARAMETERS(((Mode))((BandOrder))(
+        (BandLowMid)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<33>)(Unit<' bw%'>))(
+        (BandMidHigh)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<66>)(Unit<' bw%'>)));
 
     /// \typedef Mode
     /// \brief Specifies what is to be swapped.
@@ -73,7 +70,7 @@ struct Swappah
     ///    - MidLowHigh: mid-low-high is output.
     ///    - MidHighLow: mid-high-low is output.
     ///    - HighLowMid: high-low-mid is output.
-    ///    - HighMidLow: high-mid-low is output.     
+    ///    - HighMidLow: high-mid-low is output.
     /// \typedef BandLowMid
     /// \brief Determines the border between low and mid band.
     /// \typedef BandMidHigh
@@ -81,7 +78,7 @@ struct Swappah
 
     static bool const usesSideChannel = false;
 
-    static char const title      [];
+    static char const title[];
     static char const description[];
 };
 

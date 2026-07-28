@@ -3,14 +3,14 @@
 /// \file slicer.hpp
 /// ----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef slicer_hpp__5484C80F_BF0B_46A9_BCB8_8F68F22B46DA
 #define slicer_hpp__5484C80F_BF0B_46A9_BCB8_8F68F22B46DA
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -37,21 +37,19 @@ namespace Effects
 ///
 /// \brief Slice the signal into two parts.
 ///
-/// This effect slices the signal into chunks that are alternated with one of 
+/// This effect slices the signal into chunks that are alternated with one of
 /// three different options.
-/// 
+///
 ////////////////////////////////////////////////////////////////////////////////
 
 struct Slicer
 {
-    LE_ENUMERATED_PARAMETER( Mode, ( Hold )( Silence )( Side ) );
+    LE_ENUMERATED_PARAMETER(Mode, (Hold)(Silence)(Side));
 
-    LE_DEFINE_PARAMETERS
-    (         
-        ( ( TimeOn  )( LinearUnsignedInteger )( Minimum<10> )( Maximum<1000> )( Default<250> )( Unit<' ms'> ) )    
-        ( ( TimeOff )( LinearUnsignedInteger )( Minimum<10> )( Maximum<1000> )( Default<100> )( Unit<' ms'> ) )
-        ( ( Mode    )                                                                                         )
-    );
+    LE_DEFINE_PARAMETERS(
+        ((TimeOn)(LinearUnsignedInteger)(Minimum<10>)(Maximum<1000>)(Default<250>)(Unit<' ms'>))((
+            TimeOff)(LinearUnsignedInteger)(Minimum<10>)(Maximum<1000>)(Default<100>)(Unit<' ms'>))(
+            (Mode)));
 
     /// \typedef TimeOn
     /// \brief Determines the length of the main input slices, this slice goes
@@ -67,7 +65,7 @@ struct Slicer
 
     static bool const usesSideChannel = false;
 
-    static char const title      [];
+    static char const title[];
     static char const description[];
 };
 

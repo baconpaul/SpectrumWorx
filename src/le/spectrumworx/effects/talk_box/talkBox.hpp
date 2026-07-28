@@ -3,14 +3,14 @@
 /// \file talkBox.hpp
 /// -----------------
 ///
-/// Copyright (c) 2015 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2015 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef talkBox_hpp__5FCE18B2_5D73_4BE1_A361_A694B2655204
 #define talkBox_hpp__5FCE18B2_5D73_4BE1_A361_A694B2655204
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -44,20 +44,15 @@ struct TalkBox
 {
     /// \name Parameters
     /// @{
-    typedef Synth::HarmonicSlope   HarmonicSlope  ;
+    typedef Synth::HarmonicSlope HarmonicSlope;
     typedef Synth::FlangeIntensity FlangeIntensity;
-    typedef Synth::FlangeOffset    FlangeOffset   ;
+    typedef Synth::FlangeOffset FlangeOffset;
     /// @}
 
-    LE_DEFINE_PARAMETERS
-    (
-        ( ( ExternalCarrier ) ( Boolean ) )
-        ( ( BaseFrequency   ) ( LinearFloat )( Minimum<40> )( Maximum<400> )( Default<100> ) )
-        ( ( CutOff          ) ( LinearUnsignedInteger )( Minimum<0> )( Maximum<12000> )( Default<9000> )( Unit< 'Hz'> ) )
-        ( ( HarmonicSlope   ) )
-        ( ( FlangeIntensity ) )
-        ( ( FlangeOffset    ) )
-    );
+    LE_DEFINE_PARAMETERS(((ExternalCarrier)(Boolean))(
+        (BaseFrequency)(LinearFloat)(Minimum<40>)(Maximum<400>)(Default<100>))(
+        (CutOff)(LinearUnsignedInteger)(Minimum<0>)(Maximum<12000>)(Default<9000>)(Unit<'Hz'>))(
+        (HarmonicSlope))((FlangeIntensity))((FlangeOffset)));
 
     /// \typedef BaseFrequency
     /// \brief .
@@ -68,7 +63,7 @@ struct TalkBox
 
     static bool const usesSideChannel = false;
 
-    static char const title      [];
+    static char const title[];
     static char const description[];
 }; // struct TalkBox
 

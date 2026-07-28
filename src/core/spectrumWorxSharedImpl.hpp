@@ -3,18 +3,18 @@
 /// \file spectrumWorxSharedImpl.hpp
 /// --------------------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef spectrumWorxSharedImpl_hpp__41090002_3305_4404_9DB4_FCAEFB31B564
 #define spectrumWorxSharedImpl_hpp__41090002_3305_4404_9DB4_FCAEFB31B564
-#pragma once
 //------------------------------------------------------------------------------
 #if LE_SW_SEPARATED_DSP_GUI || !LE_SW_GUI
-    #include "core/spectrumWorxCore.hpp"
+#include "core/spectrumWorxCore.hpp"
 #else
-    #include "spectrumWorx.hpp"
+#include "spectrumWorx.hpp"
 #endif
 
 #include "core/host_interop/host2PluginImpl.hpp"
@@ -38,22 +38,21 @@ namespace SW
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-#pragma warning( push )
-#pragma warning( disable : 4127 ) // Conditional expression is constant.
+#pragma warning(push)
+#pragma warning(disable : 4127) // Conditional expression is constant.
 
 template <class Impl, class Protocol>
 class LE_NOVTABLE SpectrumWorxSharedImpl
-    :
-    public Plugins::Plugin                       <Impl, Protocol              >,
-    public SW     ::Host2PluginInteropImpl       <Impl, Protocol              >,
-    public SW     ::Plugin2HostPassiveInteropImpl<Impl, Protocol              >,
+    : public Plugins::Plugin<Impl, Protocol>,
+      public SW ::Host2PluginInteropImpl<Impl, Protocol>,
+      public SW ::Plugin2HostPassiveInteropImpl<Impl, Protocol>,
 #if !LE_SW_GUI || LE_SW_SEPARATED_DSP_GUI
-    public SpectrumWorxCore
+      public SpectrumWorxCore
 #else
-    public SW     ::Plugin2HostActiveInteropImpl <Impl, Protocol, SpectrumWorx>
+      public SW ::Plugin2HostActiveInteropImpl<Impl, Protocol, SpectrumWorx>
 #endif // LE_SW_SEPARATED_DSP_GUI
 {
-protected:
+  protected:
 #if !LE_SW_GUI || LE_SW_SEPARATED_DSP_GUI
     typedef SpectrumWorxCore Base;
 #else
@@ -61,19 +60,19 @@ protected:
 #endif // !LE_SW_GUI || LE_SW_SEPARATED_DSP_GUI
 
 #if LE_SW_ENGINE_INPUT_MODE >= 1
-    typedef SpectrumWorxCore::InputMode     InputMode    ;
+    typedef SpectrumWorxCore::InputMode InputMode;
 #endif // LE_SW_ENGINE_INPUT_MODE >= 1
     typedef SpectrumWorxCore::MixPercentage MixPercentage;
-    typedef SpectrumWorxCore::Parameters    Parameters   ;
+    typedef SpectrumWorxCore::Parameters Parameters;
 
     typedef typename Plugins::ErrorCode<Protocol>::value_type ErrorCode;
 
-public:
-    typedef Plugins::Plugin<Impl, Protocol>                         PluginPlatform    ;
+  public:
+    typedef Plugins::Plugin<Impl, Protocol> PluginPlatform;
     typedef typename Plugins::AutomatedParameterFor<Protocol>::type AutomatedParameter;
 
-public: // Plugin framework interface
-    explicit SpectrumWorxSharedImpl( typename PluginPlatform::ConstructionParameter );
+  public: // Plugin framework interface
+    explicit SpectrumWorxSharedImpl(typename PluginPlatform::ConstructionParameter);
 
     //...mrmlj...
     using Plugin2HostPassiveInteropImpl<Impl, Protocol>::getParameterDisplay;
@@ -81,20 +80,20 @@ public: // Plugin framework interface
     using Plugin2HostPassiveInteropImpl<Impl, Protocol>::getParameterName;
     using Plugin2HostPassiveInteropImpl<Impl, Protocol>::getParameterProperties;
     using Plugin2HostPassiveInteropImpl<Impl, Protocol>::getParameter;
-    using Host2PluginInteropImpl       <Impl, Protocol>::setParameter;
+    using Host2PluginInteropImpl<Impl, Protocol>::setParameter;
 
-    using Host2PluginInteropImpl       <Impl, Protocol>::isHost; //...mrmlj...
+    using Host2PluginInteropImpl<Impl, Protocol>::isHost; //...mrmlj...
 
     friend class Host2PluginInteropImpl<Impl, Protocol>;
 
     ErrorCode LE_NOTHROW initialise();
 
-    void LE_NOTHROW process( float const * const * inputs, float * * outputs, std::uint32_t samples );
+    void LE_NOTHROW process(float const *const *inputs, float **outputs, std::uint32_t samples);
 
 #if LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
     typedef SpectrumWorx::Editor Editor;
 
-    bool createGUI( typename PluginPlatform::Editor::WindowHandle const parentWindow )
+    bool createGUI(typename PluginPlatform::Editor::WindowHandle const parentWindow)
     {
         // Implementation note:
         //   Some hosts (e.g. Sonar 8) are unable to give the timing information
@@ -104,19 +103,19 @@ public: // Plugin framework interface
         // process() function has not yet been called).
         //                                    (28.01.2011.) (Domagoj Saric)
         updateTimingInformation();
-        if ( SpectrumWorx::createGUI() )
+        if (SpectrumWorx::createGUI())
         {
-            this->gui()->attachToHostWindow( parentWindow );
+            this->gui()->attachToHostWindow(parentWindow);
             return true;
         }
         return false;
     }
 #endif // LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
 
-public:
+  public:
     using Base::setGlobalParameter;
 
-protected:
+  protected:
     using PluginPlatform::impl;
 
 #if LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
@@ -124,37 +123,39 @@ protected:
     // Programs and presets
     ////////////////////////////////////////////////////////////////////////////
 
-    public:
-        using Base::setProgramName;
-        using Base::getProgramName;
-        using Base::saveProgramState;
-        using Base::loadProgramState;
+  public:
+    using Base::getProgramName;
+    using Base::loadProgramState;
+    using Base::saveProgramState;
+    using Base::setProgramName;
 
     //private:...mrmlj...
-        void markCurrentProgramAsModified() const
+    void markCurrentProgramAsModified() const
+    {
+        typename PluginPlatform::ProgramNameBuf &programName(
+            const_cast<typename PluginPlatform::ProgramNameBuf &>(
+                reinterpret_cast<typename PluginPlatform::ProgramNameBuf const &>(
+                    this->program().name())));
+        if (programName[0] != '*')
         {
-            typename PluginPlatform::ProgramNameBuf & programName( const_cast<typename PluginPlatform::ProgramNameBuf &>( reinterpret_cast<typename PluginPlatform::ProgramNameBuf const &>( this->program().name() ) ) );
-            if ( programName[ 0 ] != '*' )
-            {
-                std::memmove( &programName[ 1 ], &programName[ 0 ], sizeof( programName ) - 1 );
-                programName[                         0 ] = '*';
-                programName[ sizeof( programName ) - 1 ] = 0  ;
+            std::memmove(&programName[1], &programName[0], sizeof(programName) - 1);
+            programName[0] = '*';
+            programName[sizeof(programName) - 1] = 0;
 
-                this->host().currentPresetNameChanged();
-            }
+            this->host().currentPresetNameChanged();
         }
-
+    }
 
     ////////////////////////////////////////////////////////////////////////////
     // Timing information
     ////////////////////////////////////////////////////////////////////////////
 
-    private:
-        LE_NOTHROW bool updateTimingInformation();
+  private:
+    LE_NOTHROW bool updateTimingInformation();
 #endif // LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
 }; // class SpectrumWorxSharedImpl
 
-#pragma warning( pop )
+#pragma warning(pop)
 
 //------------------------------------------------------------------------------
 } // namespace SW

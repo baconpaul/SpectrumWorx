@@ -3,7 +3,8 @@
 /// freqnamicsImpl.cpp
 /// ------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -31,9 +32,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Freqnamics::title      [] = "Freqnamics";
+char const Freqnamics::title[] = "Freqnamics";
 char const Freqnamics::description[] = "Limit and noise-gate.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -41,9 +41,8 @@ char const Freqnamics::description[] = "Limit and noise-gate.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Freqnamics::LimiterThreshold  , "Limiter"    )
-EFFECT_PARAMETER_NAME( Freqnamics::NoisegateThreshold, "Noise gate" )
-
+EFFECT_PARAMETER_NAME(Freqnamics::LimiterThreshold, "Limiter")
+EFFECT_PARAMETER_NAME(Freqnamics::NoisegateThreshold, "Noise gate")
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -52,14 +51,13 @@ EFFECT_PARAMETER_NAME( Freqnamics::NoisegateThreshold, "Noise gate" )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void FreqnamicsImpl::setup( IndexRange const &, Engine::Setup const & engineSetup )
+void FreqnamicsImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
 {
-    float const zeroDecibel( engineSetup.maximumAmplitude() );
+    float const zeroDecibel(engineSetup.maximumAmplitude());
 
-    thrLimiter_   = zeroDecibel * Math::dB2NormalisedLinear( parameters().get<LimiterThreshold  >() );
-    thrNoisegate_ = zeroDecibel * Math::dB2NormalisedLinear( parameters().get<NoisegateThreshold>() );
+    thrLimiter_ = zeroDecibel * Math::dB2NormalisedLinear(parameters().get<LimiterThreshold>());
+    thrNoisegate_ = zeroDecibel * Math::dB2NormalisedLinear(parameters().get<NoisegateThreshold>());
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -68,15 +66,13 @@ void FreqnamicsImpl::setup( IndexRange const &, Engine::Setup const & engineSetu
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void FreqnamicsImpl::process( Engine::ChannelData_AmPh data, Engine::Setup const & ) const
+void FreqnamicsImpl::process(Engine::ChannelData_AmPh data, Engine::Setup const &) const
 {
-    float const limit( thrLimiter_   );
-    float const gate ( thrNoisegate_ );
-    for ( auto & amp : data.amps() )
+    float const limit(thrLimiter_);
+    float const gate(thrNoisegate_);
+    for (auto &amp : data.amps())
     {
-        amp = ( amp < gate )
-            ? 0
-            : std::min( amp, limit );
+        amp = (amp < gate) ? 0 : std::min(amp, limit);
     }
 }
 

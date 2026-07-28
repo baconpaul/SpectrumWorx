@@ -3,14 +3,14 @@
 /// \file slewLimiter.hpp
 /// ---------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef slewLimiter_hpp__3E24E3B5_8DED_4323_8369_F01D41240B98
 #define slewLimiter_hpp__3E24E3B5_8DED_4323_8369_F01D41240B98
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -38,26 +38,23 @@ namespace Effects
 /// \ingroup Effects
 ///
 /// \brief Limits maximum per-bin magnitude change speed.
-/// 
-/// Limits the speed of change of the magnitudes. The direction and the rate 
-/// of the slew are selectable. 
+///
+/// Limits the speed of change of the magnitudes. The direction and the rate
+/// of the slew are selectable.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
 struct SlewLimiter
 {
-private:
+  private:
     typedef boost::mpl::string<' dB/', 's'> DecibelsPerSecond;
 
-public:
-    LE_ENUMERATED_PARAMETER( Direction, ( RiseFall )( Rise )( Fall ) );
+  public:
+    LE_ENUMERATED_PARAMETER(Direction, (RiseFall)(Rise)(Fall));
 
-    LE_DEFINE_PARAMETERS
-    (
-        ( ( Direction ) ) 
-        ( ( SlewRate  ) ( LinearFloat )( Minimum<0> )( Maximum<300> )( Default<50> )( Unit2<DecibelsPerSecond> ) )
-    );
-    
+    LE_DEFINE_PARAMETERS(((Direction))(
+        (SlewRate)(LinearFloat)(Minimum<0>)(Maximum<300>)(Default<50>)(Unit2<DecibelsPerSecond>)));
+
     /// \typedef Direction
     /// \brief Determines the slew direction.
     /// \details
@@ -69,7 +66,7 @@ public:
 
     static bool const usesSideChannel = false;
 
-    static char const title      [];
+    static char const title[];
     static char const description[];
 };
 

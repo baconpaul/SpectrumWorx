@@ -3,13 +3,13 @@
 /// \file linear/tag.hpp
 /// --------------------
 ///
-/// Copyright (c) 2011 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2011 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef tag_hpp__AC776212_E8E5_4781_922F_DC16639D2364
 #define tag_hpp__AC776212_E8E5_4781_922F_DC16639D2364
-#pragma once
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 namespace LE
@@ -19,9 +19,15 @@ namespace Parameters
 {
 //------------------------------------------------------------------------------
 
-struct LinearParameterTag {};
-struct LinearFloatParameterTag   : LinearParameterTag {};
-struct LinearIntegerParameterTag : LinearParameterTag {};
+struct LinearParameterTag
+{
+};
+struct LinearFloatParameterTag : LinearParameterTag
+{
+};
+struct LinearIntegerParameterTag : LinearParameterTag
+{
+};
 
 //------------------------------------------------------------------------------
 } // namespace Parameters

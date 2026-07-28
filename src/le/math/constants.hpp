@@ -3,13 +3,13 @@
 /// \file constants.hpp
 /// -------------------
 ///
-/// Copyright (c) 2010 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2010 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef constants_hpp__74261B44_F846_409D_9A06_FE3921670A95
 #define constants_hpp__74261B44_F846_409D_9A06_FE3921670A95
-#pragma once
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 namespace LE
@@ -22,14 +22,16 @@ namespace Constants
 {
 //------------------------------------------------------------------------------
 
-double const pi_d( 3.1415926535897932384626433832795028841971693993751058209749445923078164062L );
-float  const pi  ( static_cast<float>( pi_d ) );
+double const pi_d(3.1415926535897932384626433832795028841971693993751058209749445923078164062L);
+float const pi(static_cast<float>(pi_d));
 
-double const twoPi_d( 2 * pi_d                       );
-float  const twoPi  ( static_cast<float>( 2 * pi_d ) ); //...mrmlj...msvc10 generates a dynamic initializer if twoPi_d is referenced here...(confirmed by msvc dev, fixed in msvc12)...
+double const twoPi_d(2 * pi_d);
+float const twoPi(static_cast<float>(
+    2 *
+    pi_d)); //...mrmlj...msvc10 generates a dynamic initializer if twoPi_d is referenced here...(confirmed by msvc dev, fixed in msvc12)...
 
-double const ln2_d( 0.693147180559945309417232121458L );
-float  const ln2  ( static_cast<float>( ln2_d )       );
+double const ln2_d(0.693147180559945309417232121458L);
+float const ln2(static_cast<float>(ln2_d));
 
 //------------------------------------------------------------------------------
 } // namespace Constants

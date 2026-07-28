@@ -3,13 +3,13 @@
 /// \file phlip.hpp
 /// ---------------
 ///
-/// Copyright (C) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef phlipImpl_hpp__B76D3C03_8A84_4A56_86EB_8038FA5A77EC
 #define phlipImpl_hpp__B76D3C03_8A84_4A56_86EB_8038FA5A77EC
-#pragma once
 //------------------------------------------------------------------------------
 #include "phlip.hpp"
 
@@ -27,18 +27,17 @@ namespace Effects
 
 class PhlipImpl : public EffectImpl<Phlip>
 {
-public: // LE::Effect required interface.
-
+  public: // LE::Effect required interface.
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup( IndexRange const &, Engine::Setup const & );
-    void process( Engine::ChannelData_AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(Engine::ChannelData_AmPh, Engine::Setup const &) const;
 
-private:
+  private:
     unsigned int step_;
-    bool         oddEvenAdjustment_;
+    bool oddEvenAdjustment_;
 };
 
 //------------------------------------------------------------------------------

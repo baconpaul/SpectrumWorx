@@ -3,13 +3,13 @@
 /// \file freqnamicsImpl.hpp
 /// ------------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef freqnamicsImpl_hpp__66F9664C_18BF_4F34_9C54_83FCB44DC9F1
 #define freqnamicsImpl_hpp__66F9664C_18BF_4F34_9C54_83FCB44DC9F1
-#pragma once
 //------------------------------------------------------------------------------
 #include "freqnamics.hpp"
 
@@ -27,17 +27,16 @@ namespace Effects
 
 class FreqnamicsImpl : public EffectImpl<Freqnamics>
 {
-public: // LE::Effect required interface.
-
+  public: // LE::Effect required interface.
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup  ( IndexRange const &, Engine::Setup const & );
-    void process( Engine::ChannelData_AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(Engine::ChannelData_AmPh, Engine::Setup const &) const;
 
-private:    
-    float thrLimiter_  ;
+  private:
+    float thrLimiter_;
     float thrNoisegate_;
 };
 

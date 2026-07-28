@@ -6,7 +6,8 @@
 ///   Cocoa/Objective-C(++) implementation details required for Mac OSX. Based
 /// on original JUCE code from the juce_VST_wrapper.mm file.
 ///
-/// Copyright (c) 2010.-2013. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2010 - 2013. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 // Useful links:
@@ -27,8 +28,8 @@
 #include "juce/AppConfig.h"
 #include "juce/juce_gui_basics/juce_gui_basics.h"
 
-#if ! JUCE_64BIT
-    #define JUCE_MAC_WINDOW_VISIBITY_BODGE 1 // see note below..
+#if !JUCE_64BIT
+#define JUCE_MAC_WINDOW_VISIBITY_BODGE 1 // see note below..
 #endif
 //------------------------------------------------------------------------------
 namespace LE
@@ -43,12 +44,12 @@ namespace GUI
 
 void initialiseMac() noexcept
 {
-#if ! JUCE_64BIT
-    BOOST_VERIFY( ::NSApplicationLoad() );
+#if !JUCE_64BIT
+    BOOST_VERIFY(::NSApplicationLoad());
 #endif
-    BOOST_ASSERT( [NSThread isMultiThreaded] );
+    BOOST_ASSERT([NSThread isMultiThreaded]);
 
-#if 0 //...mrmlj...experiments to 'fix' the fat fonts issue under ML...
+#if 0  //...mrmlj...experiments to 'fix' the fat fonts issue under ML...
     NSUserDefaults * pStandardUserDefaults = [NSUserDefaults standardUserDefaults];
     [pStandardUserDefaults setBool: true forKey: @"NSFontDefaultScreenFontSubstitutionEnabled"];
     //[pStandardUserDefaults registerDefaults: pStandardUserDefaults ];
@@ -58,15 +59,22 @@ void initialiseMac() noexcept
 }
 
 #if !JUCE_64BIT
-static pascal OSStatus windowVisibilityBodge( EventHandlerCallRef, EventRef const e, void * const user ) noexcept
+static pascal OSStatus windowVisibilityBodge(EventHandlerCallRef, EventRef const e,
+                                             void *const user) noexcept
 {
-    NSWindow * const hostWindow( static_cast<NSWindow *>( user ) );
+    NSWindow *const hostWindow(static_cast<NSWindow *>(user));
 
-    switch ( GetEventKind (e) )
+    switch (GetEventKind(e))
     {
-        case kEventWindowInit:   [hostWindow display        ]; break;
-        case kEventWindowShown:  [hostWindow orderFront: nil]; break;
-        case kEventWindowHidden: [hostWindow orderOut  : nil]; break;
+    case kEventWindowInit:
+        [hostWindow display];
+        break;
+    case kEventWindowShown:
+        [hostWindow orderFront:nil];
+        break;
+    case kEventWindowHidden:
+        [hostWindow orderOut:nil];
+        break;
     }
 
     return eventNotHandledErr;
@@ -77,172 +85,179 @@ static pascal OSStatus windowVisibilityBodge( EventHandlerCallRef, EventRef cons
    the event and does the job properly.
 */
 
-static void attachWindowHidingHooks( juce::Component & comp, void * const hostWindowRef, NSWindow * const nsWindow )
+static void attachWindowHidingHooks(juce::Component &comp, void *const hostWindowRef,
+                                    NSWindow *const nsWindow)
 {
     using namespace juce;
 
     // Adds a callback bodge to work around some problems with wrapped
     // carbon windows..
-    static EventTypeSpec const eventsToCatch[] =
-    {
-        { kEventClassWindow, kEventWindowInit   },
-        { kEventClassWindow, kEventWindowShown  },
-        { kEventClassWindow, kEventWindowHidden }
-    };
+    static EventTypeSpec const eventsToCatch[] = {{kEventClassWindow, kEventWindowInit},
+                                                  {kEventClassWindow, kEventWindowShown},
+                                                  {kEventClassWindow, kEventWindowHidden}};
 
     EventHandlerRef ref;
-    InstallWindowEventHandler( (WindowRef) hostWindowRef,
-        NewEventHandlerUPP (windowVisibilityBodge),
-        GetEventTypeCount (eventsToCatch), eventsToCatch,
-        (void*) nsWindow, &ref );
+    InstallWindowEventHandler((WindowRef)hostWindowRef, NewEventHandlerUPP(windowVisibilityBodge),
+                              GetEventTypeCount(eventsToCatch), eventsToCatch, (void *)nsWindow,
+                              &ref);
 
-    comp.getProperties().set( "carbonEventRef", String::toHexString( (pointer_sized_int)(void*) ref ) );
+    comp.getProperties().set("carbonEventRef", String::toHexString((pointer_sized_int)(void *)ref));
 }
 
-static void removeWindowHidingHooks( juce::Component & comp )
+static void removeWindowHidingHooks(juce::Component &comp)
 {
-    RemoveEventHandler
-    (
-        (EventHandlerRef)(void*)(juce::pointer_sized_int) comp.getProperties()[ "carbonEventRef" ].toString().getHexValue64()
-    );
+    RemoveEventHandler(
+        (EventHandlerRef)(void *)(juce::pointer_sized_int)comp.getProperties()["carbonEventRef"]
+            .toString()
+            .getHexValue64());
 }
 
-
-static void updateComponentPos( juce::Component & component ) noexcept
+static void updateComponentPos(juce::Component &component) noexcept
 {
-    HIViewRef dummyView = (HIViewRef) (void*) (juce::pointer_sized_int)
-                            component.getProperties()[ "dummyViewRef" ].toString().getHexValue64();
+    HIViewRef dummyView =
+        (HIViewRef)(void *)(juce::pointer_sized_int)component.getProperties()["dummyViewRef"]
+            .toString()
+            .getHexValue64();
 
     HIRect r;
-    HIViewGetFrame (dummyView, &r);
+    HIViewGetFrame(dummyView, &r);
     HIViewRef root;
-    HIViewFindByID (HIViewGetRoot (HIViewGetWindow (dummyView)), kHIViewWindowContentID, &root);
-    HIViewConvertRect (&r, HIViewGetSuperview (dummyView), root);
+    HIViewFindByID(HIViewGetRoot(HIViewGetWindow(dummyView)), kHIViewWindowContentID, &root);
+    HIViewConvertRect(&r, HIViewGetSuperview(dummyView), root);
 
     Rect windowPos;
-    GetWindowBounds (HIViewGetWindow (dummyView), kWindowContentRgn, &windowPos);
+    GetWindowBounds(HIViewGetWindow(dummyView), kWindowContentRgn, &windowPos);
 
-    component.setTopLeftPosition ((int) (windowPos.left + r.origin.x),
-                                  (int) (windowPos.top + r.origin.y));
+    component.setTopLeftPosition((int)(windowPos.left + r.origin.x),
+                                 (int)(windowPos.top + r.origin.y));
 }
 
-static pascal OSStatus viewBoundsChangedEvent( EventHandlerCallRef, EventRef, void * const user ) noexcept
+static pascal OSStatus viewBoundsChangedEvent(EventHandlerCallRef, EventRef,
+                                              void *const user) noexcept
 {
-    updateComponentPos( *static_cast<juce::Component *>( user ) );
+    updateComponentPos(*static_cast<juce::Component *>(user));
     return noErr;
 }
 
-
-ObjC::NSWindow * attachComponentToHostWindow( juce::Component & component, WindowRef const windowRef )
+ObjC::NSWindow *attachComponentToHostWindow(juce::Component &component, WindowRef const windowRef)
 {
     @autoreleasepool
     {
         using namespace juce;
 
-        NSWindow * hostWindow = [[NSWindow alloc] initWithWindowRef: windowRef];
+        NSWindow *hostWindow = [[NSWindow alloc] initWithWindowRef:windowRef];
         [hostWindow retain];
-        [hostWindow setCanHide: YES];
-        [hostWindow setReleasedWhenClosed: YES];
+        [hostWindow setCanHide:YES];
+        [hostWindow setReleasedWhenClosed:YES];
 
         HIViewRef parentView = 0;
 
         WindowAttributes attributes;
-        GetWindowAttributes ((WindowRef) windowRef, &attributes);
+        GetWindowAttributes((WindowRef)windowRef, &attributes);
         if ((attributes & kWindowCompositingAttribute) != 0)
         {
-            HIViewRef root = HIViewGetRoot ((WindowRef) windowRef);
-            HIViewFindByID (root, kHIViewWindowContentID, &parentView);
+            HIViewRef root = HIViewGetRoot((WindowRef)windowRef);
+            HIViewFindByID(root, kHIViewWindowContentID, &parentView);
 
             if (parentView == 0)
                 parentView = root;
         }
         else
         {
-            GetRootControl ((WindowRef) windowRef, (ControlRef*) &parentView);
+            GetRootControl((WindowRef)windowRef, (ControlRef *)&parentView);
 
             if (parentView == 0)
-                CreateRootControl ((WindowRef) windowRef, (ControlRef*) &parentView);
+                CreateRootControl((WindowRef)windowRef, (ControlRef *)&parentView);
         }
 
         // It seems that the only way to successfully position our overlaid window is by putting a dummy
         // HIView into the host's carbon window, and then catching events to see when it gets repositioned
         HIViewRef dummyView = 0;
-        HIImageViewCreate (0, &dummyView);
-        HIRect r = { {0, 0}, {static_cast<CGFloat>( component.getWidth() ), static_cast<CGFloat>( component.getHeight() )} };
-        HIViewSetFrame (dummyView, &r);
-        HIViewAddSubview (parentView, dummyView);
-        component.getProperties().set("dummyViewRef", String::toHexString ((pointer_sized_int) (void*) dummyView));
+        HIImageViewCreate(0, &dummyView);
+        HIRect r = {{0, 0},
+                    {static_cast<CGFloat>(component.getWidth()),
+                     static_cast<CGFloat>(component.getHeight())}};
+        HIViewSetFrame(dummyView, &r);
+        HIViewAddSubview(parentView, dummyView);
+        component.getProperties().set("dummyViewRef",
+                                      String::toHexString((pointer_sized_int)(void *)dummyView));
 
         EventHandlerRef ref;
-        const EventTypeSpec kControlBoundsChangedEvent = { kEventClassControl, kEventControlBoundsChanged };
-        InstallEventHandler (GetControlEventTarget (dummyView), NewEventHandlerUPP (viewBoundsChangedEvent), 1, &kControlBoundsChangedEvent, &component, &ref);
-        component.getProperties().set( "boundsEventRef", String::toHexString ((pointer_sized_int) (void*) ref) );
+        const EventTypeSpec kControlBoundsChangedEvent = {kEventClassControl,
+                                                          kEventControlBoundsChanged};
+        InstallEventHandler(GetControlEventTarget(dummyView),
+                            NewEventHandlerUPP(viewBoundsChangedEvent), 1,
+                            &kControlBoundsChangedEvent, &component, &ref);
+        component.getProperties().set("boundsEventRef",
+                                      String::toHexString((pointer_sized_int)(void *)ref));
 
-        updateComponentPos( component );
+        updateComponentPos(component);
 
-        component.juce::Component::addToDesktop( ComponentPeer::windowIsTemporary );
+        component.juce::Component::addToDesktop(ComponentPeer::windowIsTemporary);
 
         //component.juce::Component::setVisible( true  );
         //component.juce::Component::toFront   ( false );
 
-        NSView   * const pluginView   = (NSView*) component.getWindowHandle();
-        NSWindow * const pluginWindow = [pluginView window];
-        [pluginWindow setExcludedFromWindowsMenu: YES];
-        [pluginWindow setCanHide: YES];
+        NSView *const pluginView = (NSView *)component.getWindowHandle();
+        NSWindow *const pluginWindow = [pluginView window];
+        [pluginWindow setExcludedFromWindowsMenu:YES];
+        [pluginWindow setCanHide:YES];
 
-        [hostWindow addChildWindow: pluginWindow
-                            ordered: NSWindowAbove];
-        [hostWindow   orderFront: nil];
-        [pluginWindow orderFront: nil];
+        [hostWindow addChildWindow:pluginWindow ordered:NSWindowAbove];
+        [hostWindow orderFront:nil];
+        [pluginWindow orderFront:nil];
 
-        attachWindowHidingHooks( component, (WindowRef) windowRef, hostWindow );
+        attachWindowHidingHooks(component, (WindowRef)windowRef, hostWindow);
 
-        return reinterpret_cast<ObjC::NSWindow *>( hostWindow );
+        return reinterpret_cast<ObjC::NSWindow *>(hostWindow);
     }
 }
 
-
-void detachComponentFromHostWindow( juce::Component & comp, ObjC::NSWindow * const hostWindowParam )
+void detachComponentFromHostWindow(juce::Component &comp, ObjC::NSWindow *const hostWindowParam)
 {
     using namespace juce;
 
     @autoreleasepool
     {
-        EventHandlerRef ref = (EventHandlerRef) (void*) (pointer_sized_int)
-            comp.getProperties() ["boundsEventRef"].toString().getHexValue64();
-        RemoveEventHandler (ref);
+        EventHandlerRef ref =
+            (EventHandlerRef)(void *)(pointer_sized_int)comp.getProperties()["boundsEventRef"]
+                .toString()
+                .getHexValue64();
+        RemoveEventHandler(ref);
 
-        removeWindowHidingHooks (comp);
+        removeWindowHidingHooks(comp);
 
-        HIViewRef dummyView = (HIViewRef) (void*) (pointer_sized_int)
-            comp.getProperties() ["dummyViewRef"].toString().getHexValue64();
+        HIViewRef dummyView =
+            (HIViewRef)(void *)(pointer_sized_int)comp.getProperties()["dummyViewRef"]
+                .toString()
+                .getHexValue64();
 
-        if (HIViewIsValid (dummyView))
-            CFRelease (dummyView);
+        if (HIViewIsValid(dummyView))
+            CFRelease(dummyView);
 
-        NSView   * pluginView   = (NSView*) comp.getWindowHandle();
-        NSWindow * pluginWindow = [pluginView window];
+        NSView *pluginView = (NSView *)comp.getWindowHandle();
+        NSWindow *pluginWindow = [pluginView window];
 
-        ::NSWindow * const hostWindow( reinterpret_cast<::NSWindow *>( hostWindowParam ) );
+        ::NSWindow *const hostWindow(reinterpret_cast<::NSWindow *>(hostWindowParam));
 
-        [hostWindow removeChildWindow: pluginWindow];
+        [hostWindow removeChildWindow:pluginWindow];
         comp.removeFromDesktop();
 
         [hostWindow release];
     }
 }
 #else
-void detachComponentFromHostWindow( juce::Component & comp, ObjC::NSWindow * /*const hostWindowParam*/ )
+void detachComponentFromHostWindow(juce::Component &comp,
+                                   ObjC::NSWindow * /*const hostWindowParam*/)
 {
     comp.removeFromDesktop();
 }
 #endif // 64 bit
 
-
-void attachComponentToHostWindow( juce::Component & component, ObjC::NSView * const pParentViewParam )
+void attachComponentToHostWindow(juce::Component &component, ObjC::NSView *const pParentViewParam)
 {
-    ::NSView * pParentView( reinterpret_cast<::NSView *>( pParentViewParam ) );
-    BOOST_ASSERT( pParentView );
+    ::NSView *pParentView(reinterpret_cast<::NSView *>(pParentViewParam));
+    BOOST_ASSERT(pParentView);
 
 #if 0
     // (this workaround is because Wavelab provides a zero-size parent view...)
@@ -250,10 +265,10 @@ void attachComponentToHostWindow( juce::Component & component, ObjC::NSView * co
         [ static_cast<::NSView *>( component.getWindowHandle() ) setFrameOrigin: NSZeroPoint ];
 #endif // 0
 
-    [pParentView setHidden                        : NO ];
-    [pParentView setPostsFrameChangedNotifications: YES];
+    [pParentView setHidden:NO];
+    [pParentView setPostsFrameChangedNotifications:YES];
 
-    [pParentView setFrameSize: NSMakeSize( component.getWidth(), component.getHeight() )];
+    [pParentView setFrameSize:NSMakeSize(component.getWidth(), component.getHeight())];
 
     //...mrmlj...
     //[hostView setFrameSize: NSMakeSize
@@ -262,71 +277,67 @@ void attachComponentToHostWindow( juce::Component & component, ObjC::NSView * co
     //    [hostView frame].size.height + (newHeight - component->getHeight())
     //)];
 
-    ::NSWindow * const pWindow( [pParentView window] );
-    [pWindow setAcceptsMouseMovedEvents: YES];
+    ::NSWindow *const pWindow([pParentView window]);
+    [pWindow setAcceptsMouseMovedEvents:YES];
     //[pWindow makeFirstResponder: pParentView];
 
-    component.juce::Component::addToDesktop( 0, pParentView );
-    BOOST_ASSERT( component.isVisible() );
+    component.juce::Component::addToDesktop(0, pParentView);
+    BOOST_ASSERT(component.isVisible());
     //component.toFront( true );
 }
 
-
-void makeEditorChild( juce::ComponentPeer & editor, juce::ComponentPeer & childToBe ) noexcept
+void makeEditorChild(juce::ComponentPeer &editor, juce::ComponentPeer &childToBe) noexcept
 {
-    ::NSWindow * const pEditorWindow( [ static_cast<::NSView *>( editor   .getNativeHandle() ) window ] );
-    ::NSWindow * const pChildWindow ( [ static_cast<::NSView *>( childToBe.getNativeHandle() ) window ] );
-    BOOST_ASSERT( pEditorWindow );
-    BOOST_ASSERT( pChildWindow  );
+    ::NSWindow *const pEditorWindow([static_cast<::NSView *>(editor.getNativeHandle()) window]);
+    ::NSWindow *const pChildWindow([static_cast<::NSView *>(childToBe.getNativeHandle()) window]);
+    BOOST_ASSERT(pEditorWindow);
+    BOOST_ASSERT(pChildWindow);
 #if 1
-    [pEditorWindow addChildWindow: pChildWindow ordered: NSWindowAbove];
+    [pEditorWindow addChildWindow:pChildWindow ordered:NSWindowAbove];
 #else
-    NSWindow * pRealParent( pEditorWindow );
-    NSWindow * pNewParent;
-    while ( ( pNewParent = [pRealParent parentWindow] ) )
+    NSWindow *pRealParent(pEditorWindow);
+    NSWindow *pNewParent;
+    while ((pNewParent = [pRealParent parentWindow]))
     {
-	    pRealParent = pNewParent;
+        pRealParent = pNewParent;
     }
 
-    [pRealParent addChildWindow: pChildWindow ordered: NSWindowAbove];
+    [pRealParent addChildWindow:pChildWindow ordered:NSWindowAbove];
 #endif
 }
 
-
-void detachFromEditor( juce::ComponentPeer & editor, juce::ComponentPeer & child ) noexcept
+void detachFromEditor(juce::ComponentPeer &editor, juce::ComponentPeer &child) noexcept
 {
-    ::NSWindow * const pEditorWindow      ( [ static_cast<::NSView *>( editor.getNativeHandle() ) window       ] );
-    ::NSWindow * const pChildWindow       ( [ static_cast<::NSView *>( child .getNativeHandle() ) window       ] );
-    ::NSWindow * const pActualParentWindow( [ pChildWindow                                        parentWindow ] );
-    BOOST_ASSERT( pChildWindow );
-    BOOST_ASSERT( pEditorWindow == pActualParentWindow || !pEditorWindow );
-    BOOST_ASSERT( ![pChildWindow childWindows] || ![[pChildWindow  childWindows] count] );
+    ::NSWindow *const pEditorWindow([static_cast<::NSView *>(editor.getNativeHandle()) window]);
+    ::NSWindow *const pChildWindow([static_cast<::NSView *>(child.getNativeHandle()) window]);
+    ::NSWindow *const pActualParentWindow([pChildWindow parentWindow]);
+    BOOST_ASSERT(pChildWindow);
+    BOOST_ASSERT(pEditorWindow == pActualParentWindow || !pEditorWindow);
+    BOOST_ASSERT(![pChildWindow childWindows] || ![[pChildWindow childWindows] count]);
     //BOOST_ASSERT( [[pEditorWindow childWindows] count] == 1 || !pEditorWindow );
 #if 1
-    [pActualParentWindow removeChildWindow: pChildWindow];
+    [pActualParentWindow removeChildWindow:pChildWindow];
 #else
-    ::NSWindow * pRealParent( pEditorWindow );
-    ::NSWindow * pNewParent;
-    while ( ( pNewParent = [pRealParent parentWindow] ) )
+    ::NSWindow *pRealParent(pEditorWindow);
+    ::NSWindow *pNewParent;
+    while ((pNewParent = [pRealParent parentWindow]))
     {
-	    pRealParent = pNewParent;
+        pRealParent = pNewParent;
     }
 
-    [pRealParent removeChildWindow: pChildWindow];
+    [pRealParent removeChildWindow:pChildWindow];
 #endif
 }
-
 
 void hideCursor() noexcept
 {
-    BOOST_VERIFY( ::CGDisplayHideCursor( kCGDirectMainDisplay ) == kCGErrorSuccess );
+    BOOST_VERIFY(::CGDisplayHideCursor(kCGDirectMainDisplay) == kCGErrorSuccess);
     //[::NSCursor hide];
 }
 
-
 void showCursor() noexcept
 {
-    BOOST_VERIFY( ::CGDisplayShowCursor( kCGDirectMainDisplay ) == kCGErrorSuccess );
+    BOOST_VERIFY(::CGDisplayShowCursor(kCGDirectMainDisplay) == kCGErrorSuccess);
     //[::NSCursor unhide];
 }
 

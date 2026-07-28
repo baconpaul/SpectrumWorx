@@ -3,13 +3,13 @@
 /// \file armonizerImpl.hpp
 /// -----------------------
 ///
-/// Copyright (C) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef armonizerImpl_hpp__D2DC61B5_FEEC_4FD5_B4DA_E89976A55507
 #define armonizerImpl_hpp__D2DC61B5_FEEC_4FD5_B4DA_E89976A55507
-#pragma once
 //------------------------------------------------------------------------------
 #include "armonizer.hpp"
 
@@ -28,13 +28,10 @@ namespace Effects
 {
 //------------------------------------------------------------------------------
 
-class ArmonizerImpl
-    : 
-    public EffectImpl<Armonizer>,
-    public PhaseVocoderShared::PitchShifter
+class ArmonizerImpl : public EffectImpl<Armonizer>, public PhaseVocoderShared::PitchShifter
 {
-public: // LE::Effect interface.
-    void setup( IndexRange const &, Engine::Setup const & );
+  public: // LE::Effect interface.
+    void setup(IndexRange const &, Engine::Setup const &);
 };
 
 //------------------------------------------------------------------------------

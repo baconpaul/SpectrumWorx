@@ -3,7 +3,8 @@
 /// effectNames.cpp
 /// ---------------
 ///
-/// Copyright (c) 2011 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2011 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -49,13 +50,13 @@ EffectNames const effectNames =
 } // anonymous namespace
 
 LE_COLD
-char const * LE_FASTCALL effectName( std::uint8_t const effectIndex )
+char const * effectName( std::uint8_t const effectIndex )
 {
     return effectNames[ effectIndex ];
 }
 
 LE_COLD
-std::int8_t LE_FASTCALL effectIndex( boost::string_ref const effectName )
+std::int8_t effectIndex( boost::string_ref const effectName )
 {
     EffectNames::const_iterator const pFoundEffectName( boost::find( effectNames, effectName ) );
     auto const index( static_cast<std::uint8_t>( pFoundEffectName - effectNames.begin() ) );

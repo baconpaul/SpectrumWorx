@@ -727,7 +727,7 @@ typename twiddles<fft_size, stride, T>::factors_t const                         
     NT2_AUX_TWIDDLES( 1024, 4, 2 );
     NT2_AUX_TWIDDLES( 2048, 4, 1 );
     NT2_AUX_TWIDDLES( 2048, 4, 2 );
-¸*/
+Â¸*/
 #endif // disabled
 
 //------------------------------------------------------------------------------

@@ -2,14 +2,14 @@
 ///
 /// \file whispererImpl.hpp
 /// -----------------------
-/// 
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+///
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef whispererImpl_hpp__7E88348A_B8DC_4D2C_B805_7E845F3B5ACF
 #define whispererImpl_hpp__7E88348A_B8DC_4D2C_B805_7E845F3B5ACF
-#pragma once
 //------------------------------------------------------------------------------
 #include "whisperer.hpp"
 
@@ -27,14 +27,13 @@ namespace Effects
 
 class WhispererImpl : public NoParametersEffectImpl<Whisperer>
 {
-public: // LE::Effect interface.
-
+  public: // LE::Effect interface.
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    static void setup  ( IndexRange const &, Engine::Setup const & ) {}
-    void process( Engine::ChannelData_AmPh, Engine::Setup const & ) const;
+    static void setup(IndexRange const &, Engine::Setup const &) {}
+    void process(Engine::ChannelData_AmPh, Engine::Setup const &) const;
 };
 
 //------------------------------------------------------------------------------

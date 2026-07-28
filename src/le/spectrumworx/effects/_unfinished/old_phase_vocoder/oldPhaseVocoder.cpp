@@ -16,14 +16,13 @@ namespace Algorithms
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const OldPhaseVocoder::title      [] = "Old Phase Vocoder";
+char const OldPhaseVocoder::title[] = "Old Phase Vocoder";
 char const OldPhaseVocoder::description[] = "Basic phase vocoder";
 
-char const UIElements<OldPhaseVocoder::Scale                >::name_[] = "Scale";
+char const UIElements<OldPhaseVocoder::Scale>::name_[] = "Scale";
 char const UIElements<OldPhaseVocoder::SpectrumStartingPoint>::name_[] = "Spectrum starting point";
-char const UIElements<OldPhaseVocoder::SpectrumEndingPoint  >::name_[] = "Spectrum ending point";
-char const UIElements<OldPhaseVocoder::SpectrumOffset       >::name_[] = "Spectrum offset";
-
+char const UIElements<OldPhaseVocoder::SpectrumEndingPoint>::name_[] = "Spectrum ending point";
+char const UIElements<OldPhaseVocoder::SpectrumOffset>::name_[] = "Spectrum offset";
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -40,10 +39,8 @@ char const UIElements<OldPhaseVocoder::SpectrumOffset       >::name_[] = "Spectr
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-#define PI  3.1415926535897932384626433832795f     // PI
-#define iPI 0.31830988618379067153776752674503f    // 1 / PI
-
-
+#define PI 3.1415926535897932384626433832795f   // PI
+#define iPI 0.31830988618379067153776752674503f // 1 / PI
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -52,29 +49,29 @@ char const UIElements<OldPhaseVocoder::SpectrumOffset       >::name_[] = "Spectr
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void OldPhaseVocoder::analysis( ChannelState & channelState, float const * const pIn, float * const pOut ) const
+void OldPhaseVocoder::analysis(ChannelState &channelState, float const *const pIn,
+                               float *const pOut) const
 {
-    for ( unsigned int k( 0 ); k < fftHalfFrameSize_; ++k )
+    for (unsigned int k(0); k < fftHalfFrameSize_; ++k)
     {
-        float const phase( pIn[ k ] );
- 
-        float tmp( phase - channelState.lastPhase_[ k ] ); // phase difference
-        channelState.lastPhase_[ k ] = phase; // update last phase
+        float const phase(pIn[k]);
+
+        float tmp(phase - channelState.lastPhase_[k]); // phase difference
+        channelState.lastPhase_[k] = phase;            // update last phase
 
         tmp -= k * expctRate_;
-        int qdrnt( Math::round( tmp * iPI ) );  // quadrant
-        if ( qdrnt >= 0 )
+        int qdrnt(Math::round(tmp * iPI)); // quadrant
+        if (qdrnt >= 0)
             qdrnt += qdrnt & 1;
         else
             qdrnt -= qdrnt & 1; //TODO: cache stall
-        tmp -= PI * qdrnt; // mapping phase
-        tmp *= M_PI2inv_; 
-        tmp = k * freqPerBin_ + tmp * freqPerBin_; 
+        tmp -= PI * qdrnt;      // mapping phase
+        tmp *= M_PI2inv_;
+        tmp = k * freqPerBin_ + tmp * freqPerBin_;
 
-        pOut[ k ] = tmp;
+        pOut[k] = tmp;
     }
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -83,44 +80,41 @@ void OldPhaseVocoder::analysis( ChannelState & channelState, float const * const
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void OldPhaseVocoder::pitchShiftAndScale
-(
-    float       * const amplitudes,
-    float const * const anaFreqs  ,
-    float       * const synthFreqs
-) const
+void OldPhaseVocoder::pitchShiftAndScale(float *const amplitudes, float const *const anaFreqs,
+                                         float *const synthFreqs) const
 {
     Common::SSEAlignedHalfFFTBuffer synthdMgn;
     Common::SSEAlignedHalfFFTBuffer synthdFrq;
 
-    float const scaleInverse( 1 / scale_ );
+    float const scaleInverse(1 / scale_);
 
-    for ( unsigned int outputIndex( lowerBound_ ); outputIndex < upperBound_; ++outputIndex )
+    for (unsigned int outputIndex(lowerBound_); outputIndex < upperBound_; ++outputIndex)
     {
-        unsigned int const inputIndex( Math::convert<unsigned int>( ( outputIndex * scaleInverse ) + offset_ ) );
-        assert( inputIndex < fftHalfFrameSize_ );
+        unsigned int const inputIndex(
+            Math::convert<unsigned int>((outputIndex * scaleInverse) + offset_));
+        assert(inputIndex < fftHalfFrameSize_);
         {
             //  Here we (temporarily) assert our assumptions (even if obvious)
             // to aid in better code/algorithm understanding and bug tracking.
-            assert( synthdMgn[ outputIndex ] == 0 );
-            assert( synthdFrq[ outputIndex ] == 0 );
-            assert( amplitudes[ inputIndex ] >= synthdMgn[ outputIndex ] );
-            
-            synthdMgn[ outputIndex ] = amplitudes[ inputIndex ];
-            synthdFrq[ outputIndex ] = anaFreqs  [ inputIndex ] * scale_;
+            assert(synthdMgn[outputIndex] == 0);
+            assert(synthdFrq[outputIndex] == 0);
+            assert(amplitudes[inputIndex] >= synthdMgn[outputIndex]);
 
-            if ( ( synthdFrq[ outputIndex ] == 0 ) && ( outputIndex > 0 ) ) // fill empty with nearest neighbour
+            synthdMgn[outputIndex] = amplitudes[inputIndex];
+            synthdFrq[outputIndex] = anaFreqs[inputIndex] * scale_;
+
+            if ((synthdFrq[outputIndex] == 0) &&
+                (outputIndex > 0)) // fill empty with nearest neighbour
             {
-                synthdMgn[ outputIndex ] = synthdMgn[ outputIndex - 1 ];
-                synthdFrq[ outputIndex ] = synthdFrq[ outputIndex - 1 ];
+                synthdMgn[outputIndex] = synthdMgn[outputIndex - 1];
+                synthdFrq[outputIndex] = synthdFrq[outputIndex - 1];
             }
         }
     }
 
-    std::memcpy( amplitudes, synthdMgn.begin(), fftHalfFrameSize_ * sizeof( float ) );
-    std::memcpy( synthFreqs, synthdFrq.begin(), fftHalfFrameSize_ * sizeof( float ) );
+    std::memcpy(amplitudes, synthdMgn.begin(), fftHalfFrameSize_ * sizeof(float));
+    std::memcpy(synthFreqs, synthdFrq.begin(), fftHalfFrameSize_ * sizeof(float));
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -129,25 +123,20 @@ void OldPhaseVocoder::pitchShiftAndScale
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void OldPhaseVocoder::process
-(
-    ChannelState     & channelState,
-    ChannelData_AmPh & data
-) const
+void OldPhaseVocoder::process(ChannelState &channelState, ChannelData_AmPh &data) const
 {
     /// \todo Now that algorithm process() functions have been made to be
     /// in-place see if these temporary buffers (and possibly redundant copying)
     /// in OldPhaseVocoder can be removed.
     ///                                       (29.09.2009.) (Domagoj Saric)
 
-    LE::Common::SSEAlignedHalfFFTBuffer anaFreq  ;
+    LE::Common::SSEAlignedHalfFFTBuffer anaFreq;
     LE::Common::SSEAlignedHalfFFTBuffer synthFreq;
-    
-    analysis          ( channelState           , data.phases.begin(), anaFreq    .begin() );
-    pitchShiftAndScale( data.amplitudes.begin(), anaFreq    .begin(), synthFreq  .begin() );
-    synthesis         ( channelState           , synthFreq  .begin(), data.phases.begin() );
-}
 
+    analysis(channelState, data.phases.begin(), anaFreq.begin());
+    pitchShiftAndScale(data.amplitudes.begin(), anaFreq.begin(), synthFreq.begin());
+    synthesis(channelState, synthFreq.begin(), data.phases.begin());
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -156,13 +145,12 @@ void OldPhaseVocoder::process
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void OldPhaseVocoder::setScalingFactor( float const & newScale )
+void OldPhaseVocoder::setScalingFactor(float const &newScale)
 {
-    assert( newScale > 0 );
+    assert(newScale > 0);
     scale_ = newScale;
     updateActualBounds();
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -171,28 +159,32 @@ void OldPhaseVocoder::setScalingFactor( float const & newScale )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void OldPhaseVocoder::setup( EngineSetup const & engineSetup, Parameters const & myParameters )
+void OldPhaseVocoder::setup(EngineSetup const &engineSetup, Parameters const &myParameters)
 {
-    freqPerBin_              = engineSetup.sampleRate<float>() / engineSetup.fftSize<float>();
-    invFreqPerBinInvOverlap_ = ( 1 / freqPerBin_ ) * ( 2 * PI ) * ( 1 / engineSetup.windowOverlappingFactor<float>() );
-    expctRate_               = ( 2 * PI ) * engineSetup.stepSize<float>() / engineSetup.fftSize<float>();
-    M_PI2inv_                = engineSetup.windowOverlappingFactor<float>() / ( 2 * PI );
-    fftHalfFrameSize_        = engineSetup.fftSize<unsigned int>() / 2;
+    freqPerBin_ = engineSetup.sampleRate<float>() / engineSetup.fftSize<float>();
+    invFreqPerBinInvOverlap_ =
+        (1 / freqPerBin_) * (2 * PI) * (1 / engineSetup.windowOverlappingFactor<float>());
+    expctRate_ = (2 * PI) * engineSetup.stepSize<float>() / engineSetup.fftSize<float>();
+    M_PI2inv_ = engineSetup.windowOverlappingFactor<float>() / (2 * PI);
+    fftHalfFrameSize_ = engineSetup.fftSize<unsigned int>() / 2;
 
     /// \todo If it becomes necessary, fix this function to work with
     /// non-symmetric spectrum offset parameter ranges (e.g. -30% - +50%).
     ///                                       (08.06.2009.) (Domagoj Saric)
-    assert( ( - SpectrumOffset::Traits::minimumValue == SpectrumOffset::Traits::maximumValue ) && "Symmetric offset range condition breached." );
+    assert((-SpectrumOffset::Traits::minimumValue == SpectrumOffset::Traits::maximumValue) &&
+           "Symmetric offset range condition breached.");
     // Offset[ -FFTSize/16, +FFTSize/16 ] = Offset[ % ] / 100 * FFTSize / 16
-    offset_ = -myParameters.get<SpectrumOffset>() * static_cast<int>( engineSetup.fftSize<unsigned int>() / 16 ) / 100;
+    offset_ = -myParameters.get<SpectrumOffset>() *
+              static_cast<int>(engineSetup.fftSize<unsigned int>() / 16) / 100;
 
     // Calculate the user specified bounds (lowest and highest bin).
-     lowestUserSpecifiedBin_ = Math::round( myParameters.get<SpectrumStartingPoint>() * fftHalfFrameSize_ );
-    highestUserSpecifiedBin_ = Math::round( myParameters.get<SpectrumEndingPoint  >() * fftHalfFrameSize_ );
+    lowestUserSpecifiedBin_ =
+        Math::round(myParameters.get<SpectrumStartingPoint>() * fftHalfFrameSize_);
+    highestUserSpecifiedBin_ =
+        Math::round(myParameters.get<SpectrumEndingPoint>() * fftHalfFrameSize_);
 
-    setScalingFactor( myParameters.get<Scale>() );
+    setScalingFactor(myParameters.get<Scale>());
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -201,22 +193,22 @@ void OldPhaseVocoder::setup( EngineSetup const & engineSetup, Parameters const &
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void OldPhaseVocoder::synthesis( ChannelState & channelState, float const * const pIn, float * const pOut ) const
+void OldPhaseVocoder::synthesis(ChannelState &channelState, float const *const pIn,
+                                float *const pOut) const
 {
-    for ( unsigned int k( 0 ); k < fftHalfFrameSize_; ++k )
+    for (unsigned int k(0); k < fftHalfFrameSize_; ++k)
     {
-        float tmp( pIn[ k ] );
+        float tmp(pIn[k]);
 
         tmp -= k * freqPerBin_;
-        tmp *= invFreqPerBinInvOverlap_; 
-        tmp += k * expctRate_;      
+        tmp *= invFreqPerBinInvOverlap_;
+        tmp += k * expctRate_;
 
-        channelState.summPhase_[ k ] += tmp;
+        channelState.summPhase_[k] += tmp;
 
-        pOut[ k ] = channelState.summPhase_[ k ];
+        pOut[k] = channelState.summPhase_[k];
     }
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -263,21 +255,23 @@ void OldPhaseVocoder::updateActualBounds()
     // using std::min()/std::max() calls but this produced slightly smaller code
     // with MSVC++ 8.0.
     //                                        (09.06.2009.) (Domagoj Saric)
-    unsigned int const lowerIndexLimit( ( offset_ < 0 ) ? Math::convert<unsigned int>( std::ceil (                     - offset_   * scale_ ) ) : 0                 );
-    unsigned int const upperIndexLimit( ( offset_ > 0 ) ? Math::convert<unsigned int>( std::floor( ( fftHalfFrameSize_ - offset_ ) * scale_ ) ) : fftHalfFrameSize_ );
+    unsigned int const lowerIndexLimit(
+        (offset_ < 0) ? Math::convert<unsigned int>(std::ceil(-offset_ * scale_)) : 0);
+    unsigned int const upperIndexLimit((offset_ > 0) ? Math::convert<unsigned int>(std::floor(
+                                                           (fftHalfFrameSize_ - offset_) * scale_))
+                                                     : fftHalfFrameSize_);
 
-    lowerBound_ = std::max(  lowestUserSpecifiedBin_, lowerIndexLimit );
-    upperBound_ = std::min( highestUserSpecifiedBin_, upperIndexLimit );
+    lowerBound_ = std::max(lowestUserSpecifiedBin_, lowerIndexLimit);
+    upperBound_ = std::min(highestUserSpecifiedBin_, upperIndexLimit);
     // Implementation note:
     //   If the scaling factor is less than 1 (i.e. the pitch is being
     // downscaled) the inputIndex value will grow faster than outputIndex so a
     // final adjustment must be made to "final" upperLimit to prevent the
     // inputIndex growing out of range.
     //                                        (12.06.2009.) (Domagoj Saric)
-    if ( scale_ < 1 )
-        upperBound_ = Math::convert<unsigned int>( upperBound_ * scale_ );
+    if (scale_ < 1)
+        upperBound_ = Math::convert<unsigned int>(upperBound_ * scale_);
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //

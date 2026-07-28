@@ -3,7 +3,8 @@
 /// quantizerImpl.cpp
 /// -----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -32,9 +33,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Quantizer::title      [] = "Quantizer";
+char const Quantizer::title[] = "Quantizer";
 char const Quantizer::description[] = "Quantize the spectrum.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -42,9 +42,8 @@ char const Quantizer::description[] = "Quantize the spectrum.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Quantizer::Width  , "Width"   )
-EFFECT_PARAMETER_NAME( Quantizer::Origami, "Origami" )
-
+EFFECT_PARAMETER_NAME(Quantizer::Width, "Width")
+EFFECT_PARAMETER_NAME(Quantizer::Origami, "Origami")
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -53,12 +52,12 @@ EFFECT_PARAMETER_NAME( Quantizer::Origami, "Origami" )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void QuantizerImpl::setup( IndexRange const & workingRange, Engine::Setup const & engineSetup )
+void QuantizerImpl::setup(IndexRange const &workingRange, Engine::Setup const &engineSetup)
 {
-    chunkSize_ = std::min( engineSetup.frequencyInHzToBin( parameters().get<Width>() ), workingRange.size() );
-    origami_   = Math::percentage2NormalisedLinear( parameters().get<Origami>() );
+    chunkSize_ =
+        std::min(engineSetup.frequencyInHzToBin(parameters().get<Width>()), workingRange.size());
+    origami_ = Math::percentage2NormalisedLinear(parameters().get<Origami>());
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -67,9 +66,9 @@ void QuantizerImpl::setup( IndexRange const & workingRange, Engine::Setup const 
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void QuantizerImpl::process( Engine::ChannelData_AmPh data, Engine::Setup const & ) const
+void QuantizerImpl::process(Engine::ChannelData_AmPh data, Engine::Setup const &) const
 {
-    if ( chunkSize_ < 2 ) 
+    if (chunkSize_ < 2)
         return;
 
     /*
@@ -90,9 +89,8 @@ void QuantizerImpl::process( Engine::ChannelData_AmPh data, Engine::Setup const 
      }
      */
 
-    quantize( data.amps() );
+    quantize(data.amps());
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -101,30 +99,31 @@ void QuantizerImpl::process( Engine::ChannelData_AmPh data, Engine::Setup const 
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void QuantizerImpl::quantize( DataRange amps ) const
+void QuantizerImpl::quantize(DataRange amps) const
 {
-    auto const chunkSize( chunkSize_ );
+    auto const chunkSize(chunkSize_);
 
-    float const origamiByChunkSize( origami_ / Math::convert<float>( chunkSize ) );
+    float const origamiByChunkSize(origami_ / Math::convert<float>(chunkSize));
 
-    while ( amps )
+    while (amps)
     {
-        auto const currentChunkSize( std::min( static_cast<IndexRange::value_type>( amps.size() ), chunkSize ) );
+        auto const currentChunkSize(
+            std::min(static_cast<IndexRange::value_type>(amps.size()), chunkSize));
 
-        float * pCurrentChunkValue( amps.begin() );
+        float *pCurrentChunkValue(amps.begin());
 
-        amps.advance_begin( currentChunkSize );
+        amps.advance_begin(currentChunkSize);
 
-        float const magStart( *pCurrentChunkValue   );
-        float const magEnd  ( *( amps.begin() - 1 ) );
+        float const magStart(*pCurrentChunkValue);
+        float const magEnd(*(amps.begin() - 1));
 
-        float const dm( ( magEnd - magStart ) * origamiByChunkSize );
+        float const dm((magEnd - magStart) * origamiByChunkSize);
 
-        float mag( magStart );
-        while ( pCurrentChunkValue < amps.begin() )
+        float mag(magStart);
+        while (pCurrentChunkValue < amps.begin())
         {
-            *pCurrentChunkValue++  = mag;
-            mag                   += dm;
+            *pCurrentChunkValue++ = mag;
+            mag += dm;
         }
     }
 }

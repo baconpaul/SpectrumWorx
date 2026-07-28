@@ -3,14 +3,14 @@
 /// \file phaseVocoderAnalysis.hpp
 /// ------------------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef phaseVocoderAnalysis_hpp__9460BF05_301F_4800_8E81_4E5BB1D5C56B
 #define phaseVocoderAnalysis_hpp__9460BF05_301F_4800_8E81_4E5BB1D5C56B
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "boost/config/abi_prefix.hpp"
@@ -50,7 +50,7 @@ struct PhaseVocoderAnalysis
 {
     static bool const usesSideChannel = false;
 
-    static char const title      [];
+    static char const title[];
     static char const description[];
 };
 

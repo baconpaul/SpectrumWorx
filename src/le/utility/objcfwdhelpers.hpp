@@ -3,18 +3,18 @@
 /// \file objcfwdhelpers.hpp
 /// ------------------------
 ///
-/// Copyright (c) 2013 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2013 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef objcfwdhelpers_hpp__D226B9E9_A6FF_4BCC_B959_6459E0E55049
 #define objcfwdhelpers_hpp__D226B9E9_A6FF_4BCC_B959_6459E0E55049
-#pragma once
 //------------------------------------------------------------------------------
 #ifdef __APPLE__
-#if defined( __OBJC__ ) && 0 //...mrmlj...
-    #include "AppKit/NSView.h"
-    #include "AppKit/NSWindow.h"
+#if defined(__OBJC__) && 0 //...mrmlj...
+#include "AppKit/NSView.h"
+#include "AppKit/NSWindow.h"
 #endif // __OBJC__
 //------------------------------------------------------------------------------
 namespace LE
@@ -24,12 +24,12 @@ namespace ObjC
 {
 //------------------------------------------------------------------------------
 
-#if defined( __OBJC__ ) && 0 //...mrmlj...
-    typedef ::NSView   NSView  ;
-    typedef ::NSWindow NSWindow;
+#if defined(__OBJC__) && 0 //...mrmlj...
+typedef ::NSView NSView;
+typedef ::NSWindow NSWindow;
 #else
-    struct NSView  ;
-    struct NSWindow;
+struct NSView;
+struct NSWindow;
 #endif // #if __OBJC__
 
 //------------------------------------------------------------------------------

@@ -3,14 +3,14 @@
 /// \file burrito.hpp
 /// -----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef burrito_hpp__C27A00BA_023C_4D1F_9742_F431F45C6018
 #define burrito_hpp__C27A00BA_023C_4D1F_9742_F431F45C6018
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -34,25 +34,22 @@ namespace Effects
 ///
 /// \class Burrito
 ///
-/// \ingroup Effects 
+/// \ingroup Effects
 ///
 /// \brief Random spectrum combination.
 ///
-/// Copies side-channel data to the input at random locations. 
+/// Copies side-channel data to the input at random locations.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
 struct Burrito
 {
-    LE_ENUMERATED_PARAMETER( Mode, ( Replace )( Sum ) );
+    LE_ENUMERATED_PARAMETER(Mode, (Replace)(Sum));
 
-    LE_DEFINE_PARAMETERS
-    (
-        ( ( Mode     )                                                                                          )
-        ( ( Range    )( LinearUnsignedInteger )( Minimum< 0> )( Maximum< 100> )( Default< 50> )( Unit<' bw%'> ) )
-        ( ( Period   )( LinearUnsignedInteger )( Minimum<10> )( Maximum<2000> )( Default<250> )( Unit<' ms' > ) )
-        ( ( SideGain )( SymmetricInteger      )( MaximumOffset<24> )                           ( Unit<' dB' > ) )
-    );
+    LE_DEFINE_PARAMETERS(((Mode))(
+        (Range)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<50>)(Unit<' bw%'>))(
+        (Period)(LinearUnsignedInteger)(Minimum<10>)(Maximum<2000>)(Default<250>)(Unit<' ms'>))(
+        (SideGain)(SymmetricInteger)(MaximumOffset<24>)(Unit<' dB'>)));
 
     /// \typedef Mode
     /// \brief Combination mode.
@@ -68,10 +65,9 @@ struct Burrito
     /// \typedef SideGain
     /// \brief Gain applied to side-channel.
 
-
     static bool const usesSideChannel = true;
 
-    static char const title      [];
+    static char const title[];
     static char const description[];
 };
 

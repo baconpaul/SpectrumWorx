@@ -43,14 +43,14 @@
 #include <boost/type_traits/remove_reference.hpp>
 
 #ifndef BOOST_SWITCH_LIMIT
-    #define BOOST_SWITCH_LIMIT 50
+#define BOOST_SWITCH_LIMIT 50
 #endif
 
 #if BOOST_SWITCH_LIMIT > BOOST_PP_LIMIT_REPEAT
-    #error BOOST_SWITCH_LIMIT exceeds Boost.Preprocessor limit
+#error BOOST_SWITCH_LIMIT exceeds Boost.Preprocessor limit
 #endif
 #if BOOST_SWITCH_LIMIT > BOOST_PP_LIMIT_ITERATION
-    #error BOOST_SWITCH_LIMIT exceeds Boost.Preprocessor limit
+#error BOOST_SWITCH_LIMIT exceeds Boost.Preprocessor limit
 #endif
 
 namespace boost
@@ -60,36 +60,38 @@ namespace switch_detail
 {
 
 // N is the number of cases not including the default
-template<int N>
-struct switch_impl;
+template <int N> struct switch_impl;
 
 // specialize for 0 separately to avoid warnings
-template<>
-struct switch_impl<0> {
-    template<class V, class Int, class F, class Default>
-    static typename F::result_type
-    apply(Int i, F &&, Default d BOOST_APPEND_EXPLICIT_TEMPLATE_TYPE(V)) {
-        return(d(i));
+template <> struct switch_impl<0>
+{
+    template <class V, class Int, class F, class Default>
+    static typename F::result_type apply(Int i, F &&,
+                                         Default d BOOST_APPEND_EXPLICIT_TEMPLATE_TYPE(V))
+    {
+        return (d(i));
     }
 };
 
-#define BOOST_SWITCH_CASE(z, n, data)                   \
-    case boost::mpl::at_c<data, n>::type::value: {      \
-        typename boost::mpl::at_c<data, n>::type arg;   \
-        return(f(arg));                                 \
+#define BOOST_SWITCH_CASE(z, n, data)                                                              \
+    case boost::mpl::at_c<data, n>::type::value:                                                   \
+    {                                                                                              \
+        typename boost::mpl::at_c<data, n>::type arg;                                              \
+        return (f(arg));                                                                           \
     }
 
-#define BOOST_SWITCH_IMPL(z, n, data)                                   \
-    template<>                                                          \
-    struct switch_impl<n> {                                             \
-        template<class V, class I, class F, class D>                    \
-        static typename F::result_type                                  \
-        apply(I i, F && f, D d BOOST_APPEND_EXPLICIT_TEMPLATE_TYPE(V)) { \
-            switch(i) {                                                 \
-                BOOST_PP_REPEAT_##z(n, BOOST_SWITCH_CASE, V)            \
-                default: return(d(i));                                  \
-            }                                                           \
-        }                                                               \
+#define BOOST_SWITCH_IMPL(z, n, data)                                                              \
+    template <> struct switch_impl<n>                                                              \
+    {                                                                                              \
+        template <class V, class I, class F, class D>                                              \
+        static typename F::result_type apply(I i, F &&f,                                           \
+                                             D d BOOST_APPEND_EXPLICIT_TEMPLATE_TYPE(V))           \
+        {                                                                                          \
+            switch (i)                                                                             \
+            {                                                                                      \
+                BOOST_PP_REPEAT_##z(n, BOOST_SWITCH_CASE, V) default : return (d(i));              \
+            }                                                                                      \
+        }                                                                                          \
     };
 
 #define BOOST_PP_LOCAL_LIMITS (1, BOOST_SWITCH_LIMIT)
@@ -99,7 +101,7 @@ struct switch_impl<0> {
 #undef BOOST_SWITCH_IMPL
 #undef BOOST_SWITCH_CASE
 
-}  // namespace switch_detail
+} // namespace switch_detail
 
 ////////////////////////////////////////////////////////////////////////////
 ///
@@ -110,32 +112,30 @@ struct switch_impl<0> {
 ///
 ////////////////////////////////////////////////////////////////////////////
 
-template <typename result_type>
-struct assert_no_default_case
+template <typename result_type> struct assert_no_default_case
 {
-    #ifdef _MSC_VER
-        __declspec( noreturn )
-    #endif
-    result_type operator()( int ) const
+#ifdef _MSC_VER
+    __declspec(noreturn)
+#endif
+    result_type operator()(int) const
     {
-        BOOST_ASSERT( !"Default switch_ case executed!." );
-        #if defined( _MSC_VER )
-            __assume( false );
-        #elif ( __clang_major__ >= 2 ) || ( ( ( __GNUC__ * 10 ) + __GNUC_MINOR__ ) >= 45 )
-            __builtin_unreachable();
-        #else // _MSC_VER
-            return result_type();
-        #endif
+        BOOST_ASSERT(!"Default switch_ case executed!.");
+#if defined(_MSC_VER)
+        __assume(false);
+#elif (__clang_major__ >= 2) || (((__GNUC__ * 10) + __GNUC_MINOR__) >= 45)
+        __builtin_unreachable();
+#else // _MSC_VER
+        return result_type();
+#endif
     }
 };
 
-template<class V, class N, class F, class D>
-inline typename F::result_type
-switch_(N n, F && f, D d BOOST_APPEND_EXPLICIT_TEMPLATE_TYPE(V))
+template <class V, class N, class F, class D>
+inline typename F::result_type switch_(N n, F &&f, D d BOOST_APPEND_EXPLICIT_TEMPLATE_TYPE(V))
 {
     typedef switch_detail::switch_impl<boost::mpl::size<V>::value> impl;
-    return(impl::template apply<V>(n, std::forward<F>(f), d));
+    return (impl::template apply<V>(n, std::forward<F>(f), d));
 }
 
-}  // namespace boost
+} // namespace boost
 #endif

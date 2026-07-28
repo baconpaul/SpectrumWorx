@@ -3,11 +3,11 @@
 /// \file oldPhaseVocoder.hpp
 /// ----------------------
 ///
-/// Copyright (c) 2009. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
-#pragma once
 #ifndef oldPhaseVocoder_hpp__51ABC06A_AA69_4C25_8E9C_A672296BB649
 #define oldPhaseVocoder_hpp__51ABC06A_AA69_4C25_8E9C_A672296BB649
 //------------------------------------------------------------------------------
@@ -26,7 +26,7 @@ namespace Algorithms
 ///
 /// \class OldPhaseVocoder
 ///
-/// \ingroup Algorithms 
+/// \ingroup Algorithms
 ///
 /// \brief Phase vocoder for testing purposes only.
 ///
@@ -35,20 +35,17 @@ namespace Algorithms
 
 class OldPhaseVocoder
 {
-public: // LE::Algorithm interface.
-
+  public: // LE::Algorithm interface.
     ////////////////////////////////////////////////////////////////////////////
     // Parameters
     ////////////////////////////////////////////////////////////////////////////
 
-    DEFINE_PARAMETERS
-    (
-        ( ( Scale                 )( float )( MinimumValue<  1> )( MaximumValue<170> )( DefaultValue<10> )( RangeValuesDenominator<10> ) )
-        ( ( SpectrumStartingPoint )( float )( MinimumValue<  0> )( MaximumValue<  1> )( DefaultValue< 0> )                               )
-        ( ( SpectrumEndingPoint   )( float )( MinimumValue<  0> )( MaximumValue<  1> )( DefaultValue< 1> )                               )
-        ( ( SpectrumOffset        )( int   )( MinimumValue<-20> )( MaximumValue<+20> )( DisplayValueSuffix<' %'> )                        )
-    );
-
+    DEFINE_PARAMETERS(
+        ((Scale)(float)(MinimumValue<1>)(MaximumValue<170>)(DefaultValue<
+                                                            10>)(RangeValuesDenominator<10>))(
+            (SpectrumStartingPoint)(float)(MinimumValue<0>)(MaximumValue<1>)(DefaultValue<0>))(
+            (SpectrumEndingPoint)(float)(MinimumValue<0>)(MaximumValue<1>)(DefaultValue<1>))(
+            (SpectrumOffset)(int)(MinimumValue<-20>)(MaximumValue<+20>)(DisplayValueSuffix<' %'>)));
 
     ////////////////////////////////////////////////////////////////////////////
     // ChannelState
@@ -70,24 +67,23 @@ public: // LE::Algorithm interface.
         Common::SSEAlignedHalfFFTBuffer summPhase_;
     };
 
-
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup( EngineSetup const &, Parameters const & );
+    void setup(EngineSetup const &, Parameters const &);
 
     /// \brief Performs analysis, pitch scaling and shifting and synthesis.
-    void process( ChannelState &, ChannelData_AmPh & ) const;
+    void process(ChannelState &, ChannelData_AmPh &) const;
 
-public: // Algorithm traits.
+  public: // Algorithm traits.
     static bool const canUseTwoInputs = false;
 
-public: // Descriptions.
-    static char const title      [];
+  public: // Descriptions.
+    static char const title[];
     static char const description[];
 
-public:
+  public:
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \brief Changes only the scaling factor.
@@ -108,8 +104,7 @@ public:
     ///
     ////////////////////////////////////////////////////////////////////////////
 
-    void setScalingFactor( float const & newScale );
-
+    void setScalingFactor(float const &newScale);
 
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -119,8 +114,7 @@ public:
     ///
     ////////////////////////////////////////////////////////////////////////////
 
-    void analysis( ChannelState &, float const * phaseIn, float * anaFreqOut ) const;
-
+    void analysis(ChannelState &, float const *phaseIn, float *anaFreqOut) const;
 
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -130,8 +124,7 @@ public:
     ///
     ////////////////////////////////////////////////////////////////////////////
 
-    void synthesis( ChannelState &, float const * synthFreqIn, float * phaseOut ) const;
-
+    void synthesis(ChannelState &, float const *synthFreqIn, float *phaseOut) const;
 
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -145,27 +138,22 @@ public:
     ///                                       (03.06.2009.) (Domagoj Saric)
     ///
     ////////////////////////////////////////////////////////////////////////////
-    
-    void pitchShiftAndScale
-    (
-        float       * amplitudes,
-        float const * anaFreqs  ,
-        float       * synthFreqs
-    ) const;
 
-private:
+    void pitchShiftAndScale(float *amplitudes, float const *anaFreqs, float *synthFreqs) const;
+
+  private:
     void updateActualBounds();
 
-private:
-    float freqPerBin_             ;
-    float expctRate_              ;
+  private:
+    float freqPerBin_;
+    float expctRate_;
     float invFreqPerBinInvOverlap_;
-    float M_PI2inv_               ;
-    float scale_                  ;
-    int   offset_                 ;
+    float M_PI2inv_;
+    float scale_;
+    int offset_;
     unsigned int lowerBound_;
     unsigned int upperBound_;
-    unsigned int  lowestUserSpecifiedBin_;
+    unsigned int lowestUserSpecifiedBin_;
     unsigned int highestUserSpecifiedBin_;
     unsigned int fftHalfFrameSize_;
 };

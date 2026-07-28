@@ -2,7 +2,8 @@
 #
 # SpectrumWorx configuration.cmake
 #
-# Copyright (c) 2012 - 2015. Little Endian Ltd. All rights reserved.
+# Copyright (c) 2012 - 2015. Little Endian Ltd.
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 ################################################################################
 

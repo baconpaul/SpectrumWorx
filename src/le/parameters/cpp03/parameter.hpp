@@ -3,13 +3,13 @@
 /// \file parameter.hpp
 /// -------------------
 ///
-/// Copyright © 2009 - 2015. Little Endian. All rights reserved.
+/// Copyright (c) 2009 - 2015. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef parameter_hpp__B49E51E6_E59F_4C49_A702_B6533579846D
 #define parameter_hpp__B49E51E6_E59F_4C49_A702_B6533579846D
-#pragma once
 //------------------------------------------------------------------------------
 #include "boost/assert.hpp"
 #include "boost/mpl/map/map10.hpp"
@@ -72,26 +72,23 @@ namespace Traits
 
 // Helper verbosity-reducing macros for Parameter trait declarations.
 
-#define DECLARE_PARAMETER_TRAIT( name, valueType )  \
-namespace Tag { struct name; }                      \
-template <valueType vvalue>                         \
-struct name                                         \
-    :                                               \
-    boost::mpl::pair                                \
-    <                                               \
-        Tag::name,                                  \
-        boost::mpl::integral_c<valueType, vvalue>   \
-    >                                               \
-{}
+#define DECLARE_PARAMETER_TRAIT(name, valueType)                                                   \
+    namespace Tag                                                                                  \
+    {                                                                                              \
+    struct name;                                                                                   \
+    }                                                                                              \
+    template <valueType vvalue>                                                                    \
+    struct name : boost::mpl::pair<Tag::name, boost::mpl::integral_c<valueType, vvalue>>           \
+    {                                                                                              \
+    }
 
-DECLARE_PARAMETER_TRAIT( Minimum          ,          int ); /// \ingroup ParameterProperties
-DECLARE_PARAMETER_TRAIT( Maximum          ,          int ); /// \ingroup ParameterProperties
-DECLARE_PARAMETER_TRAIT( Default          ,          int ); /// \ingroup ParameterProperties
-DECLARE_PARAMETER_TRAIT( ValuesDenominator, unsigned int ); /// \ingroup ParameterProperties
+DECLARE_PARAMETER_TRAIT(Minimum, int);                    /// \ingroup ParameterProperties
+DECLARE_PARAMETER_TRAIT(Maximum, int);                    /// \ingroup ParameterProperties
+DECLARE_PARAMETER_TRAIT(Default, int);                    /// \ingroup ParameterProperties
+DECLARE_PARAMETER_TRAIT(ValuesDenominator, unsigned int); /// \ingroup ParameterProperties
 
 // Helper macro cleanup.
 #undef DECLARE_PARAMETER_TRAIT
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -108,18 +105,16 @@ DECLARE_PARAMETER_TRAIT( ValuesDenominator, unsigned int ); /// \ingroup Paramet
 //                                            (25.09.2009.) (Domagoj Saric)
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace Tag { struct Unit; }
+namespace Tag
+{
+struct Unit;
+}
 
 template <unsigned int stringLiteralPart1, unsigned int stringLiteralPart2 = 0>
 struct Unit
-    :
-    boost::mpl::pair
-    <
-        Tag::Unit,
-        boost::mpl::string<stringLiteralPart1, stringLiteralPart2>
-    >
-{};
-
+    : boost::mpl::pair<Tag::Unit, boost::mpl::string<stringLiteralPart1, stringLiteralPart2>>
+{
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -132,15 +127,9 @@ struct Unit
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-template <typename MPLString>
-struct Unit2
-    :
-    boost::mpl::pair
-    <
-        Tag::Unit,
-        MPLString
-    >
-{};
+template <typename MPLString> struct Unit2 : boost::mpl::pair<Tag::Unit, MPLString>
+{
+};
 
 //------------------------------------------------------------------------------
 } // namespace Traits
@@ -155,78 +144,84 @@ struct Unit2
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-template <class ImplTraits>
-class Parameter : public ImplTraits
+template <class ImplTraits> class Parameter : public ImplTraits
 {
-public:
+  public:
     typedef Parameter type;
 
-    typedef typename ImplTraits::value_type value_type ;
-    typedef typename ImplTraits::param_type param_type ;
-    typedef                      value_type binary_type;
+    typedef typename ImplTraits::value_type value_type;
+    typedef typename ImplTraits::param_type param_type;
+    typedef value_type binary_type;
 
-public:
+  public:
     // Intentional implicit conversion.
-    Parameter( param_type const initialValue = ImplTraits::default_() )
+    Parameter(param_type const initialValue = ImplTraits::default_())
     {
         // Traits sanity checks.
-        BOOST_ASSERT( this->isValidValue( ImplTraits::minimum () ) );
-        BOOST_ASSERT( this->isValidValue( ImplTraits::default_() ) );
-        BOOST_ASSERT( this->isValidValue( ImplTraits::maximum () ) );
+        BOOST_ASSERT(this->isValidValue(ImplTraits::minimum()));
+        BOOST_ASSERT(this->isValidValue(ImplTraits::default_()));
+        BOOST_ASSERT(this->isValidValue(ImplTraits::maximum()));
 
-        BOOST_ASSERT( ImplTraits::maximum() >= ImplTraits::minimum() );
+        BOOST_ASSERT(ImplTraits::maximum() >= ImplTraits::minimum());
 
-        setValue( initialValue );
+        setValue(initialValue);
     }
 
-    value_type const & getValue(                  ) const { BOOST_ASSERT_MSG( this->isValidValue( value_ ), "Parameter in inconsistent state."                               ); return value_;  }
-    void               setValue( param_type value )       { BOOST_ASSERT_MSG( this->isValidValue( value  ), "Specified value is invalid or out of range for this parameter." ); value_ = value; }
+    value_type const &getValue() const
+    {
+        BOOST_ASSERT_MSG(this->isValidValue(value_), "Parameter in inconsistent state.");
+        return value_;
+    }
+    void setValue(param_type value)
+    {
+        BOOST_ASSERT_MSG(this->isValidValue(value),
+                         "Specified value is invalid or out of range for this parameter.");
+        value_ = value;
+    }
 
-    void reset() { setValue( ImplTraits::default_() ); }
+    void reset() { setValue(ImplTraits::default_()); }
 
-public:
+  public:
     operator value_type const &() const { return getValue(); }
 
-    Parameter & operator++()
+    Parameter &operator++()
     {
-        BOOST_ASSERT_MSG( getValue() != ImplTraits::maximum(), "Tried to increment a parameter past its maximum value." );
-        ImplTraits::increment( value_ );
-        BOOST_ASSERT_MSG( ImplTraits::isValidValue( value_ ),  "Parameter in inconsistent state after increment."       );
+        BOOST_ASSERT_MSG(getValue() != ImplTraits::maximum(),
+                         "Tried to increment a parameter past its maximum value.");
+        ImplTraits::increment(value_);
+        BOOST_ASSERT_MSG(ImplTraits::isValidValue(value_),
+                         "Parameter in inconsistent state after increment.");
         return *this;
     }
 
-    Parameter & operator--()
+    Parameter &operator--()
     {
-        BOOST_ASSERT_MSG( getValue() != ImplTraits::minimum(), "Tried to decrement a parameter below its minimum value." );
-        ImplTraits::decrement( value_ );
-        BOOST_ASSERT_MSG( ImplTraits::isValidValue( value_ ),  "Parameter in inconsistent state after decrement."        );
+        BOOST_ASSERT_MSG(getValue() != ImplTraits::minimum(),
+                         "Tried to decrement a parameter below its minimum value.");
+        ImplTraits::decrement(value_);
+        BOOST_ASSERT_MSG(ImplTraits::isValidValue(value_),
+                         "Parameter in inconsistent state after decrement.");
         return *this;
     }
 
-    bool operator!=( param_type other ) const { return this->getValue() != other; }
+    bool operator!=(param_type other) const { return this->getValue() != other; }
 
-protected:
+  protected:
     value_type value_;
 
-private:
-    static_assert( ImplTraits::unscaledMaximum >= ImplTraits::unscaledMinimum, "Invalid range." );
+  private:
+    static_assert(ImplTraits::unscaledMaximum >= ImplTraits::unscaledMinimum, "Invalid range.");
 
-    static_assert
-    (
-        ( ImplTraits::unscaledDefault >= ImplTraits::unscaledMinimum ) &&
-        ( ImplTraits::unscaledDefault <= ImplTraits::unscaledMaximum ),
-        "Default value out of range."
-    );
+    static_assert((ImplTraits::unscaledDefault >= ImplTraits::unscaledMinimum) &&
+                      (ImplTraits::unscaledDefault <= ImplTraits::unscaledMaximum),
+                  "Default value out of range.");
 };
 
-
-template <class OriginalParameter, class NewTraits>
-struct Modify
+template <class OriginalParameter, class NewTraits> struct Modify
 {
-    typedef typename OriginalParameter:: template Modify<NewTraits>::type ModifiedTraits;
+    typedef typename OriginalParameter::template Modify<NewTraits>::type ModifiedTraits;
     typedef Parameter<ModifiedTraits> type;
 };
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -249,8 +244,7 @@ struct Modify
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-#define LE_ADD_TRAIT_PREFIX( r, dummy, trait ) LE::Parameters::Traits::trait
-
+#define LE_ADD_TRAIT_PREFIX(r, dummy, trait) LE::Parameters::Traits::trait
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -259,20 +253,9 @@ struct Modify
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-#define LE_ENUMERATE_PARAMETER_TRAITS( traitsSequence )                  \
-    BOOST_PP_CAT( boost::mpl::map, BOOST_PP_SEQ_SIZE( traitsSequence ) ) \
-    <                                                                    \
-        BOOST_PP_SEQ_ENUM                                                \
-        (                                                                \
-            BOOST_PP_SEQ_TRANSFORM                                       \
-            (                                                            \
-                LE_ADD_TRAIT_PREFIX,                                     \
-                0,                                                       \
-                traitsSequence                                           \
-            )                                                            \
-        )                                                                \
-    >
-
+#define LE_ENUMERATE_PARAMETER_TRAITS(traitsSequence)                                              \
+    BOOST_PP_CAT(boost::mpl::map, BOOST_PP_SEQ_SIZE(traitsSequence))<BOOST_PP_SEQ_ENUM(            \
+        BOOST_PP_SEQ_TRANSFORM(LE_ADD_TRAIT_PREFIX, 0, traitsSequence))>
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -290,40 +273,32 @@ struct Modify
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-#define LE_DEFINE_PARAMETER_FULL( parameterSequence )                                                    \
-    class BOOST_PP_SEQ_HEAD( parameterSequence )                                                         \
-        :                                                                                                \
-        public LE::Parameters::Modify                                                                    \
-        <                                                                                                \
-            BOOST_PP_SEQ_HEAD( BOOST_PP_SEQ_TAIL( parameterSequence ) ),                                 \
-            LE_ENUMERATE_PARAMETER_TRAITS( BOOST_PP_SEQ_TAIL( BOOST_PP_SEQ_TAIL( parameterSequence ) ) ) \
-        >::type                                                                                          \
-    {                                                                                                    \
-    public:                                                                                              \
-        BOOST_PP_SEQ_HEAD( parameterSequence )                                                           \
-            ( type::value_type const initialValue = type::default_() )                                   \
-        { setValue( initialValue ); }                                                                    \
+#define LE_DEFINE_PARAMETER_FULL(parameterSequence)                                                \
+    class BOOST_PP_SEQ_HEAD(parameterSequence)                                                     \
+        : public LE::Parameters::Modify<BOOST_PP_SEQ_HEAD(BOOST_PP_SEQ_TAIL(parameterSequence)),   \
+                                        LE_ENUMERATE_PARAMETER_TRAITS(BOOST_PP_SEQ_TAIL(           \
+                                            BOOST_PP_SEQ_TAIL(parameterSequence)))>::type          \
+    {                                                                                              \
+      public:                                                                                      \
+        BOOST_PP_SEQ_HEAD(parameterSequence)                                                       \
+        (type::value_type const initialValue = type::default_()) { setValue(initialValue); }       \
     };
 
-
-#define LE_DEFINE_PARAMETER_RENAME_ONLY( parameterSequence )                             \
-    class BOOST_PP_SEQ_HEAD( parameterSequence )                                         \
-    : public BOOST_PP_SEQ_HEAD( BOOST_PP_SEQ_TAIL( parameterSequence ) )                 \
-    {                                                                                    \
-    public:                                                                              \
-        BOOST_PP_SEQ_HEAD( parameterSequence )                                           \
-        ( type::value_type const initialValue = type::default_() )                       \
-        : BOOST_PP_SEQ_HEAD( BOOST_PP_SEQ_TAIL( parameterSequence ) )( initialValue ) {} \
+#define LE_DEFINE_PARAMETER_RENAME_ONLY(parameterSequence)                                         \
+    class BOOST_PP_SEQ_HEAD(parameterSequence)                                                     \
+        : public BOOST_PP_SEQ_HEAD(BOOST_PP_SEQ_TAIL(parameterSequence))                           \
+    {                                                                                              \
+      public:                                                                                      \
+        BOOST_PP_SEQ_HEAD(parameterSequence)                                                       \
+        (type::value_type const initialValue = type::default_())                                   \
+            : BOOST_PP_SEQ_HEAD(BOOST_PP_SEQ_TAIL(parameterSequence))(initialValue)                \
+        {                                                                                          \
+        }                                                                                          \
     };
 
-
-#define LE_DEFINE_PARAMETER( parameterSequence )                       \
-    BOOST_PP_IIF                                                       \
-    (                                                                  \
-        BOOST_PP_GREATER( BOOST_PP_SEQ_SIZE( parameterSequence ), 2 ), \
-        LE_DEFINE_PARAMETER_FULL,                                      \
-        LE_DEFINE_PARAMETER_RENAME_ONLY                                \
-    )( parameterSequence )
+#define LE_DEFINE_PARAMETER(parameterSequence)                                                     \
+    BOOST_PP_IIF(BOOST_PP_GREATER(BOOST_PP_SEQ_SIZE(parameterSequence), 2),                        \
+                 LE_DEFINE_PARAMETER_FULL, LE_DEFINE_PARAMETER_RENAME_ONLY)(parameterSequence)
 
 //------------------------------------------------------------------------------
 } // namespace Parameters

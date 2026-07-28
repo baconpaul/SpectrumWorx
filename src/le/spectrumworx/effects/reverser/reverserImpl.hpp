@@ -3,13 +3,13 @@
 /// \file reverserImpl.hpp
 /// ----------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef reverserImpl_hpp__C3A377D7_0B2D_4B86_B9F9_5609C8675D7E
 #define reverserImpl_hpp__C3A377D7_0B2D_4B86_B9F9_5609C8675D7E
-#pragma once
 //------------------------------------------------------------------------------
 #include "reverser.hpp"
 
@@ -30,22 +30,21 @@ namespace Effects
 
 class ReverserImpl : public EffectImpl<Reverser>
 {
-public: // LE::Effect interface.
+  public: // LE::Effect interface.
     ////////////////////////////////////////////////////////////////////////////
     // ChannelState
     ////////////////////////////////////////////////////////////////////////////
 
     typedef ReversedHistoryChannelState<Length::unscaledMaximum> ChannelState;
 
-
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup  ( IndexRange const &, Engine::Setup const & );
-    void process( ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const & ) const;    
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const &) const;
 
-private:
+  private:
     std::uint16_t lengthInSteps_;
 }; // class ReverserImpl
 

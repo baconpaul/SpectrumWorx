@@ -3,13 +3,13 @@
 /// \file vaxateerImpl.hpp
 /// ----------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef vaxateerImpl_hpp__BE1E8F69_E3AC_444F_91A4_4906B7C669E4
 #define vaxateerImpl_hpp__BE1E8F69_E3AC_444F_91A4_4906B7C669E4
-#pragma once
 //------------------------------------------------------------------------------
 #include "vaxateer.hpp"
 
@@ -27,17 +27,16 @@ namespace Effects
 
 class VaxateerImpl : public EffectImpl<Vaxateer>
 {
-public: // LE::Effect required interface.
-
+  public: // LE::Effect required interface.
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup  ( IndexRange const &, Engine::Setup const & );
-    void process( Engine::MainSideChannelData_AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(Engine::MainSideChannelData_AmPh, Engine::Setup const &) const;
 
-private:
-    float rmsGain_;    
+  private:
+    float rmsGain_;
 };
 
 //------------------------------------------------------------------------------

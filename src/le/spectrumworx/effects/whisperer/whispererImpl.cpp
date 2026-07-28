@@ -3,7 +3,8 @@
 /// whispererImpl.cpp
 /// -----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -29,9 +30,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Whisperer::title      [] = "Whisperer";
+char const Whisperer::title[] = "Whisperer";
 char const Whisperer::description[] = "Whispering sound.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -40,12 +40,12 @@ char const Whisperer::description[] = "Whispering sound.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void WhispererImpl::process( Engine::ChannelData_AmPh data, Engine::Setup const & ) const
+void WhispererImpl::process(Engine::ChannelData_AmPh data, Engine::Setup const &) const
 {
     using namespace Math;
-    for ( auto & phase : data.phases() )
+    for (auto &phase : data.phases())
     {
-        phase = rangedRand( Math::Constants::twoPi );
+        phase = rangedRand(Math::Constants::twoPi);
     }
 }
 

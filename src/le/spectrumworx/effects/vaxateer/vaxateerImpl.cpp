@@ -3,7 +3,8 @@
 /// vaxateerImpl.cpp
 /// ----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -32,9 +33,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Vaxateer::title      [] = "Vaxateer";
+char const Vaxateer::title[] = "Vaxateer";
 char const Vaxateer::description[] = "Combination based on RMS.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -42,30 +42,17 @@ char const Vaxateer::description[] = "Combination based on RMS.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Vaxateer::RMSTarget, "RMS target"         )
-EFFECT_PARAMETER_NAME( Vaxateer::RMSGain  , "RMS threshold gain" ) 
-EFFECT_PARAMETER_NAME( Vaxateer::Mode     , "Swap condition"     )
+EFFECT_PARAMETER_NAME(Vaxateer::RMSTarget, "RMS target")
+EFFECT_PARAMETER_NAME(Vaxateer::RMSGain, "RMS threshold gain")
+EFFECT_PARAMETER_NAME(Vaxateer::Mode, "Swap condition")
 
-EFFECT_ENUMERATED_PARAMETER_STRINGS
-(
-    Vaxateer, RMSTarget,
-    (( MainRMS, "Main" ))
-    (( SideRMS, "Side" ))
-)
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Vaxateer, RMSTarget, ((MainRMS, "Main"))((SideRMS, "Side")))
 
-EFFECT_ENUMERATED_PARAMETER_STRINGS
-(
+EFFECT_ENUMERATED_PARAMETER_STRINGS(
     Vaxateer, Mode,
-    (( M1, "Main: >Thr >Side" ))
-    (( M2, "Main: >Thr <Side" ))
-    (( M3, "Main: <Thr >Side" ))
-    (( M4, "Main: <Thr <Side" ))
-    (( M5, "Side: >Thr >Main" ))
-    (( M6, "Side: >Thr <Main" ))
-    (( M7, "Side: <Thr >Main" ))
-    (( M8, "Side: <Thr <Main" ))
-)
-
+    ((M1, "Main: >Thr >Side"))((M2, "Main: >Thr <Side"))((M3, "Main: <Thr >Side"))(
+        (M4, "Main: <Thr <Side"))((M5, "Side: >Thr >Main"))((M6, "Side: >Thr <Main"))(
+        (M7, "Side: <Thr >Main"))((M8, "Side: <Thr <Main")))
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -74,11 +61,10 @@ EFFECT_ENUMERATED_PARAMETER_STRINGS
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void VaxateerImpl::setup( IndexRange const &, Engine::Setup const & )
-{  
-    rmsGain_ = Math::dB2NormalisedLinear( parameters().get<RMSGain>() );
+void VaxateerImpl::setup(IndexRange const &, Engine::Setup const &)
+{
+    rmsGain_ = Math::dB2NormalisedLinear(parameters().get<RMSGain>());
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -87,97 +73,100 @@ void VaxateerImpl::setup( IndexRange const &, Engine::Setup const & )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void VaxateerImpl::process( Engine::MainSideChannelData_AmPh data, Engine::Setup const & ) const
+void VaxateerImpl::process(Engine::MainSideChannelData_AmPh data, Engine::Setup const &) const
 {
     // Calculate RMS of the input signal:
-    Engine::ChannelData_AmPh const * pRMSSource;
-    switch ( parameters().get<RMSTarget>().getValue() )
+    Engine::ChannelData_AmPh const *pRMSSource;
+    switch (parameters().get<RMSTarget>().getValue())
     {
-        case RMSTarget::MainRMS: pRMSSource = &data.main(); break;
-        case RMSTarget::SideRMS: pRMSSource = &data.side(); break;
+    case RMSTarget::MainRMS:
+        pRMSSource = &data.main();
+        break;
+    case RMSTarget::SideRMS:
+        pRMSSource = &data.side();
+        break;
         LE_DEFAULT_CASE_UNREACHABLE();
     }
 
-    float const thr( rmsGain_ * Math::rms( pRMSSource->amps() ) );
+    float const thr(rmsGain_ * Math::rms(pRMSSource->amps()));
 
     // Setup threshold comparison sources:
-    ReadOnlyDataRange const &       mainAmps ( static_cast<Engine::ChannelData_AmPh const &>( data.main() ).amps() );
-    ReadOnlyDataRange const &       sideAmps (                                                data.side()  .amps() );
-    ReadOnlyDataRange         const threshold( &thr, &thr + 1                                                      );
+    ReadOnlyDataRange const &mainAmps(
+        static_cast<Engine::ChannelData_AmPh const &>(data.main()).amps());
+    ReadOnlyDataRange const &sideAmps(data.side().amps());
+    ReadOnlyDataRange const threshold(&thr, &thr + 1);
 
-    ReadOnlyDataRange const * pThresholdComparisonHigherSource;
-    ReadOnlyDataRange const * pThresholdComparisonLowerSource;
-    ReadOnlyDataRange const * pAmpSideComparisonHigherSource;
-    ReadOnlyDataRange const * pAmpSideComparisonLowerSource;
-    
-    switch ( parameters().get<Mode>().getValue() )
+    ReadOnlyDataRange const *pThresholdComparisonHigherSource;
+    ReadOnlyDataRange const *pThresholdComparisonLowerSource;
+    ReadOnlyDataRange const *pAmpSideComparisonHigherSource;
+    ReadOnlyDataRange const *pAmpSideComparisonLowerSource;
+
+    switch (parameters().get<Mode>().getValue())
     {
-        case Mode::M1:
-            pThresholdComparisonHigherSource = &mainAmps;
-            pThresholdComparisonLowerSource  = &threshold;
-            pAmpSideComparisonHigherSource   = &mainAmps;
-            pAmpSideComparisonLowerSource    = &sideAmps;
-            break;
+    case Mode::M1:
+        pThresholdComparisonHigherSource = &mainAmps;
+        pThresholdComparisonLowerSource = &threshold;
+        pAmpSideComparisonHigherSource = &mainAmps;
+        pAmpSideComparisonLowerSource = &sideAmps;
+        break;
 
-        case Mode::M2:
-            pThresholdComparisonHigherSource = &mainAmps;
-            pThresholdComparisonLowerSource  = &threshold;
-            pAmpSideComparisonHigherSource   = &sideAmps;
-            pAmpSideComparisonLowerSource    = &mainAmps;
-            break;
+    case Mode::M2:
+        pThresholdComparisonHigherSource = &mainAmps;
+        pThresholdComparisonLowerSource = &threshold;
+        pAmpSideComparisonHigherSource = &sideAmps;
+        pAmpSideComparisonLowerSource = &mainAmps;
+        break;
 
-        case Mode::M3:
-            pThresholdComparisonHigherSource = &threshold;
-            pThresholdComparisonLowerSource  = &mainAmps;
-            pAmpSideComparisonHigherSource   = &mainAmps;
-            pAmpSideComparisonLowerSource    = &sideAmps;
-            break;
+    case Mode::M3:
+        pThresholdComparisonHigherSource = &threshold;
+        pThresholdComparisonLowerSource = &mainAmps;
+        pAmpSideComparisonHigherSource = &mainAmps;
+        pAmpSideComparisonLowerSource = &sideAmps;
+        break;
 
-        case Mode::M4:
-            pThresholdComparisonHigherSource = &threshold;
-            pThresholdComparisonLowerSource  = &mainAmps;
-            pAmpSideComparisonHigherSource   = &sideAmps;
-            pAmpSideComparisonLowerSource    = &mainAmps;
-            break;
+    case Mode::M4:
+        pThresholdComparisonHigherSource = &threshold;
+        pThresholdComparisonLowerSource = &mainAmps;
+        pAmpSideComparisonHigherSource = &sideAmps;
+        pAmpSideComparisonLowerSource = &mainAmps;
+        break;
 
-        case Mode::M5:
-            pThresholdComparisonHigherSource = &sideAmps;
-            pThresholdComparisonLowerSource  = &threshold;
-            pAmpSideComparisonHigherSource   = &mainAmps;
-            pAmpSideComparisonLowerSource    = &sideAmps;
-            break;
+    case Mode::M5:
+        pThresholdComparisonHigherSource = &sideAmps;
+        pThresholdComparisonLowerSource = &threshold;
+        pAmpSideComparisonHigherSource = &mainAmps;
+        pAmpSideComparisonLowerSource = &sideAmps;
+        break;
 
-        case Mode::M6:
-            pThresholdComparisonHigherSource = &sideAmps;
-            pThresholdComparisonLowerSource  = &threshold;
-            pAmpSideComparisonHigherSource   = &sideAmps;
-            pAmpSideComparisonLowerSource    = &mainAmps;
-            break;
+    case Mode::M6:
+        pThresholdComparisonHigherSource = &sideAmps;
+        pThresholdComparisonLowerSource = &threshold;
+        pAmpSideComparisonHigherSource = &sideAmps;
+        pAmpSideComparisonLowerSource = &mainAmps;
+        break;
 
-        case Mode::M7:
-            pThresholdComparisonHigherSource = &threshold;
-            pThresholdComparisonLowerSource  = &sideAmps;
-            pAmpSideComparisonHigherSource   = &mainAmps;
-            pAmpSideComparisonLowerSource    = &sideAmps;
-            break;
+    case Mode::M7:
+        pThresholdComparisonHigherSource = &threshold;
+        pThresholdComparisonLowerSource = &sideAmps;
+        pAmpSideComparisonHigherSource = &mainAmps;
+        pAmpSideComparisonLowerSource = &sideAmps;
+        break;
 
-        case Mode::M8:
-            pThresholdComparisonHigherSource = &threshold;
-            pThresholdComparisonLowerSource  = &sideAmps;
-            pAmpSideComparisonHigherSource   = &sideAmps;
-            pAmpSideComparisonLowerSource    = &mainAmps;
-            break;
+    case Mode::M8:
+        pThresholdComparisonHigherSource = &threshold;
+        pThresholdComparisonLowerSource = &sideAmps;
+        pAmpSideComparisonHigherSource = &sideAmps;
+        pAmpSideComparisonLowerSource = &mainAmps;
+        break;
 
         LE_DEFAULT_CASE_UNREACHABLE();
     }
 
-    while ( data )
+    while (data)
     {
-        if
-        (
-            ( *pThresholdComparisonHigherSource->begin() > *pThresholdComparisonLowerSource->begin() ) &&
-            ( *pAmpSideComparisonHigherSource  ->begin() > *pAmpSideComparisonLowerSource  ->begin() )
-        )
+        if ((*pThresholdComparisonHigherSource->begin() >
+             *pThresholdComparisonLowerSource->begin()) &&
+            (*pAmpSideComparisonHigherSource->begin() > *pAmpSideComparisonLowerSource->begin()))
         {
             data.main().amps().front() = data.side().amps().front();
         }

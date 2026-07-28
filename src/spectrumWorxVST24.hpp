@@ -3,13 +3,13 @@
 /// \file spectrumWorxVST24.hpp
 /// ---------------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef spectrumWorxVST24_hpp__92FDD21B_5D70_4DBB_8CE3_63498D30A98D
 #define spectrumWorxVST24_hpp__92FDD21B_5D70_4DBB_8CE3_63498D30A98D
-#pragma once
 //------------------------------------------------------------------------------
 #include "spectrumWorx.hpp"
 #include "core/spectrumWorxSharedImpl.hpp"
@@ -25,28 +25,32 @@ namespace SW
 {
 //------------------------------------------------------------------------------
 
-class SpectrumWorxVST24 LE_SEALED
-    :
-    public SpectrumWorxSharedImpl<SpectrumWorxVST24, Plugins::Protocol::VST24>
+class SpectrumWorxVST24 final
+    : public SpectrumWorxSharedImpl<SpectrumWorxVST24, Plugins::Protocol::VST24>
 {
-private:
+  private:
     typedef Plugins::Protocol::VST24 Protocol;
 
     typedef SpectrumWorxSharedImpl<SpectrumWorxVST24, Protocol> Base;
 
-    typedef Plugins::Plugin<SpectrumWorxVST24, Protocol> PluginPlatform    ;
-    typedef PluginPlatform::AutomatedParameter           AutomatedParameter;
+    typedef Plugins::Plugin<SpectrumWorxVST24, Protocol> PluginPlatform;
+    typedef PluginPlatform::AutomatedParameter AutomatedParameter;
 
-public: // Plugin framework interface
-    LE_NOTHROW SpectrumWorxVST24( PluginPlatform::ConstructionParameter const pluginBaseParam ) : Base( pluginBaseParam ) {}
+  public: // Plugin framework interface
+    LE_NOTHROW SpectrumWorxVST24(PluginPlatform::ConstructionParameter const pluginBaseParam)
+        : Base(pluginBaseParam)
+    {
+    }
 
     bool LE_NOTHROW initialise();
 
-    bool setSpeakerArrangement( ::VstSpeakerArrangement const & input, ::VstSpeakerArrangement const & output )      ;
-    bool getSpeakerArrangement( ::VstSpeakerArrangement       & input, ::VstSpeakerArrangement       & output ) const;
+    bool setSpeakerArrangement(::VstSpeakerArrangement const &input,
+                               ::VstSpeakerArrangement const &output);
+    bool getSpeakerArrangement(::VstSpeakerArrangement &input,
+                               ::VstSpeakerArrangement &output) const;
 
-	void getInputProperties ( std::uint8_t index, ::VstPinProperties & properties );
-	void getOutputProperties( std::uint8_t index, ::VstPinProperties & properties );
+    void getInputProperties(std::uint8_t index, ::VstPinProperties &properties);
+    void getOutputProperties(std::uint8_t index, ::VstPinProperties &properties);
 
     using SpectrumWorx::canParameterBeAutomated;
 }; // class SpectrumWorxVST24;

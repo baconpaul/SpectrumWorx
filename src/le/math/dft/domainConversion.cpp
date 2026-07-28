@@ -3,7 +3,8 @@
 /// domainConversion.cpp
 /// --------------------
 ///
-/// Copyright (c) 2010 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2010 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -16,36 +17,29 @@
 namespace LE
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN( Math )
+LE_IMPL_NAMESPACE_BEGIN(Math)
 //------------------------------------------------------------------------------
 
-void LE_FASTCALL reim2AmPh
-(
-    float const * const reals     , float const * const imags ,  // input
-    float       * const amplitudes, float       * const phases,  // output
-    std::uint16_t const numberOfSamples
-)
+void reim2AmPh(float const *const reals, float const *const imags, // input
+               float *const amplitudes, float *const phases,       // output
+               std::uint16_t const numberOfSamples)
 {
-    BOOST_ASSERT( reals && imags && amplitudes && phases );
+    BOOST_ASSERT(reals && imags && amplitudes && phases);
 
-    rectangular2polar( reals, imags, amplitudes, phases, numberOfSamples );
+    rectangular2polar(reals, imags, amplitudes, phases, numberOfSamples);
 }
 
-
-void LE_FASTCALL amph2ReIm
-(
-    float const * const amplitudes, float const * const phases,  // input
-    float       * const reals     , float       * const imags ,  // output
-    std::uint16_t const numberOfSamples
-)
+void amph2ReIm(float const *const amplitudes, float const *const phases, // input
+               float *const reals, float *const imags,                   // output
+               std::uint16_t const numberOfSamples)
 {
-    BOOST_ASSERT( amplitudes && phases && reals && imags );
+    BOOST_ASSERT(amplitudes && phases && reals && imags);
 
-    polar2rectangular( amplitudes, phases, reals, imags, numberOfSamples );
+    polar2rectangular(amplitudes, phases, reals, imags, numberOfSamples);
 }
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END( Math )
+LE_IMPL_NAMESPACE_END(Math)
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------

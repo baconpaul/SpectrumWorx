@@ -3,13 +3,14 @@
 /// sleep.cpp
 /// ---------
 ///
-/// Copyright (c) 2013 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2013 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #include "sleep.hpp"
 #ifdef _WIN32
-extern "C" __declspec( dllimport ) void __stdcall Sleep( unsigned long dwMilliseconds );
+extern "C" __declspec(dllimport) void __stdcall Sleep(unsigned long dwMilliseconds);
 #else
 #include <unistd.h>
 #endif // _WIN32
@@ -21,13 +22,15 @@ namespace Utility
 {
 //------------------------------------------------------------------------------
 
-LE_NOTHROWNOALIAS void LE_FASTCALL_ABI sleep( unsigned int const seconds )
+LE_NOTHROWNOALIAS void sleep(unsigned int const seconds)
 {
 #ifdef _WIN32
-    ::Sleep( seconds * 1000 );
-#else // POSIX
-    auto unslept( seconds );
-    while ( ( unslept = ::sleep( unslept ) ) ) {}
+    ::Sleep(seconds * 1000);
+#else  // POSIX
+    auto unslept(seconds);
+    while ((unslept = ::sleep(unslept)))
+    {
+    }
 #endif // OS
 }
 

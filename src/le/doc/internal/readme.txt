@@ -4,7 +4,8 @@
 Little Endian Build main documentation.
 ---------------------------------------
 
-  Copyright © 2009 - 2016. Little Endian Ltd. All rights reserved.
+  Copyright (c) 2009 - 2016. Little Endian Ltd.
+
 
 ================================================================================
 

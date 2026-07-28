@@ -3,13 +3,13 @@
 /// \file slicerImpl.hpp
 /// --------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef slicerImpl_hpp__5484C80F_BF0B_46A9_BCB8_8F68F22B46DA
 #define slicerImpl_hpp__5484C80F_BF0B_46A9_BCB8_8F68F22B46DA
-#pragma once
 //------------------------------------------------------------------------------
 #include "slicer.hpp"
 
@@ -29,36 +29,31 @@ namespace Effects
 
 class SlicerImpl : public EffectImpl<Slicer>
 {
-public: // LE::Effect interface.
-
+  public: // LE::Effect interface.
     ////////////////////////////////////////////////////////////////////////////
     // ChannelState
     ////////////////////////////////////////////////////////////////////////////
 
-    LE_DYNAMIC_CHANNEL_STATE
-    (
-        ( ( Engine::HalfFFTBuffer<float> )( mags ) )
-        ( ( Engine::HalfFFTBuffer<float> )( phas ) )
-    );
+    LE_DYNAMIC_CHANNEL_STATE(
+        ((Engine::HalfFFTBuffer<float>)(mags))((Engine::HalfFFTBuffer<float>)(phas)));
 
     struct ChannelState : DynamicChannelState
     {
         ModuloCounter counter;
-        bool          silence;
+        bool silence;
 
         void reset();
     };
-    
 
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup  ( IndexRange const &, Engine::Setup const & );
-    void process( ChannelState &, Engine::MainSideChannelData_AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(ChannelState &, Engine::MainSideChannelData_AmPh, Engine::Setup const &) const;
 
-private:
-    unsigned int timeOn_ ;
+  private:
+    unsigned int timeOn_;
     unsigned int timeOff_;
 };
 

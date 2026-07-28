@@ -2,7 +2,8 @@
 #
 # LE Utility project file
 #
-# Copyright (c) 2010 - 2016. Little Endian Ltd. All rights reserved.
+# Copyright (c) 2010 - 2016. Little Endian Ltd.
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 ################################################################################
 

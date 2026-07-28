@@ -3,14 +3,14 @@
 /// \file quietBoost.hpp
 /// --------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef quietBoost_hpp__5E3F3097_A492_4350_8DFC_1E0B575039A0
 #define quietBoost_hpp__5E3F3097_A492_4350_8DFC_1E0B575039A0
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -36,20 +36,18 @@ namespace Effects
 ///
 /// \brief Amplifies low magnitudes.
 ///
-/// Amplifies signal below the desired threshold, working as a sort of expander 
-/// in the time domain. The ratio of expansion can be selected, and there is a 
+/// Amplifies signal below the desired threshold, working as a sort of expander
+/// in the time domain. The ratio of expansion can be selected, and there is a
 /// noise threshold control. Effect will not boost anything below this threshold.
-/// 
+///
 ////////////////////////////////////////////////////////////////////////////////
 
 struct QuietBoost
 {
-    LE_DEFINE_PARAMETERS
-    (
-        ( ( Threshold          )( LinearFloat )( Minimum<-60> )( Maximum< 0> )( Default< -25> )( Unit<' dB'> ) )        
-        ( ( Ratio              )( LinearFloat )( Minimum<  1> )( Maximum<15> )( Default<   3> )                )
-        ( ( NoiseGateThreshold )( LinearFloat )( Minimum<-60> )( Maximum< 0> )( Default< -45> )( Unit<' dB'> ) )        
-    );
+    LE_DEFINE_PARAMETERS(
+        ((Threshold)(LinearFloat)(Minimum<-60>)(Maximum<0>)(Default<-25>)(Unit<' dB'>))(
+            (Ratio)(LinearFloat)(Minimum<1>)(Maximum<15>)(Default<3>))((
+            NoiseGateThreshold)(LinearFloat)(Minimum<-60>)(Maximum<0>)(Default<-45>)(Unit<' dB'>)));
 
     /// \typedef Threshold
     /// \brief Noise threshold.
@@ -60,7 +58,7 @@ struct QuietBoost
 
     static bool const usesSideChannel = false;
 
-    static char const title      [];
+    static char const title[];
     static char const description[];
 };
 

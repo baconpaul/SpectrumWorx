@@ -8,13 +8,13 @@
 /// the menus and be available to the user).
 /// Automatically updated by CMake.
 ///
-/// Copyright (c) 2011 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2011 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef allEffectImpls_hpp__387DAEB3_6C27_410A_9EB4_441604C7A12D
 #define allEffectImpls_hpp__387DAEB3_6C27_410A_9EB4_441604C7A12D
-#pragma once
 //------------------------------------------------------------------------------
 @selectedImplIncludeList@
 //------------------------------------------------------------------------------

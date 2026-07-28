@@ -3,24 +3,24 @@
 /// \file parametersUtilities.hpp
 /// -----------------------------
 ///
-/// Copyright � 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef parametersUtilities_hpp__EB1C0F5A_FC45_4407_A713_9197376BC784
 #define parametersUtilities_hpp__EB1C0F5A_FC45_4407_A713_9197376BC784
-#pragma once
 //------------------------------------------------------------------------------
 #include "fusionAdaptors.hpp"
 
 #include "le/utility/cstdint.hpp"
 #ifdef __GNUC__
-    #include "le/utility/staticForEach.hpp"
+#include "le/utility/staticForEach.hpp"
 #endif // __GNUC__
-#pragma warning( push )
-#pragma warning( disable : 4702 ) // Unreachable code.
+#pragma warning(push)
+#pragma warning(disable : 4702) // Unreachable code.
 #include "le/utility/switch.hpp"
-#pragma warning( pop )
+#pragma warning(pop)
 
 #include <boost/fusion/sequence/intrinsic/at.hpp>
 #include <boost/fusion/sequence/intrinsic/value_at.hpp>
@@ -43,80 +43,80 @@ namespace Parameters
 
 namespace Detail
 {
-    ////////////////////////////////////////////////////////////////////////////
-    ///
-    /// \class Invoker
-    /// \internal
-    /// \brief Helper functor for invoking the parameter Functor with a proper
-    /// reference to a parameter object along with the parameter index.
-    ///
-    ////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+///
+/// \class Invoker
+/// \internal
+/// \brief Helper functor for invoking the parameter Functor with a proper
+/// reference to a parameter object along with the parameter index.
+///
+////////////////////////////////////////////////////////////////////////////
 
-    template <class Parameters, class Functor>
-    class Invoker : private Functor
+template <class Parameters, class Functor> class Invoker : private Functor
+{
+  public:
+    Invoker(Parameters &parameters, Functor &&functor) : Functor(functor), pParameters_(&parameters)
     {
-    public:
-        Invoker( Parameters & parameters, Functor && functor )
-            : Functor( functor ), pParameters_( &parameters ) {}
-
-        typedef typename Functor::result_type result_type;
-
-        template <class TypeIndex>
-        result_type operator()( TypeIndex const & ) const
-        {
-            return Functor::operator()
-            (
-                boost::fusion::at<TypeIndex>( *pParameters_ )
-            );
-        }
-
-    private:
-        void operator=( Invoker const & );
-        Parameters * LE_RESTRICT const pParameters_;
-    }; // class Invoker
-
-    template <class Parameters, class Functor>
-    class StaticInvoker : public Functor
-    {
-    public:
-        typedef typename Functor::result_type result_type;
-
-        template <class TypeIndex>
-        result_type operator()( TypeIndex const & )
-        {
-            typedef typename boost::fusion::result_of:: template value_at<Parameters, TypeIndex>::type Parameter;
-            return Functor:: LE_GNU_SPECIFIC( template ) operator()<Parameter>();
-        }
-
-        template <class TypeIndex>
-        result_type operator()( TypeIndex const & typeIndex ) const { return const_cast<StaticInvoker &>( *this )( typeIndex ); }
-
-    private:
-        StaticInvoker();
-       ~StaticInvoker();
-        StaticInvoker ( StaticInvoker const & );
-        void operator=( StaticInvoker const & );
-    }; // class StaticInvoker
-
-
-    template <class WrappingFunctor, class SourceFunctor> WrappingFunctor       && forwardDownCast( SourceFunctor       & sourceFunctor ) { return std::forward<WrappingFunctor      >( static_cast<WrappingFunctor       &>( sourceFunctor ) ); }
-    template <class WrappingFunctor, class SourceFunctor> WrappingFunctor const && forwardDownCast( SourceFunctor const & sourceFunctor ) { return std::forward<WrappingFunctor const>( static_cast<WrappingFunctor const &>( sourceFunctor ) ); }
-
-
-    template <class Parameters, class Functor>
-    typename Functor::result_type LE_FASTCALL invokeFunctorOnIndexedParameter( std::uint8_t const parameterIndex, Functor && functor )
-    {
-        LE_ASSUME( parameterIndex < Parameters::static_size );
-        using namespace boost;
-
-        typedef mpl::range_c<std::uint8_t, 0, Parameters::static_size> ValidIndices;
-        return switch_<ValidIndices>
-               (
-                   parameterIndex,
-                   std::forward<Functor>( functor ),
-                   assert_no_default_case<typename Functor::result_type>()
-               );
     }
+
+    typedef typename Functor::result_type result_type;
+
+    template <class TypeIndex> result_type operator()(TypeIndex const &) const
+    {
+        return Functor::operator()(boost::fusion::at<TypeIndex>(*pParameters_));
+    }
+
+  private:
+    void operator=(Invoker const &);
+    Parameters *LE_RESTRICT const pParameters_;
+}; // class Invoker
+
+template <class Parameters, class Functor> class StaticInvoker : public Functor
+{
+  public:
+    typedef typename Functor::result_type result_type;
+
+    template <class TypeIndex> result_type operator()(TypeIndex const &)
+    {
+        typedef typename boost::fusion::result_of::template value_at<Parameters, TypeIndex>::type
+            Parameter;
+        return Functor::LE_GNU_SPECIFIC(template) operator()<Parameter>();
+    }
+
+    template <class TypeIndex> result_type operator()(TypeIndex const &typeIndex) const
+    {
+        return const_cast<StaticInvoker &>(*this)(typeIndex);
+    }
+
+  private:
+    StaticInvoker();
+    ~StaticInvoker();
+    StaticInvoker(StaticInvoker const &);
+    void operator=(StaticInvoker const &);
+}; // class StaticInvoker
+
+template <class WrappingFunctor, class SourceFunctor>
+WrappingFunctor &&forwardDownCast(SourceFunctor &sourceFunctor)
+{
+    return std::forward<WrappingFunctor>(static_cast<WrappingFunctor &>(sourceFunctor));
+}
+template <class WrappingFunctor, class SourceFunctor>
+WrappingFunctor const &&forwardDownCast(SourceFunctor const &sourceFunctor)
+{
+    return std::forward<WrappingFunctor const>(static_cast<WrappingFunctor const &>(sourceFunctor));
+}
+
+template <class Parameters, class Functor>
+typename Functor::result_type invokeFunctorOnIndexedParameter(std::uint8_t const parameterIndex,
+                                                              Functor &&functor)
+{
+    LE_ASSUME(parameterIndex < Parameters::static_size);
+    using namespace boost;
+
+    typedef mpl::range_c<std::uint8_t, 0, Parameters::static_size> ValidIndices;
+    return switch_<ValidIndices>(parameterIndex, std::forward<Functor>(functor),
+                                 assert_no_default_case<typename Functor::result_type>());
+}
 } // namespace Detail
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -134,26 +134,24 @@ namespace Detail
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class Parameters, class Functor>
-void LE_FASTCALL forEachIndexed( Parameters & parameters, Functor && functor )
-{
-    using namespace boost;
-
-    using ValidIndices   = mpl::range_c<std::uint8_t, 0, Parameters::static_size>;
-    using WrappedFunctor = Detail::Invoker<Parameters, Functor>;
-    WrappedFunctor wrappedFunctor( parameters, functor );
-    Utility::forEach<ValidIndices>( wrappedFunctor );
-}
-
-template <class Parameters, class Functor>
-void LE_FASTCALL forEachIndexed( Functor && functor )
+void forEachIndexed(Parameters &parameters, Functor &&functor)
 {
     using namespace boost;
 
     using ValidIndices = mpl::range_c<std::uint8_t, 0, Parameters::static_size>;
-    using Invoker      = Detail::StaticInvoker<Parameters, Functor>;
-    Utility::forEach<ValidIndices>( Detail::forwardDownCast<Invoker>( functor ) );
+    using WrappedFunctor = Detail::Invoker<Parameters, Functor>;
+    WrappedFunctor wrappedFunctor(parameters, functor);
+    Utility::forEach<ValidIndices>(wrappedFunctor);
 }
 
+template <class Parameters, class Functor> void forEachIndexed(Functor &&functor)
+{
+    using namespace boost;
+
+    using ValidIndices = mpl::range_c<std::uint8_t, 0, Parameters::static_size>;
+    using Invoker = Detail::StaticInvoker<Parameters, Functor>;
+    Utility::forEach<ValidIndices>(Detail::forwardDownCast<Invoker>(functor));
+}
 
 ////////////////////////////////////////////////////////////////////////////
 //
@@ -190,26 +188,23 @@ void LE_FASTCALL forEachIndexed( Functor && functor )
 ////////////////////////////////////////////////////////////////////////////
 
 template <class Parameters, class Functor>
-typename Functor::result_type LE_FASTCALL invokeFunctorOnIndexedParameter( Parameters & parameters, std::uint8_t const parameterIndex, Functor && functor )
+typename Functor::result_type invokeFunctorOnIndexedParameter(Parameters &parameters,
+                                                              std::uint8_t const parameterIndex,
+                                                              Functor &&functor)
 {
-    return Detail::invokeFunctorOnIndexedParameter<Parameters>
-    (
+    return Detail::invokeFunctorOnIndexedParameter<Parameters>(
         parameterIndex,
-        Detail::Invoker<Parameters, Functor>( parameters, std::forward<Functor>( functor ) )
-    );
+        Detail::Invoker<Parameters, Functor>(parameters, std::forward<Functor>(functor)));
 }
 
 template <class Parameters, class Functor>
-typename Functor::result_type LE_FASTCALL invokeFunctorOnIndexedParameter( std::uint8_t const parameterIndex, Functor const & functor )
+typename Functor::result_type invokeFunctorOnIndexedParameter(std::uint8_t const parameterIndex,
+                                                              Functor const &functor)
 {
     typedef Detail::StaticInvoker<Parameters, Functor> Invoker;
-    return Detail::invokeFunctorOnIndexedParameter<Parameters>
-    (
-        parameterIndex,
-        Detail::forwardDownCast<Invoker>( functor )
-    );
+    return Detail::invokeFunctorOnIndexedParameter<Parameters>(
+        parameterIndex, Detail::forwardDownCast<Invoker>(functor));
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -223,7 +218,7 @@ typename Functor::result_type LE_FASTCALL invokeFunctorOnIndexedParameter( std::
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class Parameters, class Parameter>
-using IndexOf = typename Parameters:: template IndexOf<Parameter>;
+using IndexOf = typename Parameters::template IndexOf<Parameter>;
 
 //------------------------------------------------------------------------------
 } // namespace Parameters

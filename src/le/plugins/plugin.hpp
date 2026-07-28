@@ -5,19 +5,19 @@
 ///
 ///   The idea of the LE Plugin architecture is to provide a single abstraction,
 /// a single interface specification, that enables plugin code to be written
-/// once and to compile for different plugin protocols (with as little 
+/// once and to compile for different plugin protocols (with as little
 /// target-protocol specific branching in the user code as possible ). It also
 /// tries to automate as much of the boiler-plate setup code as possible as well
 /// as insulate any bad, ugly and/or error-prone design of the original
 /// interfaces/specifications.
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef plugin_hpp__22f9B1AE_714E_4EAf_A7EB_3F0282871940
 #define plugin_hpp__22f9B1AE_714E_4EAf_A7EB_3F0282871940
-#pragma once
 //------------------------------------------------------------------------------
 #include "le/parameters/conversion.hpp" //...mrmlj...
 #include "le/utility/cstdint.hpp"
@@ -28,7 +28,10 @@
 namespace LE
 {
 //------------------------------------------------------------------------------
-namespace Parameters { struct RuntimeInformation; }
+namespace Parameters
+{
+struct RuntimeInformation;
+}
 //------------------------------------------------------------------------------
 namespace Plugins
 {
@@ -52,36 +55,37 @@ namespace Plugins
 ///                                           (24.07.2009.) (Domagoj Saric)
 enum PluginCapability
 {
-    ReceiveMIDIEvent     , ///< plug-in can receive MIDI events from Host
-    SendMIDIEvent        , ///< plug-in will send MIDI events to Host
-    Bypass               , ///< plug-in supports function #setBypass ()
-    MixDryWet            ,
+    ReceiveMIDIEvent, ///< plug-in can receive MIDI events from Host
+    SendMIDIEvent,    ///< plug-in will send MIDI events to Host
+    Bypass,           ///< plug-in supports function #setBypass ()
+    MixDryWet,
     NonRealTimeProcessing,
-    UsesAFixedSizeGUI    ,
-    AsInsert             ,
-    AsSend               ,
-    Ch1in1out            ,
-    Ch1in2out            ,
-    Ch2in1out            ,
-    Ch2in2out            ,
-    Ch2in4out            ,
-    Ch4in2out            ,
-    Ch4in4out            ,
-    Ch4in8out            , ///< 4:2 matrix to surround bus 
-    Ch8in4out            , ///< surround bus to 4:2 matrix 
-    Ch8in8out            ,
+    UsesAFixedSizeGUI,
+    AsInsert,
+    AsSend,
+    Ch1in1out,
+    Ch1in2out,
+    Ch2in1out,
+    Ch2in2out,
+    Ch2in4out,
+    Ch4in2out,
+    Ch4in4out,
+    Ch4in8out, ///< 4:2 matrix to surround bus
+    Ch8in4out, ///< surround bus to 4:2 matrix
+    Ch8in8out,
 
     // VST specific.
-    OfflineProcessing    , ///< plug-in supports offline functions (#offlineNotify, #offlinePrepare, #offlineRun)
-    ReceiveVSTEvents     , ///< plug-in can receive VST events from Host
-    SendVSTEvents        , ///< plug-in will send VST events to Host
-    ReceiveVSTTimeInfo   , ///< plug-in can receive Time info from Host
-    MidiProgramNames       ///< plug-in supports function #getMidiProgramName ()
+    OfflineProcessing, ///< plug-in supports offline functions (#offlineNotify, #offlinePrepare, #offlineRun)
+    ReceiveVSTEvents,   ///< plug-in can receive VST events from Host
+    SendVSTEvents,      ///< plug-in will send VST events to Host
+    ReceiveVSTTimeInfo, ///< plug-in can receive Time info from Host
+    MidiProgramNames    ///< plug-in supports function #getMidiProgramName ()
 };
 
 /// Helper macro for declaring plugin implementation capabilities.
-#define DECLARE_PLUGIN_CAPABILITIES( ... ) typedef boost::mpl::set_c<unsigned int/*::LE::Plugins::PluginCapability*/, __VA_ARGS__> Capabilities
-
+#define DECLARE_PLUGIN_CAPABILITIES(...)                                                           \
+    typedef boost::mpl::set_c<unsigned int /*::LE::Plugins::PluginCapability*/, __VA_ARGS__>       \
+        Capabilities
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -140,7 +144,7 @@ enum PluginCapability
 ///
 /// \todo Research and implement other potential protocols (VST 3.5, DX/DMO/MF,
 /// AAX...):
-/// - for DX/DMO/MF look into the following interfaces and/or keywords: 
+/// - for DX/DMO/MF look into the following interfaces and/or keywords:
 ///   - IMediaObject
 ///   - IMediaObjectInPlace
 ///   - ISpecifyPropertyPages
@@ -155,56 +159,56 @@ enum PluginCapability
 
 class Plugin2HostActiveController
 {
-public:
+  public:
     class HostProxy;
 
-protected: // Required function interface (provided by the PluginProtocol).
-    HostProxy & host();
+  protected: // Required function interface (provided by the PluginProtocol).
+    HostProxy &host();
 
     //notify()/update()
 };
 
-
 class Plugin2HostPassiveController
 {
-private: // Required traits.
-    static unsigned int const maxNumberOfParameters   ;
-    static unsigned int const maxNumberOfInputs       ;
-    static unsigned int const maxNumberOfOutputs      ;
-    static unsigned int const maxLatency              ;
-    static unsigned int const maxLookAhead            ; ///< how much input data will the plugin require before it can produce output, @see IMediaObject::GetInputSizeInfo().
-    static unsigned int const maxTailSize             ; ///< @see AudioEffectX::getGetTailSize().
-    static unsigned int const minimumProcessBufferSize; ///< @see IMediaObject::GetInputSizeInfo()/GetOutputSizeInfo().
-    static unsigned int const requiredBufferAlignment ; ///< @see IMediaObject::GetInputSizeInfo()/GetOutputSizeInfo().
-    static unsigned int const version                 ; ///< Plugin specific version.
-    static char         const name                  []; ///< Friendly name.
-    static char         const productString         [];
+  private: // Required traits.
+    static unsigned int const maxNumberOfParameters;
+    static unsigned int const maxNumberOfInputs;
+    static unsigned int const maxNumberOfOutputs;
+    static unsigned int const maxLatency;
+    static unsigned int const
+        maxLookAhead; ///< how much input data will the plugin require before it can produce output, @see IMediaObject::GetInputSizeInfo().
+    static unsigned int const maxTailSize; ///< @see AudioEffectX::getGetTailSize().
+    static unsigned int const
+        minimumProcessBufferSize; ///< @see IMediaObject::GetInputSizeInfo()/GetOutputSizeInfo().
+    static unsigned int const
+        requiredBufferAlignment; ///< @see IMediaObject::GetInputSizeInfo()/GetOutputSizeInfo().
+    static unsigned int const version; ///< Plugin specific version.
+    static char const name[];          ///< Friendly name.
+    static char const productString[];
 
-public: // Capabilities.
+  public: // Capabilities.
     typedef boost::mpl::set_c<PluginCapability> Capabilities;
 
-public:
+  public:
     /// @see AudioEffectX::getParameter()/setParameter().
     typedef void AutomatedParameter;
-    AutomatedParameter getAutomatedParameter( unsigned int /*index*/ );
+    AutomatedParameter getAutomatedParameter(unsigned int /*index*/);
 }; // class Plugin2HostPassiveController
 
 class Host2PluginController
 {
-public:
+  public:
     /// @see AudioEffectX::getParameter()/setParameter().
     struct AutomatedParameter;
-    void setAutomatedParameter( unsigned int /*index*/, AutomatedParameter /*value*/ );
+    void setAutomatedParameter(unsigned int /*index*/, AutomatedParameter /*value*/);
 }; // class Host2PluginController
 
-template <class Impl, typename Protocol>
-class Plugin;
+template <class Impl, typename Protocol> class Plugin;
 
-template <class Impl, typename Protocol>
-class Processor
+template <class Impl, typename Protocol> class Processor
 {
-public: // Required type definitions (possibly documented separately).
-        // (provided by the protocol specialization)
+  public: // Required type definitions (possibly documented separately).
+    // (provided by the protocol specialization)
 
     ///   A specialized Plugin<> class might require that a parameter be
     /// passed through to its constructor. It should specify its type with a
@@ -219,12 +223,12 @@ public: // Required type definitions (possibly documented separately).
     class AutomatedParameter;
     class MIDIEvent; ///< Yet to be researched and properly documented.
 
-public: // Required type definitions (possibly documented separately).
-        // (provided by the plugin implementation)
+  public: // Required type definitions (possibly documented separately).
+    // (provided by the plugin implementation)
     class Editor;
 
-private: // Required function interface (provided by the Plugin).
-    Editor & gui();
+  private: // Required function interface (provided by the Plugin).
+    Editor &gui();
 
     /// @see AudioEffectX::resume()/suspend() and IMediaObject::Flush().
     //void resume ();
@@ -233,22 +237,20 @@ private: // Required function interface (provided by the Plugin).
     //void process( float  * * inputs, float  * * outputs, unsigned int sampleFrames ); ///< VSTSDK AudioEffectX::processReplacing() equivalent.
     //void process( double * * inputs, double * * outputs, unsigned int sampleFrames ); ///< optional, VSTSDK AudioEffectX::processDoubleReplacing() equivalent.
 
-public: // Optional function interface.
+  public: // Optional function interface.
     /// @see AudioEffectX::startProcess()/stopProcess() and
     /// IMediaObject::AllocateStreamingResources()/FreeStreamingResources().
     bool preStreamingInitialization() { return false; }
-    bool postStreamingCleanup      () { return false; }
+    bool postStreamingCleanup() { return false; }
 
-protected:
-     Processor() {}
+  protected:
+    Processor() {}
     ~Processor() {}
 }; // class Plugin
 
-template <typename Protocol>
-class EditorInterface
+template <typename Protocol> class EditorInterface
 {
 };
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -328,22 +330,22 @@ private: // Required function interface (provided by user classes).
 /// @see PluginCapability note.
 enum HostCapability
 {
-    SendMidiEvent                 , ///< Host supports send of MIDI events to plug-in
-    ReceiveMidiEvent              , ///< Host can receive MIDI events from plug-in
-    SendTimeInfo                  , ///< Host supports send of VstTimeInfo to plug-in
-    ReportConnectionChanges       , ///< Host will indicates the plug-in when something change in plug-in´s routing/connections with #suspend/#resume/#setSpeakerArrangement
-    AcceptIOChanges               , ///< Host supports #ioChanged ()
-    SizeWindow                    , ///< used by VSTGUI
-    Offline                       , ///< Host supports offline feature
-    OpenFileSelector              , ///< Host supports function #openFileSelector ()
-    CloseFileSelector             , ///< Host supports function #closeFileSelector ()
-    StartStopProcess              , ///< Host supports functions #startProcess () and #stopProcess ()
+    SendMidiEvent,           ///< Host supports send of MIDI events to plug-in
+    ReceiveMidiEvent,        ///< Host can receive MIDI events from plug-in
+    SendTimeInfo,            ///< Host supports send of VstTimeInfo to plug-in
+    ReportConnectionChanges, ///< Host will indicates the plug-in when something change in plug-inÂ´s routing/connections with #suspend/#resume/#setSpeakerArrangement
+    AcceptIOChanges,         ///< Host supports #ioChanged ()
+    SizeWindow,              ///< used by VSTGUI
+    Offline,                 ///< Host supports offline feature
+    OpenFileSelector,        ///< Host supports function #openFileSelector ()
+    CloseFileSelector,       ///< Host supports function #closeFileSelector ()
+    StartStopProcess,        ///< Host supports functions #startProcess () and #stopProcess ()
 
     // VST specific.
-    SendVstEvents                 , ///< Host supports send of Vst events to plug-in
-    ReceiveVstEvents              , ///< Host can receive Vst events from plug-in
-    ShellCategory                 , ///< 'shell' handling via uniqueID. If supported by the Host and the Plug-in has the category #kPlugCategShell
-    SendVstMidiEventFlagIsRealtime  ///< Host supports flags for #VstMidiEvent
+    SendVstEvents,    ///< Host supports send of Vst events to plug-in
+    ReceiveVstEvents, ///< Host can receive Vst events from plug-in
+    ShellCategory, ///< 'shell' handling via uniqueID. If supported by the Host and the Plug-in has the category #kPlugCategShell
+    SendVstMidiEventFlagIsRealtime ///< Host supports flags for #VstMidiEvent
     // ...mrmlj... deprecated/pre 2.4 VST host can-dos ... temporarily left
     // here for documentation and investigation purposes...
     // "supplyIdle"
@@ -351,7 +353,6 @@ enum HostCapability
     // "editFile"
     // "getChunkFile"
 }; // enum HostCapability
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -401,14 +402,15 @@ struct ParameterID
 struct AutomatedParameter
 {
     using value_type = float;
-    using Info       = Parameters::RuntimeInformation;
+    using Info = Parameters::RuntimeInformation;
 
-    template <class Impl>
-    struct Getter
+    template <class Impl> struct Getter
     {
         using result_type = value_type;
-        template <class Parameter>
-        result_type operator()( Parameter const & parameter ) const { return Impl:: template convertParameterToAutomationValue<Parameter>( parameter ); }
+        template <class Parameter> result_type operator()(Parameter const &parameter) const
+        {
+            return Impl::template convertParameterToAutomationValue<Parameter>(parameter);
+        }
     }; // struct Getter
 
     ////////////////////////////////////////////////////////////////////////////
@@ -422,28 +424,30 @@ struct AutomatedParameter
     ////////////////////////////////////////////////////////////////////////////
 
 #ifdef _MSC_VER
-    #pragma warning( push )
-    #pragma warning( disable : 4510 ) // Default constructor could not be generated.
-    #pragma warning( disable : 4610 ) // Class can never be instantiated - user-defined constructor required.
-#endif // _MSC_VER
-    template <class Impl>
-    struct Setter
+#pragma warning(push)
+#pragma warning(disable : 4510) // Default constructor could not be generated.
+#pragma warning(disable                                                                            \
+                : 4610) // Class can never be instantiated - user-defined constructor required.
+#endif                  // _MSC_VER
+    template <class Impl> struct Setter
     {
-    #ifdef _MSC_VER //...mrmlj..."error C2797: list initialization inside member initializer list is not implemented" in LFOParameterSetter
-        Setter( value_type const value ) : automationValue( value ) {}
-    #endif // _MSC_VER
+#ifdef _MSC_VER //...mrmlj..."error C2797: list initialization inside member initializer list is not implemented" in LFOParameterSetter
+        Setter(value_type const value) : automationValue(value) {}
+#endif // _MSC_VER
         using result_type = void;
 
-        template <class Parameter>
-        void operator()( Parameter & parameter ) const { parameter.setValue( Impl:: template convertAutomationToParameterValue<Parameter>( automationValue ) ); }
+        template <class Parameter> void operator()(Parameter &parameter) const
+        {
+            parameter.setValue(
+                Impl::template convertAutomationToParameterValue<Parameter>(automationValue));
+        }
 
         value_type const automationValue;
     }; // class Setter
 #ifdef _MSC_VER
-    #pragma warning( pop )
+#pragma warning(pop)
 #endif // _MSC_VER
 }; // struct AutomatedParameter
-
 
 using AutomatedParameterValue = AutomatedParameter::value_type;
 
@@ -451,29 +455,33 @@ struct NormalisedAutomatedParameter : AutomatedParameter
 {
     static bool const normalised = true;
 
-    template <class Parameter> static AutomatedParameterValue        convertParameterToAutomationValue( Parameter const &       );
-    template <class Parameter> static typename Parameter::value_type convertAutomationToParameterValue( AutomatedParameterValue );
+    template <class Parameter>
+    static AutomatedParameterValue convertParameterToAutomationValue(Parameter const &);
+    template <class Parameter>
+    static
+        typename Parameter::value_type convertAutomationToParameterValue(AutomatedParameterValue);
 
     using Getter = AutomatedParameter::Getter<NormalisedAutomatedParameter>;
     using Setter = AutomatedParameter::Setter<NormalisedAutomatedParameter>;
 }; // struct NormalisedAutomatedParameter
 
-
 struct FullRangeAutomatedParameter : AutomatedParameter
 {
-public:
+  public:
     static bool const normalised = false;
 
-    template <class Parameter> static AutomatedParameterValue        convertParameterToAutomationValue( Parameter const &       );
-    template <class Parameter> static typename Parameter::value_type convertAutomationToParameterValue( AutomatedParameterValue );
+    template <class Parameter>
+    static AutomatedParameterValue convertParameterToAutomationValue(Parameter const &);
+    template <class Parameter>
+    static
+        typename Parameter::value_type convertAutomationToParameterValue(AutomatedParameterValue);
 
     using Getter = AutomatedParameter::Getter<FullRangeAutomatedParameter>;
     using Setter = AutomatedParameter::Setter<FullRangeAutomatedParameter>;
 
-private:
+  private:
     template <class Parameter, typename Tag> struct AutomationRange;
 }; // struct FullRangeAutomatedParameter
-
 
 enum DSPGUISeparation
 {
@@ -482,8 +490,7 @@ enum DSPGUISeparation
     Mandatory
 }; // enum DSPGUISeparation
 
-
-template <class Protocol> class  ParameterInformation;
+template <class Protocol> class ParameterInformation;
 template <class Protocol> struct ErrorCode;
 template <class Protocol> struct AutomatedParameterFor;
 
@@ -494,53 +501,66 @@ template <class Protocol> struct AutomatedParameterFor;
 //...mrmlj...figure out a proper place for this Plugins<->Parameters bridge...
 namespace Plugins
 {
-    template <class Parameter>
-    AutomatedParameterValue NormalisedAutomatedParameter::convertParameterToAutomationValue( Parameter const & parameter )
-    {
-        return LE::Parameters::convertParameterValueToLinearValue<AutomatedParameterValue, 0, 1, 1>( parameter );
-    }
+template <class Parameter>
+AutomatedParameterValue
+NormalisedAutomatedParameter::convertParameterToAutomationValue(Parameter const &parameter)
+{
+    return LE::Parameters::convertParameterValueToLinearValue<AutomatedParameterValue, 0, 1, 1>(
+        parameter);
+}
 
-    template <class Parameter>
-    typename Parameter::value_type NormalisedAutomatedParameter::convertAutomationToParameterValue( AutomatedParameterValue const automationValue )
-    {
-        return LE::Parameters::convertLinearValueToParameterValue<AutomatedParameterValue, 0, 1, 1, Parameter>( automationValue );
-    }
+template <class Parameter>
+typename Parameter::value_type NormalisedAutomatedParameter::convertAutomationToParameterValue(
+    AutomatedParameterValue const automationValue)
+{
+    return LE::Parameters::convertLinearValueToParameterValue<AutomatedParameterValue, 0, 1, 1,
+                                                              Parameter>(automationValue);
+}
 
-    template <class Parameter, typename Tag>
-    struct FullRangeAutomatedParameter::AutomationRange
-    {
-        static int BOOST_CONSTEXPR_OR_CONST unscaledMinimum = Parameter::unscaledMinimum;
-        static int BOOST_CONSTEXPR_OR_CONST unscaledMaximum = Parameter::unscaledMaximum;
-    };
-    template <class Parameter>
-    struct FullRangeAutomatedParameter::AutomationRange<Parameter, Parameters::PowerOfTwoParameterTag>
-    {
-        //...mrmlj...workaround for having no way to specify discrete/valid (power-of-two) values...
-        static std::uint8_t BOOST_CONSTEXPR_OR_CONST unscaledMinimum = boost::static_log2<Parameter::unscaledMinimum>::value;
-        static std::uint8_t BOOST_CONSTEXPR_OR_CONST unscaledMaximum = boost::static_log2<Parameter::unscaledMaximum>::value;
-    };
+template <class Parameter, typename Tag> struct FullRangeAutomatedParameter::AutomationRange
+{
+    static int BOOST_CONSTEXPR_OR_CONST unscaledMinimum = Parameter::unscaledMinimum;
+    static int BOOST_CONSTEXPR_OR_CONST unscaledMaximum = Parameter::unscaledMaximum;
+};
+template <class Parameter>
+struct FullRangeAutomatedParameter::AutomationRange<Parameter, Parameters::PowerOfTwoParameterTag>
+{
+    //...mrmlj...workaround for having no way to specify discrete/valid (power-of-two) values...
+    static std::uint8_t BOOST_CONSTEXPR_OR_CONST unscaledMinimum =
+        boost::static_log2<Parameter::unscaledMinimum>::value;
+    static std::uint8_t BOOST_CONSTEXPR_OR_CONST unscaledMaximum =
+        boost::static_log2<Parameter::unscaledMaximum>::value;
+};
 
-    template <class Parameter>
-    AutomatedParameterValue FullRangeAutomatedParameter::convertParameterToAutomationValue( Parameter const & parameter )
-    {
-        using Range = AutomationRange<Parameter, typename Parameter::Tag>;
-        return LE::Parameters::convertParameterValueToLinearValue<AutomatedParameterValue, Range::unscaledMinimum, Range::unscaledMaximum - Range::unscaledMinimum, Parameter::rangeValuesDenominator>( parameter );
-    }
+template <class Parameter>
+AutomatedParameterValue
+FullRangeAutomatedParameter::convertParameterToAutomationValue(Parameter const &parameter)
+{
+    using Range = AutomationRange<Parameter, typename Parameter::Tag>;
+    return LE::Parameters::convertParameterValueToLinearValue<
+        AutomatedParameterValue, Range::unscaledMinimum,
+        Range::unscaledMaximum - Range::unscaledMinimum, Parameter::rangeValuesDenominator>(
+        parameter);
+}
 
-    template <class Parameter>
-    typename Parameter::value_type FullRangeAutomatedParameter::convertAutomationToParameterValue( AutomatedParameterValue const automationValue )
-    {
-        /// \note We can't simply call
-        /// Math::convert<typename Parameter::value_type>() here because of
-        /// power-of-two parameters that require quantization/clamping to
-        /// allowed values.
-        ///                                   (01.02.2012.) (Domagoj Saric)
-        //using namespace Math;
-        //std::uint8_t const minimumExponent( boost::static_log2<Parameter::unscaledMinimum>::value );
-        //return convert<float>( PowerOfTwo::log2( parameter.getValue() ) - minimumExponent );
-        using Range = AutomationRange<Parameter, typename Parameter::Tag>;
-        return LE::Parameters::convertLinearValueToParameterValue<AutomatedParameterValue, Range::unscaledMinimum, Range::unscaledMaximum - Range::unscaledMinimum, Parameter::rangeValuesDenominator, Parameter>( automationValue );
-    }
+template <class Parameter>
+typename Parameter::value_type FullRangeAutomatedParameter::convertAutomationToParameterValue(
+    AutomatedParameterValue const automationValue)
+{
+    /// \note We can't simply call
+    /// Math::convert<typename Parameter::value_type>() here because of
+    /// power-of-two parameters that require quantization/clamping to
+    /// allowed values.
+    ///                                   (01.02.2012.) (Domagoj Saric)
+    //using namespace Math;
+    //std::uint8_t const minimumExponent( boost::static_log2<Parameter::unscaledMinimum>::value );
+    //return convert<float>( PowerOfTwo::log2( parameter.getValue() ) - minimumExponent );
+    using Range = AutomationRange<Parameter, typename Parameter::Tag>;
+    return LE::Parameters::convertLinearValueToParameterValue<
+        AutomatedParameterValue, Range::unscaledMinimum,
+        Range::unscaledMaximum - Range::unscaledMinimum, Parameter::rangeValuesDenominator,
+        Parameter>(automationValue);
+}
 } // namespace Plugins
 
 } // namespace LE

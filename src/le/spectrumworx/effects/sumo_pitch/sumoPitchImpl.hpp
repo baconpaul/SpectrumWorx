@@ -3,13 +3,13 @@
 /// \file sumoPitchImpl.hpp
 /// -----------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef sumoPitchImpl_hpp__FD93AFF5_C447_439F_96EC_CED05B70909C
 #define sumoPitchImpl_hpp__FD93AFF5_C447_439F_96EC_CED05B70909C
-#pragma once
 //------------------------------------------------------------------------------
 #include "sumoPitch.hpp"
 
@@ -30,16 +30,13 @@ namespace Effects
 
 class SumoPitchImpl : public EffectImpl<SumoPitch>
 {
-public: // LE::Effect interface.
+  public: // LE::Effect interface.
     ////////////////////////////////////////////////////////////////////////////
     // ChannelState
     ////////////////////////////////////////////////////////////////////////////
 
-    LE_DYNAMIC_CHANNEL_STATE
-    (
-        ( ( PhaseVocoderShared::PitchShifter::ChannelState )( main ) )
-        ( ( PhaseVocoderShared::PitchShifter::ChannelState )( side ) )
-    );
+    LE_DYNAMIC_CHANNEL_STATE(((PhaseVocoderShared::PitchShifter::ChannelState)(main))(
+        (PhaseVocoderShared::PitchShifter::ChannelState)(side)));
 
     struct ChannelState : DynamicChannelState
     {
@@ -51,15 +48,14 @@ public: // LE::Effect interface.
         void reset();
     };
 
-
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup  ( IndexRange const &, Engine::Setup const & );
-    void process( ChannelState &, Engine::ChannelData_AmPh2ReIm, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(ChannelState &, Engine::ChannelData_AmPh2ReIm, Engine::Setup const &) const;
 
-private:
+  private:
     float amount_;
     float pitchChangeLimitSemitones_;
 

@@ -3,7 +3,8 @@
 /// randomizer.cpp
 /// --------------
 ///
-/// Copyright (c) 2009. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -24,9 +25,8 @@ namespace Algorithms
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Randomizer::title      [] = "Randomizer";
+char const Randomizer::title[] = "Randomizer";
 char const Randomizer::description[] = "Random amplitude modification.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -35,8 +35,7 @@ char const Randomizer::description[] = "Random amplitude modification.";
 ////////////////////////////////////////////////////////////////////////////////
 
 char const UIElements<Randomizer::Intensity>::name_[] = "Max amplification";
-char const UIElements<Randomizer::BlockSize>::name_[] = "Block size"       ;
-
+char const UIElements<Randomizer::BlockSize>::name_[] = "Block size";
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -45,13 +44,13 @@ char const UIElements<Randomizer::BlockSize>::name_[] = "Block size"       ;
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void Randomizer::setup( EngineSetup const & engineSetup, Randomizer::Parameters const & myParameters )
-{      
-    num_bins_         = engineSetup.numberOfBins();    
+void Randomizer::setup(EngineSetup const &engineSetup, Randomizer::Parameters const &myParameters)
+{
+    num_bins_ = engineSetup.numberOfBins();
     maxMagCorrection_ = myParameters.get<Intensity>();
-    blockSize_        = Math::convert<unsigned int>( Math::percentage2NormalizedLinear( myParameters.get<BlockSize>() ) * num_bins_ );
-}                                                      
-
+    blockSize_ = Math::convert<unsigned int>(
+        Math::percentage2NormalizedLinear(myParameters.get<BlockSize>()) * num_bins_);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -60,22 +59,16 @@ void Randomizer::setup( EngineSetup const & engineSetup, Randomizer::Parameters 
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void Randomizer::process( ChannelData_AmPh & data ) const
+void Randomizer::process(ChannelData_AmPh &data) const
 {
-    for( unsigned int k = 0; k < ( num_bins_ - blockSize_ ); )
+    for (unsigned int k = 0; k < (num_bins_ - blockSize_);)
     {
-      //factor = 1.0f + Math::rangedRand( maxMagCorrection_ ) / 100.0f  ;
+        //factor = 1.0f + Math::rangedRand( maxMagCorrection_ ) / 100.0f  ;
 
-        float const factor
-        (
-            Math::db2normalizedLinear
-            (
-                Math::rangedRand( maxMagCorrection_ )
-            )
-        );
-        for ( unsigned int i = 0; i < blockSize_; ++i )
-            data.amplitudes[ k++ ] *= factor;
-    }   
+        float const factor(Math::db2normalizedLinear(Math::rangedRand(maxMagCorrection_)));
+        for (unsigned int i = 0; i < blockSize_; ++i)
+            data.amplitudes[k++] *= factor;
+    }
 }
 
 //------------------------------------------------------------------------------

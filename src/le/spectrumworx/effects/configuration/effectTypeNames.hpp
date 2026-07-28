@@ -3,13 +3,13 @@
 /// \file effectNames.hpp
 /// ---------------------
 ///
-/// Copyright (c) 2013 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2013 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef effectTypeNames_hpp__86C2F997_AEC7_485D_B9C3_9EE34628192D
 #define effectTypeNames_hpp__86C2F997_AEC7_485D_B9C3_9EE34628192D
-#pragma once
 //------------------------------------------------------------------------------
 #include "boost/utility/string_ref_fwd.hpp"
 
@@ -25,8 +25,8 @@ namespace Effects
 {
 //------------------------------------------------------------------------------
 
-char const * LE_FASTCALL effectIndex2TypeName( std::uint8_t      effectIndex    );
-std::uint8_t LE_FASTCALL effectTypeName2Index( boost::string_ref effectTypeName );
+char const *effectIndex2TypeName(std::uint8_t effectIndex);
+std::uint8_t effectTypeName2Index(boost::string_ref effectTypeName);
 
 //------------------------------------------------------------------------------
 } // namespace Effects

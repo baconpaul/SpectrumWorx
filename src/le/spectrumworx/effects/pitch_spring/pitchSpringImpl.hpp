@@ -3,13 +3,13 @@
 /// \file pitchSpringImpl.hpp
 /// -------------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef pitchSpringImpl_hpp__B5B2F53F_B59F_4E79_85A5_C741E0182BF5
 #define pitchSpringImpl_hpp__B5B2F53F_B59F_4E79_85A5_C741E0182BF5
-#pragma once
 //------------------------------------------------------------------------------
 #include "pitchSpring.hpp"
 
@@ -29,48 +29,37 @@ namespace Effects
 
 namespace Detail
 {
-    ////////////////////////////////////////////////////////////////////////////
-    ///
-    /// \class PitchSpringBase
-    /// \internal
-    ///
-    ////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+///
+/// \class PitchSpringBase
+/// \internal
+///
+////////////////////////////////////////////////////////////////////////////
 
-    class PitchSpringBaseImpl
-        :
-        public EffectImpl<PitchSpringBase>,
-        public VibratoEffect
-    {
-    protected:
-        void setup( IndexRange const &, Engine::Setup const & );
-        float calculateNewPitch( ChannelState & ) const;
-    };
+class PitchSpringBaseImpl : public EffectImpl<PitchSpringBase>, public VibratoEffect
+{
+  protected:
+    void setup(IndexRange const &, Engine::Setup const &);
+    float calculateNewPitch(ChannelState &) const;
+};
 } // namespace Detail
 
 class PitchSpringImpl
-    :
-    public PitchSpring,
-    public PhaseVocoderShared::PitchShifterBasedEffect
-    <
-        Detail::PitchSpringBaseImpl,
-        PhaseVocoderShared::PitchShifter
-    >
+    : public PitchSpring,
+      public PhaseVocoderShared::PitchShifterBasedEffect<Detail::PitchSpringBaseImpl,
+                                                         PhaseVocoderShared::PitchShifter>
 {
-public: // LE::Effect interface.
-    void process( ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const & ) const;
+  public: // LE::Effect interface.
+    void process(ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const &) const;
 };
 
 class PitchSpringPVDImpl
-    :
-    public PitchSpringPVD,
-    public PhaseVocoderShared::PitchShifterBasedEffect
-    <
-        Detail::PitchSpringBaseImpl,
-        PhaseVocoderShared::PVPitchShifter
-    >
+    : public PitchSpringPVD,
+      public PhaseVocoderShared::PitchShifterBasedEffect<Detail::PitchSpringBaseImpl,
+                                                         PhaseVocoderShared::PVPitchShifter>
 {
-public: // LE::Effect interface.
-    void process( ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const & ) const;
+  public: // LE::Effect interface.
+    void process(ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const &) const;
 };
 
 //------------------------------------------------------------------------------

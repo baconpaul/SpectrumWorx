@@ -3,7 +3,8 @@
 /// indexRange.cpp
 /// --------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -17,51 +18,39 @@ namespace LE
 namespace SW
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN( Effects )
+LE_IMPL_NAMESPACE_BEGIN(Effects)
 //------------------------------------------------------------------------------
 
-IndexRange::IndexRange( value_type const begin, value_type const end )
-    :
-    Pair( begin, end )
+IndexRange::IndexRange(value_type const begin, value_type const end) : Pair(begin, end)
 {
-    BOOST_ASSERT_MSG( isValid(), "Invalid range" );
+    BOOST_ASSERT_MSG(isValid(), "Invalid range");
 }
 
-
-void IndexRange::setFirst( value_type const newBeginning )
+void IndexRange::setFirst(value_type const newBeginning)
 {
-    BOOST_ASSERT_MSG( isValid( newBeginning, end() ), "Invalid range" );
+    BOOST_ASSERT_MSG(isValid(newBeginning, end()), "Invalid range");
     Pair::first = newBeginning;
 }
 
-
-void IndexRange::setLast( value_type const newLast )
+void IndexRange::setLast(value_type const newLast)
 {
-    BOOST_ASSERT_MSG( isValid( first(), newLast + 1 ), "Invalid range" );
+    BOOST_ASSERT_MSG(isValid(first(), newLast + 1), "Invalid range");
     Pair::second = newLast + 1;
 }
 
-
-void IndexRange::setNewRange( value_type const newBeginning, value_type const newLast )
+void IndexRange::setNewRange(value_type const newBeginning, value_type const newLast)
 {
-    BOOST_ASSERT_MSG( isValid( newBeginning, newLast + 1 ), "Invalid range" );
-    Pair::first  = newBeginning    ;
-    Pair::second = newLast      + 1;
+    BOOST_ASSERT_MSG(isValid(newBeginning, newLast + 1), "Invalid range");
+    Pair::first = newBeginning;
+    Pair::second = newLast + 1;
 }
 
+bool IndexRange::isValid(value_type const first, value_type const end) { return first <= end; }
 
-bool IndexRange::isValid( value_type const first, value_type const end )
-{
-    return first <= end;
-}
-
-bool IndexRange::isValid() const
-{
-    return isValid( first(), end() );
-}
+bool IndexRange::isValid() const { return isValid(first(), end()); }
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END( Effects )
+LE_IMPL_NAMESPACE_END(Effects)
 //------------------------------------------------------------------------------
 } // namespace SW
 //------------------------------------------------------------------------------

@@ -3,13 +3,13 @@
 /// \file automatableParameters.hpp
 /// -------------------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef automatableParameters_hpp__FF0C3B97_B4C7_4326_B5B9_659183A9AA22
 #define automatableParameters_hpp__FF0C3B97_B4C7_4326_B5B9_659183A9AA22
-#pragma once
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/engine/configuration.hpp"
 #include "le/parameters/enumerated/parameter.hpp"
@@ -43,19 +43,15 @@ namespace Engine
 
 using WindowFunction = Parameters::EnumeratedParameter<Constants::NumberOfWindows>;
 
-using FFTSize = Parameters::PowerOfTwoParameter
-<
-    Parameters::Traits::Minimum<Constants::minimumFFTSize>,
-    Parameters::Traits::Maximum<Constants::maximumFFTSize>,
-    Parameters::Traits::Default<Constants::defaultFFTSize>
->;
+using FFTSize =
+    Parameters::PowerOfTwoParameter<Parameters::Traits::Minimum<Constants::minimumFFTSize>,
+                                    Parameters::Traits::Maximum<Constants::maximumFFTSize>,
+                                    Parameters::Traits::Default<Constants::defaultFFTSize>>;
 
-using OverlapFactor = Parameters::PowerOfTwoParameter
-<
-    Parameters::Traits::Minimum<Constants::minimumOverlapFactor>,
-    Parameters::Traits::Maximum<Constants::maximumOverlapFactor>,
-    Parameters::Traits::Default<Constants::defaultOverlapFactor>
->;
+using OverlapFactor =
+    Parameters::PowerOfTwoParameter<Parameters::Traits::Minimum<Constants::minimumOverlapFactor>,
+                                    Parameters::Traits::Maximum<Constants::maximumOverlapFactor>,
+                                    Parameters::Traits::Default<Constants::defaultOverlapFactor>>;
 
 #if LE_SW_ENGINE_WINDOW_PRESUM
 /// \note We need to be able to forward declare the WindowSizeFactor
@@ -69,17 +65,14 @@ using OverlapFactor = Parameters::PowerOfTwoParameter
 //    Parameters::Traits::Default<4>
 //>;
 
-struct WindowSizeFactor
-    :
-    Parameters::PowerOfTwoParameter
-    <
-        Parameters::Traits::Minimum<1>,
-        Parameters::Traits::Maximum<8>,
-        Parameters::Traits::Default<1>
-    >
+struct WindowSizeFactor : Parameters::PowerOfTwoParameter<Parameters::Traits::Minimum<1>,
+                                                          Parameters::Traits::Maximum<8>,
+                                                          Parameters::Traits::Default<1>>
 {
-    explicit WindowSizeFactor( unsigned int const initialValue = WindowSizeFactor::default_() )
-        : PowerOfTwoParameter( initialValue ) {}
+    explicit WindowSizeFactor(unsigned int const initialValue = WindowSizeFactor::default_())
+        : PowerOfTwoParameter(initialValue)
+    {
+    }
 };
 #endif // LE_SW_ENGINE_WINDOW_PRESUM
 

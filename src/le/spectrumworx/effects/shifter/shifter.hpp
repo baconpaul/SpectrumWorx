@@ -3,14 +3,14 @@
 /// \file shifter.hpp
 /// -----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef shifter_hpp__8FBF160E_8886_4672_8CEC_90EA6370B72F
 #define shifter_hpp__8FBF160E_8886_4672_8CEC_90EA6370B72F
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -31,34 +31,30 @@ namespace Effects
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \class Shifter 
+/// \class Shifter
 ///
 /// \ingroup Effects
-/// 
+///
 /// \brief Shifts the spectrum along the frequency axis.
 ///
-/// Shifts frequency "bins" along the frequency axis to produce unusual 
-/// clangorous and metallic effects. 
-/// 
-/// \note In some cases Shifter will produce silent output due to sinusoids 
-/// canceling out at some shift ranges. This happens only when both magnitudes 
-/// and phases are shifted and depends very much on the engine settings 
-/// (Overlap and Window type). 
+/// Shifts frequency "bins" along the frequency axis to produce unusual
+/// clangorous and metallic effects.
+///
+/// \note In some cases Shifter will produce silent output due to sinusoids
+/// canceling out at some shift ranges. This happens only when both magnitudes
+/// and phases are shifted and depends very much on the engine settings
+/// (Overlap and Window type).
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
 struct Shifter
 {
-    LE_ENUMERATED_PARAMETER( ShiftTarget, ( Magnitudes )( Phases )( Both     ) );
-    LE_ENUMERATED_PARAMETER( Tail       , ( Leave      )( Clear  )( Circular ) );
+    LE_ENUMERATED_PARAMETER(ShiftTarget, (Magnitudes)(Phases)(Both));
+    LE_ENUMERATED_PARAMETER(Tail, (Leave)(Clear)(Circular));
 
-    LE_DEFINE_PARAMETERS
-    (
-        ( ( ShiftTarget ) )
-        ( ( Offset      )( SymmetricFloat )( MaximumOffset<10> )( Unit<' bw%'> ) )
-        ( ( Tail        ) )
-    );
-    
+    LE_DEFINE_PARAMETERS(
+        ((ShiftTarget))((Offset)(SymmetricFloat)(MaximumOffset<10>)(Unit<' bw%'>))((Tail)));
+
     /// \typedef ShiftTarget
     /// \brief Specifies what is to be shifted.
     /// \details
@@ -76,10 +72,9 @@ struct Shifter
     ///   - Clear: shifted tail samples are cleared.
     ///   - Circular: shifted samples are circularly fed to the beginning.
 
-
     static bool const usesSideChannel = false;
 
-    static char const title      [];
+    static char const title[];
     static char const description[];
 };
 

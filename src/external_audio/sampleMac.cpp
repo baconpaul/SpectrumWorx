@@ -3,7 +3,8 @@
 /// sampleMac.cpp
 /// -------------
 ///
-/// Copyright (c) 2010.-2013. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2010 - 2013. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -16,7 +17,13 @@ namespace LE
 {
 //------------------------------------------------------------------------------
 
-namespace SW { namespace GUI { FSRef makeFSRefFromPath( juce::String const & path ); } } //...mrmlj...
+namespace SW
+{
+namespace GUI
+{
+FSRef makeFSRefFromPath(juce::String const &path);
+}
+} // namespace SW
 
 juce::String Sample::supportedFormats()
 {
@@ -26,52 +33,63 @@ juce::String Sample::supportedFormats()
 
 namespace
 {
-    class ExtAudioFileGuard
+class ExtAudioFileGuard
+{
+  public:
+    ExtAudioFileGuard() : file_(0) {}
+    ~ExtAudioFileGuard() { BOOST_VERIFY(::ExtAudioFileDispose(file_) == noErr); }
+
+    ExtAudioFileRef operator*() const
     {
-    public:
-        ExtAudioFileGuard() : file_( 0 ) {}
-        ~ExtAudioFileGuard() { BOOST_VERIFY( ::ExtAudioFileDispose( file_ ) == noErr ); }
+        BOOST_ASSERT(file_);
+        return file_;
+    }
+    ExtAudioFileRef *operator&()
+    {
+        BOOST_ASSERT(!file_);
+        return &file_;
+    }
 
-        ExtAudioFileRef   operator*() const { BOOST_ASSERT(  file_ ); return  file_; }
-        ExtAudioFileRef * operator&()       { BOOST_ASSERT( !file_ ); return &file_; }
-
-    private:
-        ExtAudioFileRef file_;
-    };
+  private:
+    ExtAudioFileRef file_;
+};
 } // anonymous namespace
 
-LE_NOTHROWNOALIAS
-char const * Sample::doLoad( juce::String const & sampleFileName, unsigned int const desiredSampleRate, Sample::DataHolder & data )
+LE_NOTHROWNOALIAS char const *Sample::doLoad(juce::String const &sampleFileName,
+                                             unsigned int const desiredSampleRate,
+                                             Sample::DataHolder &data)
 {
-    FSRef const samplePath( SW::GUI::makeFSRefFromPath( sampleFileName ) );
+    FSRef const samplePath(SW::GUI::makeFSRefFromPath(sampleFileName));
 
     ExtAudioFileGuard sampleFile;
-    OSStatus error( ::ExtAudioFileOpen( &samplePath, &sampleFile ) );
-    if ( error != noErr )
+    OSStatus error(::ExtAudioFileOpen(&samplePath, &sampleFile));
+    if (error != noErr)
         return "Unable to open file.";
 
     UInt32 propertySize;
 
     AudioStreamBasicDescription inputFormat;
-    propertySize = sizeof( inputFormat );
-    BOOST_VERIFY( ::ExtAudioFileGetProperty( *sampleFile, kExtAudioFileProperty_FileDataFormat, &propertySize, &inputFormat ) == noErr );
-    BOOST_ASSERT( propertySize == sizeof( inputFormat ) );
+    propertySize = sizeof(inputFormat);
+    BOOST_VERIFY(::ExtAudioFileGetProperty(*sampleFile, kExtAudioFileProperty_FileDataFormat,
+                                           &propertySize, &inputFormat) == noErr);
+    BOOST_ASSERT(propertySize == sizeof(inputFormat));
 
     AudioStreamBasicDescription desiredFormat;
 
-    desiredFormat.mSampleRate       = desiredSampleRate;
-    desiredFormat.mFormatID         = kAudioFormatLinearPCM;
-    desiredFormat.mFormatFlags      = kLinearPCMFormatFlagIsFloat | kAudioFormatFlagIsNonInterleaved;
-    desiredFormat.mFramesPerPacket  = 1;
-    desiredFormat.mBytesPerFrame    = sizeof( float );
+    desiredFormat.mSampleRate = desiredSampleRate;
+    desiredFormat.mFormatID = kAudioFormatLinearPCM;
+    desiredFormat.mFormatFlags = kLinearPCMFormatFlagIsFloat | kAudioFormatFlagIsNonInterleaved;
+    desiredFormat.mFramesPerPacket = 1;
+    desiredFormat.mBytesPerFrame = sizeof(float);
     desiredFormat.mChannelsPerFrame = 2;
-    desiredFormat.mBitsPerChannel   = 32;
-    desiredFormat.mReserved         = 0;
+    desiredFormat.mBitsPerChannel = 32;
+    desiredFormat.mReserved = 0;
 
-    desiredFormat.mBytesPerPacket   = desiredFormat.mFramesPerPacket * desiredFormat.mBytesPerFrame;
+    desiredFormat.mBytesPerPacket = desiredFormat.mFramesPerPacket * desiredFormat.mBytesPerFrame;
 
-    error = ::ExtAudioFileSetProperty( *sampleFile, kExtAudioFileProperty_ClientDataFormat, sizeof( desiredFormat ), &desiredFormat );
-    if ( error != noErr )
+    error = ::ExtAudioFileSetProperty(*sampleFile, kExtAudioFileProperty_ClientDataFormat,
+                                      sizeof(desiredFormat), &desiredFormat);
+    if (error != noErr)
         return "Unable to set desired format.";
 
     // Implementation note:
@@ -81,45 +99,49 @@ char const * Sample::doLoad( juce::String const & sampleFileName, unsigned int c
     // http://web.archiveorange.com/archive/v/q7bub8POgFuTNzMP0MsJ
     // http://www.modejong.com/iPhone (example 3).
     //                                        (08.12.2010.) (Domagoj Saric)
-    if ( inputFormat.mChannelsPerFrame == 1 )
+    if (inputFormat.mChannelsPerFrame == 1)
     {
         AudioConverterRef converter;
-        propertySize = sizeof( converter );
-        BOOST_VERIFY( ::ExtAudioFileGetProperty( *sampleFile, kExtAudioFileProperty_AudioConverter, &propertySize, &converter ) == noErr );
-        BOOST_ASSERT( propertySize == sizeof( converter ) );
+        propertySize = sizeof(converter);
+        BOOST_VERIFY(::ExtAudioFileGetProperty(*sampleFile, kExtAudioFileProperty_AudioConverter,
+                                               &propertySize, &converter) == noErr);
+        BOOST_ASSERT(propertySize == sizeof(converter));
 
-        static SInt32 const channelMap[] = { 0, 0 };
-        BOOST_VERIFY( ::AudioConverterSetProperty( converter, kAudioConverterChannelMap, sizeof( channelMap ), channelMap ) == noErr );
+        static SInt32 const channelMap[] = {0, 0};
+        BOOST_VERIFY(::AudioConverterSetProperty(converter, kAudioConverterChannelMap,
+                                                 sizeof(channelMap), channelMap) == noErr);
     }
 
     SInt64 fileLengthInFrames;
-    propertySize = sizeof( fileLengthInFrames );
-    error = ::ExtAudioFileGetProperty( *sampleFile, kExtAudioFileProperty_FileLengthFrames, &propertySize, &fileLengthInFrames );
-    BOOST_ASSERT( error        == noErr                        );
-    BOOST_ASSERT( propertySize == sizeof( fileLengthInFrames ) );
+    propertySize = sizeof(fileLengthInFrames);
+    error = ::ExtAudioFileGetProperty(*sampleFile, kExtAudioFileProperty_FileLengthFrames,
+                                      &propertySize, &fileLengthInFrames);
+    BOOST_ASSERT(error == noErr);
+    BOOST_ASSERT(propertySize == sizeof(fileLengthInFrames));
 
-    UInt32 numberOfSamples( static_cast<std::size_t>( fileLengthInFrames ) );
+    UInt32 numberOfSamples(static_cast<std::size_t>(fileLengthInFrames));
 
-    if ( !data.recreate( numberOfSamples ) )
+    if (!data.recreate(numberOfSamples))
         return "Out of memory";
 
     struct AudioBufferList2
     {
-        UInt32      mNumberBuffers;
-        AudioBuffer mBuffers[ 2 ];
+        UInt32 mNumberBuffers;
+        AudioBuffer mBuffers[2];
     };
 
     AudioBufferList2 fillBufList;
     fillBufList.mNumberBuffers = 2;
-    fillBufList.mBuffers[ 0 ].mNumberChannels = 1;
-    fillBufList.mBuffers[ 0 ].mDataByteSize   = numberOfSamples * sizeof( float );
-    fillBufList.mBuffers[ 0 ].mData           = data.pBuffer.get();
-    fillBufList.mBuffers[ 1 ].mNumberChannels = 1;
-    fillBufList.mBuffers[ 1 ].mDataByteSize   = numberOfSamples * sizeof( float );
-    fillBufList.mBuffers[ 1 ].mData           = data.pChannel2Beginning;
+    fillBufList.mBuffers[0].mNumberChannels = 1;
+    fillBufList.mBuffers[0].mDataByteSize = numberOfSamples * sizeof(float);
+    fillBufList.mBuffers[0].mData = data.pBuffer.get();
+    fillBufList.mBuffers[1].mNumberChannels = 1;
+    fillBufList.mBuffers[1].mDataByteSize = numberOfSamples * sizeof(float);
+    fillBufList.mBuffers[1].mData = data.pChannel2Beginning;
 
-    error = ::ExtAudioFileRead( *sampleFile, &numberOfSamples, reinterpret_cast<AudioBufferList *>( &fillBufList ) );
-    if ( error != noErr )
+    error = ::ExtAudioFileRead(*sampleFile, &numberOfSamples,
+                               reinterpret_cast<AudioBufferList *>(&fillBufList));
+    if (error != noErr)
         return "Failed reading data";
 
     data.pChannel1End += numberOfSamples;

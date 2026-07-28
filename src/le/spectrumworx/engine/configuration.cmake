@@ -2,7 +2,8 @@
 #
 # LEL.Engine configuration.cmake
 #
-# Copyright (c) 2014 - 2015. Little Endian Ltd. All rights reserved.
+# Copyright (c) 2014 - 2015. Little Endian Ltd.
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 ################################################################################
 

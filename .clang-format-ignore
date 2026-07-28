@@ -1,0 +1,3 @@
+# These .m files are MATLAB prototypes, not Objective-C — clang-format mangles them.
+src/le/spectrumworx/effects/vocoder/cepstrum.m
+src/le/spectrumworx/effects/_unfinished/phase_locked_vocoder/phase_locked_vocoder.m

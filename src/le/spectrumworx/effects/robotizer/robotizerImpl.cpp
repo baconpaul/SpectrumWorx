@@ -3,7 +3,8 @@
 /// robotizerImpl.cpp
 /// -----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -28,9 +29,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Robotizer::title      [] = "Robotizer";
+char const Robotizer::title[] = "Robotizer";
 char const Robotizer::description[] = "Robotic sound.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -39,13 +39,13 @@ char const Robotizer::description[] = "Robotic sound.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void RobotizerImpl::process( Engine::ChannelData_AmPh data, Engine::Setup const & ) const
+void RobotizerImpl::process(Engine::ChannelData_AmPh data, Engine::Setup const &) const
 {
     /// \note Here we assume a zero-phase DFT and simply zero the phases.
     /// - DAFX 8.4.7 Robotization
     /// - http://prezi.com/haqtjktnzca7/robotizer-project
     ///                                       (28.06.2013.) (Domagoj Saric)
-    Math::clear( data.phases() );
+    Math::clear(data.phases());
 }
 
 //------------------------------------------------------------------------------

@@ -3,14 +3,14 @@
 /// \file ahAh.hpp
 /// --------------
 ///
-/// Copyright (C) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef ahah_hpp__D12349D97_2DB9_4249_87EF_851D727FAF71
 #define ahah_hpp__D12349D97_2DB9_4249_87EF_851D727FAF71
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -39,18 +39,16 @@ namespace Effects
 ///
 /// A kind of a wah-wah. It filters a region with a variable centre frequency.
 /// An LFO must be used to modulate the Center frequency knob for the intended
-/// effect. 
-/// 
+/// effect.
+///
 ////////////////////////////////////////////////////////////////////////////////
 
 struct AhAh
 {
-    LE_DEFINE_PARAMETERS
-    (
-        ( ( Center   )( LinearUnsignedInteger )( Minimum< 0> )( Maximum<6000> )( Default<2000> )( Unit<' Hz'> ) )
-        ( ( Width    )( LinearUnsignedInteger )( Minimum<50> )( Maximum<2000> )( Default<1000> )( Unit<' Hz'> ) )
-        ( ( Strength )( SymmetricFloat        )( MaximumOffset<24> )                            ( Unit<' dB'> ) )
-    );
+    LE_DEFINE_PARAMETERS(
+        ((Center)(LinearUnsignedInteger)(Minimum<0>)(Maximum<6000>)(Default<2000>)(Unit<' Hz'>))(
+            (Width)(LinearUnsignedInteger)(Minimum<50>)(Maximum<2000>)(Default<1000>)(Unit<' Hz'>))(
+            (Strength)(SymmetricFloat)(MaximumOffset<24>)(Unit<' dB'>)));
 
     /// \typedef Center
     /// \brief Filter center frequency.
@@ -61,7 +59,7 @@ struct AhAh
 
     static bool const usesSideChannel = false;
 
-    static char const title      [];
+    static char const title[];
     static char const description[];
 }; // struct AhAh
 

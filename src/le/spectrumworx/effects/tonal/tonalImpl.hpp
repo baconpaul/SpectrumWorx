@@ -3,13 +3,13 @@
 /// \file tonalImpl.hpp
 /// -------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef tonalImpl_hpp__71A9A670_AA87_4755_A67A_A61833B57203
 #define tonalImpl_hpp__71A9A670_AA87_4755_A67A_A61833B57203
-#pragma once
 //------------------------------------------------------------------------------
 #include "tonal.hpp"
 
@@ -28,63 +28,52 @@ namespace Effects
 
 namespace Detail ///< \internal
 {
-    class TonalBaseImpl : public TonalBase
+class TonalBaseImpl : public TonalBase
+{
+  public: // LE::Effect required interface.
+          ////////////////////////////////////////////////////////////////////////
+          // setup() and process()
+          ////////////////////////////////////////////////////////////////////////
+
+  protected:
+    template <class Implementation, class Parameters>
+    void setup(Parameters const &parameters, Engine::Setup const &engineSetup)
     {
-    public: // LE::Effect required interface.
+        setup(engineSetup);
 
-        ////////////////////////////////////////////////////////////////////////
-        // setup() and process()
-        ////////////////////////////////////////////////////////////////////////
+        pd_.setStrengthThreshold(parameters.template get<typename Implementation::Strength>());
+        pd_.setGlobalThreshold(parameters.template get<typename Implementation::GlobalThreshold>());
+        pd_.setLocalThreshold(parameters.template get<typename Implementation::LocalThreshold>());
+    }
 
-    protected:
-        template <class Implementation, class Parameters>
-        void setup( Parameters const & parameters, Engine::Setup const & engineSetup )
-        {
-            setup( engineSetup );
+  private:
+    void setup(Engine::Setup const &);
 
-            pd_.setStrengthThreshold( parameters.template get<typename Implementation::Strength       >() );
-            pd_.setGlobalThreshold  ( parameters.template get<typename Implementation::GlobalThreshold>() );
-            pd_.setLocalThreshold   ( parameters.template get<typename Implementation::LocalThreshold >() );
-        }
-
-    private:
-        void setup( Engine::Setup const & );
-
-    protected:
-        mutable PeakDetector pd_;
-    };
+  protected:
+    mutable PeakDetector pd_;
+};
 } // namespace Detail
 
-
-class TonalImpl 
-    : 
-    public EffectImpl<Tonal>,
-    public Detail::TonalBaseImpl
+class TonalImpl : public EffectImpl<Tonal>, public Detail::TonalBaseImpl
 {
-public: // LE::Effect required interface.
-
+  public: // LE::Effect required interface.
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup( IndexRange const &, Engine::Setup const & );
-    void process( Engine::ChannelData_AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(Engine::ChannelData_AmPh, Engine::Setup const &) const;
 };
 
-
-class AtonalImpl 
-    : 
-    public EffectImpl<Atonal>,
-    public Detail::TonalBaseImpl
+class AtonalImpl : public EffectImpl<Atonal>, public Detail::TonalBaseImpl
 {
-public: // LE::Effect required interface.
-
+  public: // LE::Effect required interface.
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup( IndexRange const &, Engine::Setup const & );
-    void process( Engine::ChannelData_AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(Engine::ChannelData_AmPh, Engine::Setup const &) const;
 };
 
 //------------------------------------------------------------------------------

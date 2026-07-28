@@ -3,7 +3,8 @@
 /// sharperImpl.cpp
 /// ---------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -35,9 +36,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Sharper::title      [] = "Sharper";
+char const Sharper::title[] = "Sharper";
 char const Sharper::description[] = "Sharpen the spectrum.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -45,10 +45,9 @@ char const Sharper::description[] = "Sharpen the spectrum.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Sharper::AveragingWidth, "Sharpness" )
-EFFECT_PARAMETER_NAME( Sharper::Intensity     , "Intensity" )
-EFFECT_PARAMETER_NAME( Sharper::Limiter       , "Limit"     )
-
+EFFECT_PARAMETER_NAME(Sharper::AveragingWidth, "Sharpness")
+EFFECT_PARAMETER_NAME(Sharper::Intensity, "Intensity")
+EFFECT_PARAMETER_NAME(Sharper::Limiter, "Limit")
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -57,13 +56,13 @@ EFFECT_PARAMETER_NAME( Sharper::Limiter       , "Limit"     )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void SharperImpl::setup( IndexRange const &, Engine::Setup const & engineSetup )
+void SharperImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
 {
-    filterLenHalf_ = engineSetup.frequencyInHzToBin( parameters().get<AveragingWidth>() ) / 2 ;
-    intensity_     = Math::dB2NormalisedLinear( parameters().get<Intensity>() );
-    cutoff_        = Math::dB2NormalisedLinear( parameters().get<Limiter  >() ) * engineSetup.maximumAmplitude();
+    filterLenHalf_ = engineSetup.frequencyInHzToBin(parameters().get<AveragingWidth>()) / 2;
+    intensity_ = Math::dB2NormalisedLinear(parameters().get<Intensity>());
+    cutoff_ =
+        Math::dB2NormalisedLinear(parameters().get<Limiter>()) * engineSetup.maximumAmplitude();
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -71,7 +70,7 @@ void SharperImpl::setup( IndexRange const &, Engine::Setup const & engineSetup )
 // ----------------------
 //
 ////////////////////////////////////////////////////////////////////////////////
-/// \note Alex says: "Smoother and Sharper – applies 1st order lowpass and
+/// \note Alex says: "Smoother and Sharper â€“ applies 1st order lowpass and
 ///       highpass filters respectively among the magnitude and/or the phase
 ///       axis. M_smth and p_smth are smooth (or sharp) factors whose values
 ///       range from 0...128 bins. Warning: highly recommend using small
@@ -88,23 +87,23 @@ void SharperImpl::setup( IndexRange const &, Engine::Setup const & engineSetup )
 ///                                           (19.10.2011.) (Domagoj Saric)
 ////////////////////////////////////////////////////////////////////////////////
 
-void SharperImpl::process( Engine::ChannelData_AmPh data, Engine::Setup const & ) const
+void SharperImpl::process(Engine::ChannelData_AmPh data, Engine::Setup const &) const
 {
-    if ( filterLenHalf_ == 0 )
+    if (filterLenHalf_ == 0)
         return;
 
-    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER( smoothedAmplitudes, Engine::real_t, data.size() );
-    Math::symmetricMovingAverage( data.amps(), smoothedAmplitudes, filterLenHalf_ );
+    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(smoothedAmplitudes, Engine::real_t, data.size());
+    Math::symmetricMovingAverage(data.amps(), smoothedAmplitudes, filterLenHalf_);
 
     // Combine (subtract smoother from original) smoothed amplitudes with original one:
-    float const limit    ( cutoff_    );
-    float const intensity( intensity_ );
-    float       * LE_RESTRICT pAmp        ( data.amps().begin()        );
-    float const * LE_RESTRICT pSmoothedAmp( smoothedAmplitudes.begin() );
-    while ( pSmoothedAmp != smoothedAmplitudes.end() )
+    float const limit(cutoff_);
+    float const intensity(intensity_);
+    float *LE_RESTRICT pAmp(data.amps().begin());
+    float const *LE_RESTRICT pSmoothedAmp(smoothedAmplitudes.begin());
+    while (pSmoothedAmp != smoothedAmplitudes.end())
     {
-        float       & amp        ( *pAmp++         );
-        float const   smoothedAmp( *pSmoothedAmp++ );
+        float &amp(*pAmp++);
+        float const smoothedAmp(*pSmoothedAmp++);
 
         //amp += intensity_ * ( amp - smoothedAmp );
 
@@ -112,8 +111,8 @@ void SharperImpl::process( Engine::ChannelData_AmPh data, Engine::Setup const & 
         //amp = smoothedAmp - intensity_ * ( amp - smoothedAmp );
 
         //amp = Math::clamp( intensity_ * ( smoothedAmp - amp ), 0, limit );
-        float const newAmp( amp + intensity * ( amp - smoothedAmp ) );
-        amp = Math::clamp( newAmp, 0, limit );
+        float const newAmp(amp + intensity * (amp - smoothedAmp));
+        amp = Math::clamp(newAmp, 0, limit);
 
         // Interesting bass effect:
         //amp -= smoothedAmp             ;

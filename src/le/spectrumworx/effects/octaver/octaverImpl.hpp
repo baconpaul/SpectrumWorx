@@ -3,13 +3,13 @@
 /// \file octaverImpl.hpp
 /// ---------------------
 ///
-/// Copyright (c) 2010 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2010 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef octaverImpl_hpp__A023A2C0_4D7C_47A4_BDA7_2E0E92A67D32
 #define octaverImpl_hpp__A023A2C0_4D7C_47A4_BDA7_2E0E92A67D32
-#pragma once
 //------------------------------------------------------------------------------
 #include "octaver.hpp"
 
@@ -31,40 +31,33 @@ namespace Effects
 
 class OctaverImpl : public EffectImpl<Octaver>
 {
-public: // LE::Effect interface.
+  public: // LE::Effect interface.
     ////////////////////////////////////////////////////////////////////////////
     // ChannelState
     ////////////////////////////////////////////////////////////////////////////
 
-    LE_NAMED_DYNAMIC_CHANNEL_STATE
-    (
-        ChannelState,
-        ( ( PhaseVocoderShared::PitchShifter::ChannelState )( pv1 ) )
-        ( ( PhaseVocoderShared::PitchShifter::ChannelState )( pv2 ) )
-    );
+    LE_NAMED_DYNAMIC_CHANNEL_STATE(ChannelState,
+                                   ((PhaseVocoderShared::PitchShifter::ChannelState)(pv1))(
+                                       (PhaseVocoderShared::PitchShifter::ChannelState)(pv2)));
 
-    void setup  ( IndexRange const &, Engine::Setup const & );
-    void process( ChannelState &, Engine::ChannelData_AmPh2ReIm, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(ChannelState &, Engine::ChannelData_AmPh2ReIm, Engine::Setup const &) const;
 
-private:
-    void LE_FASTCALL shiftAndMix
-    (
-        Engine::ChannelData_AmPh2ReIm                        & data,
-        Engine::ChannelData_AmPh                             & shiftedData,
-        Engine::Setup                                  const & engineSetup,
-        PhaseVocoderShared::PitchShifter::ChannelState       & pvState,
-        std::uint8_t                                           octave
-    ) const;
+  private:
+    void shiftAndMix(Engine::ChannelData_AmPh2ReIm &data, Engine::ChannelData_AmPh &shiftedData,
+                     Engine::Setup const &engineSetup,
+                     PhaseVocoderShared::PitchShifter::ChannelState &pvState,
+                     std::uint8_t octave) const;
 
-private:
+  private:
     struct OctaveSetup
     {
-        float gain      ;
+        float gain;
         float pitchScale;
     };
 
-private:
-    OctaveSetup octaveParameters_[ 2 ];
+  private:
+    OctaveSetup octaveParameters_[2];
 
     std::uint16_t cutoff_;
 

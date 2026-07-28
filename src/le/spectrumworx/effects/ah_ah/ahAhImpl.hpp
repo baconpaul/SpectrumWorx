@@ -3,13 +3,13 @@
 /// \file ahahImpl.hpp
 /// ------------------
 ///
-/// Copyright (C) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef ahahImpl_hpp__112349D97_2DB9_4249_87EF_851D727FAF71
 #define ahahImpl_hpp__112349D97_2DB9_4249_87EF_851D727FAF71
-#pragma once
 //------------------------------------------------------------------------------
 #include "ahAh.hpp"
 
@@ -29,21 +29,20 @@ namespace Effects
 
 class AhAhImpl : public EffectImpl<AhAh>
 {
-public: // LE::Effect required interface.
-
+  public: // LE::Effect required interface.
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup( IndexRange const &, Engine::Setup const & );
-    void process( Engine::ChannelData_AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(Engine::ChannelData_AmPh, Engine::Setup const &) const;
 
-private:
-    float                  gain_               ;
-    float                  omega_              ;
-    IndexRange::value_type beginBin_           ;
-    IndexRange::value_type endBin_             ;
-    float                  offsetFromUserRange_;
+  private:
+    float gain_;
+    float omega_;
+    IndexRange::value_type beginBin_;
+    IndexRange::value_type endBin_;
+    float offsetFromUserRange_;
 }; // class AhAhImpl
 
 //------------------------------------------------------------------------------

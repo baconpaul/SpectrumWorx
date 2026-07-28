@@ -3,13 +3,13 @@
 /// \file exImploderImpl.hpp
 /// ------------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef exImploderImpl_hpp__26D3CDDD_80CD_4418_806F_BFC41FD88A3D
 #define exImploderImpl_hpp__26D3CDDD_80CD_4418_806F_BFC41FD88A3D
-#pragma once
 //------------------------------------------------------------------------------
 #include "exImploder.hpp"
 
@@ -30,75 +30,57 @@ namespace Effects
 
 namespace Detail
 {
-    class ExImPloderImpl
+class ExImPloderImpl
+{
+  public:
+    LE_DYNAMIC_CHANNEL_STATE(
+        ((Engine::HalfFFTBuffer<float>)(accumMagn))((Engine::HalfFFTBuffer<float>)(accumFreqs)));
+
+    struct ChannelState : DynamicChannelState
     {
-    public:
-        LE_DYNAMIC_CHANNEL_STATE
-        (
-            ( ( Engine::HalfFFTBuffer<float> )( accumMagn  ) )
-            ( ( Engine::HalfFFTBuffer<float> )( accumFreqs ) )
-        );
-
-        struct ChannelState : DynamicChannelState
-        {   
-            void reset();
-        };
-
-    protected:
-        float LE_FASTCALL setup( int glissando, int threshold, int gate, Engine::Setup const & );
-
-        void LE_FASTCALL process
-        (
-            ChannelState             &,
-            Engine::ChannelData_AmPh &,
-            bool                       thresholdIsLowerBound
-        ) const;
-
-    protected:
-        void setMagnitudeScale( float magnitudeScale );
-
-    private:
-        float gate_          ;
-        float gliss_         ;
-        float nyquist_       ;    
-        float threshold_     ;
-        float magnitudeScale_;
+        void reset();
     };
+
+  protected:
+    float setup(int glissando, int threshold, int gate, Engine::Setup const &);
+
+    void process(ChannelState &, Engine::ChannelData_AmPh &, bool thresholdIsLowerBound) const;
+
+  protected:
+    void setMagnitudeScale(float magnitudeScale);
+
+  private:
+    float gate_;
+    float gliss_;
+    float nyquist_;
+    float threshold_;
+    float magnitudeScale_;
+};
 } // namespace Detail
 
-
-class PVImploderImpl
-    :
-    public Detail::ExImPloderImpl,
-    public EffectImpl<PVImploder>
+class PVImploderImpl : public Detail::ExImPloderImpl, public EffectImpl<PVImploder>
 {
-public: // LE::Effect required interface.
+  public: // LE::Effect required interface.
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup  ( IndexRange const &, Engine::Setup const & );
-    void process( ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const &) const;
 };
-
 
 using ImploderImpl = PhaseVocoderShared::StandaloneEffect<PVImploderImpl, Imploder>;
 
-
-class PVExploderImpl
-    :
-    public Detail::ExImPloderImpl,
-    public EffectImpl<PVExploder>
+class PVExploderImpl : public Detail::ExImPloderImpl, public EffectImpl<PVExploder>
 {
-public: // LE::Effect required interface.
+  public: // LE::Effect required interface.
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup  ( IndexRange const &, Engine::Setup const & );
-    void process( ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const &) const;
 };
-
 
 using ExploderImpl = PhaseVocoderShared::StandaloneEffect<PVExploderImpl, Exploder>;
 
@@ -112,15 +94,14 @@ namespace Parameters
 //------------------------------------------------------------------------------
 template <class Parameter> struct DisplayValueTransformer;
 
-template <>
-struct DisplayValueTransformer<SW::Effects::Detail::ExImPloder::Gate>
+template <> struct DisplayValueTransformer<SW::Effects::Detail::ExImPloder::Gate>
 {
     template <typename Source>
-    static float transform( Source const & value, SW::Engine::Setup const & )
+    static float transform(Source const &value, SW::Engine::Setup const &)
     {
-        if ( value == SW::Effects::Detail::ExImPloder::Gate::minimum() )
-            return - std::numeric_limits<float>::infinity();
-        return static_cast<float>( value );
+        if (value == SW::Effects::Detail::ExImPloder::Gate::minimum())
+            return -std::numeric_limits<float>::infinity();
+        return static_cast<float>(value);
     }
     using Suffix = boost::mpl::string<' dB'>;
 }; // struct DisplayValueTransformer<SW::Effects::Detail::ExImPloder::Gate>

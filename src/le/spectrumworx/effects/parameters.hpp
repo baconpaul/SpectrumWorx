@@ -6,17 +6,17 @@
 ///
 /// Shared LE parameter forward declarations required by all effects.
 ///
-/// Copyright (c) 2011 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2011 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef parameters_hpp__E052A5AB_F608_48B9_9C09_DC2497B4086D
 #define parameters_hpp__E052A5AB_F608_48B9_9C09_DC2497B4086D
-#pragma once
 //------------------------------------------------------------------------------
 #include "le/parameters/factoryMacro.hpp"
 
-#if defined( _MSC_VER ) && !defined( __clang__ ) && ( _MSC_VER < 1800 )
+#if defined(_MSC_VER) && !defined(__clang__) && (_MSC_VER < 1800)
 #include "le/parameters/boolean/parameter.hpp"
 #endif // old MSVC
 //------------------------------------------------------------------------------
@@ -26,20 +26,20 @@ namespace LE
 
 namespace Parameters
 {
-    template <class Traits> class Parameter; ///< \internal
+template <class Traits> class Parameter; ///< \internal
 
-#if !( defined( _MSC_VER ) && !defined( __clang__ ) && ( _MSC_VER < 1800 ) )
-    struct Boolean;
+#if !(defined(_MSC_VER) && !defined(__clang__) && (_MSC_VER < 1800))
+struct Boolean;
 #endif // !old MSVC
 
-    struct LinearUnsignedInteger;
-    struct LinearSignedInteger  ;
-    struct LinearFloat          ;
+struct LinearUnsignedInteger;
+struct LinearSignedInteger;
+struct LinearFloat;
 
-    struct SymmetricInteger;
-    struct SymmetricFloat  ;
+struct SymmetricInteger;
+struct SymmetricFloat;
 
-    class TriggerParameter;
+class TriggerParameter;
 } // namespace Parameters
 
 //------------------------------------------------------------------------------
@@ -57,12 +57,12 @@ namespace Effects
 
 using Parameters::Boolean;
 
+using Parameters::LinearFloat;
+using Parameters::LinearSignedInteger;
 using Parameters::LinearUnsignedInteger;
-using Parameters::LinearSignedInteger  ;
-using Parameters::LinearFloat          ;
 
+using Parameters::SymmetricFloat;
 using Parameters::SymmetricInteger;
-using Parameters::SymmetricFloat  ;
 
 using Parameters::TriggerParameter;
 

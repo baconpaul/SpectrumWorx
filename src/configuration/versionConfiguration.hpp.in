@@ -3,13 +3,13 @@
 /// \file versionConfiguration.hpp
 /// ------------------------------
 ///
-/// Copyright (c) 2010 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2010 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef versionConfiguration_hpp__BB8C450C_443D_4F87_9241_44B477F0DE52
 #define versionConfiguration_hpp__BB8C450C_443D_4F87_9241_44B477F0DE52
-#pragma once
 //------------------------------------------------------------------------------
 namespace LE
 {

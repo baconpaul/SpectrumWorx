@@ -3,13 +3,13 @@
 /// \file exaggeratorImpl.hpp
 /// -------------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef exaggeratorImpl_hpp__FF94E183_1CB9_4A44_8A1A_47BF21E50306
 #define exaggeratorImpl_hpp__FF94E183_1CB9_4A44_8A1A_47BF21E50306
-#pragma once
 //------------------------------------------------------------------------------
 #include "exaggerator.hpp"
 
@@ -27,16 +27,15 @@ namespace Effects
 
 class ExaggeratorImpl : public EffectImpl<Exaggerator>
 {
-public: // LE::Effect required interface.
-   
+  public: // LE::Effect required interface.
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void LE_FASTCALL setup  ( IndexRange const &      , Engine::Setup const & );
-    void LE_FASTCALL process( Engine::ChannelData_AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(Engine::ChannelData_AmPh, Engine::Setup const &) const;
 
-private:
+  private:
     float exaggerate_;
 }; // class ExaggeratorImpl
 

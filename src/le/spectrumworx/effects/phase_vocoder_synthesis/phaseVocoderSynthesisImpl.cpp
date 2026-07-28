@@ -3,7 +3,8 @@
 /// phaseVocoderSynthesis.cpp
 /// -------------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -29,9 +30,9 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const PhaseVocoderSynthesis::title      [] = "PVD stop";
-char const PhaseVocoderSynthesis::description[] = "Transform back from the \"Phase vocoder domain\".";
-
+char const PhaseVocoderSynthesis::title[] = "PVD stop";
+char const PhaseVocoderSynthesis::description[] =
+    "Transform back from the \"Phase vocoder domain\".";
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -40,18 +41,18 @@ char const PhaseVocoderSynthesis::description[] = "Transform back from the \"Pha
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void PhaseVocoderSynthesisImpl::process( ChannelState & state, Engine::ChannelData_AmPh data, Engine::Setup const & ) const
+void PhaseVocoderSynthesisImpl::process(ChannelState &state, Engine::ChannelData_AmPh data,
+                                        Engine::Setup const &) const
 {
 #ifdef LE_PV_USE_TSS
     data.pSynthesisState = &state;
 #endif // LE_PV_USE_TSS
-    PhaseVocoderShared::synthesis( state, data.full().phases(), pvParameters_ );
+    PhaseVocoderShared::synthesis(state, data.full().phases(), pvParameters_);
 }
 
-
-void PhaseVocoderSynthesisImpl::setup( IndexRange const &, Engine::Setup const & engineSetup )
+void PhaseVocoderSynthesisImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
 {
-    pvParameters_.setup( engineSetup );
+    pvParameters_.setup(engineSetup);
 }
 
 //------------------------------------------------------------------------------

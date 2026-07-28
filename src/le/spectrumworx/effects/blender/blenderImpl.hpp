@@ -3,13 +3,13 @@
 /// \file blenderImpl.hpp
 /// ---------------------
 ///
-/// Copyright (C) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef blenderImpl_hpp__F2596834_8722_40A2_B5AB_B2E91D94182A
 #define blenderImpl_hpp__F2596834_8722_40A2_B5AB_B2E91D94182A
-#pragma once
 //------------------------------------------------------------------------------
 #include "blender.hpp"
 
@@ -28,16 +28,15 @@ namespace Effects
 
 class BlenderImpl : public EffectImpl<Blender>
 {
-public: // LE::Effect interface.
+  public: // LE::Effect interface.
+    //////////////////////////////////////////////////////////////////////////////
+    // setup() and process()
+    //////////////////////////////////////////////////////////////////////////////
 
-  //////////////////////////////////////////////////////////////////////////////
-  // setup() and process()
-  //////////////////////////////////////////////////////////////////////////////
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(Engine::MainSideChannelData_ReIm, Engine::Setup const &) const;
 
-  void setup  ( IndexRange const &, Engine::Setup const & );
-  void process( Engine::MainSideChannelData_ReIm, Engine::Setup const & ) const;
-
-private:
+  private:
     float amount_;
 };
 

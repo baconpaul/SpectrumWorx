@@ -3,7 +3,8 @@
 /// quietBoostImpl.cpp
 /// ------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -31,9 +32,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const QuietBoost::title      [] = "Quiet Boost";
+char const QuietBoost::title[] = "Quiet Boost";
 char const QuietBoost::description[] = "Amplify low magnitudes.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -41,10 +41,9 @@ char const QuietBoost::description[] = "Amplify low magnitudes.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( QuietBoost::Threshold         , "Threshold"       )
-EFFECT_PARAMETER_NAME( QuietBoost::Ratio             , "Ratio"           )
-EFFECT_PARAMETER_NAME( QuietBoost::NoiseGateThreshold, "Noise threshold" )
-
+EFFECT_PARAMETER_NAME(QuietBoost::Threshold, "Threshold")
+EFFECT_PARAMETER_NAME(QuietBoost::Ratio, "Ratio")
+EFFECT_PARAMETER_NAME(QuietBoost::NoiseGateThreshold, "Noise threshold")
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -53,31 +52,31 @@ EFFECT_PARAMETER_NAME( QuietBoost::NoiseGateThreshold, "Noise threshold" )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void QuietBoostImpl::process( Engine::ChannelData_AmPh data, Engine::Setup const & setup ) const
+void QuietBoostImpl::process(Engine::ChannelData_AmPh data, Engine::Setup const &setup) const
 {
-    float const maxGlobal( setup.maximumAmplitude() );
+    float const maxGlobal(setup.maximumAmplitude());
 
-    float const threshold         ( parameters().get<Threshold         >() );
-    float const ratio             ( parameters().get<Ratio             >() );
-    float const noiseGateThreshold( parameters().get<NoiseGateThreshold>() );
+    float const threshold(parameters().get<Threshold>());
+    float const ratio(parameters().get<Ratio>());
+    float const noiseGateThreshold(parameters().get<NoiseGateThreshold>());
 
     /// \todo Convert all the parameters to linear values to avoid the linear<->
     /// dB conversions inside the loop.
     ///                                       (13.10.2011.) (Domagoj Saric)
 
-    for ( auto & amp : data.amps() )
+    for (auto &amp : data.amps())
     {
         // Transfer magnitudes to decibel scale, take global Max as a reference:
-        float mag( Math::normalisedLinear2dB( amp / maxGlobal + 0.000000001f ) );
+        float mag(Math::normalisedLinear2dB(amp / maxGlobal + 0.000000001f));
 
         // Expander:
 
         // If magnitude lower than threshold, "expand" it:
-        if ( mag < threshold && mag > noiseGateThreshold )
-            mag = threshold - ( threshold - mag ) / ratio;
+        if (mag < threshold && mag > noiseGateThreshold)
+            mag = threshold - (threshold - mag) / ratio;
 
         // Back from dB:
-        amp = maxGlobal * Math::dB2NormalisedLinear( mag );
+        amp = maxGlobal * Math::dB2NormalisedLinear(mag);
     }
 }
 

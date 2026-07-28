@@ -5,13 +5,13 @@
 ///
 /// Project wide global configuration.
 ///
-/// Copyright (c) 2009 - 2016. Little Endian. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef constants_hpp__A6314879_EA41_4A25_9F86_751B6318B5D3
 #define constants_hpp__A6314879_EA41_4A25_9F86_751B6318B5D3
-#pragma once
 //------------------------------------------------------------------------------
 #include "le/utility/cstdint.hpp"
 //------------------------------------------------------------------------------
@@ -25,11 +25,11 @@ namespace Constants
 {
 //------------------------------------------------------------------------------
 
-std::uint8_t const maxNumberOfModules            (  5 );
-std::uint8_t const maxNumberOfParametersPerModule( 10 );
-std::uint8_t const maxNumberOfModuleParameters   ( maxNumberOfModules * maxNumberOfParametersPerModule );
+std::uint8_t const maxNumberOfModules(5);
+std::uint8_t const maxNumberOfParametersPerModule(10);
+std::uint8_t const maxNumberOfModuleParameters(maxNumberOfModules *maxNumberOfParametersPerModule);
 
-std::uint8_t const numberOfPrograms( 4 );
+std::uint8_t const numberOfPrograms(4);
 
 //------------------------------------------------------------------------------
 } // namespace Constants

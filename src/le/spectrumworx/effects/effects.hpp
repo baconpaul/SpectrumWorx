@@ -8,13 +8,13 @@
 /// as an 'incubator' for shared functionality until it matures and is extracted
 /// into separate modules.
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef effects_hpp__552EB9F4_DD3A_45AD_B1A1_C50269CF6C59
 #define effects_hpp__552EB9F4_DD3A_45AD_B1A1_C50269CF6C59
-#pragma once
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/channelStateStatic.hpp"
 #include "le/spectrumworx/engine/channelData_fwd.hpp"
@@ -26,17 +26,20 @@
 //------------------------------------------------------------------------------
 namespace LE
 {
-namespace Parameters { struct Tag; }
+namespace Parameters
+{
+struct Tag;
+}
 //------------------------------------------------------------------------------
 namespace SW
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN( Engine )
-    class Setup;
-LE_IMPL_NAMESPACE_END( Engine )
-LE_IMPL_NAMESPACE_BEGIN( Effects )
-    class IndexRange;
-LE_IMPL_NAMESPACE_END( Effects )
+LE_IMPL_NAMESPACE_BEGIN(Engine)
+class Setup;
+LE_IMPL_NAMESPACE_END(Engine)
+LE_IMPL_NAMESPACE_BEGIN(Effects)
+class IndexRange;
+LE_IMPL_NAMESPACE_END(Effects)
 //------------------------------------------------------------------------------
 namespace Effects
 {
@@ -122,24 +125,21 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \class EffectImpl
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-template <class EffectBase>
-class EffectImpl : public EffectBase
+template <class EffectBase> class EffectImpl : public EffectBase
 {
-public:
-    typename EffectBase::Parameters       & parameters()       { return parameters_; }
-    typename EffectBase::Parameters const & parameters() const { return parameters_; }
+  public:
+    typename EffectBase::Parameters &parameters() { return parameters_; }
+    typename EffectBase::Parameters const &parameters() const { return parameters_; }
 
-private:
+  private:
     typename EffectBase::Parameters parameters_;
 };
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -149,38 +149,46 @@ private:
 
 namespace Detail
 {
-    struct EmptyParameters
+struct EmptyParameters
+{
+    static std::size_t const static_size = 0;
+    struct category : boost::fusion::forward_traversal_tag, boost::fusion::associative_tag
     {
-        static std::size_t const static_size = 0;
-        struct category : boost::fusion::forward_traversal_tag, boost::fusion::associative_tag {};
-        using fusion_tag = LE::Parameters::Tag                             ;
-        using tag        = boost::fusion::fusion_sequence_tag              ;
-        using is_view    = std::false_type                                 ;
-        using size       = std::integral_constant<std::size_t, static_size>;
-        template <unsigned int   , int dummy = 0> struct ParameterAt;
-        template <class Parameter, int dummy = 0> struct IndexOf : size {};
-        operator boost::fusion::detail::from_sequence_convertible_type() const;
     };
+    using fusion_tag = LE::Parameters::Tag;
+    using tag = boost::fusion::fusion_sequence_tag;
+    using is_view = std::false_type;
+    using size = std::integral_constant<std::size_t, static_size>;
+    template <unsigned int, int dummy = 0> struct ParameterAt;
+    template <class Parameter, int dummy = 0> struct IndexOf : size
+    {
+    };
+    operator boost::fusion::detail::from_sequence_convertible_type() const;
+};
 } // namespace Detail
 
-template <class EffectBase>
-class NoParametersEffectImpl : public EffectBase
+template <class EffectBase> class NoParametersEffectImpl : public EffectBase
 {
-public:
+  public:
     using Parameters = Detail::EmptyParameters;
 
-    Parameters       & parameters()       { static Parameters dummy; return dummy;                             }
-    Parameters const & parameters() const { return const_cast<NoParametersEffectImpl &>( *this ).parameters(); }
+    Parameters &parameters()
+    {
+        static Parameters dummy;
+        return dummy;
+    }
+    Parameters const &parameters() const
+    {
+        return const_cast<NoParametersEffectImpl &>(*this).parameters();
+    }
 };
-
 
 /// \todo Extract this to a separate header.
 ///                                           (31.01.2011.) (Domagoj Saric)
 
 //...mrmlj...cleanup these duplicated typedefs (also in fft.hpp)...
-using         DataRange = boost::iterator_range<float       * LE_RESTRICT>;
-using ReadOnlyDataRange = boost::iterator_range<float const * LE_RESTRICT>;
-
+using DataRange = boost::iterator_range<float *LE_RESTRICT>;
+using ReadOnlyDataRange = boost::iterator_range<float const *LE_RESTRICT>;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -188,21 +196,23 @@ using ReadOnlyDataRange = boost::iterator_range<float const * LE_RESTRICT>;
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace CommonParameters { class Mode; }
+namespace CommonParameters
+{
+class Mode;
+}
 
 class UnpackedMagPhaseMode
 {
-public:
-    void unpack( CommonParameters::Mode const & );
+  public:
+    void unpack(CommonParameters::Mode const &);
 
     bool magnitudes() const;
-    bool phases    () const;
+    bool phases() const;
 
-private:
+  private:
     bool magnitudes_;
-    bool phases_    ;
+    bool phases_;
 }; // class UnpackedMagPhaseMode
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -218,22 +228,21 @@ private:
 
 class ModuloCounter
 {
-public:
-    ModuloCounter() : counter_( 0 ) {}
+  public:
+    ModuloCounter() : counter_(0) {}
 
     using value_type = std::uint16_t;
 
-    std::pair<value_type, bool> nextValueFor( value_type moduloValue );
+    std::pair<value_type, bool> nextValueFor(value_type moduloValue);
 
     void reset() { counter_ = 0; }
 
-             value_type value() const { return counter_; }
-    operator value_type      () const { return value() ; }
+    value_type value() const { return counter_; }
+    operator value_type() const { return value(); }
 
-private:
+  private:
     value_type counter_;
 }; // class ModuloCounter
-
 
 struct ModuloCounterChannelState : StaticChannelState
 {

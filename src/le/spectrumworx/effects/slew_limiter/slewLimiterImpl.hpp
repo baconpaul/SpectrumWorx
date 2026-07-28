@@ -3,13 +3,13 @@
 /// \file slewLimiterImpl.hpp
 /// -------------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef slewLimiterImpl_hpp__2763B150_F757_4976_939E_D3385E0962CE
 #define slewLimiterImpl_hpp__2763B150_F757_4976_939E_D3385E0962CE
-#pragma once
 //------------------------------------------------------------------------------
 #include "slewLimiter.hpp"
 
@@ -29,16 +29,12 @@ namespace Effects
 
 class SlewLimiterImpl : public EffectImpl<SlewLimiter>
 {
-public: // LE::Effect required interface.
-
+  public: // LE::Effect required interface.
     ////////////////////////////////////////////////////////////////////////////
     // ChannelState
     ////////////////////////////////////////////////////////////////////////////
 
-    LE_DYNAMIC_CHANNEL_STATE
-    (
-        ( ( Engine::HalfFFTBuffer<> )( magsPrev ) )
-    );
+    LE_DYNAMIC_CHANNEL_STATE(((Engine::HalfFFTBuffer<>)(magsPrev)));
 
     struct ChannelState : DynamicChannelState
     {
@@ -47,15 +43,14 @@ public: // LE::Effect required interface.
         void reset();
     };
 
-
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup  ( IndexRange const &, Engine::Setup const & );
-    void process( ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const &) const;
 
-private:
+  private:
     float gainLowerBound_;
     float gainUpperBound_;
 };

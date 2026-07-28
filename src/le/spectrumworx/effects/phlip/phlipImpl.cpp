@@ -3,7 +3,8 @@
 /// phlipImpl.cpp
 /// -------------
 ///
-/// Copyright (C) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -30,9 +31,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Phlip::title      [] = "Phlip";
+char const Phlip::title[] = "Phlip";
 char const Phlip::description[] = "Phase flip.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -40,16 +40,9 @@ char const Phlip::description[] = "Phase flip.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Phlip::Mode, "Target harmonics" )
+EFFECT_PARAMETER_NAME(Phlip::Mode, "Target harmonics")
 
-EFFECT_ENUMERATED_PARAMETER_STRINGS
-(
-    Phlip, Mode,
-    (( All , "All"  ))
-    (( Even, "Even" ))
-    (( Odd , "Odd"  ))
-)
-
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Phlip, Mode, ((All, "All"))((Even, "Even"))((Odd, "Odd")))
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -58,31 +51,30 @@ EFFECT_ENUMERATED_PARAMETER_STRINGS
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void PhlipImpl::setup( IndexRange const & workingRange, Engine::Setup const & )
+void PhlipImpl::setup(IndexRange const &workingRange, Engine::Setup const &)
 {
-    unsigned int const startBin     (  workingRange.first() );
-    bool         const rangeNotEmpty( !workingRange.empty() );
-    switch ( parameters().get<Mode>().getValue() )
+    unsigned int const startBin(workingRange.first());
+    bool const rangeNotEmpty(!workingRange.empty());
+    switch (parameters().get<Mode>().getValue())
     {
-        case Mode::All :
-            step_              = 1;
-            oddEvenAdjustment_ = false;
-            break;
+    case Mode::All:
+        step_ = 1;
+        oddEvenAdjustment_ = false;
+        break;
 
-        case Mode::Even:
-            step_              = 2;
-            oddEvenAdjustment_ = rangeNotEmpty & ( startBin != ( startBin & ~1 ) );
-            break;
+    case Mode::Even:
+        step_ = 2;
+        oddEvenAdjustment_ = rangeNotEmpty & (startBin != (startBin & ~1));
+        break;
 
-        case Mode::Odd :
-            step_              = 2;
-            oddEvenAdjustment_ = rangeNotEmpty & ( startBin != ( startBin |  1 ) );
-            break;
+    case Mode::Odd:
+        step_ = 2;
+        oddEvenAdjustment_ = rangeNotEmpty & (startBin != (startBin | 1));
+        break;
 
         LE_DEFAULT_CASE_UNREACHABLE();
     }
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -91,9 +83,9 @@ void PhlipImpl::setup( IndexRange const & workingRange, Engine::Setup const & )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void PhlipImpl::process( Engine::ChannelData_AmPh data, Engine::Setup const & ) const
+void PhlipImpl::process(Engine::ChannelData_AmPh data, Engine::Setup const &) const
 {
-    Math::negate( DataRange( data.phases().begin() + oddEvenAdjustment_, data.phases().end() ), step_ );
+    Math::negate(DataRange(data.phases().begin() + oddEvenAdjustment_, data.phases().end()), step_);
 }
 
 //------------------------------------------------------------------------------

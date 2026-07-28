@@ -3,13 +3,13 @@
 /// \file swappahImpl.hpp
 /// ---------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef swappahImpl_hpp__8B69F4EC_B747_4300_B33F_701BABBE80F9
 #define swappahImpl_hpp__8B69F4EC_B747_4300_B33F_701BABBE80F9
-#pragma once
 //------------------------------------------------------------------------------
 #include "swappah.hpp"
 
@@ -29,23 +29,22 @@ namespace Effects
 
 class SwappahImpl : public EffectImpl<Swappah>
 {
-public: // LE::Effect required interface.
-
+  public: // LE::Effect required interface.
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup  ( IndexRange const &      , Engine::Setup const & )      ;
-    void process( Engine::ChannelData_AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(Engine::ChannelData_AmPh, Engine::Setup const &) const;
 
-private:
+  private:
     /// \brief Reorders spectral bands.
-    void swapBands( DataRange const & inBuffer ) const; /// \throws nothing
+    void swapBands(DataRange const &inBuffer) const; /// \throws nothing
 
-private:
-    std::uint16_t        band1_;
-    std::uint16_t        band2_;    
-    UnpackedMagPhaseMode mode_ ;
+  private:
+    std::uint16_t band1_;
+    std::uint16_t band2_;
+    UnpackedMagPhaseMode mode_;
 };
 
 //------------------------------------------------------------------------------

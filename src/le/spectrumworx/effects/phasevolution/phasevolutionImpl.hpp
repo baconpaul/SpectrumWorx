@@ -3,13 +3,13 @@
 /// \file phasevolutionImpl.hpp
 /// ---------------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef phasevolutionImpl_hpp__F60D23C3_A21E_4D23_B742_3E9E59D1D3F4
 #define phasevolutionImpl_hpp__F60D23C3_A21E_4D23_B742_3E9E59D1D3F4
-#pragma once
 //------------------------------------------------------------------------------
 #include "phasevolution.hpp"
 
@@ -28,17 +28,16 @@ namespace Effects
 
 class PhasevolutionImpl : public EffectImpl<Phasevolution>
 {
-public: // LE::Effect required interface.
-
+  public: // LE::Effect required interface.
     struct ChannelState : StaticChannelState
     {
         float phaseShift_;
-        float time_      ;
+        float time_;
 
-        void reset() 
-        {            
-            phaseShift_ = 0; 
-            time_       = 0;
+        void reset()
+        {
+            phaseShift_ = 0;
+            time_ = 0;
         }
     };
 
@@ -46,10 +45,10 @@ public: // LE::Effect required interface.
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup( IndexRange const &, Engine::Setup const & );
-    void process( ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const &) const;
 
-private:
+  private:
     float stepTime_;
 };
 

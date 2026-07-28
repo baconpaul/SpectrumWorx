@@ -3,14 +3,14 @@
 /// \file blender.hpp
 /// -----------------
 ///
-/// Copyright (C) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef blender_hpp__F2596834_8722_40A2_B5AB_B2E91D94182A
 #define blender_hpp__F2596834_8722_40A2_B5AB_B2E91D94182A
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -42,17 +42,15 @@ namespace Effects
 
 struct Blender
 {
-    LE_DEFINE_PARAMETERS
-    (
-        ( ( Amount )( LinearUnsignedInteger )( Minimum<0> )( Maximum<100> )( Default<30> )( Unit<' %'> ) )
-    );
+    LE_DEFINE_PARAMETERS(
+        ((Amount)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<30>)(Unit<' %'>)));
 
     /// \typedef Amount
     /// \brief Controls how much of each channel is sent to the output.
 
     static bool const usesSideChannel = true;
 
-    static char const title      [];
+    static char const title[];
     static char const description[];
 };
 

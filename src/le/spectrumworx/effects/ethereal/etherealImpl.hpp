@@ -3,13 +3,13 @@
 /// \file etherealImpl.hpp
 /// ----------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef etherealImpl_hpp__A78CE259_D3CA_4556_8B65_AAF88162B342
 #define etherealImpl_hpp__A78CE259_D3CA_4556_8B65_AAF88162B342
-#pragma once
 //------------------------------------------------------------------------------
 #include "ethereal.hpp"
 
@@ -27,18 +27,17 @@ namespace Effects
 
 class EtherealImpl : public EffectImpl<Ethereal>
 {
-public: // LE::Effect required interface.
-
+  public: // LE::Effect required interface.
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup( IndexRange const &, Engine::Setup const & );
-    void process( Engine::MainSideChannelData_AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(Engine::MainSideChannelData_AmPh, Engine::Setup const &) const;
 
-private:
-    float                threshold_;
-    UnpackedMagPhaseMode mode_     ;
+  private:
+    float threshold_;
+    UnpackedMagPhaseMode mode_;
 };
 
 //------------------------------------------------------------------------------

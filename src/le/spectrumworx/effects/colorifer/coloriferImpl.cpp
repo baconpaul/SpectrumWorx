@@ -3,7 +3,8 @@
 /// coloriferImpl.cpp
 /// -----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -36,9 +37,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Colorifer::title      [] = "Colorifer";
+char const Colorifer::title[] = "Colorifer";
 char const Colorifer::description[] = "Spectrum colour transfer.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -46,26 +46,15 @@ char const Colorifer::description[] = "Spectrum colour transfer.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Colorifer::BandWidth         , "Shape width"         )
-EFFECT_PARAMETER_NAME( Colorifer::SpectrumPreprocess, "Spectrum preprocess" )
-EFFECT_PARAMETER_NAME( Colorifer::ReplacePhase      , "Replace phase"       )
+EFFECT_PARAMETER_NAME(Colorifer::BandWidth, "Shape width")
+EFFECT_PARAMETER_NAME(Colorifer::SpectrumPreprocess, "Spectrum preprocess")
+EFFECT_PARAMETER_NAME(Colorifer::ReplacePhase, "Replace phase")
 
-EFFECT_ENUMERATED_PARAMETER_STRINGS
-(
+EFFECT_ENUMERATED_PARAMETER_STRINGS(
     Colorifer, SpectrumPreprocess,
-    (( NotUsed    , "None"        ))
-    (( SquareRoot , "Square root" ))
-    (( Square     , "Square"      ))
-    (( Exponential, "Exponent"    ))
-)
+    ((NotUsed, "None"))((SquareRoot, "Square root"))((Square, "Square"))((Exponential, "Exponent")))
 
-EFFECT_ENUMERATED_PARAMETER_STRINGS
-(
-    Colorifer, ReplacePhase,
-    (( No , "No"  ))
-    (( Yes, "Yes" ))
-)
-
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Colorifer, ReplacePhase, ((No, "No"))((Yes, "Yes")))
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -74,11 +63,11 @@ EFFECT_ENUMERATED_PARAMETER_STRINGS
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void LE_COLD ColoriferImpl::setup( IndexRange const & workingRange, Engine::Setup const & engineSetup )
+void LE_COLD ColoriferImpl::setup(IndexRange const &workingRange, Engine::Setup const &engineSetup)
 {
-    shapeWidth_ = std::min( workingRange.size(), engineSetup.frequencyInHzToBin( parameters().get<BandWidth>() ) );
+    shapeWidth_ = std::min(workingRange.size(),
+                           engineSetup.frequencyInHzToBin(parameters().get<BandWidth>()));
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -89,76 +78,87 @@ void LE_COLD ColoriferImpl::setup( IndexRange const & workingRange, Engine::Setu
 
 LE_OPTIMIZE_FOR_SPEED_BEGIN()
 
-void LE_HOT ColoriferImpl::process( Engine::MainSideChannelData_AmPh data, Engine::Setup const & ) const
+void LE_HOT ColoriferImpl::process(Engine::MainSideChannelData_AmPh data,
+                                   Engine::Setup const &) const
 {
-    if ( shapeWidth_ == 0 )
+    if (shapeWidth_ == 0)
         return;
 
     using namespace Math;
 
-    auto       & main( data.main() );
-    auto const & side( data.side() );
+    auto &main(data.main());
+    auto const &side(data.side());
 
-    if ( parameters().get<ReplacePhase>() == ReplacePhase::Yes )
-        copy( side.phases(), main.phases() );
+    if (parameters().get<ReplacePhase>() == ReplacePhase::Yes)
+        copy(side.phases(), main.phases());
 
-    auto const numberOfBins( data.numberOfBins()                               );
-    auto const mode        ( parameters().get<SpectrumPreprocess>().getValue() );
+    auto const numberOfBins(data.numberOfBins());
+    auto const mode(parameters().get<SpectrumPreprocess>().getValue());
 
-    auto const & mainAmps( main.amps() );
-    auto const & sideAmps( side.amps() );
+    auto const &mainAmps(main.amps());
+    auto const &sideAmps(side.amps());
 
     ReadOnlyDataRange x;
     ReadOnlyDataRange y;
-    if ( mode == SpectrumPreprocess::NotUsed )
+    if (mode == SpectrumPreprocess::NotUsed)
     {
         x = sideAmps;
         y = mainAmps;
     }
     else
     {
-        BOOST_SIMD_ALIGNED_STACK_BUFFER( xStorage, Engine::real_t, numberOfBins );
-        BOOST_SIMD_ALIGNED_STACK_BUFFER( yStorage, Engine::real_t, numberOfBins );
+        BOOST_SIMD_ALIGNED_STACK_BUFFER(xStorage, Engine::real_t, numberOfBins);
+        BOOST_SIMD_ALIGNED_STACK_BUFFER(yStorage, Engine::real_t, numberOfBins);
         x = xStorage;
         y = yStorage;
-        copy( sideAmps.begin(), xStorage.begin(), numberOfBins ); //...mrmlj...no out-of-place vectorized squareRoot, square, exp...
-        copy( mainAmps.begin(), yStorage.begin(), numberOfBins );
+        copy(sideAmps.begin(), xStorage.begin(),
+             numberOfBins); //...mrmlj...no out-of-place vectorized squareRoot, square, exp...
+        copy(mainAmps.begin(), yStorage.begin(), numberOfBins);
 
         LE_LOCALLY_DISABLE_FPU_EXCEPTIONS();
-        switch ( mode )
+        switch (mode)
         {
-            case SpectrumPreprocess::SquareRoot : squareRoot( /*data.side(),*/ xStorage ); squareRoot( /*data.main(),*/ yStorage ); break;
-            case SpectrumPreprocess::Square     : square    ( /*data.side(),*/ xStorage ); square    ( /*data.main(),*/ yStorage ); break;
-            case SpectrumPreprocess::Exponential: exp       ( /*data.side(),*/ xStorage ); exp       ( /*data.main(),*/ yStorage ); break;
+        case SpectrumPreprocess::SquareRoot:
+            squareRoot(/*data.side(),*/ xStorage);
+            squareRoot(/*data.main(),*/ yStorage);
+            break;
+        case SpectrumPreprocess::Square:
+            square(/*data.side(),*/ xStorage);
+            square(/*data.main(),*/ yStorage);
+            break;
+        case SpectrumPreprocess::Exponential:
+            exp(/*data.side(),*/ xStorage);
+            exp(/*data.main(),*/ yStorage);
+            break;
 
             LE_DEFAULT_CASE_UNREACHABLE();
         }
     }
 
-    auto shapeWidth( shapeWidth_  );
-    auto binsLeft  ( numberOfBins );
-    float       * LE_RESTRICT pAmps( mainAmps.begin() );
-    float const * LE_RESTRICT pX   ( x       .begin() );
-    float const * LE_RESTRICT pY   ( y       .begin() );
+    auto shapeWidth(shapeWidth_);
+    auto binsLeft(numberOfBins);
+    float *LE_RESTRICT pAmps(mainAmps.begin());
+    float const *LE_RESTRICT pX(x.begin());
+    float const *LE_RESTRICT pY(y.begin());
     LE_DISABLE_LOOP_UNROLLING()
-    while ( binsLeft )
+    while (binsLeft)
     {
-        shapeWidth = std::min( binsLeft, shapeWidth );
+        shapeWidth = std::min(binsLeft, shapeWidth);
         /// \note MSVC10 fails to merge two std::acumulate() calls into one loop
         /// so we perform accumulation manually.
         ///                                   (29.11.2012.) (Domagoj Saric)
-        float X( std::numeric_limits<float>::epsilon() );
-        float Y( std::numeric_limits<float>::epsilon() );
-        auto blockCounter( shapeWidth );
-        while ( blockCounter-- )
+        float X(std::numeric_limits<float>::epsilon());
+        float Y(std::numeric_limits<float>::epsilon());
+        auto blockCounter(shapeWidth);
+        while (blockCounter--)
         {
             X += *pX++;
             Y += *pY++;
         }
-        float const colour( X / Y );
+        float const colour(X / Y);
 
-        Math::multiply( pAmps, colour, shapeWidth );
-        pAmps    += shapeWidth;
+        Math::multiply(pAmps, colour, shapeWidth);
+        pAmps += shapeWidth;
         binsLeft -= shapeWidth;
     }
 }

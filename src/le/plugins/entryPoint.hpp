@@ -6,13 +6,13 @@
 /// Helper macros for declaring and defining exported entry point/factory
 /// functions.
 ///
-/// Copyright (c) 2013 - 2015. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2013 - 2015. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef entryPoint_hpp__FE480627_652A_4BB6_9059_D3CAEBF9D4C1
 #define entryPoint_hpp__FE480627_652A_4BB6_9059_D3CAEBF9D4C1
-#pragma once
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -40,33 +40,34 @@ namespace LE
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-
-#if defined( _MSC_VER ) || ( defined( __GNUC__ ) && !defined( __clang__ ) )
-    #define LE_HAS_FRIEND_INJECTION
+#if defined(_MSC_VER) || (defined(__GNUC__) && !defined(__clang__))
+#define LE_HAS_FRIEND_INJECTION
 #endif
 
-#if defined( _MSC_VER )
-    #define LE_ENTRY_POINT_ATTRIBUTES __declspec( dllexport nothrow noinline restrict )
-#elif defined( __GNUC__ )
-    #define LE_ENTRY_POINT_ATTRIBUTES __attribute__(( visibility( "default" ), nothrow, cdecl ))
+#if defined(_MSC_VER)
+#define LE_ENTRY_POINT_ATTRIBUTES __declspec(dllexport nothrow noinline restrict)
+#elif defined(__GNUC__)
+#define LE_ENTRY_POINT_ATTRIBUTES __attribute__((visibility("default"), nothrow, cdecl))
 #else
-    #define LE_ENTRY_POINT_ATTRIBUTES
+#define LE_ENTRY_POINT_ATTRIBUTES
 #endif
-
 
 #ifdef LE_HAS_FRIEND_INJECTION
-    #define LE_ENTRY_POINT_BEGIN( returnType, name, ... )                             \
-        extern "C" LE_ENTRY_POINT_ATTRIBUTES returnType __cdecl name( __VA_ARGS__ );  \
-        template <class Impl> struct LEPlugin_ ## name ## _EntryPointFriendInjector { \
-        friend LE_ENTRY_POINT_ATTRIBUTES returnType __cdecl name( __VA_ARGS__ )
+#define LE_ENTRY_POINT_BEGIN(returnType, name, ...)                                                \
+    extern "C" LE_ENTRY_POINT_ATTRIBUTES returnType __cdecl name(__VA_ARGS__);                     \
+    template <class Impl> struct LEPlugin_##name##_EntryPointFriendInjector                        \
+    {                                                                                              \
+        friend LE_ENTRY_POINT_ATTRIBUTES returnType __cdecl name(__VA_ARGS__)
 
-    #define LE_ENTRY_POINT_END() };
+#define LE_ENTRY_POINT_END()                                                                       \
+    }                                                                                              \
+    ;
 #else
-    #define LE_ENTRY_POINT_BEGIN( returnType, name, ... )                         \
-    extern "C" LE_ENTRY_POINT_ATTRIBUTES returnType __cdecl name( __VA_ARGS__ );  \
-    template <class Impl> returnType name ## Impl( __VA_ARGS__ )
+#define LE_ENTRY_POINT_BEGIN(returnType, name, ...)                                                \
+    extern "C" LE_ENTRY_POINT_ATTRIBUTES returnType __cdecl name(__VA_ARGS__);                     \
+    template <class Impl> returnType name##Impl(__VA_ARGS__)
 
-    #define LE_ENTRY_POINT_END()
+#define LE_ENTRY_POINT_END()
 #endif // LE_HAS_FRIEND_INJECTION
 
 //------------------------------------------------------------------------------

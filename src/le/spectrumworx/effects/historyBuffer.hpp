@@ -3,13 +3,13 @@
 /// \file historyBuffer.hpp
 /// -----------------------
 ///
-/// Copyright (c) 2011 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2011 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef historyBuffer_hpp__DADB02E4_1F76_4685_BE34_89613A823BAD
 #define historyBuffer_hpp__DADB02E4_1F76_4685_BE34_89613A823BAD
-#pragma once
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/engine/buffers.hpp"
 #include "le/spectrumworx/engine/configuration.hpp"
@@ -23,9 +23,9 @@
 namespace LE
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN( Math )
-    unsigned int alignIndex( unsigned int index );
-LE_IMPL_NAMESPACE_END( Math )
+LE_IMPL_NAMESPACE_BEGIN(Math)
+unsigned int alignIndex(unsigned int index);
+LE_IMPL_NAMESPACE_END(Math)
 //------------------------------------------------------------------------------
 namespace SW
 {
@@ -43,8 +43,8 @@ namespace Effects
 template <typename T, std::uint16_t milliSeconds>
 struct HistoryBuffer : public Utility::SharedStorageBuffer<T>
 {
-    LE_NOTHROWNOALIAS LE_NOINLINE
-    static std::uint32_t requiredStorage( Engine::StorageFactors const & factors )
+    LE_NOTHROWNOALIAS LE_NOINLINE static std::uint32_t
+    requiredStorage(Engine::StorageFactors const &factors)
     {
         // Implementation note:
         // N - number of required audio samples per second per channel
@@ -60,12 +60,12 @@ struct HistoryBuffer : public Utility::SharedStorageBuffer<T>
         //                                          QeD
         //                                    (20.05.2010.) (Domagoj Saric)
 
-        auto const frameSize        ( factors.fftSize                                               );
-        auto const samples          ( ( milliSeconds * factors.samplerate + 999 ) / 1000            );
-        auto const overlappedSamples( samples * factors.overlapFactor                               );
-        auto const samplesRounded   ( overlappedSamples + frameSize - overlappedSamples % frameSize );
+        auto const frameSize(factors.fftSize);
+        auto const samples((milliSeconds * factors.samplerate + 999) / 1000);
+        auto const overlappedSamples(samples * factors.overlapFactor);
+        auto const samplesRounded(overlappedSamples + frameSize - overlappedSamples % frameSize);
 
-        BOOST_ASSERT( samplesRounded % frameSize == 0 );
+        BOOST_ASSERT(samplesRounded % frameSize == 0);
 
         /// \note For each DFT frame we get "2 * ( DFT-size / 2 + 1 ) samples =
         /// DFT-size + 2 samples" (in ReIm or AmPh form). IOW for each frame we
@@ -74,25 +74,25 @@ struct HistoryBuffer : public Utility::SharedStorageBuffer<T>
         /// component vectors (whether in ReIm or AmPh form) need to be vector
         /// aligned.
         ///                                   (16.07.2012.) (Domagoj Saric)
-        auto const dftRepresentationOverhead( 2                                                                            );
-        auto const maximumAlignmentPadding  ( Utility::Constants::vectorAlignment / sizeof( T ) - 1                        );
-        auto const numberOfFrames           ( samplesRounded / frameSize                                                   );
-        auto const overhead                 ( numberOfFrames * ( dftRepresentationOverhead + 2 * maximumAlignmentPadding ) );
+        auto const dftRepresentationOverhead(2);
+        auto const maximumAlignmentPadding(Utility::Constants::vectorAlignment / sizeof(T) - 1);
+        auto const numberOfFrames(samplesRounded / frameSize);
+        auto const overhead(numberOfFrames *
+                            (dftRepresentationOverhead + 2 * maximumAlignmentPadding));
 
-        auto const storageBytes( ( samplesRounded + overhead ) * sizeof( T ) );
-        return static_cast<std::uint32_t>( storageBytes );
+        auto const storageBytes((samplesRounded + overhead) * sizeof(T));
+        return static_cast<std::uint32_t>(storageBytes);
     }
 
-    void resize( Engine::StorageFactors const & factors, Engine::Storage & storage )
+    void resize(Engine::StorageFactors const &factors, Engine::Storage &storage)
     {
-        Utility::SharedStorageBuffer<T>::resize( requiredStorage( factors ), storage );
+        Utility::SharedStorageBuffer<T>::resize(requiredStorage(factors), storage);
     }
 
     //...mrmlj...required for automatic reset() member function generation by
     //...mrmlj...the LE_DYNAMIC_CHANNEL_STATE macro...
     void reset() { this->clear(); }
 };
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -124,12 +124,12 @@ struct HistoryBuffer : public Utility::SharedStorageBuffer<T>
 ////////////////////////////////////////////////////////////////////////////////
 
 //...mrmlj...cleanup these duplicated typedefs (also in effects.hpp, channelDataReIm.hpp and fft.hpp)...
-using         DataRange = boost::iterator_range<float       * LE_RESTRICT>;
-using ReadOnlyDataRange = boost::iterator_range<float const * LE_RESTRICT>;
+using DataRange = boost::iterator_range<float *LE_RESTRICT>;
+using ReadOnlyDataRange = boost::iterator_range<float const *LE_RESTRICT>;
 
 class ReversedHistoryBufferState
 {
-public:
+  public:
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \struct HistoryData
@@ -152,52 +152,48 @@ public:
     ////////////////////////////////////////////////////////////////////////////
 
 #ifdef _MSC_VER
-    #pragma warning( push )
-    #pragma warning( disable : 4510 ) // Default constructor could not be generated.
-    #pragma warning( disable : 4512 ) // Assignment operator could not be generated.
-    #pragma warning( disable : 4610 ) // Class can never be instantiated - user-defined constructor required.
-#endif // _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4510) // Default constructor could not be generated.
+#pragma warning(disable : 4512) // Assignment operator could not be generated.
+#pragma warning(disable                                                                            \
+                : 4610) // Class can never be instantiated - user-defined constructor required.
+#endif                  // _MSC_VER
 
     struct HistoryData
     {
         struct TargetHistory
         {
-            float * const pAmplitudesOrReals;
-            float * const pPhasesOrImags    ;
+            float *const pAmplitudesOrReals;
+            float *const pPhasesOrImags;
         } targetHistory;
 
         struct SourceHistory
         {
-            float const * const pAmplitudesOrReals;
-            float const * const pPhasesOrImags    ;
+            float const *const pAmplitudesOrReals;
+            float const *const pPhasesOrImags;
         } sourceHistory;
 
         bool isEmulated() const;
     }; // struct HistoryData
 
 #ifdef _MSC_VER
-    #pragma warning( pop )
+#pragma warning(pop)
 #endif // _MSC_VER
 
-public:
-    HistoryData LE_FASTCALL getCurrentStepData
-    (
-        std::uint16_t historyLengthInSteps,
-        std::uint16_t numberOfBins,
-        DataRange     historyData
-    );
+  public:
+    HistoryData getCurrentStepData(std::uint16_t historyLengthInSteps, std::uint16_t numberOfBins,
+                                   DataRange historyData);
 
     void reset();
 
-private:
-    std::uint16_t step_     ;
-    std:: int8_t  increment_;
+  private:
+    std::uint16_t step_;
+    std::int8_t increment_;
 
     // State required for history emulation.
     std::uint16_t actualHistoryLengthInSteps_;
-    std::uint16_t emulatedHistoryStepOffset_ ;
+    std::uint16_t emulatedHistoryStepOffset_;
 }; // class ReversedHistoryBufferState
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -212,29 +208,27 @@ private:
 template <unsigned int historyLengthInMilliseconds>
 class ReversedHistoryChannelState : private HistoryBuffer<float, historyLengthInMilliseconds>
 {
-private:
+  private:
     using BaseBuffer = HistoryBuffer<float, historyLengthInMilliseconds>;
 
-public:
-    ReversedHistoryBufferState::HistoryData LE_FASTCALL getCurrentStepData
-    (
-        std::uint16_t historyLengthInSteps,
-        std::uint16_t numberOfBins
-    )
+  public:
+    ReversedHistoryBufferState::HistoryData getCurrentStepData(std::uint16_t historyLengthInSteps,
+                                                               std::uint16_t numberOfBins)
     {
-        return bufferState_.getCurrentStepData( historyLengthInSteps, numberOfBins, static_cast<BaseBuffer &>( *this ) );
+        return bufferState_.getCurrentStepData(historyLengthInSteps, numberOfBins,
+                                               static_cast<BaseBuffer &>(*this));
     }
 
     void reset()
     {
-        bufferState_ .reset();
-        BaseBuffer  ::clear();
+        bufferState_.reset();
+        BaseBuffer ::clear();
     }
 
     using BaseBuffer::requiredStorage;
     using BaseBuffer::resize;
 
-private:
+  private:
     ReversedHistoryBufferState bufferState_;
 }; // class ReversedHistoryChannelState
 

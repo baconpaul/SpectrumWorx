@@ -3,11 +3,11 @@
 /// \file simOctaver.hpp
 /// --------------------
 ///
-/// Copyright (c) 2010. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2010. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
-#pragma once
 #ifndef sim_octaver_hpp__9579DBDB_C9A8_486D_985B_DB6955708192
 #define sim_octaver_hpp__9579DBDB_C9A8_486D_985B_DB6955708192
 //------------------------------------------------------------------------------
@@ -35,19 +35,20 @@ namespace Algorithms
 
 class SimOctaver
 {
-public: // LE::Algorithm interface.
+  public: // LE::Algorithm interface.
     ////////////////////////////////////////////////////////////////////////////
     // Parameters
     ////////////////////////////////////////////////////////////////////////////
-    
-    DEFINE_PARAMETERS
-    (
-        ( ( GainOrig        )( float        )( MinimumValue<-48> )( MaximumValue< +12> )( DefaultValue< -3> ) ( DisplayValueSuffix<' dB'> ) )
-        ( ( GainOct1        )( float        )( MinimumValue<-48> )( MaximumValue< +12> )( DefaultValue< -3> ) ( DisplayValueSuffix<' dB'> ) )
-        ( ( GainOct2        )( float        )( MinimumValue<-48> )( MaximumValue< +12> )( DefaultValue< -3> ) ( DisplayValueSuffix<' dB'> ) )
-        ( ( CutoffFrequency )( unsigned int )( MinimumValue<  0> )( MaximumValue<6000> )( DefaultValue<6000> ) ( DisplayValueSuffix<' Hz'> ) )
-    );
 
+    DEFINE_PARAMETERS((
+        (GainOrig)(float)(MinimumValue<-48>)(MaximumValue<+12>)(DefaultValue<
+                                                                -3>)(DisplayValueSuffix<' dB'>))(
+        (GainOct1)(float)(MinimumValue<-48>)(MaximumValue<+12>)(DefaultValue<
+                                                                -3>)(DisplayValueSuffix<' dB'>))(
+        (GainOct2)(float)(MinimumValue<-48>)(MaximumValue<+12>)(DefaultValue<
+                                                                -3>)(DisplayValueSuffix<' dB'>))((
+        CutoffFrequency)(unsigned int)(MinimumValue<0>)(MaximumValue<6000>)(DefaultValue<6000>)(DisplayValueSuffix<
+                                                                                                ' Hz'>)));
 
     ////////////////////////////////////////////////////////////////////////////
     // ChannelState
@@ -61,18 +62,17 @@ public: // LE::Algorithm interface.
         void clear();
     };
 
+    void setup(EngineSetup const &, Parameters const &);
+    void process(ChannelState &, ChannelData_AmPh2ReIm) const;
 
-  void setup  ( EngineSetup const &, Parameters const & );
-  void process( ChannelState &, ChannelData_AmPh2ReIm ) const;
+  public: // Algorithm traits.
+    static bool const canUseTwoInputs = false;
 
-public: // Algorithm traits.
-  static bool const canUseTwoInputs = false;
+  public:
+    static char const title[];
+    static char const description[];
 
-public: 
-  static char const title      [];
-  static char const description[];
-
-private:
+  private:
     unsigned int num_bins_;
 
     float gain0_;
@@ -88,9 +88,7 @@ private:
     mutable Common::SSEAlignedHalfFFTBuffer shifted1Imags_;
     mutable Common::SSEAlignedHalfFFTBuffer shifted2Reals_;
     mutable Common::SSEAlignedHalfFFTBuffer shifted2Imags_;
-
 };
-
 
 //------------------------------------------------------------------------------
 } // namespace Algorithms

@@ -3,7 +3,8 @@
 /// synthImpl.cpp
 /// -------------
 ///
-/// Copyright (c) 2013 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2013 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -63,7 +64,7 @@
 /// http://ccrma.stanford.edu/software/stk/index.html
 /// http://musicdsp.org/archive.php?classid=1
 /// http://www.scs.ryerson.ca/~lkolasa/CppWavelets.html
-/// http://www.earlevel.com/main/2012/05/25/a-wavetable-oscillator—the-code
+/// http://www.earlevel.com/main/2012/05/25/a-wavetable-oscillatorâ€”the-code
 /// http://github.com/vinniefalco/DSPFilters
 /// http://ldesoras.free.fr
 /// http://mobilesynth.googlecode.com/svn/trunk/mobilesynth/Classes/synth
@@ -114,9 +115,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Synth::title      [] = "Synth";
+char const Synth::title[] = "Synth";
 char const Synth::description[] = "Spectrum colour transfer.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -124,11 +124,10 @@ char const Synth::description[] = "Spectrum colour transfer.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Synth::Frequency      , "Frequency"     )
-EFFECT_PARAMETER_NAME( Synth::HarmonicSlope  , "Slope"         )
-EFFECT_PARAMETER_NAME( Synth::FlangeIntensity, "Flange amount" )
-EFFECT_PARAMETER_NAME( Synth::FlangeOffset   , "Flange offset" )
-
+EFFECT_PARAMETER_NAME(Synth::Frequency, "Frequency")
+EFFECT_PARAMETER_NAME(Synth::HarmonicSlope, "Slope")
+EFFECT_PARAMETER_NAME(Synth::FlangeIntensity, "Flange amount")
+EFFECT_PARAMETER_NAME(Synth::FlangeOffset, "Flange offset")
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -141,104 +140,112 @@ LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 namespace
 {
-    // http://en.wikipedia.org/wiki/Cent_%28music%29
-    //...mrmlj...0 and 7 - approximation of the old carrier.wav
-    std::uint8_t BOOST_CONSTEXPR_OR_CONST toneSemitones      [ SynthImpl::numberOfTones ] = { 0, 7                                                  };
-    float        BOOST_CONSTEXPR_OR_CONST toneGain           [ SynthImpl::numberOfTones ] = { 1, 1.0f / 6                                           }; // attenuate non fundamental frequencies...
-    float        const                    toneFrequencyScales[ SynthImpl::numberOfTones ] = { 1, Math::semitone2Interval12TET( toneSemitones[ 1 ] ) };
+// http://en.wikipedia.org/wiki/Cent_%28music%29
+//...mrmlj...0 and 7 - approximation of the old carrier.wav
+std::uint8_t BOOST_CONSTEXPR_OR_CONST toneSemitones[SynthImpl::numberOfTones] = {0, 7};
+float BOOST_CONSTEXPR_OR_CONST toneGain[SynthImpl::numberOfTones] = {
+    1, 1.0f / 6}; // attenuate non fundamental frequencies...
+float const toneFrequencyScales[SynthImpl::numberOfTones] = {
+    1, Math::semitone2Interval12TET(toneSemitones[1])};
 
-    /// \note 'Original carrier.wav' emulation: it appears that the '7th
-    /// semitone overtone' does not have 'proper' harmonics itself but rather
-    /// each main harmonic has an 'overtone' offset in frequency by the same
-    /// amount (in Hz) as the 7th semitone for the main fundamental frequency.
-    ///                                       (28.10.2015.) (Domagoj Saric)
-    bool const standardHarmonicFormula( false );
+/// \note 'Original carrier.wav' emulation: it appears that the '7th
+/// semitone overtone' does not have 'proper' harmonics itself but rather
+/// each main harmonic has an 'overtone' offset in frequency by the same
+/// amount (in Hz) as the 7th semitone for the main fundamental frequency.
+///                                       (28.10.2015.) (Domagoj Saric)
+bool const standardHarmonicFormula(false);
 } // anonymous namespace
 
-LE_COLD
-void SynthImpl::setup( IndexRange const & workingRange, Engine::Setup const & engineSetup )
+LE_COLD void SynthImpl::setup(IndexRange const &workingRange, Engine::Setup const &engineSetup)
 {
-    synthesisParameters_.setup( engineSetup );
+    synthesisParameters_.setup(engineSetup);
 
-    flangeDelayPhase_ = parameters().get<FlangeOffset>() / FlangeOffset::maximum() * Math::Constants::pi;
-    flangeGain_       = std::sqrt( Math::percentage2NormalisedLinear( parameters().get<FlangeIntensity>() ) );
+    flangeDelayPhase_ =
+        parameters().get<FlangeOffset>() / FlangeOffset::maximum() * Math::Constants::pi;
+    flangeGain_ = std::sqrt(Math::percentage2NormalisedLinear(parameters().get<FlangeIntensity>()));
 
-    double const fundamentalFrequency( parameters().get<Frequency>() );
-    auto   const freqPerBin          ( engineSetup.frequencyRangePerBin<double>() );
+    double const fundamentalFrequency(parameters().get<Frequency>());
+    auto const freqPerBin(engineSetup.frequencyRangePerBin<double>());
 
     /// \note Harmonics should have 'alternating'/'opposite' phases.
     /// http://hep.physics.indiana.edu/~rickv/Making_complex_waves.html
     ///                                       (06.10.2015.) (Domagoj Saric)
     {
-        auto const halfNumberOfCoefficients  ( static_cast<std::uint8_t>( ( coefficients_.size() - 1 ) / 2 )          );
-        auto const nyquist                   ( engineSetup.sampleRate<std::uint32_t>() / 2                            );
-        auto const maxBaseBin                ( std::max( 0, workingRange.end() - 1 - halfNumberOfCoefficients )       );
-        auto const maxFrequency              ( nyquist * maxBaseBin / engineSetup.numberOfBins()                      );
-        auto const maxToneFrequencyMultiplier( toneFrequencyScales[ numberOfTones - 1 ]                               );
-        auto const maxToneFrequencyDelta     ( fundamentalFrequency * toneFrequencyScales[ 1 ] - fundamentalFrequency );
-        auto const maxHarmonic               (
-                                                 standardHarmonicFormula
-                                                     ? (   maxFrequency                           / ( fundamentalFrequency * maxToneFrequencyMultiplier ) )
-                                                     : ( ( maxFrequency - maxToneFrequencyDelta ) /   fundamentalFrequency                                )
-                                             );
-        auto const minFrequency              ( ( workingRange.begin() + halfNumberOfCoefficients ) * freqPerBin );
-        auto const minHarmonic               ( std::ceil( minFrequency / fundamentalFrequency ) );
-        auto const maxHarmonics              ( std::max<float>( 0, maxHarmonic - minHarmonic + 1 ) );
+        auto const halfNumberOfCoefficients(
+            static_cast<std::uint8_t>((coefficients_.size() - 1) / 2));
+        auto const nyquist(engineSetup.sampleRate<std::uint32_t>() / 2);
+        auto const maxBaseBin(std::max(0, workingRange.end() - 1 - halfNumberOfCoefficients));
+        auto const maxFrequency(nyquist * maxBaseBin / engineSetup.numberOfBins());
+        auto const maxToneFrequencyMultiplier(toneFrequencyScales[numberOfTones - 1]);
+        auto const maxToneFrequencyDelta(fundamentalFrequency * toneFrequencyScales[1] -
+                                         fundamentalFrequency);
+        auto const maxHarmonic(
+            standardHarmonicFormula
+                ? (maxFrequency / (fundamentalFrequency * maxToneFrequencyMultiplier))
+                : ((maxFrequency - maxToneFrequencyDelta) / fundamentalFrequency));
+        auto const minFrequency((workingRange.begin() + halfNumberOfCoefficients) * freqPerBin);
+        auto const minHarmonic(std::ceil(minFrequency / fundamentalFrequency));
+        auto const maxHarmonics(std::max<float>(0, maxHarmonic - minHarmonic + 1));
 
         LE_LOCALLY_DISABLE_FPU_EXCEPTIONS();
-        harmonicSlope_ = std::pow( Math::percentage2NormalisedLinear( parameters().get<HarmonicSlope>() ), 4 ); // 'delinearise', slope = slope**4
-        auto const maxAudibleHarmonic( 99 / harmonicSlope_ ); // based on the formula for harmonicGain (in process()) and a maximum 40dB harmonic attenuation
-        harmonics_     = static_cast<std::uint8_t>( std::min<float>( maxAudibleHarmonic, maxHarmonics ) );
-        startHarmonic_ = static_cast<std::uint8_t>( minHarmonic );
+        harmonicSlope_ =
+            std::pow(Math::percentage2NormalisedLinear(parameters().get<HarmonicSlope>()),
+                     4); // 'delinearise', slope = slope**4
+        auto const maxAudibleHarmonic(
+            99 /
+            harmonicSlope_); // based on the formula for harmonicGain (in process()) and a maximum 40dB harmonic attenuation
+        harmonics_ = static_cast<std::uint8_t>(std::min<float>(maxAudibleHarmonic, maxHarmonics));
+        startHarmonic_ = static_cast<std::uint8_t>(minHarmonic);
     }
 
-    if
-    (
-        ( lastFreq_    != fundamentalFrequency                 ) ||
-        ( lastFFTSize_ != engineSetup.fftSize<std::uint16_t>() ) ||
-        ( lastWindow_  != engineSetup.windowFunction        () )
-    )
+    if ((lastFreq_ != fundamentalFrequency) ||
+        (lastFFTSize_ != engineSetup.fftSize<std::uint16_t>()) ||
+        (lastWindow_ != engineSetup.windowFunction()))
     {
-        lastFreq_    = fundamentalFrequency;
+        lastFreq_ = fundamentalFrequency;
         lastFFTSize_ = engineSetup.fftSize<std::uint16_t>();
-        lastWindow_  = engineSetup.windowFunction        ();
+        lastWindow_ = engineSetup.windowFunction();
 
-        auto const freqBinFractional( fundamentalFrequency / freqPerBin );
-        auto const freqBin          ( static_cast<std::uint16_t>( Math::round( freqBinFractional ) ) );
+        auto const freqBinFractional(fundamentalFrequency / freqPerBin);
+        auto const freqBin(static_cast<std::uint16_t>(Math::round(freqBinFractional)));
 
-        auto const omega( Math::Constants::twoPi_d * fundamentalFrequency );
+        auto const omega(Math::Constants::twoPi_d * fundamentalFrequency);
 
-        auto const sr          ( engineSetup.sampleRate<double>() );
-        auto const numberOfBins( engineSetup.numberOfBins()       );
+        auto const sr(engineSetup.sampleRate<double>());
+        auto const numberOfBins(engineSetup.numberOfBins());
 
-        BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER( freqCoefficients, Engine::real_t, lastFFTSize_ + 2 + 16 /*for alignment padding between real and imag*/ );
+        BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(
+            freqCoefficients, Engine::real_t,
+            lastFFTSize_ + 2 + 16 /*for alignment padding between real and imag*/);
         LE_DISABLE_LOOP_UNROLLING()
-        for ( std::uint16_t bin( 0 ); bin < lastFFTSize_; ++bin )
-            freqCoefficients[ bin ] = std::sin( omega * bin / sr );
+        for (std::uint16_t bin(0); bin < lastFFTSize_; ++bin)
+            freqCoefficients[bin] = std::sin(omega * bin / sr);
 
-        auto const & processor( Engine::Processor::fromEngineSetup( engineSetup ) );
+        auto const &processor(Engine::Processor::fromEngineSetup(engineSetup));
 
         // https://ccrma.stanford.edu/~jos/parshl/Analysis_Window_Step_1.html
-        Math::multiply( processor.analysisWindow().begin(), freqCoefficients.begin(), lastFFTSize_ );
-      //Math::copy    ( processor.analysisWindow().begin(), freqCoefficients.begin(), lastFFTSize_ );
+        Math::multiply(processor.analysisWindow().begin(), freqCoefficients.begin(), lastFFTSize_);
+        //Math::copy    ( processor.analysisWindow().begin(), freqCoefficients.begin(), lastFFTSize_ );
 
-        auto const & fft( processor.fft() );
+        auto const &fft(processor.fft());
 
-        auto const pTimeDomain( freqCoefficients.begin() );
-        auto const pReals     ( freqCoefficients.begin() );
-        auto const pImags     ( static_cast<float *>( Math::align( &freqCoefficients[ numberOfBins ] ) ) );
-        fft.transform( pTimeDomain, DataRange( pImags, pImags + numberOfBins ), true );
+        auto const pTimeDomain(freqCoefficients.begin());
+        auto const pReals(freqCoefficients.begin());
+        auto const pImags(static_cast<float *>(Math::align(&freqCoefficients[numberOfBins])));
+        fft.transform(pTimeDomain, DataRange(pImags, pImags + numberOfBins), true);
 
-        BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER( amps  , Engine::real_t, numberOfBins );
-        BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER( phases, Engine::real_t, numberOfBins );
-        auto const pAmps  ( amps  .begin() );
-        auto const pPhases( phases.begin() );
-        Math::reim2AmPh( pReals, pImags, pAmps, pPhases, numberOfBins );
-        coefficients_.fill( 0 );
-        auto const coefficientsMiddle      ( static_cast<std::uint8_t>( ( coefficients_.size() - 1 ) / 2 ) );
-        auto const halfNumberOfCoefficients( std::min<std::uint16_t>( coefficientsMiddle, freqBin - 1 )    );
-        auto const startCoefficient        ( coefficientsMiddle - halfNumberOfCoefficients                 );
-        std::copy( &pAmps[ freqBin - halfNumberOfCoefficients ], &pAmps[ freqBin + 1 + halfNumberOfCoefficients ], &coefficients_[ startCoefficient ] );
+        BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(amps, Engine::real_t, numberOfBins);
+        BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(phases, Engine::real_t, numberOfBins);
+        auto const pAmps(amps.begin());
+        auto const pPhases(phases.begin());
+        Math::reim2AmPh(pReals, pImags, pAmps, pPhases, numberOfBins);
+        coefficients_.fill(0);
+        auto const coefficientsMiddle(static_cast<std::uint8_t>((coefficients_.size() - 1) / 2));
+        auto const halfNumberOfCoefficients(
+            std::min<std::uint16_t>(coefficientsMiddle, freqBin - 1));
+        auto const startCoefficient(coefficientsMiddle - halfNumberOfCoefficients);
+        std::copy(&pAmps[freqBin - halfNumberOfCoefficients],
+                  &pAmps[freqBin + 1 + halfNumberOfCoefficients], &coefficients_[startCoefficient]);
 
         resetState_ = true;
     }
@@ -246,8 +253,7 @@ void SynthImpl::setup( IndexRange const & workingRange, Engine::Setup const & en
         resetState_ = false;
 }
 
-LE_COLD
-void SynthImpl::ChannelState::reset()
+LE_COLD void SynthImpl::ChannelState::reset()
 {
     /// \note Randomize initial phases for a more 'spacey' effect. To be further
     /// investigated...
@@ -258,22 +264,23 @@ void SynthImpl::ChannelState::reset()
         LE_DISABLE_LOOP_UNROLLING()
         for ( auto & phase : oscillatorPhases ) { phase = Math::rangedRand( Math::Constants::pi ); }
 #else
-    Math::clear( phases.front().begin(), phases.back().end() );
+    Math::clear(phases.front().begin(), phases.back().end());
 #endif // initial phases generation
 }
 
-LE_COLD
-void SynthImpl::ChannelState::resize( Engine::StorageFactors const & factors, Engine::Storage & storage )
+LE_COLD void SynthImpl::ChannelState::resize(Engine::StorageFactors const &factors,
+                                             Engine::Storage &storage)
 {
     LE_DISABLE_LOOP_UNROLLING()
-    for ( auto & oscillatorPhases : phases )
-        oscillatorPhases.resize( factors, storage );
+    for (auto &oscillatorPhases : phases)
+        oscillatorPhases.resize(factors, storage);
 }
 
-LE_COLD
-std::uint32_t SynthImpl::ChannelState::requiredStorage( Engine::StorageFactors const & factors )
+LE_COLD std::uint32_t
+SynthImpl::ChannelState::requiredStorage(Engine::StorageFactors const &factors)
 {
-    return Utility::align( static_cast<std::uint32_t>( OscillatorPhases::requiredStorage( factors ) ) ) * static_cast<std::uint8_t>( Phases().size() );
+    return Utility::align(static_cast<std::uint32_t>(OscillatorPhases::requiredStorage(factors))) *
+           static_cast<std::uint8_t>(Phases().size());
 }
 
 LE_OPTIMIZE_FOR_SIZE_END()
@@ -289,53 +296,45 @@ LE_OPTIMIZE_FOR_SPEED_BEGIN()
 
 namespace //...mrmlj...copy-pasted from phase vocoder sources...
 {
-    LE_FORCEINLINE LE_HOT
-    float LE_FASTCALL reconstructPhase
-    (
-        float const estimatedFrequency,
-        float const binFrequency,
-        float const invDeviationFactor,
-        float const expectedPhaseDifference,
-        float const currentPhaseSum
-    )
-    {
-        float const phase
-        (
-            ( estimatedFrequency - binFrequency ) * invDeviationFactor
-                +
-            expectedPhaseDifference
-        );
+LE_FORCEINLINE LE_HOT float reconstructPhase(float const estimatedFrequency,
+                                             float const binFrequency,
+                                             float const invDeviationFactor,
+                                             float const expectedPhaseDifference,
+                                             float const currentPhaseSum)
+{
+    float const phase((estimatedFrequency - binFrequency) * invDeviationFactor +
+                      expectedPhaseDifference);
 
-        float const phaseSum( currentPhaseSum + phase );
-        return phaseSum;
-    }
+    float const phaseSum(currentPhaseSum + phase);
+    return phaseSum;
+}
 
-    LE_FORCEINLINE LE_HOT
-    float LE_FASTCALL mapTo2PiInterval( float const phase )
-    {
-        float const reducedPhase( Math::PositiveFloats::modulo( phase, Math::Constants::twoPi ) );
-        return reducedPhase;
-    }
+LE_FORCEINLINE LE_HOT float mapTo2PiInterval(float const phase)
+{
+    float const reducedPhase(Math::PositiveFloats::modulo(phase, Math::Constants::twoPi));
+    return reducedPhase;
+}
 } // anonymous namespace
 
-LE_HOT
-void SynthImpl::process( SynthImpl::ChannelState & cs, Engine::MainSideChannelData_AmPh data, Engine::Setup const & engineSetup ) const
+LE_HOT void SynthImpl::process(SynthImpl::ChannelState &cs, Engine::MainSideChannelData_AmPh data,
+                               Engine::Setup const &engineSetup) const
 {
-    if ( BOOST_UNLIKELY( resetState_ ) )
+    if (BOOST_UNLIKELY(resetState_))
         cs.reset();
 
 #if 1
-    auto & targetData( const_cast<Engine::ChannelData_AmPh &>( data.side() ) );
+    auto &targetData(const_cast<Engine::ChannelData_AmPh &>(data.side()));
 #else
-    auto & targetData(                                         data.main()   );
+    auto &targetData(data.main());
 #endif
 
-    float const freqPerBin             ( engineSetup.frequencyRangePerBin<float>() );
-    float const expectedPhaseDifference( synthesisParameters_.expctRate         () );
-    float const invDeviationFactor     ( synthesisParameters_.invDeviationFactor() );
-    float const fundamentalFrequency   ( parameters().get<Frequency>()             );
+    float const freqPerBin(engineSetup.frequencyRangePerBin<float>());
+    float const expectedPhaseDifference(synthesisParameters_.expctRate());
+    float const invDeviationFactor(synthesisParameters_.invDeviationFactor());
+    float const fundamentalFrequency(parameters().get<Frequency>());
 
-    float const toneFrequencyDeltas[ numberOfTones ] = { 0, fundamentalFrequency * toneFrequencyScales[ 1 ] - fundamentalFrequency };
+    float const toneFrequencyDeltas[numberOfTones] = {
+        0, fundamentalFrequency * toneFrequencyScales[1] - fundamentalFrequency};
 
     // http://www.uaudio.com/blog/flangers-and-phasers
     // http://www.soundonsound.com/sos/mar06/articles/qa0306_1.htm What's the difference between phasing and flanging?
@@ -349,100 +348,100 @@ void SynthImpl::process( SynthImpl::ChannelState & cs, Engine::MainSideChannelDa
     //Math::clear( targetData.amps  () );
     //Math::clear( targetData.phases() );
     //...mrmlj...clear the entire side chain as quick-fix for correct 'reduced working range' operation...
-    Math::clear( targetData.full().jointView() );
+    Math::clear(targetData.full().jointView());
 
     /// \note Our basBin calculation below gives 'full spectrum' bin numbers so
     /// we use full range data while obeying the working range by limiting the
     /// harmonic range.
     ///                                       (27.10.2015.) (Domagoj Saric)
-    auto const amps  ( targetData.full().amps  () );
-    auto const phases( targetData.full().phases() );
+    auto const amps(targetData.full().amps());
+    auto const phases(targetData.full().phases());
 
-    float const flangeDelayPhase( flangeDelayPhase_ );
-    float const flangeGain      ( flangeGain_       );
+    float const flangeDelayPhase(flangeDelayPhase_);
+    float const flangeGain(flangeGain_);
 
-    auto  const harmonicSlope   ( harmonicSlope_                                            );
-    float const harmonicGainBase( 2 / Math::Constants::pi * ( 0.1f + 0.9f * harmonicSlope ) ); // "rotate" rather then just "slope" the harmonics to preserve loudness
-    auto        harmonics       ( harmonics_                                                );
-    bool        evenHarmonic    ( true                                                      );
+    auto const harmonicSlope(harmonicSlope_);
+    float const harmonicGainBase(
+        2 / Math::Constants::pi *
+        (0.1f +
+         0.9f *
+             harmonicSlope)); // "rotate" rather then just "slope" the harmonics to preserve loudness
+    auto harmonics(harmonics_);
+    bool evenHarmonic(true);
 
     //...mrmlj...think of a better name...
-    auto const halfNumberOfCoefficients( static_cast<std::uint8_t>( ( coefficients_.size() - 1 ) / 2 ) );
+    auto const halfNumberOfCoefficients(static_cast<std::uint8_t>((coefficients_.size() - 1) / 2));
 
     /// \note Math::addPolar() calls atan2() which can in turn do a division by
     /// zero internally.
     ///                                       (22.10.2015.) (Domagoj Saric)
     LE_LOCALLY_DISABLE_FPU_EXCEPTIONS();
 
-    for ( std::uint8_t harmonic( startHarmonic_ ); harmonics; ++harmonic, --harmonics )
+    for (std::uint8_t harmonic(startHarmonic_); harmonics; ++harmonic, --harmonics)
     {
         evenHarmonic = !evenHarmonic;
 
-        float const harmonicGain( harmonicGainBase / ( harmonicSlope * harmonic + 1 ) );
+        float const harmonicGain(harmonicGainBase / (harmonicSlope * harmonic + 1));
         //attenuation *= std::sqrt( attenuation );
         //attenuation *= Math::dB2NormalisedLinear( harmonic * 0.1f );
 
         /// \note Use a phase shift instead of a negative amplitude
         /// in order to obey the 'no negative amps' rule.
         ///                                   (06.10.2015.) (Domagoj Saric)
-        float const phaseInversion( evenHarmonic ? 0 : Math::Constants::pi );
+        float const phaseInversion(evenHarmonic ? 0 : Math::Constants::pi);
 
-        auto const harmonicFrequency( fundamentalFrequency * harmonic );
+        auto const harmonicFrequency(fundamentalFrequency * harmonic);
 
-        for ( std::uint8_t tone( 0 ); tone < numberOfTones; ++tone )
+        for (std::uint8_t tone(0); tone < numberOfTones; ++tone)
         {
-            float const frequency
-            (
-                standardHarmonicFormula
-                    ? ( harmonicFrequency * toneFrequencyScales[ tone ] )
-                    : ( harmonicFrequency + toneFrequencyDeltas[ tone ] )
-            );
-            float const gain( toneGain[ tone ] * harmonicGain );
+            float const frequency(standardHarmonicFormula
+                                      ? (harmonicFrequency * toneFrequencyScales[tone])
+                                      : (harmonicFrequency + toneFrequencyDeltas[tone]));
+            float const gain(toneGain[tone] * harmonicGain);
 
-            auto          const baseBin ( static_cast<std::uint16_t>( Math::round( frequency / freqPerBin ) ) );
-            std::uint16_t const beginBin( baseBin     - halfNumberOfCoefficients );
-            std::uint16_t const endBin  ( baseBin + 1 + halfNumberOfCoefficients );
-            BOOST_ASSERT( endBin <= targetData.endBin() );
+            auto const baseBin(static_cast<std::uint16_t>(Math::round(frequency / freqPerBin)));
+            std::uint16_t const beginBin(baseBin - halfNumberOfCoefficients);
+            std::uint16_t const endBin(baseBin + 1 + halfNumberOfCoefficients);
+            BOOST_ASSERT(endBin <= targetData.endBin());
 
-            float const * LE_RESTRICT pAmp     ( &coefficients_        [        0 ] );
-            float       * LE_RESTRICT pPhaseSum( &cs.phases    [ tone ][ beginBin ] );
+            float const *LE_RESTRICT pAmp(&coefficients_[0]);
+            float *LE_RESTRICT pPhaseSum(&cs.phases[tone][beginBin]);
             //Math::clear( std::min<float *>( pCSPhase, pPhaseSum ), pPhaseSum ); //...mrmlj...always clear all 'unused' phase bins...
-            for ( auto bin( beginBin ); bin != endBin; ++bin )
+            for (auto bin(beginBin); bin != endBin; ++bin)
             {
-                float const phaseDelta         ( bin * expectedPhaseDifference );
-                float const currentBinFrequency( bin * freqPerBin              );
-                float const phaseSum( reconstructPhase( frequency, currentBinFrequency, invDeviationFactor, phaseDelta, *pPhaseSum ) );
-                float const amp     ( *pAmp++ * gain );
-                *pPhaseSum++ = mapTo2PiInterval( phaseSum );
-                float const phase( phaseSum + phaseInversion );
+                float const phaseDelta(bin * expectedPhaseDifference);
+                float const currentBinFrequency(bin * freqPerBin);
+                float const phaseSum(reconstructPhase(frequency, currentBinFrequency,
+                                                      invDeviationFactor, phaseDelta, *pPhaseSum));
+                float const amp(*pAmp++ * gain);
+                *pPhaseSum++ = mapTo2PiInterval(phaseSum);
+                float const phase(phaseSum + phaseInversion);
                 /// \note The addPolar() function is the bottlneck here so
                 /// try to avoid it if possible.
                 ///                           (05.10.2015.) (Domagoj Saric)
-                if ( amps[ bin ] )
-                    Math::addPolar( amp, phase, amps[ bin ], phases[ bin ] );
+                if (amps[bin])
+                    Math::addPolar(amp, phase, amps[bin], phases[bin]);
                 else
                 {
-                    amps  [ bin ] = amp  ;
-                    phases[ bin ] = phase;
+                    amps[bin] = amp;
+                    phases[bin] = phase;
                 }
 
-                if ( flangeGain )
+                if (flangeGain)
                 {
-                    Math::addPolar
-                    (
+                    Math::addPolar(
                         amp * flangeGain,
-                        phase + ( harmonic * flangeDelayPhase ), // https://en.wikipedia.org/wiki/Linear_phase
-                        amps  [ bin ],
-                        phases[ bin ]
-                    );
+                        phase + (harmonic *
+                                 flangeDelayPhase), // https://en.wikipedia.org/wiki/Linear_phase
+                        amps[bin], phases[bin]);
                 }
             }
             //pCSPhase = pPhaseSum;
         }
     }
 
-    LE_MATH_VERIFY_VALUES( Math::InvalidOrSlow | Math::Negative, amps  , "synth amplitudes" );
-    LE_MATH_VERIFY_VALUES( Math::InvalidOrSlow                 , phases, "synth phases"     );
+    LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow | Math::Negative, amps, "synth amplitudes");
+    LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow, phases, "synth phases");
 }
 
 LE_OPTIMIZE_FOR_SPEED_END()

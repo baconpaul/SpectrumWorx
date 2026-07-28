@@ -3,13 +3,13 @@
 /// \file enumerated/conversion.hpp
 /// -------------------------------
 ///
-/// Copyright (c) 2011 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2011 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef conversion_hpp__5820E6B3_7684_4DF4_BC99_B0A5CCB0F3E9
 #define conversion_hpp__5820E6B3_7684_4DF4_BC99_B0A5CCB0F3E9
-#pragma once
 //------------------------------------------------------------------------------
 #include "le/parameters/linear/conversion.hpp"
 //------------------------------------------------------------------------------

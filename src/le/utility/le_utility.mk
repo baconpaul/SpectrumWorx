@@ -2,7 +2,8 @@
 #
 # LittleEndian Utility Android make file
 #
-# Copyright (c) 2014 - 2016. Little Endian Ltd. All rights reserved.
+# Copyright (c) 2014 - 2016. Little Endian Ltd.
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 ################################################################################
 

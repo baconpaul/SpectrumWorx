@@ -3,14 +3,14 @@
 /// \file vocoder.hpp
 /// -----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef vocoder_hpp__08C0E1D2_AA0E_4399_9684_AEB65477A0F3
 #define vocoder_hpp__08C0E1D2_AA0E_4399_9684_AEB65477A0F3
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -47,14 +47,15 @@ namespace Effects
 
 struct Vocoder
 {
-    LE_ENUMERATED_PARAMETER( FilterMethod, ( CepstrumUdoBrick )( CepstrumBrick )( CepstrumHamming )( MovingAverage )( Envelope )( MelEnvelope )( Passthrough ) );
+    LE_ENUMERATED_PARAMETER(
+        FilterMethod,
+        (CepstrumUdoBrick)(CepstrumBrick)(CepstrumHamming)(MovingAverage)(Envelope)(MelEnvelope)(Passthrough));
 
-    LE_DEFINE_PARAMETERS
-    (
-        ( ( EnvelopeBorder )( LinearUnsignedInteger )( Minimum<  0> )( Maximum<12000> )( Default<1000> )( Unit<' Hz'> ) )
-        ( ( NoiseIntensity )( LinearUnsignedInteger )( Minimum<  0> )( Maximum<  100> )( Default<   0> )( Unit<' %' > ) )
-        ( ( FilterMethod ) )
-    );
+    LE_DEFINE_PARAMETERS((
+        (EnvelopeBorder)(LinearUnsignedInteger)(Minimum<0>)(Maximum<12000>)(Default<1000>)(Unit<
+                                                                                           ' Hz'>))(
+        (NoiseIntensity)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<0>)(Unit<' %'>))(
+        (FilterMethod)));
 
     /// \typedef EnvelopeBorder
     /// \brief Controls the perceived "smoothness" of the modulator.
@@ -63,10 +64,9 @@ struct Vocoder
     /// \typedef FilterMethod
     /// \brief
 
-
     static bool const usesSideChannel = true;
 
-    static char const title      [];
+    static char const title[];
     static char const description[];
 };
 

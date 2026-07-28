@@ -3,7 +3,8 @@
 /// gainImpl.cpp
 /// ------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -25,7 +26,7 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Gain::title      [] = "Gain";
+char const Gain::title[] = "Gain";
 char const Gain::description[] = "Amplification and attenuation.";
 
 //------------------------------------------------------------------------------

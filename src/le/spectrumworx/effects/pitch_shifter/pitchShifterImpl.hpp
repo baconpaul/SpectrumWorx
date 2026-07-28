@@ -3,13 +3,13 @@
 /// \file pitchShifterImpl.hpp
 /// --------------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef pitchShifterImpl_hpp__70354A08_96D9_4A83_8038_E18D73C2F0FB
-#define pitchShifterImpl_hpp__70354A08_96D9_4A83_8038_E18D73C2F0FB 
-#pragma once
+#define pitchShifterImpl_hpp__70354A08_96D9_4A83_8038_E18D73C2F0FB
 //------------------------------------------------------------------------------
 #include "pitchShifter.hpp"
 
@@ -25,24 +25,18 @@ namespace Effects
 {
 //------------------------------------------------------------------------------
 
-class PitchShifterImpl
-    :
-    public EffectImpl<PitchShifter>,
-    public PhaseVocoderShared::PitchShifter
+class PitchShifterImpl : public EffectImpl<PitchShifter>, public PhaseVocoderShared::PitchShifter
 {
-public: // LE::Effect required interface.
-    void setup( IndexRange const &, Engine::Setup const & );
+  public: // LE::Effect required interface.
+    void setup(IndexRange const &, Engine::Setup const &);
 };
 
-
-class PVPitchShifterImpl
-    :
-    public EffectImpl<PVPitchShifter>,
-    public PhaseVocoderShared::PVPitchShifter
+class PVPitchShifterImpl : public EffectImpl<PVPitchShifter>,
+                           public PhaseVocoderShared::PVPitchShifter
 {
-public: // LE::Effect required interface.
-    void setup( IndexRange const &, Engine::Setup const & );
-    void process( Engine::ChannelData_AmPh, Engine::Setup const & ) const;
+  public: // LE::Effect required interface.
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(Engine::ChannelData_AmPh, Engine::Setup const &) const;
 };
 
 //------------------------------------------------------------------------------

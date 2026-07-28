@@ -3,7 +3,8 @@
 /// \file trigger/parameter.cpp
 /// ---------------------------
 ///
-/// Copyright (c) 2011 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2011 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -50,7 +51,6 @@ namespace Parameters
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // TriggerParameter::consumeValue()
@@ -62,14 +62,12 @@ namespace Parameters
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_NOTHROWNOALIAS
-TriggerParameter::value_type TriggerParameter::consumeValue() const
+LE_NOTHROWNOALIAS TriggerParameter::value_type TriggerParameter::consumeValue() const
 {
-    value_type const currentValue( getValue() );
-    const_cast<TriggerParameter &>( *this ).reset();
+    value_type const currentValue(getValue());
+    const_cast<TriggerParameter &>(*this).reset();
     return currentValue;
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -84,11 +82,7 @@ TriggerParameter::value_type TriggerParameter::consumeValue() const
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_NOTHROWNOALIAS
-void TriggerParameter::setValue( param_type const value )
-{
-    value_ |= value;
-}
+LE_NOTHROWNOALIAS void TriggerParameter::setValue(param_type const value) { value_ |= value; }
 
 //------------------------------------------------------------------------------
 } // namespace Parameters

@@ -3,13 +3,13 @@
 /// \file effectGroups.hpp
 /// ----------------------
 ///
-/// Copyright (c) 2010 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2010 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef effectGroups_hpp__00998F05_C8C3_4C9E_A5B8_5005C5Ff61E5
 #define effectGroups_hpp__00998F05_C8C3_4C9E_A5B8_5005C5Ff61E5
-#pragma once
 //------------------------------------------------------------------------------
 #include <cstdint>
 #include <type_traits>
@@ -63,73 +63,75 @@ namespace Effects
 
 namespace Detail
 {
-    ////////////////////////////////////////////////////////////////////////////
-    //
-    // MODULE_GROUPS_BEGIN
-    // -------------------
-    //
-    ////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+//
+// MODULE_GROUPS_BEGIN
+// -------------------
+//
+////////////////////////////////////////////////////////////////////////////
 
-    #define MODULE_GROUPS_BEGIN()                                              \
-    struct ModuleGroups : public std::integral_constant<std::uint8_t, 0>::type \
-    {                                                                          \
-        typedef void         parent_group;                                     \
-        typedef ModuleGroups type;                                             \
-                                                                               \
-        static std::uint8_t const groupLevel = value;                          \
+#define MODULE_GROUPS_BEGIN()                                                                      \
+    struct ModuleGroups : public std::integral_constant<std::uint8_t, 0>::type                     \
+    {                                                                                              \
+        typedef void parent_group;                                                                 \
+        typedef ModuleGroups type;                                                                 \
+                                                                                                   \
+        static std::uint8_t const groupLevel = value;
 
+////////////////////////////////////////////////////////////////////////////
+//
+// MODULE_GROUPS_END
+// -----------------
+//
+////////////////////////////////////////////////////////////////////////////
 
-    ////////////////////////////////////////////////////////////////////////////
-    //
-    // MODULE_GROUPS_END
-    // -----------------
-    //
-    ////////////////////////////////////////////////////////////////////////////
+#define MODULE_GROUPS_END()                                                                        \
+    }                                                                                              \
+    ;
 
-    #define MODULE_GROUPS_END() };
+////////////////////////////////////////////////////////////////////////////
+//
+// SUB_GROUP_BEGIN
+// ---------------
+//
+////////////////////////////////////////////////////////////////////////////
+//
+// Implementation note:
+//   Because std::integral_constant<> overrides the "type" member of the
+// parent group we must somehow 'save' the parent group information before
+// deriving from std::integral_constant<>. For this the ParentGroup
+// helper struct is used.
+//                                        (01.06.2009.) (Domagoj Saric)
+//
+////////////////////////////////////////////////////////////////////////////
 
+// Helper for storing and fetching a group's parent group.
+template <class ParentGroupParam> struct ParentGroup
+{
+    typedef ParentGroupParam parent_group;
+};
 
-    ////////////////////////////////////////////////////////////////////////////
-    //
-    // SUB_GROUP_BEGIN
-    // ---------------
-    //
-    ////////////////////////////////////////////////////////////////////////////
-    //
-    // Implementation note:
-    //   Because std::integral_constant<> overrides the "type" member of the
-    // parent group we must somehow 'save' the parent group information before
-    // deriving from std::integral_constant<>. For this the ParentGroup
-    // helper struct is used.
-    //                                        (01.06.2009.) (Domagoj Saric)
-    //
-    ////////////////////////////////////////////////////////////////////////////
+#define SUB_GROUP_BEGIN(struct_name, user_struct_name)                                             \
+    struct struct_name : public Detail::ParentGroup<type>,                                         \
+                         public std::integral_constant<unsigned int, groupLevel + 1>::type         \
+    {                                                                                              \
+        typedef struct_name type;                                                                  \
+                                                                                                   \
+        static std::uint8_t const groupLevel = value;                                              \
+        static std::uint8_t const absoluteOrder = __LINE__;                                        \
+                                                                                                   \
+        static char const *name() { return user_struct_name; }
 
-    // Helper for storing and fetching a group's parent group.
-    template <class ParentGroupParam>
-    struct ParentGroup { typedef ParentGroupParam parent_group; };
+////////////////////////////////////////////////////////////////////////////
+//
+// SUB_GROUP_END
+// -------------
+//
+////////////////////////////////////////////////////////////////////////////
 
-    #define SUB_GROUP_BEGIN( struct_name, user_struct_name )                \
-    struct struct_name                                                      \
-        : public Detail::ParentGroup<type>,                                 \
-          public std::integral_constant<unsigned int, groupLevel + 1>::type \
-        {                                                                   \
-            typedef struct_name type;                                       \
-                                                                            \
-            static std::uint8_t const groupLevel    = value;                \
-            static std::uint8_t const absoluteOrder = __LINE__;             \
-                                                                            \
-            static char const * name() { return user_struct_name; }
-
-
-    ////////////////////////////////////////////////////////////////////////////
-    //
-    // SUB_GROUP_END
-    // -------------
-    //
-    ////////////////////////////////////////////////////////////////////////////
-
-    #define SUB_GROUP_END };
+#define SUB_GROUP_END                                                                              \
+    }                                                                                              \
+    ;
 
 } // namespace Detail
 
@@ -157,28 +159,26 @@ MODULE_GROUPS_BEGIN()
     SUB_GROUP_BEGIN( Wavelets, "Wavelets"  )
     SUB_GROUP_END
 */
-    SUB_GROUP_BEGIN( Pitch   , "Pitch"     )
-    SUB_GROUP_END
-    SUB_GROUP_BEGIN( PVD     , "PV domain" )
-    SUB_GROUP_END
-    SUB_GROUP_BEGIN( Timbre  , "Timbre"    )
-    SUB_GROUP_END
-    SUB_GROUP_BEGIN( Loudness, "Loudness"  )
-    SUB_GROUP_END
-    SUB_GROUP_BEGIN( Combine , "Combine"   )
-    SUB_GROUP_END
-    SUB_GROUP_BEGIN( Time    , "Time"      )
-    SUB_GROUP_END
-    SUB_GROUP_BEGIN( Space   , "Space"     )
-    SUB_GROUP_END
-    SUB_GROUP_BEGIN( Phase   , "Phase"     )
-    SUB_GROUP_END
-    SUB_GROUP_BEGIN( Misc    , "Misc"      )
-    SUB_GROUP_END
+SUB_GROUP_BEGIN(Pitch, "Pitch")
+SUB_GROUP_END
+SUB_GROUP_BEGIN(PVD, "PV domain")
+SUB_GROUP_END
+SUB_GROUP_BEGIN(Timbre, "Timbre")
+SUB_GROUP_END
+SUB_GROUP_BEGIN(Loudness, "Loudness")
+SUB_GROUP_END
+SUB_GROUP_BEGIN(Combine, "Combine")
+SUB_GROUP_END
+SUB_GROUP_BEGIN(Time, "Time")
+SUB_GROUP_END
+SUB_GROUP_BEGIN(Space, "Space")
+SUB_GROUP_END
+SUB_GROUP_BEGIN(Phase, "Phase")
+SUB_GROUP_END
+SUB_GROUP_BEGIN(Misc, "Misc")
+SUB_GROUP_END
 
 MODULE_GROUPS_END()
-
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //

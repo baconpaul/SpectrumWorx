@@ -3,7 +3,8 @@
 /// blenderImpl.cpp
 /// ---------------
 ///
-/// Copyright (C) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -31,9 +32,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Blender::title      [] = "Blender";
+char const Blender::title[] = "Blender";
 char const Blender::description[] = "Linear blend.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -41,8 +41,7 @@ char const Blender::description[] = "Linear blend.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Blender::Amount, "Amount" )
-
+EFFECT_PARAMETER_NAME(Blender::Amount, "Amount")
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -51,11 +50,10 @@ EFFECT_PARAMETER_NAME( Blender::Amount, "Amount" )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void BlenderImpl::setup( IndexRange const &, Engine::Setup const & )
+void BlenderImpl::setup(IndexRange const &, Engine::Setup const &)
 {
-    amount_ = 1.0f - Math::percentage2NormalisedLinear( parameters().get<Amount>() );
+    amount_ = 1.0f - Math::percentage2NormalisedLinear(parameters().get<Amount>());
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -63,31 +61,25 @@ void BlenderImpl::setup( IndexRange const &, Engine::Setup const & )
 // ----------------------
 //
 ////////////////////////////////////////////////////////////////////////////////
-/// \note Alex says: "Blender performs a linear blend or mix (sometimes wrongly 
-/// referred to as a «morph») in the frequency domain of magnitudes and phases 
-/// of Source to Target. There are two controls: Magn blends the Source 
-/// Magnitudes to the Target, and Phase blends the Source phase to the Target 
-/// Phase.  
+/// \note Alex says: "Blender performs a linear blend or mix (sometimes wrongly
+/// referred to as a Â«morphÂ») in the frequency domain of magnitudes and phases
+/// of Source to Target. There are two controls: Magn blends the Source
+/// Magnitudes to the Target, and Phase blends the Source phase to the Target
+/// Phase.
 /// If both Magn and Phase set to 0 values, you will hear only the Source input.
-/// If both Magn and Phase are at 1 – you will hear only the Target. 
-/// Blending creates a smooth, but perceptible transition from one sound to the 
-/// other. It is highly recommended that you use similar spectra sounds to avoid 
+/// If both Magn and Phase are at 1 â€“ you will hear only the Target.
+/// Blending creates a smooth, but perceptible transition from one sound to the
+/// other. It is highly recommended that you use similar spectra sounds to avoid
 /// any unwanted spectral artifacts."
 ///                                           (21.01.2010.) (Danijel Domazet)
 ////////////////////////////////////////////////////////////////////////////////
 
-void BlenderImpl::process( Engine::MainSideChannelData_ReIm data, Engine::Setup const & ) const
+void BlenderImpl::process(Engine::MainSideChannelData_ReIm data, Engine::Setup const &) const
 {
-    auto const main( data.main().jointView() );
-    auto const side( data.side().jointView() );
-    Math::mix
-    (
-        main.begin(),
-        side.begin(),
-        main.begin(),
-        amount_,
-        static_cast<unsigned int>( main.size() )
-    );
+    auto const main(data.main().jointView());
+    auto const side(data.side().jointView());
+    Math::mix(main.begin(), side.begin(), main.begin(), amount_,
+              static_cast<unsigned int>(main.size()));
 }
 
 //------------------------------------------------------------------------------

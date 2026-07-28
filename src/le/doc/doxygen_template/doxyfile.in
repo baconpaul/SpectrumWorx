@@ -2059,7 +2059,7 @@ PREDEFINED             = NDEBUG \
                          LE_NOTHROWRESTRICTNOALIAS= \
                          LE_PURE_FUNCTION= \
                          LE_RESTRICT= \
-                         LE_FASTCALL_ABI= \
+                         = \
                          BOOST_CONSTEXPR= \
                          BOOST_CONSTEXPR_OR_CONST=const \
                          @LE_DOXYGEN_EXTRA_DEFINES@

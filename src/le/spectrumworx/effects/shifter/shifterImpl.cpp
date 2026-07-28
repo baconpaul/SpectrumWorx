@@ -3,7 +3,8 @@
 /// shifterImpl.cpp
 /// ---------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -35,9 +36,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Shifter::title      [] = "Shifter";
+char const Shifter::title[] = "Shifter";
 char const Shifter::description[] = "Shifts spectrum along the frequency axis.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -45,26 +45,16 @@ char const Shifter::description[] = "Shifts spectrum along the frequency axis.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Shifter::ShiftTarget, "Target" )
-EFFECT_PARAMETER_NAME( Shifter::Offset     , "Offset" )
-EFFECT_PARAMETER_NAME( Shifter::Tail       , "Tail"   )
+EFFECT_PARAMETER_NAME(Shifter::ShiftTarget, "Target")
+EFFECT_PARAMETER_NAME(Shifter::Offset, "Offset")
+EFFECT_PARAMETER_NAME(Shifter::Tail, "Tail")
 
-EFFECT_ENUMERATED_PARAMETER_STRINGS
-(
-    Shifter, Tail,
-    (( Leave    , "Leave"    ))
-    (( Clear    , "Clear"    ))
-    (( Circular , "Circular" ))
-)
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Shifter, Tail,
+                                    ((Leave, "Leave"))((Clear, "Clear"))((Circular, "Circular")))
 
-EFFECT_ENUMERATED_PARAMETER_STRINGS
-(
-    Shifter, ShiftTarget,
-    (( Magnitudes, "Magnitudes"  ))
-    (( Phases    , "Phases"      ))
-    (( Both      , "Mags&Phases" ))
-)
-
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Shifter, ShiftTarget,
+                                    ((Magnitudes, "Magnitudes"))((Phases,
+                                                                  "Phases"))((Both, "Mags&Phases")))
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -73,20 +63,20 @@ EFFECT_ENUMERATED_PARAMETER_STRINGS
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void ShifterImpl::setup( IndexRange const & workingRange, Engine::Setup const & )
+void ShifterImpl::setup(IndexRange const &workingRange, Engine::Setup const &)
 {
     using namespace Math;
 
-    int const offset( convert<int>( percentage2NormalisedLinear( parameters().get<Offset>() ) * convert<float>( workingRange.size() ) ) );
+    int const offset(convert<int>(percentage2NormalisedLinear(parameters().get<Offset>()) *
+                                  convert<float>(workingRange.size())));
 
-    shiftLength_    = abs( offset );
+    shiftLength_ = abs(offset);
     positiveOffset_ = offset > 0;
 
-    ShiftTarget::value_type const mode( parameters().get<ShiftTarget>() );
-    magnitudes_ = ( mode == ShiftTarget::Both ) | ( mode == ShiftTarget::Magnitudes );
-    phases_     = ( mode == ShiftTarget::Both ) | ( mode == ShiftTarget::Phases     );
+    ShiftTarget::value_type const mode(parameters().get<ShiftTarget>());
+    magnitudes_ = (mode == ShiftTarget::Both) | (mode == ShiftTarget::Magnitudes);
+    phases_ = (mode == ShiftTarget::Both) | (mode == ShiftTarget::Phases);
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -95,15 +85,16 @@ void ShifterImpl::setup( IndexRange const & workingRange, Engine::Setup const & 
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void ShifterImpl::process( Engine::ChannelData_AmPh data, Engine::Setup const & ) const
+void ShifterImpl::process(Engine::ChannelData_AmPh data, Engine::Setup const &) const
 {
-    if ( shiftLength_ == 0 )
+    if (shiftLength_ == 0)
         return;
 
-    if ( magnitudes_ ) shift( data.amps  () );
-    if ( phases_     ) shift( data.phases() );
+    if (magnitudes_)
+        shift(data.amps());
+    if (phases_)
+        shift(data.phases());
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -112,48 +103,68 @@ void ShifterImpl::process( Engine::ChannelData_AmPh data, Engine::Setup const & 
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void ShifterImpl::shift( DataRange const & data ) const
+void ShifterImpl::shift(DataRange const &data) const
 {
-    Tail::value_type const type( parameters().get<Tail>() );
+    Tail::value_type const type(parameters().get<Tail>());
 
-    unsigned int const numBins       ( static_cast<unsigned int>( data.size() ) );
-    unsigned int const shiftLength   ( shiftLength_                             );
-    unsigned int const positiveOffset( positiveOffset_                          );
+    unsigned int const numBins(static_cast<unsigned int>(data.size()));
+    unsigned int const shiftLength(shiftLength_);
+    unsigned int const positiveOffset(positiveOffset_);
 
     unsigned int sourceBin;
     unsigned int targetBin;
 
-    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER( circularTailBuffer, Engine::real_t, shiftLength );
-    if ( type == Tail::Circular )
+    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(circularTailBuffer, Engine::real_t, shiftLength);
+    if (type == Tail::Circular)
     {
-        if ( positiveOffset ) { sourceBin = numBins - shiftLength; }
-        else                  { sourceBin = 0                    ; }
-        Math::copy( &data[ sourceBin ], circularTailBuffer.begin(), shiftLength );
+        if (positiveOffset)
+        {
+            sourceBin = numBins - shiftLength;
+        }
+        else
+        {
+            sourceBin = 0;
+        }
+        Math::copy(&data[sourceBin], circularTailBuffer.begin(), shiftLength);
     }
 
     // In any case:
     {
-        unsigned int const dataSize( numBins - shiftLength );
-        if ( positiveOffset ) { sourceBin = 0          ; targetBin = shiftLength; }
-        else                  { sourceBin = shiftLength; targetBin = 0          ; }
-        Math::move( data.begin() + sourceBin, data.begin() + targetBin, dataSize );
+        unsigned int const dataSize(numBins - shiftLength);
+        if (positiveOffset)
+        {
+            sourceBin = 0;
+            targetBin = shiftLength;
+        }
+        else
+        {
+            sourceBin = shiftLength;
+            targetBin = 0;
+        }
+        Math::move(data.begin() + sourceBin, data.begin() + targetBin, dataSize);
     }
 
-    switch ( type )
+    switch (type)
     {
-        case Tail::Leave:
-            break;
+    case Tail::Leave:
+        break;
 
-        case Tail::Clear:
-            sourceBin = positiveOffset ? 0 : numBins - shiftLength;
-            Math::clear( data.begin() + sourceBin, shiftLength );
-            break;
+    case Tail::Clear:
+        sourceBin = positiveOffset ? 0 : numBins - shiftLength;
+        Math::clear(data.begin() + sourceBin, shiftLength);
+        break;
 
-        case Tail::Circular:
-            if ( positiveOffset ) { targetBin = 0                    ; }
-            else                  { targetBin = numBins - shiftLength; }
-            Math::copy( circularTailBuffer.begin(), data.begin() + targetBin, shiftLength );
-            break;
+    case Tail::Circular:
+        if (positiveOffset)
+        {
+            targetBin = 0;
+        }
+        else
+        {
+            targetBin = numBins - shiftLength;
+        }
+        Math::copy(circularTailBuffer.begin(), data.begin() + targetBin, shiftLength);
+        break;
     }
 }
 

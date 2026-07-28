@@ -3,13 +3,13 @@
 /// \file talkingWindImpl.hpp
 /// -------------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef vocoderImpl_hpp__A222DFB9_9541_4031_833C_7D332A621211
 #define vocoderImpl_hpp__A222DFB9_9541_4031_833C_7D332A621211
-#pragma once
 //------------------------------------------------------------------------------
 #include "vocoder.hpp"
 
@@ -29,22 +29,23 @@ namespace Effects
 
 class VocoderImpl : public EffectImpl<Vocoder>
 {
-public: // LE::Effect required interface.
-
+  public: // LE::Effect required interface.
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup  ( IndexRange const &              , Engine::Setup const & )      ;
-    void process( Engine::MainSideChannelData_AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(Engine::MainSideChannelData_AmPh, Engine::Setup const &) const;
 
-private:
-    void lowPassSpectrum_cepstrum     ( DataRange const & spectrum, DataRange const & workBuffer, Engine::Setup const & ) const;
-    void lowPassSpectrum_movingAverage( DataRange const & spectrum, DataRange const & workBuffer, Engine::Setup const & ) const;
+  private:
+    void lowPassSpectrum_cepstrum(DataRange const &spectrum, DataRange const &workBuffer,
+                                  Engine::Setup const &) const;
+    void lowPassSpectrum_movingAverage(DataRange const &spectrum, DataRange const &workBuffer,
+                                       Engine::Setup const &) const;
 
     FilterMethod::value_type filterMethod() const { return parameters().get<FilterMethod>(); }
 
-private:
+  private:
     std::uint16_t cutoff_;
     std::uint16_t filterLength_; // moving average specific
 }; // class VocoderImpl

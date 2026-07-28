@@ -3,11 +3,11 @@
 /// \file reverbator.hpp
 /// --------------------
 ///
-/// Copyright (c) 2009. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
-#pragma once
 #ifndef reverbator_hpp__98055B9A_6CDA_4627_B71A_DA318D536B68
 #define reverbator_hpp__98055B9A_6CDA_4627_B71A_DA318D536B68
 //------------------------------------------------------------------------------
@@ -28,44 +28,43 @@ namespace Algorithms
 ///
 /// \ingroup Algorithms RC
 ///
-/// \brief Creates reverbant sound. 
+/// \brief Creates reverbant sound.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
 class Reverbator
 {
-public: // LE::Algorithm required interface.
-
+  public: // LE::Algorithm required interface.
     ////////////////////////////////////////////////////////////////////////////
     // Parameters
     ////////////////////////////////////////////////////////////////////////////
-    
-    DISCRETE_VALUES_PARAMETER( Mode, (Classic) (Takuramu) )
 
-    DEFINE_PARAMETERS
-    (
-        ( ( Mode   )                                                                                                              )            
-        ( ( Depth  )( float        )( MinimumValue< 10> )( MaximumValue<1000> )( DefaultValue<150> ) ( DisplayValueSuffix<' ms'>) )    
-      //( ( Amount )( unsigned int )( MinimumValue<  0> )( MaximumValue< 100> )( DefaultValue< 50> ) ( DisplayValueSuffix<' %'> ) )
-        ( ( Amount )( int          )( MinimumValue<-60> )( MaximumValue<   0> )( DefaultValue<-12> ) ( DisplayValueSuffix<' dB'> ) )  
-        ( ( StopFrequency  ) )
-    );
+    DISCRETE_VALUES_PARAMETER(Mode, (Classic)(Takuramu))
 
-    struct ChannelState 
+    DEFINE_PARAMETERS(
+        ((Mode))(
+            (Depth)(float)(MinimumValue<10>)(MaximumValue<1000>)(DefaultValue<
+                                                                 150>)(DisplayValueSuffix<' ms'>))
+        //( ( Amount )( unsigned int )( MinimumValue<  0> )( MaximumValue< 100> )( DefaultValue< 50> ) ( DisplayValueSuffix<' %'> ) )
+        ((Amount)(int)(MinimumValue<-60>)(MaximumValue<0>)(DefaultValue<-12>)(DisplayValueSuffix<
+                                                                              ' dB'>))(
+            (StopFrequency)));
+
+    struct ChannelState
     {
-        unsigned int frameCount;                      
-        
+        unsigned int frameCount;
+
         Common::SSEAlignedHalfFFTBuffer savedInMag;
         Common::SSEAlignedHalfFFTBuffer savedOutMag;
-        
+
         Common::SSEAlignedHalfFFTBuffer savedInMagPrev;
-        
+
         void clear()
-        {             
+        {
             savedInMag.clear();
             savedOutMag.clear();
             savedInMagPrev.clear();
-            
+
             frameCount = 0;
         }
     };
@@ -74,26 +73,25 @@ public: // LE::Algorithm required interface.
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup  ( EngineSetup const &, Parameters const & );
-    void process( ChannelState &, ChannelData_AmPh & ) const;
+    void setup(EngineSetup const &, Parameters const &);
+    void process(ChannelState &, ChannelData_AmPh &) const;
 
-public: // Algorithm traits.
+  public: // Algorithm traits.
     static bool const canUseTwoInputs = false;
 
-public: 
-    static char const title      [];
+  public:
+    static char const title[];
     static char const description[];
-private:     
 
-private:
+  private:
+  private:
     unsigned int num_bins_;
-    unsigned int depth_   ;
-    float        amount_  ;
+    unsigned int depth_;
+    float amount_;
     unsigned int rightBin_;
-    Mode::Value  mode_    ;
-    
-    mutable Common::SSEAlignedHalfFFTBuffer tempMag;
+    Mode::Value mode_;
 
+    mutable Common::SSEAlignedHalfFFTBuffer tempMag;
 };
 
 //------------------------------------------------------------------------------

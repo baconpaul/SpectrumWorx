@@ -12,16 +12,16 @@
 /// symbol error instead of at runtime through wrong behaviour caused by the
 /// usage of a default implementation).
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef uiElements_hpp__E78E35E8_D163_442F_84C0_19427B8844BA
 #define uiElements_hpp__E78E35E8_D163_442F_84C0_19427B8844BA
-#pragma once
 //------------------------------------------------------------------------------
 #ifdef __GNUC__
-    #include "linear/parameter.hpp"
+#include "linear/parameter.hpp"
 #endif // __GNUC__
 
 #include "le/utility/platformSpecifics.hpp"
@@ -36,9 +36,9 @@ namespace LE
 //------------------------------------------------------------------------------
 namespace SW
 {
-LE_IMPL_NAMESPACE_BEGIN( Engine )
-    class Setup;
-LE_IMPL_NAMESPACE_END( Engine )
+LE_IMPL_NAMESPACE_BEGIN(Engine)
+class Setup;
+LE_IMPL_NAMESPACE_END(Engine)
 } // namespace SW
 //------------------------------------------------------------------------------
 namespace Parameters
@@ -61,18 +61,15 @@ namespace Parameters
 //                                            (22.02.2011.) (Domagoj Saric)
 ////////////////////////////////////////////////////////////////////////////////
 
-template <class Parameter>
-struct Name
+template <class Parameter> struct Name
 {
     static char const string_[];
 };
 
-template <class Parameter>
-BOOST_CONSTEXPR boost::string_ref name()
+template <class Parameter> BOOST_CONSTEXPR boost::string_ref name()
 {
     return Name<Parameter>::string_;
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -83,12 +80,10 @@ BOOST_CONSTEXPR boost::string_ref name()
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-template <class Parameter>
-struct DiscreteValues
+template <class Parameter> struct DiscreteValues
 {
-    static char const * LE_RESTRICT const strings[ Parameter::numberOfDiscreteValues ];
+    static char const *LE_RESTRICT const strings[Parameter::numberOfDiscreteValues];
 };
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -97,27 +92,30 @@ struct DiscreteValues
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace Detail { template <class TraitTag, class TraitsPack, class... DefaultTraits> struct GetTraitDefaulted; }
+namespace Detail
+{
+template <class TraitTag, class TraitsPack, class... DefaultTraits> struct GetTraitDefaulted;
+}
 namespace Traits
 {
-    namespace Tag { struct Unit; }
-    template <int stringLiteralPart1, int stringLiteralPart2> struct Unit;
+namespace Tag
+{
+struct Unit;
 }
+template <int stringLiteralPart1, int stringLiteralPart2> struct Unit;
+} // namespace Traits
 
-template <class Parameter>
-struct DisplayValueTransformer
+template <class Parameter> struct DisplayValueTransformer
 {
     template <typename Source>
-    static Source const & transform( Source const & value, SW::Engine::Setup const & ) { return value; }
+    static Source const &transform(Source const &value, SW::Engine::Setup const &)
+    {
+        return value;
+    }
 
-    using Suffix = typename Detail::GetTraitDefaulted
-    <
-        Traits::Tag::Unit,
-        typename Parameter::Traits,
-        typename Parameter::Defaults
-    >::type;
+    using Suffix = typename Detail::GetTraitDefaulted<Traits::Tag::Unit, typename Parameter::Traits,
+                                                      typename Parameter::Defaults>::type;
 }; // struct DisplayValueTransformer
-
 
 /// \defgroup UIElementMacros UIElement verbosity reducing macros.
 /// \ingroup UIElementMacros
@@ -150,22 +148,33 @@ struct DisplayValueTransformer
 //                                            (15.07.2011.) (Domagoj Saric)
 ////////////////////////////////////////////////////////////////////////////////
 
-#define ADD_INDIVIDUAL_VALUE_STRING( r, parameter, valueIndex, valueStringPair ) \
-    BOOST_PP_TUPLE_ELEM( 2, 1, valueStringPair ),
+#define ADD_INDIVIDUAL_VALUE_STRING(r, parameter, valueIndex, valueStringPair)                     \
+    BOOST_PP_TUPLE_ELEM(2, 1, valueStringPair),
 
-#define ADD_INDIVIDUAL_VALUE_STRING_ASSERT( r, parameter, valueIndex, valueStringPair ) \
-    static_assert( ( parameter::BOOST_PP_TUPLE_ELEM( 2, 0, valueStringPair ) == valueIndex ), "Incorrect order of enumerated parameter value-string pairs" );
+#define ADD_INDIVIDUAL_VALUE_STRING_ASSERT(r, parameter, valueIndex, valueStringPair)              \
+    static_assert((parameter::BOOST_PP_TUPLE_ELEM(2, 0, valueStringPair) == valueIndex),           \
+                  "Incorrect order of enumerated parameter value-string pairs");
 
-#define ENUMERATED_PARAMETER_STRINGS( parentNameSpaceOrClass, parameter, discreteValueStringPairs ) \
-    template<> char const * LE_RESTRICT const DiscreteValues<parentNameSpaceOrClass::parameter>::strings[ parentNameSpaceOrClass::parameter::numberOfDiscreteValues ] = { \
-    BOOST_PP_SEQ_FOR_EACH_I( ADD_INDIVIDUAL_VALUE_STRING       , parentNameSpaceOrClass::parameter, discreteValueStringPairs ) }; \
-    BOOST_PP_SEQ_FOR_EACH_I( ADD_INDIVIDUAL_VALUE_STRING_ASSERT, parentNameSpaceOrClass::parameter, discreteValueStringPairs )
+#define ENUMERATED_PARAMETER_STRINGS(parentNameSpaceOrClass, parameter, discreteValueStringPairs)  \
+    template <>                                                                                    \
+    char const *LE_RESTRICT const DiscreteValues<parentNameSpaceOrClass::parameter>::strings       \
+        [parentNameSpaceOrClass::parameter::numberOfDiscreteValues] = {                            \
+            BOOST_PP_SEQ_FOR_EACH_I(ADD_INDIVIDUAL_VALUE_STRING,                                   \
+                                    parentNameSpaceOrClass::parameter, discreteValueStringPairs)}; \
+    BOOST_PP_SEQ_FOR_EACH_I(ADD_INDIVIDUAL_VALUE_STRING_ASSERT, parentNameSpaceOrClass::parameter, \
+                            discreteValueStringPairs)
 
-#define EFFECT_ENUMERATED_PARAMETER_STRINGS( parentClass, parameter, discreteValueStringPairs )   \
-    } } namespace Parameters {                                                                    \
-    ENUMERATED_PARAMETER_STRINGS( SW::Effects::parentClass, parameter, discreteValueStringPairs ) \
-    } namespace SW { namespace Effects {
-
+#define EFFECT_ENUMERATED_PARAMETER_STRINGS(parentClass, parameter, discreteValueStringPairs)      \
+    }                                                                                              \
+    }                                                                                              \
+    namespace Parameters                                                                           \
+    {                                                                                              \
+    ENUMERATED_PARAMETER_STRINGS(SW::Effects::parentClass, parameter, discreteValueStringPairs)    \
+    }                                                                                              \
+    namespace SW                                                                                   \
+    {                                                                                              \
+    namespace Effects                                                                              \
+    {
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -175,11 +184,19 @@ struct DisplayValueTransformer
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-#define UI_NAME( parameter ) template<> char const Name<parameter>::string_[]
+#define UI_NAME(parameter) template <> char const Name<parameter>::string_[]
 
-#define EFFECT_PARAMETER_NAME( parameter, name ) \
-    } } namespace Parameters { UI_NAME( SW::Effects::parameter ) = name; } namespace SW { namespace Effects {
-
+#define EFFECT_PARAMETER_NAME(parameter, name)                                                     \
+    }                                                                                              \
+    }                                                                                              \
+    namespace Parameters                                                                           \
+    {                                                                                              \
+    UI_NAME(SW::Effects::parameter) = name;                                                        \
+    }                                                                                              \
+    namespace SW                                                                                   \
+    {                                                                                              \
+    namespace Effects                                                                              \
+    {
 
 /// \} // UIElementMacros
 
@@ -191,7 +208,7 @@ struct DisplayValueTransformer
 
 namespace boost
 {
-    template <std::size_t N>
-    char const * LE_RESTRICT (*addressof( char const * LE_RESTRICT (&strings)[ N ] ))[ N ] { return &strings; }
+template <std::size_t N>
+char const *LE_RESTRICT (*addressof(char const *LE_RESTRICT (&strings)[N])) [N] { return &strings; }
 } // namespace boost
 #endif // uiElements_hpp

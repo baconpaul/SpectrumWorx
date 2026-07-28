@@ -3,7 +3,8 @@
 /// reverserImpl.cpp
 /// ----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -31,9 +32,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Reverser::title      [] = "Reverser";
+char const Reverser::title[] = "Reverser";
 char const Reverser::description[] = "Play chunks backwards.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -41,8 +41,7 @@ char const Reverser::description[] = "Play chunks backwards.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Reverser::Length, "Chunk length" )
-
+EFFECT_PARAMETER_NAME(Reverser::Length, "Chunk length")
 
 ///////////////////////////////////////////////////////////////////////////////
 //
@@ -51,11 +50,10 @@ EFFECT_PARAMETER_NAME( Reverser::Length, "Chunk length" )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void ReverserImpl::setup( IndexRange const &, Engine::Setup const & engineSetup )
+void ReverserImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
 {
-    lengthInSteps_ = engineSetup.milliSecondsToSteps( parameters().get<Length>() );
+    lengthInSteps_ = engineSetup.milliSecondsToSteps(parameters().get<Length>());
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -64,16 +62,15 @@ void ReverserImpl::setup( IndexRange const &, Engine::Setup const & engineSetup 
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void ReverserImpl::process( ChannelState & cs, Engine::ChannelData_AmPh data, Engine::Setup const & ) const
+void ReverserImpl::process(ChannelState &cs, Engine::ChannelData_AmPh data,
+                           Engine::Setup const &) const
 {
     using namespace Math;
 
-    auto const fullNumberOfBins( data.full().numberOfBins() );
+    auto const fullNumberOfBins(data.full().numberOfBins());
 
-    ReversedHistoryBufferState::HistoryData const historyData
-    (
-        cs.getCurrentStepData( lengthInSteps_, fullNumberOfBins )
-    );
+    ReversedHistoryBufferState::HistoryData const historyData(
+        cs.getCurrentStepData(lengthInSteps_, fullNumberOfBins));
 
     //   First we save the new input data and output the current history data.
     // After a chunk/step/frame of history is output we have no more need for it
@@ -84,12 +81,14 @@ void ReverserImpl::process( ChannelState & cs, Engine::ChannelData_AmPh data, En
     // were already saved time-reversed we in effect play/output the
     // time-reversed version of the signal history.
     //                                        (21.05.2010.) (Domagoj Saric)
-    auto const startBin( data.beginBin() );
-    swap( data.amps  ().begin(), data.amps  ().end(), historyData.targetHistory.pAmplitudesOrReals + startBin );
-    swap( data.phases().begin(), data.phases().end(), historyData.targetHistory.pPhasesOrImags     + startBin );
+    auto const startBin(data.beginBin());
+    swap(data.amps().begin(), data.amps().end(),
+         historyData.targetHistory.pAmplitudesOrReals + startBin);
+    swap(data.phases().begin(), data.phases().end(),
+         historyData.targetHistory.pPhasesOrImags + startBin);
 
-    data.copySkippedRanges( Engine::DataPair::Amps  , historyData.targetHistory.pAmplitudesOrReals );
-    data.copySkippedRanges( Engine::DataPair::Phases, historyData.targetHistory.pPhasesOrImags     );
+    data.copySkippedRanges(Engine::DataPair::Amps, historyData.targetHistory.pAmplitudesOrReals);
+    data.copySkippedRanges(Engine::DataPair::Phases, historyData.targetHistory.pPhasesOrImags);
 
     // Time reverse the new, saved, history frame.
     // Implementation note:
@@ -102,16 +101,18 @@ void ReverserImpl::process( ChannelState & cs, Engine::ChannelData_AmPh data, En
     // symmetrical, while on phases it has the effect of negation because they
     // are anti-symmetrical).
     //                                        (14.05.2010.) (Domagoj Saric)
-    negate( historyData.targetHistory.pPhasesOrImags, fullNumberOfBins );
+    negate(historyData.targetHistory.pPhasesOrImags, fullNumberOfBins);
 
     // If the requested history data was emulated, the output (from
     // historyData.targetHistory) contains garbage so we must copy the emulated
     // history to the output).
-    if ( historyData.isEmulated() )
+    if (historyData.isEmulated())
     {
-        auto const numberOfBins( data.numberOfBins() );
-        copy( historyData.sourceHistory.pAmplitudesOrReals + startBin, data.amps  ().begin(), numberOfBins );
-        copy( historyData.sourceHistory.pPhasesOrImags     + startBin, data.phases().begin(), numberOfBins );
+        auto const numberOfBins(data.numberOfBins());
+        copy(historyData.sourceHistory.pAmplitudesOrReals + startBin, data.amps().begin(),
+             numberOfBins);
+        copy(historyData.sourceHistory.pPhasesOrImags + startBin, data.phases().begin(),
+             numberOfBins);
     }
 }
 

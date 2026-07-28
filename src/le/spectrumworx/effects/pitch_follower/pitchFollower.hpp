@@ -3,14 +3,14 @@
 /// \file pitchFollower.hpp
 /// -----------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef pitchFollower_hpp__2BDC51A5_6E70_4841_B2B6_E2C764777A79
 #define pitchFollower_hpp__2BDC51A5_6E70_4841_B2B6_E2C764777A79
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -30,23 +30,20 @@ namespace Effects
 
 namespace Detail
 {
-    struct PitchFollowerBase
-    {
-        LE_DEFINE_PARAMETERS
-        (
-            ( ( Speed )( LinearFloat )( Minimum< 0> )( Maximum<60> )( Default< 1> )( Unit<' \'/s'> ) )
-        );
+struct PitchFollowerBase
+{
+    LE_DEFINE_PARAMETERS(
+        ((Speed)(LinearFloat)(Minimum<0>)(Maximum<60>)(Default<1>)(Unit<' \'/s'>)));
 
-        /// \typedef Speed
-        /// \brief Determines how fast the pitch is followed (in semitones per
-        /// second).
+    /// \typedef Speed
+    /// \brief Determines how fast the pitch is followed (in semitones per
+    /// second).
 
-        static bool const usesSideChannel = true;
+    static bool const usesSideChannel = true;
 
-        static char const description[];
-    };
+    static char const description[];
+};
 } // namespace Detail
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -56,18 +53,17 @@ namespace Detail
 ///
 /// \brief Relay pitch from side channel to main channel.
 ///
-/// The main channel is pitch-shifted to the dominant frequency detected in 
-/// the side-channel. The Speed parameter determines how quickly the 
-/// pitch-shifting to the target frequency should be done in order to provide 
+/// The main channel is pitch-shifted to the dominant frequency detected in
+/// the side-channel. The Speed parameter determines how quickly the
+/// pitch-shifting to the target frequency should be done in order to provide
 /// a smoother result.
-/// 
+///
 ////////////////////////////////////////////////////////////////////////////////
 
 struct PitchFollower : Detail::PitchFollowerBase
 {
     static char const title[];
 };
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///

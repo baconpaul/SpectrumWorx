@@ -3,7 +3,8 @@
 /// slowMotion.cpp
 /// --------------
 ///
-/// Copyright (c) 2010. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2010. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -24,9 +25,8 @@ namespace Algorithms
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const SlowMotion::title      [] = "Slow Motion";
+char const SlowMotion::title[] = "Slow Motion";
 char const SlowMotion::description[] = "Limits magnitude change speed.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -34,10 +34,9 @@ char const SlowMotion::description[] = "Limits magnitude change speed.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-UI_NAME( SlowMotion::LimitRise ) = "Speed";
-UI_NAME( SlowMotion::Threshold ) = "Threshold";
-UI_NAME( SlowMotion::Step      ) = "Step";
-
+UI_NAME(SlowMotion::LimitRise) = "Speed";
+UI_NAME(SlowMotion::Threshold) = "Threshold";
+UI_NAME(SlowMotion::Step) = "Step";
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -46,19 +45,19 @@ UI_NAME( SlowMotion::Step      ) = "Step";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void SlowMotion::setup( EngineSetup const & engineSetup, Parameters const & myParameters )
-{  
-    num_bins_ = engineSetup.numberOfBins(); 
-  
-    float const limitR( myParameters.get<LimitRise>() / engineSetup.stepsPerSecond() );
-    
-    limitRise_ = std::pow( 10, ( limitR / ( 2.0f * 10.0f) ) ); // microBell    
-    
-    threshold_ = engineSetup.maximumAmplitude () * std::pow( 10.0f, myParameters.get<Threshold>() / 20.0f );
+void SlowMotion::setup(EngineSetup const &engineSetup, Parameters const &myParameters)
+{
+    num_bins_ = engineSetup.numberOfBins();
+
+    float const limitR(myParameters.get<LimitRise>() / engineSetup.stepsPerSecond());
+
+    limitRise_ = std::pow(10, (limitR / (2.0f * 10.0f))); // microBell
+
+    threshold_ =
+        engineSetup.maximumAmplitude() * std::pow(10.0f, myParameters.get<Threshold>() / 20.0f);
 
     step_ = myParameters.get<Step>() / 1000.0f;
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -67,23 +66,23 @@ void SlowMotion::setup( EngineSetup const & engineSetup, Parameters const & myPa
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void SlowMotion::process( ChannelState & cs, ChannelData_AmPh & data ) const
+void SlowMotion::process(ChannelState &cs, ChannelData_AmPh &data) const
 {
-    float const epsilon( 1E-20f );
+    float const epsilon(1E-20f);
     float gain;
 
     // Initialize the buffer:
-    if ( !cs.isInitialized )
+    if (!cs.isInitialized)
     {
-        std::memcpy( cs.magsPrev.begin(), data.amplitudes.begin(), num_bins_ * sizeof( float ) );
+        std::memcpy(cs.magsPrev.begin(), data.amplitudes.begin(), num_bins_ * sizeof(float));
         cs.isInitialized = true;
     }
-    
+
     // Get new target:
-    for( unsigned int k( 0 ); k < num_bins_; ++k )
+    for (unsigned int k(0); k < num_bins_; ++k)
     {
         // If amplitude is higher make it target!
-        if( data.amplitudes[k] > (cs.magsTargetNew[k]*step_) && data.amplitudes[k] > threshold_ )
+        if (data.amplitudes[k] > (cs.magsTargetNew[k] * step_) && data.amplitudes[k] > threshold_)
         {
             cs.magsTargetNew[k] = data.amplitudes[k];
         }
@@ -92,12 +91,12 @@ void SlowMotion::process( ChannelState & cs, ChannelData_AmPh & data ) const
             //cs.magsTargetNew[k] = 0.0f;
         }
 
-        if( cs.reached[ k ] )
-            cs.magsTarget[ k ] = cs.magsTargetNew[ k ];
+        if (cs.reached[k])
+            cs.magsTarget[k] = cs.magsTargetNew[k];
     }
 
-    for( unsigned int k( 0 ); k < num_bins_; ++k )
-    {         
+    for (unsigned int k(0); k < num_bins_; ++k)
+    {
         //// If we reached the target, then reset it:
         //if( cs.magsPrev[k] > cs.magsTarget[k] /*&& data.amplitudes[k] < threshold_ */)
         //{
@@ -105,30 +104,28 @@ void SlowMotion::process( ChannelState & cs, ChannelData_AmPh & data ) const
         //    cs.reached[ k ] = true;
         //}
 
-
-        if( data.amplitudes[k] < threshold_ )
-            cs.reached[ k ] = true;
+        if (data.amplitudes[k] < threshold_)
+            cs.reached[k] = true;
         else
-        {            
-            // Go slowly towards the target:            
-            gain = cs.magsTarget[k] / ( cs.magsPrev[k] + epsilon ); 
-            
-            if( gain  > limitRise_ )
+        {
+            // Go slowly towards the target:
+            gain = cs.magsTarget[k] / (cs.magsPrev[k] + epsilon);
+
+            if (gain > limitRise_)
             {
-                cs.reached[ k ] = false;
-                data.amplitudes[k] = ( cs.magsPrev[k] + epsilon ) * limitRise_;
+                cs.reached[k] = false;
+                data.amplitudes[k] = (cs.magsPrev[k] + epsilon) * limitRise_;
             }
             else
             {
                 //cs.reached[ k ] = true;
             }
-        } 
+        }
     }
 
     // Save new amplitudes for next comparison:
-    std::memcpy( cs.magsPrev.begin(), data.amplitudes.begin(), num_bins_ * sizeof( float ) );
+    std::memcpy(cs.magsPrev.begin(), data.amplitudes.begin(), num_bins_ * sizeof(float));
 }
-
 
 void SlowMotion::ChannelState::clear()
 {
@@ -138,7 +135,6 @@ void SlowMotion::ChannelState::clear()
 
     isInitialized = false;
 }
-
 
 //------------------------------------------------------------------------------
 } // namespace Algorithms

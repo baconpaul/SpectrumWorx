@@ -3,7 +3,8 @@
 /// armonizerImpl.cpp
 /// -----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -18,7 +19,7 @@ namespace LE
 namespace SW
 {
 //------------------------------------------------------------------------------
-namespace Effects 
+namespace Effects
 {
 //------------------------------------------------------------------------------
 
@@ -28,9 +29,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Armonizer::title      [] = "Armonizer";
+char const Armonizer::title[] = "Armonizer";
 char const Armonizer::description[] = "Add harmonics.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -38,8 +38,7 @@ char const Armonizer::description[] = "Add harmonics.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Armonizer::Interval, "Interval" )
-
+EFFECT_PARAMETER_NAME(Armonizer::Interval, "Interval")
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -48,11 +47,12 @@ EFFECT_PARAMETER_NAME( Armonizer::Interval, "Interval" )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void ArmonizerImpl::setup( IndexRange const &, Engine::Setup const & engineSetup )
+void ArmonizerImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
 {
     // Setup pitch shifter:
-    PitchShifter::setup                     ( engineSetup                                              );
-    PitchShifter::setPitchScaleFromSemitones( parameters().get<Interval>(), engineSetup.numberOfBins() );
+    PitchShifter::setup(engineSetup);
+    PitchShifter::setPitchScaleFromSemitones(parameters().get<Interval>(),
+                                             engineSetup.numberOfBins());
 }
 
 /// \todo This is just another pitch shifter. Improve it by adding the ability

@@ -3,14 +3,14 @@
 /// \file merger.hpp
 /// ----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef merger_hpp__6BCD6590_5CD7_40EE_9566_2D273B6A9B1C
 #define merger_hpp__6BCD6590_5CD7_40EE_9566_2D273B6A9B1C
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -37,21 +37,20 @@ namespace Effects
 ///
 /// \brief Combines two samples.
 ///
-/// This effect provides conditional combinations of the input signal with that 
-/// of the side channel. Copies the side channel to the input channel if the 
-/// selected conditions are met, and depending on the threshold setting. 
+/// This effect provides conditional combinations of the input signal with that
+/// of the side channel. Copies the side channel to the input channel if the
+/// selected conditions are met, and depending on the threshold setting.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
 struct Merger
 {
-    LE_ENUMERATED_PARAMETER( Operation, ( MainLargerThanSide )( SideLargerThanMain )( MainAboveThreshold )( SideAboveThreshold )( MainBelowThreshold )( SideBelowThreshold ) );
+    LE_ENUMERATED_PARAMETER(
+        Operation,
+        (MainLargerThanSide)(SideLargerThanMain)(MainAboveThreshold)(SideAboveThreshold)(MainBelowThreshold)(SideBelowThreshold));
 
-    LE_DEFINE_PARAMETERS
-    (
-        ( ( Operation ) )
-        ( ( Threshold )( LinearFloat )( Minimum<-120> )( Maximum<0> )( Default<-20> )( Unit<' dB'> ) )
-    );
+    LE_DEFINE_PARAMETERS(((Operation))(
+        (Threshold)(LinearFloat)(Minimum<-120>)(Maximum<0>)(Default<-20>)(Unit<' dB'>)));
 
     /// \typedef Operation
     /// \brief Defines the operation to be executed.
@@ -65,10 +64,9 @@ struct Merger
     /// \typedef Threshold
     /// \brief Threshold used for comparisons.
 
-
     static bool const usesSideChannel = false;
 
-    static char const title      [];
+    static char const title[];
     static char const description[];
 };
 

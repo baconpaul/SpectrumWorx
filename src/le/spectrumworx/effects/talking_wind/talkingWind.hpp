@@ -3,14 +3,14 @@
 /// \file talkingWind.hpp
 /// ---------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef talkingWind_hpp__4426F456_173B_4D8A_9A45_20F9E315AFC7
 #define talkingWind_hpp__4426F456_173B_4D8A_9A45_20F9E315AFC7
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -47,22 +47,19 @@ namespace Effects
 
 struct TalkingWind
 {
-    LE_DEFINE_PARAMETERS
-    (
-        ( ( EnvelopeBorder )( LinearUnsignedInteger )( Minimum<  0> )( Maximum<12000> )( Default<1000> )( Unit<' Hz'> ) )
-        ( ( EnvelopeGain   )( LinearFloat           )( Minimum<-10> )( Maximum<   10> )( Default<   0> )( Unit<' dB'> ) )
-    );
-
+    LE_DEFINE_PARAMETERS(
+        ((EnvelopeBorder)(LinearUnsignedInteger)(Minimum<0>)(Maximum<12000>)(Default<
+                                                                             1000>)(Unit<' Hz'>))(
+            (EnvelopeGain)(LinearFloat)(Minimum<-10>)(Maximum<10>)(Default<0>)(Unit<' dB'>)));
 
     /// \typedef EnvelopeBorder
     /// \brief Controls the perceived "smoothness" of the modulator.
     /// \typedef EnvelopeGain
     /// \brief Adds gain to envelope to amplify the effect.
 
-
     static bool const usesSideChannel = true;
 
-    static char const title      [];
+    static char const title[];
     static char const description[];
 };
 

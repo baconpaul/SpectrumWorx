@@ -3,7 +3,8 @@
 /// historyBuffer.cpp
 /// -----------------
 ///
-/// Copyright (c) 2011 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2011 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -19,12 +20,10 @@ namespace Effects
 {
 //------------------------------------------------------------------------------
 
-ReversedHistoryBufferState::HistoryData ReversedHistoryBufferState::getCurrentStepData
-(
-    std::uint16_t const historyLengthInSteps,
-    std::uint16_t const numberOfBins,
-    DataRange     const historyData
-)
+ReversedHistoryBufferState::HistoryData
+ReversedHistoryBufferState::getCurrentStepData(std::uint16_t const historyLengthInSteps,
+                                               std::uint16_t const numberOfBins,
+                                               DataRange const historyData)
 {
     // Implementation note:
     //   The step counter has to be incremented at the beginning/before actual
@@ -44,7 +43,7 @@ ReversedHistoryBufferState::HistoryData ReversedHistoryBufferState::getCurrentSt
     // [0, historyLengthInSteps) range but because it is of unsigned type an
     // overflown result will thus always be >= historyLengthInSteps.
     //                                        (21.05.2010.) (Domagoj Saric)
-    if ( step_ >= historyLengthInSteps )
+    if (step_ >= historyLengthInSteps)
     {
         // Implementation note:
         //   Ideally we could now just do:
@@ -60,15 +59,15 @@ ReversedHistoryBufferState::HistoryData ReversedHistoryBufferState::getCurrentSt
         // historyLengthInSteps). For this reason we need to perform more
         // complex logic and properly (re)set step_.
         //                                    (21.05.2010.) (Domagoj Saric)
-        if ( increment_ > 0 )
+        if (increment_ > 0)
         {
-            LE_ASSUME( increment_ == 1 );
-            increment_ = - 1;
-            step_      = historyLengthInSteps - 1;
+            LE_ASSUME(increment_ == 1);
+            increment_ = -1;
+            step_ = historyLengthInSteps - 1;
         }
         else
         {
-            LE_ASSUME( increment_ == -1 );
+            LE_ASSUME(increment_ == -1);
             // Implementation note:
             //   Here we check for another special case: the fact that our
             // current position (step_) went outside the 'recorded' history
@@ -82,28 +81,28 @@ ReversedHistoryBufferState::HistoryData ReversedHistoryBufferState::getCurrentSt
             // direction is the correct one, i.e. reversed), we must only skip
             // over to the closest (the rightmost/uppermost) valid step.
             //                                (08.06.2010.) (Domagoj Saric)
-            if ( actualHistoryLengthInSteps_ > historyLengthInSteps )
+            if (actualHistoryLengthInSteps_ > historyLengthInSteps)
             {
                 step_ = historyLengthInSteps - 1;
             }
             else
             {
                 increment_ = 1;
-                step_      = 0;
+                step_ = 0;
             }
         }
     }
 
-    BOOST_ASSERT_MSG( step_ < historyLengthInSteps, "Step overflow." );
+    BOOST_ASSERT_MSG(step_ < historyLengthInSteps, "Step overflow.");
 
-    unsigned int const numberOfBinsAligned( Math::alignIndex( numberOfBins ) );
-    unsigned int const fullFrameSize      ( numberOfBinsAligned * 2     );
+    unsigned int const numberOfBinsAligned(Math::alignIndex(numberOfBins));
+    unsigned int const fullFrameSize(numberOfBinsAligned * 2);
 
-    float * const pTargetAmplitudesOrReals( &historyData[ step_ * fullFrameSize ]          );
-    float * const pTargetPhasesOrImags    ( pTargetAmplitudesOrReals + numberOfBinsAligned );
+    float *const pTargetAmplitudesOrReals(&historyData[step_ * fullFrameSize]);
+    float *const pTargetPhasesOrImags(pTargetAmplitudesOrReals + numberOfBinsAligned);
 
-    float *       pSourceAmplitudesOrReals( pTargetAmplitudesOrReals                       );
-    float *       pSourcePhasesOrImags    ( pTargetPhasesOrImags                           );
+    float *pSourceAmplitudesOrReals(pTargetAmplitudesOrReals);
+    float *pSourcePhasesOrImags(pTargetPhasesOrImags);
 
     // Implementation note:
     //   If the current (desired) reversing length is longer than the history we
@@ -113,12 +112,13 @@ ReversedHistoryBufferState::HistoryData ReversedHistoryBufferState::getCurrentSt
     // playing it out until enough history has been gathered to continue normal
     // operation.
     //                                        (08.06.2010.) (Domagoj Saric)
-    if ( actualHistoryLengthInSteps_ < historyLengthInSteps )
+    if (actualHistoryLengthInSteps_ < historyLengthInSteps)
     {
-        if ( step_ >= actualHistoryLengthInSteps_ )
+        if (step_ >= actualHistoryLengthInSteps_)
         {
-            pSourceAmplitudesOrReals = &historyData[ ( step_ - emulatedHistoryStepOffset_ ) * fullFrameSize ];
-            pSourcePhasesOrImags     = pSourceAmplitudesOrReals + numberOfBinsAligned;
+            pSourceAmplitudesOrReals =
+                &historyData[(step_ - emulatedHistoryStepOffset_) * fullFrameSize];
+            pSourcePhasesOrImags = pSourceAmplitudesOrReals + numberOfBinsAligned;
 
             // Implementation note:
             //   We have to move the emulated history 'pointer' one point back
@@ -133,7 +133,7 @@ ReversedHistoryBufferState::HistoryData ReversedHistoryBufferState::getCurrentSt
 
             ++actualHistoryLengthInSteps_;
 
-            if ( emulatedHistoryStepOffset_ > actualHistoryLengthInSteps_ )
+            if (emulatedHistoryStepOffset_ > actualHistoryLengthInSteps_)
                 emulatedHistoryStepOffset_ = 0;
         }
     }
@@ -142,18 +142,14 @@ ReversedHistoryBufferState::HistoryData ReversedHistoryBufferState::getCurrentSt
         // Reset the 'history emulation state' (should actually only be done
         // once after a 'history underrun' situation has passed).
         actualHistoryLengthInSteps_ = historyLengthInSteps;
-        emulatedHistoryStepOffset_  = 0                   ;
+        emulatedHistoryStepOffset_ = 0;
     }
 
-    HistoryData const result =
-    {
-        { pTargetAmplitudesOrReals, pTargetPhasesOrImags },
-        { pSourceAmplitudesOrReals, pSourcePhasesOrImags }        
-    };
+    HistoryData const result = {{pTargetAmplitudesOrReals, pTargetPhasesOrImags},
+                                {pSourceAmplitudesOrReals, pSourcePhasesOrImags}};
 
     return result;
 }
-
 
 void ReversedHistoryBufferState::reset()
 {
@@ -162,13 +158,12 @@ void ReversedHistoryBufferState::reset()
     // function we have to set it to -1 here so that it would become 0 when the
     // actual processing starts.
     //                                        (21.05.2010.) (Domagoj Saric)
-    step_      = static_cast<decltype( step_ )>( -1 );
+    step_ = static_cast<decltype(step_)>(-1);
     increment_ = 1;
 
     actualHistoryLengthInSteps_ = 0;
-    emulatedHistoryStepOffset_  = 0;
+    emulatedHistoryStepOffset_ = 0;
 }
-
 
 bool ReversedHistoryBufferState::HistoryData::isEmulated() const
 {

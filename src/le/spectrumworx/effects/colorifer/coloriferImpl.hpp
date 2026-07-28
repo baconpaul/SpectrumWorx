@@ -3,13 +3,13 @@
 /// \file coloriferImpl.hpp
 /// -----------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef coloriferImpl_hpp__B6E8308A_87E9_4d87_8E9E_C537504C54DA
 #define coloriferImpl_hpp__B6E8308A_87E9_4d87_8E9E_C537504C54DA
-#pragma once
 //------------------------------------------------------------------------------
 #include "colorifer.hpp"
 
@@ -28,16 +28,15 @@ namespace Effects
 
 class ColoriferImpl : public EffectImpl<Colorifer>
 {
-public: // LE::Effect required interface.
-
+  public: // LE::Effect required interface.
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup  ( IndexRange const &, Engine::Setup const & );
-    void process( Engine::MainSideChannelData_AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(Engine::MainSideChannelData_AmPh, Engine::Setup const &) const;
 
-private:
+  private:
     IndexRange::value_type shapeWidth_;
 }; // class ColoriferImpl
 

@@ -3,14 +3,14 @@
 /// \file bandpass.hpp
 /// ------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef bandpass_hpp__3E2335FA_F97E_47A9_9BED_977505A90353
 #define bandpass_hpp__3E2335FA_F97E_47A9_9BED_977505A90353
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -30,21 +30,18 @@ namespace Effects
 
 namespace Detail
 {
-    struct BandGain
-    {
-        LE_DEFINE_PARAMETERS
-        (
-            ( ( Attenuation )( LinearFloat )( Minimum<0> )( Maximum<60> )( Default<0> )( Unit<' dB'> ) )
-        );
+struct BandGain
+{
+    LE_DEFINE_PARAMETERS(
+        ((Attenuation)(LinearFloat)(Minimum<0>)(Maximum<60>)(Default<0>)(Unit<' dB'>)));
 
-        /// \typedef Attenuation
-        /// \brief Amount of signal attenuation (within the selected frequency
-        /// band).
+    /// \typedef Attenuation
+    /// \brief Amount of signal attenuation (within the selected frequency
+    /// band).
 
-        static bool const usesSideChannel = false;
-    };
+    static bool const usesSideChannel = false;
+};
 } // namespace Detail
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -63,10 +60,9 @@ namespace Detail
 
 struct Bandpass : Detail::BandGain
 {
-    static char const title      [];
+    static char const title[];
     static char const description[];
 };
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -83,7 +79,7 @@ struct Bandpass : Detail::BandGain
 
 struct Bandstop : Detail::BandGain
 {
-    static char const title      [];
+    static char const title[];
     static char const description[];
 };
 

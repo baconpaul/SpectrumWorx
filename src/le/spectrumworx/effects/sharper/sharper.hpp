@@ -3,14 +3,14 @@
 /// \file sharper.hpp
 /// -----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef sharper_hpp__F315fE63_42EA_4CF4_AE4D_180C4A01F4DE
-#define sharper_hpp__F315fE63_42EA_4CF4_AE4D_180C4A01F4DE 
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#define sharper_hpp__F315fE63_42EA_4CF4_AE4D_180C4A01F4DE
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -34,22 +34,21 @@ namespace Effects
 ///
 /// \ingroup Effects
 ///
-/// \brief Apply sharper effect using high pass filter. 
+/// \brief Apply sharper effect using high pass filter.
 ///
-/// The opposite of the Smoother effect, this effect sharpens the spectrum. 
-/// The smoothed signal is subtracted from original to arrive at the sharpened 
-/// signal. 
+/// The opposite of the Smoother effect, this effect sharpens the spectrum.
+/// The smoothed signal is subtracted from original to arrive at the sharpened
+/// signal.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
 struct Sharper
 {
-    LE_DEFINE_PARAMETERS
-    (        
-        ( ( AveragingWidth )( LinearUnsignedInteger )( Minimum<  0> )( Maximum<5000> )( Default<1000> )( Unit<' Hz'> ) )
-        ( ( Intensity      )( LinearFloat           )( Minimum<  0> )( Maximum< +72> )( Default<  20> )( Unit<' dB'> ) )
-        ( ( Limiter        )( LinearFloat           )( Minimum<-80> )( Maximum<   0> )( Default< -20> )( Unit<' dB'> ) )
-    );
+    LE_DEFINE_PARAMETERS(
+        ((AveragingWidth)(LinearUnsignedInteger)(Minimum<0>)(Maximum<5000>)(Default<1000>)(Unit<
+                                                                                           ' Hz'>))(
+            (Intensity)(LinearFloat)(Minimum<0>)(Maximum<+72>)(Default<20>)(Unit<' dB'>))(
+            (Limiter)(LinearFloat)(Minimum<-80>)(Maximum<0>)(Default<-20>)(Unit<' dB'>)));
 
     /// \typedef AveragingWidth
     /// \brief Width of the region to be sharpened.
@@ -59,8 +58,8 @@ struct Sharper
     /// \brief Hard limiter maintains stability.
 
     static bool const usesSideChannel = false;
- 
-    static char const title      [];
+
+    static char const title[];
     static char const description[];
 };
 

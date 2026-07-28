@@ -3,14 +3,14 @@
 /// \file centroidExtractor.hpp
 /// ---------------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef centroidExtractor_hpp__91D2BE08_ACCE_4C50_B172_CCB947A246DC
 #define centroidExtractor_hpp__91D2BE08_ACCE_4C50_B172_CCB947A246DC
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
@@ -38,24 +38,21 @@ namespace Effects
 /// \brief Adaptively finds the spectral centre and preserves the spectrum
 /// around it.
 ///
-/// Centroid is an adaptive, self-tuning band pass filter which follows the 
-/// centre frequency with a controllable symmetric band curve (slope). 
-/// The module determines the time variable centre frequency with different 
-/// processing modes. Frequencies outside the region around the centroid 
+/// Centroid is an adaptive, self-tuning band pass filter which follows the
+/// centre frequency with a controllable symmetric band curve (slope).
+/// The module determines the time variable centre frequency with different
+/// processing modes. Frequencies outside the region around the centroid
 /// frequency are removed, the rest inside the band is smoothed.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
 struct CentroidExtractor
 {
-    LE_ENUMERATED_PARAMETER( Mode, ( Centroid )( Peak )( Dominant ) );
+    LE_ENUMERATED_PARAMETER(Mode, (Centroid)(Peak)(Dominant));
 
-    LE_DEFINE_PARAMETERS
-    (
-        ( ( Mode        ) )
-        ( ( Bandwidth   )( LinearUnsignedInteger )( Minimum<0> )( Maximum<6000> )( Default<1000> )( Unit<' Hz'> ) )
-        ( ( Attenuation )( LinearSignedInteger   )( Minimum<0> )( Maximum< 100> )( Default<  10> )( Unit<' dB'> ) )
-    );
+    LE_DEFINE_PARAMETERS(((Mode))(
+        (Bandwidth)(LinearUnsignedInteger)(Minimum<0>)(Maximum<6000>)(Default<1000>)(Unit<' Hz'>))(
+        (Attenuation)(LinearSignedInteger)(Minimum<0>)(Maximum<100>)(Default<10>)(Unit<' dB'>)));
 
     /// \typedef Mode
     /// \brief
@@ -68,10 +65,9 @@ struct CentroidExtractor
     /// \typedef Attenuation
     /// \brief Intensity of attenuation.
 
-
     static bool const usesSideChannel = false;
 
-    static char const title      [];
+    static char const title[];
     static char const description[];
 };
 

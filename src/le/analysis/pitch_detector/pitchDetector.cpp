@@ -3,7 +3,8 @@
 /// pitchDetector.cpp
 /// -----------------
 ///
-/// Copyright (c) 2010 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2010 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -24,7 +25,7 @@
 #include <limits>
 #include <numeric>
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN( LE )
+LE_IMPL_NAMESPACE_BEGIN(LE)
 //------------------------------------------------------------------------------
 
 // https://www.littleendian.com/wiki/index.php/PitchDetectorSDK
@@ -48,7 +49,6 @@ LE_IMPL_NAMESPACE_BEGIN( LE )
 // http://www.scribd.com/doc/50529329/48653343-digital-processing
 // http://repository.kulib.kyoto-u.ac.jp/dspace/bitstream/2433/52615/1/soa004_081.pdf (Pitch extraction by Peak detection 1966)
 // http://ieeexplore.ieee.org/xpl/login.jsp?tp=&arnumber=5556836&url=http%3A%2F%2Fieeexplore.ieee.org%2Fiel5%2F5535008%2F5556742%2F05556836.pdf%3Farnumber%3D5556836
-
 
 // Discussions:
 // http://stackoverflow.com/questions/7181630/fft-on-iphone-to-ignore-background-noise-and-find-lower-pitches
@@ -75,7 +75,6 @@ LE_IMPL_NAMESPACE_BEGIN( LE )
 // https://github.com/JorenSix/TarsosDSP
 // - commercial:
 
-
 // 3rd party end products:
 // - free:
 // https://play.google.com/store/apps/details?id=com.ntrack.tuner
@@ -95,15 +94,14 @@ LE_IMPL_NAMESPACE_BEGIN( LE )
 
 using namespace SW; //...mrmlj...
 
-bool operator<( HPS const & left, HPS const & right )
+bool operator<(HPS const &left, HPS const &right)
 {
-    LE_ASSUME( left .harmonicProduct >= 0 );
-    LE_ASSUME( right.harmonicProduct >= 0 );
+    LE_ASSUME(left.harmonicProduct >= 0);
+    LE_ASSUME(right.harmonicProduct >= 0);
     /// \note We want a descending sort.
     ///                                       (05.04.2016.) (Domagoj Saric)
     return left.harmonicProduct > right.harmonicProduct;
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -112,56 +110,51 @@ bool operator<( HPS const & left, HPS const & right )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-float LE_FASTCALL PitchDetector::findPitch
-(
-    SW::Engine::ReadOnlyDataRange const &       amplitudes,
-    ChannelState                        &       cs,
-    float                                 const lfb,
-    float                                 const hfb,
-    SW::Engine::Setup             const &       engineSetup
-)
+float PitchDetector::findPitch(SW::Engine::ReadOnlyDataRange const &amplitudes, ChannelState &cs,
+                               float const lfb, float const hfb,
+                               SW::Engine::Setup const &engineSetup)
 {
-    auto const numberOfBins( static_cast<std::uint16_t>( amplitudes.size() ) );
+    auto const numberOfBins(static_cast<std::uint16_t>(amplitudes.size()));
 
     // Peak detector settings:
     PeakDetector pd;
     // Find all peaks, of any strength:
-    pd.setStrengthThreshold(  0 );
+    pd.setStrengthThreshold(0);
     // Relax the threshold to 80 dB:
-    pd.setGlobalThreshold  ( 80 );
-    pd.setZeroDecibelValue ( engineSetup.maximumAmplitude() );
+    pd.setGlobalThreshold(80);
+    pd.setZeroDecibelValue(engineSetup.maximumAmplitude());
 
     // Find peaks:
-    pd.findPeaksAndEstimateFrequency( amplitudes.begin(), numberOfBins, engineSetup.sampleRate<std::uint32_t>() );
+    pd.findPeaksAndEstimateFrequency(amplitudes.begin(), numberOfBins,
+                                     engineSetup.sampleRate<std::uint32_t>());
     // Delete non-peaks to make it easier for HPS:
-    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER( filteredAmps, float, numberOfBins );
-    Math::copy( amplitudes, filteredAmps );
-    pd.attenuateNonPeaks( filteredAmps.begin(), 0, numberOfBins - 1, 300.0f );
+    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(filteredAmps, float, numberOfBins);
+    Math::copy(amplitudes, filteredAmps);
+    pd.attenuateNonPeaks(filteredAmps.begin(), 0, numberOfBins - 1, 300.0f);
 
     // Find HPS spectrum:
-    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER( hps, HPS, numberOfBins );
-    findHarmonicProductSpectrumAndSort( filteredAmps, hps );
+    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(hps, HPS, numberOfBins);
+    findHarmonicProductSpectrumAndSort(filteredAmps, hps);
     // Estimate pitch:
-    float pitch( estimatePitch( cs.lastPitch, lfb, hfb, hps, pd ) );
+    float pitch(estimatePitch(cs.lastPitch, lfb, hfb, hps, pd));
 
 #ifdef LE_SW_PURE_ANALYSIS
-    std::uint8_t const maximumConfidence        ( 5    );
-    float        const maximumAllowedPitchChange( 0.2f );
+    std::uint8_t const maximumConfidence(5);
+    float const maximumAllowedPitchChange(0.2f);
 
-    if ( pitch )
+    if (pitch)
     { // Valid new pitch:
-        if ( !cs.lastPitch )
+        if (!cs.lastPitch)
         { // No previous pitch - simply use the new one:
             cs.confidence = 1;
         }
-        else
-        if ( ( Math::abs( cs.lastPitch - pitch ) ) / pitch < maximumAllowedPitchChange )
+        else if ((Math::abs(cs.lastPitch - pitch)) / pitch < maximumAllowedPitchChange)
         { // Pitch changed within limits - save it and increase confidence:
-            cs.confidence = std::min<std::uint8_t>( maximumConfidence, cs.confidence + 1 );
+            cs.confidence = std::min<std::uint8_t>(maximumConfidence, cs.confidence + 1);
         }
         else
         { // Pitch changed significantly/out of limits:
-            if ( cs.confidence > 2 )
+            if (cs.confidence > 2)
             { // we have a somewhat confident previous pitch - use it but decrease confidence:
                 pitch = cs.lastPitch;
                 --cs.confidence;
@@ -172,28 +165,28 @@ float LE_FASTCALL PitchDetector::findPitch
             }
         }
 
-        BOOST_ASSERT( pd.getNumPeaks() != 0 );
-        bool const newPitchIgnored( pitch == cs.lastPitch );
-        if ( !newPitchIgnored )
+        BOOST_ASSERT(pd.getNumPeaks() != 0);
+        bool const newPitchIgnored(pitch == cs.lastPitch);
+        if (!newPitchIgnored)
         {
-            for ( std::uint16_t peakIndex( 0 ); ; ++peakIndex )
+            for (std::uint16_t peakIndex(0);; ++peakIndex)
             {
-                Peak const & peak( *pd.getPeak( peakIndex ) );
-                if ( peak.freq == pitch )
+                Peak const &peak(*pd.getPeak(peakIndex));
+                if (peak.freq == pitch)
                 {
                     cs.amplitude = peak.amplitude;
                     break;
                 }
-                BOOST_ASSERT( peakIndex < pd.getNumPeaks() );
+                BOOST_ASSERT(peakIndex < pd.getNumPeaks());
             }
         }
     }
     else
     { // No pitch detected for current frame:
-        if ( cs.lastPitch && cs.confidence )
+        if (cs.lastPitch && cs.confidence)
         { // we have a previous pitch - use it but decrease confidence:
-            pitch         = cs.lastPitch;
-            cs.confidence = std::max<std::uint8_t>( 0, cs.confidence - 1 );
+            pitch = cs.lastPitch;
+            cs.confidence = std::max<std::uint8_t>(0, cs.confidence - 1);
         }
         else
             cs.reset();
@@ -204,7 +197,6 @@ float LE_FASTCALL PitchDetector::findPitch
 
     return pitch;
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -217,139 +209,132 @@ LE_OPTIMIZE_FOR_SPEED_BEGIN()
 
 namespace
 {
-    using SW::Engine::ReadOnlyDataRange;
+using SW::Engine::ReadOnlyDataRange;
 
-    float LE_FASTCALL LE_HOT harmonic( std::uint8_t const harmonic, std::uint16_t const bin, ReadOnlyDataRange const & amplitudes )
-    {
-        auto       pHarmonicAmp    ( amplitudes.begin() + ( harmonic * bin ) );
-        auto const pHarmonicAmpsEnd( pHarmonicAmp + harmonic                 );
-        if ( pHarmonicAmpsEnd > amplitudes.end() )
-            return 0;
-        return std::accumulate( pHarmonicAmp, pHarmonicAmpsEnd, 0.0f ) / harmonic;
-    }
+float LE_HOT harmonic(std::uint8_t const harmonic, std::uint16_t const bin,
+                      ReadOnlyDataRange const &amplitudes)
+{
+    auto pHarmonicAmp(amplitudes.begin() + (harmonic * bin));
+    auto const pHarmonicAmpsEnd(pHarmonicAmp + harmonic);
+    if (pHarmonicAmpsEnd > amplitudes.end())
+        return 0;
+    return std::accumulate(pHarmonicAmp, pHarmonicAmpsEnd, 0.0f) / harmonic;
+}
 } // anonymous namespace
 
-void LE_HOT PitchDetector::findHarmonicProductSpectrumAndSort( SW::Engine::ReadOnlyDataRange const amps, HPSRange const hps )
+void LE_HOT
+PitchDetector::findHarmonicProductSpectrumAndSort(SW::Engine::ReadOnlyDataRange const amps,
+                                                  HPSRange const hps)
 {
-    BOOST_ASSERT( amps.size() == hps.size() );
+    BOOST_ASSERT(amps.size() == hps.size());
 
-    auto         const numberOfBins( static_cast<std::uint16_t>( amps.size() ) );
-    std::uint8_t const lastHarmonic( 5                                         );
+    auto const numberOfBins(static_cast<std::uint16_t>(amps.size()));
+    std::uint8_t const lastHarmonic(5);
 
-    for ( std::uint16_t k( 0 ); k < numberOfBins; ++k )
+    for (std::uint16_t k(0); k < numberOfBins; ++k)
     {
-        float harmonicProduct( amps[ k ] );
-        for ( std::uint8_t h( 2 ); h <= lastHarmonic; ++h )
+        float harmonicProduct(amps[k]);
+        for (std::uint8_t h(2); h <= lastHarmonic; ++h)
         {
-            harmonicProduct += harmonic( h, k, amps );
+            harmonicProduct += harmonic(h, k, amps);
         }
 
-        BOOST_ASSERT( !Math::isNegative( harmonicProduct ) );
-        hps[ k ].harmonicProduct = harmonicProduct;
-        hps[ k ].bin             = k              ;
+        BOOST_ASSERT(!Math::isNegative(harmonicProduct));
+        hps[k].harmonicProduct = harmonicProduct;
+        hps[k].bin = k;
     }
 
-    std::sort( hps.begin(), hps.end() );
+    std::sort(hps.begin(), hps.end());
 }
 
-
-float LE_HOT PitchDetector::estimatePitch
-(
-    float                const lastPitch,
-    float                const lowerBound,
-    float                const upperBound,
-    HPSRange             const hps,
-    PeakDetector const &       pd
-)
+float LE_HOT PitchDetector::estimatePitch(float const lastPitch, float const lowerBound,
+                                          float const upperBound, HPSRange const hps,
+                                          PeakDetector const &pd)
 {
-	float         detectedPitch			   ( 0 );
-	float         detectedPitchPeakStrength( 0 );
-	std::uint16_t detectedPitchBin         ( 0 );
-	std::uint8_t  detectedPitchHPSIndex    ( 0 );
+    float detectedPitch(0);
+    float detectedPitchPeakStrength(0);
+    std::uint16_t detectedPitchBin(0);
+    std::uint8_t detectedPitchHPSIndex(0);
 
     // Search top 30 in the HPS:
     LE_DISABLE_LOOP_UNROLLING()
-    for ( std::uint8_t k( 0 ); k < 30; ++k ) //...mrmlj...can two HPS' bins be under the same peak?
+    for (std::uint8_t k(0); k < 30; ++k) //...mrmlj...can two HPS' bins be under the same peak?
     {
         // If HPS bin is inside a peak and within the bounds then it is the pitch:
-        auto const hpsBin( hps[ k ].bin );
-        auto const pPeak ( binPeak( hpsBin, pd ) );
-        if ( pPeak )
+        auto const hpsBin(hps[k].bin);
+        auto const pPeak(binPeak(hpsBin, pd));
+        if (pPeak)
         {
-            float const pitch       ( pPeak->freq                                  );
-            float const clampedPitch( Math::clamp( pitch, lowerBound, upperBound ) );
-            if ( clampedPitch == pitch )
-			{
-                detectedPitch             = pitch;
-				detectedPitchBin          = hpsBin;
-				detectedPitchHPSIndex     = k;
-				detectedPitchPeakStrength = pPeak->strength;
-				break;
-			}
+            float const pitch(pPeak->freq);
+            float const clampedPitch(Math::clamp(pitch, lowerBound, upperBound));
+            if (clampedPitch == pitch)
+            {
+                detectedPitch = pitch;
+                detectedPitchBin = hpsBin;
+                detectedPitchHPSIndex = k;
+                detectedPitchPeakStrength = pPeak->strength;
+                break;
+            }
         }
     }
 
-	// Detection of lower harmonics, if the change in pitch was above 100Hz in a single frame:
-	if ( lastPitch )
-	{
-        std::uint16_t pos( detectedPitchHPSIndex + 1 );
-		// Search through lower harmonics if HPS amplitude is large enough
-		// and pitch is still over 100Hz from previously detected pitch:
+    // Detection of lower harmonics, if the change in pitch was above 100Hz in a single frame:
+    if (lastPitch)
+    {
+        std::uint16_t pos(detectedPitchHPSIndex + 1);
+        // Search through lower harmonics if HPS amplitude is large enough
+        // and pitch is still over 100Hz from previously detected pitch:
         LE_DISABLE_LOOP_UNROLLING()
-		while
-        (
-            ( pos < 50 /*heuristic*/                                                                        ) &&
-            ( std::abs( detectedPitch - lastPitch ) > 100 /*heuristic*/ /*Hz*/                              ) &&
-            ( hps[ pos ].harmonicProduct > 0.4 /*heuristic*/ * hps[ detectedPitchHPSIndex ].harmonicProduct )
-        )
-		{
-			auto const lowHarmonicBin( hps[ pos ].bin );
-			if ( lowHarmonicBin == 0 )
-			{
-				++pos;
-				continue;
-			}
-			// Check if current bin is possibly a lower harmonic of originally detected pitch:
-			if ( Math::abs( detectedPitchBin - Math::round( detectedPitchBin * 1.0f / lowHarmonicBin ) * lowHarmonicBin ) < 3 )
-			{
-				auto const pPeak( binPeak( lowHarmonicBin, pd ) );
-				auto const lowHarmonicPitch       ( pPeak ? pPeak->freq     : 0 );
-				auto const lowHarmonicPeakStrength( pPeak ? pPeak->strength : 0 );
-				// Accept the lower harmonic as pitch if it is closer to the
-				// previous pitch and if peak strength is large enough:
-				if
-                (
-                    lowHarmonicPitch                                                                     &&
-                    ( std::abs( lowHarmonicPitch - lastPitch ) < std::abs( detectedPitch - lastPitch ) ) &&
-                    ( lowHarmonicPeakStrength                  > 0.4 * detectedPitchPeakStrength       )
-                )
-				{
-					detectedPitch = lowHarmonicPitch;
-				}
-			}
-			++pos;
-		}
-	}
+        while ((pos < 50 /*heuristic*/) &&
+               (std::abs(detectedPitch - lastPitch) > 100 /*heuristic*/ /*Hz*/) &&
+               (hps[pos].harmonicProduct >
+                0.4 /*heuristic*/ * hps[detectedPitchHPSIndex].harmonicProduct))
+        {
+            auto const lowHarmonicBin(hps[pos].bin);
+            if (lowHarmonicBin == 0)
+            {
+                ++pos;
+                continue;
+            }
+            // Check if current bin is possibly a lower harmonic of originally detected pitch:
+            if (Math::abs(detectedPitchBin - Math::round(detectedPitchBin * 1.0f / lowHarmonicBin) *
+                                                 lowHarmonicBin) < 3)
+            {
+                auto const pPeak(binPeak(lowHarmonicBin, pd));
+                auto const lowHarmonicPitch(pPeak ? pPeak->freq : 0);
+                auto const lowHarmonicPeakStrength(pPeak ? pPeak->strength : 0);
+                // Accept the lower harmonic as pitch if it is closer to the
+                // previous pitch and if peak strength is large enough:
+                if (lowHarmonicPitch &&
+                    (std::abs(lowHarmonicPitch - lastPitch) <
+                     std::abs(detectedPitch - lastPitch)) &&
+                    (lowHarmonicPeakStrength > 0.4 * detectedPitchPeakStrength))
+                {
+                    detectedPitch = lowHarmonicPitch;
+                }
+            }
+            ++pos;
+        }
+    }
 
-	// Return detected pitch:
-	float const clampedPitch( Math::clamp( detectedPitch, lowerBound, upperBound ) );
-    if ( clampedPitch == detectedPitch )
-		return detectedPitch;
+    // Return detected pitch:
+    float const clampedPitch(Math::clamp(detectedPitch, lowerBound, upperBound));
+    if (clampedPitch == detectedPitch)
+        return detectedPitch;
 
     return 0;
 }
 
-
-Peak const * PitchDetector::binPeak( std::uint16_t const bin, PeakDetector const & pd )
+Peak const *PitchDetector::binPeak(std::uint16_t const bin, PeakDetector const &pd)
 {
-    auto const numPeaks( pd.getNumPeaks() );
+    auto const numPeaks(pd.getNumPeaks());
 
-    for ( std::uint8_t k( 0 ); k < numPeaks; ++k )
+    for (std::uint8_t k(0); k < numPeaks; ++k)
     {
-        auto const pPeak( pd.getPeak( k ) );
-        if ( ( bin >= pPeak->startPos ) && ( bin <= pPeak->stopPos ) )
+        auto const pPeak(pd.getPeak(k));
+        if ((bin >= pPeak->startPos) && (bin <= pPeak->stopPos))
         {
-            BOOST_ASSERT( pPeak->freq && pPeak->amplitude );
+            BOOST_ASSERT(pPeak->freq && pPeak->amplitude);
             return pPeak;
         }
     }
@@ -359,16 +344,15 @@ Peak const * PitchDetector::binPeak( std::uint16_t const bin, PeakDetector const
 
 LE_OPTIMIZE_FOR_SPEED_END()
 
-
 void PitchDetector::ChannelState::reset()
 {
-    lastPitch  = 0;
+    lastPitch = 0;
 #ifdef LE_SW_PURE_ANALYSIS
-    amplitude  = -std::numeric_limits<float>::infinity();
+    amplitude = -std::numeric_limits<float>::infinity();
     confidence = 0;
 #endif // LE_SW_PURE_ANALYSIS
 }
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END( LE )
+LE_IMPL_NAMESPACE_END(LE)
 //------------------------------------------------------------------------------

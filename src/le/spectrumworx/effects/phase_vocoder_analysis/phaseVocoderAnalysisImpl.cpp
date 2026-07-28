@@ -3,7 +3,8 @@
 /// phaseVocoderAnalysisImpl.cpp
 /// ----------------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -29,9 +30,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const PhaseVocoderAnalysis::title      [] = "PVD start";
+char const PhaseVocoderAnalysis::title[] = "PVD start";
 char const PhaseVocoderAnalysis::description[] = "Transform into the \"Phase vocoder domain\".";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -40,11 +40,10 @@ char const PhaseVocoderAnalysis::description[] = "Transform into the \"Phase voc
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void PhaseVocoderAnalysisImpl::setup( IndexRange const &, Engine::Setup const & engineSetup )
+void PhaseVocoderAnalysisImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
 {
-    pvParameters_.setup( engineSetup );
+    pvParameters_.setup(engineSetup);
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -53,13 +52,14 @@ void PhaseVocoderAnalysisImpl::setup( IndexRange const &, Engine::Setup const & 
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void PhaseVocoderAnalysisImpl::process( ChannelState & state, Engine::ChannelData_AmPh data, Engine::Setup const & ) const
+void PhaseVocoderAnalysisImpl::process(ChannelState &state, Engine::ChannelData_AmPh data,
+                                       Engine::Setup const &) const
 {
 #ifdef LE_PV_USE_TSS
-    if ( data.pSynthesisState )
+    if (data.pSynthesisState)
         data.pAnalysisState = &state;
 #endif // LE_PV_USE_TSS
-    PhaseVocoderShared::analysis( state, data.full(), pvParameters_ );
+    PhaseVocoderShared::analysis(state, data.full(), pvParameters_);
 }
 
 //------------------------------------------------------------------------------

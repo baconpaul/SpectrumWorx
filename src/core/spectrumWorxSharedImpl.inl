@@ -3,7 +3,8 @@
 /// spectrumWorxSharedImpl.inl
 /// --------------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -23,7 +24,7 @@
 #include "boost/assert.hpp"
 
 #ifdef _DEBUG
-    #include <cstdio>
+#include <cstdio>
 #endif // _DEBUG
 #include <cstring>
 //------------------------------------------------------------------------------
@@ -48,21 +49,22 @@ namespace SW
 ///                                           (06.03.2013.) (Domagoj Saric)
 
 template <class Impl, class Protocol>
-LE_NOTHROW
-SpectrumWorxSharedImpl<Impl, Protocol>::SpectrumWorxSharedImpl( typename PluginPlatform::ConstructionParameter const pluginBaseParam )
-    :
-    PluginPlatform( pluginBaseParam )
+LE_NOTHROW SpectrumWorxSharedImpl<Impl, Protocol>::SpectrumWorxSharedImpl(
+    typename PluginPlatform::ConstructionParameter const pluginBaseParam)
+    : PluginPlatform(pluginBaseParam)
 #ifndef LE_SW_FMOD
 #ifdef __APPLE__
-   ,Base    ( std::is_same<typename PluginPlatform::Protocol, Plugins::Protocol::AU>::value )
+      ,
+      Base(std::is_same<typename PluginPlatform::Protocol, Plugins::Protocol::AU>::value)
 #else
-   ,Base    ( false )
+      ,
+      Base(false)
 #endif // __APPLE__
 #endif // LE_SW_FMOD
 {
-#if defined( __APPLE__ ) && !defined( LE_SW_FMOD )
-    if ( std::is_same<typename PluginPlatform::Protocol, Plugins::Protocol::AU>::value )
-        BOOST_VERIFY( GUI::initializePaths() );
+#if defined(__APPLE__) && !defined(LE_SW_FMOD)
+    if (std::is_same<typename PluginPlatform::Protocol, Plugins::Protocol::AU>::value)
+        BOOST_VERIFY(GUI::initializePaths());
 #endif // __APPLE__ && !LE_SW_FMOD
 }
 
@@ -71,29 +73,26 @@ typename Plugins::ErrorCode<Protocol>::value_type LE_NOTHROW
 SpectrumWorxSharedImpl<Impl, Protocol>::initialise()
 {
 #ifdef __APPLE__
-    if ( !std::is_same<typename PluginPlatform::Protocol, Plugins::Protocol::AU>::value )
+    if (!std::is_same<typename PluginPlatform::Protocol, Plugins::Protocol::AU>::value)
 #endif // __APPLE__
-    #if LE_SW_GUI
-        BOOST_VERIFY( GUI::initializePaths() );
-    #endif // LE_SW_GUI
-    return Base::initialise() ? Plugins::ErrorCode<Protocol>::Success : Plugins::ErrorCode<Protocol>::OutOfMemory;
+#if LE_SW_GUI
+        BOOST_VERIFY(GUI::initializePaths());
+#endif // LE_SW_GUI
+    return Base::initialise() ? Plugins::ErrorCode<Protocol>::Success
+                              : Plugins::ErrorCode<Protocol>::OutOfMemory;
 }
 
 #if LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
 template <class Impl, class Protocol>
-void LE_NOTHROW SpectrumWorxSharedImpl<Impl, Protocol>::process
-(
-    float const * const * const inputs,
-    float       *       * const outputs,
-    std::uint32_t         const samples
-)
+void LE_NOTHROW SpectrumWorxSharedImpl<Impl, Protocol>::process(float const *const *const inputs,
+                                                                float **const outputs,
+                                                                std::uint32_t const samples)
 {
-    if ( !updateTimingInformation() )
-        this->updatePosition( samples );
+    if (!updateTimingInformation())
+        this->updatePosition(samples);
 
-    Base::process( inputs, outputs, samples );
+    Base::process(inputs, outputs, samples);
 }
-
 
 template <class Impl, class Protocol>
 bool LE_NOTHROW SpectrumWorxSharedImpl<Impl, Protocol>::updateTimingInformation()
@@ -101,33 +100,26 @@ bool LE_NOTHROW SpectrumWorxSharedImpl<Impl, Protocol>::updateTimingInformation(
     using namespace Plugins::Protocol;
     using TimingInfo = typename PluginPlatform::TimingInformation;
 
-    std::uint32_t const wantedFields( TimingInfo::NumberOfBeats | TimingInfo::BPM | TimingInfo::TimeSignature );
-    auto const timeInfo( this->host().template getTimeInfo<wantedFields>() );
-    if ( !timeInfo. template hasFields<wantedFields>() )
+    std::uint32_t const wantedFields(TimingInfo::NumberOfBeats | TimingInfo::BPM |
+                                     TimingInfo::TimeSignature);
+    auto const timeInfo(this->host().template getTimeInfo<wantedFields>());
+    if (!timeInfo.template hasFields<wantedFields>())
         return false;
 
-    BOOST_ASSERT_MSG
-    (
-        ( !timeInfo. template hasField<TimingInfo::SampleRate>() ) ||
-        ( timeInfo.sampleRate() == this->uncheckedEngineSetup(). template sampleRate<float>() ),
-        "Inconsistent TimingInfo and EngineSetup sampleRate."
-    );
+    BOOST_ASSERT_MSG(
+        (!timeInfo.template hasField<TimingInfo::SampleRate>()) ||
+            (timeInfo.sampleRate() == this->uncheckedEngineSetup().template sampleRate<float>()),
+        "Inconsistent TimingInfo and EngineSetup sampleRate.");
 
-    double const beatsPerBar ( Math::convert<double>( timeInfo.timeSignatureNumerator() ) );
-    double const beatDuration( 60 / timeInfo.bpm()                                        );
+    double const beatsPerBar(Math::convert<double>(timeInfo.timeSignatureNumerator()));
+    double const beatDuration(60 / timeInfo.bpm());
 
-    double const positionInBars( timeInfo.numberOfBeats() / beatsPerBar );
-    double const barDuration   ( beatsPerBar * beatDuration             );
+    double const positionInBars(timeInfo.numberOfBeats() / beatsPerBar);
+    double const barDuration(beatsPerBar * beatDuration);
 
-    this->handleTimingInformationChange
-    (
-        this->updatePositionAndTimingInformation
-        (
-            static_cast<float>( positionInBars ),
-            static_cast<float>( barDuration    ),
-            timeInfo.timeSignatureNumerator()
-        )
-    );
+    this->handleTimingInformationChange(this->updatePositionAndTimingInformation(
+        static_cast<float>(positionInBars), static_cast<float>(barDuration),
+        timeInfo.timeSignatureNumerator()));
 
     return true;
 }

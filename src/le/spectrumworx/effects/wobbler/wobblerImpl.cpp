@@ -3,7 +3,8 @@
 /// wobblerImpl.cpp
 /// ---------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -32,9 +33,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Wobbler::title      [] = "Wobbler";
+char const Wobbler::title[] = "Wobbler";
 char const Wobbler::description[] = "Amplitude modulation.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -42,10 +42,9 @@ char const Wobbler::description[] = "Amplitude modulation.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Wobbler::Amplitude, "Amplitude" )
-EFFECT_PARAMETER_NAME( Wobbler::Period   , "Period"    )
-EFFECT_PARAMETER_NAME( Wobbler::PreGain  , "Offset"    )
-
+EFFECT_PARAMETER_NAME(Wobbler::Amplitude, "Amplitude")
+EFFECT_PARAMETER_NAME(Wobbler::Period, "Period")
+EFFECT_PARAMETER_NAME(Wobbler::PreGain, "Offset")
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -54,11 +53,10 @@ EFFECT_PARAMETER_NAME( Wobbler::PreGain  , "Offset"    )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void WobblerImpl::setup( IndexRange const &, Engine::Setup const & engineSetup )
+void WobblerImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
 {
-    period_ = engineSetup.milliSecondsToSteps( parameters().get<Period>() );
-}   
-
+    period_ = engineSetup.milliSecondsToSteps(parameters().get<Period>());
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -67,24 +65,22 @@ void WobblerImpl::setup( IndexRange const &, Engine::Setup const & engineSetup )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void WobblerImpl::process( ChannelState & cs, Engine::ChannelData_AmPh data, Engine::Setup const & ) const
+void WobblerImpl::process(ChannelState &cs, Engine::ChannelData_AmPh data,
+                          Engine::Setup const &) const
 {
     using namespace Math;
 
-    float const amplitude( parameters().get<Amplitude>() );
-    float const pregain  ( parameters().get<PreGain  >() );
+    float const amplitude(parameters().get<Amplitude>());
+    float const pregain(parameters().get<PreGain>());
 
-    float const gain
-    (
-        dB2NormalisedLinear
-        (
-            pregain + amplitude * std::sin( Math::Constants::twoPi * convert<float>( cs.frameCounter.value() ) / convert<float>( period_ ) )
-        )
-    );
+    float const gain(
+        dB2NormalisedLinear(pregain + amplitude * std::sin(Math::Constants::twoPi *
+                                                           convert<float>(cs.frameCounter.value()) /
+                                                           convert<float>(period_))));
 
-    cs.frameCounter.nextValueFor( period_ );
+    cs.frameCounter.nextValueFor(period_);
 
-    multiply( data.amps(), gain );
+    multiply(data.amps(), gain);
 }
 
 //------------------------------------------------------------------------------

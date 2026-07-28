@@ -3,13 +3,13 @@
 /// \file freezeImpl.hpp
 /// --------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef freezeImpl_hpp__1C855F51_D0CA_48B9_8F40_4B259941C1F9
 #define freezeImpl_hpp__1C855F51_D0CA_48B9_8F40_4B259941C1F9
-#pragma once
 //------------------------------------------------------------------------------
 #include "freeze.hpp"
 
@@ -30,27 +30,22 @@ namespace Effects
 
 class FreezeImpl : public EffectImpl<Freeze>
 {
-public: // LE::Effect required interface.
-
+  public: // LE::Effect required interface.
     ////////////////////////////////////////////////////////////////////////////
     // ChannelState
     ////////////////////////////////////////////////////////////////////////////
 
-    LE_DYNAMIC_CHANNEL_STATE
-    (
-        ( ( PhaseVocoderShared::PitchShifter::ChannelState )( pvState ) )
-        ( ( Engine::HalfFFTBuffer<float> )( frozenMagNew  ) )
-        ( ( Engine::HalfFFTBuffer<float> )( frozenFreqNew ) )
-        ( ( Engine::HalfFFTBuffer<float> )( frozenMagOld  ) )
-        ( ( Engine::HalfFFTBuffer<float> )( frozenFreqOld ) )
-    );
+    LE_DYNAMIC_CHANNEL_STATE(((PhaseVocoderShared::PitchShifter::ChannelState)(pvState))((
+        Engine::HalfFFTBuffer<float>)(frozenMagNew))((Engine::HalfFFTBuffer<float>)(frozenFreqNew))(
+        (Engine::HalfFFTBuffer<float>)(frozenMagOld))(
+        (Engine::HalfFFTBuffer<float>)(frozenFreqOld)));
 
     struct ChannelState : DynamicChannelState
     {
         float frameCounter;
 
         bool freezeDone;
-        bool meltDone  ;
+        bool meltDone;
 
         bool frozen;
         bool normal;
@@ -58,22 +53,22 @@ public: // LE::Effect required interface.
         //...mrmlj...quick-workaround for a non-deterministic relationship
         //...mrmlj...between setup() and process() calls...
         bool previousFreezeFlag;
-        bool previousMeltFlag  ;
+        bool previousMeltFlag;
 
         void reset();
     }; // struct ChannelState
-    
+
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup  ( IndexRange const &, Engine::Setup const & );
-    void process( ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const &) const;
 
-private:
+  private:
     float inverseTransitionTime_;
-    bool  freeze_;
-    bool  melt_  ;
+    bool freeze_;
+    bool melt_;
 
     PhaseVocoderShared::BaseParameters pvParameters_;
 }; // class FreezeImpl

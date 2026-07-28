@@ -3,13 +3,13 @@
 /// \file factory.hpp
 /// -----------------
 ///
-/// Copyright (c) 2014 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2014 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef moduleFactory_hpp__C444656C_70DA_479E_8BB5_C889A9B1EFA5
 #define moduleFactory_hpp__C444656C_70DA_479E_8BB5_C889A9B1EFA5
-#pragma once
 //------------------------------------------------------------------------------
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/cstdint.hpp"
@@ -26,7 +26,7 @@ namespace SW
 struct ModuleFactory
 {
     template <class ModuleInterface>
-    static LE_NOTHROW boost::intrusive_ptr<ModuleInterface> LE_FASTCALL create( std::int8_t effectIndex );
+    static LE_NOTHROW boost::intrusive_ptr<ModuleInterface> create(std::int8_t effectIndex);
 }; // struct ModuleFactory
 
 //------------------------------------------------------------------------------

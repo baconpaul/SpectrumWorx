@@ -3,7 +3,8 @@
 /// pitchSpringImpl.cpp
 /// -------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -30,11 +31,10 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const PitchSpring   ::title[] = "Pitch Spring";
+char const PitchSpring ::title[] = "Pitch Spring";
 char const PitchSpringPVD::title[] = "Pitch Spring (pvd)";
 
 char const Detail::PitchSpringBase::description[] = "Oscillating pitch.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -42,23 +42,22 @@ char const Detail::PitchSpringBase::description[] = "Oscillating pitch.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Detail::PitchSpringBase::Depth , "Depth"  )
-EFFECT_PARAMETER_NAME( Detail::PitchSpringBase::Period, "Period" )
-
+EFFECT_PARAMETER_NAME(Detail::PitchSpringBase::Depth, "Depth")
+EFFECT_PARAMETER_NAME(Detail::PitchSpringBase::Period, "Period")
 
 namespace Detail
 {
-    void PitchSpringBaseImpl::setup( IndexRange const &, Engine::Setup const & engineSetup )
-    {
-        VibratoEffect::setup( parameters().get<Period>(), engineSetup );
-    }
+void PitchSpringBaseImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
+{
+    VibratoEffect::setup(parameters().get<Period>(), engineSetup);
+}
 
-    float PitchSpringBaseImpl::calculateNewPitch( ChannelState & cs ) const
-    {
-        return VibratoEffect::calculateNewPitch( cs, parameters().get<SpringType>(), parameters().get<Depth>() );
-    }
+float PitchSpringBaseImpl::calculateNewPitch(ChannelState &cs) const
+{
+    return VibratoEffect::calculateNewPitch(cs, parameters().get<SpringType>(),
+                                            parameters().get<Depth>());
+}
 } // namespace Detail
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -67,16 +66,18 @@ namespace Detail
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void PitchSpringImpl::process( ChannelState & cs, Engine::ChannelData_AmPh data, Engine::Setup const & engineSetup ) const
+void PitchSpringImpl::process(ChannelState &cs, Engine::ChannelData_AmPh data,
+                              Engine::Setup const &engineSetup) const
 {
-    float const scale( PitchSpringBaseImpl::calculateNewPitch( cs ) );
-    PitchShifter::process( scale, cs, std::forward<Engine::ChannelData_AmPh>( data ), engineSetup );
+    float const scale(PitchSpringBaseImpl::calculateNewPitch(cs));
+    PitchShifter::process(scale, cs, std::forward<Engine::ChannelData_AmPh>(data), engineSetup);
 }
 
-void PitchSpringPVDImpl::process( ChannelState & cs, Engine::ChannelData_AmPh data, Engine::Setup const & engineSetup ) const
+void PitchSpringPVDImpl::process(ChannelState &cs, Engine::ChannelData_AmPh data,
+                                 Engine::Setup const &engineSetup) const
 {
-    float const scale( PitchSpringBaseImpl::calculateNewPitch( cs ) );
-    PVPitchShifter::process( scale, std::forward<Engine::ChannelData_AmPh>( data ), engineSetup );
+    float const scale(PitchSpringBaseImpl::calculateNewPitch(cs));
+    PVPitchShifter::process(scale, std::forward<Engine::ChannelData_AmPh>(data), engineSetup);
 }
 
 //------------------------------------------------------------------------------

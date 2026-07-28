@@ -3,7 +3,8 @@
 /// tonalImpl.cpp
 /// -------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -29,9 +30,8 @@ namespace Effects
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Tonal::title      [] = "Tonal";
+char const Tonal::title[] = "Tonal";
 char const Tonal::description[] = "Suppress non-tonal regions.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -39,9 +39,8 @@ char const Tonal::description[] = "Suppress non-tonal regions.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-char const Atonal::title      [] = "Atonal";
+char const Atonal::title[] = "Atonal";
 char const Atonal::description[] = "Suppress tonal regions.";
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -49,11 +48,10 @@ char const Atonal::description[] = "Suppress tonal regions.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Detail::TonalBase::Strength       , "Peak strength"    )
-EFFECT_PARAMETER_NAME( Detail::TonalBase::GlobalThreshold, "Global threshold" )
-EFFECT_PARAMETER_NAME( Detail::TonalBase::LocalThreshold , "Local threshold"  )
-EFFECT_PARAMETER_NAME( Detail::TonalBase::Attenuation    , "Attenuation"      )
-
+EFFECT_PARAMETER_NAME(Detail::TonalBase::Strength, "Peak strength")
+EFFECT_PARAMETER_NAME(Detail::TonalBase::GlobalThreshold, "Global threshold")
+EFFECT_PARAMETER_NAME(Detail::TonalBase::LocalThreshold, "Local threshold")
+EFFECT_PARAMETER_NAME(Detail::TonalBase::Attenuation, "Attenuation")
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -61,19 +59,29 @@ EFFECT_PARAMETER_NAME( Detail::TonalBase::Attenuation    , "Attenuation"      )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME( Atonal::Strength       , "Peak strength"    )
-EFFECT_PARAMETER_NAME( Atonal::GlobalThreshold, "Global threshold" )
-EFFECT_PARAMETER_NAME( Atonal::Attenuation    , "Attenuation"      )
-
+EFFECT_PARAMETER_NAME(Atonal::Strength, "Peak strength")
+EFFECT_PARAMETER_NAME(Atonal::GlobalThreshold, "Global threshold")
+EFFECT_PARAMETER_NAME(Atonal::Attenuation, "Attenuation")
 
 namespace Detail
 {
-    void TonalBaseImpl::setup( Engine::Setup const & engineSetup )
-    {   
-        pd_.setZeroDecibelValue( engineSetup.maximumAmplitude() );
-    }
+void TonalBaseImpl::setup(Engine::Setup const &engineSetup)
+{
+    pd_.setZeroDecibelValue(engineSetup.maximumAmplitude());
+}
 } // namespace Detail
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// TonalImpl::setup()
+// ------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void TonalImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
+{
+    TonalBaseImpl::setup<Tonal>(parameters(), engineSetup);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -82,24 +90,10 @@ namespace Detail
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void TonalImpl::setup( IndexRange const &, Engine::Setup const & engineSetup )
+void AtonalImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
 {
-    TonalBaseImpl::setup<Tonal>( parameters(), engineSetup );
+    TonalBaseImpl::setup<Atonal>(parameters(), engineSetup);
 }
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// TonalImpl::setup()
-// ------------------
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void AtonalImpl::setup( IndexRange const &, Engine::Setup const & engineSetup )
-{
-    TonalBaseImpl::setup<Atonal>( parameters(), engineSetup );
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -108,13 +102,13 @@ void AtonalImpl::setup( IndexRange const &, Engine::Setup const & engineSetup )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void TonalImpl::process( Engine::ChannelData_AmPh data, Engine::Setup const & ) const
+void TonalImpl::process(Engine::ChannelData_AmPh data, Engine::Setup const &) const
 {
-    unsigned int const numberOfBins( data.numberOfBins() );
-    pd_.findPeaks        ( data.amps().begin(), numberOfBins );
-    pd_.attenuateNonPeaks( data.amps().begin(), 0, numberOfBins - 1, parameters().get<Tonal::Attenuation>() );
+    unsigned int const numberOfBins(data.numberOfBins());
+    pd_.findPeaks(data.amps().begin(), numberOfBins);
+    pd_.attenuateNonPeaks(data.amps().begin(), 0, numberOfBins - 1,
+                          parameters().get<Tonal::Attenuation>());
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -123,11 +117,12 @@ void TonalImpl::process( Engine::ChannelData_AmPh data, Engine::Setup const & ) 
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void AtonalImpl::process( Engine::ChannelData_AmPh data, Engine::Setup const & ) const
+void AtonalImpl::process(Engine::ChannelData_AmPh data, Engine::Setup const &) const
 {
-    unsigned int const numberOfBins( data.numberOfBins() );
-    pd_.findPeaks     ( data.amps().begin(), numberOfBins );
-    pd_.attenuatePeaks( data.amps().begin(), 0, numberOfBins - 1, parameters().get<Atonal::Attenuation>() );
+    unsigned int const numberOfBins(data.numberOfBins());
+    pd_.findPeaks(data.amps().begin(), numberOfBins);
+    pd_.attenuatePeaks(data.amps().begin(), 0, numberOfBins - 1,
+                       parameters().get<Atonal::Attenuation>());
 }
 
 //------------------------------------------------------------------------------

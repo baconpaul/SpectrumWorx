@@ -3,13 +3,13 @@
 /// \file shapelessImpl.hpp
 /// -----------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef shapelessImpl_hpp__DBB27280_19FF_4CF5_B1E6_A9CFB52749B7
 #define shapelessImpl_hpp__DBB27280_19FF_4CF5_B1E6_A9CFB52749B7
-#pragma once
 //------------------------------------------------------------------------------
 #include "shapeless.hpp"
 
@@ -29,16 +29,15 @@ namespace Effects
 
 class ShapelessImpl : public EffectImpl<Shapeless>
 {
-public: // LE::Effect required interface.
-
+  public: // LE::Effect required interface.
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup( IndexRange const &, Engine::Setup const & );
-    void process( Engine::MainSideChannelData_AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(Engine::MainSideChannelData_AmPh, Engine::Setup const &) const;
 
-private:
+  private:
     std::uint16_t width_;
 }; // class ShapelessImpl
 

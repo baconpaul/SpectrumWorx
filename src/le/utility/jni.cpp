@@ -5,7 +5,8 @@
 ///
 /// Target platform specific boilerplate code.
 ///
-/// Copyright (c) 2011 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2011 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -52,65 +53,77 @@ namespace JNI
 ////////////////////////////////////////////////////////////////////////////////
 
 template <typename JavaType>
-LE_NOTHROW bool LE_FASTCALL operator==( GlobalRef<JavaType> const & right, GlobalRef<JavaType> const & left ) { env()->IsSameObject( right.get(), left.get() ); }
+LE_NOTHROW bool operator==( GlobalRef<JavaType> const & right, GlobalRef<JavaType> const & left ) { env()->IsSameObject( right.get(), left.get() ); }
 #endif
 
 namespace Detail
 {
-    JavaVM * __restrict pJVM;
+JavaVM *__restrict pJVM;
 
-    jobject LE_FASTCALL_ABI newGlobalReference( JNIEnv & cachedEnv, jobject const pObject ) { return cachedEnv.NewGlobalRef( pObject ); }
-    jobject LE_FASTCALL_ABI newLocalReference ( JNIEnv & cachedEnv, jobject const pObject ) { return cachedEnv.NewLocalRef ( pObject ); }
-
-    void GlobalRefDeleter::operator()( ::jobject const pObject ) const { preAttachedEnv().DeleteGlobalRef( pObject ); }
-    void LocalRefDeleter ::operator()( ::jobject const pObject ) const { preAttachedEnv().DeleteLocalRef ( pObject ); }
-
-    LE_NOTHROW LE_COLD
-    void EnvDeleter::operator()( ::JNIEnv * const pJNI ) const
-    {
-        BOOST_ASSERT( pJNI );
-        if ( BOOST_UNLIKELY( detach ) )
-        {
-            LE_TRACE_LOGONLY( "Detaching a native thread from the JVM." );
-            BOOST_VERIFY( pJVM->DetachCurrentThread() == JNI_OK );
-        }
-    }
-} // namespace Detail
-
-LE_NOTHROW LE_COLD
-void LE_FASTCALL_ABI setVM( ::JNIEnv & jni )
+jobject newGlobalReference(JNIEnv &cachedEnv, jobject const pObject)
 {
-    BOOST_ASSERT_MSG( !Detail::pJVM, "JVM singleton already set" );
-    BOOST_VERIFY( jni.GetJavaVM( const_cast<JavaVM * *>( &Detail::pJVM ) ) == JNI_OK );
+    return cachedEnv.NewGlobalRef(pObject);
+}
+jobject newLocalReference(JNIEnv &cachedEnv, jobject const pObject)
+{
+    return cachedEnv.NewLocalRef(pObject);
 }
 
-
-LE_NOTHROW LE_PURE_FUNCTION LE_COLD
-JNIEnv & LE_FASTCALL_ABI preAttachedEnv()
+void GlobalRefDeleter::operator()(::jobject const pObject) const
 {
-    JNIEnv * pJNI;
-    BOOST_VERIFY_MSG( vm().GetEnv( reinterpret_cast<void **>( &pJNI ), JNI_VERSION_1_6 ) == JNI_OK, "Calling thread not attached to the JVM" );
+    preAttachedEnv().DeleteGlobalRef(pObject);
+}
+void LocalRefDeleter ::operator()(::jobject const pObject) const
+{
+    preAttachedEnv().DeleteLocalRef(pObject);
+}
+
+LE_NOTHROW LE_COLD void EnvDeleter::operator()(::JNIEnv *const pJNI) const
+{
+    BOOST_ASSERT(pJNI);
+    if (BOOST_UNLIKELY(detach))
+    {
+        LE_TRACE_LOGONLY("Detaching a native thread from the JVM.");
+        BOOST_VERIFY(pJVM->DetachCurrentThread() == JNI_OK);
+    }
+}
+} // namespace Detail
+
+LE_NOTHROW LE_COLD void setVM(::JNIEnv &jni)
+{
+    BOOST_ASSERT_MSG(!Detail::pJVM, "JVM singleton already set");
+    BOOST_VERIFY(jni.GetJavaVM(const_cast<JavaVM **>(&Detail::pJVM)) == JNI_OK);
+}
+
+LE_NOTHROW LE_PURE_FUNCTION LE_COLD JNIEnv &preAttachedEnv()
+{
+    JNIEnv *pJNI;
+    BOOST_VERIFY_MSG(vm().GetEnv(reinterpret_cast<void **>(&pJNI), JNI_VERSION_1_6) == JNI_OK,
+                     "Calling thread not attached to the JVM");
     return *pJNI;
 }
 
 namespace Detail
 {
-LE_NOTHROW LE_PURE_FUNCTION LE_COLD /*EnvPtr...mrmlj...libc++ vs libstdc++ std::unique_ptr incompatibility*/
-std::pair<JNIEnv *, EnvDeleter> LE_FASTCALL_ABI env()
+LE_NOTHROW LE_PURE_FUNCTION
+LE_COLD /*EnvPtr...mrmlj...libc++ vs libstdc++ std::unique_ptr incompatibility*/
+std::pair<JNIEnv *, EnvDeleter>
+env()
 {
-    JNIEnv * pJNI;
-    auto const result     ( vm().GetEnv( reinterpret_cast<void **>( &pJNI ), JNI_VERSION_1_6 ) );
-    auto const preAttached( result == JNI_OK );
-    if ( BOOST_UNLIKELY( !preAttached ) )
+    JNIEnv *pJNI;
+    auto const result(vm().GetEnv(reinterpret_cast<void **>(&pJNI), JNI_VERSION_1_6));
+    auto const preAttached(result == JNI_OK);
+    if (BOOST_UNLIKELY(!preAttached))
     {
-        LE_ASSUME( result == JNI_EDETACHED );
-        LE_ASSUME( pJNI   == nullptr       );
-        LE_TRACE_LOGONLY( "Attaching a native thread to the JVM." ); //...mrmlj...avoid infinite loops and showing this info in the example app gui...
-        BOOST_VERIFY( vm().AttachCurrentThread( &pJNI, nullptr ) == JNI_OK );
+        LE_ASSUME(result == JNI_EDETACHED);
+        LE_ASSUME(pJNI == nullptr);
+        LE_TRACE_LOGONLY(
+            "Attaching a native thread to the JVM."); //...mrmlj...avoid infinite loops and showing this info in the example app gui...
+        BOOST_VERIFY(vm().AttachCurrentThread(&pJNI, nullptr) == JNI_OK);
     }
-    return { pJNI, Detail::EnvDeleter{ !preAttached } };
+    return {pJNI, Detail::EnvDeleter{!preAttached}};
 }
-} // namespace Detail ...mrmlj...
+} // namespace Detail
 
 //------------------------------------------------------------------------------
 } // namespace JNI

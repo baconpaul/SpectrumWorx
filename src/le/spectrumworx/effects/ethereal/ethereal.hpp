@@ -3,14 +3,14 @@
 /// \file ethereal.hpp
 /// ------------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef ethereal_hpp__A78CE259_D3CA_4556_8B65_AAF88162B342
 #define ethereal_hpp__A78CE259_D3CA_4556_8B65_AAF88162B342
-#if defined( _MSC_VER ) && !defined( DOXYGEN_ONLY )
-#pragma once
+#if defined(_MSC_VER) && !defined(DOXYGEN_ONLY)
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/commonParameters.hpp"
@@ -38,8 +38,8 @@ namespace Effects
 ///
 /// \brief Replaces main with side channel based on magnitude comparisons.
 ///
-/// Compares the side-channel signal with that of the input and it replaces the 
-/// input with the side signal if certain conditions are met:  
+/// Compares the side-channel signal with that of the input and it replaces the
+/// input with the side signal if certain conditions are met:
 /// (input - side > or < threshold). Can replace magnitudes or phases, or both.
 ///
 ////////////////////////////////////////////////////////////////////////////////
@@ -51,14 +51,10 @@ struct Ethereal
     typedef CommonParameters::Mode Mode;
     /// @}
 
-    LE_ENUMERATED_PARAMETER( Condition, ( DiffHigher )( DiffLower ) );
+    LE_ENUMERATED_PARAMETER(Condition, (DiffHigher)(DiffLower));
 
-    LE_DEFINE_PARAMETERS
-    (
-        ( ( Condition ) )
-        ( ( Threshold )( SymmetricFloat )( MaximumOffset<30> )( Unit<' dB'> ) )        
-        ( ( Mode      ) )
-    );
+    LE_DEFINE_PARAMETERS(
+        ((Condition))((Threshold)(SymmetricFloat)(MaximumOffset<30>)(Unit<' dB'>))((Mode)));
 
     /// \typedef Condition
     /// \brief Condition to meet in order to replace input with side channel.
@@ -70,14 +66,13 @@ struct Ethereal
     /// \typedef Mode
     /// \brief Specifies what is to be replaced.
     /// \details
-    ///   - Both      : replace both magnitudes and phases. 
+    ///   - Both      : replace both magnitudes and phases.
     ///   - Magnitudes: replace only magnitudes.
     ///   - Phases    : replace only phases.
 
-
     static bool const usesSideChannel = false;
 
-    static char const title      [];
+    static char const title[];
     static char const description[];
 };
 
@@ -92,4 +87,3 @@ struct Ethereal
 #include "boost/config/abi_suffix.hpp"
 
 #endif // ethereal_hpp
-

@@ -3,7 +3,8 @@
 /// spectrumWorx.cpp
 /// ----------------
 ///
-/// Copyright (c) 2009 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2009 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -30,18 +31,18 @@
 #include <boost/utility/in_place_factory.hpp>
 
 #ifdef __GNUC__
-    #include <cstdlib>
-    #include <iconv.h>
+#include <cstdlib>
+#include <iconv.h>
 #endif
 
 #include <algorithm>
 //------------------------------------------------------------------------------
 #ifdef __APPLE__
-    extern void const * swDLLAddress;
+extern void const *swDLLAddress;
 #endif // __APPLE__
 #ifdef _WIN32
-    extern "C" IMAGE_DOS_HEADER __ImageBase;
-    static void const * const swDLLAddress( &__ImageBase );
+extern "C" IMAGE_DOS_HEADER __ImageBase;
+static void const *const swDLLAddress(&__ImageBase);
 #endif // _WIN32
 //------------------------------------------------------------------------------
 namespace LE
@@ -51,55 +52,59 @@ namespace SW
 {
 //------------------------------------------------------------------------------
 
-LE_NOTHROW
-SpectrumWorx::SpectrumWorx( bool const runningAsAU )
+LE_NOTHROW SpectrumWorx::SpectrumWorx(bool const runningAsAU)
     :
 #ifndef LE_SW_DISABLE_SIDE_CHANNEL
-    pListenerToNotifyWhenSampleLoaded_(                                  nullptr ),
+      pListenerToNotifyWhenSampleLoaded_(nullptr),
 #endif // LE_SW_DISABLE_SIDE_CHANNEL
-    currentProgram_                   (                                        0 ),
+      currentProgram_(0),
 #if LE_SW_ENGINE_INPUT_MODE >= 2
-    inputModeToSetOnRestart_          ( static_cast<InputMode::value_type>( -1 ) ),
+      inputModeToSetOnRestart_(static_cast<InputMode::value_type>(-1)),
 #endif // LE_SW_ENGINE_INPUT_MODE >= 2
-    loadLastSessionOnStartup_         (                                    false )
+      loadLastSessionOnStartup_(false)
 #ifdef __APPLE__
-   ,runningAsAU_                      ( runningAsAU                              )
+      ,
+      runningAsAU_(runningAsAU)
 #endif // __APPLE__
 {
 #ifndef __APPLE__
-    LE_ASSUME( runningAsAU == false );
+    LE_ASSUME(runningAsAU == false);
 #endif // __APPLE__
 
-    for ( auto & program : programs() )
-        std::strcpy( &program.name()[ 0 ],"Empty" );
+    for (auto &program : programs())
+        std::strcpy(&program.name()[0], "Empty");
 
-    SpectrumWorxCore::setProgram( programs()[ getProgram() ] );
+    SpectrumWorxCore::setProgram(programs()[getProgram()]);
 }
 
-
-LE_NOTHROW
-SpectrumWorx::~SpectrumWorx()
+LE_NOTHROW SpectrumWorx::~SpectrumWorx()
 {
     //...mrmlj...rethink this...
-    if ( GUI::havePathsBeenInitialised() )
+    if (GUI::havePathsBeenInitialised())
     {
-    #if LE_SW_ENGINE_INPUT_MODE >= 2
-        if ( inputModeToSetOnRestart_ != static_cast<InputMode::value_type>( -1 ) )
-            parameters().set<InputMode>( inputModeToSetOnRestart_ );
-    #endif // LE_SW_ENGINE_INPUT_MODE >= 2
+#if LE_SW_ENGINE_INPUT_MODE >= 2
+        if (inputModeToSetOnRestart_ != static_cast<InputMode::value_type>(-1))
+            parameters().set<InputMode>(inputModeToSetOnRestart_);
+#endif // LE_SW_ENGINE_INPUT_MODE >= 2
 
-        try { savePreset( lastSessionPresetFile().getFullPathName(), currentSampleFile(), juce::String::empty, program() ); } catch ( ... ) {}
+        try
+        {
+            savePreset(lastSessionPresetFile().getFullPathName(), currentSampleFile(),
+                       juce::String::empty, program());
+        }
+        catch (...)
+        {
+        }
 
         saveSettings();
     }
 
-    LE_TRACE_IF( gui(), "\tSW: host destroyed the plugin w/o closing the GUI." );
+    LE_TRACE_IF(gui(), "\tSW: host destroyed the plugin w/o closing the GUI.");
 
 #ifndef LE_SW_DISABLE_SIDE_CHANNEL
-    BOOST_ASSERT( !pListenerToNotifyWhenSampleLoaded_ );
+    BOOST_ASSERT(!pListenerToNotifyWhenSampleLoaded_);
 #endif // LE_SW_DISABLE_SIDE_CHANNEL
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -110,52 +115,43 @@ SpectrumWorx::~SpectrumWorx()
 
 namespace
 {
-    LE_NOTHROWNOALIAS
-    float const * LE_RESTRICT getChannelDataChunk
-    (
-        Sample::ChannelData const &                   channelData,
-        std::uint32_t             &                   startingPosition,
-        std::uint16_t                                 chunkSize,
-        float                     * LE_RESTRICT const workBuffer
-    )
+LE_NOTHROWNOALIAS float const *LE_RESTRICT
+getChannelDataChunk(Sample::ChannelData const &channelData, std::uint32_t &startingPosition,
+                    std::uint16_t chunkSize, float *LE_RESTRICT const workBuffer)
+{
+    auto const dataSize(static_cast<std::uint32_t>(channelData.size()));
+    BOOST_ASSERT(startingPosition <= dataSize);
+    if (dataSize > (startingPosition + chunkSize))
     {
-        auto const dataSize( static_cast<std::uint32_t>( channelData.size() ) );
-        BOOST_ASSERT( startingPosition <= dataSize );
-        if ( dataSize > ( startingPosition + chunkSize ) )
-        {
-            float const * const pChunk( &channelData[ startingPosition ] );
-            startingPosition += chunkSize;
-            return pChunk;
-        }
-        else
-        {
-            float * workBufferPosition( workBuffer );
-            while ( chunkSize )
-            {
-                if ( startingPosition == dataSize )
-                    startingPosition = 0;
-                auto const channelDataPosition( &channelData[ startingPosition ] );
-                auto const amountToCopy       ( static_cast<std::uint16_t>( std::min<std::uint32_t>( dataSize - startingPosition, chunkSize ) ) );
-                Math::copy( channelDataPosition, workBufferPosition, amountToCopy );
-                workBufferPosition += amountToCopy;
-                startingPosition   += amountToCopy;
-                chunkSize          -= amountToCopy;
-            }
-            return workBuffer;
-        }
+        float const *const pChunk(&channelData[startingPosition]);
+        startingPosition += chunkSize;
+        return pChunk;
     }
+    else
+    {
+        float *workBufferPosition(workBuffer);
+        while (chunkSize)
+        {
+            if (startingPosition == dataSize)
+                startingPosition = 0;
+            auto const channelDataPosition(&channelData[startingPosition]);
+            auto const amountToCopy(static_cast<std::uint16_t>(
+                std::min<std::uint32_t>(dataSize - startingPosition, chunkSize)));
+            Math::copy(channelDataPosition, workBufferPosition, amountToCopy);
+            workBufferPosition += amountToCopy;
+            startingPosition += amountToCopy;
+            chunkSize -= amountToCopy;
+        }
+        return workBuffer;
+    }
+}
 } // anonymous namespace
 
-#pragma warning( push )
-#pragma warning( disable : 4701 ) // Potentially uninitialized local variable 'samplePosition' used.
+#pragma warning(push)
+#pragma warning(disable : 4701) // Potentially uninitialized local variable 'samplePosition' used.
 
-LE_NOTHROWNOALIAS
-void SpectrumWorx::process /// \throws nothing
-(
-    float const * const * const inputs ,
-    float       *       * const outputs,
-    std::uint32_t         const samples
-)
+LE_NOTHROWNOALIAS void SpectrumWorx::process /// \throws nothing
+    (float const *const *const inputs, float **const outputs, std::uint32_t const samples)
 {
     // Implementation note:
     //   A normal lock cannot be used here because that could cause the GUI
@@ -166,60 +162,54 @@ void SpectrumWorx::process /// \throws nothing
     // (e.g. Reaper 3.22). Wavelab 5, VST Scanner and SoundForge 9.0 were found
     // not to suffer from this problem.
     //                                        (05.02.2010.) (Domagoj Saric)
-    if ( !processCriticalSection_.try_lock() )
+    if (!processCriticalSection_.try_lock())
         return;
-    ProcessLockUnlocker const processingLockUnlocker( *this );
+    ProcessLockUnlocker const processingLockUnlocker(*this);
 
     Math::FPUDisableDenormalsGuard const disableDenormals;
 
     // We give higher priority to external samples loaded through SW rather than
     // side channel data provided by the host:
-    float const * const * pSideChannels;
-    if ( hasExternalSample() )
+    float const *const *pSideChannels;
+    if (hasExternalSample())
     {
-        auto const numberOfExternalAudioChannels( std::min<uint8_t>( engineSetup().numberOfChannels(), 2U ) );
+        auto const numberOfExternalAudioChannels(
+            std::min<uint8_t>(engineSetup().numberOfChannels(), 2U));
         /// \note External samples currently force-load as stereo always so we
         /// must allow buffers().numberOfSideChannels() to be larger than
         /// numberOfExternalAudioChannels (stereo > mono).
         ///                                   (20.03.2013.) (Domagoj Saric)
-        BOOST_ASSERT( numberOfExternalAudioChannels <= buffers().numberOfSideChannels() );
-        BOOST_SIMD_STACK_BUFFER( sideChannels, float const *, numberOfExternalAudioChannels );
+        BOOST_ASSERT(numberOfExternalAudioChannels <= buffers().numberOfSideChannels());
+        BOOST_SIMD_STACK_BUFFER(sideChannels, float const *, numberOfExternalAudioChannels);
         std::uint32_t samplePosition;
-        for ( std::uint8_t channel( 0 ); channel < numberOfExternalAudioChannels; ++channel )
+        for (std::uint8_t channel(0); channel < numberOfExternalAudioChannels; ++channel)
         {
             samplePosition = sample_.samplePosition();
-            sideChannels[ channel ] =
-                getChannelDataChunk
-                (
-                    sample_.channel( channel ),
-                    samplePosition,
-                    samples,
-                    buffers().sideChannel( channel ).begin()
-                );
+            sideChannels[channel] =
+                getChannelDataChunk(sample_.channel(channel), samplePosition, samples,
+                                    buffers().sideChannel(channel).begin());
         }
-        pSideChannels = &sideChannels[ 0 ];
+        pSideChannels = &sideChannels[0];
         /// \todo Think of a smarter solution.
         ///                                   (08.02.2010.) (Domagoj Saric)
-        BOOST_ASSERT( samplePosition != sample_.samplePosition() );
+        BOOST_ASSERT(samplePosition != sample_.samplePosition());
         sample_.samplePosition() = samplePosition;
     }
-    else
-    if ( engineSetup().hasSideChannel() )
+    else if (engineSetup().hasSideChannel())
     {
-        pSideChannels = &inputs[ engineSetup().numberOfChannels() ];
-        BOOST_ASSERT( *pSideChannels );
+        pSideChannels = &inputs[engineSetup().numberOfChannels()];
+        BOOST_ASSERT(*pSideChannels);
     }
     else
     {
         pSideChannels = nullptr;
     }
 
-    static float const outputGainScale( 1 );
-    SpectrumWorxCore::process( inputs, pSideChannels, outputs, outputGainScale, samples );
+    static float const outputGainScale(1);
+    SpectrumWorxCore::process(inputs, pSideChannels, outputs, outputGainScale, samples);
 }
 
-#pragma warning( pop )
-
+#pragma warning(pop)
 
 void SpectrumWorx::resume()
 {
@@ -230,16 +220,17 @@ void SpectrumWorx::resume()
     // while processing is still active). Because of this we need to hold a
     // process lock here.
     //                                        (24.06.2010.) (Domagoj Saric)
-    Utility::CriticalSectionLock const processLock( getProcessingLock() );
+    Utility::CriticalSectionLock const processLock(getProcessingLock());
     sample_.restart();
     SpectrumWorxCore::resume();
 }
 
-
-bool LE_NOTHROW SpectrumWorx::setNumberOfChannelsFromHost( std::uint8_t const numberOfInputChannels, std::uint8_t const numberOfOutputChannels )
+bool LE_NOTHROW SpectrumWorx::setNumberOfChannelsFromHost(std::uint8_t const numberOfInputChannels,
+                                                          std::uint8_t const numberOfOutputChannels)
 {
-    auto const changeSuccess( SpectrumWorxCore::setNumberOfChannels( numberOfInputChannels, numberOfOutputChannels ) );
-    if ( changeSuccess == IOChangeResult::Succeeded )
+    auto const changeSuccess(
+        SpectrumWorxCore::setNumberOfChannels(numberOfInputChannels, numberOfOutputChannels));
+    if (changeSuccess == IOChangeResult::Succeeded)
     {
         // Implementation note:
         // Changing the input mode from a side-channel mode to a
@@ -250,30 +241,27 @@ bool LE_NOTHROW SpectrumWorx::setNumberOfChannelsFromHost( std::uint8_t const nu
         // external side-chains).
         //                                    (14.01.2010.) (Domagoj Saric)
         clearSideChannelDataIfNoSideChannel();
-    #if LE_SW_ENGINE_INPUT_MODE >= 1
+#if LE_SW_ENGINE_INPUT_MODE >= 1
         updateGUIForGlobalParameterChange();
-    #endif // LE_SW_ENGINE_INPUT_MODE >= 2
+#endif // LE_SW_ENGINE_INPUT_MODE >= 2
     }
     return changeSuccess != IOChangeResult::Failed;
 }
 
-
 #if LE_SW_ENGINE_INPUT_MODE >= 2
-bool LE_NOTHROW SpectrumWorx::setNumberOfChannelsFromUser( std::uint8_t const numberOfInputChannels, std::uint8_t const numberOfOutputChannels )
+bool LE_NOTHROW SpectrumWorx::setNumberOfChannelsFromUser(std::uint8_t const numberOfInputChannels,
+                                                          std::uint8_t const numberOfOutputChannels)
 {
-    BOOST_ASSERT( checkChannelConfiguration( numberOfInputChannels, numberOfOutputChannels ) );
+    BOOST_ASSERT(checkChannelConfiguration(numberOfInputChannels, numberOfOutputChannels));
 
-    std::uint8_t const currentNumberOfMainChannels( uncheckedEngineSetup().numberOfChannels    () );
-    std::uint8_t const currentNumberOfSideChannels( uncheckedEngineSetup().numberOfSideChannels() );
+    std::uint8_t const currentNumberOfMainChannels(uncheckedEngineSetup().numberOfChannels());
+    std::uint8_t const currentNumberOfSideChannels(uncheckedEngineSetup().numberOfSideChannels());
 
-    std::uint8_t const numberOfMainChannels( numberOfOutputChannels                         );
-    std::uint8_t const numberOfSideChannels( numberOfInputChannels - numberOfOutputChannels );
+    std::uint8_t const numberOfMainChannels(numberOfOutputChannels);
+    std::uint8_t const numberOfSideChannels(numberOfInputChannels - numberOfOutputChannels);
 
-    if
-    (
-        ( numberOfMainChannels == currentNumberOfMainChannels ) &&
-        ( numberOfSideChannels == currentNumberOfSideChannels )
-    )
+    if ((numberOfMainChannels == currentNumberOfMainChannels) &&
+        (numberOfSideChannels == currentNumberOfSideChannels))
         return true;
 
     /// \note The process lock must be held during both the
@@ -283,48 +271,46 @@ bool LE_NOTHROW SpectrumWorx::setNumberOfChannelsFromUser( std::uint8_t const nu
     /// (which could lead to a crash because the host would send data for the
     /// previous IO setup).
     ///                                       (04.03.2013.) (Domagoj Saric)
-    Utility::CriticalSectionLock const processLock( this->getProcessingLock() );
+    Utility::CriticalSectionLock const processLock(this->getProcessingLock());
 
-                           setReportedNumberOfChannels (        numberOfMainChannels,        numberOfSideChannels )  ;
-    bool const hostAllows( hostTryIOConfigurationChange(        numberOfMainChannels,        numberOfSideChannels ) );
-                           setReportedNumberOfChannels ( currentNumberOfMainChannels, currentNumberOfSideChannels )  ;
-    if ( !hostAllows )
+    setReportedNumberOfChannels(numberOfMainChannels, numberOfSideChannels);
+    bool const hostAllows(hostTryIOConfigurationChange(numberOfMainChannels, numberOfSideChannels));
+    setReportedNumberOfChannels(currentNumberOfMainChannels, currentNumberOfSideChannels);
+    if (!hostAllows)
     {
-        bool const hostSupportsIOChanges( hostSupportsIOConfigurationChanges() );
-        if ( gui() )
+        bool const hostSupportsIOChanges(hostSupportsIOConfigurationChanges());
+        if (gui())
         {
             boost::string_ref errorMessage;
-            if ( hostSupportsIOChanges )
+            if (hostSupportsIOChanges)
             {
                 errorMessage = "The host rejected the requested IO mode change.";
             }
             else
             {
-                if ( runningAsAU() )
+                if (runningAsAU())
                 {
-                    errorMessage =
-                    "A preset tried to change the IO mode but this is something "
-                    "not generally supported by the AU protocol. Please adjust "
-                    "the bus configuration manually through the host as "
-                    "required (or use the VST version).";
+                    errorMessage = "A preset tried to change the IO mode but this is something "
+                                   "not generally supported by the AU protocol. Please adjust "
+                                   "the bus configuration manually through the host as "
+                                   "required (or use the VST version).";
                 }
                 else
                 {
-                    errorMessage =
-                    "An attempt was made to change the current input-output mode "
-                    "but this host does not report that it supports on-the-fly "
-                    "channel configuration changes. To avoid crashing it, the "
-                    "change will be made the next time the plugin is started.";
+                    errorMessage = "An attempt was made to change the current input-output mode "
+                                   "but this host does not report that it supports on-the-fly "
+                                   "channel configuration changes. To avoid crashing it, the "
+                                   "change will be made the next time the plugin is started.";
                     //...mrmlj...
-                    InputMode const currentIOMode( parameters().get<InputMode>() );
-                    updateInputModeForIOConfig( numberOfMainChannels, numberOfSideChannels );
-                    setInputModeToSetOnRestart( parameters().get<InputMode>() );
-                    parameters().set<InputMode>( currentIOMode );
+                    InputMode const currentIOMode(parameters().get<InputMode>());
+                    updateInputModeForIOConfig(numberOfMainChannels, numberOfSideChannels);
+                    setInputModeToSetOnRestart(parameters().get<InputMode>());
+                    parameters().set<InputMode>(currentIOMode);
                 }
-                BOOST_ASSERT( engineSetup().numberOfChannels    () == currentNumberOfMainChannels );
-                BOOST_ASSERT( engineSetup().numberOfSideChannels() == currentNumberOfSideChannels );
+                BOOST_ASSERT(engineSetup().numberOfChannels() == currentNumberOfMainChannels);
+                BOOST_ASSERT(engineSetup().numberOfSideChannels() == currentNumberOfSideChannels);
             }
-            GUI::warningMessageBox( MB_ERROR, errorMessage, false );
+            GUI::warningMessageBox(MB_ERROR, errorMessage, false);
             return false;
         }
         else
@@ -334,24 +320,23 @@ bool LE_NOTHROW SpectrumWorx::setNumberOfChannelsFromUser( std::uint8_t const nu
             /// if it is decreasing the number of channels (this should be safe
             /// crash-wise).
             ///                               (19.03.2013.) (Domagoj Saric)
-            if ( hostSupportsIOChanges || /*...mrmlj...*/ runningAsAU() )
+            if (hostSupportsIOChanges || /*...mrmlj...*/ runningAsAU())
                 return false;
-            else
-            if
-            (
-                ( numberOfMainChannels > currentNumberOfMainChannels ) ||
-                ( numberOfSideChannels > currentNumberOfSideChannels )
-            )
+            else if ((numberOfMainChannels > currentNumberOfMainChannels) ||
+                     (numberOfSideChannels > currentNumberOfSideChannels))
                 return false;
 
-            LE_TRACE( "\tSW: blindly accepting a 'downsized' IO mode change." );
+            LE_TRACE("\tSW: blindly accepting a 'downsized' IO mode change.");
         }
     }
 
-    bool const changeSuccessful( SpectrumWorxCore::setNumberOfChannelsImpl( numberOfMainChannels, numberOfSideChannels ) );
-    if ( !changeSuccessful )
+    bool const changeSuccessful(
+        SpectrumWorxCore::setNumberOfChannelsImpl(numberOfMainChannels, numberOfSideChannels));
+    if (!changeSuccessful)
     {
-        BOOST_VERIFY( hostTryIOConfigurationChange( currentNumberOfMainChannels, currentNumberOfSideChannels ) || !hostSupportsIOConfigurationChanges() );
+        BOOST_VERIFY(hostTryIOConfigurationChange(currentNumberOfMainChannels,
+                                                  currentNumberOfSideChannels) ||
+                     !hostSupportsIOConfigurationChanges());
         return false;
     }
 
@@ -367,7 +352,6 @@ bool LE_NOTHROW SpectrumWorx::setNumberOfChannelsFromUser( std::uint8_t const nu
 }
 #endif // LE_SW_ENGINE_INPUT_MODE >= 2
 
-
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// Programs and presets
@@ -376,65 +360,65 @@ bool LE_NOTHROW SpectrumWorx::setNumberOfChannelsFromUser( std::uint8_t const nu
 
 // VST Preset Program Change Suggestions
 // http://forum.cockos.com/showthread.php?p=384102
-bool SpectrumWorx::loadProgramState
-(
-    std::uint8_t          const programIndex,
-    char          const * const pProgramName,
-    void          const * const pData,
-    std::uint32_t         const dataSize
-)
+bool SpectrumWorx::loadProgramState(std::uint8_t const programIndex, char const *const pProgramName,
+                                    void const *const pData, std::uint32_t const dataSize)
 {
     /// \note We have to copy the state data because of RapidXML's destructive
     /// parsing.
     ///                                       (18.03.2013.) (Domagoj Saric)
-    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER( preset, char, dataSize );
-    std::memcpy( preset.begin(), pData, dataSize );
-    if ( !loadPreset( preset.begin(), false, nullptr, programIndex ) )
+    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(preset, char, dataSize);
+    std::memcpy(preset.begin(), pData, dataSize);
+    if (!loadPreset(preset.begin(), false, nullptr, programIndex))
         return false;
-    setProgramName( programIndex, pProgramName );
+    setProgramName(programIndex, pProgramName);
     return true;
 }
 
-
-unsigned int SpectrumWorx::saveProgramState( std::uint8_t const programIndex, void * const pStorage, std::uint32_t const storageSize ) const
+unsigned int SpectrumWorx::saveProgramState(std::uint8_t const programIndex, void *const pStorage,
+                                            std::uint32_t const storageSize) const
 {
-    unsigned int const bytesWritten( savePreset( static_cast<char *>( pStorage ), currentSampleFile(), juce::String::empty, programs()[ programIndex ] ) );
-    BOOST_ASSERT( bytesWritten < storageSize );
-    boost::ignore_unused_variable_warning( storageSize );
+    unsigned int const bytesWritten(savePreset(static_cast<char *>(pStorage), currentSampleFile(),
+                                               juce::String::empty, programs()[programIndex]));
+    BOOST_ASSERT(bytesWritten < storageSize);
+    boost::ignore_unused_variable_warning(storageSize);
     return bytesWritten;
 }
 
-
-void SpectrumWorx::getProgramName( std::uint8_t const program, boost::iterator_range<char *> const name ) const
+void SpectrumWorx::getProgramName(std::uint8_t const program,
+                                  boost::iterator_range<char *> const name) const
 {
-    copyToBuffer( &programs()[ program ].name()[ 0 ], name );
+    copyToBuffer(&programs()[program].name()[0], name);
 }
-void SpectrumWorx::getProgramName( boost::iterator_range<char *> const name ) const { getProgramName( getProgram(), name ); }
-
-
-void SpectrumWorx::setProgramName( std::uint8_t const program, char const * const programName )
+void SpectrumWorx::getProgramName(boost::iterator_range<char *> const name) const
 {
-    copyToBuffer( programName, programs()[ program ].name() );
+    getProgramName(getProgram(), name);
 }
-void SpectrumWorx::setProgramName( char const * const programName ) { setProgramName( getProgram(), programName ); }
 
+void SpectrumWorx::setProgramName(std::uint8_t const program, char const *const programName)
+{
+    copyToBuffer(programName, programs()[program].name());
+}
+void SpectrumWorx::setProgramName(char const *const programName)
+{
+    setProgramName(getProgram(), programName);
+}
 
 namespace
 {
 class GlobalParameterUpdater : public SpectrumWorx
 {
-public:
+  public:
     using result_type = void;
 
-    template <class Parameter>
-    result_type operator()( Parameter const & parameter ) const
+    template <class Parameter> result_type operator()(Parameter const &parameter) const
     {
-        BOOST_VERIFY(( setGlobalParameter<Parameter, SpectrumWorx>( const_cast<GlobalParameterUpdater &>( *this ), parameter.getValue() ) ));
+        BOOST_VERIFY((setGlobalParameter<Parameter, SpectrumWorx>(
+            const_cast<GlobalParameterUpdater &>(*this), parameter.getValue())));
     }
 
 #if LE_SW_ENGINE_INPUT_MODE >= 2
     using InputMode = GlobalParameters::InputMode;
-    result_type operator()( InputMode const & inputMode ) const
+    result_type operator()(InputMode const &inputMode) const
     {
         /// \note Changing the actual number of channels based on the input
         /// mode saved in the preset/program makes no sense (we can't/don't want
@@ -442,196 +426,211 @@ public:
         /// inserted). Instead we only update the side channel mode.
         ///                                   (18.03.2013.) (Domagoj Saric)
         bool enableSideChannel;
-        switch ( inputMode.getValue() )
+        switch (inputMode.getValue())
         {
-            case InputMode::MonoSideChain  :
-            case InputMode::StereoSideChain: enableSideChannel = true ; break;
-            default                        : enableSideChannel = false; break;
+        case InputMode::MonoSideChain:
+        case InputMode::StereoSideChain:
+            enableSideChannel = true;
+            break;
+        default:
+            enableSideChannel = false;
+            break;
         }
 
-        SpectrumWorx & effect( const_cast<GlobalParameterUpdater &>( *this ) );
-        InputMode::value_type const currentInputMode( effect.parameters().get<InputMode>() );
-        InputMode::value_type       newInputMode;
+        SpectrumWorx &effect(const_cast<GlobalParameterUpdater &>(*this));
+        InputMode::value_type const currentInputMode(effect.parameters().get<InputMode>());
+        InputMode::value_type newInputMode;
 
-        if ( enableSideChannel )
+        if (enableSideChannel)
         {
-        #ifdef LE_SW_DISABLE_SIDE_CHANNEL
-            GUI::warningMessageBox
-            (
-                MB_WARNING,
-                "Loaded preset uses side channel audio which is not "
-                "supported by this edition of SpectrumWorx.",
-                false
-            );
+#ifdef LE_SW_DISABLE_SIDE_CHANNEL
+            GUI::warningMessageBox(MB_WARNING,
+                                   "Loaded preset uses side channel audio which is not "
+                                   "supported by this edition of SpectrumWorx.",
+                                   false);
             return /*false*/;
-        #else
-            switch ( currentInputMode )
+#else
+            switch (currentInputMode)
             {
-                case InputMode::Mono  : newInputMode = InputMode::MonoSideChain  ; break;
-                case InputMode::Stereo: newInputMode = InputMode::StereoSideChain; break;
-                default               : newInputMode = inputMode                 ; break;
+            case InputMode::Mono:
+                newInputMode = InputMode::MonoSideChain;
+                break;
+            case InputMode::Stereo:
+                newInputMode = InputMode::StereoSideChain;
+                break;
+            default:
+                newInputMode = inputMode;
+                break;
             }
-        #endif // LE_SW_DISABLE_SIDE_CHANNEL
+#endif // LE_SW_DISABLE_SIDE_CHANNEL
         }
         else
         {
-            switch ( currentInputMode )
+            switch (currentInputMode)
             {
-                case InputMode::MonoSideChain  : newInputMode = InputMode::Mono  ; break;
-                case InputMode::StereoSideChain: newInputMode = InputMode::Stereo; break;
-                default                        : newInputMode = inputMode        ; break;
+            case InputMode::MonoSideChain:
+                newInputMode = InputMode::Mono;
+                break;
+            case InputMode::StereoSideChain:
+                newInputMode = InputMode::Stereo;
+                break;
+            default:
+                newInputMode = inputMode;
+                break;
             }
         }
-        LE_TRACE_IF( newInputMode != inputMode, "Rejecting exact InputMode from preset" );
-        BOOST_VERIFY( setGlobalParameter<InputMode>( effect, newInputMode ) || runningAsAU() );
+        LE_TRACE_IF(newInputMode != inputMode, "Rejecting exact InputMode from preset");
+        BOOST_VERIFY(setGlobalParameter<InputMode>(effect, newInputMode) || runningAsAU());
     }
 #endif // LE_SW_ENGINE_INPUT_MODE >= 2
 
-private:
+  private:
     GlobalParameterUpdater();
-    void operator=( GlobalParameterUpdater const & );
+    void operator=(GlobalParameterUpdater const &);
 }; // class GlobalParameterUpdater
 } // anonymous namespace
 
-void LE_NOTHROW SpectrumWorx::resetForGlobalParameters( Parameters const & parameters )
+void LE_NOTHROW SpectrumWorx::resetForGlobalParameters(Parameters const &parameters)
 {
     //...mrmlj...this can possibly cause multiple engine setup updates/memory reallocations...
     //...mrmlj...no error reporting...
-    boost::fusion::for_each( parameters, static_cast<GlobalParameterUpdater &>( *this ) );
+    boost::fusion::for_each(parameters, static_cast<GlobalParameterUpdater &>(*this));
 }
 
-
-bool LE_NOTHROW SpectrumWorx::canParameterBeAutomated( ParameterID const parameter, Program const * LE_RESTRICT const pProgram ) const
+bool LE_NOTHROW
+SpectrumWorx::canParameterBeAutomated(ParameterID const parameter,
+                                      Program const *LE_RESTRICT const pProgram) const
 {
-    bool const staticParameterList( pProgram == nullptr );
-    if ( staticParameterList )
+    bool const staticParameterList(pProgram == nullptr);
+    if (staticParameterList)
         return true;
 
-    switch ( parameter.type() )
+    switch (parameter.type())
     {
-        case ParameterID::GlobalParameter     :
-        case ParameterID::ModuleChainParameter:
-            return true;
+    case ParameterID::GlobalParameter:
+    case ParameterID::ModuleChainParameter:
+        return true;
     }
 
-    auto indices( parameter.value._.lfo );
-    switch ( parameter.type() )
+    auto indices(parameter.value._.lfo);
+    switch (parameter.type())
     {
-        case ParameterID::LFOParameter   : ++indices.moduleParameterIndex; // Bypass
-        case ParameterID::ModuleParameter:
-        {
-            auto const pModule( pProgram->moduleChain().module( indices.moduleIndex ) );
-            if ( !pModule )
-                return false;
-            if ( indices.moduleParameterIndex >= pModule->numberOfParameters() )
-                return false;
-            return true;
-        }
+    case ParameterID::LFOParameter:
+        ++indices.moduleParameterIndex; // Bypass
+    case ParameterID::ModuleParameter:
+    {
+        auto const pModule(pProgram->moduleChain().module(indices.moduleIndex));
+        if (!pModule)
+            return false;
+        if (indices.moduleParameterIndex >= pModule->numberOfParameters())
+            return false;
+        return true;
+    }
 
         LE_DEFAULT_CASE_UNREACHABLE();
     }
 }
 
-
-bool SpectrumWorx::ModuleInitialiser::operator()( Module & module, std::uint8_t const moduleIndex ) const
+bool SpectrumWorx::ModuleInitialiser::operator()(Module &module,
+                                                 std::uint8_t const moduleIndex) const
 {
-    if ( dspInitialiser( module, moduleIndex ) )
+    if (dspInitialiser(module, moduleIndex))
     {
-        if ( pEditor )
+        if (pEditor)
         {
-            if ( module.gui() )
-                module.gui()->moveToSlot( moduleIndex );
+            if (module.gui())
+                module.gui()->moveToSlot(moduleIndex);
             else
-                module.createGUI( *pEditor, moduleIndex );
+                module.createGUI(*pEditor, moduleIndex);
         }
         return true;
     }
     return false;
 }
 
-LE_NOTHROW
-SpectrumWorx::ModuleInitialiser SpectrumWorx::moduleInitialiser() { return { SpectrumWorxCore::moduleInitialiser(), gui().get_ptr() }; }
+LE_NOTHROW SpectrumWorx::ModuleInitialiser SpectrumWorx::moduleInitialiser()
+{
+    return {SpectrumWorxCore::moduleInitialiser(), gui().get_ptr()};
+}
 
-
-#pragma warning( push )
-#pragma warning( disable : 4510 ) // Default constructor could not be generated.
-#pragma warning( disable : 4610 ) // Class can never be instantiated - user-defined constructor required.
+#pragma warning(push)
+#pragma warning(disable : 4510) // Default constructor could not be generated.
+#pragma warning(disable                                                                            \
+                : 4610) // Class can never be instantiated - user-defined constructor required.
 
 struct SpectrumWorx::PresetLoader
 {
-    SpectrumWorx &       effect       ;
-    std::uint8_t   const targetProgram;
+    SpectrumWorx &effect;
+    std::uint8_t const targetProgram;
 
     using Module = ModuleInitialiser::Module;
 
-    Program                      & program               () { return effect.programs()[ targetProgram ]; }
-    GlobalParameters::Parameters & targetGlobalParameters() { return program().parameters (); }
-    AutomatedModuleChain         & targetChain           () { return program().moduleChain(); }
+    Program &program() { return effect.programs()[targetProgram]; }
+    GlobalParameters::Parameters &targetGlobalParameters() { return program().parameters(); }
+    AutomatedModuleChain &targetChain() { return program().moduleChain(); }
 
-	AutomationBlocker            automationBlocker() const { return { effect }; }
-    Utility::CriticalSectionLock processingLock   () const { return effect.getProcessingLock(); }
-    ModuleInitialiser            moduleInitialiser()       { return effect.moduleInitialiser(); }
+    AutomationBlocker automationBlocker() const { return {effect}; }
+    Utility::CriticalSectionLock processingLock() const { return effect.getProcessingLock(); }
+    ModuleInitialiser moduleInitialiser() { return effect.moduleInitialiser(); }
 
-    bool onlySetParameters     (                                                    ) const { return targetProgram != effect.getProgram(); }
-    bool setNewGlobalParameters( GlobalParameters::Parameters const & newParameters )       { effect.resetForGlobalParameters( newParameters ); return true; }
-
-    void moduleChainFinished( std::uint8_t const moduleCount, bool const syncedLFOFound )
+    bool onlySetParameters() const { return targetProgram != effect.getProgram(); }
+    bool setNewGlobalParameters(GlobalParameters::Parameters const &newParameters)
     {
-        BOOST_ASSERT( !onlySetParameters() );
-        if ( effect.gui() ) effect.gui()->setLastModulePosition( moduleCount );
-        if
-        (
-            syncedLFOFound &&
-            !LFO::Timer::hasTempoInformation() &&
+        effect.resetForGlobalParameters(newParameters);
+        return true;
+    }
+
+    void moduleChainFinished(std::uint8_t const moduleCount, bool const syncedLFOFound)
+    {
+        BOOST_ASSERT(!onlySetParameters());
+        if (effect.gui())
+            effect.gui()->setLastModulePosition(moduleCount);
+        if (syncedLFOFound && !LFO::Timer::hasTempoInformation() &&
             /// \note Some hosts (Renoise 2.8) provide tempo information
             /// lazily, after the first time they call process() so we also
             /// check if the transport has started in order to avoid false
             /// warnings.
             ///                               (03.07.2012.) (Domagoj Saric)
-            effect.lfoTimer().currentTimeInBars()
-        )
+            effect.lfoTimer().currentTimeInBars())
         {
-            GUI::warningMessageBox
-            (
-                MB_WARNING,
-                "Loaded preset uses tempo-synced LFOs but the host does not provide tempo information.",
-                false
-            );
+            GUI::warningMessageBox(MB_WARNING,
+                                   "Loaded preset uses tempo-synced LFOs but the host does not "
+                                   "provide tempo information.",
+                                   false);
         }
     }
 
 #ifndef LE_SW_DISABLE_SIDE_CHANNEL
     bool wantsSampleFile() const { return !ignoreSampleFile && !onlySetParameters(); }
-    void setSample( boost::string_ref const sampleFileName )
+    void setSample(boost::string_ref const sampleFileName)
     {
-        BOOST_ASSERT( !onlySetParameters() );
-        BOOST_ASSERT( !ignoreSampleFile );
+        BOOST_ASSERT(!onlySetParameters());
+        BOOST_ASSERT(!ignoreSampleFile);
         //   The sample has to be loaded before calling
         // gui()->updateSampleNameAsync().
         //                                    (15.12.2011.) (Domagoj Saric)
         /// \todo  Clean up this spaghetti.
         ///                                   (15.12.2011.) (Domagoj Saric)
-        if ( sampleFileName.empty() )
+        if (sampleFileName.empty())
             return;
-        effect.setNewSample
-        (
+        effect.setNewSample(
             // Implementation note:
             //   Workaround for relative sample paths and Windows paths
             // on OS X.
             //                                (17.11.2011.) (Domagoj Saric)
-            juce::File::createFileWithoutCheckingPath
-            (
-                juce::String::fromUTF8( sampleFileName.begin(), static_cast<unsigned int>( sampleFileName.size() ) )
-            #ifdef _WIN32
-                .replaceCharacter( '/', '\\' )
-            #else
-                .replaceCharacter( '\\', '/' )
-            #endif // __APPLE__
-            )
-        );
+            juce::File::createFileWithoutCheckingPath(
+                juce::String::fromUTF8(sampleFileName.begin(),
+                                       static_cast<unsigned int>(sampleFileName.size()))
+#ifdef _WIN32
+                    .replaceCharacter('/', '\\')
+#else
+                    .replaceCharacter('\\', '/')
+#endif // __APPLE__
+                    ));
         /// \todo Think of a cleaner solution.
         ///                                   (03.02.2010.) (Domagoj Saric)
-        if ( effect.gui() ) effect.gui()->updateSampleNameAsync();
+        if (effect.gui())
+            effect.gui()->updateSampleNameAsync();
     }
     bool const ignoreSampleFile;
 #endif // LE_SW_DISABLE_SIDE_CHANNEL
@@ -641,89 +640,89 @@ struct SpectrumWorx::PresetConsumer
 {
     using Module = PresetLoader::Module;
 
-    PresetLoader presetLoader( bool const ignoreExternalSample ) const { return { effect, targetProgram, ignoreExternalSample }; }
+    PresetLoader presetLoader(bool const ignoreExternalSample) const
+    {
+        return {effect, targetProgram, ignoreExternalSample};
+    }
 
-    Program & program() { return effect.programs()[ targetProgram ]; }
-    void notifyHostAboutPresetChangeBegin() const { BOOST_ASSERT( targetProgram == effect.getProgram() ); effect.presetChangeBegin(); }
-    void notifyHostAboutPresetChangeEnd  () const { BOOST_ASSERT( targetProgram == effect.getProgram() ); effect.presetChangeEnd  (); }
-    SpectrumWorx &       effect       ;
-    std::uint8_t   const targetProgram;
+    Program &program() { return effect.programs()[targetProgram]; }
+    void notifyHostAboutPresetChangeBegin() const
+    {
+        BOOST_ASSERT(targetProgram == effect.getProgram());
+        effect.presetChangeBegin();
+    }
+    void notifyHostAboutPresetChangeEnd() const
+    {
+        BOOST_ASSERT(targetProgram == effect.getProgram());
+        effect.presetChangeEnd();
+    }
+    SpectrumWorx &effect;
+    std::uint8_t const targetProgram;
 }; // struct SpectrumWorx::PresetConsumer
 
-#pragma warning( push )
+#pragma warning(push)
 
-LE_NOTHROW
-bool SpectrumWorx::loadPreset
-(
-    char         * const inMemoryPreset,
-    bool           const ignoreExternalSample,
-    juce::String * const pComment,
-    std::uint8_t   const program
-)
+LE_NOTHROW bool SpectrumWorx::loadPreset(char *const inMemoryPreset,
+                                         bool const ignoreExternalSample,
+                                         juce::String *const pComment, std::uint8_t const program)
 {
-    BOOST_ASSERT( !presetLoadingInProgress() );
+    BOOST_ASSERT(!presetLoadingInProgress());
 
-    return SW::loadPreset( inMemoryPreset, ignoreExternalSample, pComment, PresetConsumer{ *this, program } );
+    return SW::loadPreset(inMemoryPreset, ignoreExternalSample, pComment,
+                          PresetConsumer{*this, program});
 }
 
-
-bool SpectrumWorx::loadPreset
-(
-    juce::File   const &       file,
-    bool                 const ignoreExternalSample,
-    juce::String       * const pComment,
-    char_t       const * const presetName
-)
+bool SpectrumWorx::loadPreset(juce::File const &file, bool const ignoreExternalSample,
+                              juce::String *const pComment, char_t const *const presetName)
 {
-    return SW::loadPreset( file, ignoreExternalSample, pComment, presetName, PresetConsumer{ *this, getProgram() } );
+    return SW::loadPreset(file, ignoreExternalSample, pComment, presetName,
+                          PresetConsumer{*this, getProgram()});
 }
-
 
 #ifndef LE_SW_DISABLE_SIDE_CHANNEL
-bool LE_NOTHROWNOALIAS SpectrumWorx::setNewSampleWorker( juce::File const & newSampleFile )
+bool LE_NOTHROWNOALIAS SpectrumWorx::setNewSampleWorker(juce::File const &newSampleFile)
 {
-    bool succeeded( true );
-    if ( newSampleFile.existsAsFile() )
+    bool succeeded(true);
+    if (newSampleFile.existsAsFile())
     {
-    #ifndef NDEBUG
-        bool       const samplePreviouslyLoaded( sample_              );
-        juce::File const previousSample        ( sample_.sampleFile() );
-    #endif // NDEBUG
+#ifndef NDEBUG
+        bool const samplePreviouslyLoaded(sample_);
+        juce::File const previousSample(sample_.sampleFile());
+#endif // NDEBUG
 
         //...mrmlj...
         bool bufferAllocationSucceeded;
         {
-            Utility::CriticalSectionLock const processingLock( getProcessingLock() );
-            buffers().forceSideChannel( true );
-            bufferAllocationSucceeded = buffers().resize
-            (
-                buffers    ().blockSize           (),
-                engineSetup().numberOfChannels    (),
-                engineSetup().numberOfSideChannels()
-            );
+            Utility::CriticalSectionLock const processingLock(getProcessingLock());
+            buffers().forceSideChannel(true);
+            bufferAllocationSucceeded =
+                buffers().resize(buffers().blockSize(), engineSetup().numberOfChannels(),
+                                 engineSetup().numberOfSideChannels());
         }
 
-        if ( bufferAllocationSucceeded )
+        if (bufferAllocationSucceeded)
         {
-            char const * const pErrorMessage( sample_.load( newSampleFile, engineSetup().sampleRate<unsigned int>(), processCriticalSection_ ) );
-            if ( pErrorMessage )
+            char const *const pErrorMessage(sample_.load(
+                newSampleFile, engineSetup().sampleRate<unsigned int>(), processCriticalSection_));
+            if (pErrorMessage)
             {
-                GUI::warningMessageBox( "SpectrumWorx: error loading selected sample file.", pErrorMessage, true );
+                GUI::warningMessageBox("SpectrumWorx: error loading selected sample file.",
+                                       pErrorMessage, true);
 
                 // Implementation note:
                 //   Verify that the 'sample loaded' state has not changed if an
                 // error occurred.
                 //                                (08.07.2010.) (Domagoj Saric)
-                BOOST_ASSERT( !samplePreviouslyLoaded == !sample_             );
-                BOOST_ASSERT( previousSample          == sample_.sampleFile() );
+                BOOST_ASSERT(!samplePreviouslyLoaded == !sample_);
+                BOOST_ASSERT(previousSample == sample_.sampleFile());
                 succeeded = false;
             }
         }
-        buffers().forceSideChannel( hasExternalSample() );
+        buffers().forceSideChannel(hasExternalSample());
     }
     else
     {
-        Utility::CriticalSectionLock const processingLock( getProcessingLock() );
+        Utility::CriticalSectionLock const processingLock(getProcessingLock());
         sample_.clear();
         // Implementation note:
         //   Because of hosts like FL Studio 9 that disallow the changing of the
@@ -741,15 +740,14 @@ bool LE_NOTHROWNOALIAS SpectrumWorx::setNewSampleWorker( juce::File const & newS
         clearSideChannelData();
 
         //...mrmlj...
-        buffers().forceSideChannel( false );
+        buffers().forceSideChannel(false);
 
-        succeeded = ( newSampleFile == juce::File::nonexistent );
+        succeeded = (newSampleFile == juce::File::nonexistent);
     }
     return succeeded;
 }
 
-
-void SpectrumWorx::setNewSample( juce::File const & newSampleFile )
+void SpectrumWorx::setNewSample(juce::File const &newSampleFile)
 {
     // Implementation note:
     //   If the requested sample file does not exist we look for it in the
@@ -760,59 +758,49 @@ void SpectrumWorx::setNewSample( juce::File const & newSampleFile )
     pendingSampleToLoad_ =
         newSampleFile.exists()
             ? newSampleFile
-            : GUI::rootPath().getChildFile( "Samples" ).getChildFile( newSampleFile.getFileName() );
-    if ( !isSampleLoadInProgress() )
+            : GUI::rootPath().getChildFile("Samples").getChildFile(newSampleFile.getFileName());
+    if (!isSampleLoadInProgress())
     {
-        BOOST_VERIFY(( sampleLoadingThread_.start<SpectrumWorx, &SpectrumWorx::sampleLoadingLoop>( *this ) ));
-                       sampleLoadingThread_.setDebugName( "Sample thread" );
+        BOOST_VERIFY(
+            (sampleLoadingThread_.start<SpectrumWorx, &SpectrumWorx::sampleLoadingLoop>(*this)));
+        sampleLoadingThread_.setDebugName("Sample thread");
     }
 }
 
+bool SpectrumWorx::isSampleLoadInProgress() const { return sampleLoadingThread_.isRunning(); }
 
-bool SpectrumWorx::isSampleLoadInProgress() const
-{
-    return sampleLoadingThread_.isRunning();
-}
-
-
-void SpectrumWorx::registerSampleLoadedListener( Editor & listenerToRegister )
+void SpectrumWorx::registerSampleLoadedListener(Editor &listenerToRegister)
 {
     //...mrmlj...reconsider this...
-    BOOST_ASSERT( !pListenerToNotifyWhenSampleLoaded_ || ( pListenerToNotifyWhenSampleLoaded_ == &listenerToRegister ) );
+    BOOST_ASSERT(!pListenerToNotifyWhenSampleLoaded_ ||
+                 (pListenerToNotifyWhenSampleLoaded_ == &listenerToRegister));
     pListenerToNotifyWhenSampleLoaded_ = &listenerToRegister;
 }
 
-
-void SpectrumWorx::deregisterSampleLoadedListener( Editor const & listenerToDeregister )
+void SpectrumWorx::deregisterSampleLoadedListener(Editor const &listenerToDeregister)
 {
-    BOOST_ASSERT( !pListenerToNotifyWhenSampleLoaded_ || ( pListenerToNotifyWhenSampleLoaded_ == &listenerToDeregister ) );
-    boost::ignore_unused_variable_warning( listenerToDeregister );
+    BOOST_ASSERT(!pListenerToNotifyWhenSampleLoaded_ ||
+                 (pListenerToNotifyWhenSampleLoaded_ == &listenerToDeregister));
+    boost::ignore_unused_variable_warning(listenerToDeregister);
     pListenerToNotifyWhenSampleLoaded_ = nullptr;
 }
 
-LE_NOTHROW
-void SpectrumWorx::sampleLoadingLoop()
+LE_NOTHROW void SpectrumWorx::sampleLoadingLoop()
 {
-    while
-    (
-        ( pendingSampleToLoad_ != sample_.sampleFile() ) &&
-        setNewSampleWorker( pendingSampleToLoad_ )
-    ) {}
+    while ((pendingSampleToLoad_ != sample_.sampleFile()) &&
+           setNewSampleWorker(pendingSampleToLoad_))
+    {
+    }
 
     pendingSampleToLoad_ = juce::File::nonexistent;
 
-    if ( pListenerToNotifyWhenSampleLoaded_ )
+    if (pListenerToNotifyWhenSampleLoaded_)
     {
-        GUI::postMessage
-        (
-            *this,
-            []( GUI::SpectrumWorxEditor & gui )
-            {
-                gui.sampleArea_.setVisible();
-                gui.updateSampleName();
-                return true;
-            }
-        );
+        GUI::postMessage(*this, [](GUI::SpectrumWorxEditor &gui) {
+            gui.sampleArea_.setVisible();
+            gui.updateSampleName();
+            return true;
+        });
     }
     pListenerToNotifyWhenSampleLoaded_ = nullptr;
 
@@ -820,10 +808,9 @@ void SpectrumWorx::sampleLoadingLoop()
 }
 #endif // LE_SW_DISABLE_SIDE_CHANNEL
 
-
 bool LE_NOTHROW SpectrumWorx::updateEngineSetup()
 {
-    if ( SpectrumWorxCore::updateEngineSetup() )
+    if (SpectrumWorxCore::updateEngineSetup())
     {
         updateGUIForEngineSetupChanges();
         return true;
@@ -831,22 +818,17 @@ bool LE_NOTHROW SpectrumWorx::updateEngineSetup()
     return false;
 }
 
-
-void SpectrumWorx::updatePosition( std::uint32_t const deltaSamples )
+void SpectrumWorx::updatePosition(std::uint32_t const deltaSamples)
 {
-    handleTimingInformationChange
-    (
-        updatePositionAndTimingInformation( deltaSamples )
-    );
+    handleTimingInformationChange(updatePositionAndTimingInformation(deltaSamples));
 }
-
 
 bool LE_NOTHROW SpectrumWorx::initialise()
 {
     //if ( !SpectrumWorxCore::initialise() )
     //    return false;
     { //...mrmlj...copy pasted core version for different setNumberOfChannels
-      //...mrmlj...and updateEngineSetup versions...clean this up...
+        //...mrmlj...and updateEngineSetup versions...clean this up...
         bool success;
         // Update/create the initial Engine::Setup and shared storage with the
         // default and/or so far partially set parameters.
@@ -854,27 +836,32 @@ bool LE_NOTHROW SpectrumWorx::initialise()
         //...mrmlj...the parameters-engine setup synchronization in that case
         //...mrmlj...a custom io mode might have been set and this would override it
         //...mrmlj...clean this up...
-        if ( !currentStorageFactors().numberOfChannels )
+        if (!currentStorageFactors().numberOfChannels)
         {
-        #if LE_SW_ENGINE_INPUT_MODE >= 1
-            auto const ioChannelsConfig( ioChannels( parameters().get<InputMode>() ) );
+#if LE_SW_ENGINE_INPUT_MODE >= 1
+            auto const ioChannelsConfig(ioChannels(parameters().get<InputMode>()));
             //...mrmlj...see the note in SpectrumWorxVST24::initialise()...
-            success = ( SpectrumWorxCore::setNumberOfChannels( ioChannelsConfig.first, ioChannelsConfig.second ) != IOChangeResult::Failed );
-            reinterpret_cast<Plugin2HostInteropControler &>( *this ). //...ugh...mrmlj...
-            hostTryIOConfigurationChange( engineSetup().numberOfChannels(), engineSetup().numberOfSideChannels() ); //...ugh...mrmlj...
-        #else //...mrmlj...
-            success = SpectrumWorxCore::setNumberOfChannels( 1, 1 );
-        #endif // LE_SW_ENGINE_INPUT_MODE
+            success =
+                (SpectrumWorxCore::setNumberOfChannels(
+                     ioChannelsConfig.first, ioChannelsConfig.second) != IOChangeResult::Failed);
+            reinterpret_cast<Plugin2HostInteropControler &>(*this). //...ugh...mrmlj...
+                hostTryIOConfigurationChange(
+                    engineSetup().numberOfChannels(),
+                    engineSetup().numberOfSideChannels()); //...ugh...mrmlj...
+#else                                                      //...mrmlj...
+            success = SpectrumWorxCore::setNumberOfChannels(1, 1);
+#endif                                                     // LE_SW_ENGINE_INPUT_MODE
         }
         else
         {
-            BOOST_ASSERT( currentStorageFactors().numberOfChannels == engineSetup().numberOfChannels() );
+            BOOST_ASSERT(currentStorageFactors().numberOfChannels ==
+                         engineSetup().numberOfChannels());
             success = true;
         }
         //...mrmlj...AU...BOOST_ASSERT_MSG( !!buffers(), "Input buffers not initialised." );
         success &= updateEngineSetup();
-        BOOST_ASSERT( success );
-        if ( !success )
+        BOOST_ASSERT(success);
+        if (!success)
             return false;
     }
 
@@ -891,25 +878,23 @@ bool LE_NOTHROW SpectrumWorx::initialise()
     return true;
 }
 
-
 ////////////////////////////////////////////////////////////////////////////
 // Settings
 ////////////////////////////////////////////////////////////////////////////
 
 namespace
 {
-    struct Settings : GUI::Theme::Settings
+struct Settings : GUI::Theme::Settings
+{
+    Settings() : loadLastSessionOnStartup(false) {}
+    Settings(GUI::Theme::Settings const &guiSettings, bool const loadLastSessionOnStartupParam)
+        : GUI::Theme::Settings(guiSettings), loadLastSessionOnStartup(loadLastSessionOnStartupParam)
     {
-        Settings() : loadLastSessionOnStartup( false ) {}
-        Settings( GUI::Theme::Settings const & guiSettings, bool const loadLastSessionOnStartupParam )
-            :
-            GUI::Theme::Settings    ( guiSettings                   ),
-            loadLastSessionOnStartup( loadLastSessionOnStartupParam )
-        {}
+    }
 
-        bool loadLastSessionOnStartup;
-    }; // struct Settings
-} // anoynmous namepsace
+    bool loadLastSessionOnStartup;
+}; // struct Settings
+} // namespace
 
 void LE_NOTHROW SpectrumWorx::loadSettings()
 {
@@ -917,38 +902,37 @@ void LE_NOTHROW SpectrumWorx::loadSettings()
     {
         using namespace boost;
 
-        mmap::basic_read_only_mapped_view const mappedSettingsFile( mmap::map_read_only_file( settingsFile().getFullPathName().getCharPointer() ) );
+        mmap::basic_read_only_mapped_view const mappedSettingsFile(
+            mmap::map_read_only_file(settingsFile().getFullPathName().getCharPointer()));
         //...mrmlj...rethink this assertion...
         //BOOST_ASSERT( ( mappedSettingsFile || !this->settingsFile().existsAsFile() ) && "Unable to open existing settings file." );
-        if ( mappedSettingsFile.size() != sizeof( Settings ) )
+        if (mappedSettingsFile.size() != sizeof(Settings))
         {
-            LE_TRACE( "\tSW: unrecognized settings file." );
+            LE_TRACE("\tSW: unrecognized settings file.");
             return;
         }
 
-        Settings const & settings( *reinterpret_cast<Settings const *>( mappedSettingsFile.begin() ) );
+        Settings const &settings(*reinterpret_cast<Settings const *>(mappedSettingsFile.begin()));
         GUI::Theme::settings() = settings;
-        shouldLoadLastSessionOnStartup( settings.loadLastSessionOnStartup );
-        if ( shouldLoadLastSessionOnStartup() )
+        shouldLoadLastSessionOnStartup(settings.loadLastSessionOnStartup);
+        if (shouldLoadLastSessionOnStartup())
         {
-            juce::File const lastSessionFile( lastSessionPresetFile() );
-            if ( lastSessionFile.existsAsFile() )
+            juce::File const lastSessionFile(lastSessionPresetFile());
+            if (lastSessionFile.existsAsFile())
             {
                 //BOOST_VERIFY( loadPreset( lastSessionFile, false, nullptr, _T( "Last session" ) ) );
                 //...mrmlj...avoid notifyHostAboutPresetChange()
-                auto const pPresetData( Preset::loadIntoMemory( lastSessionFile ) );
-                BOOST_VERIFY
-                (
-                    pPresetData.get() &&
-                    loadPreset( pPresetData.get(), false, nullptr, getProgram() )
-                );
-                setProgramName( "Last session" );
+                auto const pPresetData(Preset::loadIntoMemory(lastSessionFile));
+                BOOST_VERIFY(pPresetData.get() &&
+                             loadPreset(pPresetData.get(), false, nullptr, getProgram()));
+                setProgramName("Last session");
             }
         }
     }
-    catch ( ... ) {}
+    catch (...)
+    {
+    }
 }
-
 
 void LE_NOTHROW SpectrumWorx::saveSettings()
 {
@@ -956,33 +940,32 @@ void LE_NOTHROW SpectrumWorx::saveSettings()
 
     // Settings file
 
-    mmap::basic_mapped_view const mappedSettingsFile( mmap::map_file( settingsFile().getFullPathName().getCharPointer(), sizeof( Settings ) ) );
-    BOOST_ASSERT_MSG( mappedSettingsFile, "Unable to create settings file." );
-    if ( mappedSettingsFile.empty() )
+    mmap::basic_mapped_view const mappedSettingsFile(
+        mmap::map_file(settingsFile().getFullPathName().getCharPointer(), sizeof(Settings)));
+    BOOST_ASSERT_MSG(mappedSettingsFile, "Unable to create settings file.");
+    if (mappedSettingsFile.empty())
     {
-        GUI::warningMessageBox( MB_ERROR, "Failed to save settings.", false );
+        GUI::warningMessageBox(MB_ERROR, "Failed to save settings.", false);
         return;
     }
 
-    Settings &       onDiskSettings ( *reinterpret_cast<Settings *>( mappedSettingsFile.begin() ) );
-    Settings   const currentSettings( GUI::Theme::settings(), loadLastSessionOnStartup_           );
+    Settings &onDiskSettings(*reinterpret_cast<Settings *>(mappedSettingsFile.begin()));
+    Settings const currentSettings(GUI::Theme::settings(), loadLastSessionOnStartup_);
     onDiskSettings = currentSettings;
 
 #ifndef LE_SW_FMOD
     // Paths file
 
-    juce::String const & rootPath     ( GUI::rootPath     ().getFullPathName() );
-    juce::String const & presetsFolder( GUI::presetsFolder().getFullPathName() );
+    juce::String const &rootPath(GUI::rootPath().getFullPathName());
+    juce::String const &presetsFolder(GUI::presetsFolder().getFullPathName());
 
-    unsigned int const rootLength   ( rootPath     .length() );
-    unsigned int const presetsLength( presetsFolder.length() );
+    unsigned int const rootLength(rootPath.length());
+    unsigned int const presetsLength(presetsFolder.length());
 
-    boost::mmap::basic_mapped_view const pathsFile
-    (
-        GUI::mapPathsFile( rootLength + sizeof( '\n' ) + presetsLength )
-    );
-    BOOST_ASSERT_MSG( pathsFile, "Unable to update the paths file." );
-    if ( !pathsFile )
+    boost::mmap::basic_mapped_view const pathsFile(
+        GUI::mapPathsFile(rootLength + sizeof('\n') + presetsLength));
+    BOOST_ASSERT_MSG(pathsFile, "Unable to update the paths file.");
+    if (!pathsFile)
         return;
 
 #ifdef __APPLE__
@@ -990,27 +973,27 @@ void LE_NOTHROW SpectrumWorx::saveSettings()
     //   See the Mac specific note in GUI::initializePaths().
     //                                        (01.12.2010.) (Domagoj Saric)
     //...mrmlj...NEW_JUCE...UNICODE
-    rootPath.copyToUTF8( &pathsFile[ 0 ], rootLength + 1 );
-    pathsFile[ rootLength ] = '\n';
+    rootPath.copyToUTF8(&pathsFile[0], rootLength + 1);
+    pathsFile[rootLength] = '\n';
 #else
-    BOOST_ASSERT( std::memcmp( pathsFile.begin(), GUI::rootPath().getFullPathName().toUTF8(), rootLength * sizeof( char ) ) == 0 );
+    BOOST_ASSERT(std::memcmp(pathsFile.begin(), GUI::rootPath().getFullPathName().toUTF8(),
+                             rootLength * sizeof(char)) == 0);
 #endif // __APPLE__
-    BOOST_ASSERT( pathsFile[ rootLength ] == '\n' );
+    BOOST_ASSERT(pathsFile[rootLength] == '\n');
     //...mrmlj...+1 because copyToX() wants to append the null terminator...
-    presetsFolder.copyToUTF8( &pathsFile[ rootLength + sizeof( '\n' ) ], presetsLength + 1 );
+    presetsFolder.copyToUTF8(&pathsFile[rootLength + sizeof('\n')], presetsLength + 1);
 #endif // LE_SW_FMOD
 }
 
 #if LE_SW_ENGINE_INPUT_MODE >= 2
-void SpectrumWorx::setInputModeToSetOnRestart( InputMode const pendingInputMode )
+void SpectrumWorx::setInputModeToSetOnRestart(InputMode const pendingInputMode)
 {
     inputModeToSetOnRestart_ = pendingInputMode;
-    shouldLoadLastSessionOnStartup( true );
+    shouldLoadLastSessionOnStartup(true);
 }
 #endif // LE_SW_ENGINE_INPUT_MODE >= 2
 
-LE_CONST_FUNCTION
-bool SpectrumWorx::runningAsAU() const
+LE_CONST_FUNCTION bool SpectrumWorx::runningAsAU() const
 {
 #ifdef __APPLE__
     return runningAsAU_;
@@ -1019,71 +1002,52 @@ bool SpectrumWorx::runningAsAU() const
 #endif // __APPLE__
 }
 
-
 juce::File SpectrumWorx::lastSessionPresetFile()
 {
-    return defaultPresetsFolder().getChildFile( "__LastSession.swp" );
+    return defaultPresetsFolder().getChildFile("__LastSession.swp");
 }
 
+juce::File SpectrumWorx::defaultPresetsFolder() { return GUI::rootPath().getChildFile("Presets"); }
 
-juce::File SpectrumWorx::defaultPresetsFolder()
-{
-    return GUI::rootPath().getChildFile( "Presets" );
-}
-
-
-juce::File SpectrumWorx::settingsFile()
-{
-    return GUI::rootPath().getChildFile( "SpectrumWorx.dat" );
-}
-
+juce::File SpectrumWorx::settingsFile() { return GUI::rootPath().getChildFile("SpectrumWorx.dat"); }
 
 void SpectrumWorx::clearSideChannelData()
 {
-    BOOST_ASSERT( !sample_ );
+    BOOST_ASSERT(!sample_);
     SpectrumWorxCore::clearSideChannelData();
 }
 
-
 void SpectrumWorx::clearSideChannelDataIfNoSideChannel()
 {
-    if ( !haveSideChannel() )
+    if (!haveSideChannel())
         clearSideChannelData();
 }
-
 
 bool SpectrumWorx::haveSideChannel() const
 {
     return sample_ || SpectrumWorxCore::haveSideChannel();
 }
 
-
-LE_NOTHROW
-void SpectrumWorx::handleTimingInformationChange( LFO::Timer::TimingInformationChange const timingInformationChange )
+LE_NOTHROW void SpectrumWorx::handleTimingInformationChange(
+    LFO::Timer::TimingInformationChange const timingInformationChange)
 {
-    if ( timingInformationChange.timingInfoChanged() )
+    if (timingInformationChange.timingInfoChanged())
     {
         /// \todo The host should also be notified about LFO parameters changed
         /// due to tempo and/or measure changes.
         ///                                   (23.02.2011.) (Domagoj Saric)
         //...mrmlj...Processor::updateModuleLFOs() should have already been called...
-        if ( gui() )
+        if (gui())
             gui()->updateForNewTimingInfo();
     }
 }
 
-
-SpectrumWorx const & SpectrumWorx::fromEngineSetup( Engine::Setup const & engineSetup )
+SpectrumWorx const &SpectrumWorx::fromEngineSetup(Engine::Setup const &engineSetup)
 {
-    return static_cast<SpectrumWorx const &>( SpectrumWorxCore::fromEngineSetup( engineSetup ) );
+    return static_cast<SpectrumWorx const &>(SpectrumWorxCore::fromEngineSetup(engineSetup));
 }
 
-
-bool SpectrumWorx::blockAutomation() const
-{
-    return SpectrumWorxCore::blockAutomation();
-}
-
+bool SpectrumWorx::blockAutomation() const { return SpectrumWorxCore::blockAutomation(); }
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -1091,13 +1055,13 @@ bool SpectrumWorx::blockAutomation() const
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-void SpectrumWorx::setProgram( std::uint8_t const newProgramIndex )
+void SpectrumWorx::setProgram(std::uint8_t const newProgramIndex)
 {
-    std::uint8_t const currentProgramIndex( getProgram() );
-    if ( newProgramIndex != currentProgramIndex )
+    std::uint8_t const currentProgramIndex(getProgram());
+    if (newProgramIndex != currentProgramIndex)
     {
-        Program & currentProgram( programs()[ currentProgramIndex ] );
-        Program & newProgram    ( programs()[ newProgramIndex     ] );
+        Program &currentProgram(programs()[currentProgramIndex]);
+        Program &newProgram(programs()[newProgramIndex]);
         {
             // Implementation note:
             //   Here we update only ourselves and expect the host to call
@@ -1106,17 +1070,17 @@ void SpectrumWorx::setProgram( std::uint8_t const newProgramIndex )
             // call saveProgramState() but still seems to remain in a consistent
             // state, probably because of its internal caching).
             //                                (09.07.2010.) (Domagoj Saric)
-            Utility::CriticalSectionLock const processLock( getProcessingLock() );
+            Utility::CriticalSectionLock const processLock(getProcessingLock());
             //...mrmlj...
-            Parameters &       newParametersSlot( newProgram.parameters() );
-            Parameters   const newParameters    ( newParametersSlot       );
+            Parameters &newParametersSlot(newProgram.parameters());
+            Parameters const newParameters(newParametersSlot);
             newParametersSlot = currentProgram.parameters();
             currentProgram_ = newProgramIndex;
-            SpectrumWorxCore::setProgram( newProgram );
-            resetForGlobalParameters( newParameters );
+            SpectrumWorxCore::setProgram(newProgram);
+            resetForGlobalParameters(newParameters);
         }
 
-    #ifndef LE_SW_FMOD //...mrmlj...
+#ifndef LE_SW_FMOD //...mrmlj...
         // Implementation note:
         //   Wavelab 5.0 creates a new instance when it wants to 'iterate'
         // over the presets of a plugin (when you press the "Presets"
@@ -1128,59 +1092,51 @@ void SpectrumWorx::setProgram( std::uint8_t const newProgramIndex )
         // solution of just blocking the GUI thread does not play nice in
         // Cubase.
         //                                    (17.01.2011.) (Domagoj Saric)
-        GUI::postOrExecuteMessage
-        (
-            *this,
-            [&]( GUI::SpectrumWorxEditor & gui )
-            {
-                auto & previousChain( currentProgram.moduleChain() );
-                auto & newChain     ( newProgram    .moduleChain() );
-                LE_ASSUME( &previousChain );
-                gui.destroyChainGUIs( previousChain );
-                gui.createChainGUIs ( newChain      );
-                // Implementation note:
-                //   The module arrow does not get cleared/erased (when it gets
-                // moved to the left, i.e. the number of modules is smaller in
-                // the set newProgram) automatically in Cubase 5 so we must
-                // manually do a repaint (theoretically only the old module
-                // arrow area needs to be repainted).
-                //                            (19.01.2011.) (Domagoj Saric)
-                /// \todo Investigate why is this required/why doesn't it happen
-                /// automatically.
-                ///                           (19.01.2011.) (Domagoj Saric)
-                gui.repaint();
-                return true;
-            }
-        );
-    #endif // LE_SW_FMOD
+        GUI::postOrExecuteMessage(*this, [&](GUI::SpectrumWorxEditor &gui) {
+            auto &previousChain(currentProgram.moduleChain());
+            auto &newChain(newProgram.moduleChain());
+            LE_ASSUME(&previousChain);
+            gui.destroyChainGUIs(previousChain);
+            gui.createChainGUIs(newChain);
+            // Implementation note:
+            //   The module arrow does not get cleared/erased (when it gets
+            // moved to the left, i.e. the number of modules is smaller in
+            // the set newProgram) automatically in Cubase 5 so we must
+            // manually do a repaint (theoretically only the old module
+            // arrow area needs to be repainted).
+            //                            (19.01.2011.) (Domagoj Saric)
+            /// \todo Investigate why is this required/why doesn't it happen
+            /// automatically.
+            ///                           (19.01.2011.) (Domagoj Saric)
+            gui.repaint();
+            return true;
+        });
+#endif // LE_SW_FMOD
     }
 }
 
-
-char const * SpectrumWorx::currentProgramName() const
+char const *SpectrumWorx::currentProgramName() const
 {
     // Skip the (possible) leading asterisk...
-    char const * LE_RESTRICT const pCurrentProgramName( &program().name()[ 0 ] );
-    return &pCurrentProgramName[ ( pCurrentProgramName[ 0 ] == '*' ) ];
+    char const *LE_RESTRICT const pCurrentProgramName(&program().name()[0]);
+    return &pCurrentProgramName[(pCurrentProgramName[0] == '*')];
 }
-
 
 bool SpectrumWorx::createGUI()
 {
-    LE_ASSUME( !editor_ );
+    LE_ASSUME(!editor_);
     try
     {
         editor_ = boost::in_place();
-        LE_ASSUME( editor_.is_initialized() );
+        LE_ASSUME(editor_.is_initialized());
         return true;
     }
-    catch ( ... )
+    catch (...)
     {
-        LE_ASSUME( !editor_ );
+        LE_ASSUME(!editor_);
         return false;
     }
 }
-
 
 void SpectrumWorx::destroyGUI()
 {
@@ -1191,41 +1147,36 @@ void SpectrumWorx::destroyGUI()
     editor_.reset();
 }
 
-
 void SpectrumWorx::updateGUIForGlobalParameterChange()
 {
-    if ( !presetLoadingInProgress() && GUI::isThisTheGUIThread() ) //...mrmlj...ughly quick-hack to detect user initiated changes and avoid calling back the GUI...
+    if (!presetLoadingInProgress() &&
+        GUI::
+            isThisTheGUIThread()) //...mrmlj...ughly quick-hack to detect user initiated changes and avoid calling back the GUI...
         return;
-    GUI::postMessage
-    (
-        *this,
-        []( GUI::SpectrumWorxEditor & gui ) { gui.updateForGlobalParameterChange(); return true; }
-    );
+    GUI::postMessage(*this, [](GUI::SpectrumWorxEditor &gui) {
+        gui.updateForGlobalParameterChange();
+        return true;
+    });
 }
-
 
 void SpectrumWorx::updateGUIForEngineSetupChanges()
 {
-    if ( !presetLoadingInProgress() && GUI::isThisTheGUIThread() ) //...mrmlj...ughly quick-hack to detect user initiated changes and avoid calling back the GUI...
+    if (!presetLoadingInProgress() &&
+        GUI::
+            isThisTheGUIThread()) //...mrmlj...ughly quick-hack to detect user initiated changes and avoid calling back the GUI...
         return;
-    GUI::postMessage
-    (
-        *this,
-        []( GUI::SpectrumWorxEditor & gui )
-        {
-            gui.updateForGlobalParameterChange();
-            gui.updateForEngineSetupChanges   ();
-            return true;
-        }
-    );
+    GUI::postMessage(*this, [](GUI::SpectrumWorxEditor &gui) {
+        gui.updateForGlobalParameterChange();
+        gui.updateForEngineSetupChanges();
+        return true;
+    });
 }
 
-
-SpectrumWorx & SpectrumWorx::effect( Editor & editor )
+SpectrumWorx &SpectrumWorx::effect(Editor &editor)
 {
-    return Utility::ParentFromOptionalMember<SpectrumWorx, Editor, &SpectrumWorx::editor_, false>()( editor );
+    return Utility::ParentFromOptionalMember<SpectrumWorx, Editor, &SpectrumWorx::editor_, false>()(
+        editor);
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -1233,63 +1184,65 @@ SpectrumWorx & SpectrumWorx::effect( Editor & editor )
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-bool LE_FASTCALL SpectrumWorx::setGlobalParameter( FFTSize & parameter, FFTSize::param_type const newValue )
+bool SpectrumWorx::setGlobalParameter(FFTSize &parameter, FFTSize::param_type const newValue)
 {
-    bool const result( SpectrumWorxCore::setGlobalParameter( parameter, newValue ) );
-    if ( result )
+    bool const result(SpectrumWorxCore::setGlobalParameter(parameter, newValue));
+    if (result)
     {
         /// \note Latency depends on the window size
         /// ( FFT size / zero padding * window size factor ) so notify the host
         /// when any of the relevant parameters change.
         ///                                   (23.05.2012.) (Domagoj Saric)
-        /*BOOST_VERIFY*/( latencyChanged() );
+        /*BOOST_VERIFY*/ (latencyChanged());
         updateGUIForEngineSetupChanges();
     }
     return result;
 }
 
-
-bool LE_FASTCALL SpectrumWorx::setGlobalParameter( OverlapFactor & parameter, OverlapFactor::param_type const newValue )
+bool SpectrumWorx::setGlobalParameter(OverlapFactor &parameter,
+                                      OverlapFactor::param_type const newValue)
 {
-    bool const result( SpectrumWorxCore::setGlobalParameter( parameter, newValue ) );
-    if ( result ) updateGUIForEngineSetupChanges();
+    bool const result(SpectrumWorxCore::setGlobalParameter(parameter, newValue));
+    if (result)
+        updateGUIForEngineSetupChanges();
     return result;
 }
 
-
 #if LE_SW_ENGINE_INPUT_MODE >= 2
-bool LE_FASTCALL SpectrumWorx::setGlobalParameter( InputMode & parameter, InputMode::param_type const newValue )
+bool SpectrumWorx::setGlobalParameter(InputMode &parameter, InputMode::param_type const newValue)
 {
-    auto const ioChannelsConfig( ioChannels( static_cast<SpectrumWorxCore::InputMode::value_type>( newValue ) ) );
+    auto const ioChannelsConfig(
+        ioChannels(static_cast<SpectrumWorxCore::InputMode::value_type>(newValue)));
 
-    bool const success( setNumberOfChannelsFromUser( ioChannelsConfig.first, ioChannelsConfig.second ) );
-    BOOST_VERIFY( ( parameter.getValue() == newValue ) || !success );
-    if ( success ) updateGUIForEngineSetupChanges();
+    bool const success(
+        setNumberOfChannelsFromUser(ioChannelsConfig.first, ioChannelsConfig.second));
+    BOOST_VERIFY((parameter.getValue() == newValue) || !success);
+    if (success)
+        updateGUIForEngineSetupChanges();
     return success;
 }
 #endif // LE_SW_ENGINE_INPUT_MODE >= 2
 
-
 #if LE_SW_ENGINE_WINDOW_PRESUM
-bool LE_FASTCALL SpectrumWorx::setGlobalParameter( WindowSizeFactor & parameter, WindowSizeFactor::param_type const newValue )
+bool SpectrumWorx::setGlobalParameter(WindowSizeFactor &parameter,
+                                      WindowSizeFactor::param_type const newValue)
 {
-    bool const result( SpectrumWorxCore::setGlobalParameter( parameter, newValue ) );
-    if ( result )
+    bool const result(SpectrumWorxCore::setGlobalParameter(parameter, newValue));
+    if (result)
     {
         /// \note See the note in the FFTSize overload.
         ///                                   (23.05.2012.) (Domagoj Saric)
-        /*BOOST_VERIFY*/( latencyChanged() );
+        /*BOOST_VERIFY*/ (latencyChanged());
         updateGUIForEngineSetupChanges();
     }
     return result;
 }
 #endif // LE_SW_ENGINE_WINDOW_PRESUM
 
-
 #if 0 //...mrmlj...alex leftovers...
 
-#pragma warning( push )
-#pragma warning( disable : 4702 ) // Unreachable code.
+#pragma warning(push)
+#pragma warning(disable : 4702) // Unreachable code.
 
 float const * SpectrumWorx::ProceedSampler( unsigned int /*const ccBuffer*/ )
 {
@@ -1437,7 +1390,7 @@ bool SpectrumWorx::processMIDIEvent( ::VstMidiEvent const & /*event*/ )
 	//return 1;	// want more
 }
 
-#pragma warning( pop )
+#pragma warning(pop)
 
 #endif //...mrmlj...alex leftovers...
 

@@ -3,13 +3,13 @@
 /// \file lfo.hpp
 /// -------------
 ///
-/// Copyright (c) 2010 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2010 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef lfo_hpp__43E00321_1DA0_4093_9688_EC409F3DE554
 #define lfo_hpp__43E00321_1DA0_4093_9688_EC409F3DE554
-#pragma once
 //------------------------------------------------------------------------------
 #include "le/parameters/enumerated/parameter.hpp"
 #include "le/utility/abi.hpp"
@@ -44,10 +44,10 @@ namespace Parameters
 
 class LFO
 {
-public:
-#if defined( _MSC_VER ) && ( _MSC_VER < 1800 )
-    #pragma warning( push )
-    #pragma warning( disable : 4480 )
+  public:
+#if defined(_MSC_VER) && (_MSC_VER < 1800)
+#pragma warning(push)
+#pragma warning(disable : 4480)
 #endif // _MSC_VER
 #ifdef DOXYGEN_ONLY
     /// \brief Types of possible LFO synchronizations to tempo
@@ -66,85 +66,91 @@ public:
     /// the closest value allowed by the set SyncTypes).
     enum SyncType
     {
-        Free   , ///< Allow free/unconstrained period adjustment
+        Free,    ///< Allow free/unconstrained period adjustment
         Quarter, ///< Allow syncing to (parts or multiples) of <a href="http://en.wikipedia.org/wiki/Quarter_note">quarter notes</a> (beats in most often used meters)
         Triplet, ///< Allow syncing to (parts or multiples) of <a href="http://en.wikipedia.org/wiki/Tuplet#Triplets">triplet notes</a>
-        Dotted , ///< Allow syncing to (parts or multiples) of <a href="http://en.wikipedia.org/wiki/Dotted_note">dotted notes</a>
-        All      ///< Allow all supported synchronization types
+        Dotted, ///< Allow syncing to (parts or multiples) of <a href="http://en.wikipedia.org/wiki/Dotted_note">dotted notes</a>
+        All     ///< Allow all supported synchronization types
     }; // enum SyncType
-#else // !DOXYGEN_ONLY
+#else  // !DOXYGEN_ONLY
     enum SyncType : std::uint8_t
     {
-        Free    = 0,
+        Free = 0,
         Quarter = 1 << 0,
         Triplet = 1 << 1,
-        Dotted  = 1 << 2,
+        Dotted = 1 << 2,
 
-        All = ( Quarter | Triplet | Dotted )
+        All = (Quarter | Triplet | Dotted)
     }; // enum SyncType
 #endif // DOXYGEN_ONLY
 
     /// Supported <a href="http://en.wikipedia.org/wiki/Waveform">waveforms</a>
     enum Waveform
-    #ifndef DOXYGEN_ONLY
+#ifndef DOXYGEN_ONLY
         : std::uint8_t
-    #endif // DOXYGEN_ONLY
+#endif // DOXYGEN_ONLY
     {
-        Sine           , ///< <a href="http://en.wikipedia.org/wiki/Sine_wave">sine wave</a>
-        Triangle       , ///< <a href="http://en.wikipedia.org/wiki/Triangle_wave">triangle waveform</a>
-        Sawtooth       , ///< <a href="http://en.wikipedia.org/wiki/Sawtooth_wave">sawtooth waveform</a>
+        Sine,     ///< <a href="http://en.wikipedia.org/wiki/Sine_wave">sine wave</a>
+        Triangle, ///< <a href="http://en.wikipedia.org/wiki/Triangle_wave">triangle waveform</a>
+        Sawtooth, ///< <a href="http://en.wikipedia.org/wiki/Sawtooth_wave">sawtooth waveform</a>
         ReverseSawtooth, ///< <a href="http://en.wikipedia.org/wiki/Sawtooth_wave">reverse sawtooth waveform</a>
-        Square         , ///< <a href="http://en.wikipedia.org/wiki/Square_wave">square wave</a>
-        Exponent       , ///< exponential rise and fall oscillations
-        RandomHold     , ///< generate a random number and hold it until the next period
-        RandomSlide    , ///< generate a random number every period and linearly slide to it from the previous the previous value
-        Whacko         , ///< generate a new random number on every query (i.e. this "waveform" is independent of the set period)
-        Dirac          , ///< a simple <a href="http://en.wikipedia.org/wiki/Dirac_delta_function">pulse</a>
-        dIRAC          , ///< the ("graphical vertical") inverse of the Dirac waveform
+        Square,      ///< <a href="http://en.wikipedia.org/wiki/Square_wave">square wave</a>
+        Exponent,    ///< exponential rise and fall oscillations
+        RandomHold,  ///< generate a random number and hold it until the next period
+        RandomSlide, ///< generate a random number every period and linearly slide to it from the previous the previous value
+        Whacko, ///< generate a new random number on every query (i.e. this "waveform" is independent of the set period)
+        Dirac,  ///< a simple <a href="http://en.wikipedia.org/wiki/Dirac_delta_function">pulse</a>
+        dIRAC,  ///< the ("graphical vertical") inverse of the Dirac waveform
 
         NumberOfWaveforms
     }; // enum Waveform
-#if defined( _MSC_VER ) && ( _MSC_VER < 1800 )
-    #pragma warning( pop )
+#if defined(_MSC_VER) && (_MSC_VER < 1800)
+#pragma warning(pop)
 #endif // _MSC_VER
 
-public:
-    LE_NOTHROW void LE_FASTCALL_ABI setEnabled   ( bool     value       ); ///< \brief enable/disable the LFO
-    LE_NOTHROW void LE_FASTCALL_ABI setPhase     ( float    phase       ); ///< \brief set the (waveform's) phase offset (as a normalised percentage value [-0.5,+0.5])
-	LE_NOTHROW void LE_FASTCALL_ABI setWaveform  ( Waveform             ); ///< \brief set the desired waveform
-     /// \brief constrain the allowed range of values the LFO can set a parameter to
-     /// \details a normalised [0, 1] value later automatically mapped to the range of the parameter the LFO is connected to
-     /// \return true if the upper bound had to be adjusted in order to make sure that the upper-bound >= lower-bound condition always holds
-    LE_NOTHROW bool LE_FASTCALL_ABI setLowerBound( float    lowerBound  );
+  public:
+    LE_NOTHROW void setEnabled(bool value); ///< \brief enable/disable the LFO
+    LE_NOTHROW void setPhase(
+        float
+            phase); ///< \brief set the (waveform's) phase offset (as a normalised percentage value [-0.5,+0.5])
+    LE_NOTHROW void setWaveform(Waveform); ///< \brief set the desired waveform
+    /// \brief constrain the allowed range of values the LFO can set a parameter to
+    /// \details a normalised [0, 1] value later automatically mapped to the range of the parameter the LFO is connected to
+    /// \return true if the upper bound had to be adjusted in order to make sure that the upper-bound >= lower-bound condition always holds
+    LE_NOTHROW bool setLowerBound(float lowerBound);
     /// \brief constrain the allowed range of values the LFO can set a parameter to
     /// \details a normalised [0, 1] value later automatically mapped to the range of the parameter the LFO is mapped to
     /// \return true if the lower bound had to be adjusted in order to make sure that the upper-bound >= lower-bound condition always holds
-    LE_NOTHROW bool LE_FASTCALL_ABI setUpperBound( float    upperBound  );
+    LE_NOTHROW bool setUpperBound(float upperBound);
 
-    LE_NOTHROW std::uint16_t LE_FASTCALL_ABI setPeriodInMilliseconds( std::uint16_t periodInMilliseconds ); ///< set the LFO period in milliseconds \return the actually applied value (autoadjusted/'clamped' to the values allowed by the currently configured sync types)
-    LE_NOTHROW float         LE_FASTCALL_ABI setPeriodInSeconds     ( float         periodInSeconds      ); ///< set the LFO period in seconds \return the actually applied value (autoadjusted/'clamped' to the values allowed by the currently configured sync types)<BR> \overload
+    LE_NOTHROW std::uint16_t setPeriodInMilliseconds(
+        std::uint16_t
+            periodInMilliseconds); ///< set the LFO period in milliseconds \return the actually applied value (autoadjusted/'clamped' to the values allowed by the currently configured sync types)
+    LE_NOTHROW float setPeriodInSeconds(
+        float
+            periodInSeconds); ///< set the LFO period in seconds \return the actually applied value (autoadjusted/'clamped' to the values allowed by the currently configured sync types)<BR> \overload
 
-    LE_NOTHROWNOALIAS bool         LE_FASTCALL_ABI enabled   () const; ///< is LFO enabled?
-    LE_NOTHROWNOALIAS float        LE_FASTCALL_ABI period    () const; ///< retrieve the current period
-    LE_NOTHROWNOALIAS float        LE_FASTCALL_ABI phase     () const; ///< retrieve the "phase offset" parameter
-    LE_NOTHROWNOALIAS float        LE_FASTCALL_ABI lowerBound() const; ///< retrieve the "lower bound" parameter
-    LE_NOTHROWNOALIAS float        LE_FASTCALL_ABI upperBound() const; ///< retrieve the "upper bound" parameter
-    LE_NOTHROWNOALIAS Waveform     LE_FASTCALL_ABI waveForm  () const; ///< retrieve the "Waveform" parameter
-    LE_NOTHROWNOALIAS std::uint8_t LE_FASTCALL_ABI syncTypes () const; ///< retrieve the syncTypes
+    LE_NOTHROWNOALIAS bool enabled() const;           ///< is LFO enabled?
+    LE_NOTHROWNOALIAS float period() const;           ///< retrieve the current period
+    LE_NOTHROWNOALIAS float phase() const;            ///< retrieve the "phase offset" parameter
+    LE_NOTHROWNOALIAS float lowerBound() const;       ///< retrieve the "lower bound" parameter
+    LE_NOTHROWNOALIAS float upperBound() const;       ///< retrieve the "upper bound" parameter
+    LE_NOTHROWNOALIAS Waveform waveForm() const;      ///< retrieve the "Waveform" parameter
+    LE_NOTHROWNOALIAS std::uint8_t syncTypes() const; ///< retrieve the syncTypes
 
-    LE_NOTHROW        void LE_FASTCALL_ABI addSyncType   ( SyncType );       ///< add/enable a specific SyncType
-    LE_NOTHROW        void LE_FASTCALL_ABI removeSyncType( SyncType );       ///< remove/disable a specific SyncType
-    LE_NOTHROWNOALIAS bool LE_FASTCALL_ABI hasEnabledSync( SyncType ) const; ///< is a specific SyncType enabled?
+    LE_NOTHROW void addSyncType(SyncType);                 ///< add/enable a specific SyncType
+    LE_NOTHROW void removeSyncType(SyncType);              ///< remove/disable a specific SyncType
+    LE_NOTHROWNOALIAS bool hasEnabledSync(SyncType) const; ///< is a specific SyncType enabled?
 
-protected:
+  protected:
 #if _MSC_VER < 1800
-     LFO() {}
-     LFO( LFO const & );
+    LFO() {}
+    LFO(LFO const &);
     ~LFO() {}
 #else
-     LFO()              = default;
-     LFO( LFO const & ) = delete;
-    ~LFO()              = default;
+    LFO() = default;
+    LFO(LFO const &) = delete;
+    ~LFO() = default;
 #endif // _MSC_VER
 }; // class LFO
 

@@ -5,13 +5,13 @@
 ///
 /// ObjC <-> C++ interop utilities.
 ///
-/// Copyright (c) 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef objc_hpp__F939BC5B_C31E_4B2E_952D_83EBCE908813
 #define objc_hpp__F939BC5B_C31E_4B2E_952D_83EBCE908813
-#pragma once
 #ifdef __OBJC__
 //------------------------------------------------------------------------------
 #include "abi.hpp"
@@ -28,11 +28,11 @@ namespace ObjC
 {
 //------------------------------------------------------------------------------
 
-LE_NOTHROW NSString * LE_FASTCALL_ABI asciiString( char const * c_str );
-LE_NOTHROW NSString * LE_FASTCALL_ABI utf8String ( char const * c_str );
+LE_NOTHROW NSString *asciiString(char const *c_str);
+LE_NOTHROW NSString *utf8String(char const *c_str);
 
-LE_NOTHROW NSString * LE_FASTCALL_ABI copyASCIIString( char const * c_str );
-LE_NOTHROW NSString * LE_FASTCALL_ABI copyUTF8String ( char const * c_str );
+LE_NOTHROW NSString *copyASCIIString(char const *c_str);
+LE_NOTHROW NSString *copyUTF8String(char const *c_str);
 
 //------------------------------------------------------------------------------
 } // namespace ObjC

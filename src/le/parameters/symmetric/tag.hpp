@@ -3,13 +3,13 @@
 /// \file symmetric/tag.hpp
 /// -----------------------
 ///
-/// Copyright (c) 2011 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2011 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef tag_hpp__538CC108_800B_442B_882C_AD3800171536
 #define tag_hpp__538CC108_800B_442B_882C_AD3800171536
-#pragma once
 //------------------------------------------------------------------------------
 #include "le/parameters/linear/tag.hpp"
 //------------------------------------------------------------------------------
@@ -20,9 +20,15 @@ namespace Parameters
 {
 //------------------------------------------------------------------------------
 
-struct SymmetricParameterTag {};
-struct SymmetricFloatParameterTag   : SymmetricParameterTag, LinearFloatParameterTag   {};
-struct SymmetricIntegerParameterTag : SymmetricParameterTag, LinearIntegerParameterTag {};
+struct SymmetricParameterTag
+{
+};
+struct SymmetricFloatParameterTag : SymmetricParameterTag, LinearFloatParameterTag
+{
+};
+struct SymmetricIntegerParameterTag : SymmetricParameterTag, LinearIntegerParameterTag
+{
+};
 
 //------------------------------------------------------------------------------
 } // namespace Parameters

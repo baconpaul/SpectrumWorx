@@ -3,13 +3,13 @@
 /// \file talkBoxImpl.hpp
 /// ---------------------
 ///
-/// Copyright (c) 2015 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2015 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef talkBoxImpl_hpp__4426F456_173B_4D8A_9A45_20F9E315AFC7
 #define talkBoxImpl_hpp__4426F456_173B_4D8A_9A45_20F9E315AFC7
-#pragma once
 //------------------------------------------------------------------------------
 #include "talkBox.hpp"
 
@@ -27,28 +27,26 @@ namespace Effects
 {
 //------------------------------------------------------------------------------
 
-class TalkBoxImpl
-    :
-    public EffectImpl<TalkBox>
+class TalkBoxImpl : public EffectImpl<TalkBox>
 {
-public: // LE::Effect required interface.
+  public: // LE::Effect required interface.
     //using ChannelState = CompoundChannelState<Vocoder::ChannelState, SynthImpl::ChannelState>;
     using ChannelState = SynthImpl::ChannelState;
 
-    using TalkBox::title;
     using TalkBox::description;
+    using TalkBox::title;
 
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
-    void setup  ( IndexRange const &                           , Engine::Setup const & )      ;
-    void process( ChannelState &, Engine::ChannelData_ReIm2AmPh, Engine::Setup const & ) const;
+    void setup(IndexRange const &, Engine::Setup const &);
+    void process(ChannelState &, Engine::ChannelData_ReIm2AmPh, Engine::Setup const &) const;
 
-    Vocoder::Parameters & vocoderParameters() { return vocoder_.parameters(); }
+    Vocoder::Parameters &vocoderParameters() { return vocoder_.parameters(); }
 
-private:
-    SynthImpl   synth_  ;
+  private:
+    SynthImpl synth_;
     VocoderImpl vocoder_;
 }; // class TalkBoxImpl
 

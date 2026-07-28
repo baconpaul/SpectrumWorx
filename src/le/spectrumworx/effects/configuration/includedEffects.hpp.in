@@ -3,13 +3,13 @@
 /// \file includedEffects.hpp
 /// -------------------------
 ///
-/// Copyright (c) 2012 - 2016. Little Endian Ltd. All rights reserved.
+/// Copyright (c) 2012 - 2016. Little Endian Ltd.
+/// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #ifndef includedEffects_hpp__7EA7BD90_59C4_4F59_87BB_3E220D923733
 #define includedEffects_hpp__7EA7BD90_59C4_4F59_87BB_3E220D923733
-#pragma once
 //------------------------------------------------------------------------------
 #include "constants.hpp"
 
