@@ -484,10 +484,10 @@ LE_FORCEINLINE float clamp(float const value, float const lowerBound, float cons
         return upperBound;
     return value;
 #else
-    float result(value);
-    result = max(result, lowerBound);
-    result = min(result, upperBound);
-    return result;
+    /// \note Unqualified min/max here only ever found LE::Math's pointer-range
+    /// overloads — this branch had never been compiled.
+    ///                                       (28.07.2026.) (SW port)
+    return std::min(std::max(value, lowerBound), upperBound);
 #endif // BOOST_SIMD_HAS_SSE_SUPPORT
 }
 

@@ -36,12 +36,17 @@
 //...mrmlj...Boost.Fusion vs ObjC "nil" name clash quick-fix...
 #undef nil
 #else
+/// \note NT2 is opt-in now: without LE_HAS_NT2 the primitives below fall back
+/// to scalar loops. Stage 4 replaces the backend outright.
+///                                       (28.07.2026.) (SW port)
+#ifdef LE_HAS_NT2
 #define LE_MATH_USE_NT2
 #ifdef _XBOX
 /// \note NT2 does not yet support Xbox's custom AltiVec.
 ///                                   (17.02.2012.) (Domagoj Saric)
 //#define BOOST_SIMD_HAS_VMX_SUPPORT
 #endif
+#endif // LE_HAS_NT2
 #endif
 
 #ifdef LE_MATH_USE_NT2
@@ -77,6 +82,8 @@ LE_FAST_MATH_ON()
 #include "math.hpp"
 
 #include "le/utility/intrinsics.hpp"
+
+#ifdef LE_MATH_USE_NT2
 
 // NT2
 
@@ -140,6 +147,8 @@ LE_FAST_MATH_ON()
 
 #pragma message("LE.Math.Vector using NT2 for " BOOST_SIMD_ARCH " with " BOOST_SIMD_STRING ".")
 
+#endif // LE_MATH_USE_NT2
+
 #if defined(LE_MATH_USE_ACC)
 // Implementation note:
 //   vForce uses int const * to pass the size parameter while we use
@@ -177,6 +186,8 @@ namespace LE
 //------------------------------------------------------------------------------
 LE_IMPL_NAMESPACE_BEGIN(Math)
 //------------------------------------------------------------------------------
+
+#ifdef LE_MATH_USE_NT2
 
 namespace
 {
@@ -434,9 +445,15 @@ template <typename T> class FastIndexedPointer
 #pragma warning(pop)
 } // anonymous namespace
 
+#endif // LE_MATH_USE_NT2
+
 namespace Constants
 {
+#ifdef LE_MATH_USE_NT2
 std::size_t const vectorSize = vector_t::static_size;
+#else
+std::size_t const vectorSize = Utility::Constants::vectorAlignment / sizeof(float);
+#endif // LE_MATH_USE_NT2
 } // namespace Constants
 
 void *align(void *const pointer)
@@ -560,6 +577,7 @@ void mix(InputRange const &amps, InputRange const &phases, InputOutputRange cons
     //...mrmlj...use vForce...
     // https://developer.apple.com/library/mac/#documentation/Performance/Conceptual/vecLib/Reference/reference.html
 
+#ifdef LE_MATH_USE_NT2
     EdgeRestoredAlignedRange const reals(realsParam.begin(), realsParam.end());
     EdgeRestoredAlignedRange const imags(imagsParam.begin(), imagsParam.end());
     LE_ASSERT_MSG(reals.compatiblyAligned(amps.begin()), "Misaligned data");
@@ -587,6 +605,26 @@ void mix(InputRange const &amps, InputRange const &phases, InputOutputRange cons
         *pReal++ = inputReal + outputReal;
         *pImag++ = inputImag + outputImag;
     }
+#else
+    LE_ASSERT_MSG(amps.size() >= realsParam.size(), "Buffer sizes mismatch.");
+    LE_ASSERT_MSG(phases.size() >= realsParam.size(), "Buffer sizes mismatch.");
+    LE_ASSERT_MSG(realsParam.size() == imagsParam.size(), "Buffer sizes mismatch.");
+
+    float const *LE_RESTRICT pAmp(amps.begin());
+    float const *LE_RESTRICT pPhase(phases.begin());
+    float *LE_RESTRICT pReal(realsParam.begin());
+    float *LE_RESTRICT pImag(imagsParam.begin());
+    auto counter(realsParam.size());
+    while (counter--)
+    {
+        float const weightedAmp(*pAmp++ * amPhGain);
+        float const phase(*pPhase++);
+        *pReal = weightedAmp * std::cos(phase) + *pReal * reImGain;
+        *pImag = weightedAmp * std::sin(phase) + *pImag * reImGain;
+        ++pReal;
+        ++pImag;
+    }
+#endif // LE_MATH_USE_NT2
 }
 
 void mix(InputRange const &amps, InputRange const &phases, InputOutputRange const &realsParam,
@@ -753,7 +791,7 @@ void reverse(float *LE_RESTRICT const pBegin, float const *const pEnd)
 {
     LE_ASSERT_MSG(pBegin <= pEnd, "Invalid range.");
     //...mrmlj...ACC vDSP_vrvrs seems slower/non-vectorized so we use NT2 whenever possible...
-#if defined(BOOST_SIMD_DETECTED) || defined(__GNUC__)
+#if defined(LE_MATH_USE_NT2)
     if (boost::simd::is_aligned(pBegin) && boost::simd::is_aligned(pEnd))
     {
         auto *LE_RESTRICT pLeft(reinterpret_cast<vector_t *>(pBegin));
@@ -784,7 +822,7 @@ void swap(float *LE_RESTRICT const pBegin, float const *const pEnd,
 {
     LE_ASSERT_MSG(pBegin <= pEnd, "Invalid range.");
     //...mrmlj...ACC vDSP_vswap seems slower/non-vectorized so we use NT2 whenever possible...
-#if defined(BOOST_SIMD_DETECTED) || defined(__GNUC__)
+#if defined(LE_MATH_USE_NT2)
     EdgeRestoredAlignedRange const data1(pBegin, pEnd);
     EdgeRestoredAlignedRange const data2(pDestination, pDestination + (pEnd - pBegin));
     LE_ASSERT_MSG(data1.compatiblyAligned(pDestination), "Misaligned data");
@@ -1387,6 +1425,14 @@ void rectangular2polar(float const *LE_RESTRICT const pReals, float const *LE_RE
             phase = 0;
     }
 #endif // TARGET_OS_IPHONE
+#else
+    for (std::uint16_t element(0); element < numberOfElements; ++element)
+    {
+        float const real(pReals[element]);
+        float const imag(pImags[element]);
+        pAmplitudes[element] = std::hypot(real, imag);
+        pPhases[element] = std::atan2(imag, real);
+    }
 #endif // LE_MATH_USE_NT2
 
     LE_MATH_VERIFY_VALUES(
@@ -1418,6 +1464,11 @@ void amplitudes(float const *LE_RESTRICT const pReals, float const *LE_RESTRICT 
 #elif defined(LE_MATH_USE_ACC)
     DSPSplitComplex data = {const_cast<float *>(pReals), const_cast<float *>(pImags)};
     vDSP_zvabs(&data, 1, pAmplitudes, 1, pAmplitudesEnd - pAmplitudes);
+#else
+    for (auto index(pAmplitudesEnd - pAmplitudes); index--;)
+    {
+        pAmplitudes[index] = std::hypot(pReals[index], pImags[index]);
+    }
 #endif // LE_MATH_USE_NT2
 
     LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow | Negative,
@@ -1500,13 +1551,15 @@ void polar2rectangular(float const *LE_RESTRICT const pAmplitudes,
     multiply(pAmplitudes, pImags, numberOfElements);
 #else
     {
-        float const *LE_RESTRICT pPhases(pPhases);
+        float const *LE_RESTRICT pPhase(pPhases);
         float *LE_RESTRICT pCosines(pReals);
         float *LE_RESTRICT pSines(pImags);
         auto counter(numberOfElements);
         while (counter--)
         {
-            nt2::sinecosine<nt2::small_>(*pPhases++, *pSines++, *pCosines++);
+            float const phase(*pPhase++);
+            *pSines++ = std::sin(phase);
+            *pCosines++ = std::cos(phase);
         }
     }
     multiply(pAmplitudes, pReals, numberOfElements);
@@ -1631,6 +1684,7 @@ void interleave(float const *LE_RESTRICT const *LE_RESTRICT const pInputs,
     case 1:
         LE_UNREACHABLE_CODE();
 
+#ifdef LE_MATH_USE_NT2
     case 2:
     {
         EdgeRestoredAlignedRange const output(pOutput, pOutput + (numberOfElements * 2));
@@ -1646,6 +1700,7 @@ void interleave(float const *LE_RESTRICT const *LE_RESTRICT const pInputs,
         }
         // intentional fall through for tail or misaligned data
     }
+#endif // LE_MATH_USE_NT2
 
     default:
         LE_DISABLE_LOOP_UNROLLING()
@@ -1670,6 +1725,7 @@ void deinterleave(float const *LE_RESTRICT pInput,
     case 1:
         LE_UNREACHABLE_CODE();
 
+#ifdef LE_MATH_USE_NT2
     case 2:
     {
         EdgeRestoredAlignedRange const channel0(pOutputs[0], pOutputs[0] + numberOfElements);
@@ -1685,6 +1741,7 @@ void deinterleave(float const *LE_RESTRICT pInput,
         }
         // intentional fall through for tail or misaligned data
     }
+#endif // LE_MATH_USE_NT2
 
     default:
         LE_DISABLE_LOOP_UNROLLING()
@@ -1709,6 +1766,15 @@ LE_IMPL_NAMESPACE_END(Math)
 /// Scalar NT2 replacements of CRT functions (for math.cpp and conversion.cpp)
 /// implemented here to minimise the NT2 inclusion compile time hit
 ////////////////////////////////////////////////////////////////////////////////
+/// \note Xcode 6.3 & 7 Clang miscompiled nt2::exp2 (e.g. pshifter had no
+/// effect), so Apple always took the CRT. Without LE_HAS_NT2 everyone does, and
+/// then math.cpp and conversion.cpp own these — see their matching guards.
+///                                       (28.07.2026.) (SW port)
+#if defined(LE_HAS_NT2) && !defined(__APPLE__)
+#define LE_MATH_SCALAR_NT2 1
+#endif
+
+#if LE_MATH_SCALAR_NT2
 #include "nt2/exponential/include/functions/scalar/exp.hpp"
 #include "nt2/exponential/include/functions/scalar/exp2.hpp"
 #include "nt2/exponential/include/functions/scalar/log.hpp"
@@ -1724,6 +1790,7 @@ LE_IMPL_NAMESPACE_END(Math)
 #include "nt2/signal/include/functions/db2pow.hpp"
 #include "nt2/signal/include/functions/mag2db.hpp"
 #include "nt2/signal/include/functions/pow2db.hpp"
+#endif // LE_MATH_SCALAR_NT2
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -1731,25 +1798,14 @@ namespace LE
 LE_IMPL_NAMESPACE_BEGIN(Math)
 //------------------------------------------------------------------------------
 
-#if !defined(__APPLE__) /*Xcode 6.3 & 7 Clang miscompiles exp2 (and e.g. pshifter has no effect)*/
-#define LE_MATH_SCALAR_NT2 1
-#endif
-
 #if LE_MATH_SCALAR_NT2
-#define LE_MATH_CRT_IMPL_NAMESPACE nt2
-#else
-#define LE_MATH_CRT_IMPL_NAMESPACE std
-#endif
 
 // https://github.com/MetaScale/nt2/issues/374 Fast pow2 and log2 implementations
-float ln(float const value) { return LE_MATH_CRT_IMPL_NAMESPACE::log(value); }
-float log2(float const value)
-{
-    return LE_MATH_CRT_IMPL_NAMESPACE::log2(value);
-} //::__builtin_log2f
-float log10(float const value) { return LE_MATH_CRT_IMPL_NAMESPACE::log10(value); }
-float exp(float const value) { return LE_MATH_CRT_IMPL_NAMESPACE::exp(value); }
-float exp2(float const value) { return LE_MATH_CRT_IMPL_NAMESPACE::exp2(value); }
+float ln(float const value) { return nt2::log(value); }
+float log2(float const value) { return nt2::log2(value); } //::__builtin_log2f
+float log10(float const value) { return nt2::log10(value); }
+float exp(float const value) { return nt2::exp(value); }
+float exp2(float const value) { return nt2::exp2(value); }
 
 #if !defined(__APPLE__) /*Denoiser assertion failures!?*/
 float dB2NormalisedLinear(float const dBValue) { return nt2::db2mag(dBValue); }
@@ -1784,13 +1840,22 @@ float dB2NormalisedPower(float const dBValue)
 } // https://github.com/jfalcou/nt2/issues/983
 #endif // !__APPLE__!?
 
+#endif // LE_MATH_SCALAR_NT2
+
 void addPolar(float const amp1, float const phase1, float &LE_GNU_SPECIFIC(__restrict) amp2,
               float &LE_GNU_SPECIFIC(__restrict) phase2)
 {
+#if LE_MATH_SCALAR_NT2
     float real1;
     float imag1(nt2::sinecosine<nt2::small_>(phase1, real1));
     float real2;
     float imag2(nt2::sinecosine<nt2::small_>(phase2, real2));
+#else
+    float real1(std::cos(phase1));
+    float imag1(std::sin(phase1));
+    float real2(std::cos(phase2));
+    float imag2(std::sin(phase2));
+#endif // LE_MATH_SCALAR_NT2
 
     real1 *= amp1;
     imag1 *= amp1;
@@ -1800,72 +1865,19 @@ void addPolar(float const amp1, float const phase1, float &LE_GNU_SPECIFIC(__res
     auto const real(real1 + real2);
     auto const imag(imag1 + imag2);
 
+#if LE_MATH_SCALAR_NT2
     amp2 = boost::simd::fast_hypot(real, imag);
     phase2 = nt2 ::nbd_atan2(imag, real);
+#else
+    amp2 = std::hypot(real, imag);
+    phase2 = std::atan2(imag, real);
+#endif // LE_MATH_SCALAR_NT2
 }
 
-#undef LE_MATH_CRT_IMPL_NAMESPACE
 //------------------------------------------------------------------------------
 LE_IMPL_NAMESPACE_END(Math)
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------
-
-////////////////////////////////////////////////////////////////////////////////
-/// Universal MSVC build section
-////////////////////////////////////////////////////////////////////////////////
-#if (defined(LE_SW_SDK_BUILD) || defined(LE_SW_FMOD)) && (_MSC_VER > 1600)
-#include "nt2/exponential/include/functions/scalar/exp2.hpp"
-#include "nt2/exponential/include/functions/scalar/log2.hpp"
-#include "nt2/exponential/include/functions/simd/log.hpp"
-
-extern "C" __m128 __vectorcall _leimpl___vdecl_log10f4(__m128 const _X)
-{
-    return nt2::log(LE::Math::vector_t(_X));
-}
-extern "C" float __cdecl _leimpl_exp2f(_In_ float const _X) { return nt2::exp2(_X); }
-extern "C" float __cdecl _leimpl_log2f(_In_ float const _X) { return nt2::log2(_X); }
-
-#ifdef _DEBUG
-#include "nt2/exponential/include/functions/scalar/exp.hpp"
-#include "nt2/exponential/include/functions/scalar/log.hpp"
-#include "nt2/exponential/include/functions/scalar/log10.hpp"
-#include "nt2/exponential/include/functions/scalar/pow.hpp"
-#include "nt2/trigonometric/include/functions/scalar/sin.hpp"
-#include "nt2/trigonometric/include/functions/scalar/cos.hpp"
-
-// http://source.winehq.org/git/wine.git/blob_plain/07566faaca053d7b2c9915e9a2bd20fdf51ba81f:/dlls/msvcrt/math.c
-
-extern "C" __m128d __vectorcall _leimpl___libm_sse2_sqrt_precise(double const value)
-{
-    return _mm_sqrt_sd(_mm_setzero_pd(), _mm_set_sd(value));
-}
-extern "C" double __vectorcall _leimpl___libm_sse2_pow_precise(double const arg1, double const arg2)
-{
-    return nt2::pow(arg1, arg2);
-}
-extern "C" double __vectorcall _leimpl___libm_sse2_exp_precise(double const value)
-{
-    return nt2::exp(value);
-}
-extern "C" double __vectorcall _leimpl___libm_sse2_log_precise(double const value)
-{
-    return nt2::log(value);
-}
-extern "C" double __vectorcall _leimpl___libm_sse2_log10_precise(double const value)
-{
-    return nt2::log10(value);
-}
-extern "C" double __vectorcall _leimpl___libm_sse2_sin_precise(double const value)
-{
-    return nt2::sin(value);
-}
-extern "C" double __vectorcall _leimpl___libm_sse2_cos_precise(double const value)
-{
-    return nt2::cos(value);
-}
-#endif // _DEBUG
-
-#endif // ( LE_SW_SDK_BUILD || LE_SW_FMOD ) && _MSC_VER > 1600
 
 LE_OPTIMIZE_FOR_SPEED_END()

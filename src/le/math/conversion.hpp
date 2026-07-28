@@ -19,9 +19,6 @@
 #include <bit>
 #include "le/utility/staticLog2.hpp"
 
-#include <boost/simd/sdk/config/arch.hpp>
-#include <boost/simd/sdk/simd/extensions.hpp>
-
 #include <cmath>
 #include <cstdint>
 #include <type_traits>

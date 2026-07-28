@@ -3,9 +3,11 @@
 /// \file typeTraits.hpp
 /// --------------------
 ///
-///   Teaches the standard library's type traits about restrict qualified
-/// pointers. The TR1 fallbacks it used to carry for pre-2011 libstdc++ are
-/// gone along with the Boost.Config macros that selected them.
+///   This used to teach the standard library's type traits about restrict
+/// qualified pointers, and to carry TR1 fallbacks for pre-2011 libstdc++.
+/// Both are gone: libc++, libstdc++ and the MS STL all answer is_pointer,
+/// is_trivially_default_constructible and is_trivially_destructible correctly
+/// for `T * __restrict` today, and C++20 makes specialising them ill-formed.
 ///
 /// Copyright (c) 2011 - 2016. Little Endian Ltd.
 /// SPDX-License-Identifier: GPL-3.0-or-later
@@ -15,43 +17,15 @@
 #ifndef typeTraits_hpp__45496FE2_5F16_4115_8225_39355C7AB4D5
 #define typeTraits_hpp__45496FE2_5F16_4115_8225_39355C7AB4D5
 //------------------------------------------------------------------------------
-
-#include <ciso646>
-
-#ifdef _STLPORT_VERSION
-#error STLPort not supported - please use a more up to date C++ standard library implementation
-#endif // _STLPORT_VERSION
-
 #include <type_traits>
-
-#define LE_AUX_TYPE_TRAITS_NAMESPACE_BEGIN()                                                       \
-    namespace std                                                                                  \
-    {
-#define LE_AUX_TYPE_TRAITS_NAMESPACE_END() }
 
 #include "abi.hpp"
 //------------------------------------------------------------------------------
 
-LE_AUX_TYPE_TRAITS_NAMESPACE_BEGIN()
-template <typename T> using has_trivial_default_constructor = is_trivially_default_constructible<T>;
-template <typename T> using has_trivial_destructor = is_trivially_destructible<T>;
-
-/// \note Workarounds for lack of restricted pointer support in most STL's.
-/// Check if a third party workaround is already included.
-///                                           (11.09.2013.) (Domagoj Saric)
-template <typename T> struct is_trivially_default_constructible<T *LE_RESTRICT> : true_type
-{
-};
-template <typename T> struct is_trivially_destructible<T *LE_RESTRICT> : true_type
-{
-};
-#ifndef BOOST_DISPATCH_RESTRICT
-template <typename T> struct is_pointer<T *LE_RESTRICT> : true_type
-{
-};
-#endif // BOOST_DISPATCH_RESTRICT
-LE_AUX_TYPE_TRAITS_NAMESPACE_END()
-
+/// \note Kept because a `new (pRestrictPointer) T` in the engine relied on it
+/// under Clang; drop it once the placement new call sites are confirmed to bind
+/// to the standard `operator new( size_t, void * )`.
+///                                       (28.07.2026.) (SW port)
 #ifdef __clang__
 template <typename T>
 void *__attribute__((nothrow)) operator new(std::size_t /*count*/, T * LE_RESTRICT *const pStorage)
@@ -60,9 +34,6 @@ void *__attribute__((nothrow)) operator new(std::size_t /*count*/, T * LE_RESTRI
     return reinterpret_cast<void *>(reinterpret_cast<std::size_t>(pStorage));
 }
 #endif // __clang__
-
-#undef LE_AUX_TYPE_TRAITS_NAMESPACE_BEGIN
-#undef LE_AUX_TYPE_TRAITS_NAMESPACE_END
 
 //------------------------------------------------------------------------------
 #endif // typeTraits_hpp

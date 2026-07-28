@@ -24,8 +24,6 @@
 #include "le/utility/intrinsics.hpp"
 #include "le/utility/platformSpecifics.hpp"
 
-#include "boost/simd/sdk/config/arch.hpp"
-
 #include "le/utility/assert.hpp"
 #include <bit>
 #include <cstdint>
@@ -404,7 +402,10 @@ bool isNegative(int const value)
 
 bool isNegative(unsigned int /*value*/) { return false; }
 
-#ifndef LE_HAS_NT2 // disabled: NT2 implementation@vector.cpp
+// others: NT2 implementation@vector.cpp — the guard has to match vector.cpp's
+// LE_MATH_SCALAR_NT2, Apple included (Xcode 6.3/7 Clang miscompiled nt2::exp2).
+#if defined(__APPLE__) || !defined(LE_HAS_NT2)
+float ln(float const value) { return std::log(value); }
 float log2(float const value)
 {
 #if defined(__GNUC__) && !defined(__ANDROID__)
@@ -413,6 +414,8 @@ float log2(float const value)
     return /*std*/ ::log2(value) / LE::Math::Constants::ln2;
 #endif
 }
+float log10(float const value) { return std::log10(value); }
+float exp(float const value) { return std::exp(value); }
 float exp2(float const value) { return std::exp2(value); }
 #endif // disabled
 
