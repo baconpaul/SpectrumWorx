@@ -1353,6 +1353,93 @@ declares those as `constexpr` templates (`juce_MathsFunctions.h:352`).
 sufficient — `juce_graphics`, `juce_data_structures`, `juce_events` and
 `juce_core` come transitively, and nothing in `src/gui` needs `juce_gui_extra`.
 
+#### Where 6.1 stands, and the two rewrites left
+
+| | state |
+|---|---|
+| 6.0 harness | ✅ `tools/show-ui`, three pages, all three are ctest cases |
+| 6.1 API drift — mechanical half | ✅ swept: the four static nulls, the four listener typedefs, the four dead lifetime calls (`Desktop::create`/`destroy`, `MessageManager::destroySingleton`, `ComponentAnimator::stopTimer`), `getMainMouseSource`, the `jmin`/`jmax`/`jlimit` ODR hazard |
+| 6.1 — include hygiene | ☐ 22 includes across 7 files still spell `"juce/<module>/<sub>/<header>.h"`, plus the `AppConfig.h` and `begin`/`endIncludes.hpp` pairs |
+| 6.2 `Theme` | ✅ `LookAndFeel_V2`, in `src/gui/theme.{hpp,cpp}`, rendered by `sw-show-ui theme` |
+| 6.3 assets | ✅ |
+| 6.1 — the widget set | ☐ blocked on the two rewrites below |
+| 6.4 – 6.7 | ☐ |
+
+**These two are not ports.** Everything swept so far was a substitution: the
+JUCE 8 spelling of a thing that still exists. What is left is two pieces of
+2016 design that JUCE 8 does not have an equivalent of, and translating them
+line by line is not available.
+
+**Rewrite 1 — synchronous menus and dialogs.**
+`JUCE_MODAL_LOOPS_PERMITTED` defaults to 0 in JUCE 8 and gates seven APIs this
+code is built on: `PopupMenu::showMenu`, `AlertWindow::showMessageBox` /
+`showOkCancelBox` / `showNativeDialogBox`, `FileChooser::browseForDirectory` /
+`browseForFileToOpen`, and `MessageManager::runDispatchLoopUntil`.
+
+Only four call sites, but each is straight-line code that *blocks on a user
+answer and then acts on it*, so going async inverts control flow through
+`ComboBox::showMenu` → `TitledComboBox::mouseDown` →
+`Settings::comboBoxValueChanged`, and through the preset browser's entire save
+path (`askForOverwrite`'s `bool` gates the write). Two consequences worth
+planning for: `PopupMenu::menuActive_` is a scoped static that only means
+anything synchronously, and every converted call site needs a lifetime story for
+`this` — a `juce::Component::SafePointer`, because a menu can outlive the widget
+that opened it.
+
+> **The escape hatch, and what taking it costs.** `JUCE_MODAL_LOOPS_PERMITTED=1`
+> restores all seven verbatim, in one line. It is the fastest route to a
+> compiling editor and it is a legitimate way to sequence the work — but record
+> it as a deferral, not a fix. JUCE warns against it specifically in plugins,
+> and a nested modal loop inside a DAW's message thread is the kind of thing
+> that works on the developer's machine and hangs on someone else's.
+> `tools/show-ui` deliberately sets it to **0**, so the harness will not let a
+> synchronous call compile.
+
+**Rewrite 2 — `GUI::PopupMenu` reads JUCE's private state.**
+`gui.cpp`'s `JuceHackery` declares a bit-for-bit copy of a JUCE-internal struct
+and reaches `juce::PopupMenu::items` to read item text, id and icon, and to
+*mutate* `isTicked` in place. In JUCE 8 that array is `private`, and the layout
+no longer matches anyway — `Item::image` is a `std::unique_ptr<Drawable>`,
+there is a `std::function<void()> action`, and `MenuItemIterator` exposes only
+`next()` and `getItem()`.
+
+The answer is to keep the item list — id, text, icon, enabled, ticked — in
+`PopupMenuWithSelection` itself and rebuild a `juce::PopupMenu` on each show,
+which is what `juce::ComboBox` does. Note that the 2016 comment at the head of
+that block explicitly rejects this as too slow ("recreating the whole menu when
+the selection changes, holding duplicates of all items"). That judgement was
+made against 2010 hardware and a menu of a few dozen entries; **re-decide it,
+don't inherit it.** Two smaller casualties: `getSelectedItemIcon()` returning
+`juce::Image const &` has no JUCE 8 equivalent, and `getSelectedItemText()`
+returning a reference into menu internals becomes a lifetime bug waiting to
+happen — both should return by value from our own list.
+
+**Do these two together.** They touch the same ~300 lines of `gui.cpp`, and
+rewriting the item model for async and rewriting it for private-member access
+is one job done once.
+
+**Then a third, smaller, which needs a test rather than a patch.**
+`Knob` calls `Slider::valueListener()`, which **never existed in stock JUCE** —
+it was an addition in the patched fork, used to unhook the Slider's own
+`Value::Listener` from its three `Value` objects and so cut the
+Slider → Value → Slider feedback loop. Stock JUCE 8 offers no handle on it. The
+honest port is to hold the value in our own model and drive the Slider one-way
+with `dontSendNotification`, which `Knob::setValue` already does. But this
+re-litigates a 2013 bug fix whose failure mode — spurious automation
+notifications — appears only at runtime under a host, so removing the hack and
+declaring victory is not evidence. Get the parameter round-trip under test in
+stage 5 first, or accept that this one is verified by hand in a DAW.
+
+**Suggested order from here:** include hygiene (nothing compiles until it is
+done and it is mechanical) → the combined menu rewrite → the remaining widgets
+→ 6.4, whose scope is bounded by `OwnedWindow<>` having exactly two
+instantiations.
+
+> **Re-run the release goldens before pushing any of this.** Stage 6 has no
+> business changing DSP output, which is exactly why an unexplained golden
+> movement here would be worth stopping for. The checked build skips them; only
+> `build-release` runs them.
+
 ---
 
 ### Stage 7 — De-Boost: the parameter system
