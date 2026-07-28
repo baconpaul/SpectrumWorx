@@ -663,6 +663,7 @@ ship unexamined.**
 | `le/utility/intrusivePtr.hpp` | 30 | *see below* — not obviously `std::shared_ptr` | 5 |
 | `LE_LIKELY` / `LE_UNLIKELY` (abi.hpp) | 50 | `[[likely]]`/`[[unlikely]]` where the site is a statement, delete where it is a no-op | 3 |
 | `LE_CURRENT_FUNCTION` (abi.hpp) | 2 | `std::source_location` in the assert handler | 3 |
+| `le/utility/stackBuffer.hpp` | 18 files | keep — alloca has no standard spelling | — |
 | `LE_LITTLE_ENDIAN` / `LE_BIG_ENDIAN` (abi.hpp) | 7 | `if constexpr (std::endian::native == …)`; the sites are `#if` only because Boost's were | 3 |
 | `LE_NO_RTTI` / `LE_NO_EXCEPTIONS` (abi.hpp) | few | keep; they are compiler feature detection, not a Boost artefact | — |
 | `LE_ASSERT` family (assert.hpp) | ~1200 | keep; revisit only if the handler should route to the DAW log | 9 |
@@ -702,7 +703,7 @@ and the `intrusive_ptr_add_ref`/`intrusive_ptr_release`/
 
 ---
 
-### Stage 3 — DSP core builds and is measured (macOS first)
+### Stage 3 — DSP core builds and is measured (macOS first) — *in progress*
 
 **3–5 weeks.** The first stage where SpectrumWorx code compiles.
 
@@ -714,27 +715,31 @@ the replacement you want golden tests to protect. So: bring it up on Apple,
 capture the goldens, then port the backend (stage 4) and check the other two
 platforms against them.
 
-**3.1** `le/math/vector.cpp` includes the NT2 headers *unconditionally* at file
+**✅ 3.1** `le/math/vector.cpp` includes the NT2 headers *unconditionally* at file
 scope even though the Apple path never uses them. Make them conditional; confirm
-the Accelerate path is self-contained.
+the Accelerate path is self-contained. — *Done. NT2 is opt-in on `LE_HAS_NT2`
+now, which nothing defines, so every platform takes the portable path until
+stage 4.*
 
-**3.2** Add the temporary Boost scaffold — CPM, not a submodule, so that it is
-visibly not a dependency:
+**✅ 3.2** Add the temporary Boost scaffold — CPM, not a submodule, so that it is
+visibly not a dependency: `cmake/temporary-boost.cmake`, Boost 1.91.0 with
+`BOOST_INCLUDE_LIBRARIES fusion;intrusive;mpl;preprocessor`, exposed as one
+`sw-boost-scaffold` target. Deleting that file and the two lines that include it
+removes Boost from the project.
 
-```cmake
-# TEMPORARY SCAFFOLD — Fusion/MPL/Preprocessor only, deleted in stage 7.
-# See doc/tech/implementation_sequence.md
-CPMAddPackage(NAME Boost VERSION 1.89.0 GITHUB_REPOSITORY boostorg/boost …)
-```
-
-**3.3** Build `sw-dsp` as a static library: `le/spectrumworx/{engine,effects}`,
+**✅ 3.3** Build `sw-dsp` as a static library: `le/spectrumworx/{engine,effects}`,
 `le/math`, `le/parameters`, `le/analysis`, the surviving parts of `le/utility`,
 plus `core/automatedModuleChain` and `core/spectrumWorxCore`. No host, no GUI.
+— *Done: `src/dsp.cmake`, 83 translation units, `libsw-dsp.a`.*
 
-**3.4** Replace `effectsList.cmake`'s string-concatenation codegen with a plain
+**✅ 3.4** Replace `effectsList.cmake`'s string-concatenation codegen with a plain
 C++20 `constexpr` table — 57 effects, entirely mechanical. This kills two dozen
 `configure_file()` calls that currently write generated headers back into the
-source tree.
+source tree. — *Done. `configuration/effectsList.hpp` is now the single source
+of truth: one `LE_SW_EFFECT_LIST(x)` list that the index→impl, index→group and
+name tables all expand. `effectsList.cmake`, `configuration.cmake` and the nine
+`.in` templates are gone; the only surviving `configure_file` is the version
+header, and it writes to the build tree.*
 
 **3.5** `tests/` with Catch2; target `sw-tests`.
 
@@ -761,6 +766,81 @@ relative cross-platform.
 
 **Done when:** `sw-tests` is green on macOS-arm64; goldens committed for all 57
 effects; `rg LE_SW_AUTHORISATION_REQUIRED src` returns nothing.
+
+#### What the first compile found
+
+Stage 2 warned that nothing was compile-verified. It was right; here is the
+residue, in the order it mattered.
+
+- **The `LE_NOTHROW` family had to go, not be made consistent — 1159 sites in
+  123 files.** C++17 made the exception specification part of the function
+  type, and `__attribute__((nothrow))` counts. The 2016 habit was to decorate
+  the out-of-line *definition* and not the header declaration, which is now a
+  hard error at roughly half the sites. Spreading the macro to fix that would
+  have entrenched an MSVC10-era workaround, so `LE_NOTHROW`,
+  `LE_NOTHROWNOALIAS`, `LE_NOTHROWRESTRICTNOALIAS`, `LE_NOALIAS`,
+  `LE_RESTRICTNOALIAS`, `LE_CONST_FUNCTION` and `LE_PURE_FUNCTION` are deleted.
+  `LE_NOEXCEPT` — which stood in for the keyword and was `noexcept` on GCC but
+  *nothing* on Clang, a live ABI divergence — is now plain `noexcept`, and it
+  only ever sat on move constructors, where it belongs. What is genuinely lost
+  is `__attribute__((const))`/`((pure))`/`((malloc))` on ~120 functions; put any
+  of them back only with a measurement behind it.
+- **Three functions had no non-NT2 implementation at all.** `Math::mix()` (the
+  range overload), `addPolar()`, and the `#else` arm of `polar2rectangular()`
+  called `nt2::sinecosine` unguarded, and `rectangular2polar()`/`amplitudes()`
+  had an NT2 arm and an Accelerate arm and nothing else. On any build that is
+  neither, the last two silently returned without writing their outputs.
+- **`Math::clamp()`'s portable branch had never been compiled.** It called
+  unqualified `min`/`max`, which in `namespace LE::Math` find only the
+  `float const *` range overloads. Every previous build took an SSE or NEON
+  branch instead. Now `std::min`/`std::max`.
+- **`polar2rectangular`'s scalar loop shadowed its own parameter.**
+  `float const *LE_RESTRICT pPhases(pPhases);` — self-initialised from itself.
+  Dead in every shipped configuration, but it is what the non-NT2 path would
+  have run.
+- **`log2`/`exp2` were defined twice and `ln`/`log10`/`exp` not at all** once
+  `LE_HAS_NT2` went undefined: `vector.cpp` defined the five unconditionally
+  while `math.cpp` defined two of them under `#ifndef LE_HAS_NT2`. Both files
+  now use `conversion.cpp`'s existing `defined(__APPLE__) || !defined(LE_HAS_NT2)`
+  guard, so exactly one definition survives in every configuration.
+- **C++20 aggregate rules broke `EffectMetaData`.** A `= delete`d copy
+  constructor is *user-declared*, and since P1008 that costs a type its
+  aggregate-ness — while `MakeEffectMetaData` initialises it as an aggregate.
+  The const and reference members already make it non-assignable.
+- **`typeTraits.hpp`'s specialisations are now ill-formed and unnecessary.**
+  Specialising `std::is_pointer` et al. is a hard error under C++20, and
+  libc++, libstdc++ and the MS STL all answer correctly for `T * __restrict`
+  today. The 2013 workarounds are deleted.
+- **`BOOST_SWITCH_LIMIT` was 50 and there are 57 effects.** Dropping editions
+  made every effect always-included, so `Effects::ValidIndices` is now the full
+  range and the `switch_` dispatcher had to grow. A tidy demonstration that the
+  edition mechanism was load bearing in more places than the codegen.
+- **Two dependencies were replaced outright rather than found.**
+  `boost::mmap` — a Boost sandbox library that was never released — was two
+  calls, now `mmap`/`munmap` (plus the Win32 pair) in `filesystem.cpp`. The NT2
+  stack-buffer macros were three, now `le/utility/stackBuffer.hpp`, which keeps
+  the alloca semantics *and* the hand alignment the original needed because
+  Clang's `alloca` does not align.
+- **RapidXML could not be deferred to stage 8.** Preset (de)serialisation is
+  inside `ModuleParameters::{load,save}PresetParameters`, not in a separable
+  preset layer, so `sw-dsp` needs an XML parser today. RapidXML 1.13 is
+  vendored in `libs/rapidxml/` — two headers — and §8.1 still replaces it.
+- **VST 2.4 is now behind `LE_SW_VST24`, which nothing defines.**
+  `plugin2Host.hpp` reached for `aeffectx.h` whenever the target was Windows or
+  macOS. The three constants it guarded (`maxNumberOfPrograms`, `category`,
+  `vstUniqueID`) are stage 5's to replace.
+
+> **One silent regression is deliberately left for stage 4.**
+> `BOOST_SIMD_HAS_SSE_SUPPORT`, `BOOST_SIMD_ARCH_X86` and `BOOST_SIMD_ARCH_ARM`
+> appear ~35 times in `le/math/math.{hpp,cpp}` as plain *architecture
+> detection*, not as NT2 usage. Undefined, every one of them falls to a correct
+> portable branch — except `FPUDisableDenormalsGuard`, whose `_mm_getcsr`/
+> `_mm_setcsr` arm is now dead on x86, so **denormal flushing is off on Linux
+> and Windows x86-64** (arm64 keys off `__aarch64__` and is unaffected, and
+> MSVC keys off `_controlfp`). The fix is to rekey them on the `LE_HAS_SSE1`/
+> `LE_HAS_SSE2` macros `leConfigurationAndODRHeader.h` already derives from
+> `__SSE__`/`__SSE2__`, which is stage 4's job anyway. Do not ship without it —
+> a denormal storm in a spectral effect is a CPU cliff, not a subtle one.
 
 ---
 
@@ -1040,7 +1120,7 @@ B takes 2 and 6 (Boost sweep, then GUI) and joins A on 7.
 | 0 | Purge and amputate ✅ | 1 |
 | 1 | Walking skeleton ✅ (CI, installers and signing deferred) | 1.5–2.5 |
 | 2 | Boost tier-1 sweep ✅ (CI wiring deferred) | 1–2 |
-| 3 | DSP core + goldens | 3–5 |
+| 3 | DSP core + goldens (3.1–3.4 ✅, sw-dsp builds) | 3–5 |
 | 4 | Portable SIMD/FFT + audio I/O | 2–3 |
 | 5 | CLAP host layer | 2.5–4 |
 | 6 | GUI | 4–6 |
