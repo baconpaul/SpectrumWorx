@@ -445,14 +445,24 @@ installers, the CI matrix — while the thing being delivered is 200 lines you c
 debug in an afternoon. Every problem it finds is a problem you would otherwise
 have found in stage 9, tangled with 90 k lines of ported code.
 
-**1.1** Add the submodules above; pin JUCE to 8.0.12.
+**1.1 ✅** Add the submodules above; pin JUCE to 8.0.12.
 
-**1.2** Top-level `CMakeLists.txt`, `libs/CMakeLists.txt`, `src/CMakeLists.txt`,
+> Done. Thirteen submodules under `libs/`, JUCE at tag 8.0.12 (`29396c22c9`).
+> Note that `git submodule update --init --recursive` resets a submodule to the
+> recorded gitlink, so the JUCE checkout has to be re-pinned and `git add`ed
+> *after* the recursive init, not before.
+
+**1.2 ✅** Top-level `CMakeLists.txt`, `libs/CMakeLists.txt`, `src/CMakeLists.txt`,
 `src/clap-first/CMakeLists.txt` per the sketches above. Version from
 `sst-plugininfra/cmake/git-version-functions.cmake`'s
 `version_from_versionfile_or_git`.
 
-**1.3** A stub plugin deriving from `clap::helpers::Plugin<>` that:
+> Done. The 2016 `src/CMakeLists.txt` is preserved as `src/legacy-build.cmake`,
+> included by nothing, as the record of the old targets' sources and defines.
+> See "What stage 1 found" below for the CMake ordering constraints that are
+> load-bearing.
+
+**1.3 ✅** A stub plugin deriving from `clap::helpers::Plugin<>` that:
 - declares the **real** audio ports it will eventually need — stereo main in,
   stereo out, optional stereo sidechain
 - exposes a handful of **fake dynamic parameters** and calls
@@ -464,19 +474,97 @@ have found in stage 9, tangled with 90 k lines of ported code.
   stage 5.
 - passes audio through unmodified
 
-**1.4** `add_clap_juce_shim` + `ADD_SHIM_IMPLEMENTATION(clapJuceShim)`, with
+> Done, and deliberately more than "a handful". `src/stubParameters.{hpp,cpp}`
+> reproduces the **whole** 287-entry skeleton — 7 globals, 5 slot selectors,
+> 5×10 module parameters, 5×9×5 LFO parameters — and the **real packed uint32
+> IDs** from `SW::ParameterID`, so hosts are being handed the exact sparse,
+> non-sequential id space the ported plugin will use.
+>
+> Six fake effects with parameter counts 3–10 sit behind the slot selectors.
+> Changing a selector changes each affected parameter's name, its module path
+> (`Module 2/Vocoder/LFO`), and whether it is `CLAP_PARAM_IS_HIDDEN` — the real
+> slots are ragged the same way. That is exactly the set of changes
+> `CLAP_PARAM_RESCAN_INFO` is specified to cover, and no more.
+>
+> The trigger is the selector itself rather than a timer, which is the real
+> path: `process()`/`paramsFlush()` set an atomic flag and call
+> `requestCallback()` (coalesced — one callback per outstanding batch), and
+> `onMainThread()` does the `paramsRescan(INFO | TEXT)`.
+
+**1.4 ✅** `add_clap_juce_shim` + `ADD_SHIM_IMPLEMENTATION(clapJuceShim)`, with
 `createEditor()` returning a `juce::Component` that paints one rectangle.
 
-**1.5** `include(basic_installer)`; CI modelled on OB-Xf's
+> Done — `src/stubEditor.{hpp,cpp}`. It paints the rectangle, and adds five
+> "cycle this slot's effect" buttons and a bare "rescan now" button, so the
+> dynamic-parameter path can be driven by hand from inside a DAW without
+> writing automation first.
+
+**1.5 ⏸ deferred.** `include(basic_installer)`; CI modelled on OB-Xf's
 `.github/workflows/build-plugin.yml` using
 `surge-synthesizer/sst-githubactions/prepare-for-juce` and `install-innosetup`.
 Matrix: macos (universal), windows-msvc-x64, windows-arm64, linux-x64 (gcc 12/13/14),
 linux-arm64. Add `clang-format-check` from the same action set.
 
+> Take `add_clapfirst_installer` from two-filters'
+> `cmake/basic_installer_clapfirst.cmake` rather than shortcircuit's hand-rolled
+> `basic-installer.cmake`; note that sst-cmake itself provides only the Inno
+> Setup imported target, not an installer module. Copy shortcircuit's
+> stage-then-package split (`*-products` then `*-installer`) so the staged
+> directory is both the CI artefact and what clap-validator points at.
+
 **Done when:** green CI on every matrix entry; `clap-validator validate` clean;
 the `.clap`, `.vst3`, `.component` and standalone all load in Reaper and Bitwig
 and show the rectangle; the mac artefact is signed and notarised; the installers
 install.
+
+> Current state: all four formats build on macOS arm64 and
+> `clap-cpp-validator validate` is **23 passed / 0 failed / 0 warnings**.
+> Remaining before this stage closes: Windows and Linux builds, DAW load tests,
+> CI, signing/notarisation, installers.
+
+#### What stage 1 found
+
+Things that would have cost real time later, all cheap here:
+
+- **Enable OBJC/OBJCXX at top level, not in a subdirectory.** `sst-clap-helpers`
+  does `enable_language(OBJC)` in its own scope; CMake then fails generation
+  with `Missing variable is: CMAKE_OBJCXX_COMPILE_OBJECT`. Hoist both
+  `enable_language` calls next to `project()`.
+- **`cmake_minimum_required(VERSION 3.28)`, not 3.21.** clap-wrapper sets
+  `CMP0149`, which is unknown before CMake 3.27 and hard-errors.
+- **`add_subdirectory(fmt)` before clap-wrapper**, or clap-wrapper vendors a
+  second copy of fmt instead of reusing `fmt-header-only`.
+- **`add_library(simde INTERFACE)` by hand.** simde ships no target, and
+  sst-basic-blocks silently downgrades to `SIMDE_UNAVAILABLE=1` — x86-only —
+  when it can't find one. `sst-cpputils` must precede it for the same reason.
+- **No `project()` call in `src/clap-first/CMakeLists.txt`.** It resets
+  `PROJECT_VERSION` to empty, which make_clapfirst passes on to
+  `set_target_properties` as a missing argument: `set_target_properties called
+  with incorrect number of arguments`, from `wrap_standalone.cmake:97`.
+- **`target_link_libraries(sw-impl PUBLIC clap)`.** The per-format entry stubs
+  are compiled into the clap/vst3/auv2/standalone targets and only see
+  sw-impl's *interface*; if `clap` is PRIVATE they cannot find `<clap/clap.h>`.
+- **`BUNDLE_IDENTIFIER` is spelled correctly in clap-wrapper 0.15.1.** Older
+  call sites in scxt/sapphire/two-filters pass `BUNDLE_IDENTIFER` (one `I`),
+  which `cmake_parse_arguments` silently discards. Ours is right; the AU comes
+  out as `com.littleendian.spectrumworx.auv2`, `aufx`/`SpWx`/`LiEn`.
+- **The standalone's bundle id is hardcoded** to `${BUNDLE_NAME}.standalone` in
+  clap-wrapper's `Info.plist.in`; no CMake property overrides it. Ours is
+  therefore `SpectrumWorx.standalone`. Fix before notarisation by passing our
+  own `MACOSX_BUNDLE_INFO_PLIST`.
+- **Clamp on the way in, at the one place a value becomes an index.** The
+  validator's `param-range-robustness` segfaulted the first build: a host
+  writing outside a selector's declared range reached the effect table
+  unchecked. `effectIn()` now rejects anything outside `[0, count)`, and
+  `setValue` clamps to the declared range and drops non-finite values. The real
+  `AutomatedModuleChain::setParameter` needs the same audit in stage 5.
+- **The Rust `clap-validator` 0.3.2 cannot survive `request_callback()` from
+  `process()`.** `Host::handle_callbacks_once` holds a `RefCell` borrow across
+  `on_main_thread()`, so the re-entrant host call panics
+  (`already mutably borrowed`). The call is `[thread-safe]` per `clap/plugin.h`
+  and is the standard shortcircuit idiom, so this is a validator defect, not a
+  plugin one — confirmed by suppressing only that call and watching the suite
+  go green. Use `clap-cpp-validator`, which handles it.
 
 ---
 
