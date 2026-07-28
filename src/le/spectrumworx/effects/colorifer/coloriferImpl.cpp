@@ -17,7 +17,7 @@
 #include "le/math/vector.hpp"
 #include "le/parameters/uiElements.hpp"
 
-#include "boost/simd/preprocessor/stack_buffer.hpp"
+#include "le/utility/stackBuffer.hpp"
 
 #include <limits>
 //------------------------------------------------------------------------------
@@ -107,8 +107,8 @@ void LE_HOT ColoriferImpl::process(Engine::MainSideChannelData_AmPh data,
     }
     else
     {
-        BOOST_SIMD_ALIGNED_STACK_BUFFER(xStorage, Engine::real_t, numberOfBins);
-        BOOST_SIMD_ALIGNED_STACK_BUFFER(yStorage, Engine::real_t, numberOfBins);
+        LE_ALIGNED_STACK_BUFFER(xStorage, Engine::real_t, numberOfBins);
+        LE_ALIGNED_STACK_BUFFER(yStorage, Engine::real_t, numberOfBins);
         x = xStorage;
         y = yStorage;
         copy(sideAmps.begin(), xStorage.begin(),

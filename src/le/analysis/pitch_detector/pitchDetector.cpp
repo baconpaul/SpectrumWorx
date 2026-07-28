@@ -16,7 +16,7 @@
 #include "le/math/vector.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 
-#include "boost/simd/preprocessor/stack_buffer.hpp"
+#include "le/utility/stackBuffer.hpp"
 
 #include "le/utility/assert.hpp"
 
@@ -128,12 +128,12 @@ float PitchDetector::findPitch(SW::Engine::ReadOnlyDataRange const &amplitudes, 
     pd.findPeaksAndEstimateFrequency(amplitudes.begin(), numberOfBins,
                                      engineSetup.sampleRate<std::uint32_t>());
     // Delete non-peaks to make it easier for HPS:
-    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(filteredAmps, float, numberOfBins);
+    LE_ALIGNED_SCOPED_STACK_BUFFER(filteredAmps, float, numberOfBins);
     Math::copy(amplitudes, filteredAmps);
     pd.attenuateNonPeaks(filteredAmps.begin(), 0, numberOfBins - 1, 300.0f);
 
     // Find HPS spectrum:
-    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(hps, HPS, numberOfBins);
+    LE_ALIGNED_SCOPED_STACK_BUFFER(hps, HPS, numberOfBins);
     findHarmonicProductSpectrumAndSort(filteredAmps, hps);
     // Estimate pitch:
     float pitch(estimatePitch(cs.lastPitch, lfb, hfb, hps, pd));

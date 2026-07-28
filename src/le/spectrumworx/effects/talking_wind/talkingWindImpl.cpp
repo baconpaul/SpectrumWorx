@@ -65,7 +65,7 @@
 #include "le/spectrumworx/engine/processor.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 
-#include "boost/simd/preprocessor/stack_buffer.hpp"
+#include "le/utility/stackBuffer.hpp"
 
 #include "le/utility/assert.hpp"
 //------------------------------------------------------------------------------
@@ -137,8 +137,7 @@ LE_HOT void TalkingWindImpl::process(Engine::MainSideChannelData_AmPh data,
     // time domain frame (i.e. the size of the FFT but allocate it as "two
     // aligned half-FFT size" buffers so that it can be used for both time
     // domain and ReIm intermediate results):
-    BOOST_SIMD_ALIGNED_STACK_BUFFER(doubleWorkBuffer, Engine::real_t,
-                                    (alignIndex(fullNumberOfBins) * 2));
+    LE_ALIGNED_STACK_BUFFER(doubleWorkBuffer, Engine::real_t, (alignIndex(fullNumberOfBins) * 2));
     DataRange envelope(&doubleWorkBuffer[0], &doubleWorkBuffer[fullNumberOfBins]);
 
     std::uint16_t const skippedLeadingBins(data.beginBin());

@@ -25,7 +25,7 @@
 #include "le/utility/tchar.hpp"
 #include "le/utility/trace.hpp"
 
-#include "boost/simd/preprocessor/stack_buffer.hpp"
+#include "le/utility/stackBuffer.hpp"
 
 #include "le/utility/assert.hpp"
 #include "le/utility/ignoreUnused.hpp"
@@ -123,7 +123,7 @@ void SpectrumWorxCore::process /// \throws nothing
         if (!Math::is<1>(inputGain))
         {
             unsigned int const numberOfChannels(engineSetup().numberOfChannels());
-            BOOST_SIMD_STACK_BUFFER(mainChannels, float const *, numberOfChannels);
+            LE_STACK_BUFFER(mainChannels, float const *, numberOfChannels);
             for (unsigned int channel(0); channel < numberOfChannels; ++channel)
             {
                 float *LE_RESTRICT const pChannel(buffers().mainChannel(channel).begin());

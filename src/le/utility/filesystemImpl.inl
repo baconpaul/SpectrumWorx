@@ -14,8 +14,6 @@
 #include "filesystemImpl.hpp"
 
 #include "platformSpecifics.hpp"
-
-#include "boost/mmap/mappble_objects/file/utility.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -32,11 +30,10 @@ File::map(char const *const relativeFilePath)
 {
     return PathResolver<rootDirectory>::template apply<File::MemoryMapping>(
         relativeFilePath, [=](char const *const fullPath) {
-            auto const mapping_reference(boost::mmap::map_read_only_file(fullPath));
-            LE_TRACE_IF(!mapping_reference, "Failed to mmap file %s (errno: %d)", relativeFilePath,
+            auto const mapping(Detail::mapReadOnlyFile(fullPath));
+            LE_TRACE_IF(!mapping.first, "Failed to mmap file %s (errno: %d)", relativeFilePath,
                         errno);
-            return File::MemoryMapping(
-                File::MemoryMapping::Range(mapping_reference.begin(), mapping_reference.end()));
+            return File::MemoryMapping(mapping);
         });
 }
 

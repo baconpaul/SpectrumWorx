@@ -18,7 +18,7 @@
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/utility/buffers.hpp"
 
-#include "boost/simd/preprocessor/stack_buffer.hpp"
+#include "le/utility/stackBuffer.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -114,7 +114,7 @@ void ShifterImpl::shift(DataRange const &data) const
     unsigned int sourceBin;
     unsigned int targetBin;
 
-    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(circularTailBuffer, Engine::real_t, shiftLength);
+    LE_ALIGNED_SCOPED_STACK_BUFFER(circularTailBuffer, Engine::real_t, shiftLength);
     if (type == Tail::Circular)
     {
         if (positiveOffset)

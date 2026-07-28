@@ -188,7 +188,13 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
         GetParameterValueString &getParameterValueString;
 #endif // !LE_NO_PARAMETER_STRINGS
 
-        EffectMetaData(EffectMetaData const &) = delete;
+        /// \note `EffectMetaData( EffectMetaData const & ) = delete;` used to
+        /// stand here to make it non-copyable. C++20 counts a user-*declared*
+        /// constructor, deleted or not, against aggregate-ness, and
+        /// MakeEffectMetaData initialises this as an aggregate. The const and
+        /// reference members already make it non-assignable, and the only
+        /// instances are the per-effect statics, handed out by reference.
+        ///                               (28.07.2026.) (SW port)
     }; // struct EffectMetaData
 #ifdef __clang__
 #pragma clang diagnostic pop

@@ -71,7 +71,7 @@
 
 #include <ranges>
 
-#include "boost/simd/preprocessor/stack_buffer.hpp"
+#include "le/utility/stackBuffer.hpp"
 
 #include "le/utility/assert.hpp"
 #include "le/utility/ignoreUnused.hpp"
@@ -288,7 +288,7 @@ LE_HOT void VocoderImpl::process(Engine::MainSideChannelData_AmPh data,
     if (filterMethod() == FilterMethod::MovingAverage)
     {
         //...mrmlj...probably still broken 'reduced range' operation...
-        BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(workBuffer, Engine::real_t, fullNumberOfBins);
+        LE_ALIGNED_SCOPED_STACK_BUFFER(workBuffer, Engine::real_t, fullNumberOfBins);
         lowPassSpectrum_movingAverage(envelope, workBuffer, setup);
 #ifndef NDEBUG //...mrmlj...?...clear out negative values to avoid assertion failures.
         for (auto &amp : envelope)
@@ -338,8 +338,8 @@ LE_HOT void VocoderImpl::process(Engine::MainSideChannelData_AmPh data,
         // time domain frame (i.e. the size of the FFT but allocate it as "two
         // aligned half-FFT size" buffers so that it can be used for both time
         // domain and ReIm intermediate results):
-        BOOST_SIMD_ALIGNED_STACK_BUFFER(doubleWorkBuffer, Engine::real_t,
-                                        (alignIndex(fullNumberOfBins) * 2));
+        LE_ALIGNED_STACK_BUFFER(doubleWorkBuffer, Engine::real_t,
+                                (alignIndex(fullNumberOfBins) * 2));
         envelope = DataRange(&doubleWorkBuffer[0], &doubleWorkBuffer[fullNumberOfBins]);
 
         // Cepstrum-based envelope calculation needs its work buffer to be the

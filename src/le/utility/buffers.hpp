@@ -17,20 +17,19 @@
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/tchar.hpp"
 
-#ifdef LE_HAS_NT2
-// NT2/Boost.SIMD
-#include "boost/simd/memory/aligned_free.hpp"
-#include "boost/simd/memory/aligned_malloc.hpp"
-#include "boost/simd/memory/aligned_object.hpp"
-#include "boost/simd/memory/aligned_reuse.hpp"
-#endif // LE_HAS_NT2
-
 #include "assert.hpp"
 #include "span.hpp"
 
+#include <algorithm>
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <type_traits>
 #include <utility>
+
+#ifdef _MSC_VER
+#include <malloc.h>
+#endif // _MSC_VER
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -51,7 +50,6 @@ inline unsigned int align(unsigned int const storageBytes)
     return totalBytes;
 }
 
-#ifdef LE_HAS_NT2
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \class AlignedBuffer
@@ -61,12 +59,16 @@ inline unsigned int align(unsigned int const storageBytes)
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
+/// \note Used to derive from boost::simd::aligned_object<> for an over-aligned
+/// operator new. C++17's aligned new honours the alignas below on its own.
+///                                       (28.07.2026.) (SW port)
 template <typename Element, unsigned int numberOfElements,
           bool defaultAutomaticInitialization = true,
           unsigned int alignmentSize = std::alignment_of<Element>::value>
-class AlignedBuffer : public boost::simd::aligned_object<alignmentSize>
+class AlignedBuffer
 {
-    static_assert(std::is_pod<Element>::value, "Only PODs supported");
+    static_assert(std::is_trivial_v<Element> && std::is_standard_layout_v<Element>,
+                  "Only PODs supported");
 
   public:
     typedef Element value_type;
@@ -154,22 +156,24 @@ template <typename T> class AlignedHeapBuffer : public Span<T>
     {
         static_cast<Range &>(source) = Range();
     }
-#if !defined(__APPLE__) && !defined(_WIN64)
-    ~AlignedHeapBuffer() { boost::simd::aligned_free(this->data()); }
-#else
-    ~AlignedHeapBuffer() { std ::free(this->data()); }
-#endif
+    /// \note Was boost::simd::aligned_free/aligned_reuse everywhere but Apple
+    /// and Win64, which took plain free/realloc. Neither malloc nor realloc
+    /// promises more than alignof(std::max_align_t) — 8 on arm64, half of what
+    /// the SIMD paths need — so the allocation is explicit on every platform
+    /// now, and reallocation is allocate-copy-free.
+    ///                                   (28.07.2026.) (SW port)
+    ~AlignedHeapBuffer() { alignedFree(this->data()); }
 
     unsigned int size() const { return static_cast<unsigned int>(Range::size()); }
 
     bool LE_COLD resize(unsigned int const numberOfElements)
     {
-#if defined(_MSC_VER) && defined(BOOST_SIMD_MEMORY_USE_BUILTINS)
+#ifdef _MSC_VER
         //...mrmlj...MSVC10 aligned_realloc seems to reallocate even if the size
         //...mrmlj...does not change...reinvestigate...
         if (numberOfElements == this->size())
             return true;
-#endif // _MSC_VER && BOOST_SIMD_MEMORY_USE_BUILTINS
+#endif // _MSC_VER
 #ifdef __APPLE__
         /// \note OSX std::realloc does not return a nullptr with 0 sizes so we
         /// explicitly handle this case out of paranoia in case some code uses
@@ -185,14 +189,8 @@ template <typename T> class AlignedHeapBuffer : public Span<T>
             return true;
         }
 #endif // __APPLE__
-        value_type *const pNewMemory(static_cast<value_type *>(
-#if !defined(__APPLE__) && !defined(_WIN64)
-            boost::simd::aligned_reuse(this->data(), numberOfElements * sizeof(value_type),
-                                       Utility::Constants::vectorAlignment)
-#else
-            std::realloc(this->data(), numberOfElements * sizeof(value_type))
-#endif
-                ));
+        value_type *const pNewMemory(static_cast<value_type *>(alignedReallocate(
+            this->data(), size() * sizeof(value_type), numberOfElements * sizeof(value_type))));
         if (pNewMemory || !numberOfElements)
         {
             LE_ASSERT_MSG((pNewMemory != nullptr) == (numberOfElements != 0),
@@ -217,12 +215,42 @@ template <typename T> class AlignedHeapBuffer : public Span<T>
     }
 
   private:
+    static void alignedFree(void *const pMemory) noexcept
+    {
+#ifdef _MSC_VER
+        ::_aligned_free(pMemory);
+#else
+        std::free(pMemory);
+#endif // _MSC_VER
+    }
+
+    static void *alignedReallocate(void *const pMemory, std::size_t const oldBytes,
+                                   std::size_t const newBytes)
+    {
+#ifdef _MSC_VER
+        return ::_aligned_realloc(pMemory, newBytes, Constants::vectorAlignment);
+#else
+        if (!newBytes)
+        {
+            alignedFree(pMemory);
+            return nullptr;
+        }
+        // std::aligned_alloc wants a size that is a multiple of the alignment.
+        void *const pNewMemory(std::aligned_alloc(Constants::vectorAlignment,
+                                                  align(static_cast<unsigned int>(newBytes))));
+        if (pNewMemory && pMemory)
+            std::memcpy(pNewMemory, pMemory, std::min(oldBytes, newBytes));
+        if (pNewMemory)
+            alignedFree(pMemory);
+        return pNewMemory;
+#endif // _MSC_VER
+    }
+
     using Range::advance_begin;
     using Range::advance_end;
     using Range::pop_back;
     using Range::pop_front;
 }; // class AlignedHeapBuffer
-#endif // LE_HAS_NT2
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -255,7 +283,7 @@ template <typename T> class SharedStorageBuffer : public Span<T>
 
     LE_NOINLINE LE_COLD void clear()
     {
-        static_assert(__has_trivial_constructor(T) || std::is_scalar<T>::value,
+        static_assert(std::is_trivially_default_constructible_v<T> || std::is_scalar_v<T>,
                       "SharedStorageBuffer supports only primitive types");
         std::memset(Range::begin(), 0, size() * sizeof(T));
     }
@@ -268,7 +296,7 @@ template <typename T> class SharedStorageBuffer : public Span<T>
 
         using iterator = T *LE_RESTRICT;
 
-        bool const doAlign(!std::is_pointer<T>::value);
+        bool const doAlign(!std::is_pointer_v<T>);
 
         /// \note static_casting through void * (instead of reinterpret_casting
         /// throguh std::size_t) fails with compiler errors on GCC 4.9 on ranges
@@ -293,7 +321,7 @@ template <typename T> class SharedStorageBuffer : public Span<T>
         static_cast<Range &>(*this) = Range(newBeginning, newEnd);
         LE_ASSERT_MSG(size() == newSize / sizeof(T), "Generated range has an invalid size.");
 
-        if (!__has_trivial_constructor(T))
+        if constexpr (!std::is_trivially_default_constructible_v<T>)
         {
             T *LE_RESTRICT pT(this->begin());
             while (pT != this->end())
@@ -321,13 +349,8 @@ template <typename T> class SharedStorageBuffer : public Span<T>
     }
 
   private:
-    static_assert(
-#if defined(_MSC_VER) && (_MSC_VER < 1900) //...mrmlj...
-        std::has_trivial_destructor<T>::value,
-#else
-        __has_trivial_destructor(T),
-#endif
-        "SharedStorageBuffer supports only primitive types");
+    static_assert(std::is_trivially_destructible_v<T>,
+                  "SharedStorageBuffer supports only primitive types");
 
     SharedStorageBuffer(SharedStorageBuffer const &);
 

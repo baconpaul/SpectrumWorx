@@ -15,7 +15,7 @@
 #include "le/math/vector.hpp"
 #include "le/utility/clear.hpp"
 
-#include "boost/simd/preprocessor/stack_buffer.hpp"
+#include "le/utility/stackBuffer.hpp"
 
 #include "le/utility/assert.hpp"
 
@@ -236,7 +236,7 @@ void LE_HOT PeakDetector::findPeaksImpl(float const *LE_RESTRICT const amplitude
     maxGlobal_ = maxGlobal;
 
     // Convert to dB, with reference level being the maximum in this frame.
-    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(ampsdB, SW::Engine::real_t, numBins);
+    LE_ALIGNED_SCOPED_STACK_BUFFER(ampsdB, SW::Engine::real_t, numBins);
     //...mrmlj...ugly msvc12 codegen...std::transform( amplitudes, amplitudes + numBins, ampsdB.begin(), [=]( float const & amp ) { return normalisedLinear2dB( amp / maxGlobal ); } );
     for (std::uint16_t i(0); i < numBins; ++i)
     {

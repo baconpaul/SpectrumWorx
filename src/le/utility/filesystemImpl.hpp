@@ -59,6 +59,16 @@ template <SpecialLocations rootLocation> struct PathResolver
     template <class Result, class Functor> static Result apply(char const *relativePath, Functor);
 };
 
+namespace Detail
+{
+/// \note Was boost::mmap::map_read_only_file()/mapped_view_reference::unmap(),
+/// from a Boost sandbox library that was never released. Two calls in total, so
+/// they are just mmap()/munmap() (and the Win32 pair) now.
+///                                       (28.07.2026.) (SW port)
+File::MemoryMapping::Range mapReadOnlyFile(char const *fullPath);
+void unmapFile(File::MemoryMapping::Range const &);
+} // namespace Detail
+
 template <>
 template <class Result, class Functor>
 LE_FORCEINLINE Result PathResolver<AbsolutePath>::apply(char const *const absolutePath,

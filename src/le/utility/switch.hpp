@@ -41,8 +41,12 @@
 #include <boost/mpl/at.hpp>
 #include <type_traits>
 
+/// \note Was 50, which was enough while an "edition" shipped a subset of the
+/// effects. Every build now carries all 57, and Effects::ValidIndices is
+/// dispatched through here.
+///                                           (28.07.2026.) (SW port)
 #ifndef BOOST_SWITCH_LIMIT
-#define BOOST_SWITCH_LIMIT 50
+#define BOOST_SWITCH_LIMIT 64
 #endif
 
 #if BOOST_SWITCH_LIMIT > BOOST_PP_LIMIT_REPEAT

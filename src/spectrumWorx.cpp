@@ -23,7 +23,7 @@
 // Boost sandbox
 #include "boost/mmap/mappble_objects/file/utility.hpp"
 
-#include "boost/simd/preprocessor/stack_buffer.hpp" // NT2
+#include "le/utility/stackBuffer.hpp"
 
 #include "le/utility/assert.hpp"
 #include "le/utility/ignoreUnused.hpp"
@@ -182,7 +182,7 @@ void SpectrumWorx::process /// \throws nothing
         /// numberOfExternalAudioChannels (stereo > mono).
         ///                                   (20.03.2013.) (Domagoj Saric)
         LE_ASSERT(numberOfExternalAudioChannels <= buffers().numberOfSideChannels());
-        BOOST_SIMD_STACK_BUFFER(sideChannels, float const *, numberOfExternalAudioChannels);
+        LE_STACK_BUFFER(sideChannels, float const *, numberOfExternalAudioChannels);
         std::uint32_t samplePosition;
         for (std::uint8_t channel(0); channel < numberOfExternalAudioChannels; ++channel)
         {
@@ -368,7 +368,7 @@ bool SpectrumWorx::loadProgramState(std::uint8_t const programIndex, char const 
     /// \note We have to copy the state data because of RapidXML's destructive
     /// parsing.
     ///                                       (18.03.2013.) (Domagoj Saric)
-    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(preset, char, dataSize);
+    LE_ALIGNED_SCOPED_STACK_BUFFER(preset, char, dataSize);
     std::memcpy(preset.begin(), pData, dataSize);
     if (!loadPreset(preset.begin(), false, nullptr, programIndex))
         return false;

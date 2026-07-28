@@ -93,7 +93,7 @@
 #include "le/utility/matlab.hpp"
 #endif // LE_UTILITY_MATLAB_INTEROP
 
-#include "boost/simd/preprocessor/stack_buffer.hpp"
+#include "le/utility/stackBuffer.hpp"
 
 #include <cmath>
 #include <limits>
@@ -214,9 +214,9 @@ LE_COLD void SynthImpl::setup(IndexRange const &workingRange, Engine::Setup cons
         auto const sr(engineSetup.sampleRate<double>());
         auto const numberOfBins(engineSetup.numberOfBins());
 
-        BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(
-            freqCoefficients, Engine::real_t,
-            lastFFTSize_ + 2 + 16 /*for alignment padding between real and imag*/);
+        LE_ALIGNED_SCOPED_STACK_BUFFER(freqCoefficients, Engine::real_t,
+                                       lastFFTSize_ + 2 +
+                                           16 /*for alignment padding between real and imag*/);
         LE_DISABLE_LOOP_UNROLLING()
         for (std::uint16_t bin(0); bin < lastFFTSize_; ++bin)
             freqCoefficients[bin] = std::sin(omega * bin / sr);
@@ -234,8 +234,8 @@ LE_COLD void SynthImpl::setup(IndexRange const &workingRange, Engine::Setup cons
         auto const pImags(static_cast<float *>(Math::align(&freqCoefficients[numberOfBins])));
         fft.transform(pTimeDomain, DataRange(pImags, pImags + numberOfBins), true);
 
-        BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(amps, Engine::real_t, numberOfBins);
-        BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(phases, Engine::real_t, numberOfBins);
+        LE_ALIGNED_SCOPED_STACK_BUFFER(amps, Engine::real_t, numberOfBins);
+        LE_ALIGNED_SCOPED_STACK_BUFFER(phases, Engine::real_t, numberOfBins);
         auto const pAmps(amps.begin());
         auto const pPhases(phases.begin());
         Math::reim2AmPh(pReals, pImags, pAmps, pPhases, numberOfBins);

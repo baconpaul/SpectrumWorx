@@ -6,6 +6,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/dsp.cmake)
+
 add_library(sw-impl STATIC
         spectrumWorxCLAP.cpp
         stubParameters.cpp

@@ -20,7 +20,7 @@
 #include "le/math/vector.hpp"
 #include "le/parameters/uiElements.hpp"
 
-#include "boost/simd/preprocessor/stack_buffer.hpp"
+#include "le/utility/stackBuffer.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -126,7 +126,7 @@ void SumoPitchImpl::process(ChannelState &cs, Engine::ChannelData_AmPh2ReIm data
         limitPitchScale(pitchScaleSide, cs.prevPitchScaleSideSemitones, pitchChangeLimitSemitones_);
     }
 
-    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(
+    LE_ALIGNED_SCOPED_STACK_BUFFER(
         workBufferStorage, char,
         Engine::ChannelData_AmPhStorage::requiredStorage(engineSetup.fftSize<unsigned int>()));
     Engine::ChannelData_AmPhStorage psWorkBuffer(engineSetup.fftSize<unsigned int>(),

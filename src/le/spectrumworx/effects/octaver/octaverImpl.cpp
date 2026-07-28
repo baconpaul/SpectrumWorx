@@ -18,7 +18,7 @@
 #include "le/math/vector.hpp"
 #include "le/parameters/uiElements.hpp"
 
-#include "boost/simd/preprocessor/stack_buffer.hpp"
+#include "le/utility/stackBuffer.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -121,8 +121,8 @@ void OctaverImpl::process(ChannelState &cs, Engine::ChannelData_AmPh2ReIm data,
     {
         // Allocate temporary AmPh storage for mixing:
         auto const fftSize(engineSetup.fftSize<std::uint16_t>());
-        BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(pitchShiftedStorage, char,
-                                               ChannelData_AmPhStorage::requiredStorage(fftSize));
+        LE_ALIGNED_SCOPED_STACK_BUFFER(pitchShiftedStorage, char,
+                                       ChannelData_AmPhStorage::requiredStorage(fftSize));
         ChannelData_AmPhStorage shiftedInput(fftSize, inputData.beginBin(), inputData.endBin(),
                                              pitchShiftedStorage);
 

@@ -15,7 +15,7 @@
 #include "le/spectrumworx/effects/indexRange.hpp"
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 
-#include "boost/simd/preprocessor/stack_buffer.hpp"
+#include "le/utility/stackBuffer.hpp"
 
 #include <array>
 //------------------------------------------------------------------------------
@@ -98,7 +98,7 @@ void SwappahImpl::swapBands(DataRange const &data) const
 {
     using namespace Math;
 
-    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(swapBuffer, Engine::real_t, data.size());
+    LE_ALIGNED_SCOPED_STACK_BUFFER(swapBuffer, Engine::real_t, data.size());
     copy(data, swapBuffer);
 
     std::uint16_t const numBins(static_cast<std::uint16_t>(data.size()));

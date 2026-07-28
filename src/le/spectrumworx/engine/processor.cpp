@@ -23,7 +23,7 @@
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/trace.hpp"
 
-#include "boost/simd/preprocessor/stack_buffer.hpp"
+#include "le/utility/stackBuffer.hpp"
 
 #include "le/utility/assert.hpp"
 
@@ -188,10 +188,9 @@ float **makeDeinterLeaveBuffers(LE::Utility::Span<float> const deinterLeavedData
 /// https://llvm.org/bugs/show_bug.cgi?id=22728
 ///                                       (24.05.2016.) (Domagoj Saric)
 #define LE_MAKE_DEINTERLEAVE_BUFFERS(resultPointer, size, numberOfChannels)                        \
-    BOOST_SIMD_ALIGNED_STACK_BUFFER(resultPointer##DeinterLeavedDataStorage, float,                \
-                                    size *numberOfChannels);                                       \
-    BOOST_SIMD_ALIGNED_STACK_BUFFER(resultPointer##DeinterLeavedDataPointers, float *,             \
-                                    numberOfChannels);                                             \
+    LE_ALIGNED_STACK_BUFFER(resultPointer##DeinterLeavedDataStorage, float,                        \
+                            size *numberOfChannels);                                               \
+    LE_ALIGNED_STACK_BUFFER(resultPointer##DeinterLeavedDataPointers, float *, numberOfChannels);  \
     resultPointer =                                                                                \
         makeDeinterLeaveBuffers(resultPointer##DeinterLeavedDataStorage,                           \
                                 resultPointer##DeinterLeavedDataPointers, size, numberOfChannels)
@@ -677,7 +676,7 @@ void LE_COLD Processor::calculateWindowAndWOLAGain()
     // Fill a temporary buffer with overlap-added copies of the window(s) to
     // determine the total gain and whether the COLA condition is (sufficiently)
     // satisfied (the gain variation is sufficiently small).
-    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(wolaBuffer, real_t, windowSize);
+    LE_ALIGNED_SCOPED_STACK_BUFFER(wolaBuffer, real_t, windowSize);
     Math::clear(wolaBuffer);
     for (DataRange::iterator pBufferPosition(wolaBuffer.begin());; pBufferPosition += stepSize)
     {

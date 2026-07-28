@@ -19,9 +19,8 @@
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 
-#include "boost/simd/sdk/config/arch.hpp"
 #ifdef LE_PV_USE_TSS
-#include "boost/simd/preprocessor/stack_buffer.hpp"
+#include "le/utility/stackBuffer.hpp"
 #endif // LE_PV_USE_TSS
 
 #include <cstdint>
@@ -738,7 +737,7 @@ LE_HOT pitchShiftAndScale(Engine::ChannelData_AmPh &data,
         AnalysisChannelState dummy;
         auto const numberOfBins(pData->full().numberOfBins());
         auto const storageBytes(numberOfBins * sizeof(Detail::AnalysisBinStateData));
-        BOOST_SIMD_STACK_BUFFER(dummyStorage, char, storageBytes);
+        LE_STACK_BUFFER(dummyStorage, char, storageBytes);
         Utility::Storage storage(dummyStorage);
         dummy.binData.Utility::SharedStorageBuffer<Detail::AnalysisBinStateData>::resize(
             storageBytes, storage);

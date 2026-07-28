@@ -45,13 +45,11 @@ namespace Engine
 {
 //------------------------------------------------------------------------------
 
-#ifdef LE_HAS_NT2
 /// Helper, frequently used typedefs.
 //...mrmlj...to be removed soon...
 using StaticHalfFFTBuffer =
     Utility::AlignedBuffer<float, LE::SW::Engine::Constants::maximumFFTSize / 2 + 1, false,
                            Utility::Constants::vectorAlignment>;
-#endif // LE_HAS_NT2
 
 using real_t = float;
 
@@ -87,7 +85,6 @@ struct StorageFactors
 
 #pragma warning(pop)
 
-#ifdef LE_HAS_NT2
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \typedef HeapSharedStorage
@@ -95,7 +92,6 @@ struct StorageFactors
 ////////////////////////////////////////////////////////////////////////////////
 
 using HeapSharedStorage = Utility::AlignedHeapBuffer<char>;
-#endif // LE_HAS_NT2
 
 ////////////////////////////////////////////////////////////////////////////////
 ///

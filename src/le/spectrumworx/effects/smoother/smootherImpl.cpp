@@ -17,7 +17,7 @@
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/utility/buffers.hpp"
 
-#include "boost/simd/preprocessor/stack_buffer.hpp"
+#include "le/utility/stackBuffer.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -73,7 +73,7 @@ void SmootherImpl::process(Engine::ChannelData_AmPh data, Engine::Setup const &)
     unsigned int filterLenHalf(filterLenHalf_);
     if (filterLenHalf == 0)
         return;
-    BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(workBuffer, Engine::real_t, data.size());
+    LE_ALIGNED_SCOPED_STACK_BUFFER(workBuffer, Engine::real_t, data.size());
     //...mrmlj...
     unsigned int const dataSize(static_cast<unsigned int>(workBuffer.size()));
     if (dataSize < 4)

@@ -20,7 +20,7 @@
 #include "le/math/vector.hpp"
 #include "le/parameters/uiElements.hpp"
 
-#include "boost/simd/preprocessor/stack_buffer.hpp"
+#include "le/utility/stackBuffer.hpp"
 //------------------------------------------------------------------------------
 /// \todo Investigate frequency-domain echo cancelation.
 /// http://jmvalin.ca/papers/valin_hscma2008.pdf
@@ -139,9 +139,8 @@ void FrechoImpl::doProcess(ChannelState &cs, Engine::ChannelData_ReIm &target,
     if (!ps_.skipProcessing())
     {
         unsigned int const fftSize(engineSetup.fftSize<unsigned int>());
-        BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(
-            pitchShiftedEchoStorage, char,
-            Engine::ChannelData_AmPhStorage::requiredStorage(fftSize));
+        LE_ALIGNED_SCOPED_STACK_BUFFER(pitchShiftedEchoStorage, char,
+                                       Engine::ChannelData_AmPhStorage::requiredStorage(fftSize));
         Engine::ChannelData_AmPhStorage pitchShiftedEcho(fftSize, target.beginBin(),
                                                          target.endBin(), pitchShiftedEchoStorage);
 

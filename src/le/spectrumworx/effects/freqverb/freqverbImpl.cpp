@@ -23,7 +23,7 @@
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/utility/platformSpecifics.hpp"
 
-#include "boost/simd/preprocessor/stack_buffer.hpp"
+#include "le/utility/stackBuffer.hpp"
 
 #include "le/utility/assert.hpp"
 
@@ -165,7 +165,7 @@ LE_HOT void FreqverbImpl::process(ChannelState &cs, Engine::ChannelData_ReIm dat
     }
 
     {
-        BOOST_SIMD_ALIGNED_SCOPED_STACK_BUFFER(
+        LE_ALIGNED_SCOPED_STACK_BUFFER(
             data2Storage, char,
             Engine::ChannelData_AmPhStorage::requiredStorage(engineSetup.fftSize<std::uint16_t>()));
         Engine::ChannelData_AmPhStorage data2(engineSetup.fftSize<std::uint16_t>(), 0, noEchoBin_,
