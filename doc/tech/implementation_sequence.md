@@ -102,6 +102,7 @@ src/
     spectrumworx/{engine,effects}
     parameters/ math/ analysis/ utility/
     plugins/{plugin.hpp, clap/}
+  nt2_static_fft/           retained NT2 static_fft (reference for stage 4)
 assets/
   skin/                     67 PNGs, was installer/ProgramFolder/Resources
   presets/                  15 factory banks
@@ -332,18 +333,39 @@ tabs.
 > but it means these two files cannot compile until then, over and above
 > everything else that cannot compile yet.
 
-**0.5 — Move to the target layout**, in one `git mv`-only commit so it reviews
+**✅ 0.5 — Move to the target layout**, in one `git mv`-only commit so it reviews
 as a rename:
 
 | From | To |
 |---|---|
 | `source/` | `src/` |
 | `source/externals/le/` | `src/le/` |
+| `source/externals/nt2_static_fft/` | `src/nt2_static_fft/` |
 | `installer/ProgramFolder/Resources/*.png` | `assets/skin/` |
 | `installer/ProgramFolder/Presets/` | `assets/presets/` |
 | `installer/ProgramFolder/Samples/` | `assets/samples/` |
-| `doc/*.doc`, `*.PDF` | `doc/manual/` |
+| `doc/*.doc`, `*.png`, `readme.txt` | `doc/manual/` |
+| `installer/ProgramFolder/{Documents/User's Guide.PDF, ReadMe.rtf}` | `doc/manual/` |
 | `installer/`, `3rd_party/` | deleted |
+
+> **Done.** `source/externals/` is gone as a level — `le/` and `nt2_static_fft/`
+> now sit directly under `src/`, which is what made the include paths collapse to
+> `${PROJECT_SOURCE_DIR}` plus one entry for `nt2_static_fft`. Four `leExternals`
+> path variables and the effects-configuration path were repointed to match.
+> Also removed the dead `LE_SW_COMPILE_TIME_PROFILING` block, which pointed at
+> `externals/boost/profile_templates2` — a directory that was never in this repo
+> to begin with (scan §4.1).
+>
+> **`EULA.txt` was moved to `doc/manual/`, not deleted.** It is the commercial
+> end-user licence agreement and it contradicts the repo's GPL-3.0 LICENSE, so
+> it should almost certainly go — but that is a licensing decision (§9.3), not a
+> file move, so it is preserved and flagged rather than quietly dropped.
+>
+> **`src/CMakeLists.txt` still contains ~400 lines of CPack/WiX/PackageMaker
+> configuration pointing at the deleted `installer/resources/` tree.** Left
+> deliberately: stage 1 replaces that file wholesale, and its `SOURCES_*` lists
+> are the authoritative record of what was actually in the build — which is
+> worth having while writing the new CMake.
 
 **0.6 — Whole-tree mechanical hygiene**, each in its own commit:
 

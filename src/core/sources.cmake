@@ -6,7 +6,7 @@
 #
 ################################################################################
 
-set( leExternals "externals/le" )
+set( leExternals "le" )
 
 set( SOURCES_Core
     core/automatedModuleChain.cpp
@@ -110,8 +110,6 @@ set(SOURCES_Externals__Utility
     ${leExternals}/utility/typeTraits.hpp
     ${leExternals}/utility/xml.cpp
     ${leExternals}/utility/xml.hpp
-    externals/boost/filesystem/directory_iterator.hpp
-    externals/boost/mmap/mapped_view/mapped_view.hpp
 )
 if( APPLE )
     set( SOURCES_Externals__Utility

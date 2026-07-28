@@ -15,8 +15,6 @@ cmake_policy( SET CMP0043 OLD )
 set( LE_SW_EDITION_SUFFIX         ""    CACHE STRING "SW project name suffix"              )
 set( LE_SW_INCLUDED_EFFECTS       "all" CACHE STRING "list of included effects (or 'all')" )
 set( LE_SW_FMOD                   false CACHE BOOL   "create FMOD Studio projects"         )
-set( LE_SW_COMPILE_TIME_PROFILING false CACHE BOOL   "add compile time profiling targets"  )
-mark_as_advanced( LE_SW_COMPILE_TIME_PROFILING )
 
 set( LE_PROJECT_NAME       "SpectrumWorx"                   )
 set( LE_PROJECT_LABEL      "SpectrumWorx"                   )
@@ -53,7 +51,7 @@ include( "$ENV{LEB_3rdParty_root}/juce/trunk/juce.cmake" )
 # Source files setup
 ############################################################################
 
-set( leExternals "externals/le" )
+set( leExternals "le" )
 
 set( SOURCES_Sources
     spectrumWorx.cpp
@@ -350,13 +348,6 @@ if ( APPLE )
 endif()
 
 
-if ( LE_SW_COMPILE_TIME_PROFILING )
-    list( APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/externals/boost/profile_templates2" )
-    include( "externals/boost/profile_templates2/profiler.cmake" )
-    appendProperty( template.profiler COMPILE_FLAGS ${exceptionsOnSwitch} )
-    template_profile( CompileTimeProfileSpectrumWorx SpectrumWorx.cpp               )
-    template_profile( CompileTimeProfileNT2          ${leExternals}/math/vector.cpp )
-endif()
 
 
 ################################################################################

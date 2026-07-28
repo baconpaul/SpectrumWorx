@@ -6,7 +6,7 @@
 #
 ################################################################################
 
-set( leExternals "${PROJECT_SOURCE_DIR}/externals/le" )
+set( leExternals "${PROJECT_SOURCE_DIR}/le" )
 
 include( "${leExternals}/build/buildOptions.cmake" )
 
@@ -115,7 +115,7 @@ set( CPACK_COMPONENT_UNSPECIFIED_HIDDEN OFF )
 include_directories(
     BEFORE #...mrmlj...it seems that the directories get added in the reverse order...
     "$ENV{LEB_3rdParty_root}/boost/${boostVersion}"
-    "${PROJECT_SOURCE_DIR}/externals"
+    "${PROJECT_SOURCE_DIR}/nt2_static_fft" # retained NT2 static_fft; see doc/tech
     ${PROJECT_SOURCE_DIR}
 )
 

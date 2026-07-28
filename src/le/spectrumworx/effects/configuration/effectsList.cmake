@@ -90,7 +90,7 @@ set( completeEffectList
 )
 
 #...mrmlj...assumes location of effects...
-set( leExternals "externals/le" )
+set( leExternals "le" )
 include( "${CMAKE_CURRENT_LIST_DIR}/configuration.cmake" )
 include( "${leExternals}/build/utilities.cmake"          )
 

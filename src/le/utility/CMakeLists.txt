@@ -13,7 +13,7 @@ cmake_minimum_required( VERSION 3.1 )
 set( LE_PROJECT_NAME  "LE_Utility" )
 set( LE_PROJECT_LABEL "Utility"    )
 
-set( leExternals "externals/le" )
+set( leExternals "le" )
 
 include( "${PROJECT_SOURCE_DIR}/${leExternals}/build/buildOptions.cmake" )
 include( "${PROJECT_SOURCE_DIR}/${leExternals}/build/sdkProject.cmake"   )

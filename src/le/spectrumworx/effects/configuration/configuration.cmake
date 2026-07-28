@@ -13,7 +13,7 @@ if ( LE_SW_PV_TSS )
 endif()
 
 #...mrmlj...assumes location of effects...
-set( effectConfigurationPath externals/le/spectrumworx/effects/configuration )
+set( effectConfigurationPath le/spectrumworx/effects/configuration )
 
 set( SOURCES_Effects_Configuration
     ${effectConfigurationPath}/allEffectImpls.hpp
