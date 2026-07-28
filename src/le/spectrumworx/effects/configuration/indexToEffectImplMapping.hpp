@@ -1,28 +1,25 @@
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \file includedEffects.hpp
-/// -------------------------
+/// \file indexToEffectImplMapping.hpp
+/// ----------------------------
 ///
-/// Copyright (c) 2012 - 2016. Little Endian Ltd.
+/// Effect index -> implementation class. Was 57 explicit template
+/// specialisations written by CMake; now one tuple indexed by std::tuple_element.
+///
+/// Copyright (c) 2011 - 2016. Little Endian Ltd.
+/// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
-#ifndef includedEffects_hpp__7EA7BD90_59C4_4F59_87BB_3E220D923733
-#define includedEffects_hpp__7EA7BD90_59C4_4F59_87BB_3E220D923733
+#ifndef indexToEffectImplMapping_hpp__A27FC4FD_E1A2_424F_97E4_17387681054F
+#define indexToEffectImplMapping_hpp__A27FC4FD_E1A2_424F_97E4_17387681054F
 //------------------------------------------------------------------------------
+#include "allEffectImpls.hpp"
 #include "constants.hpp"
+#include "effectsList.hpp"
 
-#ifdef LE_SW_FULL
-    #include "boost/mpl/range_c.hpp"
-#else
-    #include "boost/mpl/vector_c.hpp"
-#endif // LE_SW_FULL
-
-#pragma warning( push )
-#pragma warning( disable : 4512 ) // Assignment operator could not be generated.
-#include <array>
-#pragma warning( pop )
+#include <tuple>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -33,25 +30,17 @@ namespace SW
 namespace Effects
 {
 //------------------------------------------------------------------------------
-#pragma warning( push )
-#pragma warning( disable : 4512 ) // Assignment operator could not be generated.
 
-using IncludedEffects = std::array<bool const, Constants::numberOfEffects>;
+#define LE_SW_AUX_EFFECT_IMPL(folder, module, name, group) name##Impl,
+using EffectImpls = std::tuple<LE_SW_EFFECT_LIST(LE_SW_AUX_EFFECT_IMPL) void>;
+#undef LE_SW_AUX_EFFECT_IMPL
 
-extern IncludedEffects const includedEffects;
+static_assert(std::tuple_size_v<EffectImpls> == Constants::numberOfEffects + 1, "");
 
-#pragma warning( pop )
-
-/// Shared list of module indices.
-#ifdef LE_SW_FULL
-    typedef boost::mpl::range_c<unsigned, 0, Constants::numberOfEffects> ValidIndices;
-#else
-    typedef boost::mpl::vector_c
-    <
-		unsigned,
-        @validEffectIndices@
-    > ValidIndices;
-#endif // LE_SW_FULL
+template <unsigned int index> struct ImplForIndex
+{
+    using type = std::tuple_element_t<index, EffectImpls>;
+};
 
 //------------------------------------------------------------------------------
 } // namespace Effects
@@ -60,4 +49,4 @@ extern IncludedEffects const includedEffects;
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------
-#endif // includedEffects_hpp
+#endif // indexToEffectImplMapping_hpp

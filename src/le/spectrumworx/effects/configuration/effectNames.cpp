@@ -1,25 +1,27 @@
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// effectNames.cpp
+/// \file effectNames.cpp
 /// ---------------
 ///
+/// Effect index <-> display name.
+///
 /// Copyright (c) 2011 - 2016. Little Endian Ltd.
+/// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #include "allEffects.hpp"
 #include "effectNames.hpp"
+#include "effectsList.hpp"
 
+#include "constants.hpp"
 #include "le/utility/platformSpecifics.hpp"
 
 #include <algorithm>
+#include <array>
 #include <string_view>
 
-#pragma warning( push )
-#pragma warning( disable : 4512 ) // Assignment operator could not be generated.
-#include <array>
-#pragma warning( pop )
 #include <cstdint>
 //------------------------------------------------------------------------------
 namespace LE
@@ -34,38 +36,27 @@ namespace Effects
 
 LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
-#pragma warning( push )
-#pragma warning( disable : 4512 ) // Assignment operator could not be generated.
-
 namespace
 {
-using EffectNames = std::array<char const * LE_RESTRICT const, @numberOfEffects@>;
+using EffectNames = std::array<char const *LE_RESTRICT const, Constants::numberOfEffects>;
 
-LE_MSVC_SPECIFIC( LE_WEAK_SYMBOL_CONST )
-EffectNames const effectNames =
-{{
-@effectNames@
-}};
-
+#define LE_SW_AUX_EFFECT_TITLE(folder, module, name, group) name::title,
+LE_MSVC_SPECIFIC(LE_WEAK_SYMBOL_CONST)
+EffectNames const effectNames = {{LE_SW_EFFECT_LIST(LE_SW_AUX_EFFECT_TITLE)}};
+#undef LE_SW_AUX_EFFECT_TITLE
 } // anonymous namespace
 
 LE_COLD
-char const * effectName( std::uint8_t const effectIndex )
-{
-    return effectNames[ effectIndex ];
-}
+char const *effectName(std::uint8_t const effectIndex) { return effectNames[effectIndex]; }
 
 LE_COLD
-std::int8_t effectIndex( std::string_view const effectName )
+std::int8_t effectIndex(std::string_view const effectName)
 {
-    EffectNames::const_iterator const pFoundEffectName( std::ranges::find( effectNames, effectName ) );
-    auto const index( static_cast<std::uint8_t>( pFoundEffectName - effectNames.begin() ) );
-    if ( index == effectNames.size() )
+    auto const pFoundEffectName(std::ranges::find(effectNames, effectName));
+    if (pFoundEffectName == effectNames.end())
         return -1;
-    return index;
+    return static_cast<std::int8_t>(pFoundEffectName - effectNames.begin());
 }
-
-#pragma warning( pop )
 
 LE_OPTIMIZE_FOR_SIZE_END()
 

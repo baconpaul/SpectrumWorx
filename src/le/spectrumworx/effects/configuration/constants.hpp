@@ -1,16 +1,22 @@
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// includedEffects.cpp
-/// -------------------
+/// \file constants.hpp
+/// -------------
+///
+/// Effect counts, derived from effectsList.hpp.
 ///
 /// Copyright (c) 2011 - 2016. Little Endian Ltd.
+/// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
-#include "includedEffects.hpp"
+#ifndef constants_hpp__2BFA9531_49DB_46E6_A20E_3B57837B893F
+#define constants_hpp__2BFA9531_49DB_46E6_A20E_3B57837B893F
+//------------------------------------------------------------------------------
+#include "effectsList.hpp"
 
-#include "le/utility/platformSpecifics.hpp"
+#include <cstdint>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -21,17 +27,21 @@ namespace SW
 namespace Effects
 {
 //------------------------------------------------------------------------------
+namespace Constants
+{
+//------------------------------------------------------------------------------
 
-#pragma warning( push )
-#pragma warning( disable : 4512 ) // Assignment operator could not be generated.
+std::uint8_t constexpr numberOfEffects{LE_SW_NUMBER_OF_EFFECTS};
+std::uint8_t constexpr numberOfGroups{LE_SW_NUMBER_OF_EFFECT_GROUPS};
 
-LE_WEAK_SYMBOL_CONST IncludedEffects const includedEffects =
-{{
-@enabledEffects@
-}};
+/// \note Every effect ships in every build now that editions are gone. Kept as
+/// a separate name because the plugin, the presets and the GUI all still ask
+/// the question separately.
+///                                       (28.07.2026.) (SW port)
+std::uint8_t constexpr numberOfIncludedEffects{numberOfEffects};
 
-#pragma warning( pop )
-
+//------------------------------------------------------------------------------
+} // namespace Constants
 //------------------------------------------------------------------------------
 } // namespace Effects
 //------------------------------------------------------------------------------
@@ -39,3 +49,4 @@ LE_WEAK_SYMBOL_CONST IncludedEffects const includedEffects =
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------
+#endif // constants_hpp
