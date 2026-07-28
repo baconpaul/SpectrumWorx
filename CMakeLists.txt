@@ -49,6 +49,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 option(SW_COPY_AFTER_BUILD "Install the built plugins into the user plugin folders" OFF)
 option(SW_BUILD_TESTS "Build sw-tests" ON)
+option(SW_BUILD_TOOLS "Build the developer tools (sw-show-ui)" ON)
 
 if (SW_BUILD_TESTS)
     enable_testing()
@@ -67,6 +68,10 @@ include(temporary-boost) # delete with stage 7 — see the file
 add_subdirectory(assets)
 add_subdirectory(src)
 add_subdirectory(src/clap-first)
+
+if (SW_BUILD_TOOLS)
+    add_subdirectory(tools)
+endif()
 
 if (SW_BUILD_TESTS)
     include(Catch)
