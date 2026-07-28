@@ -185,7 +185,7 @@ void ModuleKnob::paint(juce::Graphics &graphics)
     unsigned int const imageWidth(pImageStrip_->getWidth());
     unsigned int const imageHeight(imageWidth);
 
-    if (!control().isLFOEnabled() || Theme::shouldUpdateLFOControl(control()))
+    if (!control().isLFOEnabled() || shouldUpdateLFOControl(control()))
         Knob::paint(*pImageStrip_, marginForGlow, marginForGlow, graphics);
     else
         paintImage(graphics, resourceBitmap<ModuleKnobLFOed>(), marginForGlow, marginForGlow);
@@ -504,7 +504,7 @@ auto const bypassIndex = LE::Parameters::IndexOf<Effects::BaseParameters::Parame
 void setParameterControl(ModuleControlBase &control, float const parameterValue,
                          ModuleUI::ParameterChangeSource const source)
 {
-    if ((source != ModuleUI::LFOValue) || Theme::shouldUpdateLFOControl(control))
+    if ((source != ModuleUI::LFOValue) || shouldUpdateLFOControl(control))
     {
         control.setValue(parameterValue);
     }

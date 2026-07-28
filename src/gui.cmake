@@ -10,6 +10,7 @@
 
 set(SW_GUI_RESOURCE_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/resources.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/gui/theme.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/le/utility/assertionHandler.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/le/utility/trace.cpp # assertionHandler routes through it
 )
@@ -18,8 +19,10 @@ add_library(sw-gui-resources STATIC ${SW_GUI_RESOURCE_SOURCES})
 
 target_include_directories(sw-gui-resources PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
+# juce_gui_basics rather than juce_graphics: Theme is a LookAndFeel_V2. The
+# other four modules come transitively.
 target_link_libraries(sw-gui-resources
-        PUBLIC juce::juce_graphics
+        PUBLIC juce::juce_gui_basics
         PRIVATE sw::skin
 )
 

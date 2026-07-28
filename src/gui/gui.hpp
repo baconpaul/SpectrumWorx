@@ -32,7 +32,13 @@
 #endif // _MSC_VER
 #include "le/utility/intrusivePtr.hpp"
 
-#include "juce/juce_gui_basics/juce_gui_basics.h"
+#include "theme.hpp"
+
+/// \note Individual JUCE 8 headers have no include guards and open
+/// `namespace juce {` mid-file; they may only be reached through the module
+/// umbrella header. The old "juce/..." prefix was the deleted fork's layout.
+///                                       (28.07.2026.) (SW port)
+#include <juce_gui_basics/juce_gui_basics.h>
 
 #if defined(_WIN32)
 #include "windows.h"
@@ -219,91 +225,25 @@ FSRef makeFSRefFromPath(juce::String const &path);
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \class Theme
-///
-/// \brief JUCE LookAndFeel class for SpectrumWorx
+/// Theme
 ///
 ////////////////////////////////////////////////////////////////////////////////
+
+/// \note Theme moved to theme.hpp, where it is a LookAndFeel_V2 (not a
+/// LookAndFeel, which is abstract in JUCE 8, and not a LookAndFeel_V4, which
+/// would paint linear sliders whole and silently drop the skinned thumb).
+///
+///   These two were static members of Theme purely because they read
+/// Theme::settings(). They ask about a ModuleControlBase and a ModuleUI, which
+/// a LookAndFeel has no business knowing about, and being members is what kept
+/// Theme from being separable at all. aModuleControlNeedsLFOUpdate went with
+/// them: it had no callers.
+///                                       (28.07.2026.) (SW port)
 
 class ModuleControlBase;
 class ModuleUI;
 
-class Theme final : public juce::LookAndFeel
-{
-  public:
-    Theme(Theme const &) = delete; // makes non-copyable
-    Theme &operator=(Theme const &) = delete;
-
-    enum ModuleUIMouseOverReaction
-    {
-        Never,
-        WhenParentModuleSelected,
-        WhenParentOrNothingSelected
-    };
-
-    enum LFOUpdateBehaviour
-    {
-        NoUpdate,
-        WhenControlSelected,
-        WhenControlActive,
-        Always
-    };
-
-    struct Settings
-    {
-        Settings();
-
-        float globalOpacity;
-        ModuleUIMouseOverReaction moduleUIMouseOverReaction;
-        LFOUpdateBehaviour lfoUpdateBehaviour;
-        bool hideCursorOnKnobDrag;
-    };
-
-  public:
-    static void createSingleton();
-    static void destroySingleton();
-
-    static Theme &singleton();
-
-    Theme();
-    ~Theme();
-
-  public:
-    static juce::Colour blueColour() { return juce::Colour(19, 181, 234); }
-
-    juce::Font const &blueFont() const { return blueFont_; }
-    juce::Font const &whiteFont() const { return whiteFont_; }
-
-    static Settings &settings() { return settings_; }
-
-    static bool shouldUpdateLFOControl(ModuleControlBase const &);
-    static bool aModuleControlNeedsLFOUpdate(ModuleUI const &);
-
-  public: // juce::LookAndFeel overrides
-    void drawLinearSliderBackground(juce::Graphics &, int x, int y, int width, int height,
-                                    float sliderPos, float minSliderPos, float maxSliderPos,
-                                    juce::Slider::SliderStyle, juce::Slider &) override;
-    void drawLinearSliderThumb(juce::Graphics &, int x, int y, int width, int height,
-                               float sliderPos, float minSliderPos, float maxSliderPos,
-                               juce::Slider::SliderStyle, juce::Slider &) override;
-    void drawPopupMenuBackground(juce::Graphics &, int width, int height) override;
-    void drawTabAreaBehindFrontButton(juce::TabbedButtonBar &, juce::Graphics &, int w,
-                                      int h) override;
-    juce::Image getDefaultFolderImage() /*override*/;
-    int getMenuWindowFlags() override;
-    juce::Font getPopupMenuFont() override;
-    int getSliderThumbRadius(juce::Slider &) override;
-    int getTabButtonSpaceAroundImage() override { return 0; }
-    int getTabButtonOverlap(int /*tabDepth*/) override { return 0; }
-
-  private:
-    juce::Font const blueFont_;
-    juce::Font const whiteFont_;
-
-    juce::Image folderIcon_;
-
-    static Settings settings_;
-}; // class Theme
+bool shouldUpdateLFOControl(ModuleControlBase const &);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// \internal

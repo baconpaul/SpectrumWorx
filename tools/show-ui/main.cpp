@@ -33,7 +33,7 @@
 //------------------------------------------------------------------------------
 #include "page.hpp"
 
-#include "gui/resources.hpp"
+#include "gui/theme.hpp"
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -124,7 +124,7 @@ class ShowUIApplication final : public juce::JUCEApplication
         // Before JUCE's leak detector runs: the skin cache holds juce::Images
         // and Typefaces, and a namespace-scope cache would otherwise be
         // destroyed after the JUCE that allocated them.
-        LE::SW::GUI::releaseCachedResources();
+        LE::SW::GUI::Theme::destroySingleton();
     }
     void systemRequestedQuit() override { quit(); }
 
@@ -191,7 +191,7 @@ int render(juce::String const &pageName, juce::File const &output)
     // cached are gone before JUCE's leak detector looks. Getting this wrong is
     // not cosmetic: JUCE is a static-destruction order hazard, and the
     // resources genuinely outlive it otherwise.
-    LE::SW::GUI::releaseCachedResources();
+    LE::SW::GUI::Theme::destroySingleton();
     return result;
 }
 

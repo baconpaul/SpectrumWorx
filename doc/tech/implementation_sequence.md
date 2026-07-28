@@ -1120,8 +1120,37 @@ so that `--render` can run before `JUCEApplicationBase::main()` creates an
 `ScopedPointer`, `ButtonListener`/`SliderListener`, the deprecated `Font`
 constructors. A few days of grinding; the volume is small.
 
-**6.2** `class Theme : juce::LookAndFeel` → `LookAndFeel_V4`. `LookAndFeel` has
-eight pure virtuals in JUCE 8 and is no longer directly derivable.
+**6.2** ✅ *complete*. `class Theme : juce::LookAndFeel` → **`LookAndFeel_V2`**,
+in its own `src/gui/theme.{hpp,cpp}`. `LookAndFeel` is abstract in JUCE 8 — it
+inherits ~26 `*::LookAndFeelMethods` interfaces whose members are pure — so the
+2016 derivation no longer compiles.
+
+Theme moved out of `gui.hpp` because it is what everything else in `src/gui`
+reaches for a font or a colour, and it has almost no dependencies of its own —
+so it is the layer that can compile first and give the rest of the stage a
+build loop. The one thing that kept it entangled was two *static members* that
+took a `ModuleControlBase` and a `ModuleUI`; they were only members because
+they read `Theme::settings()`, and they are free functions in `gui.hpp` now.
+(`aModuleControlNeedsLFOUpdate` went with them — it had no callers.)
+
+`sw-show-ui theme` renders it, which is how the V2 choice below was confirmed
+rather than merely reasoned about: the two sliders on that page draw the skin's
+bitmap thumb next to a copy of the bitmap itself.
+
+> **Not `LookAndFeel_V4`,** which the earlier draft of this plan said and which
+> is wrong. `LookAndFeel_V4::drawLinearSlider` overrides the whole slider paint
+> (`juce_LookAndFeel_V4.h:211`), so `Theme::drawLinearSliderThumb` — the thing
+> that draws the LFO slider's bitmap thumb — would never be called and the
+> failure would be silent. `LookAndFeel_V2::drawLinearSlider` forwards to
+> background + thumb (`juce_LookAndFeel_V2.cpp:1538`), which is the behaviour
+> the skin was written against. Every one of Theme's other overrides has an
+> identical signature on V2 in JUCE 8.
+>
+> One does not: `getDefaultFolderImage()` returned `juce::Image` and now returns
+> `const Drawable*` (`juce_FileBrowserComponent.h:198`). It is live code, not
+> dead — `presetBrowser.cpp:272` calls it explicitly qualified,
+> `Theme::singleton().Theme::getDefaultFolderImage()`, which is *why* the
+> `override` on it was commented out in 2016.
 
 **6.3 — Assets.** ✅ *complete*. `assets/skin/*` is a CMakeRC resource library
 (`sw::skin`, rooted at `assets/` so stage 8's presets and samples can join it),
@@ -1273,6 +1302,56 @@ the raw-`pthread` `BackgroundThread` from the harness in one flag.
 
 Also worth knowing: `OwnedWindow<>` has exactly two instantiations, `PresetBrowser`
 and `SpectrumWorxEditor::Settings`, which bounds 6.4 usefully.
+
+#### The JUCE 8 drift, verified against the vendored headers
+
+Ordered by effort, because the cheap half is genuinely cheap.
+
+**Mechanical, and safe to sweep** — `String::empty` (13), `File::nonexistent`
+(10), `Image::null` (4), `var::null` (1) are all behind
+`JUCE_ALLOW_STATIC_NULL_VARIABLES`, which defaults to 0 and deprecates them even
+when on: `{}` throughout. `ButtonListener` and `TextEditorListener` are gone
+outright, `ValueListener` never existed, and `SliderListener` still exists but is
+now a *template* (`juce_Slider.h:48`) so naming it un-instantiated is an error —
+all four become the nested `X::Listener`. `Desktop::create`/`destroy`,
+`MessageManager::destroySingleton` and `ComponentAnimator::stopTimer` are gone or
+unreachable and all three lines can simply go.
+
+**Include hygiene is the real first step**, because nothing compiles until it is
+done: 17 sites include individual JUCE headers as `"juce/<module>/<sub>/<h>.h"`.
+Both halves are wrong. The `juce/` prefix came from the deleted fork's layout,
+and JUCE 8's individual headers have **no include guards and no `#pragma once`**
+and open `namespace juce {` mid-file — they may only be reached through the
+module umbrella header. `"juce/AppConfig.h"` and the `beginIncludes.hpp` /
+`endIncludes.hpp` pairs do not exist at all.
+
+**`JUCE_MODAL_LOOPS_PERMITTED` defaults to 0** in JUCE 8 and gates seven APIs
+this code is built on: `PopupMenu::showMenu`, `AlertWindow::showMessageBox` /
+`showOkCancelBox` / `showNativeDialogBox`, `FileChooser::browseForDirectory` /
+`browseForFileToOpen`, and `MessageManager::runDispatchLoopUntil`. Defining it to
+1 restores all seven and is one line; it is also precisely what JUCE warns
+against in plugins, and it defers the largest piece of work in the stage.
+Converting properly inverts control flow through `ComboBox::showMenu` →
+`TitledComboBox::mouseDown` → `Settings::comboBoxValueChanged`, and through the
+preset browser's entire save path — and the `PopupMenu::menuActive_` static only
+makes sense synchronously, so it needs rethinking alongside.
+
+**`Slider::valueListener()` never existed in stock JUCE.** `Knob` uses it to
+unhook the Slider's own `Value::Listener` from its three `Value` objects,
+deliberately cutting the Slider → Value → Slider feedback loop. Stock JUCE 8
+offers no handle on it. The honest port is to hold the value in our own model and
+drive the Slider one-way with `dontSendNotification` — which `Knob::setValue`
+already does. Note this re-litigates a 2013 bug fix whose failure mode (spurious
+automation notifications) only appears at runtime under a host, so it wants a
+test rather than a patch.
+
+**One ODR hazard to delete on the way past:** `math.cpp:983-991` defines
+non-template `juce::jmin`/`jmax`/`jlimit(float const &, …)` overloads. JUCE 8
+declares those as `constexpr` templates (`juce_MathsFunctions.h:352`).
+
+**Modules:** linking `juce::juce_gui_basics` alone is already correct and
+sufficient — `juce_graphics`, `juce_data_structures`, `juce_events` and
+`juce_core` come transitively, and nothing in `src/gui` needs `juce_gui_extra`.
 
 ---
 

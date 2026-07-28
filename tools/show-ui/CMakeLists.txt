@@ -13,6 +13,7 @@ add_executable(sw-show-ui
         page.cpp
         pages/environmentPage.cpp
         pages/skinPage.cpp
+        pages/themePage.cpp
 )
 
 target_link_libraries(sw-show-ui PRIVATE
@@ -39,7 +40,7 @@ target_compile_definitions(sw-show-ui PRIVATE
 # thing that notices a page which compiles but throws, asserts or draws
 # nothing -- which is most of how GUI code fails.
 if (SW_BUILD_TESTS)
-    foreach (page environment skin)
+    foreach (page environment skin theme)
         add_test(NAME show-ui-renders-${page}
                 COMMAND sw-show-ui --render ${page}
                 "${CMAKE_CURRENT_BINARY_DIR}/rendered-${page}.png")
