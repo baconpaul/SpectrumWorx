@@ -50,7 +50,10 @@ class LE_NOVTABLE ModuleDSP : public Engine::ModuleDSP, public AutomatedModuleIm
 #if !LE_SW_GUI
 namespace Engine
 {
-void intrusive_ptr_release_deleter(ModuleNode const *LE_RESTRICT const pModuleNode)
+/// \note Not inline, in a header, so every translation unit that included it
+/// emitted the symbol. Only ever compiled for a single-TU Unity build before.
+///                                       (28.07.2026.) (SW port)
+inline void intrusive_ptr_release_deleter(ModuleNode const *LE_RESTRICT const pModuleNode)
 {
     auto const &module(actualModule<SW::ModuleDSP>(*pModuleNode));
     delete &module;

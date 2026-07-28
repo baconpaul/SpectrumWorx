@@ -24,6 +24,12 @@ target_include_directories(rapidxml INTERFACE rapidxml)
 
 add_subdirectory(fmt EXCLUDE_FROM_ALL)
 
+if (SW_BUILD_TESTS)
+    add_subdirectory(catch2 EXCLUDE_FROM_ALL)
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/catch2/extras")
+    set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" PARENT_SCOPE)
+endif()
+
 add_subdirectory(clap/clap EXCLUDE_FROM_ALL)
 add_subdirectory(clap/clap-helpers EXCLUDE_FROM_ALL)
 

@@ -23,6 +23,7 @@ add_library(sw-dsp STATIC
         # le/parameters
         le/parameters/implDetails.cpp
         le/parameters/lfoImpl.cpp
+        le/parameters/trigger/parameter.cpp
 
         # le/utility
         le/utility/assertionHandler.cpp
@@ -44,11 +45,17 @@ add_library(sw-dsp STATIC
         le/spectrumworx/engine/setup.cpp
 
         # le/spectrumworx/effects — shared
+        # \note The two *UIElements.cpp are named for the GUI but hold the
+        # parameter name and enumerated-value strings, and ParameterInfo
+        # carries the name because presets serialise parameters by it.
+        le/spectrumworx/effects/baseParametersUIElements.cpp
+        le/spectrumworx/effects/commonParametersUIElements.cpp
         le/spectrumworx/effects/configuration/effectNames.cpp
         le/spectrumworx/effects/effects.cpp
         le/spectrumworx/effects/historyBuffer.cpp
         le/spectrumworx/effects/indexRange.cpp
         le/spectrumworx/effects/phase_vocoder/shared.cpp
+        le/spectrumworx/effects/vibrato.cpp
 
         # le/spectrumworx/effects — one per shipped effect, per effectsList.hpp
         le/spectrumworx/effects/ah_ah/ahAhImpl.cpp
@@ -137,9 +144,15 @@ target_link_libraries(sw-dsp PUBLIC rapidxml)
 # asserts degrade to the CRT's and the DAW never sees them.
 target_compile_definitions(sw-dsp PUBLIC LE_ENABLE_ASSERT_HANDLER)
 
-# No GUI in this target: the effects' UI element definitions stay out, and
-# ModuleDSP must not drag in ModuleUI.
+# No GUI in this target: ModuleDSP must not drag in ModuleUI.
 target_compile_definitions(sw-dsp PUBLIC LE_SW_GUI=0)
+
+# No presets either, for now. le/spectrumworx/presets.cpp reads and writes
+# preset files through juce::File and boost::mmap in the same translation unit
+# as the parameter (de)serialisation, so the DSP cannot have the second without
+# the first. Stage 8 splits them; until then ModuleParameters::{load,save}
+# PresetParameters are compiled out and the goldens drive parameters directly.
+target_compile_definitions(sw-dsp PUBLIC LE_NO_PRESETS)
 
 if (APPLE)
     # le/math/vector.cpp and le/math/dft/fft.cpp are vDSP/vForce on Apple.

@@ -436,7 +436,11 @@ std::uint8_t log2(unsigned long const value)
 
 namespace PowerOfTwo
 {
-unsigned int ceil(float const &value)
+/// \note Declared as ceil( float ) and defined as ceil( float const & ), so
+/// the declaration had never resolved to anything. Nothing in the tree called
+/// it; sw-tests is the first thing that tried.
+///                                       (28.07.2026.) (SW port)
+unsigned int ceil(float const value)
 {
     // http://stackoverflow.com/questions/466204/rounding-off-to-nearest-power-of-2
     // http://www.gamedev.net/community/forums/topic.asp?topic_id=229831

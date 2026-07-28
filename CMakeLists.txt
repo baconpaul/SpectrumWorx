@@ -48,6 +48,11 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 option(SW_COPY_AFTER_BUILD "Install the built plugins into the user plugin folders" OFF)
+option(SW_BUILD_TESTS "Build sw-tests" ON)
+
+if (SW_BUILD_TESTS)
+    enable_testing()
+endif()
 
 # Before add_subdirectory(libs): sst-plugininfra configure_file()s its version
 # source from these variables, silently emitting empty strings if they are unset.
@@ -61,3 +66,8 @@ add_subdirectory(libs)
 include(temporary-boost) # delete with stage 7 — see the file
 add_subdirectory(src)
 add_subdirectory(src/clap-first)
+
+if (SW_BUILD_TESTS)
+    include(Catch)
+    add_subdirectory(tests)
+endif()

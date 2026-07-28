@@ -68,8 +68,11 @@ static void printAssertionFailureTitle()
 {
 #if defined(__ANDROID__)
 #elif defined(__APPLE__) && !(TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR)
-    ::DebugStr(
-        static_cast<ConstStr255Param>(static_cast<void const *>(LE::assertionFailureMessageTitle)));
+    /// \note Was DebugStr(), deprecated since 10.8 and now gone. stderr is
+    /// what a DAW log and a test runner both capture.
+    ///                               (28.07.2026.) (SW port)
+    std::fputs(LE::assertionFailureMessageTitle, stderr);
+    std::fputc('\n', stderr);
 #elif defined(_WIN32)
     ::OutputDebugStringA(LE::assertionFailureMessageTitle);
     std::fputs(LE::assertionFailureMessageTitle, stderr);
@@ -209,11 +212,18 @@ static LE_NOINLINE void assertionFailedMsgAux(char const *const expression,
 #pragma warning(pop)
 } // anonymous namespace
 
-namespace boost
+/// \note This used to define boost::assertion_failed and
+/// boost::assertion_failed_msg, the Boost.Assert hook. Stage 2 pointed
+/// LE_ASSERT at LE::Utility::assertionFailed and left the handler behind, so
+/// nothing had defined it since.
+///                                           (28.07.2026.) (SW port)
+namespace LE
 {
-LE_WEAK_FUNCTION void assertion_failed_msg(char const *const expression, char const *const message,
-                                           char const *const function, char const *const file,
-                                           long const line)
+namespace Utility
+{
+LE_WEAK_FUNCTION void assertionFailed(char const *const expression, char const *const message,
+                                      char const *const function, char const *const file,
+                                      long const line)
 {
 #ifdef LE_PUBLIC_BUILD // not to leak too much information to beta testers...
     assertionFailedMsgAux(nullptr, message, nullptr, nullptr, line);
@@ -224,13 +234,8 @@ LE_WEAK_FUNCTION void assertion_failed_msg(char const *const expression, char co
     assertionFailedMsgAux(expression, message, function, file, line);
 #endif // LE_PUBLIC_BUILD
 }
-
-LE_WEAK_FUNCTION void assertion_failed(char const *const expression, char const *const function,
-                                       char const *const file, long const line)
-{
-    assertion_failed_msg(expression, expression, function, file, line);
-}
-} // namespace boost
+} // namespace Utility
+} // namespace LE
 
 #pragma warning(pop)
 

@@ -496,6 +496,12 @@ void fill(InputOutputRange const data, float const value)
 #endif
 }
 
+/// \note vector.hpp declared this alongside the strided overload but nothing
+/// ever defined it. Nothing called it either; sw-tests is the first thing that
+/// tried.
+///                                       (28.07.2026.) (SW port)
+void negate(InputOutputRange const data) { negate(data, 1); }
+
 void negate(InputOutputRange data, unsigned int const stride)
 {
 #if defined(LE_MATH_USE_ACC)

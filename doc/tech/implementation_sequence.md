@@ -741,7 +741,37 @@ name tables all expand. `effectsList.cmake`, `configuration.cmake` and the nine
 `.in` templates are gone; the only surviving `configure_file` is the version
 header, and it writes to the build tree.*
 
-**3.5** `tests/` with Catch2; target `sw-tests`.
+**✅ 3.5** `tests/` with Catch2; target `sw-tests`. — *Done: 47 cases, 2216
+assertions, green under CTest. Weighted towards what stage 3 wrote — the
+portable arms of the `le/math` primitives that had none, the buffer and
+stack-buffer replacements, the FFT, and the effect tables that are no longer
+generated and so no longer consistent by construction.*
+
+> **Linking an executable found what a static library had hidden.** `sw-dsp`
+> archived happily with unresolved symbols; `sw-tests` is the first thing to
+> demand they resolve, and six were missing.
+> `LE::Utility::assertionFailed` **had no definition at all** — stage 2
+> repointed `LE_ASSERT` at it and left `assertionHandler.cpp` still defining
+> `boost::assertion_failed`, so every assert in the tree was a dangling call.
+> `Math::PowerOfTwo::ceil` was declared `(float)` and defined `(float const &)`;
+> `Math::negate(InputOutputRange)` was declared and never defined at all;
+> `intrusive_ptr_release_deleter` was a non-inline function in a header, fine
+> only for the single-TU Unity build it was written for. `DebugStr` — Carbon,
+> deprecated since 10.8 — was still being called from the tracer and the
+> assertion handler. And `baseParametersUIElements.cpp` /
+> `commonParametersUIElements.cpp` turned out to be misnamed: they hold the
+> parameter name and enumerated-value strings, which `ParameterInfo` carries
+> **because presets serialise parameters by name**, so the DSP needs them.
+
+> **Two things the test target had to give up, both stage 8's to give back.**
+> `le/spectrumworx/presets.cpp` reads and writes preset files through
+> `juce::File` and `boost::mmap` in the same translation unit as the parameter
+> (de)serialisation, so `sw-dsp` cannot have the second without the first: it
+> builds `LE_NO_PRESETS` for now. And twenty one `TuneWorx` parameters had a
+> name **only** under `LE_SW_SDK_BUILD`, so no plugin build has ever had one;
+> un-gating them makes the tree link, but they all share the placeholder
+> `"N/A"`, which is not a usable preset key. Stage 7 owns giving them the real
+> names, which are sitting commented out beside each.
 
 **3.5b — Retire the stage 2 shims that first compile validates.** Per §2.1:
 `ignoreUnused` → `[[maybe_unused]]`, `staticLog2` → `std::bit_width`,

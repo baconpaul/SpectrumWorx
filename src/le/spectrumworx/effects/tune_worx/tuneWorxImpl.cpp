@@ -65,10 +65,12 @@ EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi09, "9")
 EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi10, "10")
 EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi11, "11")
 EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi12, "12")
-#ifdef LE_SW_SDK_BUILD
-/// \note Actual names commented out because of the new DoxyHelper process which
-/// needs to report "GUI" names of parameters.
-///                                           (22.10.2013.) (Domagoj Saric)
+/// \note These were behind #ifdef LE_SW_SDK_BUILD, so no plugin build has ever
+/// had a name for them -- and ParameterInfo carries the name because presets
+/// serialise parameters by it. "N/A" is not a usable preset key: twenty one
+/// parameters sharing it makes them mutually indistinguishable on load. Stage 7
+/// owns giving them the real names that are commented out beside each.
+///                                           (28.07.2026.) (SW port)
 EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi01, "N/A")  //"Bypass 1"                )
 EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi02, "N/A")  //"Bypass 2"                )
 EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi03, "N/A")  //"Bypass 3"                )
@@ -90,7 +92,6 @@ EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Vibrato, "N/A")       //"Vibrato"   
 EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::VibratoDepth, "N/A")  //"Vibrato extent"          )
 EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::VibratoPeriod, "N/A") //"Vibrato rate"            )
 EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::VibratoDelay, "N/A")  //"Vibrato delay"           )
-#endif                                                            // LE_SW_SDK_BUILD
 
 EFFECT_ENUMERATED_PARAMETER_STRINGS(
     Detail::TuneWorxBase, Key,

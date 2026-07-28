@@ -140,8 +140,12 @@ void Tracer::error(char const *const pFormatString, ...)
 #pragma clang diagnostic ignored "-Wformat-security"
     ::syslog(LOG_ERR, &formattedError[1]);
 #pragma clang diagnostic pop
-    formattedError[0] = static_cast<unsigned char>(tagCharacters + charactersWritten);
-    ::DebugStr(static_cast<ConstStr255Param>(static_cast<void const *>(formattedError)));
+    /// \note Was DebugStr(), which took the Pascal string formattedError[0]
+    /// was being length-prefixed for. Carbon is gone; stderr is what a DAW
+    /// log and a test runner both capture.
+    ///                                   (28.07.2026.) (SW port)
+    std::fputs(&formattedError[1], stderr);
+    std::fputc('\n', stderr);
 #else
     std::fputs(&formattedError[1], stderr);
     pFormattedError[charactersWritten + 0] = '\n';
