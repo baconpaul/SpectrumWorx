@@ -235,12 +235,35 @@ void Plugin2HostPassiveInteropController::getParameterName(
                                        pProgram);
 }
 
+namespace
+{
+/// \note How many of Program's global parameters actually reach the host.
+///
+///   InputMode enters the parameter list at LE_SW_ENGINE_INPUT_MODE >= 1
+/// (parameters.hpp:47) but is withheld from the host only at >= 2 -- two
+/// different conditions, and it is the second that governs the count.
+///
+///   numberOfParameters() and getParameterIDs() used to spell this
+/// independently, the former subtracting one for InputMode unconditionally and
+/// the latter only under >= 2. At the configuration this port builds, where
+/// nothing defines LE_SW_ENGINE_INPUT_MODE at all, the parameter is absent from
+/// the list to begin with, so the subtraction removed a real parameter and
+/// getParameterIDs wrote one ID past the buffer its own caller had sized.
+/// Latent since 2013 and invisible to the 2016 builds, which all set it to 2.
+///                                           (28.07.2026.) (SW port)
+std::uint16_t constexpr exportedGlobalParameters{
+#if LE_SW_ENGINE_INPUT_MODE >= 2
+    Program::Parameters::static_size - 1 /*InputMode*/
+#else
+    Program::Parameters::static_size
+#endif // LE_SW_ENGINE_INPUT_MODE
+};
+} // anonymous namespace
+
 void Plugin2HostPassiveInteropController::getParameterIDs(
     LE::Utility::Span<Plugins::ParameterID> const ids, Program const *LE_RESTRICT const pProgram)
 {
-    //...mrmlj...parameter IDs used only by AU which doesn't use InputMode...
-    LE_ASSERT_MSG(ids.size() >= Program::Parameters::static_size - 1 /*InputMode*/ +
-                                    Constants::maxNumberOfModules,
+    LE_ASSERT_MSG(ids.size() >= exportedGlobalParameters + Constants::maxNumberOfModules,
                   "ParameterIDs buffer too small.");
 
     Plugins::ParameterID *LE_RESTRICT pParameterID(ids.begin());
@@ -337,16 +360,30 @@ void Plugin2HostPassiveInteropController::getParameterIDs(
 std::uint16_t
 Plugin2HostPassiveInteropController::numberOfParameters(Program const *LE_RESTRICT const pProgram)
 {
-    //...mrmlj...verify that this is used only by AU/"non-InputMode-aware" code...
-    std::uint16_t numberOfParameters(Program::Parameters::static_size - 1 /*InputMode*/ +
-                                     Constants::maxNumberOfModules);
+    // Must agree with getParameterIDs exactly: the host sizes the buffer it
+    // passes there from what this returns.
+    std::uint16_t numberOfParameters(exportedGlobalParameters + Constants::maxNumberOfModules);
 
     if (pProgram)
     {
         pProgram->moduleChain().forEach<Engine::ModuleParameters>(
             [&numberOfParameters](Engine::ModuleParameters const &module) {
                 std::uint8_t const numberOfModuleParameters(module.numberOfParameters());
-                std::uint8_t const numberOfModuleLFOParameters(
+                /// \note std::uint16_t, and not the std::uint8_t this was
+                /// written with. lfoExportedParameters is 7 in a build without
+                /// the GUI (parameters.hpp:28) against 5 with it, and the
+                /// effects with the most parameters -- Armonizer and Tune Worx
+                /// -- have enough that (parameters - 1) * 7 passes 255 and wraps
+                /// to 256 less than the truth. numberOfParameters() then
+                /// under-reports by exactly 256, and getParameterIDs, which
+                /// counts the same thing in wider arithmetic, writes 256 IDs
+                /// past the buffer the host sized from it.
+                ///
+                ///   The 2016 plugins never hit it: they all built with the GUI,
+                /// where the multiplier is 5 and no effect has enough
+                /// parameters to overflow.
+                ///                               (28.07.2026.) (SW port)
+                std::uint16_t const numberOfModuleLFOParameters(
                     (numberOfModuleParameters - 1 /*Bypass*/) *
                     ParameterCounts::lfoExportedParameters);
                 numberOfParameters += numberOfModuleParameters + numberOfModuleLFOParameters;
