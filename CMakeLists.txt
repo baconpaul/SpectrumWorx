@@ -64,6 +64,7 @@ set(JUCE_PATH "${CMAKE_SOURCE_DIR}/libs/JUCE")
 
 add_subdirectory(libs)
 include(temporary-boost) # delete with stage 7 — see the file
+add_subdirectory(assets)
 add_subdirectory(src)
 add_subdirectory(src/clap-first)
 

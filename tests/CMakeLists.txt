@@ -12,6 +12,7 @@ add_executable(sw-tests
         goldens/engineHarness.cpp
         goldens/goldenDigest.cpp
         goldens/goldenTests.cpp
+        gui/skinTests.cpp
         math/fftTests.cpp
         math/scalarTests.cpp
         math/vectorTests.cpp
@@ -19,7 +20,7 @@ add_executable(sw-tests
         utility/spanTests.cpp
 )
 
-target_link_libraries(sw-tests PRIVATE sw-dsp Catch2::Catch2WithMain)
+target_link_libraries(sw-tests PRIVATE sw-dsp sw-gui-resources Catch2::Catch2WithMain)
 
 # \note LE_CHECKED_BUILD is deliberately *not* forced here. It decides whether
 # NDEBUG survives, and forcing it on for the test objects only would leave them
