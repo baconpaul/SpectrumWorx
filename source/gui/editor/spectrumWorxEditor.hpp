@@ -65,36 +65,6 @@ class AutomatedModuleChain;
 class Program;
 
 
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \struct AuthorisationData
-/// \internal
-///
-////////////////////////////////////////////////////////////////////////////////
-
-class AuthorisationData
-{
-public:
-    using char_t = juce::String::CharPointerType::CharType;
-    LE_PURE_FUNCTION
-    char_t const & authorised() const;
-    void           clear     ()      ;
-
-    juce::String       & line       ( unsigned int lineIndex )      ;
-    juce::String const & line       ( unsigned int lineIndex ) const;
-    juce::String       & licenceType(                        )      ;
-    juce::String const & licenceType(                        ) const;
-
-    void swap( AuthorisationData & other )
-    {
-        for ( unsigned short i( 0 ); i < data_.size(); ++i )
-            data_[ i ].swapWith( other.data_[ i ] );
-    }
-
-private:
-    std::array<juce::String, 5> data_;
-}; // class AuthorisationData
-
 //------------------------------------------------------------------------------
 namespace GUI
 {
@@ -166,8 +136,6 @@ public:
     ///...mrmlj...cleanup:
 #if LE_SW_SEPARATED_DSP_GUI
 public:
-    bool authorised() const;
-
     typedef ModuleGUI Module;
 
     float getModuleSharedParameter( Module const &, std::uint8_t parameterIndex ) const;
@@ -215,8 +183,6 @@ protected:
 
 #else // LE_SW_SEPARATED_DSP_GUI
 public:
-    juce::String::CharPointerType::CharType const & authorised() const;
-
     SpectrumWorx       & effect()      ;
     SpectrumWorx const & effect() const;
 
@@ -352,8 +318,6 @@ private:
     void setSampleLoadingStatus();
 #endif // LE_SW_DISABLE_SIDE_CHANNEL
     void setDefaultFocusHandling();
-
-    void showRegistrationPage() { showSettings( 2 ); }
 
     static void togglePresetBrowser( juce::Button const & );
 
@@ -570,10 +534,6 @@ public:
 
         void updateEnginePage();
 
-        void setRegisteredTo( AuthorisationData const & );
-
-        AuthorisationData const * registrationData() const { return pRegistrationData_; }
-
         static void LE_FASTCALL comboBoxValueChanged( ComboBox const & );
 
         LE_NOTHROW LE_PURE_FUNCTION
@@ -633,21 +593,6 @@ public:
             LEDTextButton  hideCursorOnKnobDrag_     ;
         }; // class InterfacePage
 
-        class RegistrationPage : public BackgroundImage
-        {
-        public:
-            RegistrationPage();
-
-            void setRegistered();
-
-        private: // JUCE component overrides.
-            void paint( juce::Graphics & ) LE_OVERRIDE;
-
-        private: friend class Settings;
-            BitmapButton authorize_;
-            BitmapButton buyNow_   ;
-        }; // class RegistrationPage
-
         class AboutPage : public BackgroundImage
         {
         public:
@@ -661,10 +606,9 @@ public:
             BitmapButton       showUsersGuide_;
         }; // class AboutPage
 
-        EnginePage       enginePage_      ;
-        InterfacePage    interfacePage_   ;
-        RegistrationPage registrationPage_;
-        AboutPage        aboutPage_       ;
+        EnginePage    enginePage_   ;
+        InterfacePage interfacePage_;
+        AboutPage     aboutPage_    ;
 
         DiscreteParameterComboBox fftSize_         ;
         DiscreteParameterComboBox overlapFactor_   ;
@@ -675,8 +619,6 @@ public:
     #if LE_SW_ENGINE_INPUT_MODE >= 1
         DiscreteParameterComboBox inputMode_       ;
     #endif // LE_SW_ENGINE_INPUT_MODE
-
-        AuthorisationData const * pRegistrationData_;
 
     public:
         static std::uint8_t const xMargin = 20;

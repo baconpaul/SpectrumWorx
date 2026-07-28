@@ -66,12 +66,6 @@ class  ParametersLoader;
 struct PresetHeader;
 namespace GUI { class SpectrumWorxEditor; }
 
-#if LE_SW_AUTHORISATION_REQUIRED
-    #define LE_LICENCE_SPECIFIC( ... ) __VA_ARGS__
-#else
-    #define LE_LICENCE_SPECIFIC( ... )
-#endif
-
 typedef juce::String::CharPointerType::CharType char_t;
 
 
@@ -258,51 +252,6 @@ protected:
 
     bool blockAutomation() const;
 
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Authorization
-    ////////////////////////////////////////////////////////////////////////////
-#if LE_SW_AUTHORISATION_REQUIRED
-    public:
-        char_t const & authorised() const { return authorizationData().authorised(); }
-
-    protected:
-        AuthorisationData const & authorizationData() const { return authorizationData_; }
-
-        bool initialisePathsAndVerifyLicence();
-
-    private:
-        LE_NOTHROW char const * verifyLicence();
-
-        void startLicenceVerificationTimer();
-        void  stopLicenceVerificationTimer();
-
-        static float demoGain      ();
-               void  setDemoGain   ();
-               void  removeDemoGain();
-
-        bool isCurrentlyCrippled() const;
-
-        void demoCripplingThread();
-
-    private:
-        BackgroundThread  authorizationThread_;
-        AuthorisationData authorizationData_  ;
-        float             outputGainScale_    ;
-
-        /// \todo Find a proper spot for these (used to be in the license
-        /// related predefinedItems.hpp header before most of the licensing
-        /// functionality was extracted into the Licenser SDK).
-        ///                                   (26.04.2016.) (Domagoj Saric)
-        #define SW_LICENCE_FILE_EXTENSION_STANDARD        _T( ".SWLic"    )
-        #define SW_LICENCE_FILE_EXTENSION_VERSION_UPGRADE _T( ".SWULic"   )
-        #define SW_LICENCE_FILE_EXTENSION_OS_UPGRADE      _T( ".SWOSULic" )
-
-    /* </Authorization> */
-#else
-public:
-    static char_t const & authorised() { static char_t const a( true ); return a; }
-#endif // LE_SW_AUTHORISATION_REQUIRED
 
 
 #ifndef LE_SW_DISABLE_SIDE_CHANNEL

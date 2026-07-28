@@ -441,12 +441,6 @@ LE_NOALIAS juce::File resourcesPath()
     return rootPath().getChildFile( "Resources" );
 }
 
-LE_NOALIAS juce::File licencesPath()
-{
-    return rootPath().getChildFile( "Licences" );
-}
-
-
 #ifdef __APPLE__
 ::FSRef makeFSRefFromPath( juce::String const & path )
 {
@@ -824,8 +818,7 @@ LRESULT CALLBACK OwnedWindowBase::callWndHookProc( int const nCode, WPARAM const
         // movement) because some hosts do some non-movement adjustments to the
         // main editor's parent window (that nonetheless affect the relative
         // position of our editor window within the parent) right after creation
-        // and that breaks the positioning of the 'registration page as a demo
-        // popup'.
+        // and that breaks the positioning of the owned popup windows.
         //                                    (20.04.2010.) (Domagoj Saric)
         //if ( !( wp.flags & SWP_NOMOVE ) )
         {

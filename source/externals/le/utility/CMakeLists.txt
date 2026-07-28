@@ -34,7 +34,6 @@ set( Headers
     countof.hpp
     conditionVariable.hpp
     criticalSection.hpp
-    demoLimiter.hpp
     entryPoint.hpp
     filesystem.hpp
     filesystemImpl.hpp

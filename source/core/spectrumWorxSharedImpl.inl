@@ -42,8 +42,7 @@ namespace SW
 
 /// \note AUs must:
 /// - allow access to and change of parameters and presets even while
-///   uninitialised so we perform authorization and path initialisation early,
-///   in the constructor
+///   uninitialised so we perform path initialisation early, in the constructor
 /// - not change parameters in the process of initialisation so we have to avoid
 ///   the 'load last session on startup' procedure in that case.
 ///                                           (06.03.2013.) (Domagoj Saric)
@@ -63,11 +62,7 @@ SpectrumWorxSharedImpl<Impl, Protocol>::SpectrumWorxSharedImpl( typename PluginP
 {
 #if defined( __APPLE__ ) && !defined( LE_SW_FMOD )
     if ( std::is_same<typename PluginPlatform::Protocol, Plugins::Protocol::AU>::value )
-    #if LE_SW_AUTHORISATION_REQUIRED
-        BOOST_VERIFY( Base::initialisePathsAndVerifyLicence() );
-    #else // LE_SW_AUTHORISATION_REQUIRED
         BOOST_VERIFY( GUI::initializePaths() );
-    #endif // LE_SW_AUTHORISATION_REQUIRED
 #endif // __APPLE__ && !LE_SW_FMOD
 }
 
@@ -78,11 +73,9 @@ SpectrumWorxSharedImpl<Impl, Protocol>::initialise()
 #ifdef __APPLE__
     if ( !std::is_same<typename PluginPlatform::Protocol, Plugins::Protocol::AU>::value )
 #endif // __APPLE__
-    #if LE_SW_AUTHORISATION_REQUIRED
-        BOOST_VERIFY( Base::initialisePathsAndVerifyLicence() );
-    #elif LE_SW_GUI // LE_SW_AUTHORISATION_REQUIRED
+    #if LE_SW_GUI
         BOOST_VERIFY( GUI::initializePaths() );
-    #endif // LE_SW_AUTHORISATION_REQUIRED
+    #endif // LE_SW_GUI
     return Base::initialise() ? Plugins::ErrorCode<Protocol>::Success : Plugins::ErrorCode<Protocol>::OutOfMemory;
 }
 

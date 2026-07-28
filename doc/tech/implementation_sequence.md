@@ -300,10 +300,37 @@ Roughly 80 % of the files and 90 % of the bytes.
 >   `boost/simd/*`); it is retained as source material for stage 4, not as a
 >   build target.
 
-**0.4 — Excise the licence manager** (scan §3.2) — it is `#if`-gated with a
+**✅ 0.4 — Excise the licence manager** (scan §3.2) — it is `#if`-gated with a
 working `#else`, so this is mostly deleting branches. Includes removing the
 Registration tab from the Settings window and re-laying-out the remaining three
 tabs.
+
+> **Done.** `LE_SW_AUTHORISATION_REQUIRED` and the `LE_LICENCE_SPECIFIC` macro
+> are gone; `rg` for any of the licensing identifiers returns nothing.
+> The bulk was one contiguous ~1,000-line block in `spectrumWorx.cpp`
+> (licence parsing, RSA verification, the demo-crippling thread, the
+> "targetAuthorizationDataAntiHack" games). Beyond the plan:
+>
+> - The `#else` branch also had to go, not just the `#if`. It was not a no-op —
+>   it populated the Registration tab with a hardcoded "Registered to: Everyone
+>   / Free" and the About tab with a licence-type string. Those are artefacts of
+>   a commercial product, so the whole tab went and the Settings window is now
+>   three tabs (`createTabButton` reindexed, tab-count assertions 4 → 3).
+> - `SW_IS_RETAIL` and `SW_ENABLE_UPGRADE` existed only to serve licensing;
+>   removed from `versionConfiguration.hpp.in` along with the `retailBuild` /
+>   `versionUpgradeEnabled` CMake variables that fed them.
+> - `SpectrumWorx::blockAutomation()` had an unauthorised-and-headless early
+>   return; it now just forwards to `SpectrumWorxCore`.
+> - Unused after this: `GUI::licencesPath()`, `demoLimiter.hpp`, and eight
+>   `ResourceBitmaps` enum entries (`SettingsReg*`, `Authorize*`, `BuyNow*`).
+>   The corresponding PNGs in `assets/skin/` are now orphaned and should be
+>   dropped when the skin is embedded in 6.3.
+>
+> **Known dangling reference:** `spectrumWorx.cpp` and `gui.cpp` still
+> `#include "boost/mmap/…"` for the settings and `.paths` files, but 0.3 deleted
+> `source/externals/boost`. That is deliberate — the code using it dies in 6.3 —
+> but it means these two files cannot compile until then, over and above
+> everything else that cannot compile yet.
 
 **0.5 — Move to the target layout**, in one `git mv`-only commit so it reviews
 as a rename:

@@ -23,9 +23,6 @@ namespace SW
 #define SW_VERSION_PATCH        @versionPatch@
 #define SW_VERSION_DESCRIPTION "@versionDescription@"
 
-#define SW_IS_RETAIL      @retailBuild@
-#define SW_ENABLE_UPGRADE @versionUpgradeEnabled@
-
 #define SW_VERSION_STRING "@fullVersionString@"
 
 #define SW_EDITION_STRING "@editionString@"

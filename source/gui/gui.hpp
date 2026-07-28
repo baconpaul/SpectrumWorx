@@ -84,27 +84,19 @@ enum ResourceBitmaps
     Eject                   = '16',
     SettingsEngineBg        = '17',
     SettingsIntrfcBg        = '17', // ...currently the same as the engine background...
-    SettingsRegBg           = '19',
     SettingsAboutBg         = '20',
     SettingsEngineOff       = '21',
     SettingsEngineOn        = '22',
     SettingsGUIOff          = '23',
     SettingsGUIOn           = '24',
-    SettingsRegOff          = '25',
-    SettingsRegOn           = '26',
     SettingsAboutOff        = '27',
     SettingsAboutOn         = '28',
-    SettingsRegDoneBg       = '29',
     PresetSaveUp            = '30',
     PresetSaveDown          = '31',
     PresetDeleteUp          = '32',
     PresetDeleteDown        = '33',
     PresetSaveAsUp          = '34',
     PresetSaveAsDown        = '35',
-    AuthorizeDown           = '36',
-    AuthorizeUp             = '37',
-    BuyNowDown              = '38',
-    BuyNowUp                = '39',
     LFOSliderThumb          = '40',
     LEDOff                  = '41',
     LEDOn                   = '42',
@@ -219,7 +211,6 @@ bool LE_NOTHROW havePathsBeenInitialised();
 LE_NOTHROWNOALIAS juce::File const & rootPath     ();
 LE_NOTHROWNOALIAS juce::File       & presetsFolder();
 LE_NOALIAS        juce::File         resourcesPath();
-LE_NOALIAS        juce::File         licencesPath ();
 
 
 #ifdef __APPLE__

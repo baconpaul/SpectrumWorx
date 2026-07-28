@@ -118,24 +118,6 @@ if ( MSVC )
 endif()
 source_group("Externals\\LEB" FILES ${SOURCES_Externals__LEB})
 
-# Implementation note: adding/'integrating' the Licenser SDK 'manually'/directly
-# (as a first step) rather than building it as a separate project/library and
-# linking with it (similarly to how this project currently uses the Utility
-# library. To be cleaned up...
-#                                         (25.04.2016.) (Domagoj Saric)
-add_definitions( -DLE_SDK_NO_AUTO_LINK )
-set(SOURCES_Externals__License
-    ${leExternals}/licenser/cryptography/base64.cpp
-    ${leExternals}/licenser/cryptography/hashing.cpp
-    ${leExternals}/licenser/cryptography/key.cpp
-    ${leExternals}/licenser/cryptography/signing.cpp
-    ${leExternals}/licenser/cryptography/signing.hpp
-    ${leExternals}/licenser/license/predefinedItems.hpp
-    ${leExternals}/license_key/le_key_01_modulus.cpp
-    ${leExternals}/license_key/le_key_01_modulus.hpp
-)
-source_group("Externals\\License" FILES ${SOURCES_Externals__License})
-
 #source_group("Externals\\Plugins" FILES ${SOURCES_Externals__Plugins})
     set( SOURCES_Externals__Plugins__VST_24
       ${leExternals}/plugins/vst/2.4/plugin.cpp
@@ -160,7 +142,6 @@ source_group("Externals\\License" FILES ${SOURCES_Externals__License})
 set( SOURCES_Externals
     ${SOURCES_Externals_Core}
     ${SOURCES_Externals__LEB}
-    ${SOURCES_Externals__License}
     ${SOURCES_Externals__Plugins__VST_24}
 )
 if ( APPLE )

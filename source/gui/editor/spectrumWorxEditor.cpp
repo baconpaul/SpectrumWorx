@@ -181,41 +181,6 @@ SpectrumWorxEditor::SpectrumWorxEditor()
 
     setOpaque ( true );
     setVisible(      );
-
-#if LE_SW_AUTHORISATION_REQUIRED
-    if ( !authorised() )
-    {
-        // Implementation note:
-        //   We cannot call showRegistrationPage() directly/synchronously
-        // because of hosts like Audio Mulch where it is possible to detect the
-        // editor parent only using geometry logic which works only after the
-        // host parent window has resized to fit our editor and this happens
-        // only after this constructor exits. For this reason we have to defer
-        // the call to a later time.
-        //                                    (02.06.2010.) (Domagoj Saric)
-    #ifdef __APPLE__
-        std::uint8_t resentCount( 0 );
-    #endif // __APPLE__
-        GUI::postMessage
-        (
-            effect(),
-            [=]( GUI::SpectrumWorxEditor & editor ) mutable
-            {
-            #ifdef __APPLE__
-                //...mrmlj...temporary uber ugly hack to workaround Reaper positioning problems...
-                if ( resentCount++ < 50 )
-                {
-                    juce::Thread::sleep( 8 );
-                    return false;
-                }
-                resentCount = 0;
-            #endif // __APPLE__
-                editor.showRegistrationPage();
-                return true;
-            }
-        );
-    }
-#endif // LE_SW_AUTHORISATION_REQUIRED
 }
 
 #pragma warning( pop )
@@ -330,9 +295,6 @@ SpectrumWorxEditor & SpectrumWorxEditor::fromPresetBrowser( PresetBrowser & pres
     SpectrumWorxEditor::Host       & SpectrumWorxEditor::host()       { return *this; }
     SpectrumWorxEditor::Host const & SpectrumWorxEditor::host() const { return *this; }
 
-    bool SpectrumWorxEditor::authorised() const { return true; }
-
-
     bool SpectrumWorxEditor::ModuleInitialiser::operator()( Module & module, std::uint8_t const slotIndex ) const
     {
         module.moveToSlot( slotIndex );
@@ -343,7 +305,6 @@ SpectrumWorxEditor & SpectrumWorxEditor::fromPresetBrowser( PresetBrowser & pres
 
 #else
     Engine::Setup const & SpectrumWorxEditor::engineSetup() const { return effect().uncheckedEngineSetup(); }
-    char_t        const & SpectrumWorxEditor::authorised () const { return effect().authorised          (); }
 
     AutomatedModuleChain       & SpectrumWorxEditor::moduleChain()       { return effect().moduleChain(); }
     AutomatedModuleChain const & SpectrumWorxEditor::moduleChain() const { return effect().moduleChain(); }
@@ -583,11 +544,6 @@ void SpectrumWorxEditor::paint( juce::Graphics & graphics )
 
     for ( auto const & text : mainAreaTexts )
         drawMainAreaText( graphics, text );
-
-#if LE_SW_AUTHORISATION_REQUIRED
-    if ( !authorised() )
-        graphics.drawSingleLineText( "DEMO", 20, 287 );
-#endif // LE_SW_AUTHORISATION_REQUIRED
 }
 
 
@@ -1148,10 +1104,6 @@ void SpectrumWorxEditor::mouseDown( juce::MouseEvent const & event )
 
 void SpectrumWorxEditor::showSettings( unsigned int const pageIndexToActivate )
 {
-    // Implementation note:
-    //   Settings can be created by the user pressing the settings button and
-    // by the license verification code so it can already be created.
-    //                                            (13.04.2010.) (Domagoj Saric)
     if ( !settings_.is_initialized() )
         settings_ = boost::in_place();
     settings_->setCurrentTabIndex( pageIndexToActivate, false );
@@ -2020,38 +1972,6 @@ SpectrumWorxEditor::Settings::Settings() /// \throws std::bad_alloc Out of memor
     updateEnginePage              ();
     updateLoadLastSessionOnStartup();
 
-#if LE_SW_AUTHORISATION_REQUIRED
-    if ( editor().authorised() )
-    {
-        setRegisteredTo( editor().effect().authorizationData() );
-    }
-    else
-    {
-        registrationPage_.authorize_.addListener( this );
-        registrationPage_.buyNow_   .addListener( this );
-    }
-#else
-    {
-        static AuthorisationData authorizationData;
-    #ifdef LE_SW_FMOD
-        authorizationData.line( 1 ) = "FMOD Studio";
-        authorizationData.line( 2 ) = "Firelight Technologies Pty";
-        authorizationData.line( 3 ) = "Melbourne";
-        authorizationData.line( 4 ) = "Australia";
-
-        authorizationData.licenceType() = "FMOD";
-    #else // LE_SW_FMOD
-        authorizationData.line( 1 ) = "Everyone";
-      //authorizationData.line( 2 ) = "N/A";
-      //authorizationData.line( 3 ) = "N/A";
-      //authorizationData.line( 4 ) = "N/A";
-
-        authorizationData.licenceType() = "Free";
-    #endif
-        setRegisteredTo( authorizationData );
-    }
-#endif
-
     aboutPage_.showUsersGuide_.addListener( this );
 
     setOutline( 0 );
@@ -2059,10 +1979,9 @@ SpectrumWorxEditor::Settings::Settings() /// \throws std::bad_alloc Out of memor
     setTabBarDepth( resourceBitmap<SettingsEngineOn>().getHeight() );
 
     juce::String const dummyName( "a" );
-    addTab( dummyName, juce::Colours::transparentBlack, &enginePage_      , false );
-    addTab( dummyName, juce::Colours::transparentBlack, &interfacePage_   , false );
-    addTab( dummyName, juce::Colours::transparentBlack, &registrationPage_, false );
-    addTab( dummyName, juce::Colours::transparentBlack, &aboutPage_       , false );
+    addTab( dummyName, juce::Colours::transparentBlack, &enginePage_   , false );
+    addTab( dummyName, juce::Colours::transparentBlack, &interfacePage_, false );
+    addTab( dummyName, juce::Colours::transparentBlack, &aboutPage_    , false );
 
     OwnedWindow<Settings>::attach();
 }
@@ -2077,25 +1996,14 @@ SpectrumWorxEditor::Settings::~Settings()
 }
 
 
-void SpectrumWorxEditor::Settings::setRegisteredTo( AuthorisationData const & registrationData )
-{
-    BOOST_ASSERT( !pRegistrationData_ );
-    BOOST_ASSERT( registrationData.authorised() );
-
-    pRegistrationData_ = &registrationData;
-
-    registrationPage_.setRegistered();
-}
-
-
 void SpectrumWorxEditor::Settings::sliderValueChanged( juce::Slider * const pSlider ) noexcept
 {
     LE_ASSUME( pSlider == &interfacePage_.opacitySlider() );
     Theme::singleton().settings().globalOpacity = pSlider->getValue();
 
     juce::Colour const tabBackground( juce::Colours::black.withAlpha( static_cast<float>( std::pow( Theme::singleton().settings().globalOpacity, 14 ) ) ) );
-    BOOST_ASSERT( getTabbedButtonBar().getNumTabs() == 4 );
-    for ( unsigned int i( 0 ); i < 4; ++i )
+    BOOST_ASSERT( getTabbedButtonBar().getNumTabs() == 3 );
+    for ( unsigned int i( 0 ); i < 3; ++i )
         getTabbedButtonBar().setTabBackgroundColour( i, tabBackground );
 
     // Force repaint
@@ -2330,64 +2238,7 @@ void SpectrumWorxEditor::Settings::InterfacePage::paint( juce::Graphics & graphi
 }
 
 
-SpectrumWorxEditor::Settings::RegistrationPage::RegistrationPage()
-    :
-    BackgroundImage( resourceBitmap<SettingsRegBg>() ),
-    authorize_( *this, resourceBitmap<AuthorizeDown>(), resourceBitmap<AuthorizeUp>() ),
-    buyNow_   ( *this, resourceBitmap<BuyNowDown   >(), resourceBitmap<BuyNowUp   >() )
-{
-    authorize_.setTopLeftPosition( 101, 158 );
-    buyNow_   .setTopLeftPosition(  13, 158 );
-
-    authorize_.setClickingTogglesState( false );
-    buyNow_   .setClickingTogglesState( false );
-}
-
 #pragma warning( pop )
-
-
-void SpectrumWorxEditor::Settings::RegistrationPage::paint( juce::Graphics & graphics )
-{
-    BackgroundImage::paint( graphics );
-    Settings const & parent( Utility::ParentFromMember<Settings, RegistrationPage, &Settings::registrationPage_>()( *this ) );
-    AuthorisationData const * const pRegistrationData( parent.registrationData() );
-    if ( pRegistrationData )
-    {
-        BOOST_ASSERT( pRegistrationData->line( 1 ).isNotEmpty() );
-        graphics.setColour( juce::Colours::white );
-        juce::GlyphArrangement text;
-
-        float const fontSize ( 12           );
-        float const rowHeight( fontSize + 2 );
-        juce::Font const font( fontSize     );
-
-        juce::Justification const justification( juce::Justification::horizontallyJustified | juce::Justification::verticallyCentred );
-
-        for ( unsigned int i( 0 ); i < 4; ++i )
-        {
-            text.addFittedText
-            (
-                font,
-                pRegistrationData->line( i + 1 ),
-                14 , 56 + ( rowHeight * i ),
-                162, rowHeight,
-                justification,
-                1,
-                0.2f
-            );
-        }
-
-        text.draw( graphics );
-    }
-}
-
-
-void SpectrumWorxEditor::Settings::RegistrationPage::setRegistered()
-{
-    setImage( resourceBitmap<SettingsRegDoneBg>() );
-    authorize_.setInvisible();
-    buyNow_   .setInvisible();
-}
 
 
 #pragma warning( push )
@@ -2409,18 +2260,6 @@ void SpectrumWorxEditor::Settings::AboutPage::paint( juce::Graphics & graphics )
     BackgroundImage::paint( graphics );
     graphics.setColour( juce::Colours::white );
     versionText_.draw( graphics );
-
-    Settings & parent( Utility::ParentFromMember<Settings, AboutPage, &Settings::aboutPage_>()( *this ) );
-    AuthorisationData const * const pRegistrationData( parent.registrationData() );
-    graphics.setFont( juce::Font( 11 ) );
-    graphics.drawText
-    (
-        pRegistrationData ? pRegistrationData->licenceType() : "Demo",
-         65, 56,
-        107, 14,
-        juce::Justification::left,
-        false
-    );
 }
 
 
@@ -2461,8 +2300,7 @@ juce::TabBarButton * SpectrumWorxEditor::Settings::createTabButton( juce::String
     {
         case 0: images[ 0 ] = &resourceBitmap<SettingsEngineOff>(); images[ 1 ] = &resourceBitmap<SettingsEngineOn>(); break;
         case 1: images[ 0 ] = &resourceBitmap<SettingsGUIOff   >(); images[ 1 ] = &resourceBitmap<SettingsGUIOn   >(); break;
-        case 2: images[ 0 ] = &resourceBitmap<SettingsRegOff   >(); images[ 1 ] = &resourceBitmap<SettingsRegOn   >(); break;
-        case 3: images[ 0 ] = &resourceBitmap<SettingsAboutOff >(); images[ 1 ] = &resourceBitmap<SettingsAboutOn >(); break;
+        case 2: images[ 0 ] = &resourceBitmap<SettingsAboutOff >(); images[ 1 ] = &resourceBitmap<SettingsAboutOn >(); break;
         LE_DEFAULT_CASE_UNREACHABLE();
     }
     return new SettingsTab( tabName, getTabbedButtonBar(), images );
@@ -2477,7 +2315,7 @@ SpectrumWorxEditor & SpectrumWorxEditor::Settings::editor()
 
 void SpectrumWorxEditor::Settings::buttonClicked( juce::Button * const pButton )
 {
-#if !LE_SW_SEPARATED_DSP_GUI || LE_SW_AUTHORISATION_REQUIRED
+#if !LE_SW_SEPARATED_DSP_GUI
     SpectrumWorx & effect( editor().effect() );
 #endif
     if ( pButton == &interfacePage_.loadLastSessionOnStartup_ )
@@ -2493,65 +2331,6 @@ void SpectrumWorxEditor::Settings::buttonClicked( juce::Button * const pButton )
     {
         Theme::settings().hideCursorOnKnobDrag = interfacePage_.hideCursorOnKnobDrag_.getToggleState();
     }
-#if LE_SW_AUTHORISATION_REQUIRED
-    else
-    if ( pButton == &registrationPage_.authorize_ )
-    {
-        juce::FileChooser fileChooser
-        (
-            _T( "Please select your licence file..." ),
-            juce::File::nonexistent,
-            _T( "*" ) SW_LICENCE_FILE_EXTENSION_STANDARD   _T( ";" ) \
-            _T( "*" ) SW_LICENCE_FILE_EXTENSION_OS_UPGRADE
-            #if SW_ENABLE_UPGRADE
-                _T( ";" ) _T( "*" ) SW_LICENCE_FILE_EXTENSION_VERSION_UPGRADE
-            #endif
-            ,true
-        );
-        if ( fileChooser.browseForFileToOpen( 0 ) )
-        {
-            BOOST_ASSERT( fileChooser.getResults().size() == 1 );
-            juce::File const & selectedFile( fileChooser.getResults().getReference( 0 ) );
-            char const * LE_RESTRICT pErrorMessage
-            (
-                selectedFile.moveFileTo( licencesPath().getNonexistentChildFile( selectedFile.getFileNameWithoutExtension(), selectedFile.getFileExtension() ) )
-                    ? nullptr
-                    : "Failed to move the license file."
-            );
-
-            if ( !pErrorMessage )
-                pErrorMessage = effect.verifyLicence();
-
-            if ( !pErrorMessage )
-            {
-                BOOST_ASSERT( effect.authorizationData().authorised() );
-                setRegisteredTo( effect.authorizationData() );
-                if ( editor().presetBrowser_.is_initialized() )
-                    editor().presetBrowser_->authorize();
-                registrationPage_.repaint();
-                editor()         .repaint(); //...mrmlj...only the "DEMO" region...
-            }
-            else
-            {
-                //...mrmlj...anti-piracy hackery...to be documented if it proves useful...
-                BOOST_ASSERT( !effect.authorizationData().authorised() );
-                effect.authorizationData_.clear();
-                static char const * LE_RESTRICT volatile const authorizationFailedTitle( "Authorization failed..." );
-                char const * const authorizationFailedTitleAux( authorizationFailedTitle );
-                GUI::warningMessageBox( authorizationFailedTitleAux, pErrorMessage, false );
-            }
-        }
-    }
-    else
-    if ( pButton == &registrationPage_.buyNow_ )
-    {
-        // Implementation note:
-        //   The http:// prefix is required for OSX.
-        //                                    (10.11.2010.) (Domagoj Saric)
-        //...mrmlj...bloated...BOOST_VERIFY( juce::URL( "http://www.littleendian.com" ).launchInDefaultBrowser() );
-        BOOST_VERIFY( juce::Process::openDocument( "http://www.littleendian.com", juce::String::empty ) );
-    }
-#endif // LE_SW_AUTHORISATION_REQUIRED
     else
     if ( pButton == &aboutPage_.showUsersGuide_ )
     {
@@ -2574,51 +2353,6 @@ void SpectrumWorxEditor::Settings::updateLoadLastSessionOnStartup()
 //------------------------------------------------------------------------------
 } // namespace GUI
 //------------------------------------------------------------------------------
-
-////////////////////////////////////////////////////////////////////////////////
-// AuthorisationData
-////////////////////////////////////////////////////////////////////////////////
-
-AuthorisationData::char_t const & AuthorisationData::authorised() const
-{
-    char_t const * LE_RESTRICT const pString( data_.front().getCharPointer().getAddress() );
-    LE_ASSUME( pString );
-    return *pString;
-}
-
-
-void AuthorisationData::clear()
-{
-    for ( auto & string : data_ )
-        string = string.empty;
-}
-
-
-juce::String & AuthorisationData::line( unsigned int const lineIndex )
-{
-    // 1-based index
-    BOOST_ASSERT( lineIndex >= 1            );
-    BOOST_ASSERT( lineIndex <  data_.size() );
-    return data_[ lineIndex - 1 ];
-}
-
-
-juce::String const & AuthorisationData::line( unsigned int const lineIndex ) const
-{
-    return const_cast<AuthorisationData &>( *this ).line( lineIndex );
-}
-
-
-juce::String & AuthorisationData::licenceType()
-{
-    return data_.back();
-}
-
-
-juce::String const & AuthorisationData::licenceType() const
-{
-    return const_cast<AuthorisationData &>( *this ).licenceType();
-}
 
 //------------------------------------------------------------------------------
 } // namespace SW

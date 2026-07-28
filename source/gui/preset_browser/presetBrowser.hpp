@@ -45,8 +45,6 @@ public:
      PresetBrowser();
     ~PresetBrowser();
 
-    void authorize();
-
     juce::Component & window() { return *this; }
 
     SpectrumWorxEditor       & editor()      ;

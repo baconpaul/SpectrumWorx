@@ -27,14 +27,6 @@ else()
     set( fullVersionString "${versionString}" )
 endif()
 
-if ( versionDescription )
-    set( retailBuild 0 )
-else()
-    set( retailBuild 1 )
-endif()
-
-set( versionUpgradeEnabled 0 )
-
 configure_file(
     "${PROJECT_SOURCE_DIR}/configuration/versionConfiguration.hpp.in"
     "${PROJECT_SOURCE_DIR}/configuration/versionConfiguration.hpp"
@@ -49,13 +41,11 @@ set( LE_SW_GUI                    true  CACHE BOOL "GUI interface"              
 set( LE_SW_SEPARATED_DSP_GUI      false CACHE BOOL "separated DSP and GUI instances"            )
 set( LE_SW_PRESETS                true  CACHE BOOL "persistent, filesystem based presets"       )
 set( LE_SW_PROGRAMS               true  CACHE BOOL "temporary in-memory presets (VST programs)" )
-set( LE_SW_AUTHORISATION_REQUIRED true  CACHE BOOL "licence based copy-protection system"       )
 
 LE_configureFeatureOption( LE_SW_GUI                    )
 LE_configureFeatureOption( LE_SW_SEPARATED_DSP_GUI      )
 LE_configureFeatureOption( LE_SW_PRESETS                )
 LE_configureFeatureOption( LE_SW_PROGRAMS               )
-LE_configureFeatureOption( LE_SW_AUTHORISATION_REQUIRED )
 
 include( ${leExternals}/spectrumworx/engine/configuration.cmake )
 

@@ -152,23 +152,9 @@ PresetBrowser::~PresetBrowser()
 }
 
 
-void PresetBrowser::authorize()
-{
-    BOOST_ASSERT( save_.isEnabled() == saveAs_.isEnabled() );
-    BOOST_ASSERT_MSG( !save_.isEnabled(), "Already authorised" );
-    saveAs_.setEnabled( true );
-}
-
-
 bool PresetBrowser::enablePresetSaving() const
 {
-#if LE_SW_AUTHORISATION_REQUIRED
-    return SW_IS_RETAIL
-            ? editor().authorised() != 0
-            : true;
-#else
     return true;
-#endif // LE_SW_AUTHORISATION_REQUIRED
 }
 
 
