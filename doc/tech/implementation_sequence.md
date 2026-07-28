@@ -964,38 +964,80 @@ residue, in the order it mattered.
 > and Windows x86-64** (arm64 keys off `__aarch64__` and is unaffected, and
 > MSVC keys off `_controlfp`). The fix is to rekey them on the `LE_HAS_SSE1`/
 > `LE_HAS_SSE2` macros `leConfigurationAndODRHeader.h` already derives from
-> `__SSE__`/`__SSE2__`, which is stage 4's job anyway. Do not ship without it —
+> `__SSE__`/`__SSE2__`, which is stage 4's job (§4.2). Do not ship without it —
 > a denormal storm in a spectral effect is a CPU cliff, not a subtle one.
+>
+> It does **not** gate the macOS-first path, which is the only reason stage 4
+> could be resequenced behind stage 5: the `__aarch64__` arm at `math.cpp:906`
+> sets FPCR bit 24 and is live and correct on Apple Silicon today. An Intel Mac
+> is *not* covered — if the macOS build is ever x86_64, this comes forward.
 
 ---
 
-### Stage 4 — Portable SIMD/FFT backend, and audio file I/O
+### Stage 4 — Portable SIMD/FFT backend  *(resequenced: runs after stage 6)*
 
-**2–3 weeks.**
+**1.5–2.5 weeks**, down from 2–3 because audio file I/O left for stage 5.
+
+> **Why this moved.** The original plan ran 4 before 5 and this section was
+> written as though the macOS build still had NT2 under it. It does not. On
+> Apple, **stage 4.1 is already done, by construction:** `sw-dsp` compiles no
+> NT2 at all — the library survives only in `legacy-build.cmake`'s dead
+> `addNT2()` and the vendored `src/nt2_static_fft/` reference tree, neither of
+> which is in the live build — and `dsp.cmake:162-165` links Accelerate because
+> `le/math/vector.cpp` and `le/math/dft/fft.cpp` are vDSP/vForce there already.
+> The stage 3 goldens were rendered *through Accelerate*. What remains in 4.1 is
+> `pffft` and `simde` for the platforms a macOS-first bring-up defers anyway, and
+> 4.3 is cross-platform by definition. Neither gates a macOS CLAP plugin, so
+> neither should sit in front of one.
+>
+> The only thing in the old stage 4 that stage 5 genuinely cannot link without
+> is the audio file loader, and its platform seam is a single static function.
+> It moved to **5.0** rather than dragging a two-week stage forward.
 
 **4.1** Replace `LE_MATH_USE_NT2`, keeping the interfaces in `le/math/vector.hpp`
 and `le/math/dft/fft.hpp` byte-identical so the 203 effect files do not move:
 - vector primitives → `sst-basic-blocks` SIMD helpers over `simde` (which gives
   you SSE-on-NEON), or plain loops where the compiler auto-vectorises just as
   well — measure, don't assume
-- FFT → Accelerate/vDSP on Apple (unchanged), `pffft` elsewhere
+- FFT → `pffft` off Apple; Accelerate/vDSP stays on Apple and does not move
 
-**4.2** `external_audio/` — delete `sampleWin.cpp` (DirectShow filter graphs) and
-`sampleMac.cpp` (`ExtAudioFile` + the long-removed `FSRef`), replace with one
-`sample.cpp` over `juce::AudioFormatManager`. This is also what finally removes
-`FSRef` from `gui.hpp:226`.
+**4.2** Rekey the denormal guard, per the regression noted at the end of stage 3.
+`FPUDisableDenormalsGuard` (`math.cpp:895`) reaches `_mm_setcsr` only under
+`BOOST_SIMD_HAS_SSE_SUPPORT`, which nothing defines since NT2 went — so denormal
+flushing is off on every x86-64 target, **including an Intel Mac**. The
+`__aarch64__` arm at `math.cpp:906` is live and correct, which is the only reason
+this is not already a shipping bug. Rekey onto `LE_HAS_SSE1`/`LE_HAS_SSE2`.
+
+*This is the one item that can bite before stage 4 runs: if the macOS-first
+build is ever x86_64 rather than arm64-only, pull it forward. It is two lines.*
 
 **4.3** Run the goldens on all three OSes and both architectures.
 
 **Done when:** `sw-tests` green on macOS (arm64 + x86_64), Windows (x64 +
-arm64), Linux (x64 + arm64); NT2 is gone with no golden outside tolerance.
+arm64), Linux (x64 + arm64); NT2 is gone with no golden outside tolerance;
+denormals flush everywhere.
 
 ---
 
 ### Stage 5 — The CLAP host layer
 
 **2.5–4 weeks.** The stage the whole plan is built around, and the one that most
-resembles ordinary engineering rather than archaeology.
+resembles ordinary engineering rather than archaeology. **It runs directly after
+stage 3** — see the note under stage 4 for why nothing in the SIMD work stands
+in front of it.
+
+**5.0 — The audio file loader**, moved here out of stage 4 because it is the one
+thing in that stage stage 5 cannot link without. `spectrumWorx.hpp:15` includes
+`external_audio/sample.hpp` and the plugin holds a `Sample sample_`, so
+`SpectrumWorxCLAP` needs a `Sample::doLoad` to exist. `sample.hpp:87` shows the
+platform seam is exactly that one static function; today its only macOS
+implementation is `sampleMac.cpp` over `ExtAudioFile` and the long-removed
+`FSRef`, which will not build against a current SDK.
+
+Delete `sampleWin.cpp` (DirectShow filter graphs) and `sampleMac.cpp`, and write
+one `doLoad` over `juce::AudioFormatManager` — JUCE is already linked here for
+clap-wrapper's standalone target, so this costs nothing extra. Roughly fifty
+lines. It is also what finally removes `FSRef` from `gui.hpp:226`.
 
 **5.1 — A new protocol tag.** `src/le/plugins/clap/tag.hpp`, mirroring the
 deleted `vst/2.4/tag.hpp`:
@@ -1046,8 +1088,29 @@ of work.
 (`vst/2.4/plugin.inl:303,355`) onto `save`/`load`. Version the blob explicitly
 this time.
 
+> **This sub-stage, not stage 4, is the one with a dependency in front of it.**
+> `dsp.cmake:160` defines `LE_NO_PRESETS`, which compiles out
+> `ModuleParameters::{load,save}PresetParameters`
+> (`moduleParameters.hpp:216-222`) — the very serialisation a state blob is made
+> of. Stage 3 switched it off because `presets.cpp` welds `juce::File` and
+> `mmap` into the same translation unit as the parameter (de)serialisation, and
+> splitting them is stage 8's job.
+>
+> So either pull that split forward, or do 5.6 **last** and let 5.1–5.5 and 5.8
+> run ahead of it. A plugin that loads, shows its UI, passes audio and automates
+> — but forgets everything on reload — is a perfectly good intermediate target,
+> and it reaches the interesting risk (the dynamic parameter model, and the
+> threading in 5.8) sooner.
+
 **5.7 — Audio ports.** Main stereo in/out plus the sidechain gated by
 `LE_SW_ENGINE_INPUT_MODE`.
+
+> **Not an in-place pair, for now.** With an input gain of exactly 1,
+> `SpectrumWorxCore::process` (`spectrumWorxCore.cpp:122`) skips its own copy and
+> hands the host's input pointers straight to `Engine::Processor::process`. The
+> WOLA path has not been audited for aliasing input and output, so
+> `in_place_pair` is `CLAP_INVALID_ID` and a test pins it that way. Turn it on
+> with a test that proves it, not by reading the code.
 
 **5.8 — Threading.** The one genuinely new engineering in the project. Today
 there is a `BackgroundThread`, a `GUI::Lock` over `MessageManagerLock`, and no
@@ -1072,6 +1135,49 @@ driven entirely by the host's generic parameter panel; loading a different
 effect into a module renames that module's parameters in the host panel;
 automation round-trips; save/reload restores exactly; `clap-validator` clean;
 VST3, AUv2 and standalone all behave identically.
+
+#### What compiling the host-interop layer found
+
+`core/host_interop/plugin2Host.cpp` and `host2Plugin.cpp` were in no target — the
+stage 0 amputation left them behind with the VST2 SDK, and `sw-dsp` is forbidden
+them by design. Adding them to `sw-impl` cost **no source changes at all**: they
+compile against the stage 3 core as they stand.
+
+What they did not do is *work*. The parameter enumeration is a contract between
+two functions written independently, and both halves of it were wrong:
+
+- **`numberOfParameters` subtracted for a parameter that is not there.** It took
+  `Program::Parameters::static_size - 1 /*InputMode*/` unconditionally, but
+  `InputMode` only enters the parameter list at `LE_SW_ENGINE_INPUT_MODE >= 1`
+  (`parameters.hpp:47`) and is only withheld from the host at `>= 2`. Two
+  different conditions, and nothing defines the macro at all in this build — so
+  the subtraction removed a real parameter and `getParameterIDs` wrote one ID
+  past the buffer its own caller had sized. Both now derive from one
+  `exportedGlobalParameters` constant.
+
+- **The per-module LFO count overflowed a `std::uint8_t`.** `lfoExportedParameters`
+  is **7** without the GUI and **5** with it (`parameters.hpp:28`), and the
+  widest effects have enough parameters that `(parameters - 1) * 7` passes 255.
+  It wrapped, `numberOfParameters` under-reported by exactly **256**, and
+  `getParameterIDs` — which counts the same thing in wider arithmetic — wrote 256
+  IDs past the end. AddressSanitizer named it in one run after an afternoon of
+  reading had not.
+
+> Both are latent since 2013 and neither could fire in 2016: every shipping
+> plugin built with `LE_SW_GUI=1`, where the multiplier is 5 and no effect is
+> wide enough. The port's DSP-only configuration is what exposed them. This is
+> the second time a 2016 constant has turned out to be load bearing in a
+> configuration nobody built — `BOOST_SWITCH_LIMIT` was the first.
+
+The lesson for the rest of stage 5: **`numberOfParameters` and `getParameterIDs`
+are a pair, and so are `paramsCount` and `paramsInfo` above them.** A test that
+checks each alone passes on both of these bugs. `tests/clap/parameterModelTests.cpp`
+checks them against each other, for every effect, which is what caught it.
+
+> **Run stage 5 under `-fsanitize=address`.** The heap corruption above was
+> reachable from the host's generic panel with no GUI in the picture. 5.9 already
+> asks for `-fsanitize=realtime`; ASan is the cheaper and, on this evidence, more
+> productive of the two right now.
 
 > **Why the host layer before the GUI.** The host's generic parameter panel is a
 > complete, free test harness for the dynamic parameter model — the part of this
@@ -1528,15 +1634,28 @@ CI, with no manual steps.
 ## Sequencing and parallelism
 
 ```
-0 ─┬─▶ 1 ─┬────────────▶ 3 ──▶ 4 ──▶ 5 ─┬──▶ 7 ──▶ 8 ──▶ 9
-   │      │                             │
-   └─▶ 2 ─┘                             │
-          └──▶ 6 (GUI, in a harness) ───┘
+0 ─┬─▶ 1 ─┬─────────────▶ 3 ──▶ 5 ─┬──▶ 7 ──▶ 8 ──▶ 9
+   │      │                        │
+   └─▶ 2 ─┘                        │
+          └─▶ 6 (GUI, in a harness)┘
+
+   4    off the critical path — run it when you want a second platform,
+        which in practice is after 6
+   5.6  may trail 8 if the presets split is not pulled forward
 ```
 
 - **0 → everything.** Nothing starts before the history rewrite.
 - **1 and 2 are independent** and can run concurrently against the broken tree.
 - **3 needs both** (1 for the build, 2 so it compiles without a Boost zoo).
+- **5 follows 3 directly.** Stage 4 used to sit between them; on a macOS-first
+  bring-up it has nothing to contribute, because the Apple SIMD/FFT path is
+  Accelerate today and always was. The one genuine coupling — the audio file
+  loader — is now 5.0. See the note under stage 4.
+- **4 runs when you want a second platform**, which in practice means after 6.
+  Doing it late costs one thing worth naming: the first non-macOS build then
+  happens after the threading model in 5.8 and the GUI are both settled, so any
+  collision surfaces late. Judged mild — the FFT and vector interfaces are held
+  byte-identical by 4.1's own constraint, and the goldens are the arbiter.
 - **6 can start as soon as 1 lands.** Port `src/gui` to JUCE 8 inside a small
   standalone JUCE harness app that instantiates the editor against a mock
   controller, then wire it to the real plugin after stage 5. This keeps the
@@ -1547,8 +1666,11 @@ CI, with no manual steps.
   mocking the core — see the findings under stage 6.
 - **7 needs 5 and 6** — you want a working plugin before refactoring its spine.
 
-**Two-person split:** A takes 0, 1, 3, 4, 5, 8, 9 (build, DSP, host layer);
+**Two-person split:** A takes 0, 1, 3, 5, 8, 9 then 4 (build, DSP, host layer);
 B takes 2 and 6 (Boost sweep, then GUI) and joins A on 7.
+
+Rows below are in stage-number order, not running order. Running order is
+0, 1, 2, 3, **5, 6**, 7, 8, 9, with **4** wherever a second platform is wanted.
 
 | Stage | | Weeks |
 |---|---|---:|
@@ -1556,14 +1678,14 @@ B takes 2 and 6 (Boost sweep, then GUI) and joins A on 7.
 | 1 | Walking skeleton ✅ (CI, installers and signing deferred) | 1.5–2.5 |
 | 2 | Boost tier-1 sweep ✅ (CI wiring deferred) | 1–2 |
 | 3 | DSP core + goldens ✅ | 3–5 |
-| 4 | Portable SIMD/FFT + audio I/O | 2–3 |
-| 5 | CLAP host layer | 2.5–4 |
+| 4 | Portable SIMD/FFT — *deferred, runs after 6* | 1.5–2.5 |
+| 5 | CLAP host layer — *includes the audio loader as 5.0* | 2.5–4 |
 | 6 | GUI | 4–6 |
 | 7 | De-Boost the parameter system | 4–6 |
 | 8 | Presets and content | 1–2 |
 | 9 | Ship | 1–2 |
-| | **Serial total** | **21.5–33.5** |
-| | **Two people, 6 in parallel** | **~17–25** |
+| | **Serial total** | **20.5–33** |
+| | **Two people, 6 in parallel** | **~16.5–25** |
 
 ---
 
@@ -1574,7 +1696,8 @@ B takes 2 and 6 (Boost sweep, then GUI) and joins A on 7.
 | 1 | **Thread discipline.** CLAP's main/audio thread split is contractual; the 2016 code has no lock-free parameter queue. | Adopt the sst patch/patchMain pattern from day one of stage 5; rtsan in CI; thread-identity asserts. | 5 |
 | 2 | **Parameter refactor silently reorders parameters**, breaking saved state — invisible to audio tests. | Commit a full parameter-table snapshot test *before* starting (7.0). | 7 |
 | 3 | **Owned-window collapse is a redesign, not a port.** Two panels need re-laying-out. | Scope it as such; do not fold it into "port the GUI". | 6 |
-| 4 | **SIMD/FFT swap changes DSP output.** | macOS-first bring-up on Accelerate, goldens captured before the swap. | 3 → 4 |
+| 4 | **SIMD/FFT swap changes DSP output.** | macOS-first bring-up on Accelerate, goldens captured before the swap. Largely retired: the Apple path *is* Accelerate and never moves, so the swap only ever risks the platforms 4 brings up. | 4 |
+| 4b | **Deferring 4 past 5 and 6** means the first non-macOS build lands after the threading model and the GUI are set. | 4.1 holds the vector and FFT interfaces byte-identical, so a collision would have to be in the build, not the API; goldens arbitrate the rest. | 4 |
 | 5 | **Golden baseline is 2016 source on a 2026 compiler**, not 2016 behaviour. | If fidelity matters, diff once against renders from the original binaries (~2 days). | 3 |
 | 6 | **Host handling of `rescan(INFO\|TEXT)` varies.** The dynamic parameter model is the novel part of this plugin. | Exercise it with fake parameters in the stage 1 stub, across five DAWs, before writing the real thing. | 1 |
 | 7 | **clap-wrapper AUv2 on current macOS** — less DAW-exercised than `juce_audio_processors`. | Prove it in stage 1 with an empty plugin, not in stage 9 with a full one. | 1 |
