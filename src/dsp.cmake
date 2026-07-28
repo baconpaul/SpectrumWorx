@@ -131,8 +131,13 @@ target_include_directories(sw-dsp PUBLIC . "${swGeneratedIncludeDir}")
 
 # The 2016 build force-included this and every header assumes it: it defines
 # LE_IMPL_NAMESPACE_BEGIN, LE_CHECKED_BUILD and the SSE feature macros.
+#
+# C and OBJC are excluded: the header includes <cstddef>, so it was never
+# valid for them. It went unnoticed until a target linked both sw-dsp and a
+# JUCE module -- linking a JUCE module adds that module's own .c to the
+# consuming target, and juce_graphics ships Sheenbidi as C.
 target_compile_options(sw-dsp PUBLIC
-        "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-include;le/build/leConfigurationAndODRHeader.h>")
+        "$<$<COMPILE_LANGUAGE:CXX,OBJCXX>:-include;le/build/leConfigurationAndODRHeader.h>")
 
 # TEMPORARY — Fusion/MPL/Preprocessor for le/parameters only. Goes at stage 7.
 target_link_libraries(sw-dsp PUBLIC sw-boost-scaffold)
