@@ -82,9 +82,8 @@ void PVPitchShifterImpl::setup(IndexRange const &, Engine::Setup const &engineSe
 {
     setPitchScale(pitchShiftParameters(), parameters(), engineSetup.numberOfBins());
 #ifdef LE_PV_TSS_DYNAMIC_THRESHOLD
-    BOOST_ASSERT_MSG(
-        parameters().get<TSSSensitivity>() == TSSSensitivity::default_(),
-        "PVD PitchShifter does not (yet) support the Transient sensitivity parameter.");
+    LE_ASSERT_MSG(parameters().get<TSSSensitivity>() == TSSSensitivity::default_(),
+                  "PVD PitchShifter does not (yet) support the Transient sensitivity parameter.");
 #endif // LE_PV_TSS_DYNAMIC_THRESHOLD
 }
 

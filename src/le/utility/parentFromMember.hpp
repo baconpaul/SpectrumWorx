@@ -19,12 +19,8 @@
 #include <boost/fusion/sequence/intrinsic/at.hpp>
 #include <boost/fusion/sequence/intrinsic/value_at.hpp>
 
+#include <optional>
 #include <type_traits>
-//------------------------------------------------------------------------------
-namespace boost
-{
-template <typename T> class optional;
-}
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -144,32 +140,33 @@ template <class FusionContainerParam, unsigned int memberIndex> class FusionCont
 ///
 /// \brief In the following scenario:
 ///    class A {};
-///    typedef boost::optional<A> OptionalA;
+///    typedef std::optional<A> OptionalA;
 /// OptionalFromInstance<A> retrieves a reference to OptionalA given a reference
 /// to A (assumes that the reference to A is a reference to an A object that is
-/// actually stored in a boost::optional<>).
+/// actually stored in a std::optional<>).
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
 template <typename T, bool optionalMustBeInitialised = true> class OptionalFromInstance
 {
   public:
-    LE_FORCEINLINE boost::optional<T> &operator()(T &instance) const
+    LE_FORCEINLINE std::optional<T> &operator()(T &instance) const
     {
         //...mrmlj...assumptions about optional internals...
-        // http://www.boost.org/doc/libs/release/libs/optional/doc/html/boost_optional/tutorial/performance_considerations.html
-        struct PODOptional
-        {
-            bool is_initialized_flag;
-            std::aligned_storage_t<sizeof(T), std::alignment_of<T>::value> storage;
-        };
-        auto &optionalInstance(*reinterpret_cast<boost::optional<T> *>(
-            (reinterpret_cast<char *>(&instance) - offsetof(PODOptional, storage))));
-        BOOST_ASSERT(!optionalMustBeInitialised || optionalInstance.get_ptr() == &instance);
+        /// \note Boost.Optional put its engaged flag first, so this used to
+        /// subtract the payload offset. libstdc++, libc++ and the MS STL all
+        /// store std::optional's payload at offset zero and the flag after it,
+        /// so the instance and its optional share an address.
+        ///                                       (28.07.2026.) (SW port)
+        static_assert(sizeof(std::optional<T>) >= sizeof(T), "");
+        auto &optionalInstance(
+            *reinterpret_cast<std::optional<T> *>(reinterpret_cast<char *>(&instance)));
+        LE_ASSERT(!optionalMustBeInitialised ||
+                  (optionalInstance.has_value() && &*optionalInstance == &instance));
         return optionalInstance;
     }
 
-    LE_FORCEINLINE boost::optional<T> const &operator()(T const &instance) const
+    LE_FORCEINLINE std::optional<T> const &operator()(T const &instance) const
     {
         return operator()(const_cast<T &>(instance));
     }
@@ -180,11 +177,11 @@ template <typename T, bool optionalMustBeInitialised = true> class OptionalFromI
 /// \class ParentFromOptionalMember
 ///
 /// \brief Same as ParentFromMember but works with objects wrapped/held in
-/// boost::optionals.
+/// std::optionals.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-template <class ParentParam, class MemberParam, boost::optional<MemberParam> ParentParam::*pMember,
+template <class ParentParam, class MemberParam, std::optional<MemberParam> ParentParam::*pMember,
           bool optionalMustBeInitialised = true>
 class ParentFromOptionalMember
 {
@@ -195,7 +192,7 @@ class ParentFromOptionalMember
   public:
     LE_FORCEINLINE Parent &operator()(Member &member) const
     {
-        return ParentFromMember<Parent, boost::optional<Member>, pMember>()(
+        return ParentFromMember<Parent, std::optional<Member>, pMember>()(
             OptionalFromInstance<Member, optionalMustBeInitialised>()(member));
     }
 

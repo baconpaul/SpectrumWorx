@@ -26,8 +26,8 @@
 #include "le/utility/trace.hpp"
 #include "le/utility/cstdint.hpp"
 
-#include "boost/assert.hpp"
-#include "boost/get_pointer.hpp"
+#include "le/utility/assert.hpp"
+#include "le/utility/intrusivePtr.hpp"
 
 #ifdef _DEBUG
 #include <cstdio>
@@ -169,7 +169,7 @@ template <class Impl, class Protocol> class Host2PluginInteropImpl<Impl, Protoco
                 moduleChain.setParameter(moduleIndex, effectIndex, pImpl->moduleInitialiser()));
             if (result.second == effectIndex)
             {
-                Detail::updateGUIForChangedModule(boost::get_pointer(pImpl->gui()), addModule,
+                Detail::updateGUIForChangedModule(LE::Utility::getPointer(pImpl->gui()), addModule,
                                                   targetSlotFull);
                 //...mrmlj...http://lists.apple.com/archives/coreaudio-api/2005/Oct/msg00164.html
                 if (pImpl->host().wantsManualDependentParameterNotifications())
@@ -256,8 +256,8 @@ typename Plugins::ErrorCode<Protocol>::value_type LE_NOTHROW
 Host2PluginInteropImpl<Impl, Protocol>::setParameter(ParameterID const parameterID,
                                                      Plugins::AutomatedParameterValue const value)
 {
-    BOOST_ASSERT(parameterIndexFromBinaryID(parameterID.binaryValue) <
-                 ParameterCounts::maxNumberOfParameters);
+    LE_ASSERT(parameterIndexFromBinaryID(parameterID.binaryValue) <
+              ParameterCounts::maxNumberOfParameters);
 
     // VST threading issues discussion:
     // http://forum.cockos.com/showthread.php?t=60633

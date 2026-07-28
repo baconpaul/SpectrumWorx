@@ -25,10 +25,11 @@
 
 #include "boost/simd/preprocessor/stack_buffer.hpp"
 
-#include <boost/assert.hpp>
+#include "le/utility/assert.hpp"
 
 #include <algorithm>
 #include <cfloat>
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -77,7 +78,7 @@ class Processor::ProcessParameters
 #else
     float *output() const
     {
-        BOOST_ASSERT(pOutput_);
+        LE_ASSERT(pOutput_);
         return *pOutput_;
     }
 #endif // LE_SW_PURE_ANALYSIS
@@ -105,7 +106,7 @@ class Processor::ProcessParameters
     InputData ppSideChannels_;
     OutputData pOutput_;
 
-    boost::iterator_range<ChannelBuffers *LE_RESTRICT> channelBuffers_;
+    LE::Utility::Span<ChannelBuffers> channelBuffers_;
 
     std::uint8_t currentChannel_;
 
@@ -128,9 +129,9 @@ LE_NOTHROWNOALIAS void Processor::process /// \throws nothing
     (InputData const mainInputs, InputData const sideInputs, OutputData const outputs,
      std::uint32_t const samples, float const outputGain, float const mixAmount)
 {
-    BOOST_ASSERT_MSG(engineSetup().fftSize<std::uint16_t>() &&
-                         engineSetup().windowOverlappingFactor<std::uint8_t>(),
-                     "WOLA parameters not setup.");
+    LE_ASSERT_MSG(engineSetup().fftSize<std::uint16_t>() &&
+                      engineSetup().windowOverlappingFactor<std::uint8_t>(),
+                  "WOLA parameters not setup.");
 
 #ifdef LE_SW_SDK_BUILD
     Math::FPUDisableDenormalsGuard const disableDenormals;
@@ -153,8 +154,8 @@ namespace
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wassume"
 #endif // __clang__
-float **makeDeinterLeaveBuffers(boost::iterator_range<float *> const deinterLeavedDataStorage,
-                                boost::iterator_range<float **> const deinterLeavedDataPointers,
+float **makeDeinterLeaveBuffers(LE::Utility::Span<float> const deinterLeavedDataStorage,
+                                LE::Utility::Span<float *> const deinterLeavedDataPointers,
                                 std::uint16_t const size, std::uint8_t const numberOfChannels)
 {
     LE_ASSUME(deinterLeavedDataStorage.begin());
@@ -210,19 +211,17 @@ LE_NOTHROWNOALIAS void Processor::process /// \throws nothing
     LE_ASSUME(interleavedOutputs == nullptr);
 #endif // LE_SW_PURE_ANALYSIS
 
-    LE_MATH_VERIFY_VALUES(
-        Math::InvalidOrSlow,
-        boost::make_iterator_range_n(interleavedMainInputs, samples * numberOfChannels),
-        "main input");
+    LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow,
+                          LE::Utility::makeSpan(interleavedMainInputs, samples * numberOfChannels),
+                          "main input");
     if (interleavedSideInputs)
         LE_MATH_VERIFY_VALUES(
             Math::InvalidOrSlow,
-            boost::make_iterator_range_n(interleavedSideInputs, samples * numberOfChannels),
-            "side input");
+            LE::Utility::makeSpan(interleavedSideInputs, samples * numberOfChannels), "side input");
 
-    BOOST_ASSERT_MSG(engineSetup().fftSize<std::uint16_t>() &&
-                         engineSetup().windowOverlappingFactor<std::uint8_t>(),
-                     "WOLA parameters not setup.");
+    LE_ASSERT_MSG(engineSetup().fftSize<std::uint16_t>() &&
+                      engineSetup().windowOverlappingFactor<std::uint8_t>(),
+                  "WOLA parameters not setup.");
 
 #ifdef LE_SW_SDK_BUILD
     Math::FPUDisableDenormalsGuard const disableDenormals;
@@ -323,7 +322,7 @@ Processor::processSingleChannel(ProcessParameters const &processParameters) /// 
     auto const stepSize(engineSetup().stepSize<std::uint16_t>());
     auto const windowSizeFactor(engineSetup().windowSizeFactor());
     auto const windowSize(engineSetup().windowSize<std::uint16_t>());
-    BOOST_ASSERT(windowSize == static_cast<std::uint16_t>(analysisWindow().size()));
+    LE_ASSERT(windowSize == static_cast<std::uint16_t>(analysisWindow().size()));
 
 #ifndef LE_SW_PURE_ANALYSIS
     // Implementation note:
@@ -374,7 +373,7 @@ Processor::processSingleChannel(ProcessParameters const &processParameters) /// 
 
         channelBuffers.addNewData(pCompleteNewInput, pCompleteNewSideChannel, sizeToConsume,
                                   useSideChannel);
-        BOOST_ASSERT_MSG(channelBuffers.inputDataSize() <= windowSize, "Too much data consumed.");
+        LE_ASSERT_MSG(channelBuffers.inputDataSize() <= windowSize, "Too much data consumed.");
         inputSamples -= sizeToConsume;
 
         /// \note Assertion failures/crashes occur with 0% overlap due to the
@@ -445,7 +444,7 @@ Processor::processSingleChannel(ProcessParameters const &processParameters) /// 
 #ifndef LE_SW_PURE_ANALYSIS
         std::uint16_t const availableOutputData(channelBuffers.readyOutputDataSize());
         std::uint16_t const sizeToProduce(sizeToConsume);
-        if (BOOST_UNLIKELY(sizeToProduce > availableOutputData))
+        if (LE_UNLIKELY(sizeToProduce > availableOutputData))
         {
             // We have just started processing and the latency time has not yet
             // passed so we do not have enough data and therefore simply zero
@@ -454,9 +453,9 @@ Processor::processSingleChannel(ProcessParameters const &processParameters) /// 
             Math::clear(pOutput, amountToZero);
             pOutput += amountToZero;
         }
-        BOOST_ASSERT_MSG(availableOutputData <=
-                             (sizeToConsume + engineSetup().frameSize<unsigned int>()),
-                         "Produced too much data.");
+        LE_ASSERT_MSG(availableOutputData <=
+                          (sizeToConsume + engineSetup().frameSize<unsigned int>()),
+                      "Produced too much data.");
         auto const amountToExtract(std::min(sizeToProduce, availableOutputData));
         channelBuffers.extractChunkOfReadyOutputData(pOutput, amountToExtract,
                                                      incompleteOutputDataSizeFromPreviousSteps);
@@ -581,7 +580,7 @@ void LE_COLD Processor::calculateWindowAndWOLAGain()
         if (overlapFactor <= 2)
             //synthesisWindowFunction = Engine::Constants::Triangle;
             Math::squareRoot(analysisWindow_);
-        BOOST_ASSERT(synthesisWindowFunction == Engine::Constants::Hann);
+        LE_ASSERT(synthesisWindowFunction == Engine::Constants::Hann);
         break;
 
     // Blackman and Blackman-Harris windows seem to be power complementary
@@ -637,7 +636,7 @@ void LE_COLD Processor::calculateWindowAndWOLAGain()
     { // Default solution: synthesis window = Hann / analysis window.
         synthesisWindow_.alias(synthesisWindowBackup_);
         Math::calculateWindow(synthesisWindow_, synthesisWindowFunction);
-        BOOST_ASSERT(synthesisWindow_.back() != 0);
+        LE_ASSERT(synthesisWindow_.back() != 0);
         float const *LE_RESTRICT pAnalysisWindowSample(analysisWindow_.begin());
         float *LE_RESTRICT pSynthesisWindowSample(synthesisWindow_.begin());
         if (*pAnalysisWindowSample == 0)
@@ -750,9 +749,9 @@ LE_COLD LE_NOTHROW bool Processor::setSampleRate(float const sampleRate,
         return true;
     }
 
-    BOOST_ASSERT_MSG(Processor::requiredStorage(storageFactors) ==
-                         Processor::requiredStorage(currentStorageFactors),
-                     "Processor storage assumed not to depend on the sampling rate.");
+    LE_ASSERT_MSG(Processor::requiredStorage(storageFactors) ==
+                      Processor::requiredStorage(currentStorageFactors),
+                  "Processor storage assumed not to depend on the sampling rate.");
 
     if (modules().resizeAll(storageFactors, currentStorageFactors))
     {
@@ -786,13 +785,13 @@ LE_COLD bool Processor::resize(StorageFactors &currentStorageFactors,
     }
     else if (newStorageFactors == currentStorageFactors)
     {
-        BOOST_ASSERT(Processor::requiredStorage(newStorageFactors) ==
-                     Processor::requiredStorage(currentStorageFactors));
-        BOOST_ASSERT(analysisWindow_ && synthesisWindow_ && channels_);
+        LE_ASSERT(Processor::requiredStorage(newStorageFactors) ==
+                  Processor::requiredStorage(currentStorageFactors));
+        LE_ASSERT(analysisWindow_ && synthesisWindow_ && channels_);
         if (window != engineSetup().windowFunction())
         {
             changeWindowFunction(window);
-            BOOST_ASSERT(window == engineSetup().windowFunction());
+            LE_ASSERT(window == engineSetup().windowFunction());
         }
         return true;
     }
@@ -814,7 +813,7 @@ LE_COLD bool Processor::resize(StorageFactors &currentStorageFactors,
         {
             allocationSucceeded = false;
             engineSetup().setSampleRate(currentSampleRate);
-            BOOST_VERIFY(sharedStorage.resize(currentMainStorageSize));
+            LE_VERIFY(sharedStorage.resize(currentMainStorageSize));
         }
 
         changeWOLAParameters(currentStorageFactors, window, sharedStorage);
@@ -846,12 +845,11 @@ LE_COLD StorageFactors Processor::makeFactors(std::uint16_t const fftSize,
 void LE_COLD Processor::changeWOLAParameters(StorageFactors const &storageFactors,
                                              Setup::Window const window, Storage storage)
 {
-    BOOST_ASSERT(storage);
+    LE_ASSERT(storage);
     this->resize(storageFactors, storage);
-    BOOST_ASSERT_MSG(unsigned(storage.size()) <=
-                         storageFactors.numberOfChannels *
-                             Utility::Constants::vectorAlignment, //...mrmlj...
-                     "Requested storage space not consumed.");
+    LE_ASSERT_MSG(unsigned(storage.size()) <= storageFactors.numberOfChannels *
+                                                  Utility::Constants::vectorAlignment, //...mrmlj...
+                  "Requested storage space not consumed.");
 
     engineSetup().setFFTSize(storageFactors.fftSize);
     engineSetup().setOverlappingFactor(storageFactors.overlapFactor);
@@ -914,7 +912,7 @@ Processor::Channels::requiredStorage(StorageFactors const &factors)
     using Utility::align;
     std::uint16_t const channelBuffersBaseSize(sizeof(value_type));
     std::uint32_t const channelBuffersStorageSize(value_type::requiredStorage(factors));
-    BOOST_ASSERT(align(channelBuffersStorageSize) == channelBuffersStorageSize);
+    LE_ASSERT(align(channelBuffersStorageSize) == channelBuffersStorageSize);
     std::uint32_t const totalSizePerChannel(align(channelBuffersBaseSize) +
                                             channelBuffersStorageSize);
     return factors.numberOfChannels * totalSizePerChannel;

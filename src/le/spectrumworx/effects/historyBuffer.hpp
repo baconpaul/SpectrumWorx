@@ -16,9 +16,8 @@
 #include "le/utility/buffers.hpp"
 #include "le/utility/platformSpecifics.hpp"
 
-#include "boost/range/iterator_range_core.hpp"
-
 #include <cstdint>
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -65,7 +64,7 @@ struct HistoryBuffer : public Utility::SharedStorageBuffer<T>
         auto const overlappedSamples(samples * factors.overlapFactor);
         auto const samplesRounded(overlappedSamples + frameSize - overlappedSamples % frameSize);
 
-        BOOST_ASSERT(samplesRounded % frameSize == 0);
+        LE_ASSERT(samplesRounded % frameSize == 0);
 
         /// \note For each DFT frame we get "2 * ( DFT-size / 2 + 1 ) samples =
         /// DFT-size + 2 samples" (in ReIm or AmPh form). IOW for each frame we
@@ -124,8 +123,8 @@ struct HistoryBuffer : public Utility::SharedStorageBuffer<T>
 ////////////////////////////////////////////////////////////////////////////////
 
 //...mrmlj...cleanup these duplicated typedefs (also in effects.hpp, channelDataReIm.hpp and fft.hpp)...
-using DataRange = boost::iterator_range<float *LE_RESTRICT>;
-using ReadOnlyDataRange = boost::iterator_range<float const *LE_RESTRICT>;
+using DataRange = LE::Utility::Span<float>;
+using ReadOnlyDataRange = LE::Utility::Span<float const>;
 
 class ReversedHistoryBufferState
 {

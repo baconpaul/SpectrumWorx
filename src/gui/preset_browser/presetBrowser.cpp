@@ -28,10 +28,11 @@
 #include "juce/endIncludes.hpp"
 
 // Boost sandbox
-#include "boost/filesystem/directory_iterator.hpp"
+#include <filesystem>
+#include <system_error>
 #include "boost/mmap/mappble_objects/file/utility.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -126,9 +127,9 @@ PresetBrowser::PresetBrowser()
     comment().setEnabled(false);
     comment().setInputRestrictions(PresetHeader::maxCommentLength - 1);
 
-    BOOST_ASSERT(!save_.getMouseClickGrabsKeyboardFocus());
-    BOOST_ASSERT(!saveAs_.getMouseClickGrabsKeyboardFocus());
-    BOOST_ASSERT(!delete_.getMouseClickGrabsKeyboardFocus());
+    LE_ASSERT(!save_.getMouseClickGrabsKeyboardFocus());
+    LE_ASSERT(!saveAs_.getMouseClickGrabsKeyboardFocus());
+    LE_ASSERT(!delete_.getMouseClickGrabsKeyboardFocus());
 
     addToParentAndShow(*this, comment());
     addToParentAndShow(*this, listBox_);
@@ -180,20 +181,20 @@ void PresetBrowser::presetSelectionChanged()
 
     comment().setText(originalComment_, false);
     comment().setEnabled(enablePresetSaving);
-    BOOST_ASSERT(comment().getWantsKeyboardFocus() || !comment().isEnabled());
+    LE_ASSERT(comment().getWantsKeyboardFocus() || !comment().isEnabled());
 }
 
 unsigned int PresetBrowser::selectedIndex() const
 {
     int const index(listBox_.getLastRowSelected());
-    BOOST_ASSERT_MSG(index >= 0, "Nothing selected");
+    LE_ASSERT_MSG(index >= 0, "Nothing selected");
     return index;
 }
 
 PresetBrowser::Item const &PresetBrowser::item(unsigned int const index) const
 {
     Item const &item(files_.getReference(index));
-    BOOST_ASSERT(
+    LE_ASSERT(
         currentDirectory_.getChildFile(item.name + (item.isDirectory ? _T( "" ) : presetExtension))
             .exists());
     return item;
@@ -204,7 +205,7 @@ PresetBrowser::Item const &PresetBrowser::selectedItem() const { return item(sel
 juce::File PresetBrowser::file(unsigned int const index) const
 {
     Item const &item(this->item(index));
-    BOOST_ASSERT(!item.isDirectory);
+    LE_ASSERT(!item.isDirectory);
     return currentDirectory_.getChildFile(item.name + presetExtension);
 }
 
@@ -237,14 +238,14 @@ void PresetBrowser::paintListBoxItem(int const rowNumber, juce::Graphics &graphi
     //                                        (25.11.2011.) (Domagoj Saric)
     if (rowNumber >= files_.size())
     {
-        BOOST_ASSERT(addOneRow_ == true);
-        BOOST_ASSERT(rowNumber == files_.size());
-        BOOST_ASSERT(!rowIsSelected);
+        LE_ASSERT(addOneRow_ == true);
+        LE_ASSERT(rowNumber == files_.size());
+        LE_ASSERT(!rowIsSelected);
         return;
     }
 #endif // __APPLE__
 
-    BOOST_ASSERT(rowNumber < files_.size());
+    LE_ASSERT(rowNumber < files_.size());
 
     if (rowIsSelected)
         graphics.fillAll(Theme::singleton().Theme::findColour(
@@ -288,7 +289,7 @@ void PresetBrowser::returnKeyPressed(int /*lastRowSelected*/) noexcept {}
 
 void PresetBrowser::textEditorTextChanged(juce::TextEditor &editor)
 {
-    BOOST_ASSERT((&editor == &this->presetNameEditBox_) || (&editor == &this->comment()));
+    LE_ASSERT((&editor == &this->presetNameEditBox_) || (&editor == &this->comment()));
     if (&editor == &comment())
         dirtyCommentPresetIndex_ = listBox_.getLastRowSelected();
 }
@@ -298,9 +299,9 @@ void PresetBrowser::textEditorTextChanged(juce::TextEditor &editor)
 
 void PresetBrowser::textEditorReturnKeyPressed(juce::TextEditor &editor)
 {
-    BOOST_ASSERT(listBox_.getViewport()->isVerticalScrollBarShown() ||
-                 listBox_.getViewport()->isHorizontalScrollBarShown());
-    BOOST_ASSERT(&editor == &this->presetNameEditBox_);
+    LE_ASSERT(listBox_.getViewport()->isVerticalScrollBarShown() ||
+              listBox_.getViewport()->isHorizontalScrollBarShown());
+    LE_ASSERT(&editor == &this->presetNameEditBox_);
 
     // Implementation note:
     //   We simply do not accept empty input. The user either has to cancel the
@@ -352,7 +353,7 @@ void PresetBrowser::textEditorEscapeKeyPressed(juce::TextEditor &editor)
     }
     else
     {
-        BOOST_ASSERT(&editor == &this->comment());
+        LE_ASSERT(&editor == &this->comment());
         comment().setText(originalComment_, false);
     }
 }
@@ -365,7 +366,7 @@ void PresetBrowser::textEditorFocusLost(juce::TextEditor &editor)
     }
     else
     {
-        BOOST_ASSERT(&editor == &this->comment());
+        LE_ASSERT(&editor == &this->comment());
         // Implementation note:
         //   No need to do anything here: already handled in focusLost().
         //                                    (15.03.2010.) (Domagoj Saric)
@@ -424,7 +425,7 @@ void PresetBrowser::saveDirtyComment()
             mmap::map_file(dirtyPreset.getFullPathName().getCharPointer(), newPresetDataSize));
         if (!mappedPreset)
             return;
-        BOOST_ASSERT(mappedPreset.size() == newPresetDataSize);
+        LE_ASSERT(mappedPreset.size() == newPresetDataSize);
         std::memcpy(mappedPreset.begin(), &newPresetData[0], newPresetDataSize);
     }
 }
@@ -466,8 +467,7 @@ void PresetBrowser::buttonClicked(juce::Button *const pButton)
             unsigned int const suffixLength(1 + 1 + 2 + counter / 100 + 1);
             newPreset.preallocateBytes((newPresetNameLength + suffixLength) * sizeof(char_t));
             char_t *const pSuffix(newPreset.getCharPointer().getAddress() + newPresetNameLength);
-            BOOST_VERIFY(LE_INT_SPRINTF(pSuffix, _T( " (%02u)" ), ++counter) <=
-                         signed(suffixLength));
+            LE_VERIFY(LE_INT_SPRINTF(pSuffix, _T( " (%02u)" ), ++counter) <= signed(suffixLength));
         }
 
         // Implementation note:
@@ -485,12 +485,12 @@ void PresetBrowser::buttonClicked(juce::Button *const pButton)
     }
     else
     {
-        BOOST_ASSERT(pButton == &browseArrow_);
+        LE_ASSERT(pButton == &browseArrow_);
         juce::FileChooser folderChooser("Please select a folder with SW presets...",
                                         currentDirectory_);
         if (folderChooser.browseForDirectory())
         {
-            BOOST_ASSERT(folderChooser.getResults().size() == 1);
+            LE_ASSERT(folderChooser.getResults().size() == 1);
             setNewFolder(folderChooser.getResults().getReference(0));
         }
     }
@@ -505,7 +505,7 @@ void PresetBrowser::buttonClicked(juce::Button *const pButton)
 
 void PresetBrowser::showFilenameEditBox(juce::String const &presetName, unsigned int atRow)
 {
-    BOOST_ASSERT(presetNameEditBox_.getParentComponent() == this);
+    LE_ASSERT(presetNameEditBox_.getParentComponent() == this);
 
     listBox_.scrollToEnsureRowIsOnscreen(atRow);
 
@@ -595,39 +595,27 @@ void PresetBrowser::refresh()
 {
     files_.clearQuick();
 
-    boost::filesystem::directory_iterator directoryIterator( //...mrmlj...
-#ifdef _WIN32
-        (currentDirectory_.getFullPathName() + BOOST_FS_DIRECTORY_ITERATOR_SUFFIX())
-            .getCharPointer()
-#else
-        currentDirectory_.getFullPathName().getCharPointer()
-#endif // _WIN32
-    );
-
-    typedef boost::filesystem::directory_iterator::entry Entry;
-
+    std::error_code listingError;
     Item item;
-    while (!!directoryIterator)
+    for (auto const &entry : std::filesystem::directory_iterator(
+             currentDirectory_.getFullPathName().getCharPointer().getAddress(), listingError))
     {
-        Entry const &entry(*directoryIterator);
-        if (entry.name()[0] != '.' || entry.name()[1] != '\0')
+        auto const fileName(entry.path().filename().string());
+        if (fileName == "." || fileName == "..")
+            continue;
+
+        bool const isDirectory(entry.is_directory(listingError));
+        auto const fullNameLength(static_cast<unsigned int>(fileName.size()));
+        unsigned int const nameLength(
+            isDirectory ? fullNameLength
+                        : (fullNameLength - std::min(fullNameLength, presetExtensionLength)));
+
+        if (isDirectory || std::_tcscmp(fileName.c_str() + nameLength, presetExtension) == 0)
         {
-            bool const isDirectory(entry.is_directory());
-            unsigned int const fullNameLength(
-                static_cast<unsigned int>(std::_tcslen(entry.name())));
-            unsigned int const nameLength(
-                isDirectory ? fullNameLength
-                            : (fullNameLength - std::min(fullNameLength, presetExtensionLength)));
-
-            if (isDirectory || std::_tcscmp(entry.name() + nameLength, presetExtension) == 0)
-            {
-                item.isDirectory = isDirectory;
-                item.name = juce::String(entry.name(), nameLength);
-                files_.add(item);
-            }
+            item.isDirectory = isDirectory;
+            item.name = juce::String(fileName.c_str(), nameLength);
+            files_.add(item);
         }
-
-        ++directoryIterator;
     }
 
     std::sort(files_.begin(), files_.end());
@@ -641,7 +629,7 @@ void PresetBrowser::refreshAndSelectPreset(juce::String const &presetName)
 
     Item const *const pItem(findPreset(presetName));
     unsigned int const indexToSelect(static_cast<unsigned int>(pItem - files_.begin()));
-    BOOST_ASSERT(indexToSelect < unsigned(files_.size()));
+    LE_ASSERT(indexToSelect < unsigned(files_.size()));
 
     comment().grabKeyboardFocus();
 

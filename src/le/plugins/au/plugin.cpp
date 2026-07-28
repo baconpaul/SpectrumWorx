@@ -13,7 +13,8 @@
 #include "le/utility/buffers.hpp"
 #include "le/utility/clear.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -26,7 +27,7 @@ AUHostProxy::AUHostProxy(::AudioUnit const auInstance)
     : auInstance_(auInstance), pCurrentTimeStamp_(nullptr)
 {
     Utility::clear(callbacks());
-    BOOST_ASSERT(propertyListeners_.begin() == propertyListeners_.end());
+    LE_ASSERT(propertyListeners_.begin() == propertyListeners_.end());
 
     //...mrmlj...SW HARDCODE...
     /// \note Side channels have to be enabled for AU validation format tests to
@@ -110,7 +111,7 @@ void AUHostProxy::fireParameterEvent(::AudioUnitEventType const eventType,
     //parameter.mParameterID = parameterID           ;
     //parameter.mScope       = kAudioUnitScope_Global;
     //parameter.mElement     = 0                     ;
-    //BOOST_VERIFY( ::AUParameterListenerNotify( nullptr, nullptr, &parameter ) == noErr );
+    //LE_VERIFY( ::AUParameterListenerNotify( nullptr, nullptr, &parameter ) == noErr );
     fireEvent(eventType, parameterID);
 }
 
@@ -131,12 +132,12 @@ void AUHostProxy::fireEvent(::AudioUnitEventType const eventType, ::UInt32 const
     event.mArgument.mParameter.mParameterID = itemID;
     event.mArgument.mParameter.mScope = kAudioUnitScope_Global;
     event.mArgument.mParameter.mElement = 0;
-    BOOST_STATIC_ASSERT(sizeof(event.mArgument.mParameter) == sizeof(event.mArgument.mProperty));
-    BOOST_ASSERT(event.mArgument.mParameter.mAudioUnit == event.mArgument.mProperty.mAudioUnit);
-    BOOST_ASSERT(event.mArgument.mParameter.mParameterID == event.mArgument.mProperty.mPropertyID);
-    BOOST_ASSERT(event.mArgument.mParameter.mScope == event.mArgument.mProperty.mScope);
-    BOOST_ASSERT(event.mArgument.mParameter.mElement == event.mArgument.mProperty.mElement);
-    BOOST_VERIFY(::AUEventListenerNotify(0, 0, &event) == noErr);
+    static_assert(sizeof(event.mArgument.mParameter) == sizeof(event.mArgument.mProperty));
+    LE_ASSERT(event.mArgument.mParameter.mAudioUnit == event.mArgument.mProperty.mAudioUnit);
+    LE_ASSERT(event.mArgument.mParameter.mParameterID == event.mArgument.mProperty.mPropertyID);
+    LE_ASSERT(event.mArgument.mParameter.mScope == event.mArgument.mProperty.mScope);
+    LE_ASSERT(event.mArgument.mParameter.mElement == event.mArgument.mProperty.mElement);
+    LE_VERIFY(::AUEventListenerNotify(0, 0, &event) == noErr);
 }
 
 OSStatus AUHostProxy::addPropertyListener(::AudioUnitPropertyID const propertyID,
@@ -148,7 +149,7 @@ OSStatus AUHostProxy::addPropertyListener(::AudioUnitPropertyID const propertyID
     {
         if (propertyListeners_.emplace_back(BoundPropertyListeners{propertyID}))
         {
-            BOOST_ASSERT(propertyListeners_.back().propertyID == propertyID);
+            LE_ASSERT(propertyListeners_.back().propertyID == propertyID);
             pListeners = &propertyListeners_.back().listeners;
         }
     }
@@ -201,7 +202,7 @@ OSStatus AUHostProxy::removePropertyListener(::AudioUnitPropertyID const propert
 #endif
 
     PropertyChangeListener const propertyListener = {callback, const_cast<void *>(pUserData)};
-    BOOST_STATIC_ASSERT(sizeof(PropertyChangeListener) == 2 * sizeof(pUserData));
+    static_assert(sizeof(PropertyChangeListener) == 2 * sizeof(pUserData));
 
     PropertyChangeListener *LE_RESTRICT const pElement(
         std::find_if(pListeners->begin(), pListeners->end(),
@@ -265,10 +266,10 @@ bool AUHostProxy::reportNewNumberOfIOChannels(std::uint8_t const inputs,
                                               std::uint8_t const sideInputs,
                                               std::uint8_t const outputs) const
 {
-    BOOST_ASSERT_MSG(findListenersFor(kAudioUnitProperty_StreamFormat) == nullptr,
-                     "Unexpected: host listening to stream format changes.");
-    BOOST_ASSERT_MSG(findListenersFor(kAudioUnitProperty_ElementCount) == nullptr,
-                     "Unexpected: host listening to bus count changes.");
+    LE_ASSERT_MSG(findListenersFor(kAudioUnitProperty_StreamFormat) == nullptr,
+                  "Unexpected: host listening to stream format changes.");
+    LE_ASSERT_MSG(findListenersFor(kAudioUnitProperty_ElementCount) == nullptr,
+                  "Unexpected: host listening to bus count changes.");
     //return false;
     bool const allowed //...mrmlj...
         ((inputs == inputChannels_) & (outputs == outputChannels_) & (sideInputs == sideChannels_));
@@ -308,8 +309,8 @@ template <> bool AUHostProxy::canDo<AcceptIOChanges>() const
     /// \note See the "[VST2.4 -> AU] host and property notifications" thread on
     /// the CoreAudio ML.
     ///                                       (19.03.2013.) (Domagoj Saric)
-    BOOST_ASSERT_MSG(findListenersFor(kAudioUnitProperty_StreamFormat) == nullptr,
-                     "Unexpected: host listening to stream format changes.");
+    LE_ASSERT_MSG(findListenersFor(kAudioUnitProperty_StreamFormat) == nullptr,
+                  "Unexpected: host listening to stream format changes.");
     return false;
     //for ( auto const & listener : propertyListeners_ )
     //{
@@ -346,7 +347,7 @@ bool AudioBuffers::resize(std::uint8_t const numberOfChannels, std::uint16_t con
 
     /// \note Assume 'interleavedness' does not change once it is set.
     ///                                   (12.11.2015.) (Domagoj Saric)
-    BOOST_ASSERT(!pIOBuffers_ || interleaved == this->interleaved());
+    LE_ASSERT(!pIOBuffers_ || interleaved == this->interleaved());
     /// \note Even though realloc() does not actually reallocate if we
     /// request the same/old/previous allocation size it still does a
     /// non-trivial amount of work (examined @ OSX10.11) so we try to avoid
@@ -366,23 +367,23 @@ bool AudioBuffers::resize(std::uint8_t const numberOfChannels, std::uint16_t con
         structureRequiredStorage +
         (structureAlignmentPadding + numberOfChannels * perBufferAlignedStorage));
 
-    BOOST_ASSERT(requiredStorage != 0);
-    BOOST_ASSERT(numberOfSamples || !perBufferAlignedStorage);
+    LE_ASSERT(requiredStorage != 0);
+    LE_ASSERT(numberOfSamples || !perBufferAlignedStorage);
 
     auto const pBufferList(
         static_cast<AudioBufferListPtr>(std::realloc(pIOBuffers_, requiredStorage)));
-    if (BOOST_UNLIKELY(!pBufferList))
+    if (LE_UNLIKELY(!pBufferList))
         return false;
-    BOOST_ASSERT_MSG(
-        (pBufferList == pIOBuffers_) ||
-            ((pIOBuffers_ == nullptr) || (numberOfChannels != this->numberOfChannels()) ||
-             (numberOfSamples != this->numberOfSamples()) || (interleaved != this->interleaved())),
-        "Unexpected reallocation");
+    LE_ASSERT_MSG((pBufferList == pIOBuffers_) ||
+                      ((pIOBuffers_ == nullptr) || (numberOfChannels != this->numberOfChannels()) ||
+                       (numberOfSamples != this->numberOfSamples()) ||
+                       (interleaved != this->interleaved())),
+                  "Unexpected reallocation");
 
     pIOBuffers_ = pBufferList;
     pIOBuffers_->mNumberBuffers = numberOfBuffers;
 
-    auto const buffers(boost::make_iterator_range_n(&pIOBuffers_->mBuffers[0], numberOfBuffers));
+    auto const buffers(LE::Utility::makeSpan(&pIOBuffers_->mBuffers[0], numberOfBuffers));
     char *__restrict pBufferStorage(numberOfSamples ? reinterpret_cast<char *>(buffers.end()) +
                                                           structureAlignmentPadding
                                                     : nullptr);
@@ -396,7 +397,7 @@ bool AudioBuffers::resize(std::uint8_t const numberOfChannels, std::uint16_t con
         pBufferStorage += perBufferAlignedStorage;
     }
 
-    BOOST_ASSERT_MSG(
+    LE_ASSERT_MSG(
         (pBufferStorage - reinterpret_cast<char const *>(pIOBuffers_) == requiredStorage) ||
             !numberOfSamples,
         "Buffer overrun.");
@@ -427,7 +428,7 @@ std::uint16_t AudioBuffers::numberOfSamples() const
 void AudioBuffers::alias(::AudioBufferList const &__restrict source,
                          ::AudioBufferList &__restrict target)
 {
-    BOOST_ASSERT_MSG(source.mNumberBuffers == target.mNumberBuffers, "Mismatched buffers.");
+    LE_ASSERT_MSG(source.mNumberBuffers == target.mNumberBuffers, "Mismatched buffers.");
     std::memcpy(&target, &source,
                 reinterpret_cast<char const *>(&source.mBuffers[source.mNumberBuffers]) -
                     reinterpret_cast<char const *>(&source));
@@ -435,26 +436,26 @@ void AudioBuffers::alias(::AudioBufferList const &__restrict source,
 
 void AudioBuffers::aliasFrom(::AudioBufferList const &source)
 {
-    BOOST_ASSERT_MSG(pIOBuffers_, "Uninitialised buffer.");
+    LE_ASSERT_MSG(pIOBuffers_, "Uninitialised buffer.");
     alias(source, *pIOBuffers_);
 }
 
 void AudioBuffers::aliasTo(::AudioBufferList &target) const
 {
-    BOOST_ASSERT_MSG(pIOBuffers_, "Uninitialised buffer.");
+    LE_ASSERT_MSG(pIOBuffers_, "Uninitialised buffer.");
     alias(*pIOBuffers_, target);
 }
 
 void AudioBuffers::copyTo(::AudioBufferList &target) const
 {
-    BOOST_ASSERT_MSG(pIOBuffers_, "Uninitialised buffer.");
+    LE_ASSERT_MSG(pIOBuffers_, "Uninitialised buffer.");
     copy(*pIOBuffers_, target);
 }
 
 void AudioBuffers::copy(::AudioBufferList const &__restrict source,
                         ::AudioBufferList &__restrict target)
 {
-    BOOST_ASSERT_MSG(source.mNumberBuffers == target.mNumberBuffers, "Mismatched buffers.");
+    LE_ASSERT_MSG(source.mNumberBuffers == target.mNumberBuffers, "Mismatched buffers.");
 
     ::AudioBuffer const *__restrict pSource(source.mBuffers);
     ::AudioBuffer *__restrict pDestination(target.mBuffers);
@@ -463,12 +464,12 @@ void AudioBuffers::copy(::AudioBufferList const &__restrict source,
     unsigned int numberOfChannels(source.mNumberBuffers);
     while (numberOfChannels--)
     {
-        BOOST_ASSERT(pSource != pDestination);
-        BOOST_ASSERT(pSource->mData != pDestination->mData);
-        BOOST_ASSERT(pSource->mDataByteSize == channelSize);
-        BOOST_ASSERT(pDestination->mDataByteSize == channelSize);
-        BOOST_ASSERT(reinterpret_cast<std::size_t>(pDestination->mData) % 16 == 0);
-        BOOST_ASSERT(reinterpret_cast<std::size_t>(pSource->mData) % 16 == 0);
+        LE_ASSERT(pSource != pDestination);
+        LE_ASSERT(pSource->mData != pDestination->mData);
+        LE_ASSERT(pSource->mDataByteSize == channelSize);
+        LE_ASSERT(pDestination->mDataByteSize == channelSize);
+        LE_ASSERT(reinterpret_cast<std::size_t>(pDestination->mData) % 16 == 0);
+        LE_ASSERT(reinterpret_cast<std::size_t>(pSource->mData) % 16 == 0);
         std::memcpy(static_cast<void *>(__builtin_assume_aligned(pDestination++->mData, 16)),
                     static_cast<void const *>(__builtin_assume_aligned(pSource++->mData, 16)),
                     channelSize);
@@ -514,15 +515,15 @@ void AUPluginBase::sendRenderNotification(::AudioUnitRenderActionFlags const ext
                                           ::UInt32 const busNumber, ::UInt32 const numberFrames,
                                           ::AudioBufferList &ioData) const
 {
-    BOOST_ASSERT_MSG((ioActionFlags & extraFlags) == 0, "Invalid ioActionFlags.");
+    LE_ASSERT_MSG((ioActionFlags & extraFlags) == 0, "Invalid ioActionFlags.");
 
     ioActionFlags |= extraFlags;
 
     for (auto const &delegate : renderNotificationCallbacks_)
     {
         // https://developer.apple.com/library/mac/documentation/AudioUnit/Reference/AUComponentServicesReference/Reference/reference.html#//apple_ref/c/func/AudioUnitAddRenderNotify
-        BOOST_VERIFY(delegate.inputProc(delegate.inputProcRefCon, &ioActionFlags, &timeStamp,
-                                        busNumber, numberFrames, &ioData) == noErr);
+        LE_VERIFY(delegate.inputProc(delegate.inputProcRefCon, &ioActionFlags, &timeStamp,
+                                     busNumber, numberFrames, &ioData) == noErr);
     }
 
     ioActionFlags &= ~extraFlags;
@@ -558,11 +559,11 @@ OSStatus AUPluginBase::RenderDelegate::operator()(::AudioUnitRenderActionFlags &
     for (::AudioBuffer const *pBuffer(buffers.mBuffers);
          pBuffer < &buffers.mBuffers[buffers.mNumberBuffers]; ++pBuffer)
     {
-        BOOST_ASSERT_MSG(pBuffer->mData, "Unexpected null IO buffer.");
-        BOOST_ASSERT_MSG(pBuffer->mDataByteSize == numberFrames * sizeof(float),
-                         "Incorrect IO buffer size,");
-        BOOST_ASSERT_MSG(reinterpret_cast<std::size_t>(pBuffer->mData) % 16 == 0,
-                         "Unexpected buffer alignment.");
+        LE_ASSERT_MSG(pBuffer->mData, "Unexpected null IO buffer.");
+        LE_ASSERT_MSG(pBuffer->mDataByteSize == numberFrames * sizeof(float),
+                      "Incorrect IO buffer size,");
+        LE_ASSERT_MSG(reinterpret_cast<std::size_t>(pBuffer->mData) % 16 == 0,
+                      "Unexpected buffer alignment.");
     }
 #endif // _DEBUG
 }
@@ -588,13 +589,13 @@ OSStatus AUPluginBase::InputConnection::operator()(
     ::AudioTimeStamp const *LE_RESTRICT const pTimeStamp, ::UInt32 const numberFrames,
     ::AudioBufferList *LE_RESTRICT const pExternalBuffers, ::UInt32 const numberOfChannels) const
 {
-    BOOST_ASSERT_MSG(!pExternalBuffers || pExternalBuffers->mNumberBuffers == numberOfChannels,
-                     "Invalid inplace buffers.");
+    LE_ASSERT_MSG(!pExternalBuffers || pExternalBuffers->mNumberBuffers == numberOfChannels,
+                  "Invalid inplace buffers.");
 
     bool const allocateBufferStructureOnly(pExternalBuffers || !mustAllocateBuffer());
 
-    if (BOOST_UNLIKELY(!buffers_.resize(numberOfChannels,
-                                        allocateBufferStructureOnly ? 0 : numberFrames, false)))
+    if (LE_UNLIKELY(!buffers_.resize(numberOfChannels,
+                                     allocateBufferStructureOnly ? 0 : numberFrames, false)))
         return kAudio_MemFullError;
     if (pExternalBuffers)
         buffers_.aliasFrom(*pExternalBuffers);

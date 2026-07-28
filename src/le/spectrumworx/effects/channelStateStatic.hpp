@@ -12,11 +12,8 @@
 #define channelStateStatic_hpp__00473652_1B0C_4BDC_A10A_D2AA913A036A
 //------------------------------------------------------------------------------
 #include "le/utility/platformSpecifics.hpp"
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
-namespace boost
-{
-template <class IteratorT> class iterator_range;
-}
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -28,7 +25,7 @@ namespace SW
 namespace Engine
 {
 struct StorageFactors;
-typedef boost::iterator_range<char *LE_RESTRICT> Storage;
+typedef LE::Utility::Span<char> Storage;
 } // namespace Engine
 
 //------------------------------------------------------------------------------

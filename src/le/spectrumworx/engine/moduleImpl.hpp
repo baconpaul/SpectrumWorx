@@ -29,8 +29,7 @@
 #include "le/spectrumworx/engine/moduleParameters.hpp"
 #include "le/utility/buffers.hpp"
 #include "le/utility/platformSpecifics.hpp"
-
-#include <boost/range/iterator_range_core.hpp>
+#include "le/utility/span.hpp"
 
 #include <array>
 #include <cstdint>
@@ -126,30 +125,13 @@ struct array_aux<Parameters, offset_t, std::index_sequence<Indices...>>
 // terminating partial specialisations
 template <typename Parameters> struct array_aux<Parameters, ParameterInfo, std::index_sequence<>>
 {
-    static BOOST_CONSTEXPR ParameterInfo const *const data
-#ifndef BOOST_NO_CXX11_CONSTEXPR
-        = nullptr
-#endif // BOOST_NO_CXX11_CONSTEXPR
-        ;
+    static constexpr ParameterInfo const *const data = nullptr;
 }; // struct array_aux
-#ifdef BOOST_NO_CXX11_CONSTEXPR
-template <typename Parameters>
-ParameterInfo const *const array_aux<Parameters, ParameterInfo, std::index_sequence<>>::data =
-    nullptr;
-#endif // BOOST_NO_CXX11_CONSTEXPR
 template <typename Parameters> struct array_aux<Parameters, offset_t, std::index_sequence<>>
 {
-    static BOOST_CONSTEXPR offset_t const *const data
-#ifndef BOOST_NO_CXX11_CONSTEXPR
-        = nullptr
-#endif // BOOST_NO_CXX11_CONSTEXPR
-        ;
+    static constexpr offset_t const *const data = nullptr;
 }; // struct array_aux
-#ifdef BOOST_NO_CXX11_CONSTEXPR
-template <typename Parameters>
-offset_t const *const array_aux<Parameters, offset_t, std::index_sequence<>>::data = nullptr;
-#endif // BOOST_NO_CXX11_CONSTEXPR
-#else  // disabled/does not work
+#else // disabled/does not work
 template <typename Parameters, typename Data, index_t... Indices>
 struct array_aux<Parameters, Data, std::index_sequence<Indices...>>
 {
@@ -167,8 +149,8 @@ struct array_aux<Parameters, Data, std::index_sequence<>>
     static DataArray const data;
 }; // struct array_aux
 template <typename Parameters, typename Data>
-typename array_aux<Parameters, Data, std::index_sequence<>>::DataArray BOOST_CONSTEXPR_OR_CONST
-    array_aux<Parameters, Data, std::index_sequence<>>::data;
+typename array_aux<Parameters, Data, std::index_sequence<>>::DataArray constexpr array_aux<
+    Parameters, Data, std::index_sequence<>>::data;
 #endif
 
 template <class Parameters, unsigned index> offset_t valueOffsetGetter()
@@ -192,42 +174,38 @@ template <typename ParameterTypeTag> struct ParameterType;
 
 template <> struct ParameterType<Parameters::BooleanParameterTag>
 {
-    static ParameterInfo::Type BOOST_CONSTEXPR_OR_CONST type = ParameterInfo::Boolean;
+    static ParameterInfo::Type constexpr type = ParameterInfo::Boolean;
 };
 template <> struct ParameterType<Parameters::TriggerParameterTag>
 {
-    static ParameterInfo::Type BOOST_CONSTEXPR_OR_CONST type = ParameterInfo::Trigger;
+    static ParameterInfo::Type constexpr type = ParameterInfo::Trigger;
 };
 template <> struct ParameterType<Parameters::LinearIntegerParameterTag>
 {
-    static ParameterInfo::Type BOOST_CONSTEXPR_OR_CONST type = ParameterInfo::Integer;
+    static ParameterInfo::Type constexpr type = ParameterInfo::Integer;
 };
-//template <> struct ParameterType<Parameters::LinearSignedInteger         > { static ParameterInfo::Type BOOST_CONSTEXPR_OR_CONST type = ParameterInfo::Integer      ; };
-//template <> struct ParameterType<Parameters::LinearUnsignedInteger       > { static ParameterInfo::Type BOOST_CONSTEXPR_OR_CONST type = ParameterInfo::Integer      ; };
+//template <> struct ParameterType<Parameters::LinearSignedInteger         > { static ParameterInfo::Type constexpr type = ParameterInfo::Integer      ; };
+//template <> struct ParameterType<Parameters::LinearUnsignedInteger       > { static ParameterInfo::Type constexpr type = ParameterInfo::Integer      ; };
 template <> struct ParameterType<Parameters::SymmetricIntegerParameterTag>
 {
-    static ParameterInfo::Type BOOST_CONSTEXPR_OR_CONST type = ParameterInfo::Integer;
+    static ParameterInfo::Type constexpr type = ParameterInfo::Integer;
 };
 template <> struct ParameterType<Parameters::EnumeratedParameterTag>
 {
-    static ParameterInfo::Type BOOST_CONSTEXPR_OR_CONST type = ParameterInfo::Enumerated;
+    static ParameterInfo::Type constexpr type = ParameterInfo::Enumerated;
 };
 template <> struct ParameterType<Parameters::LinearFloatParameterTag>
 {
-    static ParameterInfo::Type BOOST_CONSTEXPR_OR_CONST type = ParameterInfo::FloatingPoint;
+    static ParameterInfo::Type constexpr type = ParameterInfo::FloatingPoint;
 };
 template <> struct ParameterType<Parameters::SymmetricFloatParameterTag>
 {
-    static ParameterInfo::Type BOOST_CONSTEXPR_OR_CONST type = ParameterInfo::FloatingPoint;
+    static ParameterInfo::Type constexpr type = ParameterInfo::FloatingPoint;
 };
 
 struct NonEnumeratedParameter
 {
-    static BOOST_CONSTEXPR char const *LE_RESTRICT const *LE_RESTRICT const strings
-#ifndef BOOST_NO_CXX11_CONSTEXPR
-        = nullptr
-#endif // BOOST_NO_CXX11_CONSTEXPR
-        ;
+    static constexpr char const *LE_RESTRICT const *LE_RESTRICT const strings = nullptr;
 };
 template <class Parameter, typename Tag> struct EnumeratedValueStrings
 {
@@ -239,8 +217,7 @@ struct EnumeratedValueStrings<Parameter, Parameters::EnumeratedParameterTag>
     using type = LE::Parameters::DiscreteValues<Parameter>;
 };
 
-#ifndef BOOST_NO_CXX11_CONSTEXPR //...mrmlj...msvc12 creates dynamic initialisers if the info<>() function template is used...
-template <class Parameter> BOOST_CONSTEXPR ParameterInfo info()
+template <class Parameter> constexpr ParameterInfo info()
 {
     static_assert(
         !std::is_same<typename Parameter::Tag, LE::Parameters::PowerOfTwoParameterTag>::value,
@@ -266,39 +243,11 @@ template <class Parameter> BOOST_CONSTEXPR ParameterInfo info()
 #endif // LE_NO_PARAMETER_STRINGS
     };
 }
-#endif // !BOOST_NO_CXX11_CONSTEXPR
 
 template <typename Parameters, index_t... Indices>
 typename array_aux<Parameters, ParameterInfo, std::index_sequence<Indices...>>::DataArray const
-    array_aux<Parameters, ParameterInfo, std::index_sequence<Indices...>>::data = {{
-#ifndef BOOST_NO_CXX11_CONSTEXPR
-        info<typename boost::fusion::result_of::value_at_c<Parameters, Indices>::type>()...
-#else
-        {ParameterType<
-             typename boost::fusion::result_of::value_at_c<Parameters, Indices>::type::Tag>::type,
-         static_cast<float>(
-             boost::fusion::result_of::value_at_c<Parameters, Indices>::type::unscaledMinimum) /
-             boost::fusion::result_of::value_at_c<Parameters,
-                                                  Indices>::type::rangeValuesDenominator,
-         static_cast<float>(
-             boost::fusion::result_of::value_at_c<Parameters, Indices>::type::unscaledMaximum) /
-             boost::fusion::result_of::value_at_c<Parameters,
-                                                  Indices>::type::rangeValuesDenominator,
-         static_cast<float>(
-             boost::fusion::result_of::value_at_c<Parameters, Indices>::type::unscaledDefault) /
-             boost::fusion::result_of::value_at_c<Parameters,
-                                                  Indices>::type::rangeValuesDenominator,
-         LE::Parameters::Name<
-             typename boost::fusion::result_of::value_at_c<Parameters, Indices>::type>::string_,
-#ifdef LE_NO_PARAMETER_STRINGS
-         nullptr, nullptr
-#else
-            boost::mpl::c_str<typename LE::Parameters::DisplayValueTransformer<typename boost::fusion::result_of::value_at_c<Parameters, Indices>::type>::Suffix>::value,
-            EnumeratedValueStrings<typename boost::fusion::result_of::value_at_c<Parameters, Indices>::type, typename boost::fusion::result_of::value_at_c<Parameters, Indices>::type::Tag>::type::strings,
-#endif // LE_NO_PARAMETER_STRINGS
-        }...
-#endif
-    }};
+    array_aux<Parameters, ParameterInfo, std::index_sequence<Indices...>>::data = {
+        {info<typename boost::fusion::result_of::value_at_c<Parameters, Indices>::type>()...}};
 
 template <class Parameters>
 struct ParametersInformation
@@ -315,7 +264,7 @@ struct MakeChannelStateHolder
     template <class Effect> struct ChannelStates
     {
         using ChannelState = typename Effect::ChannelState;
-        using ChannelStateRange = boost::iterator_range<ChannelState *LE_RESTRICT>;
+        using ChannelStateRange = LE::Utility::Span<ChannelState>;
 
         void LE_FORCEINLINE LE_HOT callProcess(Effect const &effect, std::uint8_t const channel,
                                                ChannelDataProxy const &data,
@@ -352,14 +301,14 @@ struct MakeChannelStateHolder
             channelStates_ =
                 ChannelStateRange(reinterpret_cast<ChannelState *>(pChannelStatesBegin),
                                   reinterpret_cast<ChannelState *>(pChannelStatesEnd));
-            BOOST_ASSERT(unsigned(channelStates_.size()) == factors.numberOfChannels);
+            LE_ASSERT(unsigned(channelStates_.size()) == factors.numberOfChannels);
 #ifndef _MSC_VER
             LE_DISABLE_LOOP_UNROLLING()
             LE_DISABLE_LOOP_VECTORIZATION()
 #endif // _MSC_VER
             for (auto &channelState : channelStates_)
             {
-                BOOST_ASSERT(reinterpret_cast<char *>(&channelState) < storage.end());
+                LE_ASSERT(reinterpret_cast<char *>(&channelState) < storage.end());
                 ChannelState *LE_RESTRICT const pNewChannelState(new (&channelState) ChannelState);
                 LE_ASSUME(pNewChannelState);
                 pNewChannelState->resize(factors, storage);
@@ -534,7 +483,7 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
     doProcess(std::uint8_t const channel, Engine::ModuleDSP::ChannelDataProxy const data,
               Setup const &setup) const override
     {
-        BOOST_ASSERT(setupCalled_);
+        LE_ASSERT(setupCalled_);
         channelStatesHolder_.callProcess(effect(), channel, data, setup);
     }
 
@@ -548,15 +497,15 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
   private:
     LE_NOTHROWNOALIAS LE_COLD bool resize(StorageFactors const &factors) override final
     {
-        //...mrmlj...au uninitialise...BOOST_ASSERT( factors.complete() );
+        //...mrmlj...au uninitialise...LE_ASSERT( factors.complete() );
 
         if (ChannelStatesHolder::sizeOfChannelState == 0)
         {
-            BOOST_ASSERT(channelStatesHolder_.channelStateRequiredStorage(factors) == 0);
+            LE_ASSERT(channelStatesHolder_.channelStateRequiredStorage(factors) == 0);
             return true;
         }
 
-        if (BOOST_LIKELY(
+        if (LE_LIKELY(
                 this->allocateStorage(factors, channelStatesHolder_.sizeOfChannelState,
                                       channelStatesHolder_.channelStateRequiredStorage(factors))))
         {
@@ -613,10 +562,6 @@ ModuleParameters::ParameterInfos const &ModuleParameters::parameterInfos()
 {
     return Engine::Detail::ParametersInformation<ModuleParameters::BaseParameters>::data;
 }
-#ifdef BOOST_NO_CXX11_CONSTEXPR
-LE_WEAK_SYMBOL char const *LE_RESTRICT const
-    *LE_RESTRICT const Engine::Detail::NonEnumeratedParameter::strings = nullptr;
-#endif // BOOST_NO_CXX11_CONSTEXPR
 
 //------------------------------------------------------------------------------
 } // namespace Engine

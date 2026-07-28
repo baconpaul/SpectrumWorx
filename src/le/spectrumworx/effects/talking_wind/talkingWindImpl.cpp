@@ -67,7 +67,7 @@
 
 #include "boost/simd/preprocessor/stack_buffer.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -164,7 +164,7 @@ LE_HOT void TalkingWindImpl::process(Engine::MainSideChannelData_AmPh data,
     }
 #endif // NDEBUG
 
-    if (BOOST_LIKELY(skippedLeadingBins == 0 && data.endBin() > 1))
+    if (LE_LIKELY(skippedLeadingBins == 0 && data.endBin() > 1))
     {
         /// \note Avoid passing the DC through. This primitive approach is far
         /// from ideal as the DC component can leak into the neighbouring bins
@@ -180,7 +180,7 @@ LE_HOT void TalkingWindImpl::process(Engine::MainSideChannelData_AmPh data,
 
     copy(data.side().phases(), data.main().phases());
 
-    //BOOST_ASSERT( data.main().amps()[ 0 ] == 0 ); //...mrmlj...envelope DC bin is currently not fully zeroed
+    //LE_ASSERT( data.main().amps()[ 0 ] == 0 ); //...mrmlj...envelope DC bin is currently not fully zeroed
 }
 
 void LE_HOT TalkingWindImpl::lowPassSpectrum_cepstrum(DataRange const &spectrum,
@@ -213,8 +213,8 @@ void LE_HOT TalkingWindImpl::lowPassSpectrum_cepstrum(DataRange const &spectrum,
     ///                                       (13.06.2012.) (Domagoj Saric)
 
     // spectrum must alias (and be at the beginning of) the workBuffer...
-    BOOST_ASSERT(spectrum.begin() == workBuffer.begin());
-    BOOST_ASSERT(spectrum.end() < workBuffer.end());
+    LE_ASSERT(spectrum.begin() == workBuffer.begin());
+    LE_ASSERT(spectrum.end() < workBuffer.end());
 
     float *LE_RESTRICT const pReals(spectrum.begin());
     float *LE_RESTRICT const pImags(static_cast<float *>(align(spectrum.end())));

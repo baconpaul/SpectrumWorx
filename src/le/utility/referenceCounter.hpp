@@ -13,18 +13,10 @@
 //------------------------------------------------------------------------------
 #include "platformSpecifics.hpp"
 
-#include <boost/assert.hpp>
-#include <boost/config.hpp>
-#include <boost/core/ignore_unused.hpp>
+#include "assert.hpp"
+#include "ignoreUnused.hpp"
 
-#if defined(_MSC_VER) || defined(_LIBCPP_VERSION) || !defined(BOOST_NO_CXX11_HDR_ATOMIC)
 #include <atomic>
-#else
-#ifndef BOOST_ATOMIC_NO_LIB
-#define BOOST_ATOMIC_NO_LIB
-#endif // BOOST_ATOMIC_NO_LIB
-#include <boost/atomic/atomic.hpp>
-#endif // BOOST_NO_CXX11_HDR_ATOMIC
 #include <cstdint>
 #include <limits>
 //------------------------------------------------------------------------------
@@ -37,11 +29,7 @@ namespace Utility
 
 namespace Detail
 {
-#if defined(_MSC_VER) || defined(_LIBCPP_VERSION) || !defined(BOOST_NO_CXX11_HDR_ATOMIC)
 using counter_t = std ::atomic_uint_fast8_t;
-#else
-using counter_t = boost::atomic_uint_fast8_t;
-#endif // BOOST_NO_CXX11_HDR_ATOMIC
 static_assert(sizeof(counter_t) == sizeof(char), "");
 } // namespace Detail
 
@@ -72,7 +60,7 @@ struct ReferenceCount : Detail::counter_t
     {
         auto const result(fetch_sub(1, std::memory_order_acq_rel) - 1);
         LE_ASSUME(result >= 0);
-        BOOST_UNLIKELY(result == 0);
+        LE_UNLIKELY(result == 0);
         return static_cast<std::uint8_t>(result);
     }
 #ifdef __clang__
@@ -84,8 +72,8 @@ struct ReferenceCount : Detail::counter_t
 
     void verifyCountEqual(value_type const value)
     {
-        BOOST_ASSERT(this->load(std::memory_order_seq_cst) == value);
-        boost::ignore_unused(value);
+        LE_ASSERT(this->load(std::memory_order_seq_cst) == value);
+        LE::Utility::ignoreUnused(value);
     }
 }; // class ReferenceCount
 

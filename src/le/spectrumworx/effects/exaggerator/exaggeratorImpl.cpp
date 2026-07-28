@@ -94,7 +94,7 @@ void LE_HOT ExaggeratorImpl::process(Engine::ChannelData_AmPh data, Engine::Setu
         postTotalAmp += amplitude;
     }
 
-    BOOST_ASSERT(postTotalAmp > 0);
+    LE_ASSERT(postTotalAmp > 0);
     normaliser = (preTotalAmp / postTotalAmp) / 2;
 
     Math::multiply(data.amps(), normaliser);

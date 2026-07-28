@@ -15,8 +15,6 @@
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/linear/parameter.hpp"
-
-#include "boost/config/abi_prefix.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -86,7 +84,4 @@ struct PitchMagnetPVD : Detail::PitchMagnetBase
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------
-
-#include "boost/config/abi_suffix.hpp"
-
 #endif // pitchMagnet_hpp

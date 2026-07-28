@@ -15,9 +15,9 @@
 
 #include "le/utility/platformSpecifics.hpp"
 
-#include <boost/assert.hpp>
-#include <boost/detail/endian.hpp>
-#include <boost/integer/static_log2.hpp>
+#include "le/utility/assert.hpp"
+#include <bit>
+#include "le/utility/staticLog2.hpp"
 
 #include <boost/simd/sdk/config/arch.hpp>
 #include <boost/simd/sdk/simd/extensions.hpp>
@@ -131,7 +131,7 @@ convert(Source const source)
                                   typename Detail::MakeSigned<Source>::type, Source>::type;
 
     Target const result(static_cast<Target>(static_cast<ConversionIntermediateType>(source)));
-    BOOST_ASSERT(result == static_cast<Target>(source));
+    LE_ASSERT(result == static_cast<Target>(source));
     return result;
 }
 
@@ -278,8 +278,8 @@ Target convertLinearRange(Source const sourceValue)
     Source const scaledSourceOffset(convert<Source>(sourceRangeOffset) / sourceRangeScaleFactor);
     Source const scaledSourceRange(convert<Source>(sourceRangeSize) / sourceRangeScaleFactor);
 
-    BOOST_ASSERT(isValueInRange<Source>(sourceValue, scaledSourceOffset,
-                                        scaledSourceOffset + scaledSourceRange));
+    LE_ASSERT(isValueInRange<Source>(sourceValue, scaledSourceOffset,
+                                     scaledSourceOffset + scaledSourceRange));
 
     using SignedSource = typename Detail::MakeSigned<Source>::type;
     SignedSource const unoffsetSource(sourceValue - scaledSourceOffset);
@@ -291,8 +291,8 @@ Target convertLinearRange(Source const sourceValue)
         convert<Target>(unoffsetSource * scaledTargetRange / scaledSourceRange) +
         scaledTargetOffset);
 
-    BOOST_ASSERT(isValueInRange<Target>(targetValue, scaledTargetOffset,
-                                        scaledTargetOffset + scaledTargetRange));
+    LE_ASSERT(isValueInRange<Target>(targetValue, scaledTargetOffset,
+                                     scaledTargetOffset + scaledTargetRange));
 
     return targetValue;
 }
@@ -306,7 +306,7 @@ Target convertLinearRange(Source const sourceValue, Source const sourceMinimum,
     Target const scaledTargetRange(convert<Target>(targetRangeSize) / targetRangeScaleFactor);
 
     LE_ASSUME(sourceMinimum < sourceMaximum);
-    BOOST_ASSERT(isValueInRange<Source>(sourceValue, sourceMinimum, sourceMaximum));
+    LE_ASSERT(isValueInRange<Source>(sourceValue, sourceMinimum, sourceMaximum));
 
     using SignedSource = typename Detail::MakeSigned<Source>::type;
     SignedSource const scaledSourceRange(sourceMaximum - sourceMinimum);
@@ -316,8 +316,8 @@ Target convertLinearRange(Source const sourceValue, Source const sourceMinimum,
         convert<Target>(unoffsetSource * scaledTargetRange / scaledSourceRange) +
         scaledTargetMinimum);
 
-    BOOST_ASSERT(isValueInRange<Target>(targetValue, scaledTargetMinimum,
-                                        scaledTargetMinimum + scaledTargetRange));
+    LE_ASSERT(isValueInRange<Target>(targetValue, scaledTargetMinimum,
+                                     scaledTargetMinimum + scaledTargetRange));
 
     return targetValue;
 }
@@ -332,10 +332,10 @@ Target convertLinearRange(Source const sourceValue, Target const targetMinimum,
     Source const scaledSourceRange(convert<Source>(sourceRangeSize) /
                                    convert<Source>(sourceRangeScaleFactor));
 
-    BOOST_ASSERT(isValueInRange<Source>(sourceValue, scaledSourceOffset,
-                                        scaledSourceOffset + scaledSourceRange));
+    LE_ASSERT(isValueInRange<Source>(sourceValue, scaledSourceOffset,
+                                     scaledSourceOffset + scaledSourceRange));
 
-    BOOST_ASSERT(targetMinimum <= targetMaximum);
+    LE_ASSERT(targetMinimum <= targetMaximum);
 
     using SignedTarget = typename Detail::MakeSigned<Target>::type;
     SignedTarget const scaledTargetOffset(targetMinimum);
@@ -346,7 +346,7 @@ Target convertLinearRange(Source const sourceValue, Target const targetMinimum,
                                               scaledTargetRange / scaledSourceRange) +
                               scaledTargetOffset));
 
-    BOOST_ASSERT(isValueInRange<Target>(targetValue, targetMinimum, targetMaximum));
+    LE_ASSERT(isValueInRange<Target>(targetValue, targetMinimum, targetMaximum));
 
     return targetValue;
 }
@@ -374,11 +374,11 @@ Target convertPowerOfTwo2LinearRange(unsigned int const sourceValue)
     bool const normalised(targetRangeOffset == 0 && targetRangeSize == 1 &&
                           targetRangeScaleFactor == 1);
 
-    BOOST_ASSERT(isPowerOfTwo(sourceValue));
-    unsigned int const minimumExponent(boost::static_log2<sourceMinimum>::value);
-    unsigned int const exponentRange(boost::static_log2<sourceMaximum>::value - minimumExponent);
+    LE_ASSERT(isPowerOfTwo(sourceValue));
+    unsigned int const minimumExponent(LE::Utility::staticLog2(sourceMinimum));
+    unsigned int const exponentRange(LE::Utility::staticLog2(sourceMaximum) - minimumExponent);
     unsigned int const valueExponent(PowerOfTwo::log2(sourceValue));
-    BOOST_ASSERT(minimumExponent == PowerOfTwo::log2(sourceMinimum));
+    LE_ASSERT(minimumExponent == PowerOfTwo::log2(sourceMinimum));
     return convertLinearRange<
         Target, normalised ? targetRangeOffset : 0, normalised ? targetRangeSize : exponentRange,
         normalised ? targetRangeScaleFactor : 1, unsigned int, minimumExponent, exponentRange, 1>(
@@ -404,8 +404,8 @@ template <unsigned int targetMinimum, unsigned int targetMaximum, typename Sourc
           unsigned int sourceRangeScaleFactor>
 unsigned int convertLinearRange2PowerOfTwo(Source const sourceValue)
 {
-    std::uint8_t const minimumExponent(boost::static_log2<targetMinimum>::value);
-    std::uint8_t const maximumExponent(boost::static_log2<targetMaximum>::value);
+    std::uint8_t const minimumExponent(LE::Utility::staticLog2(targetMinimum));
+    std::uint8_t const maximumExponent(LE::Utility::staticLog2(targetMaximum));
     std::uint8_t const exponentRange(maximumExponent - minimumExponent);
 
     //...mrmlj...ugh...clean this up asap...
@@ -420,7 +420,7 @@ unsigned int convertLinearRange2PowerOfTwo(Source const sourceValue)
     std::uint16_t const sourceRange(normalised ? (sourceRangeUnscaledSize / sourceRangeScaleFactor)
                                                : exponentRange);
 
-    BOOST_ASSERT(isValueInRange<Source>(sourceValue, sourceOffset, sourceOffset + sourceRange));
+    LE_ASSERT(isValueInRange<Source>(sourceValue, sourceOffset, sourceOffset + sourceRange));
 
     std::uint8_t const exponent(convert<std::uint8_t>(sourceValue * exponentRange / sourceRange) -
                                 (sourceOffset - minimumExponent));
@@ -429,7 +429,7 @@ unsigned int convertLinearRange2PowerOfTwo(Source const sourceValue)
     LE_ASSUME(exponent <= maximumExponent);
 
     unsigned int const result(static_cast<std::uint16_t>(1U) << exponent);
-    BOOST_ASSERT(isValueInRange<unsigned int>(result, targetMinimum, targetMaximum));
+    LE_ASSERT(isValueInRange<unsigned int>(result, targetMinimum, targetMaximum));
     return result;
 }
 

@@ -58,8 +58,7 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
     ///  - parameterIDFromIndex
     ///  - parameterIndexFromBinaryID
     ///                                       (07.03.2013.) (Domagoj Saric)
-    static std::uint16_t BOOST_CONSTEXPR_OR_CONST maxNumberOfParameters =
-        ParameterCounts::maxNumberOfParameters;
+    static std::uint16_t constexpr maxNumberOfParameters = ParameterCounts::maxNumberOfParameters;
     enum /*...mrmlj...Xcode7 linker errors*/
     {
         maxNumberOfOutputs = 13 + 1
@@ -68,16 +67,15 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
     {
         maxNumberOfInputs = maxNumberOfOutputs * 2
     };
-    static std::uint16_t BOOST_CONSTEXPR_OR_CONST maxLatency = Engine::Constants::maximumFFTSize;
-    static std::uint16_t BOOST_CONSTEXPR_OR_CONST maxLookAhead = Engine::Constants::maximumFFTSize;
-    static std::uint16_t BOOST_CONSTEXPR_OR_CONST maxTailSize = 0;
-    static std::uint16_t BOOST_CONSTEXPR_OR_CONST minimumProcessBufferSize = 0;
-    static std::uint8_t BOOST_CONSTEXPR_OR_CONST requiredBufferAlignement =
-        Utility::Constants::vectorAlignment;
-    static std::uint8_t BOOST_CONSTEXPR_OR_CONST versionMajor = SW_VERSION_MAJOR;
-    static std::uint8_t BOOST_CONSTEXPR_OR_CONST versionMinor = SW_VERSION_MINOR;
-    static std::uint8_t BOOST_CONSTEXPR_OR_CONST versionPatch = SW_VERSION_PATCH;
-    static std::uint32_t BOOST_CONSTEXPR_OR_CONST version =
+    static std::uint16_t constexpr maxLatency = Engine::Constants::maximumFFTSize;
+    static std::uint16_t constexpr maxLookAhead = Engine::Constants::maximumFFTSize;
+    static std::uint16_t constexpr maxTailSize = 0;
+    static std::uint16_t constexpr minimumProcessBufferSize = 0;
+    static std::uint8_t constexpr requiredBufferAlignement = Utility::Constants::vectorAlignment;
+    static std::uint8_t constexpr versionMajor = SW_VERSION_MAJOR;
+    static std::uint8_t constexpr versionMinor = SW_VERSION_MINOR;
+    static std::uint8_t constexpr versionPatch = SW_VERSION_PATCH;
+    static std::uint32_t constexpr version =
         (versionMajor * 1000) + (versionMinor * 100) + (versionPatch * 10);
     static char const name[];
     static char const productString[];
@@ -266,7 +264,7 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
             if (newValue == oldValue)
                 return true;
         bool const result(swImpl.setGlobalParameter(parameter, newValue));
-        BOOST_ASSERT_MSG(
+        LE_ASSERT_MSG(
             (result && (parameter.getValue() == newValue)) ||
                 (!result && (parameter.getValue() == oldValue)),
             "setGlobalParameter left the engine parameters and/or setup in an inconsistent state.");
@@ -391,9 +389,12 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class SpectrumWorxCore::ProcessLockUnlocker : boost::noncopyable
+class SpectrumWorxCore::ProcessLockUnlocker
 {
   public:
+    ProcessLockUnlocker(ProcessLockUnlocker const &) = delete; // makes non-copyable
+    ProcessLockUnlocker &operator=(ProcessLockUnlocker const &) = delete;
+
     ProcessLockUnlocker(SpectrumWorxCore &effect)
         : processCriticalSectionGuard_(effect.processCriticalSection_)
     {

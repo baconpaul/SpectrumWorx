@@ -14,9 +14,8 @@
 #include "le/spectrumworx/effects/channelStateStatic.hpp"
 #include "le/spectrumworx/engine/buffers.hpp"
 
-#include <boost/range/iterator_range_core.hpp>
-
 #include <cstdint>
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -81,7 +80,7 @@ class PitchDetector
                            float lfb, float hfb, SW::Engine::Setup const &);
 
   private:
-    using HPSRange = boost::iterator_range<HPS *LE_RESTRICT>;
+    using HPSRange = LE::Utility::Span<HPS>;
 
     static void findHarmonicProductSpectrumAndSort(SW::Engine::ReadOnlyDataRange amplitudes,
                                                    HPSRange);

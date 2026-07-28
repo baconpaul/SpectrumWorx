@@ -96,7 +96,7 @@ void SharedModuleControls::updateForEngineSetupChanges(Engine::Setup const &setu
 
 void SharedModuleControls::updateForActiveModule()
 {
-    BOOST_ASSERT(ModuleUI::selectedModule());
+    LE_ASSERT(ModuleUI::selectedModule());
 
     ModuleUI &moduleUI(*ModuleUI::selectedModule());
 
@@ -149,7 +149,7 @@ ModuleControlBase &SharedModuleControls::controlForParameter(std::uint8_t const 
 
 void SharedModuleControls::focusLost(FocusChangeType)
 {
-    BOOST_ASSERT(ModuleUI::selectedModule());
+    LE_ASSERT(ModuleUI::selectedModule());
     ModuleUI &moduleUI(*ModuleUI::selectedModule());
     if (!moduleUI.hasFocus())
         moduleUI.deactivate();
@@ -203,7 +203,7 @@ SharedModuleControls::FrequencyRange::FrequencyRange()
 
 LE_NOTHROW void SharedModuleControls::FrequencyRange::setValue(float const value)
 {
-    BOOST_ASSERT(canUseWriteAccessIndex());
+    LE_ASSERT(canUseWriteAccessIndex());
     switch (parameterIndexForInternalWriteAccess_)
     {
     case Constants::startFrequencyIndex:
@@ -219,7 +219,7 @@ LE_NOTHROW void SharedModuleControls::FrequencyRange::setValue(float const value
 LE_NOTHROWNOALIAS float SharedModuleControls::FrequencyRange::getValue() const
 {
     //...mrmlj...see the comment for parameterIndexForInternalWriteAccess_...
-    BOOST_ASSERT(isThisTheGUIThread());
+    LE_ASSERT(isThisTheGUIThread());
     switch (moduleParameterIndex())
     {
     case Constants::startFrequencyIndex:
@@ -278,7 +278,7 @@ void SharedModuleControls::FrequencyRange::mouseExit(juce::MouseEvent const &eve
 
 void SharedModuleControls::FrequencyRange::mouseDown(juce::MouseEvent const &event) noexcept
 {
-    //...mrmlj...BOOST_ASSERT( hasFocus() == this->isActive() );
+    //...mrmlj...LE_ASSERT( hasFocus() == this->isActive() );
     updateSliderSelection(event);
     // Implementation note:
     //   The slider is disabled if the LFO for the activated control/thumb is
@@ -315,8 +315,8 @@ void SharedModuleControls::FrequencyRange::paint(juce::Graphics &g)
 
 void SharedModuleControls::FrequencyRange::valueChanged() noexcept
 {
-    BOOST_ASSERT(ModuleUI::selectedModule());
-    BOOST_ASSERT(&this->module() == &ModuleUI::selectedModule()->module());
+    LE_ASSERT(ModuleUI::selectedModule());
+    LE_ASSERT(&this->module() == &ModuleUI::selectedModule()->module());
     /// \note juce::Slider might have updated the active thumb within its
     /// juce::Slider::mouseDown() handler before calling valueChanged().
     ///                                       (12.02.2014.) (Domagoj Saric)
@@ -337,7 +337,7 @@ LFOImpl &SharedModuleControls::FrequencyRange::lfo()
 
 void SharedModuleControls::FrequencyRange::reportActiveControl()
 {
-    BOOST_ASSERT(&parent().editor() == &this->editor());
+    LE_ASSERT(&parent().editor() == &this->editor());
 
     std::uint8_t const currentParameterIndex(moduleParameterIndex());
     std::uint8_t newParameterIndex;
@@ -451,8 +451,8 @@ void SharedModuleControls::FrequencyRange::verifyThumbAndParameterIndicies() con
         LE_DEFAULT_CASE_UNREACHABLE();
     }
     std::uint8_t const actualParameterIndex(this->moduleParameterIndex());
-    BOOST_ASSERT_MSG(expectedParameterIndex == actualParameterIndex,
-                     "Thumb and parameter indicies out of sync.");
+    LE_ASSERT_MSG(expectedParameterIndex == actualParameterIndex,
+                  "Thumb and parameter indicies out of sync.");
 #endif // NDEBUG
 }
 
@@ -460,8 +460,8 @@ bool SharedModuleControls::FrequencyRange::canUseWriteAccessIndex() const
 {
     //...mrmlj...see the comment for parameterIndexForInternalWriteAccess_...
 #if LE_SW_SEPARATED_DSP_GUI
-    BOOST_ASSERT_MSG(isThisTheGUIThread(),
-                     "All calls are expected to be serialized to the GUI thread.");
+    LE_ASSERT_MSG(isThisTheGUIThread(),
+                  "All calls are expected to be serialized to the GUI thread.");
     return true;
 #else
     return (!isThisTheGUIThread() || editor().presetLoadingInProgress()) &&

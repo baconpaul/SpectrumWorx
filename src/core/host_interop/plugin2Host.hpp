@@ -24,7 +24,8 @@
 
 #include "le/utility/cstdint.hpp"
 
-#include "boost/smart_ptr/intrusive_ptr.hpp"
+#include "le/utility/intrusivePtr.hpp"
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -174,12 +175,12 @@ class LE_NOVTABLE Plugin2HostPassiveInteropController
     ////////////////////////////////////////////////////////////////////////////
 
   public: // Parameter info
-    //static LE_NOALIAS void getParameterDisplay( ParameterID, boost::iterator_range<char                 *> text , Engine::Setup const &, Plugins::AutomatedParameterValue const * pOptionalValue, Program const & );
-    static LE_NOALIAS void getParameterLabel(ParameterID, boost::iterator_range<char *> label,
+    //static LE_NOALIAS void getParameterDisplay( ParameterID, LE::Utility::Span<char> text , Engine::Setup const &, Plugins::AutomatedParameterValue const * pOptionalValue, Program const & );
+    static LE_NOALIAS void getParameterLabel(ParameterID, LE::Utility::Span<char> label,
                                              Program const *);
-    static LE_NOALIAS void getParameterName(ParameterID, boost::iterator_range<char *> name,
+    static LE_NOALIAS void getParameterName(ParameterID, LE::Utility::Span<char> name,
                                             Program const *);
-    static LE_NOALIAS void getParameterIDs(boost::iterator_range<Plugins::ParameterID *> ids,
+    static LE_NOALIAS void getParameterIDs(LE::Utility::Span<Plugins::ParameterID> ids,
                                            Program const *);
 
     static LE_NOALIAS std::uint16_t numberOfParameters(Program const *);

@@ -17,7 +17,7 @@
 
 #include "boost/simd/preprocessor/stack_buffer.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -108,7 +108,7 @@ PeakDetector::PeakDetector()
 
 void PeakDetector::setLocalThreshold(float const threshold)
 {
-    BOOST_ASSERT(((threshold <= PD_MIN_LOCAL_THRESHOLD) && (threshold >= PD_MAX_LOCAL_THRESHOLD)));
+    LE_ASSERT(((threshold <= PD_MIN_LOCAL_THRESHOLD) && (threshold >= PD_MAX_LOCAL_THRESHOLD)));
     localThreshold_ = threshold;
 }
 
@@ -121,8 +121,7 @@ void PeakDetector::setLocalThreshold(float const threshold)
 
 void PeakDetector::setGlobalThreshold(float const threshold)
 {
-    BOOST_ASSERT(
-        ((threshold <= PD_MIN_GLOBAL_THRESHOLD) && (threshold >= PD_MAX_GLOBAL_THRESHOLD)));
+    LE_ASSERT(((threshold <= PD_MIN_GLOBAL_THRESHOLD) && (threshold >= PD_MAX_GLOBAL_THRESHOLD)));
     globalThreshold_ = threshold;
 }
 
@@ -135,7 +134,7 @@ void PeakDetector::setGlobalThreshold(float const threshold)
 
 void PeakDetector::setStrengthThreshold(float const strength)
 {
-    BOOST_ASSERT(!((strength <= PD_MIN_STRENGTH) && (strength >= PD_MAX_STRENGTH)));
+    LE_ASSERT(!((strength <= PD_MIN_STRENGTH) && (strength >= PD_MAX_STRENGTH)));
     strengthThreshold_ = strength;
 }
 
@@ -214,8 +213,8 @@ void calculateTrueFrequency(Peak &peak, float const bins, std::uint32_t const fs
     peak.freq = convert<float>(fs) * bin / bins / 2;
     peak.amplitude = b - 0.25f + (a - c) * p;
 
-    BOOST_ASSERT(peak.freq);
-    BOOST_ASSERT(peak.amplitude);
+    LE_ASSERT(peak.freq);
+    LE_ASSERT(peak.amplitude);
 }
 } // anonymous namespace
 
@@ -324,7 +323,7 @@ void LE_HOT PeakDetector::findPeaksImpl(float const *LE_RESTRICT const amplitude
 
 Peak const *PeakDetector::getPeak(std::uint8_t const pos) const
 {
-    BOOST_ASSERT(pos < numberOfPeaks_ || pos == 0);
+    LE_ASSERT(pos < numberOfPeaks_ || pos == 0);
     return &peaks_[pos];
 }
 

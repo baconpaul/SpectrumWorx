@@ -34,9 +34,11 @@
 #include "juce/beginIncludes.hpp"
 #include "juce/juce_gui_basics/mouse/juce_DragAndDropContainer.h"
 #include "juce/endIncludes.hpp"
+#include "le/utility/intrusivePtr.hpp"
 
 #include <array>
 #include <utility>
+#include <optional>
 //------------------------------------------------------------------------------
 //...mrmlj...should be deduced based on protocol through metaprogramming...
 #if defined(__APPLE__)
@@ -292,7 +294,7 @@ class SpectrumWorxEditor
 
     ParameterID moduleControlID(ModuleControlBase const &) const;
 
-    bool sharedModuleControlsActive() const { return sharedModuleControls_.is_initialized(); }
+    bool sharedModuleControlsActive() const { return sharedModuleControls_.has_value(); }
     bool sharedModuleControlsActiveAndFocused() const
     {
         return sharedModuleControlsActive() && sharedModuleControls_->hasFocus();
@@ -330,8 +332,8 @@ class SpectrumWorxEditor
   private:
     void addUserAddedModule(std::uint8_t effectIndex);
     void moveModules(ModuleUI &targetSlotUI, std::uint8_t numberOfModules, std::int16_t offset);
-    std::pair<boost::intrusive_ptr<Module>, std ::int8_t> setModuleInSlot(std::uint8_t slotIndex,
-                                                                          std::int8_t effectIndex);
+    std::pair<LE::Utility::IntrusivePtr<Module>, std ::int8_t>
+    setModuleInSlot(std::uint8_t slotIndex, std::int8_t effectIndex);
 
     void setActiveModuleName(juce::String const &newName);
     void setActiveControlName(juce::String const &newName);
@@ -518,7 +520,7 @@ class SpectrumWorxEditor
         }
         ModuleControlBase &control()
         {
-            BOOST_ASSERT(pModuleControl_);
+            LE_ASSERT(pModuleControl_);
             return *pModuleControl_;
         }
 
@@ -676,10 +678,10 @@ class SpectrumWorxEditor
     // Optional/auxiliary components
     friend class OwnedWindowBase;
     friend class SharedModuleControls;
-    boost::optional<SharedModuleControls> sharedModuleControls_;
-    boost::optional<LFODisplay> lfoDisplay_;
-    boost::optional<PresetBrowser> presetBrowser_;
-    boost::optional<Settings> settings_;
+    std::optional<SharedModuleControls> sharedModuleControls_;
+    std::optional<LFODisplay> lfoDisplay_;
+    std::optional<PresetBrowser> presetBrowser_;
+    std::optional<Settings> settings_;
 
     mutable bool holdSharedModuleControls_;
     mutable bool holdLFODisplay_;

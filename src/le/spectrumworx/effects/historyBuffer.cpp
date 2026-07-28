@@ -93,7 +93,7 @@ ReversedHistoryBufferState::getCurrentStepData(std::uint16_t const historyLength
         }
     }
 
-    BOOST_ASSERT_MSG(step_ < historyLengthInSteps, "Step overflow.");
+    LE_ASSERT_MSG(step_ < historyLengthInSteps, "Step overflow.");
 
     unsigned int const numberOfBinsAligned(Math::alignIndex(numberOfBins));
     unsigned int const fullFrameSize(numberOfBinsAligned * 2);

@@ -15,7 +15,7 @@
 #include "le/math/math.hpp"
 #include "le/math/vector.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 
 #include <algorithm>
 //------------------------------------------------------------------------------
@@ -69,7 +69,7 @@ LE_COLD void calculateWindow(DataRange const &window,
     /// http://en.wikipedia.org/wiki/Window_function#Window_examples.
     ///                                       (17.04.2012.) (Domagoj Saric)
 
-    //...mrmlj...(BandGain)...BOOST_ASSERT_MSG( window.size() % 2 == 0, "Even window sizes expected." );
+    //...mrmlj...(BandGain)...LE_ASSERT_MSG( window.size() % 2 == 0, "Even window sizes expected." );
 
     using window_t = double;
 
@@ -90,7 +90,7 @@ LE_COLD void calculateWindow(DataRange const &window,
         {
             *pWindow++ = 2 * i / sizef;
         }
-        BOOST_ASSERT(i == round(halfSize));
+        LE_ASSERT(i == round(halfSize));
         for (; i < sizef; ++i)
         {
             *pWindow++ = 2 * (1 - i / sizef);
@@ -220,10 +220,10 @@ LE_COLD void calculateWindow(DataRange const &window,
     ///                                       (16.04.2012.) (Domagoj Saric)
 
     // Verify the DFT-even requirement.
-    BOOST_ASSERT(window[0] != window.back() || windowType == Window::Rectangle);
-    BOOST_ASSERT(window[1] == window.back());
+    LE_ASSERT(window[0] != window.back() || windowType == Window::Rectangle);
+    LE_ASSERT(window[1] == window.back());
 
-    BOOST_ASSERT_MSG(max(window) > 0, "Non strictly positive window.");
+    LE_ASSERT_MSG(max(window) > 0, "Non strictly positive window.");
 }
 
 #pragma warning(pop)

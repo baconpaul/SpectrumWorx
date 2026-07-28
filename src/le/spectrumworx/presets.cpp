@@ -35,15 +35,18 @@
 
 #include "boost/mmap/mappble_objects/file/utility.hpp" // Boost sandbox
 
-#include <boost/assert.hpp>
+#include "le/utility/assert.hpp"
+#include "le/utility/ignoreUnused.hpp"
+#include "le/utility/intrusivePtr.hpp"
 #include <boost/fusion/algorithm/iteration/for_each.hpp>
 #include <boost/fusion/view/reverse_view.hpp>
 #include <boost/preprocessor/stringize.hpp>
-#include <boost/range/algorithm/find.hpp>
-#include <boost/range/algorithm/replace_copy.hpp>
+#include <algorithm>
 
 #ifndef LE_EXCEPTION_ON
 #include <csetjmp>
+#include <optional>
+#include <string_view>
 #endif // LE_EXCEPTION_ON
 //------------------------------------------------------------------------------
 LE_OPTIMIZE_FOR_SIZE_BEGIN()
@@ -67,7 +70,7 @@ namespace
 }
 LE_NOINLINE LE_COLD void parse_error_handler(char const *const what, void *const where)
 {
-    boost::ignore_unused_variable_warning(what && where);
+    LE::Utility::ignoreUnused(what && where);
     LE_TRACE("SW preset parsing failed (%s @ %s).", what, static_cast<char const *>(where));
     longjmp(preParseEnvironment, EXIT_FAILURE);
 }
@@ -81,8 +84,7 @@ namespace LE
 #if LE_SW_GUI
 namespace GUI
 {
-void LE_NOTHROW warningMessageBox(boost::string_ref title, boost::string_ref message,
-                                  bool canBlock);
+void LE_NOTHROW warningMessageBox(std::string_view title, std::string_view message, bool canBlock);
 }
 #endif // LE_SW_GUI
 //------------------------------------------------------------------------------
@@ -101,7 +103,7 @@ using PresetModule = SW::Module;
 #if LE_SW_GUI
 LE_NOTHROW PresetHeader::PresetHeader(juce::String const &commentParam)
 {
-    BOOST_ASSERT(commentParam.length() < _countof(comment) - 1);
+    LE_ASSERT(commentParam.length() < _countof(comment) - 1);
 
     std::strcpy(version,
                 BOOST_PP_STRINGIZE( SW_VERSION_MAJOR ) "." BOOST_PP_STRINGIZE( SW_VERSION_MINOR )
@@ -125,12 +127,12 @@ void PresetHeader::setCurrentTime()
     unsigned int const timeCharsWritten(::GetTimeFormatA(
         LOCALE_INVARIANT, 0, &currentUTCTime, "HH':'mm", &timeStamp[dateCharsWritten],
         _countof(timeStamp) - (dateCharsWritten - 1)));
-    BOOST_ASSERT((dateCharsWritten + timeCharsWritten) <= _countof(timeStamp));
-    BOOST_ASSERT(std::strlen(timeStamp) == (dateCharsWritten - 1 + timeCharsWritten));
-    boost::ignore_unused_variable_warning(timeCharsWritten);
+    LE_ASSERT((dateCharsWritten + timeCharsWritten) <= _countof(timeStamp));
+    LE_ASSERT(std::strlen(timeStamp) == (dateCharsWritten - 1 + timeCharsWritten));
+    LE::Utility::ignoreUnused(timeCharsWritten);
 #else
     ::time_t const currentUTCTime(::time(nullptr));
-    BOOST_VERIFY(
+    LE_VERIFY(
         ::strftime(timeStamp, sizeof(timeStamp), "%d.%m.%Y %H:%M", ::gmtime(&currentUTCTime)) > 0);
 #endif // _MSC_VER
 }
@@ -185,10 +187,10 @@ Preset::load_result_t Preset::loadFrom(char *const pBuffer)
 LE_NOTHROW Preset::InMemoryPreset Preset::loadIntoMemory(juce::File const &file)
 {
     using namespace boost;
-    BOOST_ASSERT(file.exists());
+    LE_ASSERT(file.exists());
     mmap::mapped_view<char const> const mappedPreset(
         mmap::map_read_only_file(file.getFullPathName().getCharPointer()));
-    BOOST_ASSERT_MSG(mappedPreset, "Failed to map preset file.");
+    LE_ASSERT_MSG(mappedPreset, "Failed to map preset file.");
     if (!mappedPreset)
         return InMemoryPreset();
     unsigned int const presetSize(static_cast<unsigned int>(mappedPreset.size()));
@@ -224,8 +226,8 @@ LE_NOTHROW unsigned int Preset::saveTo(char *const pBuffer)
 Utility::XML::Element &Preset::root()
 {
     auto const pHeaderNode(static_cast<Utility::XML::Element *>(preset_.first_node()));
-    BOOST_ASSERT(pHeaderNode);
-    BOOST_ASSERT(pHeaderNode->name() == headerNodeName_);
+    LE_ASSERT(pHeaderNode);
+    LE_ASSERT(pHeaderNode->name() == headerNodeName_);
     return *pHeaderNode;
 }
 
@@ -234,10 +236,10 @@ Utility::XML::Element const &Preset::root() const { return const_cast<Preset &>(
 namespace
 {
 void copyAndNullTerminate(Utility::XML::Element const &headerNode,
-                          boost::string_ref const attributeName, char *const pTargetBuffer)
+                          std::string_view const attributeName, char *const pTargetBuffer)
 {
     auto const pHeaderAttribute(headerNode.attribute(attributeName));
-    BOOST_ASSERT(pHeaderAttribute);
+    LE_ASSERT(pHeaderAttribute);
     auto const value(Utility::XML::value(*pHeaderAttribute));
     *std::copy(value.begin(), value.end(), pTargetBuffer) = '\0';
 }
@@ -272,12 +274,12 @@ LE_NOTHROW void Preset::setHeader(PresetHeader const &header)
     headerNode.attribute(header.attributeNames.comment)->value(header.comment);
 }
 
-LE_NOTHROW boost::string_ref Preset::getComment() const
+LE_NOTHROW std::string_view Preset::getComment() const
 {
     auto const &headerNode(root());
     auto const *const pCommentAttribute(
         headerNode.attribute(PresetHeader::AttributeNames::comment));
-    BOOST_ASSERT(pCommentAttribute);
+    LE_ASSERT(pCommentAttribute);
     return Utility::XML::value(*pCommentAttribute);
 }
 
@@ -319,25 +321,26 @@ char const space = ' ';
 char const mangledSpace = '_';
 } // anonymous namespace
 
-boost::string_ref PresetHandler::fixSpaces(boost::string_ref const input, char const searchFor,
-                                           char const replaceWith) const
+std::string_view PresetHandler::fixSpaces(std::string_view const input, char const searchFor,
+                                          char const replaceWith) const
 {
-    BOOST_ASSERT(!input.empty());
+    LE_ASSERT(!input.empty());
     if (input.find(searchFor) == input.npos)
         return input;
 
     auto const inputSize(static_cast<std::uint16_t>(input.size()));
     auto *LE_RESTRICT const fixedInputBuffer(
         const_cast<PresetHandler &>(*this).allocateString(inputSize));
-    auto *const pEnd(boost::replace_copy(input, fixedInputBuffer, searchFor, replaceWith));
+    auto *const pEnd(
+        std::ranges::replace_copy(input, fixedInputBuffer, searchFor, replaceWith).out);
     return {fixedInputBuffer, static_cast<std::uint16_t>(pEnd - fixedInputBuffer)};
 }
 
-boost::string_ref PresetHandler::mangleSpaces(char const *const input) const
+std::string_view PresetHandler::mangleSpaces(char const *const input) const
 {
     return fixSpaces(input, space, mangledSpace);
 }
-boost::string_ref PresetHandler::unmangleSpaces(char const *const input) const
+std::string_view PresetHandler::unmangleSpaces(char const *const input) const
 {
     return fixSpaces(input, mangledSpace, space);
 }
@@ -348,16 +351,16 @@ LE_RESTRICTNOALIAS char *PresetHandler::allocateString(unsigned int const size)
     return xml().allocate_string(nullptr, size);
 }
 
-boost::string_ref PresetHandler::makeStringRef(boost::string_ref::const_iterator const source)
+std::string_view PresetHandler::makeStringRef(std::string_view::const_iterator const source)
 {
     return source;
 }
 
-template <> boost::string_ref PresetHandler::makeStringRef<bool>(bool const binarySource)
+template <> std::string_view PresetHandler::makeStringRef<bool>(bool const binarySource)
 {
     static char const characters[] = {'0', '1'};
     char const &character(characters[binarySource]);
-    return boost::string_ref(&character, 1);
+    return std::string_view(&character, 1);
 }
 
 ParametersLoader::ParametersLoader(Preset const &preset)
@@ -376,14 +379,14 @@ ParametersLoader::ParametersLoader(Preset const &preset)
 #ifdef LE_SW_SDK_BUILD //...mrmlj...
 namespace Engine
 {
-LE_NOTHROWNOALIAS boost::intrusive_ptr<PresetModule> createModule(std::uint8_t effectIndex);
+LE_NOTHROWNOALIAS LE::Utility::IntrusivePtr<PresetModule> createModule(std::uint8_t effectIndex);
 }
 #define MB_WARNING "SW SDK warning:"
 #define MB_ERROR "SW SDK error:"
 #endif // LE_SW_SDK_BUILD
 LE_COLD ParametersLoader::ModuleChain ParametersLoader::loadModuleChain(ModuleChain &currentChain)
 {
-    BOOST_ASSERT_MSG(!switchedToModuleParameters(), "Already switched to module parameters.");
+    LE_ASSERT_MSG(!switchedToModuleParameters(), "Already switched to module parameters.");
 
     {
         auto const pModuleParameters(preset().root().child(moduleParametersNodeName_));
@@ -391,7 +394,7 @@ LE_COLD ParametersLoader::ModuleChain ParametersLoader::loadModuleChain(ModuleCh
         if ( !pModuleParameters )
             RAPIDXML_PARSE_ERROR( "Module parameters node not found", nullptr );
 #else
-        BOOST_ASSERT_MSG(pModuleParameters, "Module parameters node not found");
+        LE_ASSERT_MSG(pModuleParameters, "Module parameters node not found");
         if (!pModuleParameters)
             return ModuleChain();
 #endif
@@ -452,8 +455,8 @@ LE_COLD ParametersLoader::ModuleChain ParametersLoader::loadModuleChain(ModuleCh
     }
 
 #ifndef LE_SW_SDK_BUILD
-    BOOST_ASSERT_MSG(moduleIndex <= SW::Constants::maxNumberOfModules,
-                     "Preset loaded too many modules?");
+    LE_ASSERT_MSG(moduleIndex <= SW::Constants::maxNumberOfModules,
+                  "Preset loaded too many modules?");
 #endif // LE_SW_SDK_BUILD
     return newChain;
 }
@@ -472,16 +475,16 @@ ParametersLoader::operator()(Engine::WindowSizeFactor &parameter) const
     using binary_type = Parameter::binary_type;
     auto const parameterName(Parameters::Name<Parameter>::string_);
     auto const pParameterAttribute(getParameterAttribute(parameterName));
-    boost::optional<binary_type> const parameterValue(
+    std::optional<binary_type> const parameterValue(
         (pParameterAttribute || !isPre27Preset())
             ? getParameterValue<binary_type>(pParameterAttribute, parameterName)
             : Engine::WindowSizeFactor::default_());
-    if (parameterValue.is_initialized() && parameter.isValidValue(*parameterValue))
+    if (parameterValue.has_value() && parameter.isValidValue(*parameterValue))
         parameter.setValue(*parameterValue);
 }
 #endif // LE_SW_ENGINE_WINDOW_PRESUM
 
-boost::string_ref ParametersLoader::currentEffectName() const
+std::string_view ParametersLoader::currentEffectName() const
 {
     //...mrmlj...PresetHandler::fixSpaces() expects a terminated C string (see
     //...mrmlj...the related note at the function declaration site)...
@@ -490,19 +493,19 @@ boost::string_ref ParametersLoader::currentEffectName() const
     return unmangleSpaces(terminatedCurrentMangledEffectName.begin());
 }
 
-boost::string_ref ParametersLoader::currentMangledEffectName() const
+std::string_view ParametersLoader::currentMangledEffectName() const
 {
-    BOOST_ASSERT_MSG(switchedToModuleParameters(), "Not yet switched to module parameters.");
+    LE_ASSERT_MSG(switchedToModuleParameters(), "Not yet switched to module parameters.");
     return parameters().name();
 }
 
 LE_NOTHROW // sampleAttributeName_ contains no spaces
-boost::string_ref ParametersLoader::getSampleFileName()
+std::string_view ParametersLoader::getSampleFileName()
 {
-    BOOST_ASSERT_MSG(!switchedToModuleParameters(),
-                     "Sample file name must be fetched before switching to module parameters.");
+    LE_ASSERT_MSG(!switchedToModuleParameters(),
+                  "Sample file name must be fetched before switching to module parameters.");
     auto const pSampleAttribute(getParameterAttribute(sampleAttributeName_));
-    return pSampleAttribute ? Utility::XML::value(*pSampleAttribute) : boost::string_ref();
+    return pSampleAttribute ? Utility::XML::value(*pSampleAttribute) : std::string_view();
 }
 
 bool ParametersLoader::isPre27Preset() const
@@ -595,8 +598,8 @@ ParametersLoader::getParameterNode(char const *const parameterName) const
 
 LE_COLD void ParametersLoader::warnAboutMissingParameter(char const *const pParameterName)
 {
-    BOOST_ASSERT(pParameterName);
-    boost::string_ref const parameterName(pParameterName);
+    LE_ASSERT(pParameterName);
+    std::string_view const parameterName(pParameterName);
     if (
 #ifdef LE_PV_USE_TSS
         (parameterName != "Transient sensitivity") &&
@@ -637,31 +640,31 @@ ParametersSaver::ParametersSaver(PresetWithPreallocatedFixedNodes &preset)
 
 unsigned int ParametersSaver::saveTo(char *const pBuffer)
 {
-    BOOST_ASSERT_MSG(pParametersNode_ != &preset().globalParametersNode(),
-                     "Module chain parameters not yet saved/parsed.");
-    BOOST_ASSERT((pParametersNode_ == moduleNodesEnd()) || !pParametersNode_->parent() ||
-                 (pParametersNode_->parent() == &preset().moduleParametersNode()));
+    LE_ASSERT_MSG(pParametersNode_ != &preset().globalParametersNode(),
+                  "Module chain parameters not yet saved/parsed.");
+    LE_ASSERT((pParametersNode_ == moduleNodesEnd()) || !pParametersNode_->parent() ||
+              (pParametersNode_->parent() == &preset().moduleParametersNode()));
     return preset().saveTo(pBuffer);
 }
 
 void ParametersSaver::saveEffectModuleChain(AutomatedModuleChain const &moduleChain)
 {
-    BOOST_ASSERT_MSG(pParametersNode_ == &preset().globalParametersNode(),
-                     "Already switched to modules."); //...mrmlj...
+    LE_ASSERT_MSG(pParametersNode_ == &preset().globalParametersNode(),
+                  "Already switched to modules."); //...mrmlj...
     pParametersNode_ = &preset().moduleNodes().front();
     moduleChain.forEach<PresetModule>([&](PresetModule const &module) {
         auto const name(mangleSpaces(Effects::effectName(module.effectTypeIndex())));
         pParametersNode_->setName(name);
         module.savePresetParameters(*this);
         preset().moduleParametersNode().append_node(pParametersNode_++);
-        BOOST_ASSERT(pParametersNode_ == moduleNodesEnd() || pParametersNode_->name().empty());
+        LE_ASSERT(pParametersNode_ == moduleNodesEnd() || pParametersNode_->name().empty());
     });
 }
 
 void ParametersSaver::saveParameter(char const *const parameterName,
-                                    boost::string_ref const parameterValue)
+                                    std::string_view const parameterValue)
 {
-    boost::string_ref const fixedParameterName(mangleSpaces(parameterName));
+    std::string_view const fixedParameterName(mangleSpaces(parameterName));
     parameters().append_attribute(
         xml().allocate_attribute(fixedParameterName.begin(), parameterValue.begin(),
                                  fixedParameterName.size(), parameterValue.size()));
@@ -702,7 +705,7 @@ class LFODataSaver
             Math::equal(element.getValue(), element.default_()))
             return;
 
-        boost::string_ref const stringValue(
+        std::string_view const stringValue(
             handler_.makeStringRef(lfo_.adjustValueForPreset(element)));
 
         using namespace Parameters;
@@ -721,9 +724,9 @@ class LFODataSaver
 //} // anonymous namespace
 
 void ParametersSaver::saveParameter(char const *const parameterName,
-                                    boost::string_ref const parameterValue, LFO const &parameterLFO)
+                                    std::string_view const parameterValue, LFO const &parameterLFO)
 {
-    boost::string_ref const fixedParameterName(mangleSpaces(parameterName));
+    std::string_view const fixedParameterName(mangleSpaces(parameterName));
 
     rapidxml::xml_node<> &parameterNode(*xml().allocate_node(
         rapidxml::node_element, fixedParameterName.begin(), parameterValue.begin(),
@@ -744,10 +747,10 @@ void ParametersSaver::setSampleFileName( juce::String const & sampleFileName )
     /// \todo Add checks here and in all similar places that an attribute is not
     /// saved more than once.
     ///                                       (03.02.2010.) (Domagoj Saric)
-    saveParameter( sampleAttributeName_, boost::string_ref( pSampleFileName, sampleFileNameLength ) );
+    saveParameter( sampleAttributeName_, std::string_view( pSampleFileName, sampleFileNameLength ) );
 }*/
 
-void ParametersSaver::setSampleFileName(boost::string_ref const &sampleFileName)
+void ParametersSaver::setSampleFileName(std::string_view const &sampleFileName)
 {
     /// \todo Add checks here and in all similar places that an attribute is not
     /// saved more than once.
@@ -758,17 +761,17 @@ void ParametersSaver::setSampleFileName(boost::string_ref const &sampleFileName)
 LE_NOTHROW void savePreset(juce::File const &file, juce::File const &externalSampleFile,
                            juce::String const &comment, Program const &program)
 {
-    BOOST_ASSERT(file.getParentDirectory().isDirectory());
+    LE_ASSERT(file.getParentDirectory().isDirectory());
     Preset::InMemoryPresetBuffer buffer;
     auto const presetSize(savePreset(&buffer[0], externalSampleFile, comment, program));
-    BOOST_ASSERT(presetSize < sizeof(buffer));
+    LE_ASSERT(presetSize < sizeof(buffer));
 
     using namespace boost;
     mmap::basic_mapped_view const presetFile(
         mmap::map_file(file.getFullPathName().getCharPointer(), presetSize));
     if (presetFile)
     {
-        BOOST_ASSERT(static_cast<unsigned int>(presetFile.size()) == presetSize);
+        LE_ASSERT(static_cast<unsigned int>(presetFile.size()) == presetSize);
         std::memcpy(presetFile.begin(), &buffer[0], presetSize);
     }
     else
@@ -815,10 +818,10 @@ LE_NOTHROW unsigned int savePreset(char *const data, juce::File const &externalS
         unsigned int const sampleFileNameLength(
             static_cast<unsigned int>(sampleFileName.getNumBytesAsUTF8()));
         char *const pSampleFileName(static_cast<char *>(_alloca(sampleFileNameLength + 1)));
-        BOOST_VERIFY(sampleFileName.copyToUTF8(pSampleFileName, sampleFileNameLength + 1) ==
-                     signed(sampleFileNameLength + 1));
+        LE_VERIFY(sampleFileName.copyToUTF8(pSampleFileName, sampleFileNameLength + 1) ==
+                  signed(sampleFileNameLength + 1));
 #endif // JUCE_STRING_UTF_TYPE
-        parametersSaver.setSampleFileName(boost::string_ref(pSampleFileName, sampleFileNameLength));
+        parametersSaver.setSampleFileName(std::string_view(pSampleFileName, sampleFileNameLength));
     }
 
     parametersSaver.saveEffectModuleChain(program.moduleChain());

@@ -12,8 +12,8 @@
 #define printer_fwd_hpp__8B053D9F_3726_48FF_BDA2_DA8B0D23D422
 //------------------------------------------------------------------------------
 #include "le/utility/tchar.hpp"
+#include "le/utility/span.hpp"
 
-#include "boost/range/iterator_range_core.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -29,7 +29,7 @@ namespace Parameters
 {
 //------------------------------------------------------------------------------
 
-typedef boost::iterator_range<char *> PrintBuffer;
+typedef LE::Utility::Span<char> PrintBuffer;
 
 ////////////////////////////////////////////////////////////////////////////////
 //

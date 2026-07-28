@@ -13,15 +13,14 @@
 //------------------------------------------------------------------------------
 #include "abi.hpp"
 
-#include <boost/config.hpp>
-#include <boost/utility/string_ref.hpp>
+#include <string_view>
 
 #define RAPIDXML_NO_STREAMS
 #define RAPIDXML_STATIC_POOL_SIZE 8 * 1024
 #define RAPIDXML_DYNAMIC_POOL_SIZE RAPIDXML_STATIC_POOL_SIZE
-#if defined(BOOST_NO_EXCEPTIONS)
+#if defined(LE_NO_EXCEPTIONS)
 #define RAPIDXML_NO_EXCEPTIONS
-#endif // BOOST_NO_EXCEPTIONS
+#endif // LE_NO_EXCEPTIONS
 
 #include <rapidxml.hpp>
 
@@ -63,9 +62,9 @@ OutIt print_pi_node(OutIt out, const xml_node<Ch> *node, int flags, int indent);
 #pragma warning(pop)
 #endif // _MSC_VER
 
-#ifndef BOOST_NO_EXCEPTIONS
+#ifndef LE_NO_EXCEPTIONS
 #include <string>
-#endif // BOOST_NO_EXCEPTIONS
+#endif // LE_NO_EXCEPTIONS
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -83,7 +82,7 @@ namespace XML /// \brief XML utilities
 {
 //------------------------------------------------------------------------------
 
-using boost::string_ref;
+using std::string_view;
 
 // https://www.w3.org/XML/Datamodel.html
 // http://www.w3schools.com/xml/default.asp
@@ -99,11 +98,11 @@ using Object = rapidxml::xml_base<>;
 /// \brief All XML objects <em>are</em> <VAR>XML::Object</VAR>s making these
 /// functions usable with both Elements and Attributes.
 /// @{
-LE_NOTHROWNOALIAS inline string_ref name(Object const &object)
+LE_NOTHROWNOALIAS inline string_view name(Object const &object)
 {
     return {object.name(), object.name_size()};
 }
-LE_NOTHROWNOALIAS inline string_ref value(Object const &object)
+LE_NOTHROWNOALIAS inline string_view value(Object const &object)
 {
     return {object.value(), object.value_size()};
 }
@@ -114,22 +113,22 @@ class Element : public rapidxml::xml_node<>
 {
   public:
     LE_NOTHROWNOALIAS Element();
-    LE_NOTHROWNOALIAS Element(string_ref name);
+    LE_NOTHROWNOALIAS Element(string_view name);
 
     /// @{
     /// \name Name/value access
-    string_ref name() const { return XML::name(*this); }
-    string_ref value() const { return XML::value(*this); }
+    string_view name() const { return XML::name(*this); }
+    string_view value() const { return XML::value(*this); }
 
-    LE_NOTHROWNOALIAS void setName(string_ref);
-    LE_NOTHROWNOALIAS void setValue(string_ref);
+    LE_NOTHROWNOALIAS void setName(string_view);
+    LE_NOTHROWNOALIAS void setValue(string_view);
     /// @}
 
     /// @{
     /// \name Subelement access
-    LE_NOTHROWNOALIAS Element const *child(string_ref name) const;
-    LE_NOTHROWNOALIAS Attribute const *attribute(string_ref name) const;
-    LE_NOTHROWNOALIAS Attribute *attribute(string_ref name);
+    LE_NOTHROWNOALIAS Element const *child(string_view name) const;
+    LE_NOTHROWNOALIAS Attribute const *attribute(string_view name) const;
+    LE_NOTHROWNOALIAS Attribute *attribute(string_view name);
     /// @}
 }; // class Node
 
@@ -139,18 +138,18 @@ class Document : public rapidxml::xml_document<>
   public:
     void parse(char *string);
 
-    LE_NOTHROWNOALIAS Element const *element(string_ref name) const;
+    LE_NOTHROWNOALIAS Element const *element(string_view name) const;
 
-    string_ref copyString(string_ref) const;
+    string_view copyString(string_view) const;
 
-#ifndef BOOST_NO_EXCEPTIONS
+#ifndef LE_NO_EXCEPTIONS
     std::string print() const
     {
         std::string xmlText;
         rapidxml::print(std::back_inserter(xmlText), *this);
         return /*std::move inhibits NRVO*/ (xmlText);
     }
-#endif // BOOST_NO_EXCEPTIONS
+#endif // LE_NO_EXCEPTIONS
 
     LE_NOTHROW char *print(char *pBuffer, std::uint16_t bufferLength) const;
 }; // class Document

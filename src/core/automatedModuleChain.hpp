@@ -24,7 +24,7 @@
 #include "le/utility/cstdint.hpp"
 #include "le/utility/trace.hpp"
 
-#include "boost/smart_ptr/intrusive_ptr.hpp"
+#include "le/utility/intrusivePtr.hpp"
 
 #include <array>
 //------------------------------------------------------------------------------
@@ -36,7 +36,7 @@ namespace SW
 //------------------------------------------------------------------------------
 
 //...mrmlj...defined outside of the AutomatedModuleChain class to enable forward declarations to speed up compilation...clean this up...
-std::int8_t BOOST_CONSTEXPR_OR_CONST noModule = -1;
+std::int8_t constexpr noModule = -1;
 
 LE_DEFINE_PARAMETER(
     (ModuleChainParameter)(Parameters::
@@ -63,8 +63,8 @@ class AutomatedModuleChain : public Engine::ModuleChainImpl
     //using ModulePtr  = Engine::ModuleChainImpl::      pointer;
     //using ModuleCPtr = Engine::ModuleChainImpl::const_pointer;
     using Module = Engine::ModuleParameters;
-    using ModulePtr = boost::intrusive_ptr<Module>;
-    using ModuleCPtr = boost::intrusive_ptr<Module const>;
+    using ModulePtr = LE::Utility::IntrusivePtr<Module>;
+    using ModuleCPtr = LE::Utility::IntrusivePtr<Module const>;
 
     static std::uint8_t const maximumSize = Constants::maxNumberOfModules;
 
@@ -86,14 +86,14 @@ class AutomatedModuleChain : public Engine::ModuleChainImpl
     LE_NOTHROWNOALIAS ModuleCPtr module(std::uint8_t index) const;
 
     template <class ActualModule>
-    LE_NOTHROWNOALIAS boost::intrusive_ptr<ActualModule> moduleAs(std::uint8_t const index)
+    LE_NOTHROWNOALIAS LE::Utility::IntrusivePtr<ActualModule> moduleAs(std::uint8_t const index)
     {
         auto const pModule(ModuleChainImpl::module(index));
         return (!isEnd(pModule)) ? &Engine::actualModule<ActualModule>(*pModule) : nullptr;
     }
 
     template <class ActualModule>
-    LE_NOTHROWNOALIAS boost::intrusive_ptr<ActualModule const>
+    LE_NOTHROWNOALIAS LE::Utility::IntrusivePtr<ActualModule const>
     moduleAs(std::uint8_t const index) const
     {
         auto const pModule(ModuleChainImpl::module(index));
@@ -104,7 +104,7 @@ class AutomatedModuleChain : public Engine::ModuleChainImpl
     }
 
     template <class ModuleInitialiser>
-    std::pair<boost::intrusive_ptr<typename ModuleInitialiser::Module>, std::int8_t> LE_NOTHROW
+    std::pair<LE::Utility::IntrusivePtr<typename ModuleInitialiser::Module>, std::int8_t> LE_NOTHROW
     setParameter(std::uint8_t const moduleIndex, std::int8_t const newValue,
                  ModuleInitialiser const &initialise)
     {

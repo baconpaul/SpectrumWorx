@@ -62,6 +62,7 @@
 #endif // MSVC
 
 #include "le/utility/platformSpecifics.hpp"
+#include "le/utility/span.hpp"
 
 LE_OPTIMIZE_FOR_SPEED_BEGIN()
 LE_FAST_MATH_ON()
@@ -145,9 +146,9 @@ LE_FAST_MATH_ON()
 // unsigned int so we assert here that it is safe to do a pointer
 // reinterpret_cast.
 //                                        (17.05.2011.) (Domagoj Saric)
-#ifdef BOOST_BIG_ENDIAN
+#ifdef LE_BIG_ENDIAN
 static_assert(sizeof(unsigned int) == sizeof(int), "Unexpected data sizes");
-#endif // BOOST_LITTLE_ENDIAN
+#endif // LE_LITTLE_ENDIAN
 
 #if (TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR || (__MAC_OS_X_VERSION_MAX_ALLOWED >= __MAC_10_9))
 #include "Accelerate/Accelerate.h"
@@ -164,8 +165,7 @@ static_assert(sizeof(unsigned int) == sizeof(int), "Unexpected data sizes");
 // http://sourceforge.net/projects/libsimd
 // http://sourceforge.net/projects/framewave
 
-#include "boost/assert.hpp"
-#include "boost/range/iterator_range_core.hpp"
+#include "le/utility/assert.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -239,7 +239,7 @@ using vector_c_ptr_t = vector_t const *LE_RESTRICT;
 using extra_vector_ptr_t = boost::simd::make_extra_pointer_register<vector_t>::type;
 using extra_vector_c_ptr_t = boost::simd::make_extra_pointer_register<vector_t const>::type;
 
-using AlignedRange = boost::iterator_range<vector_t *LE_RESTRICT>;
+using AlignedRange = LE::Utility::Span<vector_t>;
 
 vector_t *alignDown(float *const p_unaligned)
 {
@@ -457,7 +457,7 @@ unsigned int alignIndex(unsigned int const index)
 
 void copy(InputRange const &input, OutputRange const &output)
 {
-    BOOST_ASSERT_MSG(input.size() <= output.size(), "Buffer sizes mismatch.");
+    LE_ASSERT_MSG(input.size() <= output.size(), "Buffer sizes mismatch.");
     copy(input.begin(), output.begin(), static_cast<unsigned int>(input.size()));
 }
 
@@ -517,19 +517,19 @@ float const &max(InputRange const &data)
 
 void add(InputRange const &input, InputOutputRange const &inputOutput)
 {
-    BOOST_ASSERT_MSG(input.size() <= inputOutput.size(), "Buffer sizes mismatch.");
+    LE_ASSERT_MSG(input.size() <= inputOutput.size(), "Buffer sizes mismatch.");
     add(input.begin(), inputOutput.begin(), inputOutput.end());
 }
 
 void add(InputRange const &input, float const constant, OutputRange const &output)
 {
-    BOOST_ASSERT_MSG(input.size() <= output.size(), "Buffer sizes mismatch.");
+    LE_ASSERT_MSG(input.size() <= output.size(), "Buffer sizes mismatch.");
     add(input.begin(), constant, output.begin(), output.end());
 }
 
 void multiply(InputRange const &input, float const multiplier, OutputRange const output)
 {
-    BOOST_ASSERT_MSG(input.size() <= output.size(), "Buffer sizes mismatch.");
+    LE_ASSERT_MSG(input.size() <= output.size(), "Buffer sizes mismatch.");
     multiply(multiplier, input.begin(), output.begin(), output.begin() + input.size());
 }
 
@@ -540,7 +540,7 @@ void multiply(InputOutputRange const &data, float const multiplier)
 
 void ln(InputRange const &input, OutputRange const &output)
 {
-    BOOST_ASSERT_MSG(input.size() == output.size(), "Buffer sizes mismatch.");
+    LE_ASSERT_MSG(input.size() == output.size(), "Buffer sizes mismatch.");
     ln(input.begin(), output.begin(), output.end());
 }
 
@@ -563,8 +563,8 @@ LE_NOTHROW void mix(InputRange const &amps, InputRange const &phases,
 
     EdgeRestoredAlignedRange const reals(realsParam.begin(), realsParam.end());
     EdgeRestoredAlignedRange const imags(imagsParam.begin(), imagsParam.end());
-    BOOST_ASSERT_MSG(reals.compatiblyAligned(amps.begin()), "Misaligned data");
-    BOOST_ASSERT_MSG(reals.compatiblyAligned(phases.begin()), "Misaligned data");
+    LE_ASSERT_MSG(reals.compatiblyAligned(amps.begin()), "Misaligned data");
+    LE_ASSERT_MSG(reals.compatiblyAligned(phases.begin()), "Misaligned data");
 
     complex_op_vector_t const amPhWeight(boost::simd::splat<complex_op_vector_t>(amPhGain));
     complex_op_vector_t const reImWeight(boost::simd::splat<complex_op_vector_t>(reImGain));
@@ -599,7 +599,7 @@ void mix(InputRange const &amps, InputRange const &phases, InputOutputRange cons
 // http://www.analog.com/static/imported-files/tech_docs/dsp_book_Ch15.pdf
 void movingAverage(InputOutputRange const &data, unsigned int const windowWidth)
 {
-    BOOST_ASSERT_MSG(windowWidth, "Wrong parameters.");
+    LE_ASSERT_MSG(windowWidth, "Wrong parameters.");
 
     float const inverseWindowWidth(1 / convert<float>(windowWidth));
     InputOutputRange window(&data[0], &data[windowWidth]);
@@ -635,9 +635,9 @@ void movingAverage(InputOutputRange const &data, unsigned int const windowWidth)
 void symmetricMovingAverage(InputRange const &input, OutputRange const output,
                             unsigned int const windowWidth)
 {
-    BOOST_ASSERT_MSG(windowWidth, "Wrong parameters.");
-    BOOST_ASSERT_MSG(input.size() == output.size(), "Input/output buffer sizes mismatched.");
-    BOOST_ASSERT_MSG(unsigned(input.size()) > windowWidth, "Window larger than data.");
+    LE_ASSERT_MSG(windowWidth, "Wrong parameters.");
+    LE_ASSERT_MSG(input.size() == output.size(), "Input/output buffer sizes mismatched.");
+    LE_ASSERT_MSG(unsigned(input.size()) > windowWidth, "Window larger than data.");
 
     unsigned int const halfWindowWidth(windowWidth / 2);
     unsigned int const fullWindowWidth(halfWindowWidth + 1 + halfWindowWidth);
@@ -647,7 +647,7 @@ void symmetricMovingAverage(InputRange const &input, OutputRange const output,
 
     // Leading partial window section (before the halfWindowWidth + 1 sample)
     {
-        BOOST_ASSERT_MSG(unsigned(window.size()) == halfWindowWidth + 1, "Algorithm bug.");
+        LE_ASSERT_MSG(unsigned(window.size()) == halfWindowWidth + 1, "Algorithm bug.");
 
         float leadWindowWidth(convert<float>(halfWindowWidth + 1));
         float const *const pLeadWindowEnd(&input[fullWindowWidth - 1] + 1);
@@ -661,8 +661,8 @@ void symmetricMovingAverage(InputRange const &input, OutputRange const output,
 
     // Main full window section
     {
-        BOOST_ASSERT_MSG(pOutputSample == &output[halfWindowWidth], "Algorithm bug.");
-        BOOST_ASSERT_MSG(unsigned(window.size()) == fullWindowWidth, "Algorithm bug.");
+        LE_ASSERT_MSG(pOutputSample == &output[halfWindowWidth], "Algorithm bug.");
+        LE_ASSERT_MSG(unsigned(window.size()) == fullWindowWidth, "Algorithm bug.");
 
         float const inverseWindowWidth(1 / convert<float>(fullWindowWidth));
         while (window.end() != input.end())
@@ -677,8 +677,8 @@ void symmetricMovingAverage(InputRange const &input, OutputRange const output,
 
     // Trailing partial window section
     {
-        BOOST_ASSERT_MSG(pOutputSample == output.end() - (halfWindowWidth + 1), "Algorithm bug.");
-        BOOST_ASSERT_MSG(unsigned(window.size()) == fullWindowWidth, "Algorithm bug.");
+        LE_ASSERT_MSG(pOutputSample == output.end() - (halfWindowWidth + 1), "Algorithm bug.");
+        LE_ASSERT_MSG(unsigned(window.size()) == fullWindowWidth, "Algorithm bug.");
 
         float tailWindowWidth(convert<float>(fullWindowWidth));
         while (pOutputSample != output.end())
@@ -692,7 +692,7 @@ void symmetricMovingAverage(InputRange const &input, OutputRange const output,
 
 void swap(InputOutputRange const &range1, InputOutputRange const &range2)
 {
-    BOOST_ASSERT_MSG(range1.size() == range2.size(), "Buffer sizes mismatch.");
+    LE_ASSERT_MSG(range1.size() == range2.size(), "Buffer sizes mismatch.");
 #ifdef LE_MATH_NATIVE_POINTER_SIZE_INTERFACE
     swap(range1.begin(), range2.begin(), static_cast<unsigned int>(range1.size()));
 #else
@@ -706,19 +706,19 @@ void swap(InputOutputRange const &range1, InputOutputRange const &range2)
 
 void copy(float const *const pBegin, float const *const pBeginEnd, float *const pDestination)
 {
-    BOOST_ASSERT_MSG(pBegin <= pBeginEnd, "Invalid range.");
+    LE_ASSERT_MSG(pBegin <= pBeginEnd, "Invalid range.");
     copy(pBegin, pDestination, static_cast<unsigned int>(pBeginEnd - pBegin));
 }
 
 void clear(float *const pBegin, float const *const pEnd)
 {
-    BOOST_ASSERT_MSG(pBegin <= pEnd, "Invalid range.");
+    LE_ASSERT_MSG(pBegin <= pEnd, "Invalid range.");
     clear(pBegin, static_cast<unsigned int>(pEnd - pBegin));
 }
 
 void fill(float *const pBegin, float const *const pEnd, float const value)
 {
-    BOOST_ASSERT_MSG(pBegin <= pEnd, "Invalid range.");
+    LE_ASSERT_MSG(pBegin <= pEnd, "Invalid range.");
 #if defined(LE_MATH_NATIVE_POINTER_SIZE_INTERFACE)
     fill(pBegin, value, static_cast<unsigned int>(pEnd - pBegin));
 #else
@@ -728,7 +728,7 @@ void fill(float *const pBegin, float const *const pEnd, float const value)
 
 void negate(float *pBegin, float const *const pEnd)
 {
-    BOOST_ASSERT_MSG(pBegin <= pEnd, "Invalid range.");
+    LE_ASSERT_MSG(pBegin <= pEnd, "Invalid range.");
 #if defined(LE_MATH_NATIVE_POINTER_SIZE_INTERFACE)
 
     negate(pBegin, static_cast<unsigned int>(pEnd - pBegin));
@@ -752,7 +752,7 @@ void negate(float *pBegin, float const *const pEnd)
 
 LE_NOTHROW void reverse(float *LE_RESTRICT const pBegin, float const *const pEnd)
 {
-    BOOST_ASSERT_MSG(pBegin <= pEnd, "Invalid range.");
+    LE_ASSERT_MSG(pBegin <= pEnd, "Invalid range.");
     //...mrmlj...ACC vDSP_vrvrs seems slower/non-vectorized so we use NT2 whenever possible...
 #if defined(BOOST_SIMD_DETECTED) || defined(__GNUC__)
     if (boost::simd::is_aligned(pBegin) && boost::simd::is_aligned(pEnd))
@@ -783,12 +783,12 @@ LE_NOTHROW void reverse(float *LE_RESTRICT const pBegin, float const *const pEnd
 void swap(float *LE_RESTRICT const pBegin, float const *const pEnd,
           float *LE_RESTRICT const pDestination)
 {
-    BOOST_ASSERT_MSG(pBegin <= pEnd, "Invalid range.");
+    LE_ASSERT_MSG(pBegin <= pEnd, "Invalid range.");
     //...mrmlj...ACC vDSP_vswap seems slower/non-vectorized so we use NT2 whenever possible...
 #if defined(BOOST_SIMD_DETECTED) || defined(__GNUC__)
     EdgeRestoredAlignedRange const data1(pBegin, pEnd);
     EdgeRestoredAlignedRange const data2(pDestination, pDestination + (pEnd - pBegin));
-    BOOST_ASSERT_MSG(data1.compatiblyAligned(pDestination), "Misaligned data");
+    LE_ASSERT_MSG(data1.compatiblyAligned(pDestination), "Misaligned data");
     if (data1.size() % 4 == 0)
     {
         // we can unroll:
@@ -876,7 +876,7 @@ void add(float const *const pInputData, float const scalar, float *const pOutput
     add(pInputData, scalar, pOutput, static_cast<unsigned int>(pOutputEnd - pOutput));
 #elif defined LE_MATH_USE_NT2
     EdgeRestoredAlignedRange const outputRange(pOutput, pOutputEnd);
-    BOOST_ASSERT_MSG(outputRange.compatiblyAligned(pInputData), "Misaligned data");
+    LE_ASSERT_MSG(outputRange.compatiblyAligned(pInputData), "Misaligned data");
     vector_t const *LE_RESTRICT pInput(alignDown(pInputData));
     vector_t const constant(boost::simd::splat<vector_t>(scalar));
     for (auto &pack : outputRange)
@@ -896,8 +896,8 @@ LE_NOINLINE_NT2 LE_NOTHROWNOALIAS void multiply(float const *const pFirstArray,
     multiply(pFirstArray, pSecondArray, pOutput, static_cast<unsigned int>(pOutputEnd - pOutput));
 #elif defined LE_MATH_USE_NT2
     EdgeRestoredAlignedRange const outputRange(pOutput, pOutputEnd);
-    BOOST_ASSERT_MSG(outputRange.compatiblyAligned(pFirstArray), "Misaligned data");
-    BOOST_ASSERT_MSG(outputRange.compatiblyAligned(pSecondArray), "Misaligned data");
+    LE_ASSERT_MSG(outputRange.compatiblyAligned(pFirstArray), "Misaligned data");
+    LE_ASSERT_MSG(outputRange.compatiblyAligned(pSecondArray), "Misaligned data");
     vector_t const *LE_RESTRICT pInput1(alignDown(pFirstArray));
     vector_t const *LE_RESTRICT pInput2(alignDown(pSecondArray));
     for (auto &pack : outputRange)
@@ -916,7 +916,7 @@ multiply(float const *const pInputData, float *const pInputOutput, float const *
     multiply(pInputData, pInputOutput, static_cast<unsigned int>(pOutputEnd - pInputOutput));
 #elif defined LE_MATH_USE_NT2
     EdgeRestoredAlignedRange const outputRange(pInputOutput, pOutputEnd);
-    BOOST_ASSERT_MSG(outputRange.compatiblyAligned(pInputData), "Misaligned data");
+    LE_ASSERT_MSG(outputRange.compatiblyAligned(pInputData), "Misaligned data");
     vector_t const *LE_RESTRICT pInput(alignDown(pInputData));
     for (auto &pack : outputRange)
     {
@@ -1014,8 +1014,8 @@ LE_NOINLINE_NT2 LE_NOTHROWNOALIAS void addProduct(float const *LE_RESTRICT const
         ///   The misaligned path becomes required when the host is set to
         /// process data in non-power-of-two sized chunks.
         ///                                   (25.01.2012.) (Domagoj Saric)
-        BOOST_ASSERT_MSG(boost::simd::is_aligned(pInputData1), "Misaligned data");
-        BOOST_ASSERT_MSG(boost::simd::is_aligned(pInputData2), "Misaligned data");
+        LE_ASSERT_MSG(boost::simd::is_aligned(pInputData1), "Misaligned data");
+        LE_ASSERT_MSG(boost::simd::is_aligned(pInputData2), "Misaligned data");
         auto const *LE_RESTRICT pInput1(reinterpret_cast<vector_t const *>(pInputData1));
         auto const *LE_RESTRICT pInput2(reinterpret_cast<vector_t const *>(pInputData2));
 
@@ -1063,7 +1063,7 @@ void ln(float const *LE_RESTRICT const pInput, float *LE_RESTRICT const pOutput,
 {
 #ifdef LE_MATH_USE_NT2
     EdgeRestoredAlignedRange const outputRange(pOutput, pOutputEnd);
-    BOOST_ASSERT_MSG(outputRange.compatiblyAligned(pInput), "Misaligned data");
+    LE_ASSERT_MSG(outputRange.compatiblyAligned(pInput), "Misaligned data");
     vector_t const *LE_RESTRICT pInputPack(alignDown(pInput));
     for (auto &pack : outputRange)
     {
@@ -1180,9 +1180,8 @@ mix(float const *LE_RESTRICT pInput1, float const *LE_RESTRICT pInput2,
 void copy(float const *LE_RESTRICT const pInput, float *LE_RESTRICT const pOutput,
           unsigned int const numberOfElements)
 {
-    BOOST_ASSERT_MSG((pOutput >= pInput + numberOfElements) ||
-                         (pInput >= pOutput + numberOfElements),
-                     "Buffer overlap."); // Use move for overlapping ranges.
+    LE_ASSERT_MSG((pOutput >= pInput + numberOfElements) || (pInput >= pOutput + numberOfElements),
+                  "Buffer overlap."); // Use move for overlapping ranges.
     std::memcpy(pOutput, pInput, numberOfElements * sizeof(*pInput));
 }
 
@@ -1251,7 +1250,7 @@ float const &min(float const *const pArray, unsigned int const numberOfElements)
     float result;
     vDSP_Length resultIndex;
     vDSP_minvi(const_cast<float *>(pArray), 1, &result, &resultIndex, numberOfElements);
-    BOOST_ASSERT(pArray[resultIndex] == result);
+    LE_ASSERT(pArray[resultIndex] == result);
     return pArray[resultIndex];
 #else
     return min(pArray, pArray + numberOfElements);
@@ -1264,7 +1263,7 @@ float const &max(float const *const pArray, unsigned int const numberOfElements)
     float result;
     vDSP_Length resultIndex;
     vDSP_maxvi(const_cast<float *>(pArray), 1, &result, &resultIndex, numberOfElements);
-    BOOST_ASSERT(pArray[resultIndex] == result);
+    LE_ASSERT(pArray[resultIndex] == result);
     return pArray[resultIndex];
 #else
     return max(pArray, pArray + numberOfElements);
@@ -1359,9 +1358,9 @@ LE_NOTHROWNOALIAS void rectangular2polar(float const *LE_RESTRICT const pReals,
 
     EdgeRestoredAlignedRange const amplitudes(pAmplitudes, pAmplitudes + numberOfElements);
     EdgeRestoredAlignedRange const phases(pPhases, pPhases + numberOfElements);
-    BOOST_ASSERT_MSG(amplitudes.compatiblyAligned(pPhases), "Misaligned data");
-    BOOST_ASSERT_MSG(amplitudes.compatiblyAligned(pReals), "Misaligned data");
-    BOOST_ASSERT_MSG(amplitudes.compatiblyAligned(pImags), "Misaligned data");
+    LE_ASSERT_MSG(amplitudes.compatiblyAligned(pPhases), "Misaligned data");
+    LE_ASSERT_MSG(amplitudes.compatiblyAligned(pReals), "Misaligned data");
+    LE_ASSERT_MSG(amplitudes.compatiblyAligned(pImags), "Misaligned data");
 
     complex_op_vector_t const *LE_RESTRICT pReal(asComplex(alignDown(pReals)));
     complex_op_vector_t const *LE_RESTRICT pImag(asComplex(alignDown(pImags)));
@@ -1392,7 +1391,7 @@ LE_NOTHROWNOALIAS void rectangular2polar(float const *LE_RESTRICT const pReals,
     // the output still sounds fine. For this reason we zero the NaNs in
     // development builds.
     //                                    (28.11.2011.) (Domagoj Saric)
-    for (float &phase : boost::make_iterator_range_n(pPhases, numberOfElements))
+    for (float &phase : LE::Utility::makeSpan(pPhases, numberOfElements))
     {
         if (!std::isfinite(phase))
             phase = 0;
@@ -1402,10 +1401,9 @@ LE_NOTHROWNOALIAS void rectangular2polar(float const *LE_RESTRICT const pReals,
 
     LE_MATH_VERIFY_VALUES(
         Math::InvalidOrSlow | Negative,
-        boost::iterator_range<float const *>(pAmplitudes, pAmplitudes + numberOfElements),
-        "amplitudes");
+        LE::Utility::Span<float const>(pAmplitudes, pAmplitudes + numberOfElements), "amplitudes");
     LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow,
-                          boost::iterator_range<float const *>(pPhases, pPhases + numberOfElements),
+                          LE::Utility::Span<float const>(pPhases, pPhases + numberOfElements),
                           "phases");
 }
 
@@ -1416,8 +1414,8 @@ LE_NOTHROWNOALIAS void amplitudes(float const *LE_RESTRICT const pReals,
 {
 #ifdef LE_MATH_USE_NT2
     EdgeRestoredAlignedRange const amplitudes(pAmplitudes, pAmplitudesEnd);
-    BOOST_ASSERT_MSG(amplitudes.compatiblyAligned(pReals), "Misaligned data");
-    BOOST_ASSERT_MSG(amplitudes.compatiblyAligned(pImags), "Misaligned data");
+    LE_ASSERT_MSG(amplitudes.compatiblyAligned(pReals), "Misaligned data");
+    LE_ASSERT_MSG(amplitudes.compatiblyAligned(pImags), "Misaligned data");
 
     complex_op_vector_t const *LE_RESTRICT pReal(asComplex(alignDown(pReals)));
     complex_op_vector_t const *LE_RESTRICT pImag(asComplex(alignDown(pImags)));
@@ -1435,7 +1433,7 @@ LE_NOTHROWNOALIAS void amplitudes(float const *LE_RESTRICT const pReals,
 #endif // LE_MATH_USE_NT2
 
     LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow | Negative,
-                          boost::make_iterator_range<float const *>(pAmplitudes, pAmplitudesEnd),
+                          LE::Utility::Span<float const>(pAmplitudes, pAmplitudesEnd),
                           "amplitudes");
 }
 
@@ -1502,9 +1500,9 @@ LE_NOTHROWNOALIAS void polar2rectangular(float const *LE_RESTRICT const pAmplitu
 #ifdef LE_MATH_USE_NT2
     EdgeRestoredAlignedRange const reals(pReals, pReals + numberOfElements);
     EdgeRestoredAlignedRange const imags(pImags, pImags + numberOfElements);
-    BOOST_ASSERT_MSG(reals.compatiblyAligned(pImags), "Misaligned data");
-    BOOST_ASSERT_MSG(reals.compatiblyAligned(pAmplitudes), "Misaligned data");
-    BOOST_ASSERT_MSG(reals.compatiblyAligned(pPhases), "Misaligned data");
+    LE_ASSERT_MSG(reals.compatiblyAligned(pImags), "Misaligned data");
+    LE_ASSERT_MSG(reals.compatiblyAligned(pAmplitudes), "Misaligned data");
+    LE_ASSERT_MSG(reals.compatiblyAligned(pPhases), "Misaligned data");
 
     Polar2rectangularData const data = {alignDown(pAmplitudes), alignDown(pPhases), reals.begin(),
                                         imags.begin()};

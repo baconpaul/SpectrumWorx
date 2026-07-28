@@ -16,8 +16,6 @@
 #include "le/spectrumworx/effects/configuration/constants.hpp"
 #include "le/utility/cstdint.hpp"
 
-#include "boost/noncopyable.hpp"
-
 #include <array>
 //------------------------------------------------------------------------------
 namespace LE
@@ -53,9 +51,12 @@ namespace GUI
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class ModuleMenuHolder : boost::noncopyable
+class ModuleMenuHolder
 {
   public:
+    ModuleMenuHolder(ModuleMenuHolder const &) = delete; // makes non-copyable
+    ModuleMenuHolder &operator=(ModuleMenuHolder const &) = delete;
+
     static unsigned int const minimumEffectsForSubMenus = 15;
     static bool const hasSubMenus =
         Effects::Constants::numberOfIncludedEffects >= minimumEffectsForSubMenus;

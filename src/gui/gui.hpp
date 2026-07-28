@@ -23,12 +23,14 @@
 
 // Boost sandbox
 #include "boost/mmap/mapped_view/mapped_view.hpp"
-#include "boost/optional/optional.hpp"
+#include <optional>
+#include <string_view>
+#include "le/utility/span.hpp"
 
 #ifndef _MSC_VER
 #include "boost/mpl/at.hpp"
 #endif // _MSC_VER
-#include "boost/smart_ptr/intrusive_ptr.hpp"
+#include "le/utility/intrusivePtr.hpp"
 
 #include "juce/juce_gui_basics/juce_gui_basics.h"
 
@@ -221,9 +223,12 @@ FSRef makeFSRefFromPath(juce::String const &path);
 class ModuleControlBase;
 class ModuleUI;
 
-class Theme final : public juce::LookAndFeel, boost::noncopyable
+class Theme final : public juce::LookAndFeel
 {
   public:
+    Theme(Theme const &) = delete; // makes non-copyable
+    Theme &operator=(Theme const &) = delete;
+
     enum ModuleUIMouseOverReaction
     {
         Never,
@@ -453,7 +458,7 @@ template <class Window> class OwnedWindow : private OwnedWindowBase
         else
             adjustPositionsForSettings(parent, &window);
 
-        BOOST_ASSERT(window.isOnDesktop() && window.getPeer());
+        LE_ASSERT(window.isOnDesktop() && window.getPeer());
     }
 
     ~OwnedWindow()
@@ -471,8 +476,7 @@ template <class Window> class OwnedWindow : private OwnedWindowBase
 }; // class OwnedWindow
 #pragma warning(pop)
 
-void
-    LE_NOTHROW warningMessageBox(boost::string_ref title, boost::string_ref message, bool canBlock);
+void LE_NOTHROW warningMessageBox(std::string_view title, std::string_view message, bool canBlock);
 bool LE_NOTHROW warningOkCancelBox(TCHAR const *title, TCHAR const *question);
 
 void addToParentAndShow(juce::Component &parent, juce::Component &childToBe);
@@ -485,8 +489,7 @@ class Lock : private juce::MessageManagerLock
   public:
     LE_NOINLINE Lock() : juce::MessageManagerLock(nullptr)
     {
-        BOOST_ASSERT(lockWasGained() ||
-                     !ReferenceCountedGUIInitializationGuard::isGUIInitialised());
+        LE_ASSERT(lockWasGained() || !ReferenceCountedGUIInitializationGuard::isGUIInitialised());
     }
 }; // class Lock
 
@@ -510,7 +513,7 @@ class Message final : public juce::MessageManager::MessageBase
     }
 
   private:
-    boost::intrusive_ptr<GUIHolder> const pGUIHolder_;
+    LE::Utility::IntrusivePtr<GUIHolder> const pGUIHolder_;
     Functor functor_;
 }; // class Message
 
@@ -663,11 +666,14 @@ class BitmapButton : public WidgetBase<juce::ImageButton>
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class PopupMenu : boost::noncopyable
+class PopupMenu
 {
   public:
+    PopupMenu(PopupMenu const &) = delete; // makes non-copyable
+    PopupMenu &operator=(PopupMenu const &) = delete;
+
     using ItemID = std::uint32_t;
-    using OptionalID = boost::optional<ItemID>;
+    using OptionalID = std::optional<ItemID>;
 
   public:
     LE_NOTHROW PopupMenu();
@@ -968,7 +974,7 @@ void addPowerOfTwoValueStringsToComboBox(unsigned int firstValue, unsigned int l
                                          ComboBox &comboBox);
 
 void addEnumeratedParameterValueStringsToComboBox(
-    boost::iterator_range<char const *LE_RESTRICT const *> strings, ComboBox &comboBox);
+    LE::Utility::Span<char const *LE_RESTRICT const> strings, ComboBox &comboBox);
 
 template <class Parameter>
 void fillComboBoxForParameter(ComboBox &comboBox, LE::Parameters::PowerOfTwoParameterTag)
@@ -980,7 +986,7 @@ template <class Parameter>
 void fillComboBoxForParameter(ComboBox &comboBox, LE::Parameters::EnumeratedParameterTag)
 {
     addEnumeratedParameterValueStringsToComboBox(
-        boost::make_iterator_range(LE::Parameters::DiscreteValues<Parameter>::strings), comboBox);
+        LE::Utility::makeSpan(LE::Parameters::DiscreteValues<Parameter>::strings), comboBox);
 }
 } // namespace Detail
 

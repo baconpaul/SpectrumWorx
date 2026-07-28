@@ -14,8 +14,8 @@
 #include "le/spectrumworx/engine/configuration.hpp"
 
 #include "le/utility/platformSpecifics.hpp"
+#include "le/utility/span.hpp"
 
-#include "boost/range/iterator_range_core.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -23,7 +23,7 @@ namespace LE
 LE_IMPL_NAMESPACE_BEGIN(Math)
 //------------------------------------------------------------------------------
 
-using DataRange = boost::iterator_range<float *LE_RESTRICT>;
+using DataRange = LE::Utility::Span<float>;
 
 void calculateWindow(DataRange const &window, LE::SW::Engine::Constants::Window);
 

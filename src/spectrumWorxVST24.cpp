@@ -15,7 +15,7 @@
 #include "le/plugins/vst/2.4/plugin.hpp"
 #include "le/plugins/vst/2.4/tag.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 
 #include <array>
 #include <cstring>
@@ -32,7 +32,7 @@ namespace SW
 bool LE_NOTHROW SpectrumWorxVST24::initialise()
 {
     bool success(Base::initialise() == Success);
-    BOOST_ASSERT(success);
+    LE_ASSERT(success);
     auto const hostInputs(host().getNumInputs());
     auto const hostOutputs(host().getNumOutputs());
     auto const pluginInputs(engineSetup().numberOfChannels() +
@@ -53,7 +53,7 @@ bool LE_NOTHROW SpectrumWorxVST24::initialise()
     {
         bool const changeSuccessful( SpectrumWorxCore::setNumberOfChannels( hostInputs, hostOutputs ) );
 #if LE_SW_ENGINE_INPUT_MODE >= 2
-        BOOST_ASSERT( hostTryIOConfigurationChange( engineSetup().numberOfChannels(), engineSetup().numberOfSideChannels() ) );
+        LE_ASSERT( hostTryIOConfigurationChange( engineSetup().numberOfChannels(), engineSetup().numberOfSideChannels() ) );
 #endif // #if LE_SW_ENGINE_INPUT_MODE >= 2
         success &= changeSuccessful;
     }
@@ -65,8 +65,8 @@ bool LE_NOTHROW SpectrumWorxVST24::initialise()
     /// settings) which is at least crash-wise safe (because at worst we will
     /// simply be ignoring the data for the extra channels).
     ///                                       (24.09.2014.) (Domagoj Saric)
-    BOOST_ASSERT(hostInputs == maxNumberOfInputs || hostInputs == pluginInputs);
-    BOOST_ASSERT(hostOutputs == maxNumberOfOutputs || hostOutputs == pluginOutputs);
+    LE_ASSERT(hostInputs == maxNumberOfInputs || hostInputs == pluginInputs);
+    LE_ASSERT(hostOutputs == maxNumberOfOutputs || hostOutputs == pluginOutputs);
     aEffect().numInputs = pluginInputs;
     aEffect().numOutputs = pluginOutputs;
 #endif
@@ -171,7 +171,7 @@ bool SpectrumWorxVST24::getSpeakerArrangement(::VstSpeakerArrangement &input,
     auto const numberOfMainChannels(engineSetup().numberOfChannels());
     auto const numberOfSideChannels(engineSetup().numberOfSideChannels());
 
-    BOOST_ASSERT_MSG(
+    LE_ASSERT_MSG(
         ((host().getNumOutputs() == numberOfMainChannels) ||
          (host().getNumOutputs() == maxNumberOfOutputs)) &&
             ((host().getNumInputs() == unsigned(numberOfMainChannels + numberOfSideChannels)) ||
@@ -200,7 +200,7 @@ void fillChannelProperties(::VstPinProperties &properties, char const *const lab
 {
     LE_INT_SPRINTFA(properties.label, labelFormatString, channelIndex + 1);
     std::strcpy(properties.shortLabel, &properties.label[3]);
-    BOOST_ASSERT(std::strlen(properties.shortLabel) < _countof(properties.shortLabel));
+    LE_ASSERT(std::strlen(properties.shortLabel) < _countof(properties.shortLabel));
     properties.flags = kVstPinIsActive | kVstPinUseSpeaker;
     if (channelIndex % 2 == 0)
         properties.flags |= kVstPinIsStereo;
@@ -213,8 +213,8 @@ void fillChannelProperties(::VstPinProperties &properties, char const *const lab
 void SpectrumWorxVST24::getInputProperties(std::uint8_t const index, ::VstPinProperties &properties)
 {
     auto const numberOfMainChannels(engineSetup().numberOfChannels());
-    BOOST_ASSERT(index < unsigned(numberOfMainChannels + engineSetup().numberOfSideChannels()));
-    BOOST_ASSERT(index < this->host().getNumInputs());
+    LE_ASSERT(index < unsigned(numberOfMainChannels + engineSetup().numberOfSideChannels()));
+    LE_ASSERT(index < this->host().getNumInputs());
     if (index < numberOfMainChannels)
         fillChannelProperties(properties, "SW in %1d", static_cast<std::uint8_t>(index),
                               numberOfMainChannels);
@@ -228,8 +228,8 @@ void SpectrumWorxVST24::getOutputProperties(std::uint8_t const index,
                                             ::VstPinProperties &properties)
 {
     auto const numberOfMainChannels(engineSetup().numberOfChannels());
-    BOOST_ASSERT(index < numberOfMainChannels);
-    BOOST_ASSERT(index < this->host().getNumOutputs());
+    LE_ASSERT(index < numberOfMainChannels);
+    LE_ASSERT(index < this->host().getNumOutputs());
     fillChannelProperties(properties, "SW out %1d", static_cast<std::uint8_t>(index),
                           numberOfMainChannels);
 }

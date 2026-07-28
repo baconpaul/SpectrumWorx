@@ -21,7 +21,8 @@
 //------------------------------------------------------------------------------
 #include "pimpl.hpp"
 
-#include <boost/assert.hpp>
+#include "assert.hpp"
+#include "intrusivePtr.hpp"
 
 #include <new>
 #include <type_traits>
@@ -51,10 +52,9 @@ typename Implementation<Interface>::type &impl(PImpl<Interface, BaseInterface> &
     Interface *const pInterface(static_cast<Interface *>(&interfaceBase));
     Implementation *const pImplementation(
         static_cast<Implementation *>(static_cast<void *>(pInterface)));
-    BOOST_ASSERT_MSG(
-        ptrdiff(pImplementation, static_cast<BaseImplementation *>(pImplementation)) ==
-            ptrdiff(pInterface, static_cast<BaseInterface *>(pInterface)),
-        "Interface and implementation with multiple inheritance at different offsets!");
+    LE_ASSERT_MSG(ptrdiff(pImplementation, static_cast<BaseImplementation *>(pImplementation)) ==
+                      ptrdiff(pInterface, static_cast<BaseInterface *>(pInterface)),
+                  "Interface and implementation with multiple inheritance at different offsets!");
     LE_ASSUME(pImplementation);
     return *pImplementation;
 }
@@ -235,7 +235,7 @@ LE_NOTHROWNOALIAS void HeapPImpl<Interface, BaseInterface>::operator delete(void
 }
 
 template <class Interface, class BaseInterface>
-LE_NOTHROWNOALIAS boost::intrusive_ptr<Interface> HeapPImpl<Interface, BaseInterface>::create()
+LE_NOTHROWNOALIAS LE::Utility::IntrusivePtr<Interface> HeapPImpl<Interface, BaseInterface>::create()
 {
     using Implementation = typename Implementation<Interface>::type;
     Implementation *LE_RESTRICT const pImplementation(new (std::nothrow) Implementation);
@@ -244,7 +244,7 @@ LE_NOTHROWNOALIAS boost::intrusive_ptr<Interface> HeapPImpl<Interface, BaseInter
 #if !defined(__clang__)
     LE_ASSUME(&Utility::impl(*pInterface) == pImplementation);
 #endif // !__clang__
-    return boost::intrusive_ptr<Interface>(pInterface);
+    return LE::Utility::IntrusivePtr<Interface>(pInterface);
 }
 
 //------------------------------------------------------------------------------

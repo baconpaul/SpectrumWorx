@@ -93,10 +93,10 @@ template <int minimumValue, int maximumValue, int defaultValue> struct LinearPar
     using Tag = LinearParameterTag;
 
   public: // Values
-    static std::int32_t BOOST_CONSTEXPR_OR_CONST unscaledMinimum = minimumValue;
-    static std::int32_t BOOST_CONSTEXPR_OR_CONST unscaledMaximum = maximumValue;
-    static std::int32_t BOOST_CONSTEXPR_OR_CONST unscaledDefault = defaultValue;
-    static std::uint32_t BOOST_CONSTEXPR_OR_CONST rangeValuesDenominator = 1;
+    static std::int32_t constexpr unscaledMinimum = minimumValue;
+    static std::int32_t constexpr unscaledMaximum = maximumValue;
+    static std::int32_t constexpr unscaledDefault = defaultValue;
+    static std::uint32_t constexpr rangeValuesDenominator = 1;
 
   protected:
     template <typename T> static void increment(T &value) { ++value; }
@@ -118,7 +118,7 @@ struct LinearFloatParameterTraitsBase
 #endif // _MSC_VER
 
   public: // Values
-    static unsigned int BOOST_CONSTEXPR_OR_CONST rangeValuesDenominator = rangeScaleFactor;
+    static unsigned int constexpr rangeValuesDenominator = rangeScaleFactor;
 
     static value_type const &minimum()
     {

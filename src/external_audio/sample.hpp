@@ -12,22 +12,13 @@
 #define sample_hpp__A94590F9_6645_4380_8512_060CF57872FA
 //------------------------------------------------------------------------------
 #include "le/utility/platformSpecifics.hpp"
+#include "le/utility/span.hpp"
 
 #include <juce/juce_core/juce_core.h>
 
-#include <boost/range/iterator_range_core.hpp>
-#include <boost/smart_ptr/scoped_array.hpp>
+#include <memory>
+#include <mutex>
 //------------------------------------------------------------------------------
-
-#ifdef _WIN32
-namespace boost
-{
-namespace signals2
-{
-class mutex;
-}
-} // namespace boost
-#endif // _WIN32
 
 namespace LE
 {
@@ -44,7 +35,7 @@ namespace LE
 namespace Utility
 {
 #ifdef _WIN32
-using CriticalSection = boost::signals2::mutex;
+using CriticalSection = std::mutex;
 #else
 class CriticalSection;
 #endif // _WIN32
@@ -53,7 +44,7 @@ class CriticalSection;
 class Sample
 {
   public:
-    using ChannelData = boost::iterator_range<float const *LE_RESTRICT>;
+    using ChannelData = LE::Utility::Span<float const>;
 
   public:
     char const *load(juce::File const &sampleFile, unsigned int desiredSampleRate,
@@ -83,7 +74,7 @@ class Sample
 
         void takeDataFrom(DataHolder &other);
 
-        boost::scoped_array<float> pBuffer;
+        std::unique_ptr<float[]> pBuffer;
         float *pChannel1End;
         float *pChannel2Beginning;
         float *pChannel2End;

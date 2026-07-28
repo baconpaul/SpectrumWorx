@@ -12,7 +12,7 @@
 
 #include "module.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 
 #include <utility>
 //------------------------------------------------------------------------------
@@ -61,34 +61,34 @@ LE_NOTHROW LE_COLD ModuleChainBase::~ModuleChainBase()
     /// leaks.
     ///                                       (12.03.2014.) (Domagoj Saric)
     clear();
-    BOOST_ASSERT(this->referenceCount_ == 1 || this->referenceCount_ == 3);
+    LE_ASSERT(this->referenceCount_ == 1 || this->referenceCount_ == 3);
 }
 
 LE_NOTHROW LE_COLD void ModuleChainBase::moveAssign(ModuleChainBase &&other)
 {
-    BOOST_ASSERT(this->empty());
+    LE_ASSERT(this->empty());
 
 #ifndef NDEBUG
     auto const otherSize(other.size());
 #endif // NDEBUG
 
     Node *const begin(other.next_.get());
-    BOOST_ASSERT(&*begin == other.begin());
+    LE_ASSERT(&*begin == other.begin());
     Node *const end(&other);
-    BOOST_ASSERT(&*end == other.end());
+    LE_ASSERT(&*end == other.end());
     node_algorithms::transfer(this, begin, end);
     //this->previous_ = other.previous_;
     //this->next_     = other.next_    ;
     //other.resetRoot();
-    BOOST_ASSERT(other.referenceCount_ == 3);
-    BOOST_ASSERT(other.empty());
-    BOOST_ASSERT(this->size() == otherSize);
+    LE_ASSERT(other.referenceCount_ == 3);
+    LE_ASSERT(other.empty());
+    LE_ASSERT(this->size() == otherSize);
 }
 
 LE_NOTHROWNOALIAS LE_COLD std::uint8_t ModuleChainBase::getIndexForModule(Node const &module) const
 {
 #if 0
-    BOOST_ASSERT_MSG
+    LE_ASSERT_MSG
     (
         std::find_if
         (
@@ -107,18 +107,18 @@ LE_NOTHROWNOALIAS LE_COLD std::uint8_t ModuleChainBase::getIndexForModule(Node c
             module.next_
                 .get()) //...mrmlj...ugh...use the next node to handle the case when this module is already removed...
             break;
-        BOOST_ASSERT_MSG(!isEnd(pCurrentModule), "Module not from this chain!");
+        LE_ASSERT_MSG(!isEnd(pCurrentModule), "Module not from this chain!");
     }
-    BOOST_ASSERT(index <= this->size());
+    LE_ASSERT(index <= this->size());
     return index - 1;
 #endif // impl
 }
 
 LE_NOTHROWNOALIAS LE_COLD ModuleChainBase::iterator ModuleChainBase::module(std::uint8_t index)
 {
-#if !defined(BOOST_NO_RTTI)
-    BOOST_ASSERT_MSG(!dynamic_cast<Engine::ModuleDSP const *>(end().get()),
-                     "Root node is not supposed to be an actual module.");
+#if !defined(LE_NO_RTTI)
+    LE_ASSERT_MSG(!dynamic_cast<Engine::ModuleDSP const *>(end().get()),
+                  "Root node is not supposed to be an actual module.");
 #endif
     iterator pCurrentModule(this->begin());
     while (index && !isEnd(pCurrentModule))
@@ -152,8 +152,8 @@ LE_NOTHROW LE_COLD void ModuleChainBase::moveModule(std::uint8_t const sourceInd
     //LE_ASSUME( targetIndex < Constants::maxNumberOfModules );
     iterator const pSource(module(sourceIndex));
     iterator const pTarget(module(targetIndex));
-    BOOST_ASSERT(pSource != end());
-    BOOST_ASSERT(pTarget != end());
+    LE_ASSERT(pSource != end());
+    LE_ASSERT(pTarget != end());
     node_algorithms::unlink(pSource.get());
     if (sourceIndex < targetIndex)
         node_algorithms::link_after(pTarget.get(), pSource.get());
@@ -168,15 +168,15 @@ LE_NOTHROW LE_COLD void ModuleChainBase::moveModule(std::uint8_t const sourceInd
 
 LE_NOTHROW LE_COLD void ModuleChainBase::push_back(Node &module)
 {
-    //...mrmlj...BOOST_ASSERT_MSG( node_algorithms::inited( &module ), "Module already belongs to a different chain." );
+    //...mrmlj...LE_ASSERT_MSG( node_algorithms::inited( &module ), "Module already belongs to a different chain." );
     node_algorithms::link_before(this, &module);
 }
 
 LE_NOTHROW LE_COLD void ModuleChainBase::insertAtAndReplace(iterator const &pInsertPosition,
                                                             Node &moduleToInsert)
 {
-    BOOST_ASSERT_MSG(node_algorithms::inited(&moduleToInsert),
-                     "Module already belongs to a different chain.");
+    LE_ASSERT_MSG(node_algorithms::inited(&moduleToInsert),
+                  "Module already belongs to a different chain.");
     node_algorithms::link_before(pInsertPosition.get(), &moduleToInsert);
     if (!isEnd(pInsertPosition))
         remove(*pInsertPosition);
@@ -185,12 +185,12 @@ LE_NOTHROW LE_COLD void ModuleChainBase::insertAtAndReplace(iterator const &pIns
 LE_NOTHROW LE_COLD void ModuleChainBase::remove(Node &node)
 {
 #ifndef NDEBUG
-    BOOST_ASSERT_MSG(&node != this, "You can't remove the root node.");
+    LE_ASSERT_MSG(&node != this, "You can't remove the root node.");
     auto const previous(node.previous_);
     auto const next(node.next_);
     bool const referenced(node.referenceCount_ > 2);
-    BOOST_ASSERT(previous_);
-    BOOST_ASSERT(next_);
+    LE_ASSERT(previous_);
+    LE_ASSERT(next_);
 #endif // NDEBUG
     node_algorithms::unlink(&node);
 #ifndef NDEBUG
@@ -199,7 +199,7 @@ LE_NOTHROW LE_COLD void ModuleChainBase::remove(Node &node)
     /// to continue on to the next one after it finishes with the one being
     /// unlinked.
     ///                                       (11.09.2014.) (Domagoj Saric)
-    BOOST_ASSERT((node.previous_ == previous && node.next_ == next) || !referenced);
+    LE_ASSERT((node.previous_ == previous && node.next_ == next) || !referenced);
 #endif // NDEBUG
 }
 
@@ -244,9 +244,9 @@ LE_NOTHROW LE_COLD void ModuleChainBase::resetRoot()
 {
     //...mrmlj...a module sent to be destroyed in the GUI thread might still be
     //...mrmlj...referencing the root node...
-    //BOOST_ASSERT( this->referenceCount_ == 1 || this->referenceCount_ == 3 );
+    //LE_ASSERT( this->referenceCount_ == 1 || this->referenceCount_ == 3 );
     node_algorithms::init_header(&rootNode());
-    //BOOST_ASSERT( this->referenceCount_ == 3 );
+    //LE_ASSERT( this->referenceCount_ == 3 );
 }
 
 LE_NOTHROWNOALIAS LE_COLD bool ModuleChainBase::empty() const { return this->next_.get() == this; }
@@ -335,7 +335,7 @@ LE_NOTHROW LE_COLD bool ModuleChainImpl::resizeAll(Engine::StorageFactors const 
     iterator const reachedIterator(resize(pModulesBegin, *end(), newfactors));
     if (isEnd(reachedIterator))
         return true;
-    BOOST_VERIFY(resize(pModulesBegin, *reachedIterator, currentFactors) == reachedIterator);
+    LE_VERIFY(resize(pModulesBegin, *reachedIterator, currentFactors) == reachedIterator);
     return false;
 }
 

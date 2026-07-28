@@ -21,9 +21,8 @@
 #include "fmod.h"
 #include "fmod_studio_plugin_sdk.hpp"
 
-#include "boost/optional/optional.hpp" // Boost sandbox
+#include <optional>
 
-#include "boost/utility/in_place_factory.hpp"
 //------------------------------------------------------------------------------
 #if defined(_WIN32)
 struct HWND__;
@@ -121,14 +120,13 @@ template <class Impl> class FMODEditor : public FMODEditorBase
         if (!stateSize)
             return FMOD_OK;
         typedef decltype(impl().getPosition()) position_t;
-        BOOST_ASSERT_MSG(pState && (stateSize == sizeof(position_t)),
-                         "Invalid editor state object");
+        LE_ASSERT_MSG(pState && (stateSize == sizeof(position_t)), "Invalid editor state object");
         impl().setTopLeftPosition(*static_cast<position_t const *>(pState));
         return FMOD_OK;
     }
 
   private:
-    typedef boost::optional2<Impl> OptionalEditor;
+    typedef std::optional<Impl> OptionalEditor;
 
     Impl &impl() { return **optionalEditorFromBase(this, true); }
     Impl const &impl() const { return const_cast<FMODEditor &>(*this).impl(); }
@@ -137,14 +135,15 @@ template <class Impl> class FMODEditor : public FMODEditorBase
     {
         LE_ASSUME(pOptionalEditor);
         Impl *const pImpl(reinterpret_cast<Impl *>(pOptionalEditor));
-        BOOST_ASSERT(pOptionalEditor->get_ptr() == pImpl || pOptionalEditor->get_ptr() == nullptr);
+        LE_ASSERT(pOptionalEditor->operator->() == pImpl ||
+                  pOptionalEditor->operator->() == nullptr);
         return pImpl;
     }
 
     static FMODEditorBase *baseFromConstructedEditor(OptionalEditor *const pOptionalEditor)
     {
         LE_ASSUME(pOptionalEditor);
-        Impl *const pImpl(pOptionalEditor->get_ptr());
+        Impl *const pImpl(pOptionalEditor->operator->());
         LE_ASSUME(pImpl);
         return pImpl;
     }
@@ -155,8 +154,8 @@ template <class Impl> class FMODEditor : public FMODEditorBase
         LE_ASSUME(pEditorBase);
         Impl *const pImpl(static_cast<Impl *>(pEditorBase));
         OptionalEditor *const pOptionalEditor(reinterpret_cast<OptionalEditor *>(pImpl));
-        LE_ASSUME((pOptionalEditor->get_ptr() == pImpl) ||
-                  (!assumeConstructed && pOptionalEditor->get_ptr() == nullptr));
+        LE_ASSUME((pOptionalEditor->operator->() == pImpl) ||
+                  (!assumeConstructed && pOptionalEditor->operator->() == nullptr));
         return pOptionalEditor;
     }
 
@@ -215,7 +214,7 @@ LE_NOTHROW FMOD_RESULT F_CALLBACK FMODEditor<Impl>::create(void **const ppEditor
 {
     try
     {
-        OptionalEditor *const pNewEditorHolder(new OptionalEditor(boost::in_place()));
+        OptionalEditor *const pNewEditorHolder(new OptionalEditor(std::in_place));
         (*pNewEditorHolder)->setInvisible();
         *ppEditor = baseFromOptionalEditor(pNewEditorHolder);
         return FMOD_OK;
@@ -268,7 +267,7 @@ LE_NOTHROW FMOD_RESULT F_CALLBACK FMODEditor<Impl>::getLocalState(void *const pE
                                                                   unsigned int *const pStateSize)
 {
     OptionalEditor &editor(*optionalEditorFromBase(static_cast<FMODEditorBase *>(pEditor), true));
-    BOOST_ASSERT_MSG(editor.is_initialized(), "Editor not yet shown");
+    LE_ASSERT_MSG(editor.has_value(), "Editor not yet shown");
     editor->getLocalState(ppState, pStateSize);
     return FMOD_OK;
 }
@@ -293,8 +292,8 @@ LE_NOTHROW FMOD_RESULT F_CALLBACK FMODEditor<Impl>::updateParameterValue(
         break;
         LE_DEFAULT_CASE_UNREACHABLE();
     }
-    BOOST_ASSERT_MSG(editor->getParameter(parameterIndex) == value,
-                     "Updated parameter value out of sync");
+    LE_ASSERT_MSG(editor->getParameter(parameterIndex) == value,
+                  "Updated parameter value out of sync");
     return static_cast<FMOD_RESULT>(editor->setParameter(parameterIndex, value));
 }
 

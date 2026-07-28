@@ -15,8 +15,7 @@
 #include "objc.hpp"
 #include "trace.hpp"
 
-#include <boost/assert.hpp>
-#include <boost/config.hpp>
+#include "assert.hpp"
 
 #import <TargetConditionals.h>
 #import <CoreFoundation/CoreFoundation.h>

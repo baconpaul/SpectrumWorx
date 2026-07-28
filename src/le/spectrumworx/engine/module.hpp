@@ -22,8 +22,10 @@
 #include "le/spectrumworx/engine/moduleParameters.hpp"
 
 #include "le/utility/platformSpecifics.hpp"
+#include "le/utility/intrusivePtr.hpp"
 
 #include <cstdint>
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -34,7 +36,7 @@ namespace SW
 namespace Engine
 {
 struct StorageFactors;
-using Storage = boost::iterator_range<char *LE_RESTRICT>;
+using Storage = LE::Utility::Span<char>;
 } // namespace Engine
 LE_IMPL_NAMESPACE_BEGIN(Engine)
 //------------------------------------------------------------------------------
@@ -113,7 +115,7 @@ class LE_NOVTABLE ModuleDSP :
 #endif
           parametersBaseOffset_(parametersBaseOffset), pParameterOffsets_(pParameterOffsets)
     {
-        BOOST_ASSERT(storage_.begin() == nullptr);
+        LE_ASSERT(storage_.begin() == nullptr);
     }
 
 #ifdef LE_SW_SDK_BUILD //...mrmlj...reinvestigate this...
@@ -139,7 +141,7 @@ class LE_NOVTABLE ModuleDSP :
                                              Setup const &) const = 0;
 
 #ifdef LE_SW_SDK_BUILD
-  private: // boost::intrusive_ptr required section
+  private: // LE::Utility::IntrusivePtr required section
     friend LE_NOTHROWNOALIAS void intrusive_ptr_add_ref(ModuleBase const *);
     friend LE_NOTHROW void intrusive_ptr_release(ModuleBase const *);
 #endif // LE_SW_SDK_BUILD

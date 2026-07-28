@@ -69,12 +69,12 @@
 #include "le/utility/matlab.hpp"
 #endif // LE_UTILITY_MATLAB_INTEROP
 
-#include "boost/range/adaptor/reversed.hpp"
+#include <ranges>
 
 #include "boost/simd/preprocessor/stack_buffer.hpp"
 
-#include "boost/assert.hpp"
-#include "boost/concept_check.hpp"
+#include "le/utility/assert.hpp"
+#include "le/utility/ignoreUnused.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -235,12 +235,12 @@ class LogRC : private RC
 
     void skipSamplesForward(std::uint16_t samplesToSkip) const
     {
-        while (BOOST_UNLIKELY(samplesToSkip--))
+        while (LE_UNLIKELY(samplesToSkip--))
             processForward(0);
     }
     void skipSamplesBackward(std::uint16_t samplesToSkip) const
     {
-        while (BOOST_UNLIKELY(samplesToSkip--))
+        while (LE_UNLIKELY(samplesToSkip--))
             processBackward(0);
     }
 
@@ -307,7 +307,7 @@ LE_HOT void VocoderImpl::process(Engine::MainSideChannelData_AmPh data,
             bin = envelopeCalculator.process(bin);
         }
         envelopeCalculator.reset();
-        for (float &bin : boost::adaptors::reverse(envelope))
+        for (float &bin : std::views::reverse(envelope))
         {
             bin = envelopeCalculator.process(bin);
         }
@@ -324,7 +324,7 @@ LE_HOT void VocoderImpl::process(Engine::MainSideChannelData_AmPh data,
         }
         envelopeCalculator.reset();
         envelopeCalculator.skipSamplesBackward(skippedTrailingBins);
-        for (float &bin : boost::adaptors::reverse(envelope))
+        for (float &bin : std::views::reverse(envelope))
         {
             bin = envelopeCalculator.processBackward(bin);
         }
@@ -361,7 +361,7 @@ LE_HOT void VocoderImpl::process(Engine::MainSideChannelData_AmPh data,
 #endif // NDEBUG
     }
 
-    if (BOOST_LIKELY(skippedLeadingBins == 0 && data.endBin() > 1))
+    if (LE_LIKELY(skippedLeadingBins == 0 && data.endBin() > 1))
     {
         /// \note Avoid passing the DC through. This primitive approach is far
         /// from ideal as the DC component can leak into the neighbouring bins
@@ -376,7 +376,7 @@ LE_HOT void VocoderImpl::process(Engine::MainSideChannelData_AmPh data,
     Matlab::Engine::singleton().setVariable("envs", envelope);
 #endif // LE_UTILITY_MATLAB_INTEROP
 
-    if (BOOST_UNLIKELY(parameters().get<NoiseIntensity>()))
+    if (LE_UNLIKELY(parameters().get<NoiseIntensity>()))
     {
         /// \note Modifying the carrier directly is easier and faster but does
         /// not play nice with downstream effects that also use the side chain.
@@ -402,7 +402,7 @@ LE_HOT void VocoderImpl::process(Engine::MainSideChannelData_AmPh data,
 
     copy(data.side().phases(), data.main().phases());
 
-    //BOOST_ASSERT( data.main().amps()[ 0 ] == 0 ); //...mrmlj...envelope DC bin is currently not fully zeroed
+    //LE_ASSERT( data.main().amps()[ 0 ] == 0 ); //...mrmlj...envelope DC bin is currently not fully zeroed
 
 #if LE_UTILITY_MATLAB_INTEROP
     static bool freqsSet(false);
@@ -465,8 +465,8 @@ void LE_HOT VocoderImpl::lowPassSpectrum_cepstrum(DataRange const &spectrum,
     ///                                       (13.06.2012.) (Domagoj Saric)
 
     // spectrum must alias (and be at the beginning of) the workBuffer...
-    BOOST_ASSERT(spectrum.begin() == workBuffer.begin());
-    BOOST_ASSERT(spectrum.end() < workBuffer.end());
+    LE_ASSERT(spectrum.begin() == workBuffer.begin());
+    LE_ASSERT(spectrum.end() < workBuffer.end());
 
     float *LE_RESTRICT const pReals(spectrum.begin());
     float *LE_RESTRICT const pImags(static_cast<float *>(align(spectrum.end())));
@@ -537,7 +537,7 @@ void LE_HOT VocoderImpl::lowPassSpectrum_cepstrum(DataRange const &spectrum,
     fft.transform(pCepstrum, pImags, fft.size());
 
     //...mrmlj...testing what to do about imaginary components...
-    //BOOST_ASSERT_MSG( Math::max( pImags, engineSetup.numberOfBins() ) < std::numeric_limits<float>::epsilon() * 10, "Power spectrum not real." );
+    //LE_ASSERT_MSG( Math::max( pImags, engineSetup.numberOfBins() ) < std::numeric_limits<float>::epsilon() * 10, "Power spectrum not real." );
     //for ( std::uint16_t bin( 0 ); bin < engineSetup.numberOfBins(); ++bin )
     //{
     //    float const real( pCepstrum[ bin ] );
@@ -555,7 +555,7 @@ void VocoderImpl::lowPassSpectrum_movingAverage(DataRange const &spectrum,
 
     // Moving Average Filters
     // http://www.analog.com/media/en/technical-documentation/dsp-book/dsp_book_Ch15.pdf
-    BOOST_ASSERT_MSG(spectrum.size() == workBuffer.size(), "Buffer sizes mismatch.");
+    LE_ASSERT_MSG(spectrum.size() == workBuffer.size(), "Buffer sizes mismatch.");
     DataRange const smoothedSpectrum(workBuffer);
     Math::symmetricMovingAverage(spectrum, smoothedSpectrum, filterLength_);
     Math::copy(smoothedSpectrum, spectrum);

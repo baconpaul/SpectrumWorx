@@ -23,6 +23,7 @@
 
 #include <cstdint>
 #include <utility>
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -114,12 +115,10 @@ namespace Effects
 //
 //  The Base-Impl separation is required to facilitate easier extraction of
 // effects into the SW SDK without duplication and without disclosing
-// internal implementation details. To ensure ABI compatibility all headers that
-// contain the "base" effect class definitions (that are therefore part of
-// the SDK) must include "boost/config/abi_prefix.hpp" and
-// "boost/config/abi_suffix.hpp" headers. The abi_prefix.hpp header must appear
-// after all other includes and before any code while the abi_suffix.hpp header
-// must appear at the end of the file (before the closing endif).
+// internal implementation details. These headers used to bracket themselves
+// with Boost.Config's abi_prefix.hpp/abi_suffix.hpp for ABI compatibility;
+// those only ever restored the default packing and calling convention, which
+// the build now sets uniformly, so they are gone.
 //
 //  All processing is done in-place, side-channel data is considered read only.
 //
@@ -187,8 +186,8 @@ template <class EffectBase> class NoParametersEffectImpl : public EffectBase
 ///                                           (31.01.2011.) (Domagoj Saric)
 
 //...mrmlj...cleanup these duplicated typedefs (also in fft.hpp)...
-using DataRange = boost::iterator_range<float *LE_RESTRICT>;
-using ReadOnlyDataRange = boost::iterator_range<float const *LE_RESTRICT>;
+using DataRange = LE::Utility::Span<float>;
+using ReadOnlyDataRange = LE::Utility::Span<float const>;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///

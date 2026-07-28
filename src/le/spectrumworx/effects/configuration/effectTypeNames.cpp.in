@@ -14,8 +14,8 @@
 
 #include "le/utility/platformSpecifics.hpp"
 
-#include "boost/range/algorithm/find.hpp"
-#include "boost/utility/string_ref.hpp"
+#include <algorithm>
+#include <string_view>
 
 #pragma warning( push )
 #pragma warning( disable : 4512 ) // Assignment operator could not be generated.
@@ -55,11 +55,11 @@ char const * effectIndex2TypeName( std::uint8_t const effectIndex )
 }
 
 LE_COLD
-std::uint8_t effectTypeName2Index( boost::string_ref const effectTypeName )
+std::uint8_t effectTypeName2Index( std::string_view const effectTypeName )
 {
-    EffectTypeNames::const_iterator const pFoundEffectTypeName( boost::find( effectTypeNames, effectTypeName ) );
+    EffectTypeNames::const_iterator const pFoundEffectTypeName( std::ranges::find( effectTypeNames, effectTypeName ) );
     //...mrmlj...required by DoxyHelper
-    //BOOST_ASSERT_MSG( pFoundEffectTypeName != effectTypeNames.end(), "Effect not found." );
+    //LE_ASSERT_MSG( pFoundEffectTypeName != effectTypeNames.end(), "Effect not found." );
     if ( pFoundEffectTypeName == effectTypeNames.end() )
         return std::uint8_t( -1 );
     auto const index( static_cast<std::uint8_t>( pFoundEffectTypeName - effectTypeNames.begin() ) );

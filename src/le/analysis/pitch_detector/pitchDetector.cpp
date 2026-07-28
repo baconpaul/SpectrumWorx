@@ -18,7 +18,7 @@
 
 #include "boost/simd/preprocessor/stack_buffer.hpp"
 
-#include <boost/assert.hpp>
+#include "le/utility/assert.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -165,7 +165,7 @@ float PitchDetector::findPitch(SW::Engine::ReadOnlyDataRange const &amplitudes, 
             }
         }
 
-        BOOST_ASSERT(pd.getNumPeaks() != 0);
+        LE_ASSERT(pd.getNumPeaks() != 0);
         bool const newPitchIgnored(pitch == cs.lastPitch);
         if (!newPitchIgnored)
         {
@@ -177,7 +177,7 @@ float PitchDetector::findPitch(SW::Engine::ReadOnlyDataRange const &amplitudes, 
                     cs.amplitude = peak.amplitude;
                     break;
                 }
-                BOOST_ASSERT(peakIndex < pd.getNumPeaks());
+                LE_ASSERT(peakIndex < pd.getNumPeaks());
             }
         }
     }
@@ -226,7 +226,7 @@ void LE_HOT
 PitchDetector::findHarmonicProductSpectrumAndSort(SW::Engine::ReadOnlyDataRange const amps,
                                                   HPSRange const hps)
 {
-    BOOST_ASSERT(amps.size() == hps.size());
+    LE_ASSERT(amps.size() == hps.size());
 
     auto const numberOfBins(static_cast<std::uint16_t>(amps.size()));
     std::uint8_t const lastHarmonic(5);
@@ -239,7 +239,7 @@ PitchDetector::findHarmonicProductSpectrumAndSort(SW::Engine::ReadOnlyDataRange 
             harmonicProduct += harmonic(h, k, amps);
         }
 
-        BOOST_ASSERT(!Math::isNegative(harmonicProduct));
+        LE_ASSERT(!Math::isNegative(harmonicProduct));
         hps[k].harmonicProduct = harmonicProduct;
         hps[k].bin = k;
     }
@@ -334,7 +334,7 @@ Peak const *PitchDetector::binPeak(std::uint16_t const bin, PeakDetector const &
         auto const pPeak(pd.getPeak(k));
         if ((bin >= pPeak->startPos) && (bin <= pPeak->stopPos))
         {
-            BOOST_ASSERT(pPeak->freq && pPeak->amplitude);
+            LE_ASSERT(pPeak->freq && pPeak->amplitude);
             return pPeak;
         }
     }

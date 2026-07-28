@@ -11,7 +11,7 @@
 #ifndef effectTypeNames_hpp__86C2F997_AEC7_485D_B9C3_9EE34628192D
 #define effectTypeNames_hpp__86C2F997_AEC7_485D_B9C3_9EE34628192D
 //------------------------------------------------------------------------------
-#include "boost/utility/string_ref_fwd.hpp"
+#include <string_view>
 
 #include <cstdint>
 //------------------------------------------------------------------------------
@@ -26,7 +26,7 @@ namespace Effects
 //------------------------------------------------------------------------------
 
 char const *effectIndex2TypeName(std::uint8_t effectIndex);
-std::uint8_t effectTypeName2Index(boost::string_ref effectTypeName);
+std::uint8_t effectTypeName2Index(std::string_view effectTypeName);
 
 //------------------------------------------------------------------------------
 } // namespace Effects

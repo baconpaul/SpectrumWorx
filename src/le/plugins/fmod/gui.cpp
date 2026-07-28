@@ -29,13 +29,13 @@ FMOD_DSP_DESCRIPTION const *LE_RESTRICT pUgh; //...mrmlj...get/setParameter quic
 
 void FMODEditorBase::gestureBegin(char const *const description) const
 {
-    BOOST_VERIFY(plugin2HostCallbacks_.beginEdit(const_cast<FMODEditorBase *>(this), description) ==
-                 FMOD_OK);
+    LE_VERIFY(plugin2HostCallbacks_.beginEdit(const_cast<FMODEditorBase *>(this), description) ==
+              FMOD_OK);
 }
 
 void FMODEditorBase::gestureEnd() const
 {
-    BOOST_VERIFY(plugin2HostCallbacks_.endEdit(const_cast<FMODEditorBase *>(this)) == FMOD_OK);
+    LE_VERIFY(plugin2HostCallbacks_.endEdit(const_cast<FMODEditorBase *>(this)) == FMOD_OK);
 }
 
 void FMODEditorBase::automatedParameterChanged(ParameterIndex const parameterIndex,
@@ -64,8 +64,8 @@ void FMODEditorBase::automatedParameterChanged(ParameterIndex const parameterInd
         LE_DEFAULT_CASE_UNREACHABLE();
     }
 
-    BOOST_VERIFY(plugin2HostCallbacks_.setParameter(const_cast<FMODEditorBase *>(this),
-                                                    parameterIndex.value, &value) == FMOD_OK);
+    LE_VERIFY(plugin2HostCallbacks_.setParameter(const_cast<FMODEditorBase *>(this),
+                                                 parameterIndex.value, &value) == FMOD_OK);
 }
 
 float FMODEditorBase::getParameter(ParameterSelector const index) const
@@ -76,8 +76,8 @@ float FMODEditorBase::getParameter(ParameterSelector const index) const
     FMOD_DSP_PARAMETER_DESC const &desc(*pUgh->paramdesc[index.value]);
     AutomatedParameterValue value;
     value.type = desc.type;
-    BOOST_VERIFY(plugin2HostCallbacks_.getParameter(const_cast<FMODEditorBase *>(this), index.value,
-                                                    &value) == FMOD_OK);
+    LE_VERIFY(plugin2HostCallbacks_.getParameter(const_cast<FMODEditorBase *>(this), index.value,
+                                                 &value) == FMOD_OK);
     switch (desc.type)
     {
     case FMOD_DSP_PARAMETER_TYPE_FLOAT:
@@ -110,22 +110,22 @@ void FMODEditorBase::syncStudioWindowSize(WindowHandle const studioWindowHandle,
     // http://msdn.microsoft.com/en-us/library/windows/desktop/ms633591(v=vs.85).aspx
     LONG_PTR const studioWindowStyles(::GetWindowLongPtr(studioWindowHandle, GWL_STYLE));
     LONG_PTR const studioWindowExtendedStyles(::GetWindowLongPtr(studioWindowHandle, GWL_EXSTYLE));
-    BOOST_VERIFY(::SetWindowLongPtr(studioWindowHandle, GWL_STYLE,
-                                    studioWindowStyles & ~WS_SIZEBOX) == studioWindowStyles);
-    BOOST_VERIFY(::SetWindowLongPtr(studioWindowHandle, GWL_EXSTYLE,
-                                    studioWindowExtendedStyles & ~WS_EX_TOPMOST) ==
-                 studioWindowExtendedStyles);
-    BOOST_VERIFY(::SetWindowPos(studioWindowHandle, nullptr, 0, 0, 0, 0,
-                                SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOREDRAW |
-                                    SWP_NOSENDCHANGING | SWP_NOSIZE));
+    LE_VERIFY(::SetWindowLongPtr(studioWindowHandle, GWL_STYLE, studioWindowStyles & ~WS_SIZEBOX) ==
+              studioWindowStyles);
+    LE_VERIFY(::SetWindowLongPtr(studioWindowHandle, GWL_EXSTYLE,
+                                 studioWindowExtendedStyles & ~WS_EX_TOPMOST) ==
+              studioWindowExtendedStyles);
+    LE_VERIFY(::SetWindowPos(studioWindowHandle, nullptr, 0, 0, 0, 0,
+                             SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOREDRAW |
+                                 SWP_NOSENDCHANGING | SWP_NOSIZE));
 
     // Sync the parent window size
     // http://msdn.microsoft.com/en-us/library/windows/desktop/ms632599(v=vs.85).aspx
     // http://stackoverflow.com/questions/431470/window-border-width-and-height-in-win32-how-do-i-get-it
     ::RECT parentFullRectangle;
-    BOOST_VERIFY(::GetWindowRect(studioWindowHandle, &parentFullRectangle));
+    LE_VERIFY(::GetWindowRect(studioWindowHandle, &parentFullRectangle));
     ::RECT parentClientRectangle;
-    BOOST_VERIFY(::GetClientRect(studioWindowHandle, &parentClientRectangle));
+    LE_VERIFY(::GetClientRect(studioWindowHandle, &parentClientRectangle));
 
     unsigned int const fullWidth(parentFullRectangle.right - parentFullRectangle.left);
     unsigned int const fullHeight(parentFullRectangle.bottom - parentFullRectangle.top);
@@ -136,10 +136,10 @@ void FMODEditorBase::syncStudioWindowSize(WindowHandle const studioWindowHandle,
     unsigned int const studioWindowExtraWidth(fullWidth - clientWidth);
     unsigned int const studioWindowExtraHeight(fullHeight - clientHeight);
 
-    BOOST_VERIFY(::SetWindowPos(studioWindowHandle, nullptr, 0, 0, width + studioWindowExtraWidth,
-                                height + studioWindowExtraHeight,
-                                SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOZORDER | SWP_NOOWNERZORDER |
-                                    SWP_NOREDRAW));
+    LE_VERIFY(::SetWindowPos(studioWindowHandle, nullptr, 0, 0, width + studioWindowExtraWidth,
+                             height + studioWindowExtraHeight,
+                             SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOZORDER | SWP_NOOWNERZORDER |
+                                 SWP_NOREDRAW));
 
 #endif // OS
 }

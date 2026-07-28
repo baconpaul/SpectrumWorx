@@ -108,7 +108,7 @@ __attribute__((weak)) extern LE_COLD system_clock::time_point system_clock::now(
 __attribute__((weak)) extern LE_HOT steady_clock::time_point steady_clock::now() _NOEXCEPT
 {
     struct timespec tp;
-    BOOST_VERIFY(::clock_gettime(CLOCK_MONOTONIC, &tp) == 0);
+    LE_VERIFY(::clock_gettime(CLOCK_MONOTONIC, &tp) == 0);
     return time_point(seconds(tp.tv_sec) + nanoseconds(tp.tv_nsec));
 }
 } // namespace chrono

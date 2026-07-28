@@ -7,15 +7,15 @@
 /// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
-#if (!defined(NDEBUG) || defined(LE_PUBLIC_BUILD)) && defined(BOOST_ENABLE_ASSERT_HANDLER)
+#if (!defined(NDEBUG) || defined(LE_PUBLIC_BUILD)) && defined(LE_ENABLE_ASSERT_HANDLER)
 //------------------------------------------------------------------------------
 #include "platformSpecifics.hpp"
 #include "tchar.hpp"
 #include "trace.hpp"
 
-#include "boost/assert.hpp"
+#include "assert.hpp"
 #ifdef LE_PUBLIC_BUILD
-#include "boost/concept_check.hpp"
+#include "ignoreUnused.hpp"
 #endif // LE_PUBLIC_BUILD
 
 #if defined(__ANDROID__)
@@ -161,9 +161,9 @@ static LE_NOINLINE void assertionFailedMsgAux(char const *const expression,
 #ifdef LE_PUBLIC_BUILD // not to leak too much information to beta testers...
     std::strcpy(fullMessage, message);
     std::strcat(fullMessage, " (");
-    boost::ignore_unused_variable_warning(expression);
-    boost::ignore_unused_variable_warning(function);
-    boost::ignore_unused_variable_warning(file);
+    LE::Utility::ignoreUnused(expression);
+    LE::Utility::ignoreUnused(function);
+    LE::Utility::ignoreUnused(file);
 #else
     if (message != expression)
     {
@@ -217,9 +217,9 @@ LE_WEAK_FUNCTION void assertion_failed_msg(char const *const expression, char co
 {
 #ifdef LE_PUBLIC_BUILD // not to leak too much information to beta testers...
     assertionFailedMsgAux(nullptr, message, nullptr, nullptr, line);
-    boost::ignore_unused_variable_warning(expression);
-    boost::ignore_unused_variable_warning(function);
-    boost::ignore_unused_variable_warning(file);
+    LE::Utility::ignoreUnused(expression);
+    LE::Utility::ignoreUnused(function);
+    LE::Utility::ignoreUnused(file);
 #else
     assertionFailedMsgAux(expression, message, function, file, line);
 #endif // LE_PUBLIC_BUILD
@@ -234,4 +234,4 @@ LE_WEAK_FUNCTION void assertion_failed(char const *const expression, char const 
 
 #pragma warning(pop)
 
-#endif // ( !NDEBUG || LE_PUBLIC_BUILD ) && BOOST_ENABLE_ASSERT_HANDLER
+#endif // ( !NDEBUG || LE_PUBLIC_BUILD ) && LE_ENABLE_ASSERT_HANDLER

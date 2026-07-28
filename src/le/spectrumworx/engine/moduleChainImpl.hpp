@@ -16,8 +16,7 @@
 #include "le/parameters/lfoImpl.hpp" //...mrmlj...only for the LFOImpl::Timer nested type...
 #include "le/utility/platformSpecifics.hpp"
 
-#include "boost/config.hpp"
-#include "boost/get_pointer.hpp"
+#include "le/utility/intrusivePtr.hpp"
 #if defined(__clang__) && !defined(LE_EXCEPTION_ON)
 #define throw LE_UNREACHABLE_CODE()
 #endif // LE_EXCEPTION_ON
@@ -25,7 +24,6 @@
 #if defined(__clang__) && !defined(LE_EXCEPTION_ON)
 #undef throw
 #endif // LE_EXCEPTION_ON
-#include "boost/smart_ptr/intrusive_ptr.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -97,10 +95,12 @@ struct module_node_traits
 class ModuleChainBase :
     //...mrmlj...
     //: public boost::intrusive::list<ModuleDSP, boost::intrusive::value_traits<Detail::module_node_value_traits>>
-    private ModuleNode,
-    private boost::noncopyable
+    private ModuleNode
 {
-  public: // Typedefs
+  public:                                              // Typedefs
+    ModuleChainBase(ModuleChainBase const &) = delete; // makes non-copyable
+    ModuleChainBase &operator=(ModuleChainBase const &) = delete;
+
     using difference_type = std::int8_t;
     using size_type = std::uint8_t;
 
@@ -188,7 +188,7 @@ class ModuleChainBase :
         using pointer = value_type *;
         using reference = value_type &;
 
-        using smart_ptr_t = boost::intrusive_ptr<Node>;
+        using smart_ptr_t = LE::Utility::IntrusivePtr<Node>;
 
       public:
         chain_iterator(decltype(nullptr) = nullptr) {}
@@ -290,7 +290,7 @@ class ModuleChainBase :
 
     template <class Iterator> LE_NOTHROWNOALIAS bool isEnd(Iterator const &pModule) const
     {
-        return isEnd(static_cast<Node const *>(boost::get_pointer(pModule)));
+        return isEnd(static_cast<Node const *>(LE::Utility::getPointer(pModule)));
     }
     LE_NOTHROWNOALIAS bool isEnd(Node const *) const;
 
@@ -340,8 +340,8 @@ class ModuleChainImpl : public ModuleChainBase
     using value_type = Module;
     using reference = value_type &;
     using const_reference = value_type const &;
-    using pointer = boost::intrusive_ptr<Module>;
-    using const_pointer = boost::intrusive_ptr<Module const>;
+    using pointer = LE::Utility::IntrusivePtr<Module>;
+    using const_pointer = LE::Utility::IntrusivePtr<Module const>;
 
   public:
 #if defined(_MSC_VER) && _MSC_VER < 1900

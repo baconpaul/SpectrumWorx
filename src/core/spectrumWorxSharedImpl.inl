@@ -21,7 +21,7 @@
 #include "le/plugins/vst/2.4/tag.hpp"
 #include "le/utility/platformSpecifics.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 
 #ifdef _DEBUG
 #include <cstdio>
@@ -64,7 +64,7 @@ LE_NOTHROW SpectrumWorxSharedImpl<Impl, Protocol>::SpectrumWorxSharedImpl(
 {
 #if defined(__APPLE__) && !defined(LE_SW_FMOD)
     if (std::is_same<typename PluginPlatform::Protocol, Plugins::Protocol::AU>::value)
-        BOOST_VERIFY(GUI::initializePaths());
+        LE_VERIFY(GUI::initializePaths());
 #endif // __APPLE__ && !LE_SW_FMOD
 }
 
@@ -76,7 +76,7 @@ SpectrumWorxSharedImpl<Impl, Protocol>::initialise()
     if (!std::is_same<typename PluginPlatform::Protocol, Plugins::Protocol::AU>::value)
 #endif // __APPLE__
 #if LE_SW_GUI
-        BOOST_VERIFY(GUI::initializePaths());
+        LE_VERIFY(GUI::initializePaths());
 #endif // LE_SW_GUI
     return Base::initialise() ? Plugins::ErrorCode<Protocol>::Success
                               : Plugins::ErrorCode<Protocol>::OutOfMemory;
@@ -106,7 +106,7 @@ bool LE_NOTHROW SpectrumWorxSharedImpl<Impl, Protocol>::updateTimingInformation(
     if (!timeInfo.template hasFields<wantedFields>())
         return false;
 
-    BOOST_ASSERT_MSG(
+    LE_ASSERT_MSG(
         (!timeInfo.template hasField<TimingInfo::SampleRate>()) ||
             (timeInfo.sampleRate() == this->uncheckedEngineSetup().template sampleRate<float>()),
         "Inconsistent TimingInfo and EngineSetup sampleRate.");

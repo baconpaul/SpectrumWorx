@@ -9,6 +9,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #include "shared.hpp"
+#include "le/utility/ignoreUnused.hpp"
 //------------------------------------------------------------------------------
 #include "le/math/constants.hpp"
 #include "le/math/conversion.hpp"
@@ -79,8 +80,8 @@ LE_NOINLINE void BaseParameters::setup(Engine::Setup const &engineSetupParam)
     0 //...mrmlj...started failing even on msvc10...
     float const inverseDeviationFactor(1 / deviationFactor_);
     float const inverseInverseDeviationFactor(1 / inverseDeviationFactor);
-    BOOST_ASSERT_MSG(inverseInverseDeviationFactor == deviationFactor_,
-                     "Deviation factor inverse suffers from numerical error.");
+    LE_ASSERT_MSG(inverseInverseDeviationFactor == deviationFactor_,
+                  "Deviation factor inverse suffers from numerical error.");
 #endif // __clang__
 
 #ifdef LE_PV_USE_TSS
@@ -173,7 +174,7 @@ void LE_NOINLINE PitchShifter::process(ChannelState &channelState,
         }
         channelState.reinitializePhases = false;
     }
-    BOOST_ASSERT(channelState.reinitializePhases == false);
+    LE_ASSERT(channelState.reinitializePhases == false);
     channelState.previousScaleFactor = scaleFactor;
 
 #ifdef LE_PV_USE_TSS
@@ -301,8 +302,8 @@ void verifyDCPhase(float const phase)
     // Implementation note:
     //   Valid phases for the DC bin are 0, Pi and - Pi.
     //                                    (04.06.2010.) (Domagoj Saric)
-    BOOST_ASSERT_MSG(phase == 0 || phase == Math::Constants::pi, "Invalid DC phase.");
-    boost::ignore_unused_variable_warning(phase);
+    LE_ASSERT_MSG(phase == 0 || phase == Math::Constants::pi, "Invalid DC phase.");
+    LE::Utility::ignoreUnused(phase);
 }
 
 float LE_FORCEINLINE mapTo2PiInterval(float const &phase)
@@ -313,7 +314,7 @@ float LE_FORCEINLINE mapTo2PiInterval(float const &phase)
     // 1.5 Pi).
     //                                    (02.12.2010.) (Domagoj Saric)
     float const reducedPhase(Math::PositiveFloats::modulo(phase, Math::Constants::twoPi));
-    //BOOST_ASSERT( Math::nearEqual( sin( reducedPhase ), sin( phase ) ) );
+    //LE_ASSERT( Math::nearEqual( sin( reducedPhase ), sin( phase ) ) );
     return reducedPhase;
 }
 
@@ -361,7 +362,7 @@ float LE_FORCEINLINE mapToPiInterval(float const phase)
 
 #if defined(_DEBUG) && !(defined(LE_SW_SDK_BUILD) && !defined(__MSVC_RUNTIME_CHECKS))
     //...mrmlj...temporarily disabled as it seems to fail in iOS builds...
-    BOOST_ASSERT_MSG(
+    LE_ASSERT_MSG(
         /// \note Reducing the accumulated synthesis phase for only a subset
         /// of bins per frame even further reduces the precision of this
         /// function because the input values become large.
@@ -369,7 +370,7 @@ float LE_FORCEINLINE mapToPiInterval(float const phase)
         abs(phaseInPi) <= (pi + 0.005), "Phase reduction broken.");
 #endif // _DEBUG
 
-    //BOOST_ASSERT_MSG( abs( sin( phaseInPi ) - sin( phase ) ) < 0.05, "Phase reduction broken." );
+    //LE_ASSERT_MSG( abs( sin( phaseInPi ) - sin( phase ) ) < 0.05, "Phase reduction broken." );
 
     return phaseInPi;
 }
@@ -459,7 +460,7 @@ void LE_NOINLINE LE_NOTHROWNOALIAS LE_HOT analysis(AnalysisChannelState &state,
         //...mrmlj...reinvestigate this (does not need to hold if there is
         //...mrmlj...another phase modifying effect between the FFT and this PV
         //...mrmlj...instance...
-        //BOOST_ASSERT_MSG
+        //LE_ASSERT_MSG
         //(
         //    Math::abs( phase ) <= Math::Constants::pi,
         //    "PV expects input phases in the [-Pi, +Pi] interval."
@@ -522,7 +523,7 @@ void LE_NOINLINE LE_NOTHROWNOALIAS LE_HOT analysis(AnalysisChannelState &state,
         thresholdFactor += beta;
         float const adaptiveThreshold(convert<float>(thresholdFactor) * threshold);
 #if defined(_DEBUG) && !defined(LE_PUBLIC_BUILD)
-        BOOST_ASSERT(adaptiveThreshold == adaptiveThresholdReference);
+        LE_ASSERT(adaptiveThreshold == adaptiveThresholdReference);
 #endif // _DEBUG && !LE_PUBLIC_BUILD
         *pAdaptiveThresholdFactor = thresholdFactor;
 
@@ -537,7 +538,7 @@ void LE_NOINLINE LE_NOTHROWNOALIAS LE_HOT analysis(AnalysisChannelState &state,
 #endif // LE_PV_USE_TSS
     }
 
-    //BOOST_ASSERT( pPhFq == pData->phases().end() );
+    //LE_ASSERT( pPhFq == pData->phases().end() );
 
     //verifyDCPhase( phaseInAnaFreqOut.front() );
 
@@ -612,7 +613,7 @@ void LE_NOINLINE LE_NOTHROWNOALIAS LE_HOT synthesis(SynthesisChannelState &state
     LE_ASSUME(counter % 2 == 0);
     while (counter--)
     {
-        BOOST_ASSERT(Math::truncate(bin) == bin);
+        LE_ASSERT(Math::truncate(bin) == bin);
         float const expectedPhaseDifference(bin * expctRate);
         float const currentBinFrequency(bin * freqPerBin);
         float const phaseSum(reconstructPhase(*pFqPh, currentBinFrequency, invDeviationFactor,
@@ -643,7 +644,7 @@ void LE_NOINLINE LE_NOTHROWNOALIAS LE_HOT synthesis(SynthesisChannelState &state
         LE_DISABLE_LOOP_UNROLLING()
         for (std::uint16_t counter(binsToReduce); counter; --counter)
         {
-            BOOST_ASSERT(*pPhaseToReduce == *pOutputPhase);
+            LE_ASSERT(*pPhaseToReduce == *pOutputPhase);
             float const reducedPhase(mapTo2PiInterval(*pPhaseToReduce));
             *pPhaseToReduce++ = reducedPhase;
             *pOutputPhase++ = reducedPhase;
@@ -744,7 +745,7 @@ LE_HOT pitchShiftAndScale(Engine::ChannelData_AmPh &data,
             storageBytes, storage);
         dummy.binData.reset();
         pData->pAnalysisState = &dummy;
-        BOOST_ASSERT(!pData->pSynthesisState || pData->pSynthesisState == &dummySynthesisState);
+        LE_ASSERT(!pData->pSynthesisState || pData->pSynthesisState == &dummySynthesisState);
         pData->pSynthesisState = const_cast<SynthesisChannelState *>(&dummySynthesisState);
     }
 
@@ -794,14 +795,14 @@ LE_HOT pitchShiftAndScale(Engine::ChannelData_AmPh &data,
             --floatInputIndex;
 #endif // LE_PV_USE_BACKWARD_PROPAGATION
 
-            BOOST_ASSERT_MSG(inputIndex < pData->numberOfBins(), "Index out of range.");
-            BOOST_ASSERT_MSG(outputIndex < pData->numberOfBins(), "Index out of range.");
+            LE_ASSERT_MSG(inputIndex < pData->numberOfBins(), "Index out of range.");
+            LE_ASSERT_MSG(outputIndex < pData->numberOfBins(), "Index out of range.");
 
 #ifndef __APPLE__
             //...mrmlj...this sometimes fails in SDK builds on Apple platforms...
-            BOOST_ASSERT_MSG(amplitudes[inputIndex] >= 0, "Negative amplitude");
+            LE_ASSERT_MSG(amplitudes[inputIndex] >= 0, "Negative amplitude");
 #endif      // __APPLE__
-            //BOOST_ASSERT_MSG( frequencies[ inputIndex ] >= 0, "Negative frequency" );//...mrmlj...
+            //LE_ASSERT_MSG( frequencies[ inputIndex ] >= 0, "Negative frequency" );//...mrmlj...
 
 #ifdef LE_PV_USE_TSS
             switch (transientBins(pAnalysisData, inputIndex, outputIndex))
@@ -863,13 +864,13 @@ LE_HOT pitchShiftAndScale(Engine::ChannelData_AmPh &data,
             /// skipped and lastOutputIndex == outputIndex) so it must be
             /// explicitly set to the correct value/position.
             ///                               (03.04.2012.) (Domagoj Saric)
-            BOOST_ASSERT((lastOutputIndex == outputIndex) || (lastOutputIndex == outputIndex - 1));
+            LE_ASSERT((lastOutputIndex == outputIndex) || (lastOutputIndex == outputIndex - 1));
             lastOutputIndex = outputIndex;
 #endif // LE_PV_USE_BACKWARD_PROPAGATION
         }
 
 #ifndef LE_PV_USE_BACKWARD_PROPAGATION
-        BOOST_ASSERT(round(++floatInputIndex) == 1);
+        LE_ASSERT(round(++floatInputIndex) == 1);
 #endif // LE_PV_USE_BACKWARD_PROPAGATION
     }
     else
@@ -901,11 +902,11 @@ LE_HOT pitchShiftAndScale(Engine::ChannelData_AmPh &data,
                 std::uint16_t const outputIndex(truncate(floatInputIndex * scale));
                 ++floatInputIndex;
 
-                BOOST_ASSERT_MSG(inputIndex < pData->numberOfBins(), "Index out of range.");
-                BOOST_ASSERT_MSG(outputIndex < pData->numberOfBins(), "Index out of range.");
+                LE_ASSERT_MSG(inputIndex < pData->numberOfBins(), "Index out of range.");
+                LE_ASSERT_MSG(outputIndex < pData->numberOfBins(), "Index out of range.");
 
-                BOOST_ASSERT_MSG(amplitudes[inputIndex] >= 0, "Negative amplitude");
-                //BOOST_ASSERT_MSG( frequencies[ inputIndex ] >= 0, "Negative frequency" );
+                LE_ASSERT_MSG(amplitudes[inputIndex] >= 0, "Negative amplitude");
+                //LE_ASSERT_MSG( frequencies[ inputIndex ] >= 0, "Negative frequency" );
 
 #ifdef LE_PV_USE_TSS
                 float const inputAmp(pAnalysisData[inputIndex].transient ? 0
@@ -980,7 +981,7 @@ LE_HOT pitchShiftAndScale(Engine::ChannelData_AmPh &data,
             // treatment of each bin, instead of each sinusoidal component.
             //                                    (14.05.2010.) (Domagoj Saric)
 
-            BOOST_ASSERT(pitchShiftParameters.skipProcessing());
+            LE_ASSERT(pitchShiftParameters.skipProcessing());
         }
 
 #ifdef LE_PV_USE_TSS

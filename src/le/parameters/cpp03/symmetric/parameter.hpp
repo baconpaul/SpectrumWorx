@@ -15,7 +15,7 @@
 
 #include "le/parameters/linear/parameter.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 #include "boost/mpl/integral_c.hpp"
 #include "boost/mpl/map/map10.hpp"
 //------------------------------------------------------------------------------

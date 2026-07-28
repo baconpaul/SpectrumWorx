@@ -29,7 +29,7 @@
 #include "le/math/math.hpp"
 #include "le/utility/platformSpecifics.hpp"
 
-#include <boost/assert.hpp>
+#include "le/utility/assert.hpp"
 
 #include <windows.h>
 
@@ -85,9 +85,12 @@ namespace LE
 /// express Visual Studio editions).
 ////////////////////////////////////////////////////////////////////////////////
 
-template <class T> class COMPtr : boost::noncopyable
+template <class T> class COMPtr
 {
   private:
+    COMPtr(COMPtr const &) = delete; // makes non-copyable
+    COMPtr &operator=(COMPtr const &) = delete;
+
     class LE_NOVTABLE NoAddRefReleaseProxy : public T
     {
       private:
@@ -101,7 +104,7 @@ template <class T> class COMPtr : boost::noncopyable
 
     LE_NOTHROWNOALIAS COMPtr(IUnknown &source)
     {
-        BOOST_VERIFY(source.QueryInterface(__uuidof(T), reinterpret_cast<void **>(&pT_)) == S_OK);
+        LE_VERIFY(source.QueryInterface(__uuidof(T), reinterpret_cast<void **>(&pT_)) == S_OK);
     }
 
     LE_NOTHROW COMPtr(COMPtr &&other) : pT_(other.pT_) { other.pT_ = 0; }
@@ -119,13 +122,13 @@ template <class T> class COMPtr : boost::noncopyable
 
     NoAddRefReleaseProxy *operator->() const
     {
-        BOOST_ASSERT(pT_ != nullptr);
+        LE_ASSERT(pT_ != nullptr);
         return static_cast<NoAddRefReleaseProxy *>(pT_);
     }
 
     T **operator&()
     {
-        BOOST_ASSERT(pT_ == nullptr);
+        LE_ASSERT(pT_ == nullptr);
         return &pT_;
     }
 
@@ -133,14 +136,14 @@ template <class T> class COMPtr : boost::noncopyable
 
     HRESULT createInstance(CLSID const &classID)
     {
-        BOOST_ASSERT(pT_ == nullptr);
+        LE_ASSERT(pT_ == nullptr);
         return ::CoCreateInstance(classID, nullptr, CLSCTX_ALL, __uuidof(T),
                                   reinterpret_cast<void **>(&pT_));
     }
 
     template <class Q> HRESULT queryInterface(COMPtr<Q> &pTarget) const
     {
-        BOOST_ASSERT(pT_ != nullptr);
+        LE_ASSERT(pT_ != nullptr);
         return pT_->QueryInterface(__uuidof(Q), reinterpret_cast<void **>(&pTarget));
     }
 
@@ -185,13 +188,13 @@ class ConnectedOutputPin
 {
   public:
     ConnectedOutputPin() : pConnectedOutputPin_(0) {}
-    ~ConnectedOutputPin() { BOOST_ASSERT(!pConnectedOutputPin_); }
+    ~ConnectedOutputPin() { LE_ASSERT(!pConnectedOutputPin_); }
 
     operator IPin *&() { return pConnectedOutputPin_; }
 
     IPin *operator->()
     {
-        BOOST_ASSERT(pConnectedOutputPin_);
+        LE_ASSERT(pConnectedOutputPin_);
         return pConnectedOutputPin_;
     }
 
@@ -211,12 +214,12 @@ char const *errorMessage(HRESULT const errorCode)
     // DXGetErrorDescription()...
     static char buffer[512] = {0};
     HMODULE const quartz(::LoadLibraryA("quartz.dll"));
-    BOOST_ASSERT(quartz);
-    BOOST_VERIFY(::FormatMessageA(FORMAT_MESSAGE_FROM_HMODULE | FORMAT_MESSAGE_FROM_SYSTEM |
-                                      FORMAT_MESSAGE_IGNORE_INSERTS,
-                                  quartz, errorCode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                                  buffer, _countof(buffer), nullptr) > 0);
-    BOOST_VERIFY(::FreeLibrary(quartz));
+    LE_ASSERT(quartz);
+    LE_VERIFY(::FormatMessageA(FORMAT_MESSAGE_FROM_HMODULE | FORMAT_MESSAGE_FROM_SYSTEM |
+                                   FORMAT_MESSAGE_IGNORE_INSERTS,
+                               quartz, errorCode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buffer,
+                               _countof(buffer), nullptr) > 0);
+    LE_VERIFY(::FreeLibrary(quartz));
     return buffer;
 }
 } // namespace
@@ -422,13 +425,12 @@ namespace
 HANDLE openLogFile()
 {
     TCHAR expandedBuffer[MAX_PATH];
-    BOOST_VERIFY(::ExpandEnvironmentStrings(_T( "%TEMP%\\SpectrumWorxDirectShow.log" ),
-                                            expandedBuffer,
-                                            _countof(expandedBuffer)) < _countof(expandedBuffer));
+    LE_VERIFY(::ExpandEnvironmentStrings(_T( "%TEMP%\\SpectrumWorxDirectShow.log" ), expandedBuffer,
+                                         _countof(expandedBuffer)) < _countof(expandedBuffer));
     HANDLE const logHandle(::CreateFile(expandedBuffer, GENERIC_READ | GENERIC_WRITE,
                                         FILE_SHARE_READ, nullptr, OPEN_ALWAYS,
                                         FILE_ATTRIBUTE_NORMAL, nullptr));
-    BOOST_ASSERT_MSG(logHandle != INVALID_HANDLE_VALUE, "DShow wrapper: failed to open log file.");
+    LE_ASSERT_MSG(logHandle != INVALID_HANDLE_VALUE, "DShow wrapper: failed to open log file.");
     return logHandle;
 }
 #endif // _DEBUG
@@ -447,17 +449,17 @@ LE_NOTHROWNOALIAS COMPtr<IPin> getOutputPin(IBaseFilter &filter, HRESULT &hr)
     IPin *pPin;
     while ((hr = pEnumerator->Next(1, &pPin, nullptr)) == S_OK)
     {
-        BOOST_ASSERT(pPin);
+        LE_ASSERT(pPin);
         PIN_DIRECTION pinDirection;
-        BOOST_VERIFY(pPin->QueryDirection(&pinDirection) == S_OK);
+        LE_VERIFY(pPin->QueryDirection(&pinDirection) == S_OK);
         if (pinDirection == PINDIR_OUTPUT)
         {
 #ifndef NDEBUG
             IPin *pTmp;
             HRESULT const hrTmp(pPin->ConnectedTo(&pTmp));
-            BOOST_ASSERT(FAILED(hrTmp) && pTmp == 0);
+            LE_ASSERT(FAILED(hrTmp) && pTmp == 0);
 #endif // NDEBUG
-            BOOST_ASSERT(hr == S_OK);
+            LE_ASSERT(hr == S_OK);
             return COMPtr<IPin>(pPin);
         }
         else
@@ -476,7 +478,7 @@ Sample::Impl::Impl(std::uint32_t const allowedSamplerate)
 #endif // _DEBUG
 {
 #ifdef _DEBUG
-    BOOST_ASSERT(hLog_);
+    LE_ASSERT(hLog_);
 #endif // _DEBUG
 
     fillType(types_[0], allowedSamplerate, 16);
@@ -494,7 +496,7 @@ Sample::Impl::~Impl()
 {
 #ifdef _DEBUG
     //...mrmlj...this sometimes fails so it is not currently checked as a (harmless) workaround...
-    /*BOOST_VERIFY*/ (::CloseHandle(hLog_));
+    /*LE_VERIFY*/ (::CloseHandle(hLog_));
 #endif // _DEBUG
 }
 
@@ -525,12 +527,12 @@ void Sample::Impl::fillType(DataType &type, unsigned int const sampleRate,
 
 HRESULT STDMETHODCALLTYPE Sample::Impl::QueryInterface(IID const &iid, void **const ppvObject)
 {
-    BOOST_ASSERT(ppvObject);
+    LE_ASSERT(ppvObject);
 
     if (iid == IID_IMediaSeeking &&
         pConnectedOutputPin_ /*...mrmlj...a temporary quick-fix attempt for issues Danijel encountered with Nero filters...*/)
     {
-        BOOST_ASSERT(pConnectedOutputPin_);
+        LE_ASSERT(pConnectedOutputPin_);
         return pConnectedOutputPin_->QueryInterface(iid, ppvObject);
     }
     else if (iid == __uuidof(IUnknown))
@@ -572,7 +574,7 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::QueryInterface(IID const &iid, void **co
 
 HRESULT STDMETHODCALLTYPE Sample::Impl::Run(REFERENCE_TIME /*tStart*/)
 {
-    BOOST_ASSERT(state_ != State_Running);
+    LE_ASSERT(state_ != State_Running);
     state_ = State_Running;
     return S_OK;
 }
@@ -580,34 +582,34 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::Run(REFERENCE_TIME /*tStart*/)
 HRESULT STDMETHODCALLTYPE Sample::Impl::GetState(DWORD /*dwMilliSecsTimeout*/,
                                                  FILTER_STATE *const pState)
 {
-    BOOST_ASSERT(pState);
+    LE_ASSERT(pState);
     *pState = state_;
     return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE Sample::Impl::SetSyncSource(IReferenceClock *const pClock)
 {
-    BOOST_VERIFY(!pClock);
+    LE_VERIFY(!pClock);
     return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE Sample::Impl::GetSyncSource(IReferenceClock **const pClock)
 {
-    BOOST_ASSERT(pClock);
+    LE_ASSERT(pClock);
     *pClock = 0;
     return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE Sample::Impl::EnumPins(IEnumPins **const ppEnum)
 {
-    BOOST_ASSERT(ppEnum);
+    LE_ASSERT(ppEnum);
     *ppEnum = static_cast<IEnumPins *>(this);
     return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE Sample::Impl::QueryFilterInfo(FILTER_INFO *const pInfo)
 {
-    BOOST_ASSERT(pInfo);
+    LE_ASSERT(pInfo);
     pInfo->achName[0] = 0;
     pInfo->pGraph = pMyGraph_;
     pMyGraph_->AddRef();
@@ -617,7 +619,7 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::QueryFilterInfo(FILTER_INFO *const pInfo
 HRESULT STDMETHODCALLTYPE Sample::Impl::JoinFilterGraph(IFilterGraph *const pGraph,
                                                         LPCWSTR /*pName*/)
 {
-    BOOST_ASSERT(!pGraph || !pMyGraph_);
+    LE_ASSERT(!pGraph || !pMyGraph_);
     pMyGraph_ = pGraph;
     return S_OK;
 }
@@ -626,7 +628,7 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::Next(ULONG const cMediaTypes,
                                              AM_MEDIA_TYPE **const ppMediaTypes,
                                              ULONG *const pcFetched)
 {
-    BOOST_ASSERT(ppMediaTypes);
+    LE_ASSERT(ppMediaTypes);
     *ppMediaTypes = 0;
     unsigned int const numberOfTypes(std::min<unsigned int>(cMediaTypes, remainingTypes()));
     unsigned int const targetType(currentType_ + numberOfTypes);
@@ -674,8 +676,8 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::Connect(IPin * /*pReceivePin*/,
 HRESULT STDMETHODCALLTYPE Sample::Impl::ReceiveConnection(IPin *const pConnector,
                                                           AM_MEDIA_TYPE const *const pmt)
 {
-    BOOST_ASSERT(!pConnectedOutputPin_);
-    BOOST_ASSERT(state_ == State_Stopped);
+    LE_ASSERT(!pConnectedOutputPin_);
+    LE_ASSERT(state_ == State_Stopped);
     std::size_t const typeRelevantSize(offsetof(AM_MEDIA_TYPE, pUnk));
     std::size_t const formatRelevantSize(offsetof(WAVEFORMATEX, cbSize));
     for (auto &type : types_)
@@ -685,16 +687,16 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::ReceiveConnection(IPin *const pConnector
         {
 #ifndef NDEBUG
             PIN_DIRECTION connectorDirection;
-            BOOST_VERIFY(pConnector->QueryDirection(&connectorDirection) == S_OK);
-            BOOST_ASSERT((connectorDirection == PINDIR_OUTPUT) ||
-                         (connectorDirection == PINDIR_INPUT));
-            BOOST_ASSERT(connectorDirection != PINDIR_INPUT);
+            LE_VERIFY(pConnector->QueryDirection(&connectorDirection) == S_OK);
+            LE_ASSERT((connectorDirection == PINDIR_OUTPUT) ||
+                      (connectorDirection == PINDIR_INPUT));
+            LE_ASSERT(connectorDirection != PINDIR_INPUT);
 #endif //NDEBUG
             pConnectedOutputPin_ = pConnector;
             pConnectedOutputPin_->AddRef();
-            BOOST_ASSERT_MSG((type.format.wBitsPerSample / 8) ==
-                                 (type.format.nBlockAlign / type.format.nChannels),
-                             "Padded data types (e.g. unpacked 24 bit) not supported.");
+            LE_ASSERT_MSG((type.format.wBitsPerSample / 8) ==
+                              (type.format.nBlockAlign / type.format.nChannels),
+                          "Padded data types (e.g. unpacked 24 bit) not supported.");
             resolutionInBytesPerSample_ = type.format.wBitsPerSample / 8;
             return S_OK;
         }
@@ -705,7 +707,7 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::ReceiveConnection(IPin *const pConnector
 
 HRESULT STDMETHODCALLTYPE Sample::Impl::Disconnect()
 {
-    BOOST_ASSERT(pConnectedOutputPin_);
+    LE_ASSERT(pConnectedOutputPin_);
     pConnectedOutputPin_->Release();
     pConnectedOutputPin_ = 0;
     return S_OK;
@@ -713,7 +715,7 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::Disconnect()
 
 HRESULT STDMETHODCALLTYPE Sample::Impl::ConnectedTo(IPin **const ppPin)
 {
-    BOOST_ASSERT(ppPin);
+    LE_ASSERT(ppPin);
 
     *ppPin = pConnectedOutputPin_;
     if (pConnectedOutputPin_)
@@ -723,7 +725,7 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::ConnectedTo(IPin **const ppPin)
     }
     else
     {
-        BOOST_ASSERT(*ppPin == nullptr);
+        LE_ASSERT(*ppPin == nullptr);
         return VFW_E_NOT_CONNECTED;
     }
 }
@@ -739,7 +741,7 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::ConnectionMediaType(AM_MEDIA_TYPE *const
 
 HRESULT STDMETHODCALLTYPE Sample::Impl::QueryPinInfo(PIN_INFO *const pInfo)
 {
-    BOOST_ASSERT(pInfo);
+    LE_ASSERT(pInfo);
     pInfo->pFilter = static_cast<IBaseFilter *>(this);
     pInfo->dir = PINDIR_INPUT;
     pInfo->achName[0] = 0;
@@ -748,14 +750,14 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::QueryPinInfo(PIN_INFO *const pInfo)
 
 HRESULT STDMETHODCALLTYPE Sample::Impl::QueryDirection(PIN_DIRECTION *const pPinDir)
 {
-    BOOST_ASSERT(pPinDir);
+    LE_ASSERT(pPinDir);
     *pPinDir = PINDIR_INPUT;
     return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE Sample::Impl::EnumMediaTypes(IEnumMediaTypes **const ppEnum)
 {
-    BOOST_ASSERT(ppEnum);
+    LE_ASSERT(ppEnum);
     *ppEnum = static_cast<IEnumMediaTypes *>(this);
     return S_OK;
 }
@@ -763,7 +765,7 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::EnumMediaTypes(IEnumMediaTypes **const p
 HRESULT STDMETHODCALLTYPE Sample::Impl::QueryInternalConnections(IPin **const ppPin,
                                                                  ULONG *const pNPin)
 {
-    BOOST_ASSERT(pNPin);
+    LE_ASSERT(pNPin);
     /// \todo Reread the documentation for the IPin::QueryInternalConnections()
     /// and IAMFilterMiscFlags interfaces and rethink this function's
     /// implementation.
@@ -777,13 +779,13 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::QueryInternalConnections(IPin **const pp
 
 LE_NOTHROW HRESULT STDMETHODCALLTYPE Sample::Impl::EndOfStream()
 {
-    BOOST_ASSERT(pMyGraph_);
+    LE_ASSERT(pMyGraph_);
     COMPtr<IMediaEventSink> pEventSink(*pMyGraph_);
     if (!pEventSink)
         return S_FALSE;
-    BOOST_VERIFY(pEventSink->Notify(EC_COMPLETE, S_OK,
-                                    reinterpret_cast<LONG_PTR>(static_cast<IUnknown *>(
-                                        static_cast<IBaseFilter *>(this)))) == S_OK);
+    LE_VERIFY(pEventSink->Notify(EC_COMPLETE, S_OK,
+                                 reinterpret_cast<LONG_PTR>(static_cast<IUnknown *>(
+                                     static_cast<IBaseFilter *>(this)))) == S_OK);
     return S_OK;
 }
 
@@ -794,10 +796,10 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::GetAllocator(IMemAllocator ** /*ppAlloca
 
 HRESULT STDMETHODCALLTYPE Sample::Impl::Receive(IMediaSample *const pBufferHolder)
 {
-    BOOST_ASSERT(pBufferHolder);
-    //...mrmlj...BOOST_ASSERT( pBufferHolder->IsDiscontinuity() != S_OK );
-    BOOST_ASSERT(pBufferHolder->IsPreroll() != S_OK);
-    //...mrmlj...BOOST_ASSERT( pBufferHolder->IsSyncPoint() == S_OK );
+    LE_ASSERT(pBufferHolder);
+    //...mrmlj...LE_ASSERT( pBufferHolder->IsDiscontinuity() != S_OK );
+    LE_ASSERT(pBufferHolder->IsPreroll() != S_OK);
+    //...mrmlj...LE_ASSERT( pBufferHolder->IsSyncPoint() == S_OK );
 
     // Implementation note:
     //   When loading MP3s after one has already been loaded, this method
@@ -807,8 +809,8 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::Receive(IMediaSample *const pBufferHolde
     /// \todo Reinvestigate the above issue.
     ///                                       (12.07.2010.) (Domagoj Saric)
     LONG const reportedBufferLen(pBufferHolder->GetActualDataLength());
-    BOOST_ASSERT(reportedBufferLen <= pBufferHolder->GetSize());
-    BOOST_ASSERT(data_.pChannel1End <= data_.pChannel2Beginning);
+    LE_ASSERT(reportedBufferLen <= pBufferHolder->GetSize());
+    LE_ASSERT(data_.pChannel1End <= data_.pChannel2Beginning);
     unsigned int const bufferSpaceLeftInFloatsPerChannel(
         static_cast<unsigned int>(data_.pChannel2Beginning - data_.pChannel1End));
     unsigned int const bufferSpaceLeft(bufferSpaceLeftInFloatsPerChannel * 2 *
@@ -818,10 +820,10 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::Receive(IMediaSample *const pBufferHolde
     bool const endOfStream(inputLength == bufferSpaceLeft);
 
     BYTE *pBuffer;
-    BOOST_VERIFY(pBufferHolder->GetPointer(&pBuffer) == S_OK);
+    LE_VERIFY(pBufferHolder->GetPointer(&pBuffer) == S_OK);
     BYTE const *const dataEnd(pBuffer + inputLength);
 
-    BOOST_ASSERT(inputLength % (resolutionInBytesPerSample_ * 2) == 0);
+    LE_ASSERT(inputLength % (resolutionInBytesPerSample_ * 2) == 0);
 
     switch (resolutionInBytesPerSample_)
     {
@@ -832,7 +834,7 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::Receive(IMediaSample *const pBufferHolde
 
         while (pSample < reinterpret_cast<short const *>(dataEnd))
         {
-            BOOST_ASSERT(data_.pChannel1End < data_.pChannel2Beginning);
+            LE_ASSERT(data_.pChannel1End < data_.pChannel2Beginning);
 
             *data_.pChannel1End++ = LE::Math::convert<float>(*pSample++) * scale;
             *data_.pChannel2End++ = LE::Math::convert<float>(*pSample++) * scale;
@@ -880,7 +882,7 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::Receive(IMediaSample *const pBufferHolde
 
         while (pBuffer < dataEnd)
         {
-            BOOST_ASSERT(data_.pChannel1End < data_.pChannel2Beginning);
+            LE_ASSERT(data_.pChannel1End < data_.pChannel2Beginning);
 
             Two24bitSamples const &twoSamples(*reinterpret_cast<Two24bitSamples const *>(pBuffer));
 
@@ -900,7 +902,7 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::Receive(IMediaSample *const pBufferHolde
 
         while (pSample < reinterpret_cast<int const *>(dataEnd))
         {
-            BOOST_ASSERT(data_.pChannel1End < data_.pChannel2Beginning);
+            LE_ASSERT(data_.pChannel1End < data_.pChannel2Beginning);
 
             *data_.pChannel1End++ = static_cast<float>(*pSample++) * scale;
             *data_.pChannel2End++ = static_cast<float>(*pSample++) * scale;
@@ -918,7 +920,7 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::Receive(IMediaSample *const pBufferHolde
     //                                        (18.06.2010.) (Domagoj Saric)
     if (endOfStream)
     {
-        BOOST_VERIFY(Sample::Impl::EndOfStream() == S_OK);
+        LE_VERIFY(Sample::Impl::EndOfStream() == S_OK);
         return S_FALSE;
     }
     else
@@ -938,8 +940,8 @@ HRESULT STDMETHODCALLTYPE Sample::Impl::ReceiveMultiple(IMediaSample **, long, l
 HRESULT STDMETHODCALLTYPE Sample::Impl::Next(ULONG const cPins, IPin **const ppPins,
                                              ULONG *const pcFetched)
 {
-    BOOST_ASSERT(cPins);
-    BOOST_ASSERT(ppPins);
+    LE_ASSERT(cPins);
+    LE_ASSERT(ppPins);
 
     if (onlyPinAlreadyEnumerated_)
     {
@@ -1023,16 +1025,16 @@ LE_NOTHROWNOALIAS char const *Sample::Impl::load(juce::String const &sampleFileN
             // http://www.ernzo.com/Mpeg4Dmo.aspx
 
             COMPtr<IBaseFilter> pDMOWrapperFilter;
-            BOOST_VERIFY(pDMOWrapperFilter.createInstance(CLSID_DMOWrapperFilter) == S_OK);
+            LE_VERIFY(pDMOWrapperFilter.createInstance(CLSID_DMOWrapperFilter) == S_OK);
             COMPtr<IDMOWrapperFilter> pDMOWrapper;
-            BOOST_VERIFY(pDMOWrapperFilter.queryInterface(pDMOWrapper) == S_OK);
-            BOOST_VERIFY(pDMOWrapper);
-            BOOST_VERIFY(pDMOWrapper->Init(CLSID_CResamplerMediaObject, DMOCATEGORY_AUDIO_EFFECT) ==
-                         S_OK);
+            LE_VERIFY(pDMOWrapperFilter.queryInterface(pDMOWrapper) == S_OK);
+            LE_VERIFY(pDMOWrapper);
+            LE_VERIFY(pDMOWrapper->Init(CLSID_CResamplerMediaObject, DMOCATEGORY_AUDIO_EFFECT) ==
+                      S_OK);
 
             COMPtr<IMediaObject> pIMediaObject;
-            BOOST_VERIFY(pDMOWrapper.queryInterface(pIMediaObject) == S_OK);
-            BOOST_VERIFY(pGraphBuilder_->AddFilter(pDMOWrapperFilter, L"Resampler") == S_OK);
+            LE_VERIFY(pDMOWrapper.queryInterface(pIMediaObject) == S_OK);
+            LE_VERIFY(pGraphBuilder_->AddFilter(pDMOWrapperFilter, L"Resampler") == S_OK);
             // http://msdn.microsoft.com/en-us/library/aa451595.aspx
             //hr = pIMediaObject->SetOutputType( 0, reinterpret_cast<DMO_MEDIA_TYPE const *>( &types_[ 3 ] ), 0 );
 
@@ -1053,14 +1055,14 @@ LE_NOTHROWNOALIAS char const *Sample::Impl::load(juce::String const &sampleFileN
             // working graph.
             //                                (19.07.2010.) (Domagoj Saric)
             COMPtr<IBaseFilter> pPCMFilter;
-            BOOST_VERIFY(pPCMFilter.createInstance(CLSID_ACMWrapper) == S_OK);
-            BOOST_VERIFY(pGraphBuilder_->AddFilter(pPCMFilter, nullptr) == S_OK);
+            LE_VERIFY(pPCMFilter.createInstance(CLSID_ACMWrapper) == S_OK);
+            LE_VERIFY(pGraphBuilder_->AddFilter(pPCMFilter, nullptr) == S_OK);
 
 #endif // LE_USE_RESAMPLER_DMO
         }
     }
 
-    BOOST_ASSERT(pSourceFilter_);
+    LE_ASSERT(pSourceFilter_);
     COMPtr<IPin> const pSource(getOutputPin(*pSourceFilter_, hr));
     if (!pSource)
         return errorMessage(hr);
@@ -1069,19 +1071,19 @@ LE_NOTHROWNOALIAS char const *Sample::Impl::load(juce::String const &sampleFileN
     if (hr != S_OK)
         return errorMessage(hr);
 
-    BOOST_VERIFY(pMediaEvent_->SetNotifyFlags(AM_MEDIAEVENT_NONOTIFY) == S_OK);
-    BOOST_VERIFY(pMediaEvent_->SetNotifyWindow(NULL, 0, 0) == S_OK);
+    LE_VERIFY(pMediaEvent_->SetNotifyFlags(AM_MEDIAEVENT_NONOTIFY) == S_OK);
+    LE_VERIFY(pMediaEvent_->SetNotifyWindow(NULL, 0, 0) == S_OK);
     HANDLE hEvent;
-    BOOST_VERIFY(pMediaEvent_->GetEventHandle(reinterpret_cast<OAEVENT *>(&hEvent)) == S_OK);
+    LE_VERIFY(pMediaEvent_->GetEventHandle(reinterpret_cast<OAEVENT *>(&hEvent)) == S_OK);
 
     long long reftime;
-    BOOST_VERIFY(pMediaSeeking_->GetDuration(&reftime) == S_OK);
-    BOOST_ASSERT(reftime);
+    LE_VERIFY(pMediaSeeking_->GetDuration(&reftime) == S_OK);
+    LE_ASSERT(reftime);
 #ifndef NDEBUG
     {
         GUID timeFormat;
-        BOOST_VERIFY(pMediaSeeking_->GetTimeFormat(&timeFormat) == S_OK);
-        BOOST_ASSERT(timeFormat == TIME_FORMAT_MEDIA_TIME);
+        LE_VERIFY(pMediaSeeking_->GetTimeFormat(&timeFormat) == S_OK);
+        LE_ASSERT(timeFormat == TIME_FORMAT_MEDIA_TIME);
     }
 #endif // NDEBUG
     unsigned long long const hundredNanoSecondsPerSecond(1000 * 1000 * 1000ULL / 100);
@@ -1089,20 +1091,20 @@ LE_NOTHROWNOALIAS char const *Sample::Impl::load(juce::String const &sampleFileN
         static_cast<std::size_t>(LE::Math::roundUpUnsignedIntegerDivision(
             static_cast<unsigned long long>(reftime) * types_.front().format.nSamplesPerSec,
             hundredNanoSecondsPerSecond)));
-    BOOST_ASSERT((pMediaSeeking_->GetCurrentPosition(&reftime) == S_OK) && (reftime == 0));
+    LE_ASSERT((pMediaSeeking_->GetCurrentPosition(&reftime) == S_OK) && (reftime == 0));
 
     if (!data_.recreate(numberOfSamples))
         return "Out of memory.";
 
 #ifndef NDEBUG
     FILTER_STATE state;
-    BOOST_VERIFY(pMediaControl_->GetState(INFINITE, reinterpret_cast<OAFilterState *>(&state)) ==
-                 S_OK);
-    BOOST_ASSERT(state == State_Stopped);
+    LE_VERIFY(pMediaControl_->GetState(INFINITE, reinterpret_cast<OAFilterState *>(&state)) ==
+              S_OK);
+    LE_ASSERT(state == State_Stopped);
 #endif // NDEBUG
 
     // Set the graph clock.
-    BOOST_VERIFY(pMediaFilter_->SetSyncSource(0) == S_OK);
+    LE_VERIFY(pMediaFilter_->SetSyncSource(0) == S_OK);
 
     hr = pMediaControl_->Run();
     if ((hr != S_OK) && (hr != S_FALSE))
@@ -1110,8 +1112,8 @@ LE_NOTHROWNOALIAS char const *Sample::Impl::load(juce::String const &sampleFileN
 
 #ifndef NDEBUG
     hr = pMediaControl_->GetState(INFINITE, reinterpret_cast<OAFilterState *>(&state));
-    BOOST_ASSERT(hr == S_OK || hr == VFW_S_STATE_INTERMEDIATE);
-    BOOST_ASSERT(state == State_Running);
+    LE_ASSERT(hr == S_OK || hr == VFW_S_STATE_INTERMEDIATE);
+    LE_ASSERT(state == State_Running);
 #endif // NDEBUG
 
     DWORD const waitResult(::WaitForSingleObject(hEvent, 10000));
@@ -1122,12 +1124,12 @@ LE_NOTHROWNOALIAS char const *Sample::Impl::load(juce::String const &sampleFileN
         return "Failed to read data.";
     waitResult;
 
-    BOOST_VERIFY(pMediaControl_->Stop() == S_OK);
+    LE_VERIFY(pMediaControl_->Stop() == S_OK);
 
 #ifndef NDEBUG
-    BOOST_VERIFY(pMediaControl_->GetState(INFINITE, reinterpret_cast<OAFilterState *>(&state)) ==
-                 S_OK);
-    BOOST_ASSERT(state == State_Stopped);
+    LE_VERIFY(pMediaControl_->GetState(INFINITE, reinterpret_cast<OAFilterState *>(&state)) ==
+              S_OK);
+    LE_ASSERT(state == State_Stopped);
 #endif // NDEBUG
 
     data.takeDataFrom(this->data_);

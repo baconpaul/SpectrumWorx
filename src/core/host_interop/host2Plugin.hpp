@@ -18,6 +18,7 @@
 
 #include "le/spectrumworx/engine/configuration.hpp"
 #include "le/utility/platformSpecifics.hpp"
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -62,9 +63,12 @@ class LE_NOVTABLE Host2PluginInteropControler
     mutable bool blockAutomation_;
 }; // Host2PluginInteropControler
 
-class Host2PluginInteropControler::AutomationBlocker : boost::noncopyable
+class Host2PluginInteropControler::AutomationBlocker
 {
   public:
+    AutomationBlocker(AutomationBlocker const &) = delete; // makes non-copyable
+    AutomationBlocker &operator=(AutomationBlocker const &) = delete;
+
     AutomationBlocker(Host2PluginInteropControler const &effect)
         : pBlockAutomation_(&effect.blockAutomation_)
     {
@@ -98,13 +102,12 @@ class Host2PluginInteropControler::AutomationBlocker : boost::noncopyable
 
 //...mrmlj...orphan...
 template <typename Char>
-LE_NOTHROWNOALIAS char *copyToBuffer(Char const *string,
-                                     boost::iterator_range<char *> const &buffer);
+LE_NOTHROWNOALIAS char *copyToBuffer(Char const *string, LE::Utility::Span<char> const &buffer);
 
 template <typename Char, std::size_t N>
 char *copyToBuffer(Char const *const string, std::array<char, N> &buffer)
 {
-    return copyToBuffer<Char>(string, boost::make_iterator_range_n(&buffer[0], buffer.size()));
+    return copyToBuffer<Char>(string, LE::Utility::makeSpan(&buffer[0], buffer.size()));
 }
 
 //------------------------------------------------------------------------------

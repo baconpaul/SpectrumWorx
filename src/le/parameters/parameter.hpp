@@ -17,7 +17,7 @@
 //------------------------------------------------------------------------------
 #include "le/utility/assert.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 #include "boost/mpl/pair.hpp"
 #include "boost/mpl/string.hpp"
 #include "boost/preprocessor/comparison/greater.hpp"
@@ -164,11 +164,11 @@ template <class ImplTraits> class Parameter : public ImplTraits
     Parameter(param_type const initialValue = ImplTraits::default_())
     {
         // Traits sanity checks.
-        BOOST_ASSERT(this->isValidValue(ImplTraits::minimum()));
-        BOOST_ASSERT(this->isValidValue(ImplTraits::default_()));
-        BOOST_ASSERT(this->isValidValue(ImplTraits::maximum()));
+        LE_ASSERT(this->isValidValue(ImplTraits::minimum()));
+        LE_ASSERT(this->isValidValue(ImplTraits::default_()));
+        LE_ASSERT(this->isValidValue(ImplTraits::maximum()));
 
-        BOOST_ASSERT(ImplTraits::maximum() >= ImplTraits::minimum());
+        LE_ASSERT(ImplTraits::maximum() >= ImplTraits::minimum());
 
         setValue(initialValue);
     }

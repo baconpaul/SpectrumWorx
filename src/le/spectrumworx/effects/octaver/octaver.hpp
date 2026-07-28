@@ -17,8 +17,6 @@
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
 #include "le/parameters/enumerated/parameter.hpp"
-
-#include "boost/config/abi_prefix.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -91,7 +89,4 @@ struct Octaver
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------
-
-#include "boost/config/abi_suffix.hpp"
-
 #endif // octaver_hpp

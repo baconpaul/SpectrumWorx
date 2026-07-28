@@ -15,10 +15,9 @@
 #include "jni.hpp"
 #include "trace.hpp"
 
-#include <boost/assert.hpp>
-#include <boost/config.hpp>
-#include <boost/smart_ptr/scoped_array.hpp>
-#include <boost/utility/string_ref.hpp>
+#include "assert.hpp"
+#include <memory>
+#include <string_view>
 
 #include <../../../../../sources/android/ndk_helper/JNIHelper.h>
 #include <android/asset_manager.h>
@@ -52,7 +51,7 @@ namespace Utility
 {
 //------------------------------------------------------------------------------
 
-using CString = boost::scoped_array<char>;
+using CString = std::unique_ptr<char[]>;
 
 namespace
 {
@@ -77,29 +76,29 @@ bool setAppContext(::ANativeActivity const &nativeActivity)
     /// http://android.stackexchange.com/questions/34958/what-are-the-minimum-hardware-specifications-for-android
     ///                                       (07.05.2014.) (Domagoj Saric)
     if (!nativeActivity.internalDataPath)
-        if (BOOST_UNLIKELY(!setAppContext(*JNI::env(), nativeActivity.clazz)))
+        if (LE_UNLIKELY(!setAppContext(*JNI::env(), nativeActivity.clazz)))
             return false;
 #endif // Gingerbread/pre ARMv7
 
-    BOOST_ASSERT(nativeActivity.internalDataPath);
-    BOOST_ASSERT(nativeActivity.externalDataPath);
+    LE_ASSERT(nativeActivity.internalDataPath);
+    LE_ASSERT(nativeActivity.externalDataPath);
 
 #ifndef NDEBUG
-    BOOST_VERIFY(setAppContext(*JNI::env(), nativeActivity.clazz));
-    BOOST_ASSERT(std::strcmp(internalDataPath.get(), nativeActivity.internalDataPath) == 0);
-    BOOST_ASSERT(std::strcmp(externalDataPath.get(), nativeActivity.externalDataPath) == 0 ||
-                 *nativeActivity.externalDataPath == 0 ||
-                 std::strstr(nativeActivity.externalDataPath, externalDataPath.get()) ==
-                     nativeActivity.externalDataPath);
+    LE_VERIFY(setAppContext(*JNI::env(), nativeActivity.clazz));
+    LE_ASSERT(std::strcmp(internalDataPath.get(), nativeActivity.internalDataPath) == 0);
+    LE_ASSERT(std::strcmp(externalDataPath.get(), nativeActivity.externalDataPath) == 0 ||
+              *nativeActivity.externalDataPath == 0 ||
+              std::strstr(nativeActivity.externalDataPath, externalDataPath.get()) ==
+                  nativeActivity.externalDataPath);
 #endif // NDEBUG
 
     pAssetManager = nativeActivity.assetManager;
-    BOOST_ASSERT(pAssetManager);
+    LE_ASSERT(pAssetManager);
 
     internalDataPath.reset(/*std*/ ::strdup(nativeActivity.internalDataPath));
     externalDataPath.reset(/*std*/ ::strdup(nativeActivity.externalDataPath));
 
-    if (BOOST_UNLIKELY(!internalDataPath || !externalDataPath))
+    if (LE_UNLIKELY(!internalDataPath || !externalDataPath))
         return false;
 
     switch (*nativeActivity.externalDataPath)
@@ -115,10 +114,10 @@ bool setAppContext(::ANativeActivity const &nativeActivity)
             {
 #ifndef NDEBUG
                 int const result(::mkdir(sdCardPath, accessFlags));
-                BOOST_ASSERT((result == 0) || (errno == EEXIST));
+                LE_ASSERT((result == 0) || (errno == EEXIST));
 #endif // NDEBUG
                 externalDataPath.reset(/*std*/ ::strdup(sdCardPath));
-                if (BOOST_UNLIKELY(!externalDataPath))
+                if (LE_UNLIKELY(!externalDataPath))
                     return false;
             }
         }
@@ -134,7 +133,7 @@ bool setAppContext(::ANativeActivity const &nativeActivity)
 bool setAppContext(::ndk_helper::JNIHelper const &jniHelper,
                    ::ANativeActivity const &nativeActivity)
 {
-    if (BOOST_UNLIKELY(!setAppContext(nativeActivity)))
+    if (LE_UNLIKELY(!setAppContext(nativeActivity)))
         return false;
     auto &jni(const_cast<::ndk_helper::JNIHelper &>(jniHelper));
     externalDataPath.reset(/*std*/ ::strdup(jni.GetExternalFilesDir().c_str()));
@@ -144,15 +143,15 @@ bool setAppContext(::ndk_helper::JNIHelper const &jniHelper,
 bool setAppContext(::JNIEnv &__restrict jni, ::jobject const __restrict activity,
                    ::jobject const __restrict assetManager)
 {
-    BOOST_ASSERT_MSG(!globalAssetManager, "App context already set");
+    LE_ASSERT_MSG(!globalAssetManager, "App context already set");
 
     JNI::setVM(jni);
 
-    BOOST_ASSERT_MSG(&jni == &JNI::preAttachedEnv(), "Invalid JNIEnv reference");
+    LE_ASSERT_MSG(&jni == &JNI::preAttachedEnv(), "Invalid JNIEnv reference");
 
     globalAssetManager = JNI::globalReference(assetManager);
     pAssetManager = ::AAssetManager_fromJava(&jni, assetManager);
-    if (BOOST_UNLIKELY(!globalAssetManager || !pAssetManager))
+    if (LE_UNLIKELY(!globalAssetManager || !pAssetManager))
         return false;
 
     // SD card access:
@@ -186,18 +185,18 @@ bool setAppContext(::JNIEnv &__restrict jni, ::jobject const __restrict activity
     ///                                       (13.01.2016.) (Domagoj Saric)
 
     jclass const activityClass(jni.GetObjectClass(activity));
-    BOOST_ASSERT(activityClass);
+    LE_ASSERT(activityClass);
     jmethodID const getFilesDir(jni.GetMethodID(activityClass, "getFilesDir", "()Ljava/io/File;"));
-    BOOST_ASSERT(getFilesDir);
+    LE_ASSERT(getFilesDir);
     jobject const fileObject(jni.CallObjectMethod(activity, getFilesDir));
-    BOOST_ASSERT(fileObject);
+    LE_ASSERT(fileObject);
     jclass const fileClass(jni.GetObjectClass(fileObject));
-    BOOST_ASSERT(fileClass);
+    LE_ASSERT(fileClass);
     jmethodID const getAbsolutePath(
         jni.GetMethodID(fileClass, "getAbsolutePath", "()Ljava/lang/String;"));
-    BOOST_ASSERT(getAbsolutePath);
+    LE_ASSERT(getAbsolutePath);
 
-    if (BOOST_UNLIKELY(jni.ExceptionOccurred() != nullptr))
+    if (LE_UNLIKELY(jni.ExceptionOccurred() != nullptr))
         return false;
 
     {
@@ -205,21 +204,21 @@ bool setAppContext(::JNIEnv &__restrict jni, ::jobject const __restrict activity
         jstring const jpath(
             static_cast<jstring>(jni.CallObjectMethod(fileObject, getAbsolutePath)));
         char const *const path(jni.GetStringUTFChars(jpath, nullptr));
-        if (BOOST_UNLIKELY(!path))
+        if (LE_UNLIKELY(!path))
             return false;
         internalDataPath.reset(/*std*/ ::strdup(path));
         jni.ReleaseStringUTFChars(jpath, path);
-        if (BOOST_UNLIKELY(!internalDataPath))
+        if (LE_UNLIKELY(!internalDataPath))
             return false;
     }
 
     // Get File object for the external storage directory.
     {
         jclass const classEnvironment(jni.FindClass("android/os/Environment"));
-        BOOST_ASSERT(classEnvironment);
+        LE_ASSERT(classEnvironment);
         jmethodID const methodIDgetExternalStorageDirectory(jni.GetStaticMethodID(
             classEnvironment, "getExternalStorageDirectory", "()Ljava/io/File;"));
-        BOOST_ASSERT(
+        LE_ASSERT(
             methodIDgetExternalStorageDirectory); // public static File getExternalStorageDirectory()
         jobject const objectFile(
             jni.CallStaticObjectMethod(classEnvironment, methodIDgetExternalStorageDirectory));
@@ -228,16 +227,16 @@ bool setAppContext(::JNIEnv &__restrict jni, ::jobject const __restrict activity
         jstring const jpath(
             static_cast<jstring>(jni.CallObjectMethod(objectFile, getAbsolutePath)));
 
-        if (BOOST_UNLIKELY(jni.ExceptionOccurred() != nullptr))
+        if (LE_UNLIKELY(jni.ExceptionOccurred() != nullptr))
             return false;
         {
             // http://stackoverflow.com/questions/5859673/should-you-call-releasestringutfchars-if-getstringutfchars-returned-a-copy
             char const *const path(jni.GetStringUTFChars(jpath, nullptr));
-            if (BOOST_UNLIKELY(!path))
+            if (LE_UNLIKELY(!path))
                 return false;
             externalDataPath.reset(/*std*/ ::strdup(path));
             jni.ReleaseStringUTFChars(jpath, path);
-            if (BOOST_UNLIKELY(!externalDataPath))
+            if (LE_UNLIKELY(!externalDataPath))
                 return false;
         }
     }
@@ -259,17 +258,17 @@ bool setAppContext(::JNIEnv &__restrict jni, ::jobject const __restrict activity
 
 bool setAppContext(::JNIEnv &__restrict jni, ::jobject const __restrict activity)
 {
-    //BOOST_ASSERT_MSG( &jni == &JNI::preAttachedEnv(), "Invalid JNIEnv reference" );
+    //LE_ASSERT_MSG( &jni == &JNI::preAttachedEnv(), "Invalid JNIEnv reference" );
 
     // https://github.com/ddlee/AndroidLuaActivity/blob/master/jni/src/jnicontext.cpp
 
     jmethodID const methodGetAssets(jni.GetMethodID(jni.GetObjectClass(activity), "getAssets",
                                                     "()Landroid/content/res/AssetManager;"));
-    BOOST_ASSERT(methodGetAssets);
+    LE_ASSERT(methodGetAssets);
     jobject const localAssetManager(jni.CallObjectMethod(activity, methodGetAssets));
-    BOOST_ASSERT(localAssetManager);
+    LE_ASSERT(localAssetManager);
 
-    if (BOOST_UNLIKELY(jni.ExceptionOccurred() != nullptr))
+    if (LE_UNLIKELY(jni.ExceptionOccurred() != nullptr))
         return false;
 
     return setAppContext(jni, activity, localAssetManager);
@@ -277,7 +276,7 @@ bool setAppContext(::JNIEnv &__restrict jni, ::jobject const __restrict activity
 
 LE_CONST_FUNCTION ::AAssetManager &resourceManager()
 {
-    BOOST_ASSERT_MSG(pAssetManager, "Android app context not set");
+    LE_ASSERT_MSG(pAssetManager, "Android app context not set");
     return *pAssetManager;
 }
 
@@ -322,8 +321,8 @@ template <SpecialLocations rootDirectory>
 template <class Result, class Functor>
 Result PathResolver<rootDirectory>::apply(char const *const relativePathParam, Functor const f)
 {
-    boost::string_ref const rootPath(pathFor<rootDirectory>());
-    boost::string_ref const relativePath(relativePathParam);
+    std::string_view const rootPath(pathFor<rootDirectory>());
+    std::string_view const relativePath(relativePathParam);
 
     char absolutePath[rootPath.size() + 1 + relativePath.size()];
     char *position(std::copy(rootPath.begin(), rootPath.end(), absolutePath));
@@ -378,12 +377,12 @@ std::uint32_t ResourceFile::MemoryMapping::size() const
 
 ResourceFile::MemoryMapping::operator bool() const
 {
-    BOOST_ASSERT(!handle_ || begin());
+    LE_ASSERT(!handle_ || begin());
     return handle_ != nullptr;
 }
 bool ResourceFile::MemoryMapping::operator!() const
 {
-    BOOST_ASSERT(!handle_ || begin());
+    LE_ASSERT(!handle_ || begin());
     return handle_ == nullptr;
 }
 
@@ -393,10 +392,10 @@ ResourceFile::MemoryMapping ResourceFile::map(char const *const relativeFilePath
     // http://stackoverflow.com/questions/18862715/how-to-generate-the-aac-adts-elementary-stream-with-android-mediacodec
     AAsset *const pInputFileAsset(
         ::AAssetManager_open(&resourceManager(), relativeFilePath, AASSET_MODE_STREAMING));
-    if (BOOST_UNLIKELY(!pInputFileAsset))
+    if (LE_UNLIKELY(!pInputFileAsset))
         return LE_TRACE_RETURN(MemoryMapping(), "Failed to open resource %s", relativeFilePath);
 
-    if (BOOST_UNLIKELY(!::AAsset_getBuffer(pInputFileAsset)))
+    if (LE_UNLIKELY(!::AAsset_getBuffer(pInputFileAsset)))
     {
         ::AAsset_close(pInputFileAsset);
         return LE_TRACE_RETURN(MemoryMapping(), "Failed to load resource %s", relativeFilePath);
@@ -442,12 +441,12 @@ bool ResourceFile::Stream::seek(std::int32_t const offset, std::uint8_t const wh
 
 ResourceFile::Stream::operator bool() const
 {
-    BOOST_ASSERT(!handle_ == !size());
+    LE_ASSERT(!handle_ == !size());
     return handle_ != nullptr;
 }
 bool ResourceFile::Stream::operator!() const
 {
-    BOOST_ASSERT(!handle_ == !size());
+    LE_ASSERT(!handle_ == !size());
     return handle_ == nullptr;
 }
 

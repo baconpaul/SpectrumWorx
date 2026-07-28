@@ -19,7 +19,7 @@
 
 #include "le/parameters/linear/parameter.hpp"
 
-#include <boost/assert.hpp>
+#include "le/utility/assert.hpp"
 #include <boost/mpl/pair.hpp>
 
 #include <cstdint>

@@ -23,14 +23,12 @@
 #endif // LE_HAS_NT2
 
 #ifndef NDEBUG
-#include "boost/current_function.hpp"
 #endif // NDEBUG
-#include "boost/integer/static_log2.hpp"
-#include "boost/noncopyable.hpp"
-#include "boost/range/iterator_range_core.hpp"
+#include "le/utility/staticLog2.hpp"
 
 #if defined(__ARM_NEON__) || defined(__aarch64__)
 #include "arm_neon.h"
+#include "le/utility/ignoreUnused.hpp"
 #endif // __ARM_NEON__
 
 #ifndef BOOST_SIMD_HAS_SSE_SUPPORT
@@ -43,6 +41,7 @@
 #include <type_traits>
 #ifndef NDEBUG
 #include <string>
+#include "le/utility/span.hpp"
 #endif // NDEBUG
 //------------------------------------------------------------------------------
 #if defined(_MSC_VER)
@@ -196,7 +195,7 @@ bool isPowerOfTwo(unsigned int);
 bool isPowerOfTwo(float);
 
 template <unsigned int value>
-struct IsPowerOfTwo : std::integral_constant<bool, (1 << boost::static_log2<value>::value) == value>
+struct IsPowerOfTwo : std::integral_constant<bool, (1 << LE::Utility::staticLog2(value)) == value>
 {
 };
 
@@ -228,9 +227,12 @@ UnsignedInteger roundUpUnsignedIntegerDivision(UnsignedInteger const dividend,
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class FPUDisableDenormalsGuard : boost::noncopyable
+class FPUDisableDenormalsGuard
 {
   public:
+    FPUDisableDenormalsGuard(FPUDisableDenormalsGuard const &) = delete; // makes non-copyable
+    FPUDisableDenormalsGuard &operator=(FPUDisableDenormalsGuard const &) = delete;
+
     FPUDisableDenormalsGuard();
     ~FPUDisableDenormalsGuard();
 
@@ -248,9 +250,12 @@ class FPUDisableDenormalsGuard : boost::noncopyable
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class FPUExceptionsGuard : boost::noncopyable
+class FPUExceptionsGuard
 {
   public:
+    FPUExceptionsGuard(FPUExceptionsGuard const &) = delete; // makes non-copyable
+    FPUExceptionsGuard &operator=(FPUExceptionsGuard const &) = delete;
+
     FPUExceptionsGuard();
     ~FPUExceptionsGuard();
 
@@ -403,7 +408,7 @@ unsigned int LE_NOINLINE has(float const *LE_RESTRICT pRange, std::size_t rangeS
     return result;
 }
 
-template <unsigned FPClasses> unsigned int has(boost::iterator_range<float const *> const &range)
+template <unsigned FPClasses> unsigned int has(LE::Utility::Span<float const> const &range)
 {
     return has<FPClasses>(range.begin(), range.size());
 }
@@ -414,14 +419,14 @@ void verifyFPValues(float const *const pRange, std::size_t const rangeSize,
                     long const line)
 {
 #ifdef NDEBUG
-    boost::ignore_unused_variable_warning(pRange && rangeSize && valueName);
+    LE::Utility::ignoreUnused(pRange && rangeSize && valueName);
 #else
-#ifdef BOOST_ENABLE_ASSERT_HANDLER
-#define LE_AUX_VERIFY_FP_VALUES_FAILURE(...) boost::assertion_failed_msg(__VA_ARGS__)
+#ifdef LE_ENABLE_ASSERT_HANDLER
+#define LE_AUX_VERIFY_FP_VALUES_FAILURE(...) LE::Utility::assertionFailed(__VA_ARGS__)
 #else
 #define LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, errorString, function, file, line)              \
-    BOOST_ASSERT_MSG(false, (std::string(errorString " @ ") + valueName).c_str())
-#endif // BOOST_ENABLE_ASSERT_HANDLER
+    LE_ASSERT_MSG(false, (std::string(errorString " @ ") + valueName).c_str())
+#endif // LE_ENABLE_ASSERT_HANDLER
     unsigned int const fpClasses(has<FPClasses>(pRange, rangeSize));
     if (fpClasses & FPClasses & NaN)
         LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, "NaN value found", function, file, line);
@@ -443,7 +448,7 @@ void verifyFPValues(float const *const pRange, std::size_t const rangeSize,
 }
 
 template <unsigned FPClasses>
-void verifyFPValues(boost::iterator_range<float const *> const &range, char const *const valueName,
+void verifyFPValues(LE::Utility::Span<float const> const &range, char const *const valueName,
                     char const *const function, char const *const file, long const line)
 {
     return verifyFPValues<FPClasses>(range.begin(), range.size(), valueName, function, file, line);
@@ -455,7 +460,7 @@ void verifyFPValues(boost::iterator_range<float const *> const &range, char cons
 #endif // LE_MATH_VERIFY_VALUES
 #else
 #define LE_MATH_VERIFY_VALUES(fpClasses, range, valueName)                                         \
-    /*::LE::*/ Math::verifyFPValues<fpClasses>(range, valueName, BOOST_CURRENT_FUNCTION, __FILE__, \
+    /*::LE::*/ Math::verifyFPValues<fpClasses>(range, valueName, LE_CURRENT_FUNCTION, __FILE__,    \
                                                __LINE__)
 #endif // NDEBUG
 
@@ -508,9 +513,9 @@ LE_FORCEINLINE float copySign(float const targetNumber, float const signSource)
 #endif // BOOST_SIMD_HAS_SSE_SUPPORT
 
 #ifdef _MSC_VER
-    BOOST_ASSERT(result == /*std*/ ::_copysign(targetNumber, signSource));
+    LE_ASSERT(result == /*std*/ ::_copysign(targetNumber, signSource));
 #else
-    BOOST_ASSERT(result == /*std*/ ::copysign(targetNumber, signSource));
+    LE_ASSERT(result == /*std*/ ::copysign(targetNumber, signSource));
 #endif // _MSC_VER
     return result;
 }
@@ -532,7 +537,7 @@ LE_FORCEINLINE float valueIfNot(float const &value, bool const condition)
     resultBits.bits &= mask;
     float const result(resultBits.value);
 #endif // BOOST_SIMD_HAS_SSE_SUPPORT
-    BOOST_ASSERT(result == (condition ? 0 : value));
+    LE_ASSERT(result == (condition ? 0 : value));
     return result;
 }
 
@@ -614,7 +619,7 @@ LE_FORCEINLINE std::int32_t round(float const floatingPointValue)
     __asm__("vcvtr.s32.f32 %1, %1\n"
             "vmov.s32      %0, %1\n"
             : "=r"(integerValue), "+&w"(mutableInput));
-    BOOST_ASSERT(integerValue == __builtin_lrintf(floatingPointValue));
+    LE_ASSERT(integerValue == __builtin_lrintf(floatingPointValue));
     return integerValue;
 #elif (__ARM_ARCH >= 8)
     return vcvtns_s32_f32(floatingPointValue);
@@ -624,7 +629,7 @@ LE_FORCEINLINE std::int32_t round(float const floatingPointValue)
 #if 1
     std::int32_t const integerValue(floatingPointValue +
                                     __builtin_copysignf(0.5f, floatingPointValue));
-#elif 0 && defined(BOOST_LITTLE_ENDIAN)
+#elif 0 && defined(LE_LITTLE_ENDIAN)
     double constexpr magic(
         (1ULL << 52) *
         1.5); //...mrmlj...float( 1<<23 ) should work/be enough for positive numbers...
@@ -643,7 +648,7 @@ LE_FORCEINLINE std::int32_t round(float const floatingPointValue)
 #else
     int const integerValue(floatingPointValue + ((floatingPointValue > 0) ? +0.5f : -0.5f));
 #endif
-    //...mrmlj...BOOST_ASSERT( integerValue == ::__builtin_rintf( floatingPointValue ) ) ); // rounds to nearest even
+    //...mrmlj...LE_ASSERT( integerValue == ::__builtin_rintf( floatingPointValue ) ) ); // rounds to nearest even
     return integerValue;
 #endif
 #elif defined(__GNUC__)
@@ -662,7 +667,7 @@ LE_FORCEINLINE int round(double const floatingPointValue)
     return static_cast<int>(::__builtin_lrint(floatingPointValue));
 #elif defined(_XBOX)
     return __frnd(floatingPointValue);
-#elif defined(BOOST_LITTLE_ENDIAN)
+#elif defined(LE_LITTLE_ENDIAN)
     double const magic((1ULL << 52) * 1.5);
     union
     {
@@ -677,7 +682,7 @@ LE_FORCEINLINE int round(double const floatingPointValue)
             fld   floatingPointValue
             fistp integerValue
         }
-    BOOST_ASSERT(result == integerValue);
+    LE_ASSERT(result == integerValue);
 #endif // internal DEBUG build
     return result;
 #endif
@@ -696,10 +701,8 @@ LE_FORCEINLINE int round(double const floatingPointValue)
 
 LE_FORCEINLINE int truncate(float const floatingPointValue)
 {
-    BOOST_ASSERT_MSG(floatingPointValue < std::numeric_limits<int>::max(),
-                     "Float out of int range.");
-    BOOST_ASSERT_MSG(floatingPointValue > std::numeric_limits<int>::min(),
-                     "Float out of int range.");
+    LE_ASSERT_MSG(floatingPointValue < std::numeric_limits<int>::max(), "Float out of int range.");
+    LE_ASSERT_MSG(floatingPointValue > std::numeric_limits<int>::min(), "Float out of int range.");
 #ifdef BOOST_SIMD_HAS_SSE_SUPPORT
     return _mm_cvttss_si32(_mm_set_ss(floatingPointValue));
 #else

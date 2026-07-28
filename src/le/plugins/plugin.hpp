@@ -24,6 +24,7 @@
 #include "le/utility/platformSpecifics.hpp"
 
 #include "boost/mpl/set_c.hpp"
+#include "le/utility/staticLog2.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -519,17 +520,17 @@ typename Parameter::value_type NormalisedAutomatedParameter::convertAutomationTo
 
 template <class Parameter, typename Tag> struct FullRangeAutomatedParameter::AutomationRange
 {
-    static int BOOST_CONSTEXPR_OR_CONST unscaledMinimum = Parameter::unscaledMinimum;
-    static int BOOST_CONSTEXPR_OR_CONST unscaledMaximum = Parameter::unscaledMaximum;
+    static int constexpr unscaledMinimum = Parameter::unscaledMinimum;
+    static int constexpr unscaledMaximum = Parameter::unscaledMaximum;
 };
 template <class Parameter>
 struct FullRangeAutomatedParameter::AutomationRange<Parameter, Parameters::PowerOfTwoParameterTag>
 {
     //...mrmlj...workaround for having no way to specify discrete/valid (power-of-two) values...
-    static std::uint8_t BOOST_CONSTEXPR_OR_CONST unscaledMinimum =
-        boost::static_log2<Parameter::unscaledMinimum>::value;
-    static std::uint8_t BOOST_CONSTEXPR_OR_CONST unscaledMaximum =
-        boost::static_log2<Parameter::unscaledMaximum>::value;
+    static std::uint8_t constexpr unscaledMinimum =
+        LE::Utility::staticLog2(Parameter::unscaledMinimum);
+    static std::uint8_t constexpr unscaledMaximum =
+        LE::Utility::staticLog2(Parameter::unscaledMaximum);
 };
 
 template <class Parameter>
@@ -553,7 +554,7 @@ typename Parameter::value_type FullRangeAutomatedParameter::convertAutomationToP
     /// allowed values.
     ///                                   (01.02.2012.) (Domagoj Saric)
     //using namespace Math;
-    //std::uint8_t const minimumExponent( boost::static_log2<Parameter::unscaledMinimum>::value );
+    //std::uint8_t const minimumExponent( LE::Utility::staticLog2(Parameter::unscaledMinimum) );
     //return convert<float>( PowerOfTwo::log2( parameter.getValue() ) - minimumExponent );
     using Range = AutomationRange<Parameter, typename Parameter::Tag>;
     return LE::Parameters::convertLinearValueToParameterValue<

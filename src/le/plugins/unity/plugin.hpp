@@ -35,6 +35,7 @@
 #define UInt32_defined
 #endif // __APPLE__
 #include "AudioPluginInterface.h"
+#include "le/utility/staticLog2.hpp"
 #undef SInt32_defined
 #undef UInt32_defined
 #ifdef _MSC_VER
@@ -42,7 +43,6 @@
 #endif // _MSC_VER
 
 #include <boost/mpl/string.hpp>
-#include <boost/predef/os.h>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -54,7 +54,7 @@ namespace Plugins
 /// \note Detect targets that can also run the Unity Editor (so that UI-only
 /// code can be excluded from builds for other targets).
 ///                                           (14.10.2015.) (Domagoj Saric)
-#if !((BOOST_OS_MACOS && __LP64__) || (BOOST_OS_WINDOWS && defined(_WIN64)))
+#if !((defined(__APPLE__) && __LP64__) || (defined(_WIN32) && defined(_WIN64)))
 #ifndef LE_NO_PARAMETER_STRINGS
 #define LE_NO_PARAMETER_STRINGS 1
 #endif // LE_NO_PARAMETER_STRINGS
@@ -217,9 +217,9 @@ template <> class ParameterInformation<Protocol::Unity> : private UnityAudioPara
 
     void clear()
     {
-        BOOST_ASSERT(name[0] == 0);
-        BOOST_ASSERT(unit[0] == 0);
-        BOOST_ASSERT(description == nullptr);
+        LE_ASSERT(name[0] == 0);
+        LE_ASSERT(unit[0] == 0);
+        LE_ASSERT(description == nullptr);
     }
 
     UnityAudioParameterDefinition const &abiStructure() const { return *this; }
@@ -238,9 +238,9 @@ template <> class ParameterInformation<Protocol::Unity> : private UnityAudioPara
         //setValues<Parameter>( Parameters::LinearIntegerParameterTag() );
         //...mrmlj...workaround for having no way to specify discrete/valid values...
 
-        std::uint8_t const minimumExponent(boost::static_log2<Parameter::unscaledMinimum>::value);
-        std::uint8_t const maximumExponent(boost::static_log2<Parameter::unscaledMaximum>::value);
-        std::uint8_t const defaultExponent(boost::static_log2<Parameter::unscaledDefault>::value);
+        std::uint8_t const minimumExponent(LE::Utility::staticLog2(Parameter::unscaledMinimum));
+        std::uint8_t const maximumExponent(LE::Utility::staticLog2(Parameter::unscaledMaximum));
+        std::uint8_t const defaultExponent(LE::Utility::staticLog2(Parameter::unscaledDefault));
 
         min = 0;
         max = maximumExponent - minimumExponent;
@@ -345,12 +345,11 @@ class LE_ALIGN(16) Plugin<ImplParam, Protocol::Unity> : public UnityPluginBase
     LE_COLD friend int UnityGetAudioEffectDefinitionsImpl(
         ::UnityAudioEffectDefinition const *const **const ppDefinitions)
     {
-        auto BOOST_CONSTEXPR_OR_CONST numberOfParameters = Impl::maxNumberOfParameters;
+        auto constexpr numberOfParameters = Impl::maxNumberOfParameters;
         using ParameterDefinitions = std::array<ParameterInformation, numberOfParameters>;
         static ParameterDefinitions parameterDefinitions;
 
-        bool BOOST_CONSTEXPR_OR_CONST usesSideChain(Impl::maxNumberOfInputs ==
-                                                    (Impl::maxNumberOfOutputs * 2));
+        bool constexpr usesSideChain(Impl::maxNumberOfInputs == (Impl::maxNumberOfOutputs * 2));
         static UnityAudioEffectDefinition /*const*/ definition = {
             /*structsize       */ sizeof(definition),
             /*paramstructsize  */ sizeof(*definition.paramdefs),

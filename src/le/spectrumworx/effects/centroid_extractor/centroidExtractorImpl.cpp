@@ -106,9 +106,9 @@ void CentroidExtractorImpl::process(ChannelState &cs, Engine::ChannelData_AmPh d
     IndexRange::signed_value_type const desiredLeftBin(desiredCentralBin - bandwidth);
     IndexRange::value_type const desiredRightBin(desiredCentralBin + bandwidth);
 
-    BOOST_ASSERT_MSG((desiredCentralBin - desiredLeftBin + 1) > 0,
-                     "Assumed bin order breached."); //...mrmlj...add a better message...
-    BOOST_ASSERT_MSG((desiredRightBin - desiredCentralBin + 1) > 0, "Assumed bin order breached.");
+    LE_ASSERT_MSG((desiredCentralBin - desiredLeftBin + 1) > 0,
+                  "Assumed bin order breached."); //...mrmlj...add a better message...
+    LE_ASSERT_MSG((desiredRightBin - desiredCentralBin + 1) > 0, "Assumed bin order breached.");
 
     auto const dataBeginBin(data.beginBin());
     auto const dataEndBin(data.endBin());
@@ -136,8 +136,8 @@ void CentroidExtractorImpl::process(ChannelState &cs, Engine::ChannelData_AmPh d
         slope += slopeIncrement;
     }
 
-    BOOST_ASSERT(nearEqual(slope, 1 - slopeIncrement) || (centralBin < desiredCentralBin) ||
-                 (centralBin == lBin && slope == slopeStart));
+    LE_ASSERT(nearEqual(slope, 1 - slopeIncrement) || (centralBin < desiredCentralBin) ||
+              (centralBin == lBin && slope == slopeStart));
     slope = 1;
 
     for (auto &amp : Engine::subRange(data.full().amps(), centralBin, rBin))

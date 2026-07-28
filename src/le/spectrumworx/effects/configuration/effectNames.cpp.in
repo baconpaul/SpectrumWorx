@@ -13,8 +13,8 @@
 
 #include "le/utility/platformSpecifics.hpp"
 
-#include "boost/range/algorithm/find.hpp"
-#include "boost/utility/string_ref.hpp"
+#include <algorithm>
+#include <string_view>
 
 #pragma warning( push )
 #pragma warning( disable : 4512 ) // Assignment operator could not be generated.
@@ -56,9 +56,9 @@ char const * effectName( std::uint8_t const effectIndex )
 }
 
 LE_COLD
-std::int8_t effectIndex( boost::string_ref const effectName )
+std::int8_t effectIndex( std::string_view const effectName )
 {
-    EffectNames::const_iterator const pFoundEffectName( boost::find( effectNames, effectName ) );
+    EffectNames::const_iterator const pFoundEffectName( std::ranges::find( effectNames, effectName ) );
     auto const index( static_cast<std::uint8_t>( pFoundEffectName - effectNames.begin() ) );
     if ( index == effectNames.size() )
         return -1;

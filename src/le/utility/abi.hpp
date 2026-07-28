@@ -46,6 +46,12 @@
 
 #define LE_ASSUME(condition) __assume(condition)
 
+// MSVC has no branch hints; the profile guided optimiser is the substitute.
+#define LE_LIKELY(expression) (expression)
+#define LE_UNLIKELY(expression) (expression)
+
+#define LE_CURRENT_FUNCTION __FUNCSIG__
+
 #elif defined(__GNUC__)
 
 #if __cplusplus < 201103L
@@ -83,10 +89,31 @@
             __builtin_unreachable();                                                               \
     } while (0)
 
+#define LE_LIKELY(expression) __builtin_expect(!!(expression), 1)
+#define LE_UNLIKELY(expression) __builtin_expect(!!(expression), 0)
+
+#define LE_CURRENT_FUNCTION __PRETTY_FUNCTION__
+
 #else
 
 #error LE unsupported compiler
 
+#endif
+
+// Byte order, previously taken from boost/detail/endian.hpp. Preprocessor
+// macros rather than std::endian because the call sites are #if's.
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#define LE_BIG_ENDIAN
+#else
+#define LE_LITTLE_ENDIAN
+#endif
+
+// Language feature detection, previously taken from boost/config.hpp.
+#if !defined(__cpp_exceptions) && !defined(_CPPUNWIND) && !defined(__EXCEPTIONS)
+#define LE_NO_EXCEPTIONS
+#endif
+#if !defined(__cpp_rtti) && !defined(_CPPRTTI) && !defined(__GXX_RTTI)
+#define LE_NO_RTTI
 #endif
 
 //------------------------------------------------------------------------------

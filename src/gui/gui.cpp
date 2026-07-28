@@ -17,20 +17,24 @@
 
 #include "boost/mmap/mappble_objects/file/utility.hpp" // Boost sandbox
 
-#include "boost/assert.hpp"
-#include "boost/polymorphic_cast.hpp"
+#include "le/utility/assert.hpp"
+#include "le/utility/polymorphicDowncast.hpp"
 #ifdef _WIN32
-#include "boost/range/algorithm/search.hpp"
+#include <algorithm>
 #endif // _WIN32
 
 #ifdef __APPLE__
 #include "dlfcn.h"
 #include "ApplicationServices/ApplicationServices.h" // only for CoreGraphics...
-#endif                                               // __APPLE__
+#include "le/utility/ignoreUnused.hpp"
+#endif // __APPLE__
 
 #include <array>
 #include <cstdio>
 #include <cstdlib>
+#include <optional>
+#include <string_view>
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 #ifdef __APPLE__
 void const *swDLLAddress;
@@ -107,7 +111,7 @@ ReferenceCountedGUIInitializationGuard::ReferenceCountedGUIInitializationGuard()
 
 ReferenceCountedGUIInitializationGuard::~ReferenceCountedGUIInitializationGuard()
 {
-    BOOST_ASSERT(isThisTheGUIThread());
+    LE_ASSERT(isThisTheGUIThread());
 
 #if defined(__APPLE__) && !__LP64__
     /// \note See the end note in detachComponentFromHostWindow() in gui.mm.
@@ -145,13 +149,13 @@ ReferenceCountedGUIInitializationGuard::~ReferenceCountedGUIInitializationGuard(
             juce::Desktop::getInstance().getAnimator().cancelAllAnimations(false);
             juce::Desktop::getInstance().getAnimator().stopTimer();
 #if defined(_WIN32)
-            BOOST_ASSERT(juce::Process::getCurrentModuleInstanceHandle() == &__ImageBase);
+            LE_ASSERT(juce::Process::getCurrentModuleInstanceHandle() == &__ImageBase);
 #endif // _WIN32
             juce::shutdownJuce_GUI();
             juce::Desktop::destroy();
             juce::MessageManager::destroySingleton();
 
-            BOOST_ASSERT(guiInitializationReferenceCount == 0);
+            LE_ASSERT(guiInitializationReferenceCount == 0);
         }
     }
 }
@@ -161,7 +165,7 @@ LE_NOTHROWNOALIAS bool ReferenceCountedGUIInitializationGuard::isGUIInitialised(
 #if LE_SW_GUI
     return guiInitializationReferenceCount != 0;
 #else
-    BOOST_ASSERT(guiInitializationReferenceCount == 0);
+    LE_ASSERT(guiInitializationReferenceCount == 0);
     return false;
 #endif // LE_SW_GUI
 }
@@ -188,10 +192,10 @@ bool LE_NOTHROW useJUCEAlertBox(bool const canBlock)
 #pragma warning(push)
 #pragma warning(disable : 4127) // Conditional expression is constant.
 
-void LE_NOTHROW warningMessageBox(boost::string_ref const title, boost::string_ref const message,
+void LE_NOTHROW warningMessageBox(std::string_view const title, std::string_view const message,
                                   bool const canBlock)
 {
-    BOOST_ASSERT(ReferenceCountedGUIInitializationGuard::isGUIInitialised() || canBlock);
+    LE_ASSERT(ReferenceCountedGUIInitializationGuard::isGUIInitialised() || canBlock);
     JUCE_AUTORELEASEPOOL
     {
         try
@@ -261,8 +265,8 @@ unsigned int getBinaryPath(path_t &path)
 
     DWORD const fullPathLength(
         ::GetModuleFileName(reinterpret_cast<HMODULE>(&__ImageBase), path, _countof(path)));
-    BOOST_ASSERT((fullPathLength > 0) && (fullPathLength < _countof(path)));
-    BOOST_ASSERT(path[fullPathLength] == '\0');
+    LE_ASSERT((fullPathLength > 0) && (fullPathLength < _countof(path)));
+    LE_ASSERT(path[fullPathLength] == '\0');
     static TCHAR const extension[] = _T( ".dll" );
 
 #elif defined(__APPLE__)
@@ -273,10 +277,10 @@ unsigned int getBinaryPath(path_t &path)
     //unsigned long fullPathLength( PATH_MAX );
     //NSGetExecutablePath( path, &fullPathLength );
     Dl_info exeInfo;
-    BOOST_VERIFY(dladdr(&pluginRootPath, &exeInfo) != 0);
+    LE_VERIFY(dladdr(&pluginRootPath, &exeInfo) != 0);
     ::swDLLAddress = exeInfo.dli_fbase;
     unsigned long fullPathLength(std::strlen(exeInfo.dli_fname));
-    BOOST_ASSERT(fullPathLength <= _countof(path) + _countof(".paths"));
+    LE_ASSERT(fullPathLength <= _countof(path) + _countof(".paths"));
     std::memcpy(path, exeInfo.dli_fname, fullPathLength);
     //static TCHAR const extension[] = _T( ".dylib" );...mrmlj...does not see through symlink...
     static TCHAR const extension[] = _T( "." );
@@ -289,8 +293,8 @@ unsigned int getBinaryPath(path_t &path)
                                 (_countof(extension) - sizeof('\0') - sizeof('.')));
     unsigned int const insertionIndex(dotIndex + sizeof('\0'));
 
-    BOOST_ASSERT(path[dotIndex] == _T('.'));
-    BOOST_ASSERT(std::_tcscmp(&path[dotIndex], extension) == 0);
+    LE_ASSERT(path[dotIndex] == _T('.'));
+    LE_ASSERT(std::_tcscmp(&path[dotIndex], extension) == 0);
     return insertionIndex;
 }
 } // anonymous namespace
@@ -382,11 +386,11 @@ bool LE_NOTHROW initializePaths()
                     true);
                 return false;
             }
-            boost::string_ref const rootPath(reinterpret_cast<char const *>(pathsFile.begin()),
-                                             std::find(pathsFile.begin(), pathsFile.end(), '\n') -
-                                                 pathsFile.begin());
-            boost::string_ref const presetsPath(rootPath.end() + 1,
-                                                pathsFile.end() - (rootPath.end() + 1));
+            std::string_view const rootPath(reinterpret_cast<char const *>(pathsFile.begin()),
+                                            std::find(pathsFile.begin(), pathsFile.end(), '\n') -
+                                                pathsFile.begin());
+            std::string_view const presetsPath(rootPath.end() + 1,
+                                               pathsFile.end() - (rootPath.end() + 1));
             pluginRootPath = juce::String::fromUTF8(rootPath.begin(),
                                                     static_cast<unsigned int>(rootPath.size()));
             mruPresetsFolder = juce::String::fromUTF8(
@@ -400,9 +404,9 @@ bool LE_NOTHROW initializePaths()
             {
                 JUCE_AUTORELEASEPOOL
                 {
-                    BOOST_ASSERT(!mruPresetsFolder.isDirectory());
-                    BOOST_ASSERT(rootPath.front() == '/');
-                    BOOST_ASSERT(presetsPath.front() == '/');
+                    LE_ASSERT(!mruPresetsFolder.isDirectory());
+                    LE_ASSERT(rootPath.front() == '/');
+                    LE_ASSERT(presetsPath.front() == '/');
                     juce::File const userFolder(
                         juce::File::getSpecialLocation(juce::File::userHomeDirectory));
                     pluginRootPath = userFolder.getChildFile(
@@ -434,13 +438,13 @@ bool LE_NOTHROW havePathsBeenInitialised() { return pluginRootPath != juce::File
 
 LE_NOTHROWNOALIAS juce::File const &rootPath()
 {
-    BOOST_ASSERT_MSG((pluginRootPath != juce::File::nonexistent), "Not initialized.");
+    LE_ASSERT_MSG((pluginRootPath != juce::File::nonexistent), "Not initialized.");
     return pluginRootPath;
 }
 
 LE_NOTHROWNOALIAS juce::File &presetsFolder()
 {
-    BOOST_ASSERT_MSG((mruPresetsFolder != juce::File::nonexistent), "Not initialized.");
+    LE_ASSERT_MSG((mruPresetsFolder != juce::File::nonexistent), "Not initialized.");
     return mruPresetsFolder;
 }
 
@@ -452,9 +456,8 @@ LE_NOALIAS juce::File resourcesPath() { return rootPath().getChildFile("Resource
     // FSPathMakeRef broken on relative paths
     // http://lists.apple.com/archives/carbon-development/2003/Mar/msg00997.html
     FSRef result;
-    BOOST_VERIFY(
-        ::FSPathMakeRef(reinterpret_cast<UInt8 const *>(path.getCharPointer().getAddress()),
-                        &result, nullptr) == noErr);
+    LE_VERIFY(::FSPathMakeRef(reinterpret_cast<UInt8 const *>(path.getCharPointer().getAddress()),
+                              &result, nullptr) == noErr);
     return result;
 }
 
@@ -462,12 +465,12 @@ LE_NOALIAS juce::File resourcesPath() { return rootPath().getChildFile("Resource
 {
     //::CFStringRef const pathString( ::CFStringCreateWithCStringNoCopy( nullptr, path.getFullPathName().getCharPointer().getAddress(), kCFStringEncodingUTF8, kCFAllocatorNull ) );
     //::CFURLRef    const pathURL   ( ::CFURLCreateWithFileSystemPath  ( nullptr, pathString, kCFURLPOSIXPathStyle, false ) );
-    //BOOST_ASSERT( pathString );
-    //BOOST_ASSERT( pathURL    );
+    //LE_ASSERT( pathString );
+    //LE_ASSERT( pathURL    );
     //::CFRelease( pathString );
     ::FSRef const pathFSRef(makeFSRefFromPath(path.getFullPathName()));
     ::CFURLRef const pathURL(::CFURLCreateFromFSRef(nullptr, &pathFSRef));
-    BOOST_ASSERT(pathURL);
+    LE_ASSERT(pathURL);
     return pathURL;
 }
 #endif // __APPLE__
@@ -476,7 +479,7 @@ juce::Image resourceBitmap(char const (&bitmapNumber)[2 + 1])
 {
     char const extension[] = ".png";
     std::array<char, _countof(bitmapNumber) - 1 + _countof(extension) - 1> fileName;
-    BOOST_ASSERT(bitmapNumber[2] == '\0');
+    LE_ASSERT(bitmapNumber[2] == '\0');
     fileName[0] = bitmapNumber[0];
     fileName[1] = bitmapNumber[1];
     fileName[2] = extension[0];
@@ -493,16 +496,16 @@ juce::Image resourceBitmap(char const (&bitmapNumber)[2 + 1])
         juce::FileInputStream fileInputStream(file);
         juce::PNGImageFormat pngReader;
         juce::Image const bitmap(pngReader.decodeImage(fileInputStream));
-        BOOST_ASSERT_MSG(bitmap.isValid() && bitmap.getWidth() && bitmap.getHeight(),
-                         "Error loading bitmap from disk.");
+        LE_ASSERT_MSG(bitmap.isValid() && bitmap.getWidth() && bitmap.getHeight(),
+                      "Error loading bitmap from disk.");
 
 #ifdef __APPLE__
         // PC to Mac gamma correction
         // http://www.giassa.net/?page_id=475
         {
             juce::Image::BitmapData pixels(bitmap, juce::Image::BitmapData::readWrite);
-            BOOST_ASSERT(((bitmap.getFormat() == juce::Image::ARGB) && (pixels.pixelStride == 4)) ||
-                         ((bitmap.getFormat() == juce::Image::RGB) && (pixels.pixelStride == 3)));
+            LE_ASSERT(((bitmap.getFormat() == juce::Image::ARGB) && (pixels.pixelStride == 4)) ||
+                      ((bitmap.getFormat() == juce::Image::RGB) && (pixels.pixelStride == 3)));
 
             {
                 float const pcGamma(2.2f);
@@ -601,7 +604,7 @@ LE_NOTHROWNOALIAS float LE_COLD displayScale()
     auto const scale(desktop.getGlobalScaleFactor());
 #ifndef NDEBUG
     for (auto const &display : desktop.getDisplays().displays)
-        BOOST_ASSERT(display.scale == scale);
+        LE_ASSERT(display.scale == scale);
 #endif // NDEBUG
     return scale;
 }
@@ -620,7 +623,7 @@ LE_NOINLINE LE_COLD void setName(juce::Component &widget, char const *const newN
 bool hasDirectFocus(juce::Component const &widget)
 {
     bool const result(&widget == widget.getCurrentlyFocusedComponent());
-    BOOST_ASSERT(result == widget.hasKeyboardFocus(false));
+    LE_ASSERT(result == widget.hasKeyboardFocus(false));
     return result;
 }
 
@@ -628,7 +631,7 @@ bool hasFocus(juce::Component const &widget)
 {
     bool const result(hasDirectFocus(widget) ||
                       isParentOf(widget, widget.getCurrentlyFocusedComponent()));
-    BOOST_ASSERT(result == widget.hasKeyboardFocus(true));
+    LE_ASSERT(result == widget.hasKeyboardFocus(true));
     return result;
 }
 
@@ -656,7 +659,7 @@ HHOOK OwnedWindowBase::wndProcHook(0);
 
 void OwnedWindowBase::attach(SpectrumWorxEditor &parent, juce::Component &window)
 {
-    BOOST_ASSERT(!window.isOpaque());
+    LE_ASSERT(!window.isOpaque());
 
     //...mrmlj...check these links for mac keystroke handling:
     //http://lists.steinberg.net:8100/Lists/vst-plugins/Message/12066.html
@@ -690,15 +693,15 @@ void OwnedWindowBase::attach(SpectrumWorxEditor &parent, juce::Component &window
     HWND const editorHandle(reinterpret_cast<HWND>(owner.getNativeHandle()));
     HWND editorRootParentNativeHandle(editorHandle);
     HWND lastPossibleHandle(0);
-    boost::string_ref const spectrumWorxTitle("SpectrumWorx");
+    std::string_view const spectrumWorxTitle("SpectrumWorx");
     char windowTitleBuffer[256];
     do
     {
         editorRootParentNativeHandle = ::GetAncestor(editorRootParentNativeHandle, GA_PARENT);
-        boost::string_ref const windowTitle(
+        std::string_view const windowTitle(
             windowTitleBuffer, ::GetWindowTextA(editorRootParentNativeHandle, windowTitleBuffer,
                                                 _countof(windowTitleBuffer)));
-        if (boost::search(windowTitle, spectrumWorxTitle) != windowTitle.end())
+        if (windowTitle.find(spectrumWorxTitle) != std::string_view::npos)
             lastPossibleHandle = editorRootParentNativeHandle;
     } while (editorRootParentNativeHandle);
     editorRootParentNativeHandle = lastPossibleHandle;
@@ -725,14 +728,14 @@ void OwnedWindowBase::attach(SpectrumWorxEditor &parent, juce::Component &window
         if (!masterParent || (masterParent == ::GetDesktopWindow()))
         {
             RECT editorRect;
-            BOOST_VERIFY(::GetWindowRect(editorHandle, &editorRect));
+            LE_VERIFY(::GetWindowRect(editorHandle, &editorRect));
             editorRootParentNativeHandle = editorHandle;
             do
             {
                 editorRootParentNativeHandle =
                     ::GetAncestor(editorRootParentNativeHandle, GA_PARENT);
                 RECT editorParentRect;
-                BOOST_VERIFY(::GetWindowRect(editorRootParentNativeHandle, &editorParentRect));
+                LE_VERIFY(::GetWindowRect(editorRootParentNativeHandle, &editorParentRect));
                 if ((editorParentRect.left < editorRect.left) &&
                     (editorParentRect.top < editorRect.top))
                     break;
@@ -743,7 +746,7 @@ void OwnedWindowBase::attach(SpectrumWorxEditor &parent, juce::Component &window
     if (wndProcHook == 0)
         wndProcHook =
             ::SetWindowsHookEx(WH_CALLWNDPROC, &callWndHookProc, 0, ::GetCurrentThreadId());
-    BOOST_ASSERT(wndProcHook); //...mrmlj...better error handling desired...
+    LE_ASSERT(wndProcHook); //...mrmlj...better error handling desired...
 
     window.juce::Component::addToDesktop(juce::ComponentPeer::windowIsSemiTransparent,
                                          owner.getNativeHandle());
@@ -764,17 +767,17 @@ void OwnedWindowBase::attach(SpectrumWorxEditor &parent, juce::Component &window
 void OwnedWindowBase::detach(SpectrumWorxEditor &editor, juce::Component &ownee)
 {
 #ifdef _WIN32
-    BOOST_ASSERT(wndProcHook != 0);
+    LE_ASSERT(wndProcHook != 0);
     if (juce::ComponentPeer::getNumPeers() < 3)
     {
-        BOOST_ASSERT(juce::ComponentPeer::getNumPeers() == 2);
-        BOOST_ASSERT(juce::ComponentPeer::getPeer(0) == editor.getPeer());
-        BOOST_ASSERT(juce::ComponentPeer::getPeer(1) == ownee.getPeer());
-        BOOST_VERIFY(::UnhookWindowsHookEx(wndProcHook));
+        LE_ASSERT(juce::ComponentPeer::getNumPeers() == 2);
+        LE_ASSERT(juce::ComponentPeer::getPeer(0) == editor.getPeer());
+        LE_ASSERT(juce::ComponentPeer::getPeer(1) == ownee.getPeer());
+        LE_VERIFY(::UnhookWindowsHookEx(wndProcHook));
         wndProcHook = 0;
     }
-    boost::ignore_unused_variable_warning(editor);
-    boost::ignore_unused_variable_warning(ownee);
+    LE::Utility::ignoreUnused(editor);
+    LE::Utility::ignoreUnused(ownee);
 #else
     detachFromEditor(*editor.getPeer(), *ownee.getPeer());
 #endif // _WIN32
@@ -786,7 +789,7 @@ juce::ComponentPeer *peerWithParentHandle(HWND const parentWindowHandle)
     for (unsigned int i(0); i < static_cast<unsigned int>(juce::ComponentPeer::getNumPeers()); ++i)
     {
         juce::ComponentPeer *const pPeer(juce::ComponentPeer::getPeer(i));
-        BOOST_ASSERT(pPeer);
+        LE_ASSERT(pPeer);
         if (::IsChild(parentWindowHandle, static_cast<HWND>(pPeer->getNativeHandle())))
             return pPeer;
     }
@@ -796,13 +799,13 @@ juce::ComponentPeer *peerWithParentHandle(HWND const parentWindowHandle)
 LRESULT CALLBACK OwnedWindowBase::callWndHookProc(int const nCode, WPARAM const wParam,
                                                   LPARAM const lParam)
 {
-    BOOST_ASSERT(lParam);
+    LE_ASSERT(lParam);
     CWPSTRUCT const &info(*reinterpret_cast<CWPSTRUCT const *>(lParam));
     if (info.message == WM_WINDOWPOSCHANGED)
     {
-        BOOST_ASSERT(info.lParam);
+        LE_ASSERT(info.lParam);
         WINDOWPOS const &wp(*reinterpret_cast<WINDOWPOS const *>(info.lParam));
-        BOOST_ASSERT(wp.hwnd == info.hwnd);
+        LE_ASSERT(wp.hwnd == info.hwnd);
         // Implementation note:
         //   We have to update on all parent window adjustments (not just on
         // movement) because some hosts do some non-movement adjustments to the
@@ -815,13 +818,13 @@ LRESULT CALLBACK OwnedWindowBase::callWndHookProc(int const nCode, WPARAM const 
             juce::ComponentPeer *pEditorPeer(peerWithParentHandle(info.hwnd));
             if (pEditorPeer)
             {
-                SpectrumWorxEditor &editor(*boost::polymorphic_downcast<SpectrumWorxEditor *>(
+                SpectrumWorxEditor &editor(*LE::Utility::polymorphicDowncast<SpectrumWorxEditor *>(
                     &pEditorPeer->getComponent()));
                 RECT parentRect;
-                BOOST_VERIFY(::GetWindowRect(info.hwnd, &parentRect));
+                LE_VERIFY(::GetWindowRect(info.hwnd, &parentRect));
                 RECT editorRect;
-                BOOST_VERIFY(::GetWindowRect(reinterpret_cast<HWND>(pEditorPeer->getNativeHandle()),
-                                             &editorRect));
+                LE_VERIFY(::GetWindowRect(reinterpret_cast<HWND>(pEditorPeer->getNativeHandle()),
+                                          &editorRect));
                 unsigned int const parentHorizontalMargin(editorRect.left - parentRect.left);
                 unsigned int const parentVerticalMargin(editorRect.top - parentRect.top);
                 POINT newEditorLocation = {wp.x + parentHorizontalMargin,
@@ -836,7 +839,7 @@ LRESULT CALLBACK OwnedWindowBase::callWndHookProc(int const nCode, WPARAM const 
                 // this will simply 'do nothing' so there is no need for
                 // separate logic.
                 //                            (25.05.2010.) (Domagoj Saric)
-                BOOST_VERIFY(
+                LE_VERIFY(
                     ::ClientToScreen(::GetAncestor(info.hwnd, GA_PARENT), &newEditorLocation));
                 /// \note Account for display scaling/"high DPI display".
                 /// http://msdn.microsoft.com/en-us/library/windows/desktop/ms633533(v=vs.85).aspx
@@ -854,10 +857,10 @@ LRESULT CALLBACK OwnedWindowBase::callWndHookProc(int const nCode, WPARAM const 
                     Math::round(Math::convert<float>(newEditorLocation.x) * scale);
                 newEditorLocation.y =
                     Math::round(Math::convert<float>(newEditorLocation.y) * scale);
-                BOOST_ASSERT(Math::abs(newEditorLocation.x - editor.getScreenX()) <=
-                             1); //...mrmlj...rounding error...
-                BOOST_ASSERT(Math::abs(newEditorLocation.y - editor.getScreenY()) <= 1);
-                adjustPositions(editor.presetBrowser_.get_ptr(), editor.settings_.get_ptr(),
+                LE_ASSERT(Math::abs(newEditorLocation.x - editor.getScreenX()) <=
+                          1); //...mrmlj...rounding error...
+                LE_ASSERT(Math::abs(newEditorLocation.y - editor.getScreenY()) <= 1);
+                adjustPositions(editor.presetBrowser_.operator->(), editor.settings_.operator->(),
                                 newEditorLocation.x, newEditorLocation.y, wp.flags);
             }
         }
@@ -907,11 +910,11 @@ void OwnedWindowBase::adjustPositions(juce::Component *pFirstWindow, juce::Compo
     BOOL const doShow(flags & SWP_SHOWWINDOW);
 #else
     //...mrmlj...clean this up...
-    BOOST_ASSERT(!flags);
+    LE_ASSERT(!flags);
     bool const doHide(false);
     bool const doShow(false);
 #endif // _WIN32
-    BOOST_ASSERT((!doHide && !doShow) || (!!doHide != !!doShow));
+    LE_ASSERT((!doHide && !doShow) || (!!doHide != !!doShow));
 
     adjustOwnedWindow(pFirstWindow, x, y, doHide, doShow);
     adjustOwnedWindow(pSecondWindow, x, y, doHide, doShow);
@@ -928,13 +931,13 @@ void OwnedWindowBase::adjustPositions(SpectrumWorxEditor &parent,
 void OwnedWindowBase::adjustPositionsForPresetBrowser(SpectrumWorxEditor &parent,
                                                       juce::Component *const pCurrentWindowState)
 {
-    adjustPositions(parent, pCurrentWindowState, parent.settings_.get_ptr());
+    adjustPositions(parent, pCurrentWindowState, parent.settings_.operator->());
 }
 
 void OwnedWindowBase::adjustPositionsForSettings(SpectrumWorxEditor &parent,
                                                  juce::Component *const pCurrentWindowState)
 {
-    adjustPositions(parent, parent.presetBrowser_.get_ptr(), pCurrentWindowState);
+    adjustPositions(parent, parent.presetBrowser_.operator->(), pCurrentWindowState);
 }
 
 #if 0  //...mrmlj...does not work with the latest juce...cleanup...
@@ -998,7 +1001,7 @@ void BackgroundImage::paint(juce::Graphics &graphics)
 
 juce::Image const &BackgroundImage::image() const
 {
-    BOOST_ASSERT(pImage_);
+    LE_ASSERT(pImage_);
     return *pImage_;
 }
 
@@ -1008,8 +1011,8 @@ BitmapButton::BitmapButton(juce::Component &parent, juce::Image const &on, juce:
                            juce::Colour const &overlayColourWhenOver, bool const toggled)
 {
     //...mrmlj...the settings bitmaps are currently broken...
-    BOOST_ASSERT((on.getHeight() == off.getHeight()) || (&on == &resourceBitmap<SettingsOn>()));
-    BOOST_ASSERT(on.getWidth() == off.getWidth());
+    LE_ASSERT((on.getHeight() == off.getHeight()) || (&on == &resourceBitmap<SettingsOn>()));
+    LE_ASSERT(on.getWidth() == off.getWidth());
 
     /// \note JUCE's ugly Value chemistry tends to backfire when the button's
     /// 'value' is updated through automation/LFOing: juce::Button registers
@@ -1107,13 +1110,13 @@ static MenuItemInfo &getItemInfo(juce::PopupMenu &menu, unsigned int const itemI
 
 #ifdef _DEBUG
     juce::PopupMenu::MenuItemIterator menuIterator(menu);
-    BOOST_VERIFY(menuIterator.next());
+    LE_VERIFY(menuIterator.next());
     unsigned int currentItemIndex(0);
     while (currentItemIndex++ != itemIndex)
-        BOOST_VERIFY(menuIterator.next());
-    BOOST_ASSERT(menuIterator.itemName == item.text);
-    BOOST_ASSERT(menuIterator.itemId == item.itemID);
-    BOOST_ASSERT(menuIterator.isTicked == item.isTicked);
+        LE_VERIFY(menuIterator.next());
+    LE_ASSERT(menuIterator.itemName == item.text);
+    LE_ASSERT(menuIterator.itemId == item.itemID);
+    LE_ASSERT(menuIterator.isTicked == item.isTicked);
 #endif // _DEBUG
 
     return item;
@@ -1149,7 +1152,7 @@ void PopupMenu::addItem(ItemID const newItemId, char const *const newItemText,
 
 void PopupMenu::addSubMenu(PopupMenu &subMenu, char const *const name)
 {
-    BOOST_ASSERT(name);
+    LE_ASSERT(name);
     juce::String const text(name);
     updateDimensionsForNewItem(text);
     menu_.addSubMenu(text, subMenu.menu_, true);
@@ -1157,7 +1160,7 @@ void PopupMenu::addSubMenu(PopupMenu &subMenu, char const *const name)
 
 void PopupMenu::addSectionHeader(char const *const title)
 {
-    BOOST_ASSERT(title);
+    LE_ASSERT(title);
     juce::String const text(title);
     updateDimensionsForNewItem(text);
     menu_.addSectionHeader(text);
@@ -1216,7 +1219,7 @@ PopupMenu::OptionalID PopupMenu::showAt(unsigned int x, unsigned int const y,
     if (chosenMenuEntryID)
         return unmangleID(chosenMenuEntryID);
     else
-        return boost::none;
+        return std::nullopt;
 }
 
 void PopupMenu::clear()
@@ -1230,7 +1233,7 @@ unsigned int PopupMenu::numberOfItems() const { return JuceHackery::getNumberOfI
 
 PopupMenu::MangledID PopupMenu::mangleID(ItemID const id)
 {
-    BOOST_ASSERT(id < zeroIDMaskWorkaround);
+    LE_ASSERT(id < zeroIDMaskWorkaround);
     return id | zeroIDMaskWorkaround;
 }
 
@@ -1243,7 +1246,7 @@ PopupMenuWithSelection::PopupMenuWithSelection() : currentSelection_(0), current
 
 unsigned int PopupMenuWithSelection::getSelectedIndex() const
 {
-    BOOST_ASSERT(hasValidSelection());
+    LE_ASSERT(hasValidSelection());
     return currentSelection_;
 }
 
@@ -1255,7 +1258,7 @@ void PopupMenuWithSelection::setSelectedIndex(unsigned int const newSelectionInd
 
 unsigned int PopupMenuWithSelection::getSelectedID() const
 {
-    BOOST_ASSERT(hasValidSelection());
+    LE_ASSERT(hasValidSelection());
     return unmangleID(currentSelectionID_);
 }
 
@@ -1297,7 +1300,7 @@ bool PopupMenuWithSelection::hasValidSelection() const
 
 bool PopupMenuWithSelection::handleNewSelection(OptionalID const &chosenMenuEntryID)
 {
-    if (chosenMenuEntryID.is_initialized())
+    if (chosenMenuEntryID.has_value())
     {
         currentSelectionID_ = mangleID(*chosenMenuEntryID);
         updateSelection(JuceHackery::getItemIndexForItemID(menu_, currentSelectionID_));
@@ -1326,8 +1329,8 @@ ComboBox::ComboBox(juce::Component &parent, juce::Image const &normalBackground,
                    juce::Image const &selectedBackground)
     : normalBackground_(normalBackground), selectedBackground_(selectedBackground)
 {
-    BOOST_ASSERT(normalBackground.getWidth() == selectedBackground.getWidth());
-    BOOST_ASSERT(normalBackground.getHeight() == selectedBackground.getHeight());
+    LE_ASSERT(normalBackground.getWidth() == selectedBackground.getWidth());
+    LE_ASSERT(normalBackground.getHeight() == selectedBackground.getHeight());
 
     setSizeFromImage(*this, normalBackground);
     addToParentAndShow(parent, *this);
@@ -1409,7 +1412,7 @@ void LEDTextButton::paintButton(juce::Graphics &g, bool const isMouseOverButton,
                                 bool const isButtonDown)
 {
     std::size_t const imageWidth(25);
-    BOOST_ASSERT(getCurrentImage().getWidth() == imageWidth);
+    LE_ASSERT(getCurrentImage().getWidth() == imageWidth);
     Detail::paintTextButton(*this, g, imageWidth, 3, 0, 0, isMouseOverButton, isButtonDown);
 }
 
@@ -1470,7 +1473,7 @@ void Knob::setupForParameter(char const *const title, juce::Image const &filmStr
 
     unsigned int const imageWidth(filmStripToSizeFor.getWidth());
     unsigned int const imageHeight(filmStripToSizeFor.getHeight() / numberOfKnobSubbitmaps);
-    BOOST_ASSERT((filmStripToSizeFor.getHeight() % numberOfKnobSubbitmaps == 0));
+    LE_ASSERT((filmStripToSizeFor.getHeight() % numberOfKnobSubbitmaps == 0));
     LE_ASSUME(imageWidth == imageHeight);
 
     unsigned int const xMargin(getWidth());
@@ -1488,23 +1491,23 @@ void Knob::startedDragging() noexcept
     if (!Theme::singleton().settings().hideCursorOnKnobDrag)
         return;
 
-    BOOST_ASSERT(juce::Desktop::getInstance().getNumMouseSources() == 1);
+    LE_ASSERT(juce::Desktop::getInstance().getNumMouseSources() == 1);
     juce::MouseInputSource &mouseSource(juce::Desktop::getInstance().getMainMouseSource());
-    BOOST_ASSERT((juce::Desktop::getInstance().getDraggingMouseSource(0) ==
-                  nullptr) || //...mrmlj...double click...
-                 (juce::Desktop::getInstance().getDraggingMouseSource(0) == &mouseSource));
+    LE_ASSERT((juce::Desktop::getInstance().getDraggingMouseSource(0) ==
+               nullptr) || //...mrmlj...double click...
+              (juce::Desktop::getInstance().getDraggingMouseSource(0) == &mouseSource));
 
     /// \note setMouseCursor( juce::MouseCursor::NoCursor ) and
     /// enableUnboundedMouseMovement() result in a black box under VMWare.
     ///                                       (10.07.2012.) (Domagoj Saric)
     mouseSource.enableUnboundedMouseMovement(true, false);
-    BOOST_ASSERT(mouseSource.canDoUnboundedMovement());
+    LE_ASSERT(mouseSource.canDoUnboundedMovement());
 }
 
 #ifndef NDEBUG
 void Knob::stoppedDragging() noexcept
 {
-    BOOST_ASSERT(juce::Desktop::getInstance().getNumMouseSources() == 1);
+    LE_ASSERT(juce::Desktop::getInstance().getNumMouseSources() == 1);
     //juce::MouseInputSource & mouseSource( juce::Desktop::getInstance().getMainMouseSource() );
     // http://www.rawmaterialsoftware.com/viewtopic.php?f=2&t=5628&hilit=enableUnboundedMouseMovement
     //mouseSource.enableUnboundedMouseMovement( false, !Theme::singleton().settings().hideCursorOnKnobDrag );
@@ -1541,7 +1544,7 @@ void LE_NOINLINE LE_NOTHROWNOALIAS Knob::setValue(param_type const newValue)
     {
         // Implementation note:
         //   A simple
-        // BOOST_ASSERT( Math::isValueInRange( static_cast<value_type>( newValue ), getMinimum(), getMaximum() ) );
+        // LE_ASSERT( Math::isValueInRange( static_cast<value_type>( newValue ), getMinimum(), getMaximum() ) );
         // assertion would sometimes falsely fail for knobs with
         // quantization-adjusted ranges.
         //                                    (05.05.2011.) (Domagoj Saric)
@@ -1550,10 +1553,10 @@ void LE_NOINLINE LE_NOTHROWNOALIAS Knob::setValue(param_type const newValue)
             engineSetup.frequencyRangePerBin<Knob::param_type>(), engineSetup.stepTime() * 1000));
         auto const minimum(getMinimum());
         auto const maximum(getMaximum());
-        BOOST_ASSERT_MSG(Math::isValueInRange(static_cast<value_type>(newValue),
-                                              minimum - maxQuantizationAdjustment,
-                                              maximum + maxQuantizationAdjustment),
-                         "Knob value out of range");
+        LE_ASSERT_MSG(Math::isValueInRange(static_cast<value_type>(newValue),
+                                           minimum - maxQuantizationAdjustment,
+                                           maximum + maxQuantizationAdjustment),
+                      "Knob value out of range");
     }
 #endif // NDEBUG
     juce::Slider::setValue(static_cast<value_type>(newValue), juce::dontSendNotification);
@@ -1562,15 +1565,15 @@ void LE_NOINLINE LE_NOTHROWNOALIAS Knob::setValue(param_type const newValue)
 void Knob::paint(juce::Image const &filmStrip, unsigned int const xMargin,
                  unsigned int const yMargin, juce::Graphics &graphics)
 {
-    BOOST_ASSERT(filmStrip.getWidth() == filmStrip.getHeight() / signed(numberOfKnobSubbitmaps));
+    LE_ASSERT(filmStrip.getWidth() == filmStrip.getHeight() / signed(numberOfKnobSubbitmaps));
 
     unsigned int const imageWidth(filmStrip.getWidth());
     unsigned int const imageHeight(imageWidth);
     unsigned int const pictureIndex(Math::convert<unsigned int>(
         (numberOfKnobSubbitmaps - 1) * juce::Slider::valueToProportionOfLength(getValue())));
     unsigned int const pictureOffset(pictureIndex * imageHeight);
-    BOOST_ASSERT(pictureIndex < numberOfKnobSubbitmaps);
-    BOOST_ASSERT(pictureOffset < static_cast<unsigned int>(filmStrip.getHeight()));
+    LE_ASSERT(pictureIndex < numberOfKnobSubbitmaps);
+    LE_ASSERT(pictureOffset < static_cast<unsigned int>(filmStrip.getHeight()));
 
     graphics.drawImage(filmStrip, xMargin, yMargin, imageWidth, imageHeight, 0, pictureOffset,
                        imageWidth, imageHeight);
@@ -1629,7 +1632,7 @@ void EditorKnob::paint(juce::Graphics &graphics)
     Knob::paint(resourceBitmap<EditorKnobStrip>(), 0, 0, graphics);
 
     // For main knobs we display the value within the knob itself.
-    BOOST_ASSERT(resourceBitmap<EditorKnobStrip>().getWidth() == 55);
+    LE_ASSERT(resourceBitmap<EditorKnobStrip>().getWidth() == 55);
     graphics.setColour(juce::Colours::white);
     {
         juce::Font font(Theme::singleton().whiteFont());
@@ -1639,9 +1642,8 @@ void EditorKnob::paint(juce::Graphics &graphics)
 
     //...mrmlj...ugh...
     std::array<char, 20> valueString;
-    ParameterPrinter const printer = {
-        editor().engineSetup(), static_cast<float>(getValue()),
-        boost::make_iterator_range_n(&valueString[0], valueString.size())};
+    ParameterPrinter const printer = {editor().engineSetup(), static_cast<float>(getValue()),
+                                      LE::Utility::makeSpan(&valueString[0], valueString.size())};
     using LE::Parameters::IndexOf;
     using namespace GlobalParameters;
     typedef GlobalParameters::Parameters GlobalParams;
@@ -1678,13 +1680,13 @@ LE_NOTHROW void EditorKnob::valueChanged() noexcept
     switch (parameterIndex_)
     {
     case IndexOf<GlobalParams, InputGain>::value:
-        BOOST_VERIFY(editor.globalParameterChanged<InputGain>(value, false));
+        LE_VERIFY(editor.globalParameterChanged<InputGain>(value, false));
         break;
     case IndexOf<GlobalParams, OutputGain>::value:
-        BOOST_VERIFY(editor.globalParameterChanged<OutputGain>(value, false));
+        LE_VERIFY(editor.globalParameterChanged<OutputGain>(value, false));
         break;
     case IndexOf<GlobalParams, MixPercentage>::value:
-        BOOST_VERIFY(editor.globalParameterChanged<MixPercentage>(value, false));
+        LE_VERIFY(editor.globalParameterChanged<MixPercentage>(value, false));
         break;
         LE_DEFAULT_CASE_UNREACHABLE();
     }
@@ -1704,7 +1706,7 @@ void EditorKnob::stoppedDragging() noexcept
 
 SpectrumWorxEditor &EditorKnob::editor()
 {
-    return *boost::polymorphic_downcast<SpectrumWorxEditor *>(this->getParentComponent());
+    return *LE::Utility::polymorphicDowncast<SpectrumWorxEditor *>(this->getParentComponent());
 }
 
 TitledComboBox::TitledComboBox(juce::Component &parent, unsigned int const x, unsigned int const y,
@@ -1738,7 +1740,7 @@ namespace Detail
 void addPowerOfTwoValueStringsToComboBox(unsigned int const firstValue,
                                          unsigned int const lastValue, ComboBox &comboBox)
 {
-    BOOST_ASSERT_MSG(comboBox.numberOfItems() == 0, "ComboBox already filled.");
+    LE_ASSERT_MSG(comboBox.numberOfItems() == 0, "ComboBox already filled.");
     std::array<char, 20> buffer;
     unsigned int value(firstValue);
     while (value <= lastValue)
@@ -1751,9 +1753,9 @@ void addPowerOfTwoValueStringsToComboBox(unsigned int const firstValue,
 }
 
 void addEnumeratedParameterValueStringsToComboBox(
-    boost::iterator_range<char const *LE_RESTRICT const *> strings, ComboBox &comboBox)
+    LE::Utility::Span<char const *LE_RESTRICT const> strings, ComboBox &comboBox)
 {
-    BOOST_ASSERT_MSG(comboBox.numberOfItems() == 0, "ComboBox already filled.");
+    LE_ASSERT_MSG(comboBox.numberOfItems() == 0, "ComboBox already filled.");
     ComboBox::value_type parameterValue(0);
     while (strings)
     {
@@ -1790,20 +1792,20 @@ void registerFonts(bool const doRegister)
         juce::File const fontPath(resources.getChildFile(font));
 #ifdef _WIN32
         if (doRegister)
-            BOOST_VERIFY(::AddFontResourceEx(fontPath.getFullPathName().getCharPointer(),
-                                             FR_PRIVATE, 0) > 0);
+            LE_VERIFY(::AddFontResourceEx(fontPath.getFullPathName().getCharPointer(), FR_PRIVATE,
+                                          0) > 0);
         else
-            BOOST_VERIFY(::RemoveFontResourceEx(fontPath.getFullPathName().getCharPointer(),
-                                                FR_PRIVATE, 0) > 0);
+            LE_VERIFY(::RemoveFontResourceEx(fontPath.getFullPathName().getCharPointer(),
+                                             FR_PRIVATE, 0) > 0);
 #else   // OSX
         // http://developer.apple.com/legacy/mac/library/#documentation/Carbon/Reference/ATS/Reference/reference.html
         // http://blogs.msdn.com/b/michkap/archive/2006/06/25/646701.aspx
         ::CFURLRef const fontURL(makeCFURLFromPath(fontPath));
         if (doRegister)
-            BOOST_VERIFY(
+            LE_VERIFY(
                 ::CTFontManagerRegisterFontsForURL(fontURL, kCTFontManagerScopeProcess, nullptr));
         else
-            BOOST_VERIFY(
+            LE_VERIFY(
                 ::CTFontManagerUnregisterFontsForURL(fontURL, kCTFontManagerScopeProcess, nullptr));
         if (fontURL)
             ::CFRelease(fontURL);
@@ -1819,7 +1821,7 @@ Theme::Theme()
       whiteFont_(blueFont_.getTypefaceName(), 12, juce::Font::bold)
 {
 #ifdef LE_SW_FMOD //...mrmlj...
-    BOOST_VERIFY(initializePaths());
+    LE_VERIFY(initializePaths());
 #endif // LE_SW_FMOD
     juce::LookAndFeel::setDefaultSansSerifTypefaceName(blueFont_.getTypefaceName());
 
@@ -1954,8 +1956,8 @@ void Theme::drawLinearSliderBackground(juce::Graphics &g, int const x, int const
                                        juce::Slider::SliderStyle const style,
                                        juce::Slider & /*slider*/)
 {
-    BOOST_VERIFY((style == juce::Slider::LinearHorizontal) ||
-                 (style == juce::Slider::TwoValueHorizontal));
+    LE_VERIFY((style == juce::Slider::LinearHorizontal) ||
+              (style == juce::Slider::TwoValueHorizontal));
     g.setColour(juce::Colours::white);
     // Implementation note:
     //   MSVC 9.0 SP1 inserts unnecessary cdq and sub instructions without the
@@ -2024,10 +2026,10 @@ Theme::Settings::Settings()
 {
 }
 
-static boost::optional<Theme> singleton_;
+static std::optional<Theme> singleton_;
 
-void Theme::createSingleton() { singleton_ = boost::in_place(); }
-void Theme::destroySingleton() { singleton_ = boost::none; }
+void Theme::createSingleton() { singleton_.emplace(); }
+void Theme::destroySingleton() { singleton_ = std::nullopt; }
 
 Theme &Theme::singleton() { return *singleton_; }
 
@@ -2054,9 +2056,9 @@ extern "C"
 {
     size_t __attribute__((weak)) __cdecl strnlen(char const *str, size_t const maxsize_param)
     {
-        BOOST_ASSERT(str);
+        LE_ASSERT(str);
         unsigned int const maxsize(static_cast<unsigned int>(maxsize_param));
-        BOOST_ASSERT(maxsize == maxsize_param);
+        LE_ASSERT(maxsize == maxsize_param);
         unsigned int n;
         for (n = 0; n < maxsize && *str; n++, str++)
         {
@@ -2066,9 +2068,9 @@ extern "C"
 
     size_t __attribute__((weak)) __cdecl wcsnlen(wchar_t const *wcs, size_t const maxsize_param)
     {
-        BOOST_ASSERT(wcs);
+        LE_ASSERT(wcs);
         unsigned int const maxsize(static_cast<unsigned int>(maxsize_param));
-        BOOST_ASSERT(maxsize == maxsize_param);
+        LE_ASSERT(maxsize == maxsize_param);
         unsigned int n;
         for (n = 0; n < maxsize && *wcs; n++, wcs++)
         {

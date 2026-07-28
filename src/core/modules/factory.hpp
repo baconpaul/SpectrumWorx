@@ -14,7 +14,7 @@
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/cstdint.hpp"
 
-#include "boost/smart_ptr/intrusive_ptr.hpp"
+#include "le/utility/intrusivePtr.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -26,7 +26,7 @@ namespace SW
 struct ModuleFactory
 {
     template <class ModuleInterface>
-    static LE_NOTHROW boost::intrusive_ptr<ModuleInterface> create(std::int8_t effectIndex);
+    static LE_NOTHROW LE::Utility::IntrusivePtr<ModuleInterface> create(std::int8_t effectIndex);
 }; // struct ModuleFactory
 
 //------------------------------------------------------------------------------

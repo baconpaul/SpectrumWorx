@@ -56,7 +56,7 @@ template <typename Target, int targetRangeOffset, unsigned int targetRangeSize,
           unsigned int targetRangeScaleFactor, class Parameter, typename Source>
 Target convertParameterValueToLinearValue(Source const sourceValue, BooleanParameterTag)
 {
-    BOOST_ASSERT(sourceValue == 0 || sourceValue == 1);
+    LE_ASSERT(sourceValue == 0 || sourceValue == 1);
 
     int const minimum(targetRangeOffset);
     int const maximum(targetRangeOffset + targetRangeSize);

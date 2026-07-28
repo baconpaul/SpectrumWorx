@@ -21,11 +21,10 @@
 #include "le/spectrumworx/effects/baseParameters.hpp"
 #include "le/utility/platformSpecifics.hpp"
 
-#include "boost/range/iterator_range_core.hpp"
-
 #include <array>
 #include <cstdint>
 #include <utility>
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -122,7 +121,7 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
     /// will be crammed here.
     ///                                       (14.03.2014.) (Domagoj Saric)
     using LFO = LE::Parameters::LFOImpl;
-    using LFOs = boost::iterator_range<LFO *LE_RESTRICT>;
+    using LFOs = LE::Utility::Span<LFO>;
 
     void updateLFOs(LFO::Timer::TimingInformationChange);
 

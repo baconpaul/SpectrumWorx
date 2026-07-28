@@ -33,10 +33,9 @@
 #include "le/utility/countof.hpp"
 #include "le/utility/parentFromMember.hpp"
 
-#include "boost/assert.hpp"
-#include "boost/range/algorithm/find_if.hpp"
-#include "boost/range/algorithm/min_element.hpp"
-#include "boost/range/counting_range.hpp"
+#include "le/utility/assert.hpp"
+#include <algorithm>
+#include <ranges>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -90,8 +89,8 @@ void LFO::setEnabled(bool const value)
 
 void LFO::setPhase(LFOImpl::value_type const newPhase)
 {
-    BOOST_ASSERT(newPhase >= -0.5);
-    BOOST_ASSERT(newPhase <= +0.5);
+    LE_ASSERT(newPhase >= -0.5);
+    LE_ASSERT(newPhase <= +0.5);
     static_cast<LFOImpl &>(*this).parameters().set<Phase>(newPhase);
 }
 
@@ -114,7 +113,7 @@ bool LFO::setLowerBound(LFOImpl::value_type const newLowerBound)
 
 bool LFO::setUpperBound(LFOImpl::value_type const newUpperBound)
 {
-    BOOST_ASSERT(LFOImpl::isValueInRange(newUpperBound));
+    LE_ASSERT(LFOImpl::isValueInRange(newUpperBound));
     static_cast<LFOImpl &>(*this).setUpperBound(newUpperBound);
     auto const lowerBound(this->lowerBound());
     if (lowerBound > newUpperBound)
@@ -147,16 +146,16 @@ float LFO::setPeriodInSeconds(float const periodInSeconds)
 void LFO::addSyncType(SyncType const syncType)
 {
     auto &parameters(static_cast<LFOImpl &>(*this).parameters());
-    BOOST_ASSERT(syncType && "No sync type specified.");
-    BOOST_ASSERT(!hasEnabledSync(syncType) && "Sync type already enabled.");
+    LE_ASSERT(syncType && "No sync type specified.");
+    LE_ASSERT(!hasEnabledSync(syncType) && "Sync type already enabled.");
     parameters.set<SyncTypes>(parameters.get<SyncTypes>().getValue() | syncType);
 }
 
 void LFO::removeSyncType(SyncType const syncType)
 {
     auto &parameters(static_cast<LFOImpl &>(*this).parameters());
-    BOOST_ASSERT(syncType && "No sync type specified.");
-    BOOST_ASSERT(hasEnabledSync(syncType) && "Sync type not enabled.");
+    LE_ASSERT(syncType && "No sync type specified.");
+    LE_ASSERT(hasEnabledSync(syncType) && "Sync type not enabled.");
     parameters.set<SyncTypes>(parameters.get<SyncTypes>().getValue() & ~syncType);
 }
 
@@ -195,20 +194,20 @@ LFOImpl::value_type LFOImpl::periodScale() const { return parameters().get<Perio
 
 void LFOImpl::setLowerBound(value_type const newLowerBound)
 {
-    BOOST_ASSERT(isValueInRange(newLowerBound));
+    LE_ASSERT(isValueInRange(newLowerBound));
     parameters().set<LowerBound>(newLowerBound);
 }
 
 void LFOImpl::setUpperBound(value_type const newUpperBound)
 {
-    BOOST_ASSERT(isValueInRange(newUpperBound));
+    LE_ASSERT(isValueInRange(newUpperBound));
     parameters().set<UpperBound>(newUpperBound);
 }
 
 void LFOImpl::setPeriodScale(value_type const newPeriodScale)
 {
-    BOOST_ASSERT(newPeriodScale >= LFOImpl::currentPeriodScaleMinimum());
-    BOOST_ASSERT(newPeriodScale <= LFOImpl::currentPeriodScaleMaximum());
+    LE_ASSERT(newPeriodScale >= LFOImpl::currentPeriodScaleMinimum());
+    LE_ASSERT(newPeriodScale <= LFOImpl::currentPeriodScaleMaximum());
     parameters().set<PeriodScale>(newPeriodScale);
 }
 
@@ -380,8 +379,8 @@ LFOImpl::value_type LE_NOTHROWNOALIAS LFOImpl::getValue(Timer const &timer) cons
 
     value_type const currentPeriodNormalisedPosition(
         Math::splitFloat((periodOffset + timer.currentTimeInBars()) / periodScale).fractional);
-    BOOST_ASSERT(currentPeriodNormalisedPosition >= 0);
-    BOOST_ASSERT(currentPeriodNormalisedPosition <= 1);
+    LE_ASSERT(currentPeriodNormalisedPosition >= 0);
+    LE_ASSERT(currentPeriodNormalisedPosition <= 1);
 
     value_type const previousPeriodPosition(
         Math::PositiveFloats::modulo((periodOffset + timer.previousTimeInBars()), periodScale));
@@ -393,12 +392,12 @@ LFOImpl::value_type LE_NOTHROWNOALIAS LFOImpl::getValue(Timer const &timer) cons
     value_type const newValue(
         getWaveformAmplitudeForPosition(currentPeriodNormalisedPosition, newPeriod));
 
-    BOOST_ASSERT(isValueInRange(newValue));
+    LE_ASSERT(isValueInRange(newValue));
     value_type const result(
         Math::convertLinearRange<value_type, value_type, LFOImpl::minimumValue,
                                  LFOImpl::maximumValue - LFOImpl::minimumValue, 1>(
             newValue, lowerBound(), upperBound()));
-    BOOST_ASSERT(isValueInBounds(result));
+    LE_ASSERT(isValueInBounds(result));
 
     return result;
 }
@@ -410,7 +409,7 @@ LFOImpl::value_type LE_NOTHROWNOALIAS LFOImpl::getValue(Timer const &timer) cons
 template <>
 LFOImpl::PeriodScale::value_type LFOImpl::adjustValueForPreset(PeriodScale const &periodScale) const
 {
-    BOOST_ASSERT(periodScale == this->periodScale());
+    LE_ASSERT(periodScale == this->periodScale());
     if (syncTypes() == LFO::Free)
     {
         return periodScale * LFOImpl::Timer::basePeriod() * 1000;
@@ -438,7 +437,7 @@ void LFOImpl::snapPeriodScaleFromAutomation(PeriodScale &periodScale)
         periodScale = snapSyncedPeriod(periodScale, lfo.syncTypes()).first;
     else
     {
-        BOOST_ASSERT(clampFreePeriod(periodScale) == periodScale);
+        LE_ASSERT(clampFreePeriod(periodScale) == periodScale);
     }
 }
 
@@ -478,17 +477,17 @@ lfo_value_t snapSyncedPeriodScale(lfo_value_t const periodScale)
     }
     else if (numberOfBeats > 0)
     {
-        BOOST_ASSERT((numberOfBeats >= 1) && (numberOfBeats <= LFOImpl::Timer::measureNumerator()));
+        LE_ASSERT((numberOfBeats >= 1) && (numberOfBeats <= LFOImpl::Timer::measureNumerator()));
 
         auto const wholeDivisorFinder([](std::uint8_t const value) {
             return LFOImpl::Timer::measureNumerator() % value == 0;
         });
 
-        auto const upperClosest(*boost::find_if(
-            boost::counting_range(numberOfBeats, LFOImpl::Timer::measureNumerator()),
+        auto const upperClosest(*std::ranges::find_if(
+            std::views::iota(numberOfBeats, LFOImpl::Timer::measureNumerator()),
             wholeDivisorFinder));
-        auto const lowerClosest(*boost::find_if(
-            boost::counting_range(std::uint8_t(1), numberOfBeats), wholeDivisorFinder));
+        auto const lowerClosest(*std::ranges::find_if(
+            std::views::iota(std::uint8_t(1), numberOfBeats), wholeDivisorFinder));
         auto const closest(((upperClosest - numberOfBeats) < (numberOfBeats - lowerClosest))
                                ? upperClosest
                                : lowerClosest);
@@ -496,7 +495,7 @@ lfo_value_t snapSyncedPeriodScale(lfo_value_t const periodScale)
     }
     else
     {
-        BOOST_ASSERT(numberOfBeats < 1);
+        LE_ASSERT(numberOfBeats < 1);
 
         float const upperBound(1 / measureNumerator);
         float const lowerBound(upperBound / LFOImpl::minimumPeriodAsMaximumBeatDenominator);
@@ -521,7 +520,7 @@ lfo_value_t snapSyncedPeriodScale(lfo_value_t const periodScale, float const tem
 LFOImpl::SnappedPeriod LFOImpl::snapSyncedPeriod(value_type const periodScale,
                                                  std::uint8_t const syncTypes)
 {
-    BOOST_ASSERT(syncTypes != Free);
+    LE_ASSERT(syncTypes != Free);
 
     float const quarterPeriod(snapSyncedPeriodScale(periodScale, 1 / 1.0f));
     float const tripletPeriod(snapSyncedPeriodScale(periodScale, 3 / 2.0f));
@@ -535,7 +534,7 @@ LFOImpl::SnappedPeriod LFOImpl::snapSyncedPeriod(value_type const periodScale,
         SnappedPeriod((syncTypes & Dotted) ? dottedPeriod : std::numeric_limits<float>::max(),
                       Dotted)};
 
-    return *boost::min_element(
+    return *std::ranges::min_element(
         nearestPeriods, [=](SnappedPeriod const &left, SnappedPeriod const &right) {
             return (Math::abs(right.first - periodScale) > Math::abs(left.first - periodScale));
         });
@@ -559,7 +558,7 @@ void LFOImpl::updateForNewTimingInformation(
     }
     else
     {
-        BOOST_ASSERT(syncTypes() != Free);
+        LE_ASSERT(syncTypes() != Free);
         if (timingInformationChage.measureNumeratorChanged())
             setPeriodScale(snapSyncedPeriod(periodScale(), syncTypes()).first);
     }
@@ -579,7 +578,7 @@ struct LFOParameterGetter
 #pragma warning(disable : 4127) // Conditional expression is constant.
     template <class Parameter> result_type operator()() const
     {
-        BOOST_ASSERT_MSG(
+        LE_ASSERT_MSG(
             Parameter::isValidValue(Math::convert<typename Parameter::value_type>(value_)),
             "Invalid LFO parameter value.");
         result_type result(
@@ -639,7 +638,7 @@ Plugins::AutomatedParameterValue LFOImpl::unlinearisePeriodScale(
     value_type const normalisedSkewedAutomationValue(linearisedNormalisedPeriodScale);
     value_type const normalisedUnskewedAutomationValue(
         Math::exp(Math::ln(normalisedSkewedAutomationValue) / normalisedPeriodScaleSkewFactor()));
-    BOOST_ASSERT(Math::isNormalisedValue(normalisedUnskewedAutomationValue));
+    LE_ASSERT(Math::isNormalisedValue(normalisedUnskewedAutomationValue));
     return normalisedUnskewedAutomationValue;
 }
 
@@ -668,11 +667,11 @@ LFOImpl::Timer::Timer() { reset(); }
 LFOImpl::Timer::TimingInformationChange LFOImpl::Timer::updatePositionAndTimingInformation(
     float const positionInBars, float const barDuration, std::uint8_t const measureNumerator)
 {
-    BOOST_ASSERT(std::isfinite(positionInBars));
-    BOOST_ASSERT(std::isfinite(barDuration));
+    LE_ASSERT(std::isfinite(positionInBars));
+    LE_ASSERT(std::isfinite(barDuration));
 
-    BOOST_ASSERT(positionInBars >= 0);
-    BOOST_ASSERT(barDuration >= 0);
+    LE_ASSERT(positionInBars >= 0);
+    LE_ASSERT(barDuration >= 0);
 
     // Position
     previousTimeInBars_ = currentTimeInBars_;
@@ -697,9 +696,9 @@ LFOImpl::Timer::TimingInformationChange LFOImpl::Timer::updatePositionAndTimingI
     barDuration_ = barDuration;
     measureNumerator_ = measureNumerator;
 
-    BOOST_ASSERT(std::isfinite(currentTimeInBars_));
-    BOOST_ASSERT(std::isfinite(previousTimeInBars_));
-    BOOST_ASSERT(std::isfinite(barDuration_));
+    LE_ASSERT(std::isfinite(currentTimeInBars_));
+    LE_ASSERT(std::isfinite(previousTimeInBars_));
+    LE_ASSERT(std::isfinite(barDuration_));
 
     return changeInfo;
 }
@@ -712,7 +711,7 @@ LFOImpl::Timer::updatePositionAndTimingInformation(unsigned int const deltaNumbe
     float const timeToAdvanceInSeconds(Math::convert<float>(deltaNumberOfSamples) / sampleRate);
     float const timeToAdvanceInBars(timeToAdvanceInSeconds / barDuration_);
 
-    BOOST_ASSERT((currentTimeInBars_ >= previousTimeInBars_) || (currentTimeInBars_ == 0));
+    LE_ASSERT((currentTimeInBars_ >= previousTimeInBars_) || (currentTimeInBars_ == 0));
     previousTimeInBars_ = currentTimeInBars_;
     currentTimeInBars_ += timeToAdvanceInBars;
 
@@ -752,7 +751,7 @@ void LFOImpl::Timer::setPosition(float const timeInSeconds)
     // Position
     float const timeInBars(timeInSeconds / barDuration_);
 
-    BOOST_ASSERT((currentTimeInBars_ > previousTimeInBars_) || (currentTimeInBars_ == 0));
+    LE_ASSERT((currentTimeInBars_ > previousTimeInBars_) || (currentTimeInBars_ == 0));
     previousTimeInBars_ = currentTimeInBars_;
     currentTimeInBars_ = timeInBars;
 }

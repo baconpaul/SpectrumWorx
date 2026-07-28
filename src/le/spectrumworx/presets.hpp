@@ -32,13 +32,13 @@
 #include "le/utility/trace.hpp"
 #include "le/utility/xml.hpp"
 
-#include "boost/optional/optional.hpp" // Boost sandbox
+#include <optional>
 
 #include <boost/fusion/algorithm/iteration/for_each_fwd.hpp>
 #include <boost/mpl/bool_fwd.hpp>
-#include <boost/noncopyable.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <boost/utility/string_ref.hpp>
+#include "le/utility/intrusivePtr.hpp"
+#include "le/utility/ignoreUnused.hpp"
+#include <string_view>
 
 #include <array>
 #include <cstddef>
@@ -109,9 +109,12 @@ struct PresetHeader
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class Preset : boost::noncopyable
+class Preset
 {
   public:
+    Preset(Preset const &) = delete; // makes non-copyable
+    Preset &operator=(Preset const &) = delete;
+
     using InMemoryPresetBuffer = std::array<char, 4096>;
 
   public:
@@ -136,7 +139,7 @@ class Preset : boost::noncopyable
     LE_NOTHROW void getHeader(PresetHeader &) const;
     LE_NOTHROW void setHeader(PresetHeader const &);
 
-    LE_NOTHROW boost::string_ref getComment() const;
+    LE_NOTHROW std::string_view getComment() const;
 
     Utility::XML::Document &xml() { return preset_; }
     Utility::XML::Document const &xml() const { return preset_; }
@@ -170,8 +173,8 @@ class PresetHandler
     PresetHandler(Preset &preset) : preset_(preset) {}
 
   protected:
-    boost::string_ref mangleSpaces(char const *input) const;
-    boost::string_ref unmangleSpaces(char const *input) const;
+    std::string_view mangleSpaces(char const *input) const;
+    std::string_view unmangleSpaces(char const *input) const;
 
     LE_RESTRICTNOALIAS char *allocateString(unsigned int size);
 
@@ -186,12 +189,9 @@ class PresetHandler
   protected:
     friend class LFODataSaver;
 
-    static boost::string_ref const &makeStringRef(boost::string_ref const &source)
-    {
-        return source;
-    }
-    static boost::string_ref makeStringRef(boost::string_ref::const_iterator source);
-    template <typename T> boost::string_ref makeStringRef(T const binarySource)
+    static std::string_view const &makeStringRef(std::string_view const &source) { return source; }
+    static std::string_view makeStringRef(std::string_view::const_iterator source);
+    template <typename T> std::string_view makeStringRef(T const binarySource)
     {
         auto const valueBufferSize(Utility::RequiredStringStorage<T>::value);
         char *LE_RESTRICT const buffer(allocateString(valueBufferSize));
@@ -199,17 +199,17 @@ class PresetHandler
             std::is_enum<T>::value ? static_cast<std::uint8_t>(binarySource) : binarySource,
             buffer));
         LE_ASSUME(numberOfCharacters <= valueBufferSize);
-        return boost::string_ref(buffer, numberOfCharacters);
+        return std::string_view(buffer, numberOfCharacters);
     }
 
   private:
-    boost::string_ref fixSpaces(boost::string_ref input, char searchFor, char replaceWith) const;
+    std::string_view fixSpaces(std::string_view input, char searchFor, char replaceWith) const;
 
   private:
     Preset &preset_;
 }; // class PresetHandler
 
-template <> boost::string_ref PresetHandler::makeStringRef<bool>(bool);
+template <> std::string_view PresetHandler::makeStringRef<bool>(bool);
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -236,27 +236,27 @@ class ParametersLoader : private PresetHandler
 
     ModuleChain loadModuleChain(ModuleChain &currentChain);
 
-    boost::string_ref getSampleFileName();
+    std::string_view getSampleFileName();
 
     bool syncedLFOFound() const { return syncedLFOFound_; }
 
     bool isPre27Preset() const;
 
     template <typename T>
-    LE_NOINLINE boost::optional<T> getSimpleParameterValue(char const *const parameterName) const
+    LE_NOINLINE std::optional<T> getSimpleParameterValue(char const *const parameterName) const
     {
         auto const pParameterAttribute(getParameterAttribute(parameterName));
         return getParameterValue<T>(pParameterAttribute, parameterName);
     }
 
     template <typename T>
-    boost::optional<T> getLFOParameterValue(char const *const parameterName, LFO &lfo) const
+    std::optional<T> getLFOParameterValue(char const *const parameterName, LFO &lfo) const
     {
         auto const pParameterNode(getParameterNode(parameterName));
         if (pParameterNode)
         {
             if (loadLFO(*pParameterNode, lfo))
-                return boost::none;
+                return std::nullopt;
             else
                 return getParameterValue<T>(pParameterNode, parameterName);
         }
@@ -281,34 +281,33 @@ class ParametersLoader : private PresetHandler
     template <class Parameter> void operator()(Parameter &parameter) const
     {
         using binary_type = typename Parameter::binary_type;
-        boost::optional<binary_type> const parameterValue(
+        std::optional<binary_type> const parameterValue(
             getSimpleParameterValue<binary_type>(LE::Parameters::Name<Parameter>::string_));
-        if (parameterValue.is_initialized() && parameter.isValidValue(*parameterValue))
+        if (parameterValue.has_value() && parameter.isValidValue(*parameterValue))
             parameter.setValue(*parameterValue);
     }
 
     template <class Parameter> void operator()(Parameter &parameter, LFO &lfo) const
     {
         using binary_type = typename Parameter::binary_type;
-        boost::optional<binary_type> const parameterValueWithoutLFO(
-            getLFOParameterValue<binary_type>(Parameters::Name<Parameter>::string_, lfo,
-                                              &parameter));
-        if (parameterValueWithoutLFO.is_initialized() &&
+        std::optional<binary_type> const parameterValueWithoutLFO(getLFOParameterValue<binary_type>(
+            Parameters::Name<Parameter>::string_, lfo, &parameter));
+        if (parameterValueWithoutLFO.has_value() &&
             parameter.isValidValue(*parameterValueWithoutLFO))
             parameter.setValue(*parameterValueWithoutLFO);
     }
 
   private:
     template <typename T>
-    boost::optional<T> getParameterValue(Utility::XML::Object const *const pXMLElement,
-                                         char const *const parameterName) const
+    std::optional<T> getParameterValue(Utility::XML::Object const *const pXMLElement,
+                                       char const *const parameterName) const
     {
         if (pXMLElement)
         {
             return Utility::lexical_cast<T>(pXMLElement->value());
         }
         warnAboutMissingParameter(parameterName);
-        return boost::none;
+        return std::nullopt;
     }
 
     Utility::XML::Attribute const *getParameterAttribute(char const *parameterName) const;
@@ -318,8 +317,8 @@ class ParametersLoader : private PresetHandler
 
     static void warnAboutMissingParameter(char const *parameterName);
 
-    boost::string_ref currentEffectName() const;
-    boost::string_ref currentMangledEffectName() const;
+    std::string_view currentEffectName() const;
+    std::string_view currentMangledEffectName() const;
 
     Utility::XML::Element const &parameters() const
     {
@@ -390,7 +389,7 @@ class ParametersSaver : private PresetHandler
 
     //...mrmlj...temporarily reverting to old code for the 2.1 release...
     //void setSampleFileName( juce::String const & sampleFileName );
-    void setSampleFileName(boost::string_ref const &sampleFileName);
+    void setSampleFileName(std::string_view const &sampleFileName);
 
     unsigned int saveTo(char *pBuffer);
 
@@ -426,8 +425,8 @@ class ParametersSaver : private PresetHandler
     }
 
   private:
-    void saveParameter(char const *parameterName, boost::string_ref parameterValue);
-    void saveParameter(char const *parameterName, boost::string_ref parameterValue,
+    void saveParameter(char const *parameterName, std::string_view parameterValue);
+    void saveParameter(char const *parameterName, std::string_view parameterValue,
                        LFO const &parameterLFO);
 
     Utility::XML::Element &parameters()
@@ -541,7 +540,7 @@ LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignor
         {
             auto const lock(loader.processingLock()); //...mrmlj...
             newChain = parametersLoader.loadModuleChain(currentChain);
-            boost::ignore_unused_variable_warning(lock);
+            LE::Utility::ignoreUnused(lock);
         }
 #ifndef LE_SW_SDK_BUILD
         if (loader.onlySetParameters())
@@ -559,7 +558,7 @@ LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignor
                 Preset::reportPresetLoadingError();
                 return false;
             }
-            boost::ignore_unused_variable_warning(automationBlocker);
+            LE::Utility::ignoreUnused(automationBlocker);
         }
 
         auto const initialiseModule(loader.moduleInitialiser());
@@ -573,9 +572,9 @@ LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignor
         {
             auto const lock(loader.processingLock()); //...mrmlj...
             currentChain = std::move(newChain);
-            BOOST_ASSERT(newChain.size() == 0);
-            BOOST_ASSERT(currentChain.size() == moduleIndex);
-            boost::ignore_unused_variable_warning(lock);
+            LE_ASSERT(newChain.size() == 0);
+            LE_ASSERT(currentChain.size() == moduleIndex);
+            LE::Utility::ignoreUnused(lock);
         }
         loader.moduleChainFinished(moduleIndex, parametersLoader.syncedLFOFound());
         return true;

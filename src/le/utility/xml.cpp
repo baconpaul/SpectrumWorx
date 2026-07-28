@@ -12,7 +12,7 @@
 
 #include "platformSpecifics.hpp"
 
-#include <boost/assert.hpp>
+#include "assert.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -42,46 +42,46 @@ void Document::parse(char *const string)
     rapidxml::xml_document<>::parse<defaultRapidXMLOptions>(string);
 }
 
-string_ref Document::copyString(string_ref const source) const
+string_view Document::copyString(string_view const source) const
 {
     return {const_cast<Document &>(*this).allocate_string(source.begin(), source.length()),
             source.length()};
 }
 
-LE_NOTHROWNOALIAS Element const *Document::element(string_ref const name) const
+LE_NOTHROWNOALIAS Element const *Document::element(string_view const name) const
 {
     return static_cast<Element const &>(static_cast<rapidxml::xml_node<> const &>(*this))
         .child(name);
 }
 
-LE_NOTHROWNOALIAS Element const *Element::child(string_ref const name) const
+LE_NOTHROWNOALIAS Element const *Element::child(string_view const name) const
 {
     return static_cast<Element const *>(first_node(name.begin(), name.length()));
 }
-LE_NOTHROWNOALIAS Attribute *Element::attribute(string_ref const name)
+LE_NOTHROWNOALIAS Attribute *Element::attribute(string_view const name)
 {
     return static_cast<Attribute *>(first_attribute(name.begin(), name.length()));
 }
-LE_NOTHROWNOALIAS Attribute const *Element::attribute(string_ref const name) const
+LE_NOTHROWNOALIAS Attribute const *Element::attribute(string_view const name) const
 {
     return const_cast<Element &>(*this).attribute(name);
 }
 
-LE_NOTHROWNOALIAS void Element::setName(string_ref const name)
+LE_NOTHROWNOALIAS void Element::setName(string_view const name)
 {
     static_cast<Object &>(*this).name(name.begin(), name.size());
 }
-LE_NOTHROWNOALIAS void Element::setValue(string_ref const value)
+LE_NOTHROWNOALIAS void Element::setValue(string_view const value)
 {
     static_cast<Object &>(*this).value(value.begin(), value.size());
 }
 
 LE_NOTHROWNOALIAS Element::Element() : rapidxml::xml_node<>(rapidxml::node_element) {}
 
-LE_NOTHROWNOALIAS Element::Element(string_ref const name)
+LE_NOTHROWNOALIAS Element::Element(string_view const name)
     : rapidxml::xml_node<>(rapidxml::node_element)
 {
-    BOOST_ASSERT(*name.end() == '\0');
+    LE_ASSERT(*name.end() == '\0');
     Object::name(name.begin(), name.size());
 }
 

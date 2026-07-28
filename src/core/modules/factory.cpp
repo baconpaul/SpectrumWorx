@@ -38,7 +38,8 @@
 #include "le/spectrumworx/effects/pitch_magnet/pitchMagnet.hpp"
 #endif // LE_SW_GUI
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
+#include "le/utility/intrusivePtr.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -144,7 +145,7 @@ template <class ModuleInterface> struct ModuleConstructor
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class ModuleInterface>
-LE_NOTHROW boost::intrusive_ptr<ModuleInterface>
+LE_NOTHROW LE::Utility::IntrusivePtr<ModuleInterface>
 ModuleFactory::create(std::int8_t const effectIndex)
 {
     std::int8_t const noModule(-1);
@@ -172,7 +173,7 @@ ModuleFactory::create(std::int8_t const effectIndex)
         effectIndex, SizeGetter(), assert_no_default_case<typename SizeGetter::result_type>()));
     void *const pStorage(std::malloc(storageSize));
 
-    if (BOOST_UNLIKELY(!pStorage))
+    if (LE_UNLIKELY(!pStorage))
         return nullptr;
 
     using Constructor = ModuleConstructor<ModuleInterface>;
@@ -183,13 +184,14 @@ ModuleFactory::create(std::int8_t const effectIndex)
 }
 
 #if LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
-template LE_NOTHROW boost::intrusive_ptr<SW::Module> ModuleFactory::create(std::int8_t effectIndex);
+template
+    LE_NOTHROW LE::Utility::IntrusivePtr<SW::Module> ModuleFactory::create(std::int8_t effectIndex);
 #else
-template
-    LE_NOTHROW boost::intrusive_ptr<SW::ModuleDSP> ModuleFactory::create(std::int8_t effectIndex);
+template LE_NOTHROW LE::Utility::IntrusivePtr<SW::ModuleDSP>
+ModuleFactory::create(std::int8_t effectIndex);
 #if LE_SW_GUI
-template
-    LE_NOTHROW boost::intrusive_ptr<SW::ModuleGUI> ModuleFactory::create(std::int8_t effectIndex);
+template LE_NOTHROW LE::Utility::IntrusivePtr<SW::ModuleGUI>
+ModuleFactory::create(std::int8_t effectIndex);
 #endif
 #endif
 

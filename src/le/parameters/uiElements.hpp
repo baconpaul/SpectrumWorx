@@ -29,7 +29,7 @@
 
 #include "boost/preprocessor/seq/for_each_i.hpp"
 #include "boost/preprocessor/tuple/elem.hpp"
-#include "boost/utility/string_ref.hpp"
+#include <string_view>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -66,10 +66,7 @@ template <class Parameter> struct Name
     static char const string_[];
 };
 
-template <class Parameter> BOOST_CONSTEXPR boost::string_ref name()
-{
-    return Name<Parameter>::string_;
-}
+template <class Parameter> constexpr std::string_view name() { return Name<Parameter>::string_; }
 
 ////////////////////////////////////////////////////////////////////////////////
 ///

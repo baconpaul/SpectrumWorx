@@ -39,9 +39,10 @@
 
 #include "tag.hpp"
 
-#include "boost/optional/optional.hpp" // Boost sandbox
+#include <optional>
 
 #include "boost/mpl/string.hpp"
+#include "le/utility/staticLog2.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -170,7 +171,7 @@ template <> class ParameterInformation<Protocol::FMOD> : private FMOD_DSP_PARAME
         case AutomatedParameter::Info::Boolean:
             type = FMOD_DSP_PARAMETER_TYPE_BOOL;
             booldesc.defaultval = info.default_ != 0;
-            BOOST_ASSERT(booldesc.valuenames == nullptr);
+            LE_ASSERT(booldesc.valuenames == nullptr);
             break;
         case AutomatedParameter::Info::Integer:
         case AutomatedParameter::Info::Enumerated:
@@ -208,10 +209,10 @@ template <> class ParameterInformation<Protocol::FMOD> : private FMOD_DSP_PARAME
 
     void clear()
     {
-        BOOST_ASSERT(type == 0);
-        BOOST_ASSERT(name[0] == 0);
-        BOOST_ASSERT(label[0] == 0);
-        BOOST_ASSERT(description == 0);
+        LE_ASSERT(type == 0);
+        LE_ASSERT(name[0] == 0);
+        LE_ASSERT(label[0] == 0);
+        LE_ASSERT(description == 0);
     }
 
     FMOD_DSP_PARAMETER_DESC const &fmodStructure() const { return *this; }
@@ -222,7 +223,7 @@ template <> class ParameterInformation<Protocol::FMOD> : private FMOD_DSP_PARAME
     {
         type = FMOD_DSP_PARAMETER_TYPE_BOOL;
         booldesc.defaultval = Parameter::default_();
-        BOOST_ASSERT(booldesc.valuenames == nullptr);
+        LE_ASSERT(booldesc.valuenames == nullptr);
     }
 
     template <class Parameter> void setValues(Parameters::LinearFloatParameterTag)
@@ -240,7 +241,7 @@ template <> class ParameterInformation<Protocol::FMOD> : private FMOD_DSP_PARAME
         intdesc.min = Parameter::minimum();
         intdesc.max = Parameter::maximum();
         intdesc.defaultval = Parameter::default_();
-        BOOST_ASSERT(intdesc.valuenames == nullptr);
+        LE_ASSERT(intdesc.valuenames == nullptr);
     }
 
     template <class Parameter> void setValues(Parameters::EnumeratedParameterTag)
@@ -255,15 +256,15 @@ template <> class ParameterInformation<Protocol::FMOD> : private FMOD_DSP_PARAME
         //setValues<Parameter>( Parameters::LinearIntegerParameterTag() );
         //...mrmlj...workaround for having no way to specify discrete/valid values...
 
-        std::uint8_t const minimumExponent(boost::static_log2<Parameter::unscaledMinimum>::value);
-        std::uint8_t const maximumExponent(boost::static_log2<Parameter::unscaledMaximum>::value);
-        std::uint8_t const defaultExponent(boost::static_log2<Parameter::unscaledDefault>::value);
+        std::uint8_t const minimumExponent(LE::Utility::staticLog2(Parameter::unscaledMinimum));
+        std::uint8_t const maximumExponent(LE::Utility::staticLog2(Parameter::unscaledMaximum));
+        std::uint8_t const defaultExponent(LE::Utility::staticLog2(Parameter::unscaledDefault));
 
         type = FMOD_DSP_PARAMETER_TYPE_INT;
         intdesc.min = 0;
         intdesc.max = maximumExponent - minimumExponent;
         intdesc.defaultval = defaultExponent - minimumExponent;
-        BOOST_ASSERT(intdesc.valuenames == nullptr);
+        LE_ASSERT(intdesc.valuenames == nullptr);
     }
 
     template <class Parameter> void setValues(LE::Parameters::DynamicRangeParameterTag)

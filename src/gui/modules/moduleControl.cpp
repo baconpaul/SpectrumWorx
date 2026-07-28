@@ -24,12 +24,10 @@
 #include "core/modules/moduleDSPAndGUI.hpp"
 #endif // LE_SW_SEPARATED_DSP_GUI
 
-#include "boost/config.hpp"
-#if !defined(BOOST_NO_RTTI) && (!defined(BOOST_NO_EXCEPTIONS) || defined(_MSC_VER))
-#include "boost/polymorphic_cast.hpp"
-#endif // no RTTI
+#include "le/utility/polymorphicDowncast.hpp"
 
 #include "juce/juce_gui_basics/juce_gui_basics.h"
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -107,11 +105,11 @@ bool LE_NOTHROW ModuleControlBase::reportInactiveControl() const
 
 void ModuleControlBase::moduleParameterChanged()
 {
-    BOOST_ASSERT(!ModuleUI::selectedModule() || ModuleUI::selectedModule() == &moduleUI());
-    BOOST_ASSERT(noModuleOrModuleControlFocused() || Detail::hasDirectFocus(widget()) ||
-                 moduleUI().hasDirectFocus());
-    BOOST_ASSERT(isActive());
-    BOOST_ASSERT(!isLFOEnabled());
+    LE_ASSERT(!ModuleUI::selectedModule() || ModuleUI::selectedModule() == &moduleUI());
+    LE_ASSERT(noModuleOrModuleControlFocused() || Detail::hasDirectFocus(widget()) ||
+              moduleUI().hasDirectFocus());
+    LE_ASSERT(isActive());
+    LE_ASSERT(!isLFOEnabled());
 
     /// \note Checkout revision 7493 or earlier for (more templated) code
     /// that directly accessed the effect's parameters.
@@ -150,19 +148,15 @@ ModuleUI &ModuleControlBase::moduleUI()
     // Implementation note:
     //   Shared module controls are not children of ModuleUI instances so we
     // cannot just return
-    // *boost::polymorphic_downcast<ModuleUI *>( widget().getParentComponent() ).
+    // *LE::Utility::polymorphicDowncast<ModuleUI *>( widget().getParentComponent() ).
     //                                        (04.10.2011.) (Domagoj Saric)
-    BOOST_ASSERT(pModuleUI_);
+    LE_ASSERT(pModuleUI_);
     return *pModuleUI_;
 }
 
 SpectrumWorxEditor &ModuleControlBase::editor() const
 {
-#if !defined(BOOST_NO_RTTI) && (!defined(BOOST_NO_EXCEPTIONS) || defined(_MSC_VER))
-    return *boost::polymorphic_downcast<SpectrumWorxEditor *>(moduleUI().getParentComponent());
-#else
-    return *static_cast<SpectrumWorxEditor *>(moduleUI().getParentComponent());
-#endif
+    return *LE::Utility::polymorphicDowncast<SpectrumWorxEditor *>(moduleUI().getParentComponent());
 }
 
 LE::Parameters::LFOImpl &ModuleControlBase::lfo() { return module().lfo(moduleParameterIndex()); }
@@ -182,7 +176,7 @@ juce::String ModuleControlBase::getValueString(float const *LE_RESTRICT const pV
     std::array<char, 20> buffer;
     using Printer = Engine::ModuleParameters::ParameterPrinter;
     Printer const printer = {pValue ? *pValue : 0, pValue ? Printer::Unchanged : Printer::Internal,
-                             boost::make_iterator_range_n(&buffer[0], buffer.size()),
+                             LE::Utility::makeSpan(&buffer[0], buffer.size()),
                              moduleUI().editor().engineSetup()};
     std::uint8_t const parameterIndex(moduleParameterIndex() + 1 /*Bypass*/);
     char const *const pValueString(module().getParameterValueString(parameterIndex, printer));
@@ -202,8 +196,8 @@ class LE_NOVTABLE ControlWidgetBridge : public ModuleControlBase, public WidgetB
     {
         LE_ASSUME(&widget);
         ModuleControlBase &control(static_cast<ControlWidgetBridge &>(widget));
-        BOOST_ASSERT_MSG(&control == dynamic_cast<ModuleControlBase *>(&widget),
-                         "Widget is not a module control.");
+        LE_ASSERT_MSG(&control == dynamic_cast<ModuleControlBase *>(&widget),
+                      "Widget is not a module control.");
         LE_ASSUME(&control);
         return control;
     }
@@ -212,8 +206,8 @@ class LE_NOVTABLE ControlWidgetBridge : public ModuleControlBase, public WidgetB
     {
         LE_ASSUME(&control);
         juce::Component &widget(static_cast<ControlWidgetBridge &>(control));
-        BOOST_ASSERT_MSG(&widget == dynamic_cast<juce::Component *>(&control),
-                         "Module control detached from its widget.");
+        LE_ASSERT_MSG(&widget == dynamic_cast<juce::Component *>(&control),
+                      "Module control detached from its widget.");
         LE_ASSUME(&widget);
         return widget;
     }
@@ -234,27 +228,27 @@ bool ModuleControlBase::isLFOEnabled() const { return lfo().enabled(); }
 
 void ModuleControlBase::reassignTo(ModuleUI &moduleUI)
 {
-    BOOST_ASSERT_MSG(isASharedModuleControl(),
-                     "This functionality is meant only for SharedModuleControls where the "
-                     "controls are not actually owned by the ModuleUI and can thus be "
-                     "assigned to different module UIs.");
+    LE_ASSERT_MSG(isASharedModuleControl(),
+                  "This functionality is meant only for SharedModuleControls where the "
+                  "controls are not actually owned by the ModuleUI and can thus be "
+                  "assigned to different module UIs.");
     pModuleUI_ = &moduleUI;
 }
 
 void ModuleControlBase::reassignTo(std::uint8_t const parameterIndex)
 {
-    BOOST_ASSERT_MSG(isASharedModuleControl(),
-                     "This functionality is meant only for SharedModuleControls where the "
-                     "frequency control can change the parameter it maps to.");
+    LE_ASSERT_MSG(isASharedModuleControl(),
+                  "This functionality is meant only for SharedModuleControls where the "
+                  "frequency control can change the parameter it maps to.");
     parameterIndex_ = parameterIndex;
 }
 
 void ModuleControlBase::clearActiveControl()
 {
-    BOOST_ASSERT_MSG(isASharedModuleControl(),
-                     "This functionality is meant only for the "
-                     "SharedModuleControls::FrequencyRange class where the same "
-                     "ModuleControlBase instance can map to a different logical control.");
+    LE_ASSERT_MSG(isASharedModuleControl(),
+                  "This functionality is meant only for the "
+                  "SharedModuleControls::FrequencyRange class where the same "
+                  "ModuleControlBase instance can map to a different logical control.");
     pActiveControl = nullptr;
 }
 

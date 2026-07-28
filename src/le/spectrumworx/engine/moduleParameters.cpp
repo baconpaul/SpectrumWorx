@@ -17,6 +17,7 @@
 #ifndef LE_NO_PRESETS
 #include "le/spectrumworx/effects/baseParametersUIElements.hpp" // Bypass@presets
 #include "le/spectrumworx/presets.hpp"
+#include <optional>
 #endif // !LE_NO_PRESETS
 //------------------------------------------------------------------------------
 namespace LE
@@ -150,7 +151,7 @@ ModuleParameters::effectSpecificParameterIndex(std::uint8_t const parameterIndex
 LE_COLD LE_NOTHROW void
 ModuleParameters::updateLFOs(LFO::Timer::TimingInformationChange const timingInformationChange)
 {
-    BOOST_ASSERT_MSG(timingInformationChange.timingInfoChanged(), "No need to call this.");
+    LE_ASSERT_MSG(timingInformationChange.timingInfoChanged(), "No need to call this.");
 
     for (auto &lfo : lfos())
         lfo.updateForNewTimingInformation(timingInformationChange);
@@ -224,8 +225,8 @@ LE_COLD LE_NOTHROW void ModuleParameters::updateEffectParametersFromLFOs(LFO::Ti
 LE_COLD LE_NOTHROW parameter_value_t ModuleParameters::setBaseParameterFromLFOAux(
     std::uint8_t const parameterIndex, LFO::value_type const lfoValue)
 {
-    BOOST_STATIC_ASSERT_MSG(LFO::minimumValue == 0 && LFO::maximumValue == 1,
-                            "LFO::value_type not normalised.");
+    static_assert(LFO::minimumValue == 0 && LFO::maximumValue == 1,
+                  "LFO::value_type not normalised.");
     auto const parameterValue(
         normalisedToParameterValue(lfoValue, parameterInfos()[parameterIndex]));
     return setBaseParameter(parameterIndex, parameterValue);
@@ -234,8 +235,8 @@ LE_COLD LE_NOTHROW parameter_value_t ModuleParameters::setBaseParameterFromLFOAu
 LE_COLD LE_NOTHROW parameter_value_t ModuleParameters::setEffectParameterFromLFOAux(
     std::uint8_t const parameterIndex, LFO::value_type const lfoValue)
 {
-    BOOST_STATIC_ASSERT_MSG(LFO::minimumValue == 0 && LFO::maximumValue == 1,
-                            "LFO::value_type not normalised.");
+    static_assert(LFO::minimumValue == 0 && LFO::maximumValue == 1,
+                  "LFO::value_type not normalised.");
     auto const &info(effectSpecificParameterInfo(parameterIndex));
     auto const parameterValue(normalisedToParameterValue(lfoValue, info));
     return setEffectParameter(parameterIndex, parameterValue);
@@ -260,7 +261,7 @@ LE_COLD LE_NOTHROW parameter_value_t ModuleParameters::parameterToNormalisedValu
 namespace
 {
 using LFO = Parameters::LFOImpl;
-LE_COLD LE_NOTHROW boost::optional<float>
+LE_COLD LE_NOTHROW std::optional<float>
 getParameterValueWithoutLFO(ParametersLoader const &parameterLoader,
                             ParameterInfo const &parameterInfo, LFO &parameterLFO)
 {
@@ -270,13 +271,13 @@ getParameterValueWithoutLFO(ParametersLoader const &parameterLoader,
         (*parameterValueWithoutLFO <= parameterInfo.maximum))
         return parameterValueWithoutLFO;
     else
-        return boost::none;
+        return std::nullopt;
 }
 } // anonymous namespace
 LE_COLD LE_NOTHROW void
 ModuleParameters::loadPresetParameters(ParametersLoader const &parameterLoader)
 {
-    //BOOST_ASSERT_MSG
+    //LE_ASSERT_MSG
     //(
     //    parameterLoader.currentEffectName() == Effects::effectName( effectTypeIndex() ),
     //    "ParametersLoader and module out-of-sync"

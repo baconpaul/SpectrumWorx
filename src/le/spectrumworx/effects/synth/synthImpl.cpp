@@ -142,8 +142,8 @@ namespace
 {
 // http://en.wikipedia.org/wiki/Cent_%28music%29
 //...mrmlj...0 and 7 - approximation of the old carrier.wav
-std::uint8_t BOOST_CONSTEXPR_OR_CONST toneSemitones[SynthImpl::numberOfTones] = {0, 7};
-float BOOST_CONSTEXPR_OR_CONST toneGain[SynthImpl::numberOfTones] = {
+std::uint8_t constexpr toneSemitones[SynthImpl::numberOfTones] = {0, 7};
+float constexpr toneGain[SynthImpl::numberOfTones] = {
     1, 1.0f / 6}; // attenuate non fundamental frequencies...
 float const toneFrequencyScales[SynthImpl::numberOfTones] = {
     1, Math::semitone2Interval12TET(toneSemitones[1])};
@@ -319,7 +319,7 @@ LE_FORCEINLINE LE_HOT float mapTo2PiInterval(float const phase)
 LE_HOT void SynthImpl::process(SynthImpl::ChannelState &cs, Engine::MainSideChannelData_AmPh data,
                                Engine::Setup const &engineSetup) const
 {
-    if (BOOST_UNLIKELY(resetState_))
+    if (LE_UNLIKELY(resetState_))
         cs.reset();
 
 #if 1
@@ -402,7 +402,7 @@ LE_HOT void SynthImpl::process(SynthImpl::ChannelState &cs, Engine::MainSideChan
             auto const baseBin(static_cast<std::uint16_t>(Math::round(frequency / freqPerBin)));
             std::uint16_t const beginBin(baseBin - halfNumberOfCoefficients);
             std::uint16_t const endBin(baseBin + 1 + halfNumberOfCoefficients);
-            BOOST_ASSERT(endBin <= targetData.endBin());
+            LE_ASSERT(endBin <= targetData.endBin());
 
             float const *LE_RESTRICT pAmp(&coefficients_[0]);
             float *LE_RESTRICT pPhaseSum(&cs.phases[tone][beginBin]);

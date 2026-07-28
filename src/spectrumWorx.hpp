@@ -26,7 +26,7 @@
 #include "juce/juce_core/threads/juce_Thread.h"
 #include "juce/endIncludes.hpp"
 
-#include "boost/intrusive_ptr.hpp"
+#include "le/utility/intrusivePtr.hpp"
 
 #ifdef _MSC_VER
 #include "process.h"
@@ -38,6 +38,8 @@
 #endif // _MSC_VER
 
 #include <array>
+#include <optional>
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -78,32 +80,30 @@ class BackgroundThread
 
     template <class Runner, void (Runner::*callback)()> bool start(Runner &runner)
     {
-        BOOST_ASSERT_MSG(!isRunning(), "Background thread already running");
+        LE_ASSERT_MSG(!isRunning(), "Background thread already running");
 #ifdef _WIN32
         thread_ = _beginthread(&callbackWrapper<Runner, callback>, 0, &runner);
         if (thread_ == invalidHandle)
             return false;
-        BOOST_VERIFY(::SetThreadPriority(reinterpret_cast<HANDLE>(thread_), THREAD_PRIORITY_IDLE));
+        LE_VERIFY(::SetThreadPriority(reinterpret_cast<HANDLE>(thread_), THREAD_PRIORITY_IDLE));
         return true;
 #else
         if (::pthread_create(&thread_, nullptr, &callbackWrapper<Runner, callback>, &runner) != 0)
         {
-            BOOST_ASSERT(thread_ == invalidHandle);
+            LE_ASSERT(thread_ == invalidHandle);
             return false;
         }
         sched_param schedulingParameters;
         int schedulingPolicy;
-        BOOST_VERIFY(::pthread_getschedparam(thread_, &schedulingPolicy, &schedulingParameters) ==
-                     0);
+        LE_VERIFY(::pthread_getschedparam(thread_, &schedulingPolicy, &schedulingParameters) == 0);
 #ifdef SCHED_IDLE
         schedulingPolicy = SCHED_IDLE;
 #else
         schedulingPolicy = SCHED_OTHER;
 #endif // SCHED_OTHER
         schedulingParameters.sched_priority = ::sched_get_priority_min(schedulingPolicy);
-        BOOST_VERIFY(::pthread_setschedparam(thread_, schedulingPolicy, &schedulingParameters) ==
-                     0);
-        BOOST_VERIFY(::pthread_detach(thread_) == 0);
+        LE_VERIFY(::pthread_setschedparam(thread_, schedulingPolicy, &schedulingParameters) == 0);
+        LE_VERIFY(::pthread_detach(thread_) == 0);
         return true;
 #endif // _WIN32
     }
@@ -145,7 +145,7 @@ class BackgroundThread
 #endif
 #else
 #ifndef __APPLE__
-        BOOST_VERIFY(::pthread_setname_np(thread_, threadName) == 0);
+        LE_VERIFY(::pthread_setname_np(thread_, threadName) == 0);
 #endif // __APPLE__
 #endif // API
 #else
@@ -158,10 +158,9 @@ class BackgroundThread
         if (!isRunning())
             return;
 #ifdef _WIN32
-        BOOST_VERIFY(::WaitForSingleObject(reinterpret_cast<HANDLE>(thread_), 5000) ==
-                     WAIT_OBJECT_0);
+        LE_VERIFY(::WaitForSingleObject(reinterpret_cast<HANDLE>(thread_), 5000) == WAIT_OBJECT_0);
 #else
-        BOOST_VERIFY(::pthread_cancel(thread_));
+        LE_VERIFY(::pthread_cancel(thread_));
         thread_ = invalidHandle;
 #endif // _WIN32
         kill();
@@ -170,10 +169,10 @@ class BackgroundThread
     void kill()
     {
 #ifdef _WIN32
-        BOOST_VERIFY(::TerminateThread(reinterpret_cast<HANDLE>(thread_), 0) ||
-                     thread_ == invalidHandle);
+        LE_VERIFY(::TerminateThread(reinterpret_cast<HANDLE>(thread_), 0) ||
+                  thread_ == invalidHandle);
 #else
-        BOOST_VERIFY(::pthread_cancel(thread_) == 0 || thread_ == invalidHandle);
+        LE_VERIFY(::pthread_cancel(thread_) == 0 || thread_ == invalidHandle);
 #endif // _WIN32
         thread_ = invalidHandle;
     }
@@ -233,7 +232,7 @@ class LE_NOVTABLE SpectrumWorx : public SpectrumWorxCore, public Plugin2HostInte
     Programs const &programs() const { return programs_; }
 
     using Module = SW::Module;
-    using ModulePtr = boost::intrusive_ptr<Module>;
+    using ModulePtr = LE::Utility::IntrusivePtr<Module>;
     struct ModuleInitialiser;
     ModuleInitialiser moduleInitialiser();
 
@@ -321,8 +320,8 @@ class LE_NOVTABLE SpectrumWorx : public SpectrumWorxCore, public Plugin2HostInte
 
     void setProgramName(char const *name);
     void setProgramName(std::uint8_t program, char const *name);
-    void getProgramName(boost::iterator_range<char *> name) const;
-    void getProgramName(std::uint8_t program, boost::iterator_range<char *> name) const;
+    void getProgramName(LE::Utility::Span<char> name) const;
+    void getProgramName(std::uint8_t program, LE::Utility::Span<char> name) const;
 
     char const *currentProgramName() const;
 
@@ -400,7 +399,7 @@ class LE_NOVTABLE SpectrumWorx : public SpectrumWorxCore, public Plugin2HostInte
 
   public:
     using Editor = GUI::SpectrumWorxEditor;
-    using OptionalEditor = boost::optional<Editor>;
+    using OptionalEditor = std::optional<Editor>;
 
     bool createGUI();
     void destroyGUI();

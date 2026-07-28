@@ -10,7 +10,7 @@
 //------------------------------------------------------------------------------
 #include "indexRange.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -23,24 +23,24 @@ LE_IMPL_NAMESPACE_BEGIN(Effects)
 
 IndexRange::IndexRange(value_type const begin, value_type const end) : Pair(begin, end)
 {
-    BOOST_ASSERT_MSG(isValid(), "Invalid range");
+    LE_ASSERT_MSG(isValid(), "Invalid range");
 }
 
 void IndexRange::setFirst(value_type const newBeginning)
 {
-    BOOST_ASSERT_MSG(isValid(newBeginning, end()), "Invalid range");
+    LE_ASSERT_MSG(isValid(newBeginning, end()), "Invalid range");
     Pair::first = newBeginning;
 }
 
 void IndexRange::setLast(value_type const newLast)
 {
-    BOOST_ASSERT_MSG(isValid(first(), newLast + 1), "Invalid range");
+    LE_ASSERT_MSG(isValid(first(), newLast + 1), "Invalid range");
     Pair::second = newLast + 1;
 }
 
 void IndexRange::setNewRange(value_type const newBeginning, value_type const newLast)
 {
-    BOOST_ASSERT_MSG(isValid(newBeginning, newLast + 1), "Invalid range");
+    LE_ASSERT_MSG(isValid(newBeginning, newLast + 1), "Invalid range");
     Pair::first = newBeginning;
     Pair::second = newLast + 1;
 }

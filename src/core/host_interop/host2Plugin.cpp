@@ -11,6 +11,7 @@
 #include "host2Plugin.hpp"
 
 #include "le/utility/trace.hpp"
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -24,7 +25,7 @@ LE_OPTIMIZE_FOR_SIZE_BEGIN()
 //...mrmlj...orphan...
 template <typename Char>
 LE_NOTHROWNOALIAS LE_COLD char *copyToBuffer(Char const *const string,
-                                             boost::iterator_range<char *> const &buffer)
+                                             LE::Utility::Span<char> const &buffer)
 {
     //std::strncpy( buffer.begin(), string, buffer.size() - 1 );
     Char const *LE_RESTRICT pSourceCharacter(string);
@@ -36,7 +37,7 @@ LE_NOTHROWNOALIAS LE_COLD char *copyToBuffer(Char const *const string,
         (static_cast<void const *>(string) == static_cast<void const *>(pDestinationCharacter)));
     if (same)
     {
-        BOOST_ASSERT(*pDestinationCharacter == '\0');
+        LE_ASSERT(*pDestinationCharacter == '\0');
         return pDestinationCharacter;
     }
     if (string == nullptr)
@@ -51,7 +52,7 @@ LE_NOTHROWNOALIAS LE_COLD char *copyToBuffer(Char const *const string,
         if (sourceCharacter == '\0')
             break;
         *pDestinationCharacter = static_cast<char>(sourceCharacter);
-        BOOST_ASSERT(*pDestinationCharacter == sourceCharacter);
+        LE_ASSERT(*pDestinationCharacter == sourceCharacter);
         ++pSourceCharacter;
         ++pDestinationCharacter;
     }
@@ -69,11 +70,10 @@ LE_NOTHROWNOALIAS LE_COLD char *copyToBuffer(Char const *const string,
 
 #pragma warning(pop)
 
-template
-    LE_NOTHROWNOALIAS char *copyToBuffer<char>(char const *, boost::iterator_range<char *> const &);
+template LE_NOTHROWNOALIAS char *copyToBuffer<char>(char const *, LE::Utility::Span<char> const &);
 #ifdef _WIN32
-template LE_NOTHROWNOALIAS char *copyToBuffer<wchar_t>(wchar_t const *,
-                                                       boost::iterator_range<char *> const &);
+template
+    LE_NOTHROWNOALIAS char *copyToBuffer<wchar_t>(wchar_t const *, LE::Utility::Span<char> const &);
 #endif // _WIN32
 
 LE_OPTIMIZE_FOR_SIZE_END()

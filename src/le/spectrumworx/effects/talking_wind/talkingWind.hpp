@@ -16,8 +16,6 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/enumerated/parameter.hpp"
 #include "le/parameters/linear/parameter.hpp"
-
-#include "boost/config/abi_prefix.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -70,7 +68,4 @@ struct TalkingWind
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------
-
-#include "boost/config/abi_suffix.hpp"
-
 #endif // talkingWind_hpp

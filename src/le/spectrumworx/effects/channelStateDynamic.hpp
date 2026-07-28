@@ -17,11 +17,8 @@
 #include "boost/preprocessor/seq/for_each.hpp"
 
 #include <cstdint>
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
-namespace boost
-{
-template <class IteratorT> class iterator_range;
-}
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -39,7 +36,7 @@ namespace SW
 namespace Engine
 {
 struct StorageFactors;
-using Storage = boost::iterator_range<char *LE_RESTRICT>;
+using Storage = LE::Utility::Span<char>;
 } //namespace Engine
 //------------------------------------------------------------------------------
 namespace Effects

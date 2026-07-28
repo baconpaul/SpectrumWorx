@@ -27,18 +27,18 @@ LE_IMPL_NAMESPACE_BEGIN(Math)
 #pragma check_stack(off)
 #pragma optimize("s", off)
 #pragma optimize("t", on)
-#endif // BOOST_MSVC
+#endif // _MSC_VER
 LE_NOTHROWNOALIAS bool makeBool(unsigned int const boolean)
 {
-    BOOST_ASSERT_MSG(boolean == 0 || boolean == 1, "Boolean value not exactly 0 or 1");
-#if defined(BOOST_LITTLE_ENDIAN)
+    LE_ASSERT_MSG(boolean == 0 || boolean == 1, "Boolean value not exactly 0 or 1");
+#if defined(LE_LITTLE_ENDIAN)
     bool const &result(reinterpret_cast<bool const &>(boolean));
-#elif defined(BOOST_BIG_ENDIAN)
+#elif defined(LE_BIG_ENDIAN)
     typedef unsigned char bytes[sizeof(boolean)];
     bytes const &input_bytes(reinterpret_cast<bytes const &>(boolean));
     bool const &result(reinterpret_cast<bool const &>(input_bytes[sizeof(boolean) - 1]));
-#endif // BOOST_LITTLE_ENDIAN
-    BOOST_ASSERT(static_cast<unsigned int>(result) == boolean);
+#endif // LE_LITTLE_ENDIAN
+    LE_ASSERT(static_cast<unsigned int>(result) == boolean);
     return result;
 }
 
@@ -54,14 +54,14 @@ bool Detail::convertToBool(float const source)
     /// preferably not know about any of this, this knowledge should probably be
     /// moved into parameter related functionality.
     ///                                       (07.07.2011.) (Domagoj Saric)
-    BOOST_ASSERT(isNormalisedValue(source));
+    LE_ASSERT(isNormalisedValue(source));
     int const result(Math::round(source));
     return makeBool(result);
 }
 
 bool Detail::convertToBool(double const source)
 {
-    BOOST_ASSERT(isNormalisedValue(static_cast<float>(source)));
+    LE_ASSERT(isNormalisedValue(static_cast<float>(source)));
     int const result(Math::round(source));
     return makeBool(result);
 }
@@ -114,19 +114,19 @@ float dB2NormalisedLinear(std::uint16_t const dBValue)
 
 float normalisedLinear2dB(float const linearNormalisedValue)
 {
-    BOOST_ASSERT_MSG(linearNormalisedValue >= 0, "Value out of range.");
+    LE_ASSERT_MSG(linearNormalisedValue >= 0, "Value out of range.");
     return 20 * log10(linearNormalisedValue);
 }
 
 double normalisedLinear2dB(double const linearNormalisedValue)
 {
-    BOOST_ASSERT_MSG(linearNormalisedValue >= 0, "Value out of range.");
+    LE_ASSERT_MSG(linearNormalisedValue >= 0, "Value out of range.");
     return 20 * log10(linearNormalisedValue);
 }
 
 float normalisedPower2dB(float const linearPowerValue)
 {
-    BOOST_ASSERT_MSG(linearPowerValue >= 0, "Value out of range.");
+    LE_ASSERT_MSG(linearPowerValue >= 0, "Value out of range.");
     return 10 * log10(linearPowerValue);
 }
 

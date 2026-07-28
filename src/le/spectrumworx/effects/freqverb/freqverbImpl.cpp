@@ -25,7 +25,7 @@
 
 #include "boost/simd/preprocessor/stack_buffer.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 
 #include <cstdint>
 //------------------------------------------------------------------------------
@@ -156,7 +156,7 @@ LE_HOT void FreqverbImpl::process(ChannelState &cs, Engine::ChannelData_ReIm dat
             }
         }
 
-        BOOST_ASSERT(pSignalReal == pEnd);
+        LE_ASSERT(pSignalReal == pEnd);
         if (pSignalReal < data.reals().end())
         {
             Math::clear(pSignalReal, data.reals().end());
@@ -170,7 +170,7 @@ LE_HOT void FreqverbImpl::process(ChannelState &cs, Engine::ChannelData_ReIm dat
             Engine::ChannelData_AmPhStorage::requiredStorage(engineSetup.fftSize<std::uint16_t>()));
         Engine::ChannelData_AmPhStorage data2(engineSetup.fftSize<std::uint16_t>(), 0, noEchoBin_,
                                               data2Storage);
-        BOOST_ASSERT(data2.numberOfBins() == noEchoBin_);
+        LE_ASSERT(data2.numberOfBins() == noEchoBin_);
 
         reim2AmPh(cs.feedbackSumReals.begin(), cs.feedbackSumImags.begin(),
                   data2.full().amps().begin(), data2.full().phases().begin(), noEchoBin_);
@@ -180,7 +180,7 @@ LE_HOT void FreqverbImpl::process(ChannelState &cs, Engine::ChannelData_ReIm dat
 
         // Randomize phase (skip DC bin):
         //...mrmlj...could be done with reim...http://en.wikipedia.org/wiki/Rotation_(mathematics)#Complex_numbers
-        for (auto &phase : DataRange(data2.phases()).advance_begin(1))
+        for (auto &phase : DataRange(data2.phases()).subspan(1))
         {
             phase = rangedRand(Math::Constants::twoPi);
         }

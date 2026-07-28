@@ -19,8 +19,8 @@
 
 #include "le/parameters/parameter.hpp" //...mrmlj...for Default
 
-#include "boost/assert.hpp"
-#include "boost/concept_check.hpp"
+#include "le/utility/assert.hpp"
+#include "le/utility/ignoreUnused.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -50,11 +50,11 @@ template <bool defaultValue = false> struct BooleanParameterTraits
     using Traits = TraitPack<Traits::Default<defaultValue>>; //...mrmlj...FMOD param info...
 
   public:
-    static bool BOOST_CONSTEXPR_OR_CONST unscaledMinimum = false;
-    static bool BOOST_CONSTEXPR_OR_CONST unscaledMaximum = true;
-    static bool BOOST_CONSTEXPR_OR_CONST unscaledDefault = defaultValue;
+    static bool constexpr unscaledMinimum = false;
+    static bool constexpr unscaledMaximum = true;
+    static bool constexpr unscaledDefault = defaultValue;
 
-    static unsigned char BOOST_CONSTEXPR_OR_CONST rangeValuesDenominator = 1;
+    static unsigned char constexpr rangeValuesDenominator = 1;
 
   public: // Values.
     static bool minimum() { return unscaledMinimum; }
@@ -65,8 +65,8 @@ template <bool defaultValue = false> struct BooleanParameterTraits
 
     static bool isValidValue(value_type const value)
     {
-        BOOST_ASSERT((value == false) || (value == true));
-        boost::ignore_unused_variable_warning(value);
+        LE_ASSERT((value == false) || (value == true));
+        LE::Utility::ignoreUnused(value);
         return true;
     }
 

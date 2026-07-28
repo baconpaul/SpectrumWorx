@@ -16,8 +16,6 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/enumerated/parameter.hpp"
 #include "le/parameters/trigger/parameter.hpp"
-
-#include "boost/config/abi_prefix.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -80,7 +78,4 @@ struct Convolver
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------
-
-#include "boost/config/abi_suffix.hpp"
-
 #endif // convolver_hpp

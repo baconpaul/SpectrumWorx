@@ -26,9 +26,8 @@ typedef unsigned long vDSP_Length;
 struct DSPSplitComplex;
 #endif // LE_ACC_FFT
 
-#include "boost/range/iterator_range_core.hpp"
-
 #include <cstdint>
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -37,8 +36,8 @@ LE_IMPL_NAMESPACE_BEGIN(Math)
 //------------------------------------------------------------------------------
 
 //...mrmlj...cleanup these duplicated typedefs (also in effects.hpp)...
-typedef boost::iterator_range<float *LE_RESTRICT> DataRange;
-typedef boost::iterator_range<float const *LE_RESTRICT> ReadOnlyDataRange;
+typedef LE::Utility::Span<float> DataRange;
+typedef LE::Utility::Span<float const> ReadOnlyDataRange;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///

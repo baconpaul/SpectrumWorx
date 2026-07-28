@@ -15,7 +15,7 @@
 #include "trace.hpp"
 #include "windowsLite.hpp"
 
-#include <boost/assert.hpp>
+#include "assert.hpp"
 
 #ifndef _WIN32
 #include "criticalSection.hpp"
@@ -77,13 +77,13 @@ class ConditionVariable
     ConditionVariable(ConditionVariable const &) = delete;
 
     LE_NOTHROW void signal() { ::WakeAllConditionVariable(&cv_); }
-    LE_NOINLINE LE_NOTHROW void wait(Lock &lock) { BOOST_VERIFY(wait(lock, INFINITE)); }
+    LE_NOINLINE LE_NOTHROW void wait(Lock &lock) { LE_VERIFY(wait(lock, INFINITE)); }
 
     LE_NOTHROW bool wait(Lock &lock, std::uint32_t const milliseconds)
     {
         auto const result(::SleepConditionVariableSRW(&cv_, &lock.lock_, milliseconds,
                                                       0 /*CONDITION_VARIABLE_LOCKMODE_SHARED*/));
-        BOOST_ASSERT(result || ::GetLastError() == ERROR_TIMEOUT);
+        LE_ASSERT(result || ::GetLastError() == ERROR_TIMEOUT);
         return result != FALSE;
     }
 
@@ -106,7 +106,7 @@ class ConditionVariable
     using Lock = CriticalSection;
 
     LE_NOTHROW LE_COLD ConditionVariable() : cv_(PTHREAD_COND_INITIALIZER) {}
-    LE_NOTHROW LE_COLD ~ConditionVariable() { BOOST_VERIFY(::pthread_cond_destroy(&cv_) == 0); }
+    LE_NOTHROW LE_COLD ~ConditionVariable() { LE_VERIFY(::pthread_cond_destroy(&cv_) == 0); }
 
     ConditionVariable(ConditionVariable &&other) noexcept : cv_(other.cv_)
     {
@@ -115,10 +115,10 @@ class ConditionVariable
 
     ConditionVariable(ConditionVariable const &) = delete;
 
-    LE_NOTHROW LE_COLD void signal() { BOOST_VERIFY(::pthread_cond_broadcast(&cv_) == 0); }
+    LE_NOTHROW LE_COLD void signal() { LE_VERIFY(::pthread_cond_broadcast(&cv_) == 0); }
     LE_NOTHROW LE_COLD void wait(Lock &lock)
     {
-        BOOST_VERIFY(::pthread_cond_wait(&cv_, &lock.mutex_) == 0);
+        LE_VERIFY(::pthread_cond_wait(&cv_, &lock.mutex_) == 0);
     }
 
     LE_NOTHROW LE_COLD bool wait(Lock &lock, std::uint16_t /*const*/ milliseconds)
@@ -132,9 +132,9 @@ class ConditionVariable
         auto const result(::pthread_cond_timedwait_relative_np(&cv_, &lock.mutex_, &timeout));
 #elif !defined(__APPLE__)                         // no clock_gettime()
         ::timespec timeout;
-        BOOST_VERIFY(::clock_gettime(CLOCK_REALTIME, &timeout) == 0);
+        LE_VERIFY(::clock_gettime(CLOCK_REALTIME, &timeout) == 0);
         timeout.tv_nsec += static_cast<long>(milliseconds * 1000 * 1000);
-        BOOST_ASSERT(timeout.tv_nsec < 1000 * 1000 * 1000);
+        LE_ASSERT(timeout.tv_nsec < 1000 * 1000 * 1000);
         auto const result(::pthread_cond_timedwait(&cv_, &lock.mutex_, &timeout));
 #else
 #if 0
@@ -152,18 +152,18 @@ class ConditionVariable
                 ::timespec timeout;
                 timeout.tv_sec  = static_cast<decltype( timeout.tv_sec  )>(  sec.count() );
                 timeout.tv_nsec = static_cast<decltype( timeout.tv_nsec )>( nsec.count() );
-                BOOST_ASSERT( timeout.tv_nsec < 1000 * 1000 * 1000 );
+                LE_ASSERT( timeout.tv_nsec < 1000 * 1000 * 1000 );
 #else
         ::timeval tv;
-        BOOST_VERIFY(::gettimeofday(&tv, nullptr) == 0);
+        LE_VERIFY(::gettimeofday(&tv, nullptr) == 0);
         ::timespec const timeout = {
             .tv_sec = tv.tv_sec,
             .tv_nsec = static_cast<long>((tv.tv_usec + milliseconds * 1000) * 1000)};
 #endif
         auto const result(::pthread_cond_timedwait(&cv_, &lock.mutex_, &timeout));
 #endif
-        BOOST_ASSERT(result == 0 || result == ETIMEDOUT);
-        return BOOST_LIKELY(result == 0);
+        LE_ASSERT(result == 0 || result == ETIMEDOUT);
+        return LE_LIKELY(result == 0);
     }
 
   private:
@@ -179,7 +179,7 @@ class WaitableWithSharedLock
     WaitableWithSharedLock(WaitableWithSharedLock &&other)
         : cv_(std::move(other.cv_)), signaled_(false)
     {
-        BOOST_ASSERT(!signaled_);
+        LE_ASSERT(!signaled_);
     }
 
     // notify
@@ -210,7 +210,7 @@ class WaitableWithSharedLock
         }
         bool const result(signaled_);
         signaled_ = false;
-        return BOOST_LIKELY(result);
+        return LE_LIKELY(result);
     }
 
   private:

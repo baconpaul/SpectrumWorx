@@ -14,11 +14,9 @@
 #endif // _WIN32
 
 #if defined(_DEBUG) && defined(_WIN32)
-#include "boost/optional/optional.hpp" // Boost sandbox
+#include <optional>
 
-#include "boost/assert.hpp"
-#include "boost/noncopyable.hpp"
-#include "boost/utility/in_place_factory.hpp"
+#include "le/utility/assert.hpp"
 
 #include "windows.h"
 
@@ -29,20 +27,23 @@ namespace LE
 {
 //------------------------------------------------------------------------------
 
-class Console : boost::noncopyable
+class Console
 {
   public:
+    Console(Console const &) = delete; // makes non-copyable
+    Console &operator=(Console const &) = delete;
+
     Console()
     {
-        BOOST_VERIFY(::AllocConsole());
-        BOOST_VERIFY(std::freopen("conin$", "r", stdin));
-        BOOST_VERIFY(std::freopen("conout$", "w", stdout));
-        BOOST_VERIFY(std::freopen("conout$", "w", stderr));
+        LE_VERIFY(::AllocConsole());
+        LE_VERIFY(std::freopen("conin$", "r", stdin));
+        LE_VERIFY(std::freopen("conout$", "w", stdout));
+        LE_VERIFY(std::freopen("conout$", "w", stderr));
     }
-    ~Console() { BOOST_VERIFY(::FreeConsole()); }
+    ~Console() { LE_VERIFY(::FreeConsole()); }
 };
 
-boost::optional<Console> debugConsole;
+std::optional<Console> debugConsole;
 
 //------------------------------------------------------------------------------
 } // namespace LE
@@ -76,14 +77,14 @@ BOOL WINAPI DllMain(HINSTANCE /*hInst*/, DWORD const dwReason, LPVOID /*lpvReser
         //                                (07.04.2011.) (Domagoj Saric)
         OSVERSIONINFO versionInfo;
         versionInfo.dwOSVersionInfoSize = sizeof(versionInfo);
-        BOOST_VERIFY(::GetVersionEx(&versionInfo));
+        LE_VERIFY(::GetVersionEx(&versionInfo));
         if (versionInfo.dwMajorVersion > 5)
         {
             /// \note Handle multiple instances: do not try to open more
             /// than one console window.
             ///                           (03.04.2012.) (Domagoj Saric)
             if (!LE::debugConsole)
-                LE::debugConsole = boost::in_place();
+                LE::debugConsole.emplace();
         }
         TCHAR fileName[MAX_PATH];
         ::GetModuleFileName(nullptr, fileName, _countof(fileName));
@@ -93,7 +94,7 @@ BOOL WINAPI DllMain(HINSTANCE /*hInst*/, DWORD const dwReason, LPVOID /*lpvReser
     case DLL_PROCESS_DETACH:
         ::puts("Plugin unloaded." /*" Press enter to continue..."*/);
         //getchar();
-        LE::debugConsole = boost::none;
+        LE::debugConsole = std::nullopt;
         break;
     };
 

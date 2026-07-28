@@ -25,10 +25,9 @@
 
 #include "boost/simd/preprocessor/stack_buffer.hpp" // NT2
 
-#include <boost/assert.hpp>
-#include <boost/core/ignore_unused.hpp>
+#include "le/utility/assert.hpp"
+#include "le/utility/ignoreUnused.hpp"
 #include <boost/fusion/algorithm/iteration/for_each.hpp>
-#include <boost/utility/in_place_factory.hpp>
 
 #ifdef __GNUC__
 #include <cstdlib>
@@ -36,6 +35,8 @@
 #endif
 
 #include <algorithm>
+#include <string_view>
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 #ifdef __APPLE__
 extern void const *swDLLAddress;
@@ -102,7 +103,7 @@ LE_NOTHROW SpectrumWorx::~SpectrumWorx()
     LE_TRACE_IF(gui(), "\tSW: host destroyed the plugin w/o closing the GUI.");
 
 #ifndef LE_SW_DISABLE_SIDE_CHANNEL
-    BOOST_ASSERT(!pListenerToNotifyWhenSampleLoaded_);
+    LE_ASSERT(!pListenerToNotifyWhenSampleLoaded_);
 #endif // LE_SW_DISABLE_SIDE_CHANNEL
 }
 
@@ -120,7 +121,7 @@ getChannelDataChunk(Sample::ChannelData const &channelData, std::uint32_t &start
                     std::uint16_t chunkSize, float *LE_RESTRICT const workBuffer)
 {
     auto const dataSize(static_cast<std::uint32_t>(channelData.size()));
-    BOOST_ASSERT(startingPosition <= dataSize);
+    LE_ASSERT(startingPosition <= dataSize);
     if (dataSize > (startingPosition + chunkSize))
     {
         float const *const pChunk(&channelData[startingPosition]);
@@ -179,7 +180,7 @@ LE_NOTHROWNOALIAS void SpectrumWorx::process /// \throws nothing
         /// must allow buffers().numberOfSideChannels() to be larger than
         /// numberOfExternalAudioChannels (stereo > mono).
         ///                                   (20.03.2013.) (Domagoj Saric)
-        BOOST_ASSERT(numberOfExternalAudioChannels <= buffers().numberOfSideChannels());
+        LE_ASSERT(numberOfExternalAudioChannels <= buffers().numberOfSideChannels());
         BOOST_SIMD_STACK_BUFFER(sideChannels, float const *, numberOfExternalAudioChannels);
         std::uint32_t samplePosition;
         for (std::uint8_t channel(0); channel < numberOfExternalAudioChannels; ++channel)
@@ -192,13 +193,13 @@ LE_NOTHROWNOALIAS void SpectrumWorx::process /// \throws nothing
         pSideChannels = &sideChannels[0];
         /// \todo Think of a smarter solution.
         ///                                   (08.02.2010.) (Domagoj Saric)
-        BOOST_ASSERT(samplePosition != sample_.samplePosition());
+        LE_ASSERT(samplePosition != sample_.samplePosition());
         sample_.samplePosition() = samplePosition;
     }
     else if (engineSetup().hasSideChannel())
     {
         pSideChannels = &inputs[engineSetup().numberOfChannels()];
-        BOOST_ASSERT(*pSideChannels);
+        LE_ASSERT(*pSideChannels);
     }
     else
     {
@@ -252,7 +253,7 @@ bool LE_NOTHROW SpectrumWorx::setNumberOfChannelsFromHost(std::uint8_t const num
 bool LE_NOTHROW SpectrumWorx::setNumberOfChannelsFromUser(std::uint8_t const numberOfInputChannels,
                                                           std::uint8_t const numberOfOutputChannels)
 {
-    BOOST_ASSERT(checkChannelConfiguration(numberOfInputChannels, numberOfOutputChannels));
+    LE_ASSERT(checkChannelConfiguration(numberOfInputChannels, numberOfOutputChannels));
 
     std::uint8_t const currentNumberOfMainChannels(uncheckedEngineSetup().numberOfChannels());
     std::uint8_t const currentNumberOfSideChannels(uncheckedEngineSetup().numberOfSideChannels());
@@ -281,7 +282,7 @@ bool LE_NOTHROW SpectrumWorx::setNumberOfChannelsFromUser(std::uint8_t const num
         bool const hostSupportsIOChanges(hostSupportsIOConfigurationChanges());
         if (gui())
         {
-            boost::string_ref errorMessage;
+            std::string_view errorMessage;
             if (hostSupportsIOChanges)
             {
                 errorMessage = "The host rejected the requested IO mode change.";
@@ -307,8 +308,8 @@ bool LE_NOTHROW SpectrumWorx::setNumberOfChannelsFromUser(std::uint8_t const num
                     setInputModeToSetOnRestart(parameters().get<InputMode>());
                     parameters().set<InputMode>(currentIOMode);
                 }
-                BOOST_ASSERT(engineSetup().numberOfChannels() == currentNumberOfMainChannels);
-                BOOST_ASSERT(engineSetup().numberOfSideChannels() == currentNumberOfSideChannels);
+                LE_ASSERT(engineSetup().numberOfChannels() == currentNumberOfMainChannels);
+                LE_ASSERT(engineSetup().numberOfSideChannels() == currentNumberOfSideChannels);
             }
             GUI::warningMessageBox(MB_ERROR, errorMessage, false);
             return false;
@@ -334,9 +335,9 @@ bool LE_NOTHROW SpectrumWorx::setNumberOfChannelsFromUser(std::uint8_t const num
         SpectrumWorxCore::setNumberOfChannelsImpl(numberOfMainChannels, numberOfSideChannels));
     if (!changeSuccessful)
     {
-        BOOST_VERIFY(hostTryIOConfigurationChange(currentNumberOfMainChannels,
-                                                  currentNumberOfSideChannels) ||
-                     !hostSupportsIOConfigurationChanges());
+        LE_VERIFY(hostTryIOConfigurationChange(currentNumberOfMainChannels,
+                                               currentNumberOfSideChannels) ||
+                  !hostSupportsIOConfigurationChanges());
         return false;
     }
 
@@ -379,17 +380,17 @@ unsigned int SpectrumWorx::saveProgramState(std::uint8_t const programIndex, voi
 {
     unsigned int const bytesWritten(savePreset(static_cast<char *>(pStorage), currentSampleFile(),
                                                juce::String::empty, programs()[programIndex]));
-    BOOST_ASSERT(bytesWritten < storageSize);
-    boost::ignore_unused_variable_warning(storageSize);
+    LE_ASSERT(bytesWritten < storageSize);
+    LE::Utility::ignoreUnused(storageSize);
     return bytesWritten;
 }
 
 void SpectrumWorx::getProgramName(std::uint8_t const program,
-                                  boost::iterator_range<char *> const name) const
+                                  LE::Utility::Span<char> const name) const
 {
     copyToBuffer(&programs()[program].name()[0], name);
 }
-void SpectrumWorx::getProgramName(boost::iterator_range<char *> const name) const
+void SpectrumWorx::getProgramName(LE::Utility::Span<char> const name) const
 {
     getProgramName(getProgram(), name);
 }
@@ -412,7 +413,7 @@ class GlobalParameterUpdater : public SpectrumWorx
 
     template <class Parameter> result_type operator()(Parameter const &parameter) const
     {
-        BOOST_VERIFY((setGlobalParameter<Parameter, SpectrumWorx>(
+        LE_VERIFY((setGlobalParameter<Parameter, SpectrumWorx>(
             const_cast<GlobalParameterUpdater &>(*this), parameter.getValue())));
     }
 
@@ -480,7 +481,7 @@ class GlobalParameterUpdater : public SpectrumWorx
             }
         }
         LE_TRACE_IF(newInputMode != inputMode, "Rejecting exact InputMode from preset");
-        BOOST_VERIFY(setGlobalParameter<InputMode>(effect, newInputMode) || runningAsAU());
+        LE_VERIFY(setGlobalParameter<InputMode>(effect, newInputMode) || runningAsAU());
     }
 #endif // LE_SW_ENGINE_INPUT_MODE >= 2
 
@@ -550,7 +551,7 @@ bool SpectrumWorx::ModuleInitialiser::operator()(Module &module,
 
 LE_NOTHROW SpectrumWorx::ModuleInitialiser SpectrumWorx::moduleInitialiser()
 {
-    return {SpectrumWorxCore::moduleInitialiser(), gui().get_ptr()};
+    return {SpectrumWorxCore::moduleInitialiser(), gui().operator->()};
 }
 
 #pragma warning(push)
@@ -582,7 +583,7 @@ struct SpectrumWorx::PresetLoader
 
     void moduleChainFinished(std::uint8_t const moduleCount, bool const syncedLFOFound)
     {
-        BOOST_ASSERT(!onlySetParameters());
+        LE_ASSERT(!onlySetParameters());
         if (effect.gui())
             effect.gui()->setLastModulePosition(moduleCount);
         if (syncedLFOFound && !LFO::Timer::hasTempoInformation() &&
@@ -602,10 +603,10 @@ struct SpectrumWorx::PresetLoader
 
 #ifndef LE_SW_DISABLE_SIDE_CHANNEL
     bool wantsSampleFile() const { return !ignoreSampleFile && !onlySetParameters(); }
-    void setSample(boost::string_ref const sampleFileName)
+    void setSample(std::string_view const sampleFileName)
     {
-        BOOST_ASSERT(!onlySetParameters());
-        BOOST_ASSERT(!ignoreSampleFile);
+        LE_ASSERT(!onlySetParameters());
+        LE_ASSERT(!ignoreSampleFile);
         //   The sample has to be loaded before calling
         // gui()->updateSampleNameAsync().
         //                                    (15.12.2011.) (Domagoj Saric)
@@ -648,12 +649,12 @@ struct SpectrumWorx::PresetConsumer
     Program &program() { return effect.programs()[targetProgram]; }
     void notifyHostAboutPresetChangeBegin() const
     {
-        BOOST_ASSERT(targetProgram == effect.getProgram());
+        LE_ASSERT(targetProgram == effect.getProgram());
         effect.presetChangeBegin();
     }
     void notifyHostAboutPresetChangeEnd() const
     {
-        BOOST_ASSERT(targetProgram == effect.getProgram());
+        LE_ASSERT(targetProgram == effect.getProgram());
         effect.presetChangeEnd();
     }
     SpectrumWorx &effect;
@@ -666,7 +667,7 @@ LE_NOTHROW bool SpectrumWorx::loadPreset(char *const inMemoryPreset,
                                          bool const ignoreExternalSample,
                                          juce::String *const pComment, std::uint8_t const program)
 {
-    BOOST_ASSERT(!presetLoadingInProgress());
+    LE_ASSERT(!presetLoadingInProgress());
 
     return SW::loadPreset(inMemoryPreset, ignoreExternalSample, pComment,
                           PresetConsumer{*this, program});
@@ -713,8 +714,8 @@ bool LE_NOTHROWNOALIAS SpectrumWorx::setNewSampleWorker(juce::File const &newSam
                 //   Verify that the 'sample loaded' state has not changed if an
                 // error occurred.
                 //                                (08.07.2010.) (Domagoj Saric)
-                BOOST_ASSERT(!samplePreviouslyLoaded == !sample_);
-                BOOST_ASSERT(previousSample == sample_.sampleFile());
+                LE_ASSERT(!samplePreviouslyLoaded == !sample_);
+                LE_ASSERT(previousSample == sample_.sampleFile());
                 succeeded = false;
             }
         }
@@ -761,7 +762,7 @@ void SpectrumWorx::setNewSample(juce::File const &newSampleFile)
             : GUI::rootPath().getChildFile("Samples").getChildFile(newSampleFile.getFileName());
     if (!isSampleLoadInProgress())
     {
-        BOOST_VERIFY(
+        LE_VERIFY(
             (sampleLoadingThread_.start<SpectrumWorx, &SpectrumWorx::sampleLoadingLoop>(*this)));
         sampleLoadingThread_.setDebugName("Sample thread");
     }
@@ -772,16 +773,16 @@ bool SpectrumWorx::isSampleLoadInProgress() const { return sampleLoadingThread_.
 void SpectrumWorx::registerSampleLoadedListener(Editor &listenerToRegister)
 {
     //...mrmlj...reconsider this...
-    BOOST_ASSERT(!pListenerToNotifyWhenSampleLoaded_ ||
-                 (pListenerToNotifyWhenSampleLoaded_ == &listenerToRegister));
+    LE_ASSERT(!pListenerToNotifyWhenSampleLoaded_ ||
+              (pListenerToNotifyWhenSampleLoaded_ == &listenerToRegister));
     pListenerToNotifyWhenSampleLoaded_ = &listenerToRegister;
 }
 
 void SpectrumWorx::deregisterSampleLoadedListener(Editor const &listenerToDeregister)
 {
-    BOOST_ASSERT(!pListenerToNotifyWhenSampleLoaded_ ||
-                 (pListenerToNotifyWhenSampleLoaded_ == &listenerToDeregister));
-    boost::ignore_unused_variable_warning(listenerToDeregister);
+    LE_ASSERT(!pListenerToNotifyWhenSampleLoaded_ ||
+              (pListenerToNotifyWhenSampleLoaded_ == &listenerToDeregister));
+    LE::Utility::ignoreUnused(listenerToDeregister);
     pListenerToNotifyWhenSampleLoaded_ = nullptr;
 }
 
@@ -854,13 +855,12 @@ bool LE_NOTHROW SpectrumWorx::initialise()
         }
         else
         {
-            BOOST_ASSERT(currentStorageFactors().numberOfChannels ==
-                         engineSetup().numberOfChannels());
+            LE_ASSERT(currentStorageFactors().numberOfChannels == engineSetup().numberOfChannels());
             success = true;
         }
-        //...mrmlj...AU...BOOST_ASSERT_MSG( !!buffers(), "Input buffers not initialised." );
+        //...mrmlj...AU...LE_ASSERT_MSG( !!buffers(), "Input buffers not initialised." );
         success &= updateEngineSetup();
-        BOOST_ASSERT(success);
+        LE_ASSERT(success);
         if (!success)
             return false;
     }
@@ -905,7 +905,7 @@ void LE_NOTHROW SpectrumWorx::loadSettings()
         mmap::basic_read_only_mapped_view const mappedSettingsFile(
             mmap::map_read_only_file(settingsFile().getFullPathName().getCharPointer()));
         //...mrmlj...rethink this assertion...
-        //BOOST_ASSERT( ( mappedSettingsFile || !this->settingsFile().existsAsFile() ) && "Unable to open existing settings file." );
+        //LE_ASSERT( ( mappedSettingsFile || !this->settingsFile().existsAsFile() ) && "Unable to open existing settings file." );
         if (mappedSettingsFile.size() != sizeof(Settings))
         {
             LE_TRACE("\tSW: unrecognized settings file.");
@@ -920,11 +920,11 @@ void LE_NOTHROW SpectrumWorx::loadSettings()
             juce::File const lastSessionFile(lastSessionPresetFile());
             if (lastSessionFile.existsAsFile())
             {
-                //BOOST_VERIFY( loadPreset( lastSessionFile, false, nullptr, _T( "Last session" ) ) );
+                //LE_VERIFY( loadPreset( lastSessionFile, false, nullptr, _T( "Last session" ) ) );
                 //...mrmlj...avoid notifyHostAboutPresetChange()
                 auto const pPresetData(Preset::loadIntoMemory(lastSessionFile));
-                BOOST_VERIFY(pPresetData.get() &&
-                             loadPreset(pPresetData.get(), false, nullptr, getProgram()));
+                LE_VERIFY(pPresetData.get() &&
+                          loadPreset(pPresetData.get(), false, nullptr, getProgram()));
                 setProgramName("Last session");
             }
         }
@@ -942,7 +942,7 @@ void LE_NOTHROW SpectrumWorx::saveSettings()
 
     mmap::basic_mapped_view const mappedSettingsFile(
         mmap::map_file(settingsFile().getFullPathName().getCharPointer(), sizeof(Settings)));
-    BOOST_ASSERT_MSG(mappedSettingsFile, "Unable to create settings file.");
+    LE_ASSERT_MSG(mappedSettingsFile, "Unable to create settings file.");
     if (mappedSettingsFile.empty())
     {
         GUI::warningMessageBox(MB_ERROR, "Failed to save settings.", false);
@@ -964,7 +964,7 @@ void LE_NOTHROW SpectrumWorx::saveSettings()
 
     boost::mmap::basic_mapped_view const pathsFile(
         GUI::mapPathsFile(rootLength + sizeof('\n') + presetsLength));
-    BOOST_ASSERT_MSG(pathsFile, "Unable to update the paths file.");
+    LE_ASSERT_MSG(pathsFile, "Unable to update the paths file.");
     if (!pathsFile)
         return;
 
@@ -976,10 +976,10 @@ void LE_NOTHROW SpectrumWorx::saveSettings()
     rootPath.copyToUTF8(&pathsFile[0], rootLength + 1);
     pathsFile[rootLength] = '\n';
 #else
-    BOOST_ASSERT(std::memcmp(pathsFile.begin(), GUI::rootPath().getFullPathName().toUTF8(),
-                             rootLength * sizeof(char)) == 0);
+    LE_ASSERT(std::memcmp(pathsFile.begin(), GUI::rootPath().getFullPathName().toUTF8(),
+                          rootLength * sizeof(char)) == 0);
 #endif // __APPLE__
-    BOOST_ASSERT(pathsFile[rootLength] == '\n');
+    LE_ASSERT(pathsFile[rootLength] == '\n');
     //...mrmlj...+1 because copyToX() wants to append the null terminator...
     presetsFolder.copyToUTF8(&pathsFile[rootLength + sizeof('\n')], presetsLength + 1);
 #endif // LE_SW_FMOD
@@ -1013,7 +1013,7 @@ juce::File SpectrumWorx::settingsFile() { return GUI::rootPath().getChildFile("S
 
 void SpectrumWorx::clearSideChannelData()
 {
-    BOOST_ASSERT(!sample_);
+    LE_ASSERT(!sample_);
     SpectrumWorxCore::clearSideChannelData();
 }
 
@@ -1127,8 +1127,8 @@ bool SpectrumWorx::createGUI()
     LE_ASSUME(!editor_);
     try
     {
-        editor_ = boost::in_place();
-        LE_ASSUME(editor_.is_initialized());
+        editor_.emplace();
+        LE_ASSUME(editor_.has_value());
         return true;
     }
     catch (...)
@@ -1142,7 +1142,7 @@ void SpectrumWorx::destroyGUI()
 {
     // Implementation note:
     //   Wavelab calls effEditClose even if effEditOpen failed so we
-    // cannot assert( editor_.is_initialized() ) here.
+    // cannot assert( editor_.has_value() ) here.
     //                                        (23.11.2009.) (Domagoj Saric)
     editor_.reset();
 }
@@ -1193,7 +1193,7 @@ bool SpectrumWorx::setGlobalParameter(FFTSize &parameter, FFTSize::param_type co
         /// ( FFT size / zero padding * window size factor ) so notify the host
         /// when any of the relevant parameters change.
         ///                                   (23.05.2012.) (Domagoj Saric)
-        /*BOOST_VERIFY*/ (latencyChanged());
+        /*LE_VERIFY*/ (latencyChanged());
         updateGUIForEngineSetupChanges();
     }
     return result;
@@ -1216,7 +1216,7 @@ bool SpectrumWorx::setGlobalParameter(InputMode &parameter, InputMode::param_typ
 
     bool const success(
         setNumberOfChannelsFromUser(ioChannelsConfig.first, ioChannelsConfig.second));
-    BOOST_VERIFY((parameter.getValue() == newValue) || !success);
+    LE_VERIFY((parameter.getValue() == newValue) || !success);
     if (success)
         updateGUIForEngineSetupChanges();
     return success;
@@ -1232,7 +1232,7 @@ bool SpectrumWorx::setGlobalParameter(WindowSizeFactor &parameter,
     {
         /// \note See the note in the FFTSize overload.
         ///                                   (23.05.2012.) (Domagoj Saric)
-        /*BOOST_VERIFY*/ (latencyChanged());
+        /*LE_VERIFY*/ (latencyChanged());
         updateGUIForEngineSetupChanges();
     }
     return result;

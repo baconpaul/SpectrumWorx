@@ -34,7 +34,7 @@ char *doubleToString(char * /*const*/ buffer, int const numChars, double const n
                      int const numDecPlaces, std::size_t &len) noexcept
 {
     len = LE::Utility::lexical_cast(n, static_cast<unsigned char>(numDecPlaces), buffer);
-    BOOST_ASSERT(len < unsigned(numChars));
+    LE_ASSERT(len < unsigned(numChars));
     (void)numChars;
     return buffer;
 }
@@ -64,7 +64,7 @@ double CharacterFunctions::readDoubleValue(CharPointer_UTF8 &text) noexcept
 double CharacterFunctions::readDoubleValue(CharPointer_UTF16 &text) noexcept
 {
     char buffer[64];
-    BOOST_ASSERT(text.length() < numElementsInArray(buffer));
+    LE_ASSERT(text.length() < numElementsInArray(buffer));
     CharPointer_ASCII ascii(buffer);
     copyAll(ascii, text);
     double const result(readDoubleValue(ascii));

@@ -11,7 +11,7 @@
 #ifndef parameter_hpp__B49E51E6_E59F_4C49_A702_B6533579846D
 #define parameter_hpp__B49E51E6_E59F_4C49_A702_B6533579846D
 //------------------------------------------------------------------------------
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 #include "boost/mpl/map/map10.hpp"
 #include "boost/mpl/string.hpp"
 #include "boost/preprocessor/comparison/greater.hpp"
@@ -158,24 +158,24 @@ template <class ImplTraits> class Parameter : public ImplTraits
     Parameter(param_type const initialValue = ImplTraits::default_())
     {
         // Traits sanity checks.
-        BOOST_ASSERT(this->isValidValue(ImplTraits::minimum()));
-        BOOST_ASSERT(this->isValidValue(ImplTraits::default_()));
-        BOOST_ASSERT(this->isValidValue(ImplTraits::maximum()));
+        LE_ASSERT(this->isValidValue(ImplTraits::minimum()));
+        LE_ASSERT(this->isValidValue(ImplTraits::default_()));
+        LE_ASSERT(this->isValidValue(ImplTraits::maximum()));
 
-        BOOST_ASSERT(ImplTraits::maximum() >= ImplTraits::minimum());
+        LE_ASSERT(ImplTraits::maximum() >= ImplTraits::minimum());
 
         setValue(initialValue);
     }
 
     value_type const &getValue() const
     {
-        BOOST_ASSERT_MSG(this->isValidValue(value_), "Parameter in inconsistent state.");
+        LE_ASSERT_MSG(this->isValidValue(value_), "Parameter in inconsistent state.");
         return value_;
     }
     void setValue(param_type value)
     {
-        BOOST_ASSERT_MSG(this->isValidValue(value),
-                         "Specified value is invalid or out of range for this parameter.");
+        LE_ASSERT_MSG(this->isValidValue(value),
+                      "Specified value is invalid or out of range for this parameter.");
         value_ = value;
     }
 
@@ -186,21 +186,21 @@ template <class ImplTraits> class Parameter : public ImplTraits
 
     Parameter &operator++()
     {
-        BOOST_ASSERT_MSG(getValue() != ImplTraits::maximum(),
-                         "Tried to increment a parameter past its maximum value.");
+        LE_ASSERT_MSG(getValue() != ImplTraits::maximum(),
+                      "Tried to increment a parameter past its maximum value.");
         ImplTraits::increment(value_);
-        BOOST_ASSERT_MSG(ImplTraits::isValidValue(value_),
-                         "Parameter in inconsistent state after increment.");
+        LE_ASSERT_MSG(ImplTraits::isValidValue(value_),
+                      "Parameter in inconsistent state after increment.");
         return *this;
     }
 
     Parameter &operator--()
     {
-        BOOST_ASSERT_MSG(getValue() != ImplTraits::minimum(),
-                         "Tried to decrement a parameter below its minimum value.");
+        LE_ASSERT_MSG(getValue() != ImplTraits::minimum(),
+                      "Tried to decrement a parameter below its minimum value.");
         ImplTraits::decrement(value_);
-        BOOST_ASSERT_MSG(ImplTraits::isValidValue(value_),
-                         "Parameter in inconsistent state after decrement.");
+        LE_ASSERT_MSG(ImplTraits::isValidValue(value_),
+                      "Parameter in inconsistent state after decrement.");
         return *this;
     }
 

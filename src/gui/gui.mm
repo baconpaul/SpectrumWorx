@@ -20,7 +20,7 @@
 //------------------------------------------------------------------------------
 #include "le/utility/objcfwdhelpers.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 
 #include <Carbon/Carbon.h>
 #include <Cocoa/Cocoa.h>
@@ -45,9 +45,9 @@ namespace GUI
 void initialiseMac() noexcept
 {
 #if !JUCE_64BIT
-    BOOST_VERIFY(::NSApplicationLoad());
+    LE_VERIFY(::NSApplicationLoad());
 #endif
-    BOOST_ASSERT([NSThread isMultiThreaded]);
+    LE_ASSERT([NSThread isMultiThreaded]);
 
 #if 0  //...mrmlj...experiments to 'fix' the fat fonts issue under ML...
     NSUserDefaults * pStandardUserDefaults = [NSUserDefaults standardUserDefaults];
@@ -257,7 +257,7 @@ void detachComponentFromHostWindow(juce::Component &comp,
 void attachComponentToHostWindow(juce::Component &component, ObjC::NSView *const pParentViewParam)
 {
     ::NSView *pParentView(reinterpret_cast<::NSView *>(pParentViewParam));
-    BOOST_ASSERT(pParentView);
+    LE_ASSERT(pParentView);
 
 #if 0
     // (this workaround is because Wavelab provides a zero-size parent view...)
@@ -282,7 +282,7 @@ void attachComponentToHostWindow(juce::Component &component, ObjC::NSView *const
     //[pWindow makeFirstResponder: pParentView];
 
     component.juce::Component::addToDesktop(0, pParentView);
-    BOOST_ASSERT(component.isVisible());
+    LE_ASSERT(component.isVisible());
     //component.toFront( true );
 }
 
@@ -290,8 +290,8 @@ void makeEditorChild(juce::ComponentPeer &editor, juce::ComponentPeer &childToBe
 {
     ::NSWindow *const pEditorWindow([static_cast<::NSView *>(editor.getNativeHandle()) window]);
     ::NSWindow *const pChildWindow([static_cast<::NSView *>(childToBe.getNativeHandle()) window]);
-    BOOST_ASSERT(pEditorWindow);
-    BOOST_ASSERT(pChildWindow);
+    LE_ASSERT(pEditorWindow);
+    LE_ASSERT(pChildWindow);
 #if 1
     [pEditorWindow addChildWindow:pChildWindow ordered:NSWindowAbove];
 #else
@@ -311,10 +311,10 @@ void detachFromEditor(juce::ComponentPeer &editor, juce::ComponentPeer &child) n
     ::NSWindow *const pEditorWindow([static_cast<::NSView *>(editor.getNativeHandle()) window]);
     ::NSWindow *const pChildWindow([static_cast<::NSView *>(child.getNativeHandle()) window]);
     ::NSWindow *const pActualParentWindow([pChildWindow parentWindow]);
-    BOOST_ASSERT(pChildWindow);
-    BOOST_ASSERT(pEditorWindow == pActualParentWindow || !pEditorWindow);
-    BOOST_ASSERT(![pChildWindow childWindows] || ![[pChildWindow childWindows] count]);
-    //BOOST_ASSERT( [[pEditorWindow childWindows] count] == 1 || !pEditorWindow );
+    LE_ASSERT(pChildWindow);
+    LE_ASSERT(pEditorWindow == pActualParentWindow || !pEditorWindow);
+    LE_ASSERT(![pChildWindow childWindows] || ![[pChildWindow childWindows] count]);
+    //LE_ASSERT( [[pEditorWindow childWindows] count] == 1 || !pEditorWindow );
 #if 1
     [pActualParentWindow removeChildWindow:pChildWindow];
 #else
@@ -331,13 +331,13 @@ void detachFromEditor(juce::ComponentPeer &editor, juce::ComponentPeer &child) n
 
 void hideCursor() noexcept
 {
-    BOOST_VERIFY(::CGDisplayHideCursor(kCGDirectMainDisplay) == kCGErrorSuccess);
+    LE_VERIFY(::CGDisplayHideCursor(kCGDirectMainDisplay) == kCGErrorSuccess);
     //[::NSCursor hide];
 }
 
 void showCursor() noexcept
 {
-    BOOST_VERIFY(::CGDisplayShowCursor(kCGDirectMainDisplay) == kCGErrorSuccess);
+    LE_VERIFY(::CGDisplayShowCursor(kCGDirectMainDisplay) == kCGErrorSuccess);
     //[::NSCursor unhide];
 }
 

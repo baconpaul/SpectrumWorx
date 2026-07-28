@@ -147,10 +147,13 @@ namespace Detail
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class AEffectWrapper : boost::noncopyable
+class AEffectWrapper
 {
   private:
     friend class Plugins::VSTHost24Proxy;
+
+    AEffectWrapper(AEffectWrapper const &) = delete; // makes non-copyable
+    AEffectWrapper &operator=(AEffectWrapper const &) = delete;
 
     AEffectWrapper();
     ~AEffectWrapper() {}
@@ -450,14 +453,14 @@ class VSTHost24Proxy : private Detail::AEffectWrapper
   public: // Vendor specific.
     template <class Range> bool getHostVendorString(Range &text) const
     {
-        BOOST_ASSERT(boost::size(text) >= kVstMaxVendorStrLen);
-        return call(audioMasterGetVendorString, 0, 0, &*boost::begin(text)) != 0;
+        LE_ASSERT(std::size(text) >= kVstMaxVendorStrLen);
+        return call(audioMasterGetVendorString, 0, 0, std::data(text)) != 0;
     }
 
     template <class Range> bool getHostProductString(Range &text) const
     {
-        BOOST_ASSERT(boost::size(text) >= kVstMaxProductStrLen);
-        return call(audioMasterGetProductString, 0, 0, &*boost::begin(text)) != 0;
+        LE_ASSERT(std::size(text) >= kVstMaxProductStrLen);
+        return call(audioMasterGetProductString, 0, 0, std::data(text)) != 0;
     }
 
     unsigned int getHostVendorVersion() const
@@ -796,10 +799,10 @@ template <> class ParameterInformation<Protocol::VST24> : public ::VstParameterP
     {
         static_assert(Parameter::discreteValueDistance == 0, "");
         //...mrmlj...Audition...
-        //BOOST_ASSERT( flags          == 0 );
-        //BOOST_ASSERT( stepFloat      == 0 );
-        //BOOST_ASSERT( smallStepFloat == 0 );
-        //BOOST_ASSERT( largeStepFloat == 0 );
+        //LE_ASSERT( flags          == 0 );
+        //LE_ASSERT( stepFloat      == 0 );
+        //LE_ASSERT( smallStepFloat == 0 );
+        //LE_ASSERT( largeStepFloat == 0 );
 
         flags |= kVstParameterCanRamp;
         if ((Parameter::rangeValuesDenominator == 1) &&
@@ -986,13 +989,13 @@ template <class ImplParam> class Plugin<ImplParam, Protocol::VST24> : public VST
 
     bool setProcessPrecision(::VstProcessPrecision const precision)
     {
-        BOOST_VERIFY(precision == kVstProcessPrecision32);
+        LE_VERIFY(precision == kVstProcessPrecision32);
         return false;
     }
 
     bool processVariableIo(::VstVariableIo const *const pInfo)
     {
-        BOOST_VERIFY(!pInfo);
+        LE_VERIFY(!pInfo);
         return false;
     }
 
@@ -1167,8 +1170,8 @@ template <class ImplParam> class Plugin<ImplParam, Protocol::VST24> : public VST
     LE_COLD LE_NOTHROW void inspectedParameter(ParameterIndex const index) const
     {
         auto &inspectedParameters(this->inspectedParameters());
-        BOOST_ASSERT(index < Impl::maxNumberOfParameters);
-        BOOST_ASSERT(index < inspectedParameters.size());
+        LE_ASSERT(index < Impl::maxNumberOfParameters);
+        LE_ASSERT(index < inspectedParameters.size());
         inspectedParameters.set(index);
         VSTPluginBase::allParametersInspected_ |= inspectedParameters.all();
     }
@@ -1201,7 +1204,7 @@ template <class ImplParam> class Plugin<ImplParam, Protocol::VST24> : public VST
                                                         float **const /*outputs*/,
                                                         ::VstInt32 const /*sampleFrames */)
     {
-        BOOST_ASSERT(!"Unsupported/Should not get called for VST 2.4 plugins.");
+        LE_ASSERT(!"Unsupported/Should not get called for VST 2.4 plugins.");
     }
     LE_NOTHROW static void LE_CDECL processReplacing(::AEffect *const pEffect, float **const inputs,
                                                      float **const outputs,

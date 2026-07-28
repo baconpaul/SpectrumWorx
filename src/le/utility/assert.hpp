@@ -3,6 +3,10 @@
 /// \file assert.hpp
 /// ----------------
 ///
+///   LE_ASSERT and friends. Previously a thin skin over Boost.Assert; the
+/// handler hook it provided is reproduced here so that assertionHandler.cpp
+/// still gets to route failures to the platform debugger and the GUI.
+///
 /// Copyright (c) 2010 - 2016. Little Endian Ltd.
 /// SPDX-License-Identifier: GPL-3.0-or-later
 ///
@@ -11,11 +15,11 @@
 #ifndef assert_hpp__6E5E1CC9_AFB3_4326_A27F_473AF9722938
 #define assert_hpp__6E5E1CC9_AFB3_4326_A27F_473AF9722938
 //------------------------------------------------------------------------------
-#ifdef BOOST_ENABLE_ASSERT_HANDLER
-#include "boost/assert.hpp"
-#else
+#include "abi.hpp"
+
+#ifndef LE_ENABLE_ASSERT_HANDLER
 #include <cassert>
-#endif // BOOST_ENABLE_ASSERT_HANDLER
+#endif // LE_ENABLE_ASSERT_HANDLER
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -24,12 +28,23 @@ namespace Utility
 {
 //------------------------------------------------------------------------------
 
-#ifdef BOOST_ENABLE_ASSERT_HANDLER
-#define LE_ASSERT BOOST_ASSERT
-#define LE_ASSERT_MSG BOOST_ASSERT_MSG
-#define LE_VERIFY BOOST_VERIFY
-#define LE_VERIFY_MSG BOOST_VERIFY_MSG
-#else
+#ifdef LE_ENABLE_ASSERT_HANDLER
+
+/// Defined in assertionHandler.cpp. Never returns unless the user chooses to
+/// ignore, which only the Windows and JUCE message boxes offer.
+void assertionFailed(char const *expression, char const *message, char const *function,
+                     char const *file, long line);
+
+#define LE_ASSERT_MSG(expression, message)                                                         \
+    (LE_LIKELY(expression) ? static_cast<void>(0)                                                  \
+                           : ::LE::Utility::assertionFailed(                                       \
+                                 #expression, message, LE_CURRENT_FUNCTION, __FILE__, __LINE__))
+#define LE_ASSERT(expression) LE_ASSERT_MSG(expression, #expression)
+#define LE_VERIFY LE_ASSERT
+#define LE_VERIFY_MSG LE_ASSERT_MSG
+
+#else // LE_ENABLE_ASSERT_HANDLER
+
 #define LE_ASSERT assert
 #define LE_ASSERT_MSG(expression, message) assert((expression) && (message))
 #ifdef NDEBUG
@@ -39,7 +54,8 @@ namespace Utility
 #define LE_VERIFY(expression) assert(expression)
 #define LE_VERIFY_MSG(expression, message) LE_VERIFY((expression) && (message))
 #endif // NDEBUG
-#endif // BOOST_ENABLE_ASSERT_HANDLER
+
+#endif // LE_ENABLE_ASSERT_HANDLER
 
 //------------------------------------------------------------------------------
 } // namespace Utility

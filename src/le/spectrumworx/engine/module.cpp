@@ -50,7 +50,7 @@ void LE_COLD ModuleDSP::setup(Setup const &engineSetup)
     float const leftFrequency(baseParameters().get<StartFrequency>());
     float const rightFrequency(baseParameters().get<StopFrequency>());
     //...mrmlj...for now we will just fix the range until all other code (LFO) ensures a valid range...
-    //BOOST_ASSERT( leftFrequency <= rightFrequency );
+    //LE_ASSERT( leftFrequency <= rightFrequency );
     workingRange_.setNewRange(
         engineSetup.normalisedFrequencyToBin(std::min(leftFrequency, rightFrequency)),
         engineSetup.normalisedFrequencyToBin(rightFrequency));
@@ -145,8 +145,8 @@ LE_NOTHROWNOALIAS ModuleDSP::ChannelDataProxy::operator ChannelData_AmPh2ReIm() 
     ChannelData_AmPh2ReIm const result = {
         MainSideChannelData_AmPh(bothDomainData.first, module_.workingRange()),
         ChannelData_ReIm(bothDomainData.second.main(), module_.workingRange())};
-    BOOST_ASSERT(result.input.main().beginBin() == result.output.beginBin());
-    BOOST_ASSERT(result.input.main().endBin() == result.output.endBin());
+    LE_ASSERT(result.input.main().beginBin() == result.output.beginBin());
+    LE_ASSERT(result.input.main().endBin() == result.output.endBin());
     return result;
 }
 
@@ -157,8 +157,8 @@ LE_NOTHROWNOALIAS ModuleDSP::ChannelDataProxy::operator ChannelData_ReIm2AmPh() 
         MainSideChannelData_ReIm(bothDomainData.second, module_.workingRange()),
         MainSideChannelData_AmPh(bothDomainData.first, module_.workingRange()),
     };
-    BOOST_ASSERT(result.input.beginBin() == result.output.beginBin());
-    BOOST_ASSERT(result.input.endBin() == result.output.endBin());
+    LE_ASSERT(result.input.beginBin() == result.output.beginBin());
+    LE_ASSERT(result.input.endBin() == result.output.endBin());
     return result;
 }
 
@@ -179,12 +179,10 @@ ModuleDSP::getEffectParameterPtr(std::uint8_t const parameterIndex) const
 LE_NOTHROW float ModuleDSP::setEffectParameter(std::uint8_t const parameterIndex, float const value,
                                                ParameterInfo const &cachedInfo)
 {
-    BOOST_ASSERT(&cachedInfo == &effectSpecificParameterInfo(parameterIndex));
+    LE_ASSERT(&cachedInfo == &effectSpecificParameterInfo(parameterIndex));
     void *LE_RESTRICT const pValue(getEffectParameterPtr(parameterIndex));
-    BOOST_ASSERT_MSG(static_cast<float>(value) >= cachedInfo.minimum,
-                     "Parameter value out of range");
-    BOOST_ASSERT_MSG(static_cast<float>(value) <= cachedInfo.maximum,
-                     "Parameter value out of range");
+    LE_ASSERT_MSG(static_cast<float>(value) >= cachedInfo.minimum, "Parameter value out of range");
+    LE_ASSERT_MSG(static_cast<float>(value) <= cachedInfo.maximum, "Parameter value out of range");
     switch (cachedInfo.type)
     {
         //...mrmlj...internal TriggerParameter knowledge...
@@ -322,7 +320,7 @@ LE_NOTHROWNOALIAS Parameters::LFO &ModuleBase::lfo(std::uint8_t const parameterI
     static_assert(ModuleParameters::numberOfNonLFOBaseParameters ==
                       ModuleBase::numberOfNonLFOBaseParameters,
                   "");
-    BOOST_ASSERT(parameterIndex > ModuleParameters::numberOfNonLFOBaseParameters);
+    LE_ASSERT(parameterIndex > ModuleParameters::numberOfNonLFOBaseParameters);
     return impl.ModuleParameters::lfo(parameterIndex -
                                       ModuleParameters::numberOfNonLFOBaseParameters);
 }

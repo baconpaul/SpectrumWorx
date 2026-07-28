@@ -18,6 +18,7 @@
 #include "le/plugins/plugin.hpp" //...ugh...mrmlj...for Plugins::*AutomatedParameter usage in printer.hpp...clean this up...
 #include "le/spectrumworx/effects/baseParametersUIElements.hpp" // BaseParameters printers
 #include "le/spectrumworx/engine/moduleParameters.hpp"
+#include <optional>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -39,7 +40,7 @@ LE_NOTHROWNOALIAS char const *getParameterValueString(std::uint8_t const index,
 {
     if (index >= module.numberOfParameters())
     {
-        BOOST_ASSERT(printer.printer.buffer[0] == 0);
+        LE_ASSERT(printer.printer.buffer[0] == 0);
         return nullptr;
     }
 
@@ -72,7 +73,7 @@ Plugins::AutomatedParameterValue internal2AutomatedValue(std::uint8_t const para
                                                          bool const normalised,
                                                          ModuleParameters const &module)
 {
-    BOOST_ASSERT(parameterIndex < module.numberOfParameters());
+    LE_ASSERT(parameterIndex < module.numberOfParameters());
     if (!normalised)
         return internalValue;
     if (parameterIndex < module.numberOfBaseParameters)
@@ -84,7 +85,7 @@ float automated2InternalValue(std::uint8_t const parameterIndex,
                               Plugins::AutomatedParameterValue const automatedValue,
                               bool const normalised, ModuleParameters const &module)
 {
-    BOOST_ASSERT(parameterIndex < module.numberOfParameters());
+    LE_ASSERT(parameterIndex < module.numberOfParameters());
     if (!normalised)
         return automatedValue;
     if (parameterIndex < module.numberOfBaseParameters)
@@ -129,7 +130,7 @@ float effectAutomated2InternalValue(std::uint8_t const effectParameterIndex,
         automatedValue, module.effectSpecificParameterInfo(effectParameterIndex));
 }
 
-boost::optional<AutoAdjustedLFOParameter> LE_COLD
+std::optional<AutoAdjustedLFOParameter> LE_COLD
 Detail::autoAdjustedLFOParameter(LFO &lfo, std::uint8_t const lfoParameterIndex)
 {
     //LFO::value_type const * __restrict pSourceBound;
@@ -159,7 +160,7 @@ Detail::autoAdjustedLFOParameter(LFO &lfo, std::uint8_t const lfoParameterIndex)
     default:
         break;
     }
-    return boost::none;
+    return std::nullopt;
 }
 
 LE_OPTIMIZE_FOR_SIZE_END()

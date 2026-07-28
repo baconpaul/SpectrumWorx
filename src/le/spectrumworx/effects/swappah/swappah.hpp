@@ -17,8 +17,6 @@
 #include "le/spectrumworx/effects/commonParameters.hpp"
 #include "le/parameters/enumerated/parameter.hpp"
 #include "le/parameters/linear/parameter.hpp"
-
-#include "boost/config/abi_prefix.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -89,7 +87,4 @@ struct Swappah
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------
-
-#include "boost/config/abi_suffix.hpp"
-
 #endif // swappah_hpp

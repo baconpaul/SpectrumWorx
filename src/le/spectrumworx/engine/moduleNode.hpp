@@ -15,10 +15,10 @@
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/referenceCounter.hpp"
 
-#if !defined(BOOST_NO_RTTI) && (!defined(BOOST_NO_EXCEPTIONS) || defined(_MSC_VER))
-#include "boost/polymorphic_cast.hpp"
+#if !defined(LE_NO_RTTI) && (!defined(LE_NO_EXCEPTIONS) || defined(_MSC_VER))
+#include "le/utility/polymorphicDowncast.hpp"
 #endif // LE_SW_SDK_BUILD
-#include "boost/smart_ptr/intrusive_ptr.hpp"
+#include "le/utility/intrusivePtr.hpp"
 
 #include <type_traits>
 //------------------------------------------------------------------------------
@@ -34,8 +34,8 @@ LE_IMPL_NAMESPACE_BEGIN(Engine)
 class LE_NOVTABLE ModuleNode
 {
   public:
-    using NodePtr = boost::intrusive_ptr<ModuleNode>;
-    using NodeCPtr = boost::intrusive_ptr<ModuleNode const>;
+    using NodePtr = LE::Utility::IntrusivePtr<ModuleNode>;
+    using NodeCPtr = LE::Utility::IntrusivePtr<ModuleNode const>;
 
     static_assert(sizeof(NodePtr) == sizeof(void *), "");
 
@@ -72,7 +72,7 @@ LE_NOTHROW void intrusive_ptr_release_deleter(ModuleNode const *);
 inline LE_NOTHROW void intrusive_ptr_release(ModuleNode const *LE_RESTRICT const pModuleNode)
 {
     LE_ASSUME(pModuleNode);
-    if (BOOST_UNLIKELY(!--pModuleNode->referenceCount_))
+    if (LE_UNLIKELY(!--pModuleNode->referenceCount_))
     {
 #if LE_SW_SEPARATED_DSP_GUI
         static_assert(__has_virtual_destructor(ModuleNode),
@@ -87,11 +87,11 @@ inline LE_NOTHROW void intrusive_ptr_release(ModuleNode const *LE_RESTRICT const
 template <class ActualModule> ActualModule &actualModule(ModuleNode &node)
 {
     auto *LE_RESTRICT const pModule(
-#if !defined(BOOST_NO_RTTI) && (!defined(BOOST_NO_EXCEPTIONS) || defined(_MSC_VER))
-        boost::polymorphic_downcast<ActualModule *>(&node)
+#if !defined(LE_NO_RTTI) && (!defined(LE_NO_EXCEPTIONS) || defined(_MSC_VER))
+        LE::Utility::polymorphicDowncast<ActualModule *>(&node)
 #else
         static_cast<ActualModule *>(&node)
-#endif // BOOST_NO_RTTI
+#endif // LE_NO_RTTI
     );
     LE_ASSUME(pModule);
     return *pModule;
@@ -104,11 +104,11 @@ template <class ActualModule> ActualModule const &actualModule(ModuleNode const 
 template <class ActualModule> ModuleNode &node(ActualModule &module)
 {
     auto *LE_RESTRICT const pNode(
-#if !defined(BOOST_NO_RTTI) && (!defined(BOOST_NO_EXCEPTIONS) || defined(_MSC_VER))
-        boost::polymorphic_downcast<ModuleNode *>(&module)
+#if !defined(LE_NO_RTTI) && (!defined(LE_NO_EXCEPTIONS) || defined(_MSC_VER))
+        LE::Utility::polymorphicDowncast<ModuleNode *>(&module)
 #else
         static_cast<ModuleNode *>(&module)
-#endif // BOOST_NO_RTTI
+#endif // LE_NO_RTTI
     );
     LE_ASSUME(pNode);
     return *pNode;
@@ -122,12 +122,12 @@ template <class ActualModule> ModuleNode const &node(ActualModule const &chained
 LE_IMPL_NAMESPACE_END(Engine)
 //------------------------------------------------------------------------------
 template <class ActualModule>
-BOOST_FORCEINLINE void intrusive_ptr_add_ref(ActualModule const *const pModule)
+LE_FORCEINLINE void intrusive_ptr_add_ref(ActualModule const *const pModule)
 {
     intrusive_ptr_add_ref(&Engine::node(*pModule));
 }
 template <class ActualModule>
-BOOST_FORCEINLINE void intrusive_ptr_release(ActualModule const *const pModule)
+LE_FORCEINLINE void intrusive_ptr_release(ActualModule const *const pModule)
 {
     intrusive_ptr_release(&Engine::node(*pModule));
 }

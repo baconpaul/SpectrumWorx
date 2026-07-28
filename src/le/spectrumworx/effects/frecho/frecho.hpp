@@ -18,8 +18,6 @@
 #include "le/parameters/symmetric/parameter.hpp"
 
 #include "boost/mpl/string.hpp"
-
-#include "boost/config/abi_prefix.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -113,7 +111,4 @@ struct Frevcho
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------
-
-#include "boost/config/abi_suffix.hpp"
-
 #endif // frecho_hpp

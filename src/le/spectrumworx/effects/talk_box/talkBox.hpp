@@ -17,8 +17,6 @@
 #include "le/spectrumworx/effects/synth/synth.hpp"
 #include "le/parameters/boolean/parameter.hpp"
 #include "le/parameters/linear/parameter.hpp"
-
-#include "boost/config/abi_prefix.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -74,7 +72,4 @@ struct TalkBox
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------
-
-#include "boost/config/abi_suffix.hpp"
-
 #endif // talkBox_hpp

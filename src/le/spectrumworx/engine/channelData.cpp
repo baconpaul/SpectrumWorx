@@ -26,7 +26,7 @@
 #include "le/math/vector.hpp"
 #include "le/utility/platformSpecifics.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -47,7 +47,7 @@ void ChannelData::setNewTimeDomainData(float const *const mainChannel,
 {
     amphDataFreshness_ = 0;
     dftDataFreshness_ = 0;
-    BOOST_ASSERT(fftSize() == fft.size());
+    LE_ASSERT(fftSize() == fft.size());
 
     dftAndTimeData_.setToDFTDomain();
     time2DFT(mainChannel, dftData().main(), window, fft, windowSizeFactor);
@@ -62,7 +62,7 @@ void ChannelData::setNewTimeDomainData(float const *const mainChannel,
 #if 0  //...mrmlj...synth...
     else
     {
-        BOOST_ASSERT_MSG
+        LE_ASSERT_MSG
         (
             Math::max( amphData_.side().jointView() ) == 0,
             "Side channel data not cleared."
@@ -74,8 +74,8 @@ void ChannelData::setNewTimeDomainData(float const *const mainChannel,
     auto const sideRealsSize(dftData().side().reals().size());
     auto const sideImagsSize(dftData().side().imags().size());
     auto const mainRealsSize(dftData().main().reals().size());
-    BOOST_ASSERT_MSG(sideRealsSize == sideImagsSize, "Buffer sizes mismatched.");
-    BOOST_ASSERT_MSG(sideRealsSize == mainRealsSize, "Buffer sizes mismatched.");
+    LE_ASSERT_MSG(sideRealsSize == sideImagsSize, "Buffer sizes mismatched.");
+    LE_ASSERT_MSG(sideRealsSize == mainRealsSize, "Buffer sizes mismatched.");
 #endif // NDEBUG
 }
 
@@ -112,14 +112,14 @@ LE_NOTHROW void ChannelData::time2DFT(float const *const pInputData, FullChannel
 
     auto const frameSize(fft.size());
 
-    BOOST_ASSERT_MSG(frameSize < dftData.size() * 2, "Buffer size incorrect.");
+    LE_ASSERT_MSG(frameSize < dftData.size() * 2, "Buffer size incorrect.");
 
     LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow,
                           ReadOnlyDataRange(pInputData, pInputData + fft.size()), "time domain");
     LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow, window, "window");
 
 #ifdef LE_PURE_REAL_FFT_TEST
-    BOOST_ASSERT(windowSizeFactor == 1);
+    LE_ASSERT(windowSizeFactor == 1);
     fft.transform(pInputData, window.begin(), dftData.reals().begin(), dftData.imags());
 #else
     float *const windowedTimeData(dftData.jointView().begin());
@@ -155,7 +155,7 @@ void ChannelData::dft2AmPh(FullChannelData_ReIm const &reImData, FullChannelData
     LE_MATH_VERIFY_VALUES(InvalidOrSlow, amPhData.phases(), "phases");
 
     //...mrmlj...need not hold if input data is amplified/out of range...fix this...
-    //BOOST_ASSERT_MSG
+    //LE_ASSERT_MSG
     //(
     //    max( amPhData.amps() ) <= FFT_float_real_1D::maximumAmplitude( convert<float>( ( amPhData.numberOfBins() - 1 ) * 2 ) ),
     //    "FFT reports wrong maximum amplitude."
@@ -275,7 +275,7 @@ void ChannelData::blendWithPreviousData(float const currentDataWeight, bool cons
         ///                                   (29.05.2012.) (Domagoj Saric)
         dftDataFreshness_ = amphDataFreshness_ + 1;
     }
-    BOOST_ASSERT(dftDataFreshness_ > amphDataFreshness_);
+    LE_ASSERT(dftDataFreshness_ > amphDataFreshness_);
 }
 
 void ChannelData::amplifyCurrentData(float const gain)
@@ -303,13 +303,13 @@ void ChannelData::resize(StorageFactors const &factors, Storage &storage)
 
 float *ChannelData::InPlaceDFTBuffer::timeDomainData()
 {
-    BOOST_ASSERT_MSG(isTimeDomainDataValid(), "Incorrect usage or buffer in wrong state.");
+    LE_ASSERT_MSG(isTimeDomainDataValid(), "Incorrect usage or buffer in wrong state.");
     return this->main().jointView().begin();
 }
 
 FullMainSideChannelData_ReIm &ChannelData::InPlaceDFTBuffer::dftData()
 {
-    BOOST_ASSERT_MSG(isDFTDomainDataValid(), "Incorrect usage or buffer in wrong state.");
+    LE_ASSERT_MSG(isDFTDomainDataValid(), "Incorrect usage or buffer in wrong state.");
     return *this;
 }
 

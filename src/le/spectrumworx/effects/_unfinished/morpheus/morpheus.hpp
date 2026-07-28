@@ -81,7 +81,7 @@ class Morpheus
     //   Preallocated work buffers to avoid the hidden call to _chkstk() in the
     // process() function.
     //                                        (25.02.2010.) (Domagoj Saric)
-    mutable boost::array<PeakR, (LE_CONFIGURATION_MAX_FFT_SIZE / 2) + 1> peaks_;
+    mutable std::array<PeakR, (LE_CONFIGURATION_MAX_FFT_SIZE / 2) + 1> peaks_;
 };
 
 //------------------------------------------------------------------------------

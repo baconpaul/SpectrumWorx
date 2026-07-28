@@ -13,8 +13,8 @@
 //------------------------------------------------------------------------------
 #include "tag.hpp"
 
-#include "boost/assert.hpp"
-#include "boost/concept_check.hpp"
+#include "le/utility/assert.hpp"
+#include "le/utility/ignoreUnused.hpp"
 #include "boost/mpl/map/map0.hpp"
 #include "boost/mpl/map/map10.hpp"
 //------------------------------------------------------------------------------
@@ -59,8 +59,8 @@ struct BooleanParameterTraits
 
     static bool isValidValue(value_type const value)
     {
-        BOOST_ASSERT((value == false) || (value == true));
-        boost::ignore_unused_variable_warning(value);
+        LE_ASSERT((value == false) || (value == true));
+        LE::Utility::ignoreUnused(value);
         return true;
     }
 

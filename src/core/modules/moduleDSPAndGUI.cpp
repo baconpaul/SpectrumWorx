@@ -16,8 +16,9 @@
 #include "le/spectrumworx/engine/moduleNode.hpp" // for intrusive_ptr_release_deleter
 #include "gui/editor/spectrumWorxEditor.hpp"
 
-#include "boost/smart_ptr/intrusive_ptr.hpp"
-#include "boost/utility/typed_in_place_factory.hpp"
+#include "le/utility/intrusivePtr.hpp"
+
+#include <optional>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -30,49 +31,39 @@ namespace SW
 //   This is required to prevent Clang from inlining the base destructor into
 // each ModuleDSP<> destructor.
 //                                            (13.12.2011.) (Domagoj Saric)
-LE_NOINLINE LE_NOTHROW LE_COLD Module::~Module() { LE_ASSUME(!ui_.is_initialized()); }
+LE_NOINLINE LE_NOTHROW LE_COLD Module::~Module() { LE_ASSUME(!ui_.has_value()); }
 
 void LE_NOTHROW Module::createGUI(GUI::SpectrumWorxEditor &editor, std::uint8_t const moduleIndex)
 {
-    struct ModuleUIInplaceConstructor : public boost::typed_in_place_factory_base
-    {
-        ModuleUIInplaceConstructor(GUI::SpectrumWorxEditor &editor) : editor_(editor) {}
-
-        GUI::ModuleUI *apply(void *const pAddress) const
-        {
-            LE_ASSUME(pAddress);
-            GUI::ModuleUI *const pModuleUI(new (pAddress) GUI::ModuleUI());
-            /// \note We initiate the creation of effect specific widgets from
-            /// within this specialized inplace factory so that the module's GUI
-            /// does not get marked as constructed until all the controls have
-            /// actually been constructed and setup.
-            ///                               (23.04.2013.) (Domagoj Saric)
-            pModuleUI->module().doCreateGUI(*pModuleUI);
-            BOOST_ASSERT_MSG(pModuleUI->getNumChildComponents() ==
-                                 (GUI::ModuleUI::baseWidgets +
-                                  pModuleUI->module().numberOfEffectSpecificParameters()),
-                             "Unexpected number of child widgets at end of ModuleUI constructor.");
-            pModuleUI->updateForEngineSetupChanges(editor_.engineSetup());
-            return pModuleUI;
-        }
-
-        GUI::SpectrumWorxEditor &editor_;
-    }; // struct ModuleUIInplaceConstructor
+    /// \note This used to be a Boost.Optional typed in-place factory, whose
+    /// apply() ran the widget construction below before the optional marked
+    /// itself as initialised. std::optional::emplace() engages first, so a
+    /// re-entrant gui() during doCreateGUI() now sees a half built ModuleUI
+    /// where it used to see an empty optional.
+    ///                                       (28.07.2026.) (SW port)
+    auto const constructModuleUI([&](GUI::ModuleUI &moduleUI) {
+        moduleUI.module().doCreateGUI(moduleUI);
+        LE_ASSERT_MSG(
+            moduleUI.getNumChildComponents() ==
+                (GUI::ModuleUI::baseWidgets + moduleUI.module().numberOfEffectSpecificParameters()),
+            "Unexpected number of child widgets at end of ModuleUI constructor.");
+        moduleUI.updateForEngineSetupChanges(editor.engineSetup());
+    });
 
     if (!GUI::isThisTheGUIThread())
     {
-        boost::intrusive_ptr<Module> pModule(this);
+        LE::Utility::IntrusivePtr<Module> pModule(this);
         GUI::postMessage([=, &editor]() { pModule->createGUI(editor, moduleIndex); });
         return;
     }
 
     try
     {
-        BOOST_ASSERT(GUI::isThisTheGUIThread() ||
-                     juce::MessageManager::getInstance()->currentThreadHasLockedMessageManager());
-        BOOST_ASSERT(!ui_);
-        ui_ = ModuleUIInplaceConstructor(editor);
-        BOOST_ASSERT(gui());
+        LE_ASSERT(GUI::isThisTheGUIThread() ||
+                  juce::MessageManager::getInstance()->currentThreadHasLockedMessageManager());
+        LE_ASSERT(!ui_);
+        constructModuleUI(ui_.emplace());
+        LE_ASSERT(gui());
 
 #ifndef NDEBUG
         /// \note Certain debug-only sanity checks may require early access to
@@ -85,7 +76,7 @@ void LE_NOTHROW Module::createGUI(GUI::SpectrumWorxEditor &editor, std::uint8_t 
         /// selected and that therefor its shared parameters UI is not active
         /// and does not need to be updated.
         ///                                   (07.02.2014.) (Domagoj Saric)
-        BOOST_ASSERT(!gui()->selected());
+        LE_ASSERT(!gui()->selected());
         gui()->setBypass(bypass());
 
         using GUI::ModuleControlBase;
@@ -115,8 +106,8 @@ bool LE_NOTHROW Module::destroyGUI()
     //                                        (18.11.2011.) (Domagoj Saric)
     if (GUI::isThisTheGUIThread() /*&& referenceCount_ == 1*/)
     {
-        BOOST_ASSERT(juce::MessageManager::getInstance()->currentThreadHasLockedMessageManager());
-        BOOST_ASSERT(
+        LE_ASSERT(juce::MessageManager::getInstance()->currentThreadHasLockedMessageManager());
+        LE_ASSERT(
             gui()); //...might not be true if not part of the "active chain"...checked outside for now...
 #if !LE_SW_SEPARATED_DSP_GUI
         /// \note Make sure the module is not 'used' from the processing thread
@@ -124,14 +115,14 @@ bool LE_NOTHROW Module::destroyGUI()
         ///                                       (18.03.2014.) (Domagoj Saric)
         auto const processingLock(gui()->getProcessingLock());
 #endif
-        gui() = boost::none;
+        gui() = std::nullopt;
         doDestroyGUI(*this);
         return true;
     }
     else if (gui())
     {
         GUI::postMessage(*this, [](GUI::ModuleUI &gui) {
-            BOOST_VERIFY(gui.module()./*...mrmlj...*/ destroyGUI());
+            LE_VERIFY(gui.module()./*...mrmlj...*/ destroyGUI());
             return true;
         });
         return false;
@@ -153,7 +144,7 @@ LE_NOTHROW float Module::setEffectParameter(std::uint8_t const effectParameterIn
                                             float const parameterValue)
 {
     float const setValue(ModuleDSP::setEffectParameter(effectParameterIndex, parameterValue));
-    BOOST_ASSERT(
+    LE_ASSERT(
         (parameterValue == setValue) ||
         (effectSpecificParameterInfo(effectParameterIndex).type != ParameterInfo::FloatingPoint));
     if (gui())
@@ -165,8 +156,8 @@ LE_NOTHROW float Module::setEffectParameter(std::uint8_t const effectParameterIn
 LE_NOTHROW float Module::setParameterValueFromUI(std::uint8_t const parameterIndex,
                                                  float const value)
 {
-    BOOST_ASSERT_MSG((parameterIndex == 0) || !lfo(parameterIndex - 1).enabled(),
-                     "Parameter changed from the GUI while its LFO is enabled?");
+    LE_ASSERT_MSG((parameterIndex == 0) || !lfo(parameterIndex - 1).enabled(),
+                  "Parameter changed from the GUI while its LFO is enabled?");
     return (parameterIndex < numberOfBaseParameters)
                ? ModuleDSP::setBaseParameter(parameterIndex, value)
                : ModuleDSP::setEffectParameter(effectSpecificParameterIndex(parameterIndex), value);

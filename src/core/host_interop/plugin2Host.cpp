@@ -15,13 +15,13 @@
 
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
 #include "le/spectrumworx/engine/moduleParameters.hpp"
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
 
 template <typename Char>
-LE_NOTHROWNOALIAS char *copyToBuffer(Char const *string,
-                                     boost::iterator_range<char *> const &buffer);
+LE_NOTHROWNOALIAS char *copyToBuffer(Char const *string, LE::Utility::Span<char> const &buffer);
 
 namespace Parameters
 {
@@ -66,7 +66,7 @@ LE_NOTHROW void
 Plugin2HostInteropControler::moduleChangedByUser(std::uint8_t const chainParameterIndex,
                                                  Module const *LE_RESTRICT const pModule) const
 {
-    BOOST_ASSERT(GUI::isThisTheGUIThread());
+    LE_ASSERT(GUI::isThisTheGUIThread());
 
     if (parameterListChanged())
         return;
@@ -87,7 +87,7 @@ LE_NOTHROW void Plugin2HostInteropControler::automatedParameterChanged(
     Module const &module, std::uint8_t const moduleIndex, std::uint8_t const moduleParameterIndex,
     float const parameterValue) const
 {
-    //BOOST_ASSERT( moduleParameterID.moduleParameterIndex < Constants::maxNumberOfParametersPerModule ); //...mrmlj...TuneWorx...
+    //LE_ASSERT( moduleParameterID.moduleParameterIndex < Constants::maxNumberOfParametersPerModule ); //...mrmlj...TuneWorx...
     /// \todo Consider a smarter place to put this check (currently needed only
     /// for TuneWorx).
     ///                                       (18.01.2012.) (Domagoj Saric)
@@ -145,7 +145,7 @@ Plugin2HostInteropControler::modulesChanged(AutomatedModuleChain const &chain,
                                             std::uint8_t /*const*/ firstModuleIndex,
                                             std::uint8_t /*const*/ lastModuleIndex) const
 {
-    //...mrmlj...BOOST_ASSERT( firstModuleIndex <= lastModuleIndex );
+    //...mrmlj...LE_ASSERT( firstModuleIndex <= lastModuleIndex );
 
     if (parameterListChanged())
         return;
@@ -159,8 +159,8 @@ Plugin2HostInteropControler::modulesChanged(AutomatedModuleChain const &chain,
     auto moduleIter(chain.Engine::ModuleChainImpl::module(moduleIndex)); //...mrmlj...
     while (moduleIndex != moduleIndexEnd)
     {
-        BOOST_ASSERT_MSG(moduleIter->referenceCount_ >= 3,
-                         "Module chain altered while notifying host about current state.");
+        LE_ASSERT_MSG(moduleIter->referenceCount_ >= 3,
+                      "Module chain altered while notifying host about current state.");
         Module const *pModule(nullptr);
         if (!chain.isEnd(moduleIter))
         {
@@ -197,29 +197,29 @@ struct Plugin2HostPassiveInteropController::ParameterNameGetter
     result_type operator()(ParameterID::Module, Program const *) const;
     result_type operator()(ParameterID::LFO, Program const *) const;
 
-    typedef boost::iterator_range<char *> Buffer;
+    typedef LE::Utility::Span<char> Buffer;
     Buffer const buffer_;
 }; // struct Plugin2HostPassiveInteropController
 #pragma warning(pop)
 
 LE_NOTHROWNOALIAS void
 Plugin2HostPassiveInteropController::getParameterLabel(ParameterID const parameterID,
-                                                       boost::iterator_range<char *> const label,
+                                                       LE::Utility::Span<char> const label,
                                                        Program const *LE_RESTRICT const pProgram)
 {
-    BOOST_ASSERT(label[0] == 0);
+    LE_ASSERT(label[0] == 0);
     char const *const pUnit(
         invokeFunctorOnIdentifiedParameter(parameterID, ParameterLabelGetter(), pProgram));
     if (pUnit)
     {
-        BOOST_ASSERT(std::strlen(pUnit) < unsigned(label.size() - 1));
+        LE_ASSERT(std::strlen(pUnit) < unsigned(label.size() - 1));
         std::strcpy(label.begin(), pUnit);
     }
 }
 
 #if 0
 LE_NOTHROWNOALIAS
-void Plugin2HostPassiveInteropController::getParameterDisplay( ParameterID const parameterID, boost::iterator_range<char *> const text, Engine::Setup const & engineSetup, Plugins::AutomatedParameterValue const * LE_RESTRICT const pValue, Program const & program )
+void Plugin2HostPassiveInteropController::getParameterDisplay( ParameterID const parameterID, LE::Utility::Span<char> const text, Engine::Setup const & engineSetup, Plugins::AutomatedParameterValue const * LE_RESTRICT const pValue, Program const & program )
 {
 #ifdef _WIN32
     LE_ASSUME( pValue == nullptr );
@@ -232,7 +232,7 @@ void Plugin2HostPassiveInteropController::getParameterDisplay( ParameterID const
 
 LE_NOTHROWNOALIAS void
 Plugin2HostPassiveInteropController::getParameterName(ParameterID const parameterID,
-                                                      boost::iterator_range<char *> const name,
+                                                      LE::Utility::Span<char> const name,
                                                       Program const *LE_RESTRICT const pProgram)
 {
     ParameterNameGetter const getter = {name};
@@ -241,13 +241,12 @@ Plugin2HostPassiveInteropController::getParameterName(ParameterID const paramete
 }
 
 LE_NOTHROWNOALIAS void Plugin2HostPassiveInteropController::getParameterIDs(
-    boost::iterator_range<Plugins::ParameterID *> const ids,
-    Program const *LE_RESTRICT const pProgram)
+    LE::Utility::Span<Plugins::ParameterID> const ids, Program const *LE_RESTRICT const pProgram)
 {
     //...mrmlj...parameter IDs used only by AU which doesn't use InputMode...
-    BOOST_ASSERT_MSG(ids.size() >= Program::Parameters::static_size - 1 /*InputMode*/ +
-                                       Constants::maxNumberOfModules,
-                     "ParameterIDs buffer too small.");
+    LE_ASSERT_MSG(ids.size() >= Program::Parameters::static_size - 1 /*InputMode*/ +
+                                    Constants::maxNumberOfModules,
+                  "ParameterIDs buffer too small.");
 
     Plugins::ParameterID *LE_RESTRICT pParameterID(ids.begin());
 
@@ -336,8 +335,8 @@ LE_NOTHROWNOALIAS void Plugin2HostPassiveInteropController::getParameterIDs(
         }
     }
 
-    BOOST_ASSERT(pParameterID <= ids.end());
-    BOOST_ASSERT(pParameterID == ids.end());
+    LE_ASSERT(pParameterID <= ids.end());
+    LE_ASSERT(pParameterID == ids.end());
 }
 
 LE_NOTHROWNOALIAS std::uint16_t
@@ -590,8 +589,8 @@ void Plugin2HostPassiveInteropController::ParameterNameGetter::operator()(
     // It was however, simplified to a single std::sprintf() after revision
     // 3602 as it was deemed enough.
     //                                    (22.02.2011.) (Domagoj Saric)
-    BOOST_VERIFY(unsigned(LE_INT_SPRINTFA(buffer_.begin(), "Module %u",
-                                          parameterID.moduleIndex + 1)) < buffer_.size());
+    LE_VERIFY(unsigned(LE_INT_SPRINTFA(buffer_.begin(), "Module %u", parameterID.moduleIndex + 1)) <
+              buffer_.size());
 }
 
 void Plugin2HostPassiveInteropController::ParameterNameGetter::operator()(
@@ -620,7 +619,7 @@ void Plugin2HostPassiveInteropController::ParameterNameGetter::operator()(
         *pPosition++ = 'P';
         pPosition += Utility::lexical_cast(
             Module::effectSpecificParameterIndex(parameterID.moduleParameterIndex) + 1, pPosition);
-        BOOST_ASSERT(pPosition <= buffer_.end());
+        LE_ASSERT(pPosition <= buffer_.end());
     }
     else
     {
@@ -632,7 +631,7 @@ void Plugin2HostPassiveInteropController::ParameterNameGetter::operator()(
                       ->effectSpecificParameterInfo(
                           pModule->effectSpecificParameterIndex(parameterID.moduleParameterIndex))
                       .name);
-        copyToBuffer(parameterName, boost::iterator_range<char *>(pPosition, buffer_.end()));
+        copyToBuffer(parameterName, LE::Utility::Span<char>(pPosition, buffer_.end()));
     }
 }
 
@@ -655,7 +654,7 @@ void Plugin2HostPassiveInteropController::ParameterNameGetter::operator()(
     if (!pModule &&
         (parameterID.moduleParameterIndex + 1 >= Effects::BaseParameters::Parameters::static_size))
     {
-        BOOST_VERIFY(
+        LE_VERIFY(
             unsigned(LE_INT_SPRINTFA(buffer_.begin(), "M%u.P%u.LFO.%s", parameterID.moduleIndex + 1,
                                      parameterID.moduleParameterIndex - (5 - 1) + 1,
                                      lfoParameterName)) < buffer_.size());
@@ -669,7 +668,7 @@ void Plugin2HostPassiveInteropController::ParameterNameGetter::operator()(
 
     Buffer remainingBuffer(&buffer_[std::strlen(buffer_.begin())], buffer_.end());
     remainingBuffer = Buffer(copyToBuffer(".LFO.", remainingBuffer), remainingBuffer.end());
-    BOOST_VERIFY(copyToBuffer(lfoParameterName, remainingBuffer) <= buffer_.end());
+    LE_VERIFY(copyToBuffer(lfoParameterName, remainingBuffer) <= buffer_.end());
 }
 
 #if 0  //...mrmlj...MSVC12u5 bad codegen
@@ -710,7 +709,7 @@ parameterIDFromIndex(Plugins::ParameterIndex const parameterIndex)
     ParameterID parameterID;
 
     LE_ASSUME(parameterIndex < maxNumberOfParameters);
-    BOOST_ASSERT(maxNumberOfParameters <= std::numeric_limits<std::uint16_t>::max());
+    LE_ASSERT(maxNumberOfParameters <= std::numeric_limits<std::uint16_t>::max());
     auto index(parameterIndex.value);
 
     if (index < Parameters::static_size)
@@ -751,10 +750,10 @@ parameterIDFromIndex(Plugins::ParameterIndex const parameterIndex)
     }
 
 #if LE_SW_ENGINE_INPUT_MODE >= 2
-    BOOST_ASSERT_MSG((LE::Parameters::IndexOf<Parameters, GlobalParameters::InputMode>::value ==
-                      parameterIndex) ||
-                         (parameterIndexFromBinaryID(parameterID.binaryValue) == parameterIndex),
-                     "Parameter index<->ID conversion broken.");
+    LE_ASSERT_MSG((LE::Parameters::IndexOf<Parameters, GlobalParameters::InputMode>::value ==
+                   parameterIndex) ||
+                      (parameterIndexFromBinaryID(parameterID.binaryValue) == parameterIndex),
+                  "Parameter index<->ID conversion broken.");
 #endif // LE_SW_ENGINE_INPUT_MODE >= 2
 
     return parameterID.binaryValue;
@@ -770,7 +769,7 @@ parameterIndexFromBinaryID(ParameterID::BinaryValue const parameterIDValue)
     parameterID.binaryValue = parameterIDValue;
 
     //...mrmlj...our VST2.4 code also uses IDs internally...
-    //BOOST_ASSERT_MSG
+    //LE_ASSERT_MSG
     //(
     //    ( parameterID.value._.global.index != LE::Parameters::IndexOf<Parameters, InputMode>::value ) ||
     //    ( parameterID.value.type           !=  ParameterID::GlobalParameter                         ),

@@ -50,8 +50,8 @@ char const *LE_COLD print(Source const parameterValue, SW::Engine::Setup const &
 {
     char const *const valueString(
         Detail::print<Parameter>(parameterValue, engineSetup, buffer, typename Parameter::Tag()));
-    BOOST_ASSERT((valueString != buffer.begin()) ||
-                 (std::strlen(valueString) < unsigned(buffer.size())));
+    LE_ASSERT((valueString != buffer.begin()) ||
+              (std::strlen(valueString) < unsigned(buffer.size())));
     return valueString;
 }
 

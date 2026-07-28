@@ -14,7 +14,7 @@
 #include "le/math/dft/fft.hpp"
 #include "le/math/vector.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 
 #include <algorithm>
 //------------------------------------------------------------------------------
@@ -68,8 +68,8 @@ namespace
 void addNewDataWorker(float const *LE_RESTRICT &pInputData, DataRange const &outputBuffer,
                       std::uint16_t const outputBufferPosition, std::uint16_t const sizeToCopy)
 {
-    BOOST_ASSERT_MSG(unsigned(outputBuffer.size()) >= unsigned(outputBufferPosition + sizeToCopy),
-                     "Buffer overflow.");
+    LE_ASSERT_MSG(unsigned(outputBuffer.size()) >= unsigned(outputBufferPosition + sizeToCopy),
+                  "Buffer overflow.");
     Math::copy(pInputData, outputBuffer.begin() + outputBufferPosition, sizeToCopy);
     pInputData += sizeToCopy;
 }
@@ -79,8 +79,8 @@ void ChannelBuffers::addNewData(float const *LE_RESTRICT &pNewMainChannelData,
                                 float const *LE_RESTRICT &pNewSideChannelData,
                                 std::uint16_t const sizeToCopy, bool const useSideChannel)
 {
-    BOOST_ASSERT_MSG(unsigned(inputOLAPosition_ + sizeToCopy) <= mainOLA_.size(),
-                     "Buffer size mismatch.");
+    LE_ASSERT_MSG(unsigned(inputOLAPosition_ + sizeToCopy) <= mainOLA_.size(),
+                  "Buffer size mismatch.");
 
     addNewDataWorker(pNewMainChannelData, mainOLA_, inputOLAPosition_, sizeToCopy);
     if (useSideChannel)
@@ -94,7 +94,7 @@ void ChannelBuffers::setCurrentDataToChannelData(bool const useSideChannel,
                                                  ReadOnlyDataRange const &window,
                                                  std::uint8_t const windowSizeFactor)
 {
-    BOOST_ASSERT_MSG(inputDataSize() == unsigned(window.size()), "Buffer size mismatch.");
+    LE_ASSERT_MSG(inputDataSize() == unsigned(window.size()), "Buffer size mismatch.");
     channelData_.setNewTimeDomainData(mainOLA_.begin(), useSideChannel ? sideOLA_.begin() : 0, fft,
                                       window, windowSizeFactor);
 }
@@ -119,15 +119,15 @@ namespace
 void shiftBufferToLeft(DataRange const &buffer, std::uint16_t const dataSize,
                        std::uint16_t const hopSize)
 {
-    BOOST_ASSERT_MSG(dataSize >= hopSize, "Move size too large.");
-    BOOST_ASSERT_MSG(dataSize <= static_cast<unsigned int>(buffer.size()), "Buffer size mismatch.");
+    LE_ASSERT_MSG(dataSize >= hopSize, "Move size too large.");
+    LE_ASSERT_MSG(dataSize <= static_cast<unsigned int>(buffer.size()), "Buffer size mismatch.");
     Math::move(&buffer[hopSize - 1] + 1, &buffer[0], dataSize - hopSize);
 }
 } // anonymous namespace
 
 void ChannelBuffers::moveForwardByHopSize(std::uint16_t const hopSize, bool const useSideChannel)
 {
-    BOOST_ASSERT_MSG(inputOLAPosition_ >= hopSize, "Move amount - buffer position mismatch");
+    LE_ASSERT_MSG(inputOLAPosition_ >= hopSize, "Move amount - buffer position mismatch");
 
     shiftBufferToLeft(mainOLA_, inputDataSize(), hopSize);
     if (useSideChannel)
@@ -136,7 +136,7 @@ void ChannelBuffers::moveForwardByHopSize(std::uint16_t const hopSize, bool cons
     inputOLAPosition_ -= hopSize;
 #ifndef LE_SW_PURE_ANALYSIS
     outputOLAPosition_ += hopSize;
-    BOOST_ASSERT_MSG(outputOLAPosition_ <= outputOLA_.size(), "Buffer overflow");
+    LE_ASSERT_MSG(outputOLAPosition_ <= outputOLA_.size(), "Buffer overflow");
 #endif // LE_SW_PURE_ANALYSIS
 }
 
@@ -148,10 +148,9 @@ float *ChannelBuffers::putNewTimeDomainDataToOutput(Math::FFT_float_real_1D cons
     LE_ASSUME(windowSizeFactor == 1);
 #endif // LE_SW_ENGINE_WINDOW_PRESUM
 
-    BOOST_ASSERT_MSG((readyOutputDataSize() + window.size()) <= outputOLA_.size(),
-                     "Buffer overflow.");
-    BOOST_ASSERT_MSG(window.size() == unsigned(fft.size() * windowSizeFactor),
-                     "Window-FFT sizes mismatched.");
+    LE_ASSERT_MSG((readyOutputDataSize() + window.size()) <= outputOLA_.size(), "Buffer overflow.");
+    LE_ASSERT_MSG(window.size() == unsigned(fft.size() * windowSizeFactor),
+                  "Window-FFT sizes mismatched.");
 
     bool const needFFTShift(windowSizeFactor == 1);
     float const *const pNewData(channelData_.getNewTimeDomainData(fft, needFFTShift));
@@ -164,8 +163,8 @@ float *ChannelBuffers::putNewTimeDomainDataToOutput(Math::FFT_float_real_1D cons
     unsigned int position(0);
     while (windowSizeFactor--)
     {
-        BOOST_ASSERT_MSG(&pOutput[position + frameSize] <= outputOLA_.end(),
-                         "Output OLA buffer overflow!");
+        LE_ASSERT_MSG(&pOutput[position + frameSize] <= outputOLA_.end(),
+                      "Output OLA buffer overflow!");
         Math::addProduct(pNewData, &window[position], &pOutput[position], frameSize);
         position += frameSize;
     }
@@ -198,7 +197,7 @@ void ChannelBuffers::extractChunkOfReadyOutputData(float *LE_RESTRICT const pTar
                                                    std::uint16_t const chunkSize,
                                                    std::uint16_t const incompleteOutputOLASamples)
 {
-    BOOST_ASSERT_MSG(chunkSize <= readyOutputDataSize(), "Insufficient data.");
+    LE_ASSERT_MSG(chunkSize <= readyOutputDataSize(), "Insufficient data.");
 
     // copy the results to the output location.
     Math::copy(outputOLA_.begin(), pTargetBuffer, chunkSize);
@@ -210,11 +209,10 @@ void ChannelBuffers::extractChunkOfReadyOutputData(float *LE_RESTRICT const pTar
     // chunk.
     std::uint16_t const validOutputSamples(readyOutputDataSize() + incompleteOutputOLASamples -
                                            chunkSize);
-    BOOST_ASSERT_MSG(unsigned(chunkSize + validOutputSamples) <= outputOLA_.size(),
-                     "Buffer overrun.");
+    LE_ASSERT_MSG(unsigned(chunkSize + validOutputSamples) <= outputOLA_.size(), "Buffer overrun.");
     Math::move(outputOLA_.begin() + chunkSize, outputOLA_.begin(), validOutputSamples);
 
-    BOOST_ASSERT(outputOLAPosition_ >= chunkSize);
+    LE_ASSERT(outputOLAPosition_ >= chunkSize);
     outputOLAPosition_ -= chunkSize;
 
     //  Zero the leftover samples on the right side, otherwise they would be
@@ -248,7 +246,7 @@ void ChannelBuffers::extractChunkOfReadyOutputData(float *LE_RESTRICT const pTar
 
 float *ChannelBuffers::inputBuffer()
 {
-    BOOST_ASSERT_MSG(channelData_.sourceTimeDomainDataWasConsumed(), "Incorrect buffer state.");
+    LE_ASSERT_MSG(channelData_.sourceTimeDomainDataWasConsumed(), "Incorrect buffer state.");
     return mainOLA_.begin();
 }
 

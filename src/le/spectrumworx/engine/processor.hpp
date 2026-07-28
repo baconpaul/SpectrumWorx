@@ -23,11 +23,6 @@
 
 #include <cstdint>
 //------------------------------------------------------------------------------
-namespace boost
-{
-template <class T> class intrusive_ptr;
-template <class T> class iterator_range;
-} // namespace boost
 //------------------------------------------------------------------------------
 namespace LE
 {

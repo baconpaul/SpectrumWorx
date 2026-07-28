@@ -18,8 +18,6 @@
 #include "le/parameters/linear/parameter.hpp"
 
 #include "boost/mpl/string.hpp"
-
-#include "boost/config/abi_prefix.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -77,7 +75,4 @@ struct SlewLimiter
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------
-
-#include "boost/config/abi_suffix.hpp"
-
 #endif // slewLimiter_hpp

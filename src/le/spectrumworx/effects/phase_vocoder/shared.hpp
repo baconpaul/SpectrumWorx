@@ -23,7 +23,7 @@
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/utility/platformSpecifics.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 
 #include <cstdint>
 #include <utility>

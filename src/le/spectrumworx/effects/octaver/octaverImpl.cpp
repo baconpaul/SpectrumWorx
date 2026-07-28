@@ -130,7 +130,7 @@ void OctaverImpl::process(ChannelState &cs, Engine::ChannelData_AmPh2ReIm data,
         shiftAndMix(data, shiftedInput, engineSetup, cs.pv2, 1);
     }
 
-    BOOST_ASSERT(cutoff_ <= outputData.numberOfBins());
+    LE_ASSERT(cutoff_ <= outputData.numberOfBins());
     clear(outputData.reals().begin() + cutoff_, outputData.reals().end());
     clear(outputData.imags().begin() + cutoff_, outputData.imags().end());
 }

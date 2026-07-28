@@ -58,8 +58,7 @@ template <class ImplWidget> class LE_NOVTABLE ModuleControl
     void moduleParameterChanged() { impl().ModuleControlBase::moduleParameterChanged(); }
 
     ModuleControlBase &control()
-    { /*BOOST_ASSERT( &ModuleControlBase::controlForWidget( impl() ) == &impl() );*/ return impl();
-    }
+    { /*LE_ASSERT( &ModuleControlBase::controlForWidget( impl() ) == &impl() );*/ return impl(); }
 
   protected: // Default implementations for the module control interface
     static bool const mouseClickCanGrabFocus = false;
@@ -259,13 +258,13 @@ class ModuleControlImpl final : public ModuleControlBase, public ImplWidget
   private:
     virtual void focusGained(juce::Component::FocusChangeType) override
     {
-        BOOST_ASSERT(this->getWantsKeyboardFocus());
+        LE_ASSERT(this->getWantsKeyboardFocus());
         reportActiveControl();
         ImplWidget::focusChanged();
     }
     virtual void focusLost(juce::Component::FocusChangeType) noexcept override
     {
-        BOOST_ASSERT(this->getWantsKeyboardFocus());
+        LE_ASSERT(this->getWantsKeyboardFocus());
         reportInactiveControl();
         ImplWidget::focusChanged();
     }

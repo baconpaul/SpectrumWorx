@@ -32,12 +32,15 @@
 #include "juce/juce_gui_basics/windows/juce_ComponentPeer.h"
 #include "juce/endIncludes.hpp"
 
-#include "boost/assert.hpp"
-#include "boost/polymorphic_cast.hpp"
-#include "boost/smart_ptr/intrusive_ptr.hpp"
-#include "boost/utility/in_place_factory.hpp"
+#include "le/utility/assert.hpp"
+#include "le/utility/polymorphicDowncast.hpp"
+#include "le/utility/intrusivePtr.hpp"
+#include "le/utility/ignoreUnused.hpp"
 
 #include <array>
+#include <optional>
+#include <string_view>
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -73,7 +76,7 @@ template <> void fillComboBoxForParameter<Engine::OverlapFactor>(ComboBox &combo
         using LE::Parameters::DisplayValueTransformer;
         using LE::Parameters::print;
         print<Parameter>(value, const_cast<Engine::Setup const &>(*pEngineSetup),
-                         boost::make_iterator_range_n(&buffer[0], buffer.size()));
+                         LE::Utility::makeSpan(&buffer[0], buffer.size()));
         std::strcat(
             &buffer[0],
             boost::mpl::c_str<DisplayValueTransformer<Engine::OverlapFactor>::Suffix>::value);
@@ -143,7 +146,7 @@ SpectrumWorxEditor::SpectrumWorxEditor()
                            MixPercentage::maximum(), MixPercentage::default_());
 
     updateMainKnobs();
-    BOOST_ASSERT(!settings_);
+    LE_ASSERT(!settings_);
 
 #ifndef LE_SW_DISABLE_SIDE_CHANNEL
     // Implementation note:
@@ -187,7 +190,7 @@ SpectrumWorxEditor::SpectrumWorxEditor()
 
 LE_NOTHROW SpectrumWorxEditor::~SpectrumWorxEditor()
 {
-    BOOST_ASSERT(GUI::isThisTheGUIThread());
+    LE_ASSERT(GUI::isThisTheGUIThread());
 
 #ifndef LE_SW_DISABLE_SIDE_CHANNEL
     effect().deregisterSampleLoadedListener(*this);
@@ -207,19 +210,19 @@ LE_NOTHROW SpectrumWorxEditor::~SpectrumWorxEditor()
     /// it will refocus the ModuleUI being destroyed, just what we are trying
     /// to avoid).
     ///                                       (13.01.2012.) (Domagoj Saric)
-    BOOST_ASSERT(getWantsKeyboardFocus());
-    BOOST_ASSERT(getMouseClickGrabsKeyboardFocus());
+    LE_ASSERT(getWantsKeyboardFocus());
+    LE_ASSERT(getMouseClickGrabsKeyboardFocus());
     grabKeyboardFocus();
     destroyChainGUIs(moduleChain());
 
     /// \note
-    ///   Required now that boost::optional does not mark itself as
+    ///   Required now that std::optional does not mark itself as
     /// uninitialised in its destructor so the PresetBrowser would think that
     /// the Settings window still exists (and vice verse) in its destructor.
     ///                                       (12.01.2012.) (Domagoj Saric)
     //...mrmlj...think of a cleaner solution...
-    settings_ = boost::none;
-    presetBrowser_ = boost::none;
+    settings_ = std::nullopt;
+    presetBrowser_ = std::nullopt;
 
 #if defined(__APPLE__) && !defined(__x86_64__)
     if (pCocoaHostWindow_)
@@ -240,7 +243,7 @@ void SpectrumWorxEditor::attachToHostWindow(HWND const parentWindowHandle)
     //...mrmlj...taken from the JUCE VST wrapper
     juce::Component::addToDesktop(0);
     HWND const thisHWND(reinterpret_cast<HWND>(this->getWindowHandle()));
-    BOOST_VERIFY(::SetParent(thisHWND, parentWindowHandle));
+    LE_VERIFY(::SetParent(thisHWND, parentWindowHandle));
 
     DWORD val(::GetWindowLong(thisHWND, GWL_STYLE));
     val = (val & ~WS_POPUP) | WS_CHILD;
@@ -268,11 +271,11 @@ void SpectrumWorxEditor::attachToHostWindow(WindowRef const parentWindow)
 LE_NOTHROW
 LE_PURE_FUNCTION SpectrumWorxEditor &SpectrumWorxEditor::fromChild(juce::Component const &widget)
 {
-    BOOST_ASSERT(widget.getParentComponent());
+    LE_ASSERT(widget.getParentComponent());
     juce::Component *pParent(widget.getParentComponent());
     while (pParent->getParentComponent())
         pParent = pParent->getParentComponent();
-    return *boost::polymorphic_downcast<SpectrumWorxEditor *>(pParent);
+    return *LE::Utility::polymorphicDowncast<SpectrumWorxEditor *>(pParent);
 }
 
 LE_NOTHROW LE_PURE_FUNCTION SpectrumWorxEditor &
@@ -347,12 +350,12 @@ Utility::CriticalSectionLock LE_NOTHROW SpectrumWorxEditor::getProcessingLock() 
 void SpectrumWorxEditor::togglePresetBrowser(juce::Button const &button)
 {
     auto &editor(SpectrumWorxEditor::fromChild(button));
-    BOOST_ASSERT(editor.getPeer());
+    LE_ASSERT(editor.getPeer());
     bool const open(button.getToggleState());
     if (open)
-        editor.presetBrowser_ = boost::in_place();
+        editor.presetBrowser_.emplace();
     else
-        editor.presetBrowser_ = boost::none;
+        editor.presetBrowser_ = std::nullopt;
 }
 
 void SpectrumWorxEditor::setDefaultFocusHandling()
@@ -395,13 +398,13 @@ void SpectrumWorxEditor::moduleDrag(ModuleUI &moduleUI, juce::MouseEvent const &
 
             unsigned int const gradientIndex((mousePosition.getX() - firstGradientOffset) /
                                              (ModuleUI::width + ModuleUI::distance));
-            BOOST_ASSERT(gradient_.getHeight() == ModuleUI::height);
-            BOOST_ASSERT(gradient_.getWidth() == ModuleUI::width);
+            LE_ASSERT(gradient_.getHeight() == ModuleUI::height);
+            LE_ASSERT(gradient_.getWidth() == ModuleUI::width);
 
             unsigned int const gradientOffset(
                 firstGradientOffset + (gradientIndex * (ModuleUI::width + ModuleUI::distance)));
             gradient_.setTopLeftPosition(gradientOffset, ModuleUI::verticalOffset);
-            BOOST_ASSERT(!gradient_.getBounds().intersects(sourceRect));
+            LE_ASSERT(!gradient_.getBounds().intersects(sourceRect));
         }
         gradient_.setIsVisible(showGradient);
     }
@@ -435,14 +438,14 @@ void SpectrumWorxEditor::moduleDragEnd(ModuleUI &moduleUI, juce::MouseEvent cons
     Host2PluginInteropControler::AutomationBlocker const automationBlocker(
         /*host*/ moduleChainOwner /*mrmlj*/ ());
 
-    BOOST_ASSERT(!gradient_.getBounds().intersects(moduleUI.getBounds()));
+    LE_ASSERT(!gradient_.getBounds().intersects(moduleUI.getBounds()));
     unsigned int const slotWidth(ModuleUI::width + ModuleUI::distance);
     unsigned int const sourceX(moduleUI.getX());
     unsigned int targetX(gradient_.getX());
     bool const moveLeft(static_cast<unsigned int>(gradient_.getRight()) < sourceX);
     int const gradientToTargetOffset((ModuleUI::width + ModuleUI::distance) / 2);
     targetX -= moveLeft ? -gradientToTargetOffset : +gradientToTargetOffset;
-    BOOST_ASSERT((signed(targetX - sourceX) % signed(slotWidth)) == 0);
+    LE_ASSERT((signed(targetX - sourceX) % signed(slotWidth)) == 0);
     moduleUI.setTopLeftPosition(targetX, ModuleUI::verticalOffset);
 
     int const offset(moveLeft ? +static_cast<int>(slotWidth) : -static_cast<int>(slotWidth));
@@ -463,7 +466,7 @@ void SpectrumWorxEditor::moduleDragEnd(ModuleUI &moduleUI, juce::MouseEvent cons
 
 void SpectrumWorxEditor::setLastModulePosition(std::uint_fast8_t const slotIndex)
 {
-    BOOST_ASSERT(slotIndex <= SW::Constants::maxNumberOfModules);
+    LE_ASSERT(slotIndex <= SW::Constants::maxNumberOfModules);
     nextAvailableModuleSlot_ = slotIndex;
     moduleMenuButton_.moveToSlot(slotIndex);
 }
@@ -546,13 +549,13 @@ void SpectrumWorxEditor::buttonClicked(juce::Button *const pButton)
         }
         else
         {
-            BOOST_ASSERT(settings_);
-            settings_ = boost::none;
+            LE_ASSERT(settings_);
+            settings_ = std::nullopt;
         }
     }
     else
     {
-        BOOST_ASSERT(pButton == &preset_);
+        LE_ASSERT(pButton == &preset_);
         togglePresetBrowser(*pButton);
     }
 }
@@ -590,7 +593,7 @@ LE_NOTHROW void SpectrumWorxEditor::updateActiveControlValue()
 {
     try
     {
-        BOOST_ASSERT(lfoDisplay_);
+        LE_ASSERT(lfoDisplay_);
         LFODisplay const &lfoDisplay(/*static_cast<LFODisplay const &>*/ (*lfoDisplay_));
         if (lfoDisplay.lfo().enabled())
             setActiveControlValue("[LFO]");
@@ -620,7 +623,7 @@ void SpectrumWorxEditor::updateSampleNameAsync()
     {
         effect().registerSampleLoadedListener(*this);
         setSampleLoadingStatus();
-        BOOST_ASSERT(
+        LE_ASSERT(
             effect()
                 .isSampleLoadInProgress()); //...mrmlj...handle this threading issue properly....
     }
@@ -660,7 +663,7 @@ void LE_NOTHROW SpectrumWorxEditor::removeModule(ModuleUI &moduleUI)
     auto const lastModuleIndex(nextAvailableModuleSlot_ - 1);
     moveModules(moduleUI, lastModuleIndex - firstModuleIndex, offset);
     moduleRemoved();
-    BOOST_VERIFY(setModuleInSlot(slot, AutomatedModuleChain::noModule).first == nullptr);
+    LE_VERIFY(setModuleInSlot(slot, AutomatedModuleChain::noModule).first == nullptr);
     host().gestureBegin("Remove module");
     host().modulesChanged(moduleChain(), firstModuleIndex, lastModuleIndex);
     host().gestureEnd();
@@ -686,7 +689,7 @@ void LE_NOTHROW SpectrumWorxEditor::moveModules(ModuleUI &targetSlotUI,
     }
 }
 
-std::pair<boost::intrusive_ptr<SpectrumWorxEditor::Module>, std::int8_t> LE_NOTHROW
+std::pair<LE::Utility::IntrusivePtr<SpectrumWorxEditor::Module>, std::int8_t> LE_NOTHROW
 SpectrumWorxEditor::setModuleInSlot(std::uint8_t const slotIndex, std::int8_t const effectIndex)
 {
     return moduleChainOwner().moduleChain().setParameter(slotIndex, effectIndex,
@@ -700,7 +703,7 @@ void LE_NOTHROW SpectrumWorxEditor::addUserAddedModule(std::uint8_t const effect
     // the module creation to be done synchronously, in order for the focus
     // grabbing to be safe.
     //                                        (06.07.2011.) (Domagoj Saric)
-    BOOST_ASSERT(isThisTheGUIThread());
+    LE_ASSERT(isThisTheGUIThread());
     // Implementation note:
     //   We want any user-added module (using the add module menu) to
     // automatically gain focus.
@@ -713,8 +716,8 @@ void LE_NOTHROW SpectrumWorxEditor::addUserAddedModule(std::uint8_t const effect
     /// starts pumping messages seemingly queued by SoundForge at some point,
     /// one of which causes a call to loadProgramState()).
     ///                                       (24.01.2013.) (Domagoj Saric)
-    BOOST_ASSERT(getWantsKeyboardFocus());
-    BOOST_ASSERT(getMouseClickGrabsKeyboardFocus());
+    LE_ASSERT(getWantsKeyboardFocus());
+    LE_ASSERT(getMouseClickGrabsKeyboardFocus());
     juce::MessageManager::getInstance()->runDispatchLoopUntil(2);
     this->grabKeyboardFocus();
 #endif // _WIN32
@@ -723,7 +726,7 @@ void LE_NOTHROW SpectrumWorxEditor::addUserAddedModule(std::uint8_t const effect
     std::int8_t const actualEffectIndex(result.second);
     if (actualEffectIndex == effectIndex) //...mrmlj...
     {
-        BOOST_ASSERT(result.first);
+        LE_ASSERT(result.first);
         std::uint8_t const changedSlot(nextAvailableModuleSlot_);
         moduleAdded();
         result.first->gui()->grabKeyboardFocus();
@@ -733,8 +736,8 @@ void LE_NOTHROW SpectrumWorxEditor::addUserAddedModule(std::uint8_t const effect
     }
     else
     { // failed module creation
-        BOOST_ASSERT(result.first == nullptr);
-        BOOST_ASSERT(result.second == noModule);
+        LE_ASSERT(result.first == nullptr);
+        LE_ASSERT(result.second == noModule);
     }
 }
 
@@ -752,7 +755,7 @@ struct SpectrumWorxEditor::PresetLoader
 
     ModuleInitialiser moduleInitialiser() { return editor.moduleInitialiser(); }
 
-    static boost::none_t processingLock() { return boost::none; }
+    static std::nullopt_t processingLock() { return std::nullopt; }
 
     static bool onlySetParameters() { return false; }
 
@@ -802,7 +805,7 @@ struct SpectrumWorxEditor::PresetLoader
 
 #ifndef LE_SW_DISABLE_SIDE_CHANNEL
     bool wantsSampleFile() const { return false; }
-    void setSample(boost::string_ref /*const sampleFileName*/) { LE_UNREACHABLE_CODE(); }
+    void setSample(std::string_view /*const sampleFileName*/) { LE_UNREACHABLE_CODE(); }
     bool const ignoreSampleFile;
 #endif // LE_SW_DISABLE_SIDE_CHANNEL
 
@@ -864,8 +867,8 @@ char const *SpectrumWorxEditor::currentProgramName() const
 
 void SpectrumWorxEditor::moduleActivated()
 {
-    BOOST_ASSERT(isThisTheGUIThread());
-    BOOST_ASSERT(ModuleUI::selectedModule());
+    LE_ASSERT(isThisTheGUIThread());
+    LE_ASSERT(ModuleUI::selectedModule());
     ModuleUI const &module(*ModuleUI::selectedModule());
     setActiveModuleName(module.getName());
     if (!ModuleControlBase::activeControl())
@@ -880,7 +883,7 @@ void SpectrumWorxEditor::moduleActivated()
     /// possibly be already created.
     ///                                       (17.01.2012.) (Domagoj Saric)
     if (!sharedModuleControls_)
-        sharedModuleControls_ = boost::in_place();
+        sharedModuleControls_.emplace();
     else
         sharedModuleControls_->setEnabled(true);
     sharedModuleControls_->updateForActiveModule();
@@ -888,7 +891,7 @@ void SpectrumWorxEditor::moduleActivated()
 
 void SpectrumWorxEditor::moduleDeactivated()
 {
-    BOOST_ASSERT(ModuleUI::selectedModule());
+    LE_ASSERT(ModuleUI::selectedModule());
 
     // Implementation note:
     //   We need to prevent JUCE from transferring focus to other module UIs
@@ -900,14 +903,14 @@ void SpectrumWorxEditor::moduleDeactivated()
     // transferring focus to the editor window if the module being deactivated
     // (and possibly destroyed) is currently focused.
     //                                        (03.01.2012.) (Domagoj Saric)
-    BOOST_ASSERT(this->getWantsKeyboardFocus());
+    LE_ASSERT(this->getWantsKeyboardFocus());
     if (ModuleUI::selectedModule()->juce::Component::isParentOf(getCurrentlyFocusedComponent()))
     {
         this->grabKeyboardFocus();
-        BOOST_ASSERT(hasDirectFocus());
+        LE_ASSERT(hasDirectFocus());
     }
 
-    BOOST_ASSERT_MSG(!lfoDisplay_ || !lfoDisplay_->isEnabled(), "Module controls not deactivated.");
+    LE_ASSERT_MSG(!lfoDisplay_ || !lfoDisplay_->isEnabled(), "Module controls not deactivated.");
 
     setActiveModuleName(juce::String::empty);
     setActiveControlName(juce::String::empty);
@@ -927,7 +930,7 @@ void SpectrumWorxEditor::moduleDeactivated()
                 if (static_cast<bool const volatile &>(editor.holdSharedModuleControls_))
                     return false;
                 else
-                    sharedModuleControls = boost::none;
+                    sharedModuleControls = std::nullopt;
             }
             return true;
         });
@@ -954,7 +957,7 @@ void SpectrumWorxEditor::moduleControlActivated(ModuleControlBase &control, doub
     /// one of its thumbs can be activated w/o first deactivating the other).
     ///                                       (17.01.2012.) (Domagoj Saric)
     if (!lfoDisplay_)
-        lfoDisplay_ = boost::in_place();
+        lfoDisplay_.emplace();
     else
         lfoDisplay_->setEnabled(true);
 
@@ -969,10 +972,10 @@ void SpectrumWorxEditor::moduleControlActivated(ModuleControlBase &control, doub
 
 void SpectrumWorxEditor::moduleControlDectivated(ModuleControlBase const &control)
 {
-    BOOST_ASSERT(lfoDisplay_);
-    BOOST_ASSERT_MSG((&static_cast<LFODisplay const &>(*lfoDisplay_).control() == &control),
-                     "Deactivating active module control through a wrong control.");
-    boost::ignore_unused_variable_warning(control);
+    LE_ASSERT(lfoDisplay_);
+    LE_ASSERT_MSG((&static_cast<LFODisplay const &>(*lfoDisplay_).control() == &control),
+                  "Deactivating active module control through a wrong control.");
+    LE::Utility::ignoreUnused(control);
 
     setActiveControlName(ModuleUI::selectedModule() ? ModuleUI::selectedModule()->description()
                                                     : juce::String::empty);
@@ -995,9 +998,9 @@ void SpectrumWorxEditor::moduleControlDectivated(ModuleControlBase const &contro
                 if (static_cast<bool const volatile &>(editor.holdLFODisplay_))
                     return false;
                 else
-                    lfoDisplay = boost::none;
-                BOOST_ASSERT(editor.getWantsKeyboardFocus());
-                BOOST_ASSERT(editor.getMouseClickGrabsKeyboardFocus());
+                    lfoDisplay = std::nullopt;
+                LE_ASSERT(editor.getWantsKeyboardFocus());
+                LE_ASSERT(editor.getMouseClickGrabsKeyboardFocus());
             }
             return true;
         });
@@ -1025,7 +1028,7 @@ void SpectrumWorxEditor::mainKnobDragStopped(std::uint8_t const index) const
 void LE_NOTHROW SpectrumWorxEditor::createChainGUIs(AutomatedModuleChain &chain)
 {
 #if LE_SW_SEPARATED_DSP_GUI
-    boost::ignore_unused_variable_warning(chain);
+    LE::Utility::ignoreUnused(chain);
 #else
     // http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2012/n3424.pdf
     std::uint8_t moduleIndex(0);
@@ -1037,7 +1040,7 @@ void LE_NOTHROW SpectrumWorxEditor::createChainGUIs(AutomatedModuleChain &chain)
 void LE_NOTHROW SpectrumWorxEditor::destroyChainGUIs(AutomatedModuleChain &chain)
 {
 #if LE_SW_SEPARATED_DSP_GUI
-    boost::ignore_unused_variable_warning(chain);
+    LE::Utility::ignoreUnused(chain);
 #else
     chain.forEach<Module>([](Module &module) { module.destroyGUI(); });
     setLastModulePosition(0);
@@ -1055,15 +1058,15 @@ void SpectrumWorxEditor::mouseDown(juce::MouseEvent const &event)
 
 void SpectrumWorxEditor::showSettings(unsigned int const pageIndexToActivate)
 {
-    if (!settings_.is_initialized())
-        settings_ = boost::in_place();
+    if (!settings_.has_value())
+        settings_.emplace();
     settings_->setCurrentTabIndex(pageIndexToActivate, false);
     settingsButton_.setToggleState(true, juce::dontSendNotification);
 }
 
 void SpectrumWorxEditor::updateSettings()
 {
-    if (settings_.is_initialized())
+    if (settings_.has_value())
         settings_->updateEnginePage();
 }
 
@@ -1130,7 +1133,7 @@ void SpectrumWorxEditor::updateForEngineSetupChanges()
     moduleChain().forEach<Module>([&](Module &module) {
 #ifndef LE_SW_FMOD
         //...mrmlj...when switching programs...
-        BOOST_ASSERT(module.gui());
+        LE_ASSERT(module.gui());
         if (module.gui())
 #endif // LE_SW_FMOD
             module.gui()->updateForEngineSetupChanges(engineSetup);
@@ -1140,7 +1143,7 @@ void SpectrumWorxEditor::updateForEngineSetupChanges()
 void SpectrumWorxEditor::updateForNewTimingInfo()
 {
     // This gets called from a non GUI thread.
-    BOOST_ASSERT(!holdLFODisplay_);
+    LE_ASSERT(!holdLFODisplay_);
     holdLFODisplay_ = true;
     if (lfoDisplay_ && lfoDisplay_->isEnabled())
         lfoDisplay_->updateForNewTimingInfo();
@@ -1152,7 +1155,7 @@ void SpectrumWorxEditor::updateLFO(ModuleUI const &moduleUI, std::uint8_t const 
                                    Plugins::AutomatedParameterValue const value)
 {
     // This gets called from a non GUI thread.
-    BOOST_ASSERT(!holdLFODisplay_);
+    LE_ASSERT(!holdLFODisplay_);
     holdLFODisplay_ = true;
     if (lfoDisplay_ && lfoDisplay_->isEnabled())
         lfoDisplay_->updateForChangedParameters(moduleUI, parameterIndex, lfoParameterIndex, value);
@@ -1190,13 +1193,13 @@ void SpectrumWorxEditor::ModuleMenuButton::moveToSlot(std::uint8_t const slotInd
 void SpectrumWorxEditor::ModuleMenuButton::clicked()
 {
     SpectrumWorxEditor &editor(
-        *boost::polymorphic_downcast<SpectrumWorxEditor *>(this->getParentComponent()));
-    BOOST_ASSERT(editor.nextAvailableModuleSlot_ < SW::Constants::maxNumberOfModules);
+        *LE::Utility::polymorphicDowncast<SpectrumWorxEditor *>(this->getParentComponent()));
+    LE_ASSERT(editor.nextAvailableModuleSlot_ < SW::Constants::maxNumberOfModules);
     PopupMenu::OptionalID const chosenMenuEntryID(
         editor.moduleMenu_.topMenu().showCenteredAtRight(*this));
-    if (chosenMenuEntryID.is_initialized())
+    if (chosenMenuEntryID.has_value())
     {
-        BOOST_ASSERT(editor.moduleMenu_.isOwnerOfEntry(*chosenMenuEntryID));
+        LE_ASSERT(editor.moduleMenu_.isOwnerOfEntry(*chosenMenuEntryID));
         std::uint8_t const effectIndex(editor.moduleMenu_.effectIndexForEntry(*chosenMenuEntryID));
         editor.addUserAddedModule(effectIndex);
     }
@@ -1246,7 +1249,7 @@ void fillLFOWaveformsMenu(PopupMenu &menu)
         &resourceBitmap<LFORandomWhacko>(), &resourceBitmap<LFODirac>(),
         &resourceBitmap<LFOdIRAC>()};
 
-    //BOOST_ASSERT( menu.getNumItems() == 0 );...mrmlj...add size information to the new ComboBox class...
+    //LE_ASSERT( menu.getNumItems() == 0 );...mrmlj...add size information to the new ComboBox class...
     unsigned int itemId(0);
     juce::Image const *LE_RESTRICT const *ppIcon = icons;
     for (auto const waveFormName : LE::Parameters::DiscreteValues<LFO::Waveform>::strings)
@@ -1415,7 +1418,7 @@ juce::String periodRatioString(SpectrumWorxEditor::LFODisplay const &parent,
     unsigned int const charactersWritten(
         LE_INT_SPRINTFA(&buffer[0], "%u/%u%s bars", Math::convert<unsigned int>(numerator),
                         Math::convert<unsigned int>(denominator), suffix));
-    BOOST_ASSERT(charactersWritten < buffer.size());
+    LE_ASSERT(charactersWritten < buffer.size());
     return juce::String(&buffer[0], charactersWritten);
 }
 
@@ -1446,8 +1449,8 @@ juce::String phaseString(SpectrumWorxEditor::LFODisplay const & /*parent*/,
 juce::String rangeValueString(SpectrumWorxEditor::LFODisplay const &parent,
                               double const &periodScale)
 {
-    BOOST_ASSERT(ModuleControlBase::activeControl());
-    BOOST_ASSERT(parent.control().isActive());
+    LE_ASSERT(ModuleControlBase::activeControl());
+    LE_ASSERT(parent.control().isActive());
     return parent.control().getTextFromValue(static_cast<float>(periodScale));
 }
 
@@ -1509,10 +1512,10 @@ void SpectrumWorxEditor::LFODisplay::paint(juce::Graphics &graphics)
     //...mrmlj...ugh...2.6.x quick-fix workarounds...reinvestigate and clean this up...
     if (!this->isEnabled())
         return;
-    BOOST_ASSERT(ModuleControlBase::activeControl() != nullptr);
-    BOOST_ASSERT(ModuleControlBase::activeControl() == &control());
-    BOOST_ASSERT(control().isActive());
-    BOOST_ASSERT(getParentComponent() == &editor());
+    LE_ASSERT(ModuleControlBase::activeControl() != nullptr);
+    LE_ASSERT(ModuleControlBase::activeControl() == &control());
+    LE_ASSERT(control().isActive());
+    LE_ASSERT(getParentComponent() == &editor());
 
     {
         graphics.setFont(DrawableText::defaultFont());
@@ -1528,8 +1531,7 @@ void SpectrumWorxEditor::LFODisplay::paint(juce::Graphics &graphics)
     sliderTexts[3].value = range_.getMinValue();
     sliderTexts[4].value = phase_.getValue();
 
-    for (auto const &text :
-         boost::make_iterator_range(sliderTexts).advance_begin(skipPeriodRatio(period_)))
+    for (auto const &text : LE::Utility::makeSpan(sliderTexts).subspan(skipPeriodRatio(period_)))
     {
         graphics.drawText(text.getString(*this, text.value), text.x, text.y, text.width,
                           text.height, text.justification, false);
@@ -1545,7 +1547,7 @@ void SpectrumWorxEditor::LFODisplay::buttonClicked(juce::Button *const pButton)
     if (pButton == &switch_)
     {
         bool const enable(switch_.getToggleState());
-        BOOST_ASSERT(enable != lfo.enabled());
+        LE_ASSERT(enable != lfo.enabled());
         updateParameterAndNotifyHost<LFO::Enabled>(enable);
         control().lfoStateChanged();
         editor().updateActiveControlValue();
@@ -1561,7 +1563,7 @@ void SpectrumWorxEditor::LFODisplay::buttonClicked(juce::Button *const pButton)
     }
     else
     {
-        BOOST_ASSERT(LFO::Timer::hasTempoInformation());
+        LE_ASSERT(LFO::Timer::hasTempoInformation());
 
         LFO::SyncType syncType;
         if (pButton == &quarter_)
@@ -1574,7 +1576,7 @@ void SpectrumWorxEditor::LFODisplay::buttonClicked(juce::Button *const pButton)
         }
         else
         {
-            BOOST_ASSERT(pButton == &dotted_);
+            LE_ASSERT(pButton == &dotted_);
             syncType = LFO::Dotted;
         }
 
@@ -1609,7 +1611,7 @@ void SpectrumWorxEditor::LFODisplay::sliderValueChanged(juce::Slider *const pSli
     }
     else
     {
-        BOOST_ASSERT(pSlider == &phase_);
+        LE_ASSERT(pSlider == &phase_);
         updateParameterAndNotifyHost<LFO::Phase>(phase_.getValue());
     }
 }
@@ -1730,11 +1732,11 @@ void SpectrumWorxEditor::LFODisplay::verifyGUIAndLFOConsistency() const
 #ifndef NDEBUG
     //...mrmlj...
     //...mrmlj...the rounding error difference is too great even for the nearEqual() function...
-    //BOOST_ASSERT( Math::nearEqual( lfo().periodScale(), static_cast<LFO::value_type>( period_.getValue() ) ) );
-    //BOOST_ASSERT( Math::abs( lfo().periodScale() - period_.getValue() ) < 0.001 );
+    //LE_ASSERT( Math::nearEqual( lfo().periodScale(), static_cast<LFO::value_type>( period_.getValue() ) ) );
+    //LE_ASSERT( Math::abs( lfo().periodScale() - period_.getValue() ) < 0.001 );
     double const guiPeriod(lfo().periodScale());
     double const lfoPeriod(period_.getValue());
-    BOOST_ASSERT(Math::abs(guiPeriod - lfoPeriod) < 0.001);
+    LE_ASSERT(Math::abs(guiPeriod - lfoPeriod) < 0.001);
 #endif // NDEBUG
 }
 
@@ -1749,7 +1751,7 @@ LE_NOTHROW LE_PURE_FUNCTION SpectrumWorxEditor &SpectrumWorxEditor::LFODisplay::
     SpectrumWorxEditor &editor(
         Utility::ParentFromOptionalMember<SpectrumWorxEditor, LFODisplay,
                                           &SpectrumWorxEditor::lfoDisplay_, false>()(*this));
-    BOOST_ASSERT((&editor == this->getParentComponent()) || !this->getParentComponent());
+    LE_ASSERT((&editor == this->getParentComponent()) || !this->getParentComponent());
     return editor;
 }
 
@@ -1808,7 +1810,7 @@ void SpectrumWorxEditor::SampleArea::mouseUp(juce::MouseEvent const &event)
             editor.effect().currentSampleFile(), Sample::supportedFormats(), true);
         if (fileChooser.browseForFileToOpen(0))
         {
-            BOOST_ASSERT(fileChooser.getResults().size() == 1);
+            LE_ASSERT(fileChooser.getResults().size() == 1);
             editor.newSampleFileSelected(fileChooser.getResults().getReference(0));
         }
     }
@@ -1897,7 +1899,7 @@ void SpectrumWorxEditor::Settings::sliderValueChanged(juce::Slider *const pSlide
 
     juce::Colour const tabBackground(juce::Colours::black.withAlpha(
         static_cast<float>(std::pow(Theme::singleton().settings().globalOpacity, 14))));
-    BOOST_ASSERT(getTabbedButtonBar().getNumTabs() == 3);
+    LE_ASSERT(getTabbedButtonBar().getNumTabs() == 3);
     for (unsigned int i(0); i < 3; ++i)
         getTabbedButtonBar().setTabBackgroundColour(i, tabBackground);
 
@@ -1910,7 +1912,7 @@ void SpectrumWorxEditor::Settings::sliderValueChanged(juce::Slider *const pSlide
         peer.repaint(bounds);
     }
 
-    boost::ignore_unused_variable_warning(pSlider);
+    LE::Utility::ignoreUnused(pSlider);
 }
 
 #pragma warning(push)
@@ -1918,7 +1920,7 @@ void SpectrumWorxEditor::Settings::sliderValueChanged(juce::Slider *const pSlide
 
 void SpectrumWorxEditor::Settings::comboBoxValueChanged(ComboBox const &comboBox)
 {
-    auto &settings(*boost::polymorphic_downcast<Settings *>(
+    auto &settings(*LE::Utility::polymorphicDowncast<Settings *>(
         comboBox.getParentComponent()->getParentComponent()));
     auto &editor(settings.editor());
 
@@ -1929,23 +1931,23 @@ void SpectrumWorxEditor::Settings::comboBoxValueChanged(ComboBox const &comboBox
 
     if (&comboBox == &settings.fftSize_)
     {
-        BOOST_VERIFY(
+        LE_VERIFY(
             editor.globalParameterChanged<FFTSize>(static_cast<FFTSize ::value_type>(value), true));
     }
     else if (&comboBox == &settings.overlapFactor_)
     {
-        BOOST_VERIFY(editor.globalParameterChanged<OverlapFactor>(
+        LE_VERIFY(editor.globalParameterChanged<OverlapFactor>(
             static_cast<OverlapFactor ::value_type>(value), true));
     }
     else if (&comboBox == &settings.windowFunction_)
     {
-        BOOST_VERIFY(editor.globalParameterChanged<WindowFunction>(
+        LE_VERIFY(editor.globalParameterChanged<WindowFunction>(
             static_cast<WindowFunction ::value_type>(value), true));
     }
 #if LE_SW_ENGINE_WINDOW_PRESUM
     else if (&comboBox == &settings.windowSizeFactor_)
     {
-        BOOST_VERIFY(editor.globalParameterChanged<WindowSizeFactor>(
+        LE_VERIFY(editor.globalParameterChanged<WindowSizeFactor>(
             static_cast<WindowSizeFactor::value_type>(value), true));
     }
 #endif // LE_SW_ENGINE_WINDOW_PRESUM
@@ -1953,7 +1955,7 @@ void SpectrumWorxEditor::Settings::comboBoxValueChanged(ComboBox const &comboBox
     else if (&comboBox == &settings.inputMode_)
     {
         LE_ASSUME(!editor.effect().completelyDisableIOChanges());
-        /*BOOST_VERIFY*/ (editor.globalParameterChanged<InputMode>(
+        /*LE_VERIFY*/ (editor.globalParameterChanged<InputMode>(
             static_cast<InputMode::value_type>(value), true));
         settings.updateLoadLastSessionOnStartup();
         settings.inputMode_->setValue(
@@ -2042,7 +2044,7 @@ void SpectrumWorxEditor::Settings::EnginePage::setNewQualityFactor(float const &
     else
         description = "% (poor)";
     char buffer[32];
-    BOOST_VERIFY(Utility::lexical_cast(qualityFactor * 100.0f, 2, buffer) < _countof(buffer));
+    LE_VERIFY(Utility::lexical_cast(qualityFactor * 100.0f, 2, buffer) < _countof(buffer));
     *engineQuality_.getCharPointer().getAddress() = 0;
     engineQuality_ += "Ripple amount: ";
     engineQuality_ += buffer;
@@ -2059,7 +2061,7 @@ void printEngineDiagnostics(juce::String &buffer, char const *const title, float
                             juce::Graphics const &graphics)
 {
     char valueStr[32];
-    BOOST_VERIFY(Utility::lexical_cast(value, 1, valueStr) < _countof(valueStr));
+    LE_VERIFY(Utility::lexical_cast(value, 1, valueStr) < _countof(valueStr));
     buffer = title;
     buffer += ": ";
     buffer += valueStr;
@@ -2231,7 +2233,7 @@ void SpectrumWorxEditor::Settings::buttonClicked(juce::Button *const pButton)
     if (pButton == &interfacePage_.loadLastSessionOnStartup_)
     {
 #if LE_SW_SEPARATED_DSP_GUI
-        BOOST_ASSERT_MSG(false, "Not yet implemented!");
+        LE_ASSERT_MSG(false, "Not yet implemented!");
 #else
         effect.shouldLoadLastSessionOnStartup(
             interfacePage_.loadLastSessionOnStartup_.getToggleState());
@@ -2244,7 +2246,7 @@ void SpectrumWorxEditor::Settings::buttonClicked(juce::Button *const pButton)
     }
     else if (pButton == &aboutPage_.showUsersGuide_)
     {
-        BOOST_VERIFY(juce::Process::openDocument(
+        LE_VERIFY(juce::Process::openDocument(
             rootPath().getChildFile("Documents/User's Guide.PDF").getFullPathName(),
             juce::String::empty));
     }

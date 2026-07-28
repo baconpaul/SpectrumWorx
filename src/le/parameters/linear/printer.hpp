@@ -19,6 +19,7 @@
 #include "boost/mpl/string.hpp"
 
 #include <cstdio>
+#include <type_traits>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -40,7 +41,7 @@ LE_NOTHROWNOALIAS char const *printLinear(char *const buffer, Source const &para
 }
 
 template <typename Source>
-typename boost::enable_if<std::is_integral<Source>, char const *>::type LE_FORCEINLINE
+std::enable_if_t<std::is_integral_v<Source>, char const *> LE_FORCEINLINE
 printLinear(char *const buffer, Source const parameterValue, LinearIntegerParameterTag const &)
 {
     Utility::lexical_cast(parameterValue, buffer);
@@ -48,8 +49,7 @@ printLinear(char *const buffer, Source const parameterValue, LinearIntegerParame
 }
 
 template <typename Source>
-typename boost::enable_if<std::is_floating_point<Source>, char const *>::type
-
+std::enable_if_t<std::is_floating_point_v<Source>, char const *>
 printLinear(char *const buffer, Source const &parameterValue, LinearIntegerParameterTag const &)
 {
     Utility::lexical_cast(parameterValue, 0, buffer);

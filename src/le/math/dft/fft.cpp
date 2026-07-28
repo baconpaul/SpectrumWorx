@@ -29,7 +29,7 @@ LE_FAST_MATH_ON()
 #include "le/math/vector.hpp"
 #include "le/utility/buffers.hpp"
 
-#include <boost/assert.hpp>
+#include "le/utility/assert.hpp"
 
 // Implementation specific includes.
 #ifdef LE_ACC_FFT
@@ -113,7 +113,7 @@ LE_NOTHROW void FFT_float_real_1D::resize(SW::Engine::StorageFactors const &fact
 {
     auto const size(factors.fftSize);
 
-    BOOST_ASSERT_MSG(size <= LE::SW::Engine::Constants::maximumFFTSize, "FFT size too large.");
+    LE_ASSERT_MSG(size <= LE::SW::Engine::Constants::maximumFFTSize, "FFT size too large.");
 
     /// \note The work buffer has to be resized (relocated) even if the FFT size
     /// hasn't changed because shared storage might have been reallocated.
@@ -123,12 +123,12 @@ LE_NOTHROW void FFT_float_real_1D::resize(SW::Engine::StorageFactors const &fact
 #if defined(LE_ACC_FFT)
     workBufferSplit_.realp = workBuffer_.begin();
     workBufferSplit_.imagp = workBuffer_.begin() + (workBuffer_.size() / 2);
-    BOOST_ASSERT_MSG((reinterpret_cast<std::size_t>(workBufferSplit_.realp) %
-                      Utility::Constants::vectorAlignment) == 0,
-                     "Buffer misaligned.");
-    BOOST_ASSERT_MSG((reinterpret_cast<std::size_t>(workBufferSplit_.imagp) %
-                      Utility::Constants::vectorAlignment) == 0,
-                     "Buffer misaligned.");
+    LE_ASSERT_MSG((reinterpret_cast<std::size_t>(workBufferSplit_.realp) %
+                   Utility::Constants::vectorAlignment) == 0,
+                  "Buffer misaligned.");
+    LE_ASSERT_MSG((reinterpret_cast<std::size_t>(workBufferSplit_.imagp) %
+                   Utility::Constants::vectorAlignment) == 0,
+                  "Buffer misaligned.");
 
     if (size != size_)
     {
@@ -142,7 +142,7 @@ LE_NOTHROW void FFT_float_real_1D::resize(SW::Engine::StorageFactors const &fact
         }
         else
         {
-            BOOST_ASSERT(!"FFT failure"); /*...mrmlj...proper error handling...*/
+            LE_ASSERT(!"FFT failure"); /*...mrmlj...proper error handling...*/
         }
     }
 #endif // LE_ACC_FFT
@@ -159,7 +159,7 @@ FFT_float_real_1D::transform(float *LE_RESTRICT const data /*in time, out DFT re
                              float *LE_RESTRICT const imaginaryTargetSubRange,
                              std::uint16_t const size) const
 {
-    BOOST_ASSERT(size <= this->size());
+    LE_ASSERT(size <= this->size());
 #if defined(LE_ACC_FFT) || defined(LE_SORENSEN_PURE_REAL_FFT_TEST)
     std::uint16_t const halfSize(size / 2);
     vDSP_ctoz(reinterpret_cast<DSPComplex const *>(data), 2, &workBufferSplit(), 1, halfSize);
@@ -187,7 +187,7 @@ FFT_float_real_1D::inverseTransform(float *LE_RESTRICT const data /*in DFT reals
                                     float const *LE_RESTRICT const imaginarySourceSubRange,
                                     std::uint16_t const size) const
 {
-    BOOST_ASSERT(size <= this->size());
+    LE_ASSERT(size <= this->size());
 #if defined(LE_ACC_FFT) || defined(LE_SORENSEN_PURE_REAL_FFT_TEST)
     std::uint16_t const halfSize(size / 2);
     // http://developer.apple.com/library/ios/documentation/Performance/Conceptual/vDSP_Programming_Guide/UsingFourierTransforms/UsingFourierTransforms.html#//apple_ref/doc/uid/TP40005147-CH202-15411
@@ -216,7 +216,7 @@ LE_NOTHROW void FFT_float_real_1D::transform(float *const timeDomainData,
 {
     if (doFFTShift)
         fftshift(timeDomainData);
-    BOOST_ASSERT(imaginarySubRange.size() == (size() / 2) + 1);
+    LE_ASSERT(imaginarySubRange.size() == (size() / 2) + 1);
     transform(timeDomainData, imaginarySubRange.begin(), size());
 }
 
@@ -224,7 +224,7 @@ LE_NOTHROW void FFT_float_real_1D::inverseTransform(float *const dftData,
                                                     ReadOnlyDataRange const &imaginarySubRange,
                                                     bool const doFFTShift) const
 {
-    BOOST_ASSERT(imaginarySubRange.size() == (size() / 2) + 1);
+    LE_ASSERT(imaginarySubRange.size() == (size() / 2) + 1);
     inverseTransform(dftData, imaginarySubRange.begin(), size());
     if (doFFTShift)
         fftshift(dftData);
@@ -241,7 +241,7 @@ LE_NOTHROW void FFT_float_real_1D::transform(float *LE_RESTRICT const pReals,
                                              float *LE_RESTRICT const pImags) const
 {
 #if defined(LE_ACC_FFT)
-    BOOST_ASSERT(!"Not implemented!");
+    LE_ASSERT(!"Not implemented!");
 #else  // NT2
     std::uint16_t const halfSize(size() / 2);
     nt2::static_fft<128 / 2, 8192 / 2, float>::forward_transform(pReals, pImags, halfSize);
@@ -255,7 +255,7 @@ LE_NOTHROW void FFT_float_real_1D::inverseTransform(float *LE_RESTRICT const pRe
                                                     float *LE_RESTRICT const pImags) const
 {
 #if defined(LE_ACC_FFT)
-    BOOST_ASSERT(!"Not implemented!");
+    LE_ASSERT(!"Not implemented!");
 #else
     std::uint16_t const halfSize(size() / 2);
     nt2::static_fft<128 / 2, 8192 / 2, float>::inverse_transform(pReals, pImags, halfSize);
@@ -272,9 +272,9 @@ void lock(void const *const address, std::size_t const /*size*/)
 {
 #ifdef _WIN32
     DWORD old_protection;
-    BOOST_VERIFY(::VirtualProtect(const_cast<void *>(address), 4 /*size * sizeof( float )*/,
-                                  PAGE_READONLY, &old_protection));
-    BOOST_ASSERT(old_protection == PAGE_READWRITE);
+    LE_VERIFY(::VirtualProtect(const_cast<void *>(address), 4 /*size * sizeof( float )*/,
+                               PAGE_READONLY, &old_protection));
+    LE_ASSERT(old_protection == PAGE_READWRITE);
 #endif // _WIN32
 }
 
@@ -282,9 +282,9 @@ void unlock(void const *const address, std::size_t const /*size*/)
 {
 #ifdef _WIN32
     DWORD old_protection;
-    BOOST_VERIFY(::VirtualProtect(const_cast<void *>(address), 4 /*size * sizeof( float )*/,
-                                  PAGE_READWRITE, &old_protection));
-    BOOST_ASSERT(old_protection == PAGE_READONLY);
+    LE_VERIFY(::VirtualProtect(const_cast<void *>(address), 4 /*size * sizeof( float )*/,
+                               PAGE_READWRITE, &old_protection));
+    LE_ASSERT(old_protection == PAGE_READONLY);
 #endif // _WIN32
 }
 } // namespace
@@ -391,7 +391,7 @@ void FFT_float_real_1D::fftshift(float *const pTimeDomainData) const
     /// Research this more thoroughly...
     ///                                       (24.04.2012.) (Domagoj Saric)
 
-    BOOST_ASSERT_MSG(size() % 2 == 0, "Even data size expected.");
+    LE_ASSERT_MSG(size() % 2 == 0, "Even data size expected.");
     float *const pHalfPoint(pTimeDomainData + size() / 2);
     swap(pTimeDomainData, pHalfPoint, pHalfPoint);
 }

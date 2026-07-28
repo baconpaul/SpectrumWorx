@@ -60,7 +60,7 @@ LE_NOTHROWNOALIAS LE_COLD void userMessage(char const *const pFormatString,
 {
     if (!userMessageMethod)
         return;
-    BOOST_ASSERT(userMessageObject);
+    LE_ASSERT(userMessageObject);
     char formattedMessage[512];
     /*auto const charactersWritten*/ (
         /*std*/ ::vsnprintf(formattedMessage, sizeof(formattedMessage), pFormatString, arglist));
@@ -189,18 +189,18 @@ LE_NOTHROW bool Tracer::setJavaCallback(JNIEnv &jni, jobject const callbackObjec
                                         char const *const callbackMethodName)
 {
     jclass const callbackClass(jni.GetObjectClass(callbackObject));
-    BOOST_ASSERT(callbackClass);
+    LE_ASSERT(callbackClass);
     userMessageMethod = jni.GetMethodID(callbackClass, callbackMethodName, "(Ljava/lang/String;)V");
-    BOOST_ASSERT(userMessageMethod);
+    LE_ASSERT(userMessageMethod);
     userMessageObject = JNI::globalReference(callbackObject);
-    return BOOST_LIKELY(userMessageObject != nullptr);
+    return LE_LIKELY(userMessageObject != nullptr);
 }
 #elif TARGET_OS_IPHONE
 LE_NOTHROW bool Tracer::setObjCCallback(void (^newCallback)(NSString *message))
 {
     Block_release(userMessageCallback);
     userMessageCallback = Block_copy(newCallback);
-    return BOOST_LIKELY(userMessageCallback != nullptr);
+    return LE_LIKELY(userMessageCallback != nullptr);
 }
 #endif // os
 

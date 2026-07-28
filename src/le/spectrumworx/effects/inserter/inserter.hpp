@@ -16,8 +16,6 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/spectrumworx/effects/commonParameters.hpp"
 #include "le/parameters/linear/parameter.hpp"
-
-#include "boost/config/abi_prefix.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -84,7 +82,4 @@ struct Inserter
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------
-
-#include "boost/config/abi_suffix.hpp"
-
 #endif // inserter_hpp

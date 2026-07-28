@@ -12,6 +12,7 @@
 #define filesystem_hpp__656E7522_88F0_4EA5_9E7D_3944AC55FE77
 //------------------------------------------------------------------------------
 #include "abi.hpp"
+#include "span.hpp"
 
 #include <sys/types.h>
 
@@ -40,10 +41,6 @@ class JNIHelper;
 #endif // _WIN32/64
 #endif // _MSC_VER && !LE_SDK_NO_AUTO_LINK
 //------------------------------------------------------------------------------
-namespace boost
-{
-template <typename Iterator> class iterator_range;
-}
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -230,10 +227,7 @@ class File::MemoryMapping : public std::pair<char const *, char const *>
         return begin() != nullptr;
     }
 
-    template <typename Iterator> operator boost::iterator_range<Iterator>() const
-    {
-        return {begin(), end()};
-    }
+    template <typename Element> operator Span<Element>() const { return {begin(), end()}; }
 
   private:
     friend class File;

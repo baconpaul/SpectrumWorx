@@ -29,9 +29,10 @@
 #include "le/utility/tchar.hpp"
 
 #include "boost/mpl/fold.hpp"
-#include "boost/polymorphic_cast.hpp"
+#include "le/utility/polymorphicDowncast.hpp"
 
 #include "juce/juce_gui_basics/juce_gui_basics.h"
+#include <optional>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -347,7 +348,7 @@ class ModuleUI
     SharedModuleControls &sharedControls();
 
 #if LE_SW_SEPARATED_DSP_GUI
-    static boost::none_t processingLock() { return boost::none; }
+    static std::nullopt_t processingLock() { return std::nullopt; }
 #else
     Utility::CriticalSectionLock getProcessingLock() const; //...mrmlj...quick-fix...
 #endif // LE_SW_SEPARATED_DSP_GUI
@@ -563,12 +564,12 @@ template <class ParametersParam> class ParameterWidgets
   public:
 #ifndef NDEBUG
     ParameterWidgets() : constructed_(false) {}
-    ~ParameterWidgets() { BOOST_ASSERT(!constructed_); }
+    ~ParameterWidgets() { LE_ASSERT(!constructed_); }
 #endif // NDEBUG
 
     void construct(ModuleUI &parent)
     {
-        BOOST_ASSERT(!constructed_);
+        LE_ASSERT(!constructed_);
         doConstruct(parent);
         container().setup(Detail::WidgetInitialiser());
 #ifndef NDEBUG
@@ -578,7 +579,7 @@ template <class ParametersParam> class ParameterWidgets
 
     void destroy()
     {
-        BOOST_ASSERT(constructed_);
+        LE_ASSERT(constructed_);
         container().~Container();
 #ifndef NDEBUG
         constructed_ = false;
@@ -627,10 +628,10 @@ template <class Interface> struct ParameterWidgetsVTable
         :
 #ifndef _MSC_VER //...mrmlj...msvc(12) compilation error bug...
           doCreateGUI([](ModuleUI &uiBase) {
-              boost::polymorphic_downcast<Implementation *>(&uiBase.module())->create(uiBase);
+              LE::Utility::polymorphicDowncast<Implementation *>(&uiBase.module())->create(uiBase);
           }),
           doDestroyGUI([](ModuleUI::Module &base) {
-              boost::polymorphic_downcast<Implementation *>(&base)->destroy();
+              LE::Utility::polymorphicDowncast<Implementation *>(&base)->destroy();
           })
 #else
           doCreateGUI(&createGUI<Implementation>), doDestroyGUI(&destroyGUI<Implementation>)
@@ -647,11 +648,11 @@ template <class Interface> struct ParameterWidgetsVTable
   private:
     template <class Implementation> LE_NOALIAS static void createGUI(ModuleUI &uiBase)
     {
-        boost::polymorphic_downcast<Implementation *>(&uiBase.module())->create(uiBase);
+        LE::Utility::polymorphicDowncast<Implementation *>(&uiBase.module())->create(uiBase);
     }
     template <class Implementation> LE_NOTHROWNOALIAS static void destroyGUI(ModuleUI::Module &base)
     {
-        boost::polymorphic_downcast<Implementation *>(&base)->destroy();
+        LE::Utility::polymorphicDowncast<Implementation *>(&base)->destroy();
     }
 #endif
 }; // struct ParameterWidgetsVTable

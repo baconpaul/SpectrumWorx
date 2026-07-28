@@ -28,7 +28,7 @@ BraceWrapping:
   SplitEmptyNamespace: true
 ColumnLimit: 100
 SortIncludes: false
-# This tree has order-dependent includes (boost/config/abi_prefix.hpp) and a
+# This tree has order-dependent includes (the Boost.SIMD and NT2 headers) and a
 # dense //...mrmlj... comment style worth preserving verbatim.
 ReflowComments: false
 AttributeMacros:

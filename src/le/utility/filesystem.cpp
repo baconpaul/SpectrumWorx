@@ -21,8 +21,7 @@
 #include "boost/mmap/amalgamated_lib.cpp"
 #endif // BOOST_MMAP_HEADER_ONLY
 
-#include <boost/assert.hpp>
-#include <boost/config.hpp>
+#include "assert.hpp"
 
 #include <algorithm>
 #include <cerrno>
@@ -80,7 +79,7 @@ LE_NOTHROW LE_COLD void File::Stream::close()
 {
     if (handle_ != invalidHandle)
     {
-        BOOST_VERIFY(::close(handle_) == 0);
+        LE_VERIFY(::close(handle_) == 0);
         handle_ = invalidHandle;
     }
 }
@@ -97,7 +96,7 @@ LE_NOTHROW File::Stream &File::Stream::operator=(File::Stream &&other)
 
 LE_NOTHROWNOALIAS std::uint32_t File::Stream::read(void *pBuffer, std::uint32_t numberOfBytesToRead)
 {
-    BOOST_ASSERT_MSG(handle_ != invalidHandle, "No file open");
+    LE_ASSERT_MSG(handle_ != invalidHandle, "No file open");
     auto const result(::read(handle_, pBuffer, numberOfBytesToRead));
     LE_TRACE_IF(result < 0, "File read error (%d).", errno);
     return static_cast<std::uint32_t>(std::max(0, static_cast<std::int32_t>(result)));
@@ -105,7 +104,7 @@ LE_NOTHROWNOALIAS std::uint32_t File::Stream::read(void *pBuffer, std::uint32_t 
 LE_NOTHROWNOALIAS std::uint32_t File::Stream::write(void const *pBuffer,
                                                     std::uint32_t numberOfBytesToWrite)
 {
-    BOOST_ASSERT_MSG(handle_ != invalidHandle, "No file open");
+    LE_ASSERT_MSG(handle_ != invalidHandle, "No file open");
     auto const result(::write(handle_, pBuffer, numberOfBytesToWrite));
     LE_TRACE_IF(result < 0, "File write error (%d).", errno);
     return static_cast<std::uint32_t>(std::max(0, static_cast<std::int32_t>(result)));
@@ -129,13 +128,13 @@ LE_NOTHROWNOALIAS bool File::Stream::seek(std::int32_t const offset, std::uint8_
 
 LE_NOTHROWNOALIAS std::uint32_t File::Stream::size() const
 {
-#ifdef BOOST_MSVC
+#ifdef _MSC_VER
     return static_cast<std::uint32_t>(/*std*/ ::_filelength(handle_));
 #else
     struct stat file_status;
-    BOOST_VERIFY(::fstat(handle_, &file_status) == 0);
+    LE_VERIFY(::fstat(handle_, &file_status) == 0);
     return static_cast<std::uint32_t>(file_status.st_size);
-#endif // BOOST_MSVC
+#endif // _MSC_VER
 }
 
 LE_NOTHROWNOALIAS int File::Stream::asPOSIXFile(::off_t &startOffset, std::size_t &size) const

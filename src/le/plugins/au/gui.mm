@@ -36,7 +36,7 @@
 
 - initWithFrame:(NSRect)frame lePlugin:(::AudioUnit)audioUnit
 {
-    BOOST_ASSERT(audioUnit);
+    LE_ASSERT(audioUnit);
     self = [super initWithFrame:frame];
     if (self)
     {
@@ -71,7 +71,7 @@
 
 - (void)close
 {
-    BOOST_ASSERT(effect_);
+    LE_ASSERT(effect_);
     ::NSView *const pParentView(nullptr);
     ::OSStatus const result(::AudioUnitSetProperty(effect_, LE::Plugins::Detail::auViewPropertyID,
                                                    kAudioUnitScope_Global, 0, &pParentView,
@@ -81,7 +81,7 @@
                 "was destroyed beforehand).",
                 result);
     [[NSNotificationCenter defaultCenter] removeObserver:self];
-    BOOST_ASSERT((effect_ = nullptr) == nullptr);
+    LE_ASSERT((effect_ = nullptr) == nullptr);
 }
 
 @end

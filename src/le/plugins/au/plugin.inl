@@ -17,11 +17,11 @@
 #include "le/utility/trace.hpp"
 #include "le/utility/typeTraits.hpp"
 
-#include "boost/assert.hpp"
-#include "boost/range/iterator_range_core.hpp"
+#include "le/utility/assert.hpp"
 
 #include <cmath>
 #include <cstddef>
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 #if MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_6
 typedef OSStatus (*AudioComponentMethod)(void *self, ...);
@@ -167,14 +167,14 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
         /// \note AU Lab 2.2.2 (Mountain Lion) calls this more than once and it
         /// gets confused if we return kAudioUnitErr_Initialized.
         ///                                   (21.02.2013.) (Domagoj Saric)
-        if (BOOST_UNLIKELY(impl.initialised_))
+        if (LE_UNLIKELY(impl.initialised_))
         {
-            BOOST_ASSERT_MSG(hostProxy.inputChannels_ == impl.numberOfInputChannels(),
-                             "IO setup mismatch on extra initialisation.");
-            BOOST_ASSERT_MSG(hostProxy.sideChannels_ == impl.numberOfSideChannels(),
-                             "IO setup mismatch on extra initialisation.");
-            BOOST_ASSERT_MSG(hostProxy.outputChannels_ == impl.numberOfOutputChannels(),
-                             "IO setup mismatch on extra initialisation.");
+            LE_ASSERT_MSG(hostProxy.inputChannels_ == impl.numberOfInputChannels(),
+                          "IO setup mismatch on extra initialisation.");
+            LE_ASSERT_MSG(hostProxy.sideChannels_ == impl.numberOfSideChannels(),
+                          "IO setup mismatch on extra initialisation.");
+            LE_ASSERT_MSG(hostProxy.outputChannels_ == impl.numberOfOutputChannels(),
+                          "IO setup mismatch on extra initialisation.");
             return LE_TRACE_RETURN(noErr, "\tSW AU: multiple initialisation.");
         }
 
@@ -192,7 +192,7 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
         ///                                   (27.08.2014.) (Domagoj Saric)
         OSStatus const channelSetupResult(makeErrorCode(impl.setNumberOfChannels(
             hostProxy.inputChannels_ + sideChannels, hostProxy.outputChannels_)));
-        if (BOOST_UNLIKELY(channelSetupResult != noErr))
+        if (LE_UNLIKELY(channelSetupResult != noErr))
         {
             LE_TRACE("\tSW AU: initialisation failure: unsupported IO mode (%d+%d:%d).",
                      hostProxy.inputChannels_, hostProxy.sideChannels_, hostProxy.outputChannels_);
@@ -211,7 +211,7 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
                                        "Initialisation failure: process block allocation failure.");
         }
         OSStatus const initResult(makeErrorCode(impl.initialise()));
-        if (BOOST_UNLIKELY(initResult != noErr))
+        if (LE_UNLIKELY(initResult != noErr))
             return LE_TRACE_RETURN(
                 initResult,
                 "Initialisation failure: plugin init failure (" LE_OSX_INT_FORMAT(d) ").",
@@ -228,13 +228,13 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
 
         /// \note auval tool 1.6.1a1 (Mountain Lion)
         ///                                   (25.02.2013.) (Domagoj Saric)
-        if (BOOST_UNLIKELY(!impl.initialised_))
+        if (LE_UNLIKELY(!impl.initialised_))
             return LE_TRACE_RETURN(
                 noErr, "Uninitialising a non initialised AU."); // kAudioUnitErr_Uninitialized
 
-        BOOST_ASSERT(impl.host().inputChannels_ == impl.numberOfInputChannels());
-        BOOST_ASSERT(impl.host().sideChannels_ == impl.numberOfSideChannels());
-        BOOST_ASSERT(impl.host().outputChannels_ == impl.numberOfOutputChannels());
+        LE_ASSERT(impl.host().inputChannels_ == impl.numberOfInputChannels());
+        LE_ASSERT(impl.host().sideChannels_ == impl.numberOfSideChannels());
+        LE_ASSERT(impl.host().outputChannels_ == impl.numberOfOutputChannels());
 
         impl.suspend();
         impl.uninitialise();
@@ -373,7 +373,7 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
         LE_ASSUME(element == 0);
 
         value = instance.impl().getParameter(ParameterID{parameterID});
-        BOOST_ASSERT(std::isfinite(value));
+        LE_ASSERT(std::isfinite(value));
         return noErr;
     }
 
@@ -385,7 +385,7 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
         //...mrmlj...SW HARDCODE...
         LE_ASSUME(scope == kAudioUnitScope_Global);
         LE_ASSUME(element == 0);
-        BOOST_ASSERT(std::isfinite(value));
+        LE_ASSERT(std::isfinite(value));
 
         /// \todo Implement this properly.
         ///                                   (12.11.2015.) (Domagoj Saric)
@@ -405,7 +405,7 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
     {
         /// \todo Implement this properly.
         ///                                   (12.11.2015.) (Domagoj Saric)
-        for (auto const &__restrict event : boost::make_iterator_range_n(pEvents, numberOfEvents))
+        for (auto const &__restrict event : LE::Utility::makeSpan(pEvents, numberOfEvents))
         {
             ::AudioUnitParameterValue const *__restrict pValue;
             ::SInt32 offset;
@@ -416,7 +416,7 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
             }
             else
             {
-                BOOST_ASSERT(event.eventType == kParameterEvent_Ramped);
+                LE_ASSERT(event.eventType == kParameterEvent_Ramped);
                 LE_TRACE("\tSW AU: host tried to make a ramped set of parameter " LE_OSX_INT_FORMAT(
                              u) ".",
                          event.parameter);
@@ -424,8 +424,8 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
                 offset = event.eventValues.ramp.startBufferOffset +
                          event.eventValues.ramp.durationInFrames;
             }
-            BOOST_VERIFY(AUMethodSetParameter(instance, event.parameter, event.scope, event.element,
-                                              *pValue, offset) == noErr);
+            LE_VERIFY(AUMethodSetParameter(instance, event.parameter, event.scope, event.element,
+                                           *pValue, offset) == noErr);
         }
 
         return noErr;
@@ -463,7 +463,7 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
     static OSStatus LE_NOTHROW
     AUMethodAddRenderNotify(This &instance, AURenderCallback const callback, void *const pUserData)
     {
-        BOOST_ASSERT(callback);
+        LE_ASSERT(callback);
         ::AURenderCallbackStruct const renderDelegate = {callback, pUserData};
         return Detail::makeErrorCode(
             instance.impl().renderNotificationCallbacks_.push_back(renderDelegate));
@@ -473,7 +473,7 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
                                                           AURenderCallback const callback,
                                                           void const *const pUserData)
     {
-        BOOST_ASSERT(callback);
+        LE_ASSERT(callback);
         ::AURenderCallbackStruct const renderDelegate = {callback, const_cast<void *>(pUserData)};
         instance.impl().renderNotificationCallbacks_.remove(renderDelegate);
         return noErr;
@@ -498,13 +498,12 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
 
         LE_ASSUME(impl.initialised_);
 
-        if (BOOST_UNLIKELY(numberOfSamples >
-                           impl.processBlockSize())) //...mrmlj...auval tests this...
+        if (LE_UNLIKELY(numberOfSamples > impl.processBlockSize())) //...mrmlj...auval tests this...
             return kAudioUnitErr_TooManyFramesToProcess;
 
-        BOOST_ASSERT_MSG(outputBusNumber == 0, "SW HARDCODED: single output bus.");
-        BOOST_ASSERT_MSG(impl.numberOfOutputChannels() == pIOData->mNumberBuffers,
-                         "Incorrect number of IO data channels.");
+        LE_ASSERT_MSG(outputBusNumber == 0, "SW HARDCODED: single output bus.");
+        LE_ASSERT_MSG(impl.numberOfOutputChannels() == pIOData->mNumberBuffers,
+                      "Incorrect number of IO data channels.");
 
         auto const numberOfChannels(impl.numberOfOutputChannels());
 
@@ -514,11 +513,11 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
             for (AudioBuffer const *pBuffer(pIOData->mBuffers);
                  pBuffer < &pIOData->mBuffers[pIOData->mNumberBuffers]; ++pBuffer)
             {
-                BOOST_ASSERT_MSG(pBuffer->mData, "Unexpected null IO buffer.");
-                BOOST_ASSERT_MSG(pBuffer->mDataByteSize == numberOfSamples * sizeof(float),
-                                 "Incorrect IO buffer size,");
-                BOOST_ASSERT_MSG(reinterpret_cast<std::size_t>(pBuffer->mData) % 16 == 0,
-                                 "Unexpected buffer alignment.");
+                LE_ASSERT_MSG(pBuffer->mData, "Unexpected null IO buffer.");
+                LE_ASSERT_MSG(pBuffer->mDataByteSize == numberOfSamples * sizeof(float),
+                              "Incorrect IO buffer size,");
+                LE_ASSERT_MSG(reinterpret_cast<std::size_t>(pBuffer->mData) % 16 == 0,
+                              "Unexpected buffer alignment.");
             }
         }
 #endif // _DEBUG
@@ -541,7 +540,7 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
             useProvidedBufferForInput ? pIOData : nullptr, numberOfChannels));
         LE_TRACE_IF(mainRenderResult != noErr, "\tSW AU: main input render error (%ld)",
                     mainRenderResult);
-        BOOST_ASSERT(mainRenderResult == noErr);
+        LE_ASSERT(mainRenderResult == noErr);
 
         bool const hasSideChannel(impl.inputConnections_[1]);
         OSStatus const sideRenderResult(
@@ -550,9 +549,9 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
                            : noErr);
         LE_TRACE_IF(sideRenderResult != noErr, "\tSW AU: side input render error (%ld)",
                     sideRenderResult);
-        BOOST_ASSERT(sideRenderResult == noErr);
+        LE_ASSERT(sideRenderResult == noErr);
 
-        if (BOOST_LIKELY((mainRenderResult == noErr) && (sideRenderResult == noErr)))
+        if (LE_LIKELY((mainRenderResult == noErr) && (sideRenderResult == noErr)))
         {
             ::AudioBufferList *pActualOutputBuffers;
             if (callerProvidedOutputBuffer &&
@@ -573,13 +572,13 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
                 }
                 else
                 {
-                    if (BOOST_UNLIKELY(
+                    if (LE_UNLIKELY(
                             !impl.outputBuffers_.resize(numberOfChannels, numberOfSamples, false)))
                         return kAudio_MemFullError;
                     pActualOutputBuffers = impl.outputBuffers_;
                 }
             }
-            BOOST_ASSERT_MSG(pActualOutputBuffers->mBuffers[0].mData, "Null output buffer.");
+            LE_ASSERT_MSG(pActualOutputBuffers->mBuffers[0].mData, "Null output buffer.");
 
             ::AudioBuffer const *LE_RESTRICT const pMainInput(
                 impl.inputConnections_[0].buffers().mBuffers);
@@ -596,7 +595,7 @@ struct Plugin<Impl, Protocol::AU>::AudioComponentPlugInInstance : ::AudioCompone
                     (pMainInput->mData == pSideInput->mData));
                 auto const result(
                     Detail::makeErrorCode(impl.enableSideChannelInput(!silentOrFakeSideChain)));
-                if (BOOST_UNLIKELY(result != noErr))
+                if (LE_UNLIKELY(result != noErr))
                     return result;
                 impl.host().sideChannels_ = silentOrFakeSideChain ? 0 : impl.host().inputChannels_;
             }
@@ -752,17 +751,17 @@ template <class Impl>
 
     ::SInt16 const selector(pParameters->what);
 
-    BOOST_ASSERT((pParameters->paramSize % sizeof(pParameters->params[0]) == 0) ||
-                 selector == kComponentCanDoSelect);
+    LE_ASSERT((pParameters->paramSize % sizeof(pParameters->params[0]) == 0) ||
+              selector == kComponentCanDoSelect);
 
     if (selector == kComponentOpenSelect)
     {
-        BOOST_ASSERT(userDataHandle == nullptr);
+        LE_ASSERT(userDataHandle == nullptr);
 #if __LP64__
-        BOOST_ASSERT(pParameters->paramSize == 2 * sizeof(pParameters->params[0]));
-        BOOST_ASSERT(pParameters->params[0] == pParameters->params[1]);
+        LE_ASSERT(pParameters->paramSize == 2 * sizeof(pParameters->params[0]));
+        LE_ASSERT(pParameters->params[0] == pParameters->params[1]);
 #else
-        BOOST_ASSERT(pParameters->paramSize == sizeof(pParameters->params[0]));
+        LE_ASSERT(pParameters->paramSize == sizeof(pParameters->params[0]));
 #endif // __LP64__
         ::AudioUnit const auComponentInstance(
             reinterpret_cast<::ComponentInstance>(pParameters->params[0]));
@@ -770,7 +769,7 @@ template <class Impl>
                                                                       AudioComponentPlugInInstance);
         if (!pInstance)
             return kAudio_MemFullError;
-        BOOST_VERIFY(AudioComponentPlugInInstance::open(pInstance, auComponentInstance) == noErr);
+        LE_VERIFY(AudioComponentPlugInInstance::open(pInstance, auComponentInstance) == noErr);
         ::SetComponentInstanceStorage(auComponentInstance, reinterpret_cast<::Handle>(pInstance));
         return noErr;
     }
@@ -782,8 +781,8 @@ template <class Impl>
     case kComponentCanDoSelect:
     {
         //...mrmlj...auval -comp...
-        //BOOST_ASSERT( userDataHandle == nullptr );
-        //BOOST_ASSERT( pParameters->paramSize == sizeof( pParameters->params[ 0 ] ) );
+        //LE_ASSERT( userDataHandle == nullptr );
+        //LE_ASSERT( pParameters->paramSize == sizeof( pParameters->params[ 0 ] ) );
         ::SInt16 const canDoSelector(reinterpret_cast<::SInt16 const &>(pParameters->params[0]));
         switch (canDoSelector)
         {
@@ -805,10 +804,10 @@ template <class Impl>
 
     case kComponentCloseSelect:
 #if __LP64__
-        BOOST_ASSERT(pParameters->paramSize == 2 * sizeof(pParameters->params[0]));
-        BOOST_ASSERT(pParameters->params[0] == pParameters->params[1]);
+        LE_ASSERT(pParameters->paramSize == 2 * sizeof(pParameters->params[0]));
+        LE_ASSERT(pParameters->params[0] == pParameters->params[1]);
 #else
-        BOOST_ASSERT(pParameters->paramSize == sizeof(pParameters->params[0]));
+        LE_ASSERT(pParameters->paramSize == sizeof(pParameters->params[0]));
 #endif // __LP64__
         ::SetComponentInstanceStorage(reinterpret_cast<::ComponentInstance>(pParameters->params[0]),
                                       nullptr);
@@ -864,8 +863,8 @@ template <class Impl>
             // https://groups.google.com/forum/#!msg/altdevauthors/tMZQhyeZbBk/yy34T1EL8kMJ
             // http://blogs.msdn.com/b/freik/archive/2005/03/17/398200.aspx
 
-            BOOST_ASSERT_MSG(pParameters->paramSize % sizeof(*pParameters->params) == 0,
-                             "Invalid ComponentParameters::paramSize.");
+            LE_ASSERT_MSG(pParameters->paramSize % sizeof(*pParameters->params) == 0,
+                          "Invalid ComponentParameters::paramSize.");
             unsigned int const minimumParameters(0); // initialise() otherwise the minimum is 2...
             unsigned int const maximumParameters(5);
             unsigned int const actualParameters(pParameters->paramSize /
@@ -878,11 +877,10 @@ template <class Impl>
             /// \note It seems that the instance (if there at all)
             /// is not counted in pParameters->paramSize.
             ///                   (20.02.2013.) (Domagoj Saric)
-            BOOST_ASSERT_MSG(std::find(&pParameters->params[0],
-                                       &pParameters->params[actualParameters],
-                                       reinterpret_cast<long>(&instance)) ==
-                                 &pParameters->params[actualParameters],
-                             "Instance found within parameter after all.");
+            LE_ASSERT_MSG(std::find(&pParameters->params[0], &pParameters->params[actualParameters],
+                                    reinterpret_cast<long>(&instance)) ==
+                              &pParameters->params[actualParameters],
+                          "Instance found within parameter after all.");
 #endif
 
             return pMethod(&instance,

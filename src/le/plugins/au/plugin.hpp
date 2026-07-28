@@ -47,7 +47,7 @@
 #include "le/utility/rvalueReferences.hpp"
 #include "le/utility/trace.hpp"
 
-#include "boost/integer/static_log2.hpp"
+#include "le/utility/staticLog2.hpp"
 #include "boost/mpl/string.hpp"
 
 #include "AvailabilityMacros.h"
@@ -214,7 +214,7 @@ template <typename T, unsigned int N> class VariableLengthArray : public std::ar
         unsigned int const trailBytesToSkip(0);
 #endif // __LP64__
         //T const * const pNewEnd( std::remove( begin(), end(), element ) );
-        //BOOST_ASSERT( pNewEnd == pEnd_ - 1 );
+        //LE_ASSERT( pNewEnd == pEnd_ - 1 );
         //pEnd_ = pNewEnd;
         T *const pElement(std::find_if(this->begin(), end(), [=, &element](T const &other) {
             return std::memcmp(&other, &element, sizeof(element) - trailBytesToSkip) == 0;
@@ -259,7 +259,7 @@ class AUTimingInformation
     double const &position() const { return currentSampleInTimeLine_; }
     double sampleRate() const
     {
-        BOOST_ASSERT(false);
+        LE_ASSERT(false);
         return 0;
     }
     double const &sampleRateScale() const { return pCurrentTimeStamp_->mRateScalar; }
@@ -313,8 +313,8 @@ class AUTimingInformation
             }
             else
             {
-                BOOST_ASSERT_MSG(result == kAudioUnitErr_CannotDoInCurrentContext,
-                                 "Unexpected result.");
+                LE_ASSERT_MSG(result == kAudioUnitErr_CannotDoInCurrentContext,
+                              "Unexpected result.");
             }
         }
 
@@ -810,7 +810,7 @@ template <> class ParameterInformation<Protocol::AU> : public ::AudioUnitParamet
         {
             ::CFStringRef const unitName(::CFStringCreateWithCStringNoCopy(
                 nullptr, info.unit, kCFStringEncodingASCII, kCFAllocatorNull));
-            BOOST_ASSERT_MSG(unitName, "CFString creation failed.");
+            LE_ASSERT_MSG(unitName, "CFString creation failed.");
             ::AudioUnitParameterInfo::unitName = unitName;
             ::AudioUnitParameterInfo::unit = kAudioUnitParameterUnit_CustomUnit;
             flags |= kAudioUnitParameterFlag_ValuesHaveStrings;
@@ -830,9 +830,9 @@ template <> class ParameterInformation<Protocol::AU> : public ::AudioUnitParamet
     {
         //...mrmlj...workaround for having no way to specify discrete/valid values...
 
-        std::uint8_t const minimumExponent(boost::static_log2<Parameter::unscaledMinimum>::value);
-        std::uint8_t const maximumExponent(boost::static_log2<Parameter::unscaledMaximum>::value);
-        std::uint8_t const defaultExponent(boost::static_log2<Parameter::unscaledDefault>::value);
+        std::uint8_t const minimumExponent(LE::Utility::staticLog2(Parameter::unscaledMinimum));
+        std::uint8_t const maximumExponent(LE::Utility::staticLog2(Parameter::unscaledMaximum));
+        std::uint8_t const defaultExponent(LE::Utility::staticLog2(Parameter::unscaledDefault));
         minValue = static_cast<::AudioUnitParameterValue>(0);
         maxValue = static_cast<::AudioUnitParameterValue>(maximumExponent - minimumExponent);
         defaultValue = static_cast<::AudioUnitParameterValue>(defaultExponent - minimumExponent);
@@ -852,7 +852,7 @@ template <> class ParameterInformation<Protocol::AU> : public ::AudioUnitParamet
             ::CFStringRef const unitName(::CFStringCreateWithBytesNoCopy(
                 nullptr, reinterpret_cast<::UInt8 const *>(unit), length, kCFStringEncodingASCII,
                 false, kCFAllocatorNull));
-            BOOST_ASSERT_MSG(unitName, "CFString creation failed.");
+            LE_ASSERT_MSG(unitName, "CFString creation failed.");
             ::AudioUnitParameterInfo::unitName = unitName;
             if (::AudioUnitParameterInfo::unit == kAudioUnitParameterUnit_Generic)
                 ::AudioUnitParameterInfo::unit = kAudioUnitParameterUnit_CustomUnit;

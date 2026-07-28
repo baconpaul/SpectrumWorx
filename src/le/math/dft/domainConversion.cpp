@@ -12,7 +12,7 @@
 
 #include "le/math/vector.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -24,7 +24,7 @@ void reim2AmPh(float const *const reals, float const *const imags, // input
                float *const amplitudes, float *const phases,       // output
                std::uint16_t const numberOfSamples)
 {
-    BOOST_ASSERT(reals && imags && amplitudes && phases);
+    LE_ASSERT(reals && imags && amplitudes && phases);
 
     rectangular2polar(reals, imags, amplitudes, phases, numberOfSamples);
 }
@@ -33,7 +33,7 @@ void amph2ReIm(float const *const amplitudes, float const *const phases, // inpu
                float *const reals, float *const imags,                   // output
                std::uint16_t const numberOfSamples)
 {
-    BOOST_ASSERT(amplitudes && phases && reals && imags);
+    LE_ASSERT(amplitudes && phases && reals && imags);
 
     polar2rectangular(amplitudes, phases, reals, imags, numberOfSamples);
 }

@@ -12,8 +12,9 @@
 
 #include "le/utility/clear.hpp"
 
-#include "boost/assert.hpp"
-#include "boost/type_traits/function_traits.hpp"
+#include "le/utility/assert.hpp"
+#include <type_traits>
+#include "le/utility/ignoreUnused.hpp"
 
 #include <memory>
 //------------------------------------------------------------------------------
@@ -64,9 +65,9 @@ AEffectWrapper *AEffectWrapper::fromAEffect(AEffect *const pEffect)
 #ifdef _MSC_VER
     static_assert(&static_cast<AEffectWrapper *>(0)->aEffect_ == 0, "");
 #else
-    BOOST_ASSERT(&static_cast<AEffectWrapper *>(0)->aEffect_ == 0);
+    LE_ASSERT(&static_cast<AEffectWrapper *>(0)->aEffect_ == 0);
 #endif // _MSC_VER
-    BOOST_ASSERT(pEffect == pEffect->object);
+    LE_ASSERT(pEffect == pEffect->object);
     LE_ASSUME(pEffect != 0);
     return static_cast<AEffectWrapper *>(static_cast<void *>(pEffect));
 }
@@ -85,13 +86,13 @@ bool VSTHost24Proxy::supportsDynamicParameterLists(false);
 
 VSTHost24Proxy::VSTHost24Proxy(audioMasterCallback const audioMaster) : audioMaster_(audioMaster)
 {
-    BOOST_ASSERT_MSG(audioMaster, "Null VST host callback!?");
+    LE_ASSERT_MSG(audioMaster, "Null VST host callback!?");
 
     /// \todo This assertion fails with FL Studio 9 but everything works as
     /// expected (it does not call processAccumulate()). Try to think of a
     /// different test.
     ///                                       (25.05.2010.) (Domagoj Saric)
-    //BOOST_ASSERT( call( DECLARE_VST_DEPRECATED( audioMasterWillReplaceOrAccumulate ) ) <= 1 );
+    //LE_ASSERT( call( DECLARE_VST_DEPRECATED( audioMasterWillReplaceOrAccumulate ) ) <= 1 );
 
     // Implementation note:
     //   Because Reaper is such a popular host and it actually does support IO
@@ -103,7 +104,7 @@ VSTHost24Proxy::VSTHost24Proxy(audioMasterCallback const audioMaster) : audioMas
 
     VSTPluginBase::ProductStringBuf buffer;
     buffer[0] = 0;
-    /*BOOST_VERIFY Cantabile 2*/ (getHostProductString(buffer));
+    /*LE_VERIFY Cantabile 2*/ (getHostProductString(buffer));
     bool const hostIsReaper(std::strcmp(buffer, "REAPER") == 0);
     bool const hostIsLive(std::strcmp(buffer, "Live") == 0);
     assumeIOChangedAlwaysSucceedes = hostIsReaper;
@@ -113,22 +114,22 @@ VSTHost24Proxy::VSTHost24Proxy(audioMasterCallback const audioMaster) : audioMas
 void VSTHost24Proxy::automatedParameterChanged(ParameterIndex const parameterIndex,
                                                AutomatedParameterValue const newValue) const
 {
-    BOOST_ASSERT_MSG(aEffect().getParameter(const_cast<::AEffect *>(&aEffect()),
-                                            parameterIndex.value) == newValue,
-                     "Wrong parameter value reported?");
-    /*Live8&9 BOOST_VERIFY*/ (
+    LE_ASSERT_MSG(aEffect().getParameter(const_cast<::AEffect *>(&aEffect()),
+                                         parameterIndex.value) == newValue,
+                  "Wrong parameter value reported?");
+    /*Live8&9 LE_VERIFY*/ (
         call(audioMasterAutomate, parameterIndex.value, 0, 0, newValue) /*!= 0*/);
 }
 
 //...multi gesture...http://www.kvraudio.com/forum/viewtopic.php?t=303406
 void VSTHost24Proxy::automatedParameterBeginEdit(ParameterIndex const parameterIndex) const
 {
-    /*FL11    BOOST_VERIFY*/ (call(audioMasterBeginEdit, parameterIndex.value) /*!= 0*/);
+    /*FL11    LE_VERIFY*/ (call(audioMasterBeginEdit, parameterIndex.value) /*!= 0*/);
 }
 
 void VSTHost24Proxy::automatedParameterEndEdit(ParameterIndex const parameterIndex) const
 {
-    /*FL11    BOOST_VERIFY*/ (call(audioMasterEndEdit, parameterIndex.value) /*!= 0*/);
+    /*FL11    LE_VERIFY*/ (call(audioMasterEndEdit, parameterIndex.value) /*!= 0*/);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -145,9 +146,9 @@ VstIntPtr LE_NOTHROW LE_COLD VSTHost24Proxy::call(VstInt32 const opCode, VstInt3
 #ifdef _DEBUG
     // Properly typed opcode for better visualization to aid in debugging.
     AEffectOpcodes const vstOpCode(static_cast<AEffectOpcodes>(opCode));
-    boost::ignore_unused_variable_warning(vstOpCode);
+    LE::Utility::ignoreUnused(vstOpCode);
     AEffectXOpcodes const vstOpCodeX(static_cast<AEffectXOpcodes>(opCode));
-    boost::ignore_unused_variable_warning(vstOpCodeX);
+    LE::Utility::ignoreUnused(vstOpCodeX);
 #endif // _DEBUG
 
     return audioMaster_(&const_cast<VSTHost24Proxy &>(*this).aEffect(), opCode, index, value, ptr,
@@ -163,8 +164,8 @@ VstIntPtr LE_NOTHROW LE_COLD VSTHost24Proxy::call(VstInt32 const opCode, VstInt3
 
 VSTHost24Proxy::PathSpec VSTHost24Proxy::getPluginDirectory() const
 {
-    typedef boost::function_traits<std::remove_pointer<audioMasterCallback>::type>::result_type
-        AudioMasterCallbackReturnType;
+    using AudioMasterCallbackReturnType =
+        decltype(std::declval<audioMasterCallback>()(nullptr, 0, 0, 0, nullptr, 0));
 
     static_assert(sizeof(PathSpec) == sizeof(AudioMasterCallbackReturnType),
                   "Unexpected object sizes");
@@ -227,12 +228,12 @@ Detail::VST24TimingInformation VSTHost24Proxy::makeTimeInfo(::VstIntPtr const pV
 {
     ::VstTimeInfo const *LE_RESTRICT const pTimeInfo(
         reinterpret_cast<::VstTimeInfo const *>(pVoidTimeInfo));
-    BOOST_ASSERT_MSG((canDo<SendTimeInfo>() == (pTimeInfo != nullptr)) ||
-                         (isHost("Audition") /*3.0*/) || (isHost("Gold") /*Audition CS 5.5*/) ||
-                         (isHost("DSP-Quattr") /*3.5.1*/) || (isHost("Vst2Au2")) ||
-                         (isHost("VSTMANLIB") /*VST Scanner 1.048*/) || (isHost("Soundminer")) ||
-                         (isHost("Sound Forge Pro 10.0")) || (isHost("") /*Audacity*/),
-                     "Inconsistent host replies to SendTimeInfo and audioMasterGetTime");
+    LE_ASSERT_MSG((canDo<SendTimeInfo>() == (pTimeInfo != nullptr)) ||
+                      (isHost("Audition") /*3.0*/) || (isHost("Gold") /*Audition CS 5.5*/) ||
+                      (isHost("DSP-Quattr") /*3.5.1*/) || (isHost("Vst2Au2")) ||
+                      (isHost("VSTMANLIB") /*VST Scanner 1.048*/) || (isHost("Soundminer")) ||
+                      (isHost("Sound Forge Pro 10.0")) || (isHost("") /*Audacity*/),
+                  "Inconsistent host replies to SendTimeInfo and audioMasterGetTime");
     return Detail::VST24TimingInformation(pTimeInfo);
 }
 
@@ -286,8 +287,8 @@ void LE_NOTHROW VSTHost24Proxy::allParametersChanged() const
 
 template <> LE_NOTHROWNOALIAS bool VSTHost24Proxy::canDo<AcceptIOChanges>() const
 {
-    BOOST_ASSERT_MSG(!(assumeIOChangedAlwaysSucceedes && capabilityString<AcceptIOChanges>()),
-                     "Host 'gained' ioChanged() support");
+    LE_ASSERT_MSG(!(assumeIOChangedAlwaysSucceedes && capabilityString<AcceptIOChanges>()),
+                  "Host 'gained' ioChanged() support");
     return assumeIOChangedAlwaysSucceedes || canDo(capabilityString<AcceptIOChanges>());
 }
 

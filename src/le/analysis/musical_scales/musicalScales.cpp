@@ -15,7 +15,7 @@
 #include "le/math/math.hpp"
 #include "le/math/vector.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 
 #include <array>
 #include <cstring>
@@ -43,9 +43,8 @@ void Scale::tonesUpdated(std::uint8_t const snappedTo, std::uint8_t const bypass
 {
 #ifndef NDEBUG
     auto const n(snappedTo + bypassed);
-    BOOST_ASSERT(unsigned(n) <= toneOffsets_.size());
-    BOOST_ASSERT((*std::max_element(toneOffsets_.begin(), toneOffsets_.begin() + n) < 12) ||
-                 (n == 0));
+    LE_ASSERT(unsigned(n) <= toneOffsets_.size());
+    LE_ASSERT((*std::max_element(toneOffsets_.begin(), toneOffsets_.begin() + n) < 12) || (n == 0));
 #endif // NDEBUG
 
     numberOfTones_ = snappedTo;
@@ -182,7 +181,7 @@ LE_OPTIMIZE_FOR_SPEED_END()
 
 Scale::ToneOffsets::value_type Scale::toneOffset(std::uint8_t const i) const
 {
-    BOOST_ASSERT(i < numberOfTones() + numberOfBypassed());
+    LE_ASSERT(i < numberOfTones() + numberOfBypassed());
     return toneOffsets_[i];
 }
 

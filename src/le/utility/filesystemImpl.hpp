@@ -14,7 +14,7 @@
 #include "filesystem.hpp"
 #include "platformSpecifics.hpp"
 
-#include <boost/smart_ptr/scoped_array.hpp>
+#include <memory>
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -46,7 +46,7 @@ namespace Utility
 {
 //------------------------------------------------------------------------------
 
-using CString = boost::scoped_array<char>;
+using CString = std::unique_ptr<char[]>;
 
 #ifdef _WIN32
 using Path = std::array<char, 260 /*MAX_PATH*/>;

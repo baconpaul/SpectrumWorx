@@ -15,9 +15,8 @@
 #include "platformSpecifics.hpp"
 #include "trace.hpp"
 
-#include <boost/assert.hpp>
-#include <boost/config.hpp>
-#include <boost/smart_ptr/scoped_array.hpp>
+#include "assert.hpp"
+#include <memory>
 
 #include "windowsLite.hpp"
 #include <knownfolders.h>
@@ -37,7 +36,7 @@ namespace Utility
 
 LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
-using CString = boost::scoped_array<char>;
+using CString = std::unique_ptr<char[]>;
 
 namespace
 {
@@ -49,19 +48,18 @@ bool domainDirectory(::KNOWNFOLDERID const &knownFolder, Path &path)
         &pPath));
     if (FAILED(result))
     {
-        BOOST_ASSERT(!pPath);
+        LE_ASSERT(!pPath);
         return false;
     }
-    BOOST_VERIFY(::WideCharToMultiByte(CP_ACP, 0, pPath, -1, &path[0],
-                                       static_cast<unsigned int>(path.size()), nullptr,
-                                       nullptr) > 0);
+    LE_VERIFY(::WideCharToMultiByte(CP_ACP, 0, pPath, -1, &path[0],
+                                    static_cast<unsigned int>(path.size()), nullptr, nullptr) > 0);
     ::CoTaskMemFree(pPath);
     return true;
 }
 
 template <SpecialLocations> bool pathFor(Path &buffer);
 
-//template <> bool pathFor<AppData        >( Path & buffer ) { return BOOST_VERIFY( ::getcwd( &buffer[ 0 ], buffer.size() ) == &buffer[ 0 ] ); }
+//template <> bool pathFor<AppData        >( Path & buffer ) { return LE_VERIFY( ::getcwd( &buffer[ 0 ], buffer.size() ) == &buffer[ 0 ] ); }
 template <> bool pathFor<AppData>(Path &buffer)
 {
     return domainDirectory(FOLDERID_ProgramData, buffer);
@@ -85,7 +83,7 @@ template <> bool pathFor<Temporaries>(Path &buffer)
 {
     return ::GetTempPathA(static_cast<unsigned int>(buffer.size()), &buffer[0]) != FALSE;
 }
-//template <> bool pathFor<Temporaries    >( Path & absoluteFilePath ) { return BOOST_VERIFY( ::GetEnvironmentVariable( "TEMP", &absoluteFilePath[ 0 ], absoluteFilePath.size() ) ); }
+//template <> bool pathFor<Temporaries    >( Path & absoluteFilePath ) { return LE_VERIFY( ::GetEnvironmentVariable( "TEMP", &absoluteFilePath[ 0 ], absoluteFilePath.size() ) ); }
 } // anonymous namespace
 
 template <SpecialLocations rootDirectory>

@@ -37,16 +37,16 @@ class ExtAudioFileGuard
 {
   public:
     ExtAudioFileGuard() : file_(0) {}
-    ~ExtAudioFileGuard() { BOOST_VERIFY(::ExtAudioFileDispose(file_) == noErr); }
+    ~ExtAudioFileGuard() { LE_VERIFY(::ExtAudioFileDispose(file_) == noErr); }
 
     ExtAudioFileRef operator*() const
     {
-        BOOST_ASSERT(file_);
+        LE_ASSERT(file_);
         return file_;
     }
     ExtAudioFileRef *operator&()
     {
-        BOOST_ASSERT(!file_);
+        LE_ASSERT(!file_);
         return &file_;
     }
 
@@ -70,9 +70,9 @@ LE_NOTHROWNOALIAS char const *Sample::doLoad(juce::String const &sampleFileName,
 
     AudioStreamBasicDescription inputFormat;
     propertySize = sizeof(inputFormat);
-    BOOST_VERIFY(::ExtAudioFileGetProperty(*sampleFile, kExtAudioFileProperty_FileDataFormat,
-                                           &propertySize, &inputFormat) == noErr);
-    BOOST_ASSERT(propertySize == sizeof(inputFormat));
+    LE_VERIFY(::ExtAudioFileGetProperty(*sampleFile, kExtAudioFileProperty_FileDataFormat,
+                                        &propertySize, &inputFormat) == noErr);
+    LE_ASSERT(propertySize == sizeof(inputFormat));
 
     AudioStreamBasicDescription desiredFormat;
 
@@ -103,21 +103,21 @@ LE_NOTHROWNOALIAS char const *Sample::doLoad(juce::String const &sampleFileName,
     {
         AudioConverterRef converter;
         propertySize = sizeof(converter);
-        BOOST_VERIFY(::ExtAudioFileGetProperty(*sampleFile, kExtAudioFileProperty_AudioConverter,
-                                               &propertySize, &converter) == noErr);
-        BOOST_ASSERT(propertySize == sizeof(converter));
+        LE_VERIFY(::ExtAudioFileGetProperty(*sampleFile, kExtAudioFileProperty_AudioConverter,
+                                            &propertySize, &converter) == noErr);
+        LE_ASSERT(propertySize == sizeof(converter));
 
         static SInt32 const channelMap[] = {0, 0};
-        BOOST_VERIFY(::AudioConverterSetProperty(converter, kAudioConverterChannelMap,
-                                                 sizeof(channelMap), channelMap) == noErr);
+        LE_VERIFY(::AudioConverterSetProperty(converter, kAudioConverterChannelMap,
+                                              sizeof(channelMap), channelMap) == noErr);
     }
 
     SInt64 fileLengthInFrames;
     propertySize = sizeof(fileLengthInFrames);
     error = ::ExtAudioFileGetProperty(*sampleFile, kExtAudioFileProperty_FileLengthFrames,
                                       &propertySize, &fileLengthInFrames);
-    BOOST_ASSERT(error == noErr);
-    BOOST_ASSERT(propertySize == sizeof(fileLengthInFrames));
+    LE_ASSERT(error == noErr);
+    LE_ASSERT(propertySize == sizeof(fileLengthInFrames));
 
     UInt32 numberOfSamples(static_cast<std::size_t>(fileLengthInFrames));
 

@@ -17,6 +17,7 @@
 #include "le/plugins/au/plugin.hpp"
 #include "le/utility/cstdint.hpp"
 #include "le/utility/platformSpecifics.hpp"
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -43,7 +44,7 @@ class SpectrumWorxAU final : public SpectrumWorxSharedImpl<SpectrumWorxAU, Plugi
     using SpectrumWorx::uninitialise;
 
     static LE_NOTHROWNOALIAS void
-    getDependentParameters(ParameterID, boost::iterator_range<::AUDependentParameter *> ids,
+    getDependentParameters(ParameterID, LE::Utility::Span<::AUDependentParameter> ids,
                            SpectrumWorxCore const *);
     static LE_NOTHROWNOALIAS std::uint16_t numberOfDependentParameters(ParameterID,
                                                                        SpectrumWorxCore const *);

@@ -15,7 +15,7 @@
 
 #include "le/utility/platformSpecifics.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 
 #include <cstdint>
 //------------------------------------------------------------------------------

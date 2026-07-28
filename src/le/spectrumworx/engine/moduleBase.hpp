@@ -13,12 +13,9 @@
 #include <le/spectrumworx/effects/baseParameters.hpp>
 #include <le/utility/abi.hpp>
 
-#include <boost/noncopyable.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "le/utility/intrusivePtr.hpp"
 
 #include <cstdint>
-
-#include <boost/config/abi_prefix.hpp>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -58,11 +55,13 @@ class ModuleProcessor;
 ////////////////////////////////////////////////////////////////////////////////
 
 class ModuleBase
-#ifndef DOXYGEN_ONLY
-    : public boost::noncopyable
-#endif // DOXYGEN_ONLY
 {
   public:
+#ifndef DOXYGEN_ONLY
+    ModuleBase(ModuleBase const &) = delete; // makes non-copyable
+    ModuleBase &operator=(ModuleBase const &) = delete;
+#endif // DOXYGEN_ONLY
+
     /// \name Basic parameters included by all effects
     /// @{
     typedef Effects::BaseParameters::Parameters BaseParameters;
@@ -161,9 +160,9 @@ class ModuleBase
     /// \name Factory function
     /// @{
 
-    typedef boost::intrusive_ptr<ModuleBase>
+    typedef LE::Utility::IntrusivePtr<ModuleBase>
         Ptr; ///< shared pointer to a mutable ModuleBase instance
-    typedef boost::intrusive_ptr<ModuleBase const>
+    typedef LE::Utility::IntrusivePtr<ModuleBase const>
         CPtr; ///< shared pointer to a const ModuleBase instance
 
     ////////////////////////////////////////////////////////////////////////////
@@ -187,7 +186,7 @@ class ModuleBase
 typedef ModuleBase::Ptr ModulePtr;   ///< shared pointer to a mutable ModuleBase instance
 typedef ModuleBase::CPtr ModuleCPtr; ///< shared pointer to a const ModuleBase instance
 
-// boost::intrusive_ptr required details
+// LE::Utility::IntrusivePtr required details
 LE_NOTHROWNOALIAS void intrusive_ptr_add_ref(ModuleBase const *); ///< \internal
 LE_NOTHROW void intrusive_ptr_release(ModuleBase const *);        ///< \internal
 
@@ -200,5 +199,4 @@ LE_NOTHROW void intrusive_ptr_release(ModuleBase const *);        ///< \internal
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------
-#include <boost/config/abi_suffix.hpp>
 #endif // moduleBase_hpp

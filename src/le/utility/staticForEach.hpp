@@ -68,7 +68,7 @@ void executeMPL(F &&f, std::false_type)
 
     f.
 #ifndef _MSC_VER
-        BOOST_NESTED_TEMPLATE
+        template
 #endif // _MSC_VER
         operator()<item>();
 
@@ -103,7 +103,7 @@ void executeFusion(F &&f, std::false_type)
 
     f.
 #ifndef _MSC_VER
-        BOOST_NESTED_TEMPLATE
+        template
 #endif // _MSC_VER
         operator()<item>();
 

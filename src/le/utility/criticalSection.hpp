@@ -13,17 +13,16 @@
 //------------------------------------------------------------------------------
 #include "le/utility/platformSpecifics.hpp"
 
-/// \note The boost::signals2::mutex class is not recursive under POSIX.
+/// \note std::mutex (boost::signals2::mutex before it) is not recursive.
 ///                                           (27.09.2013.) (Domagoj Saric)
 /// \todo  Cleanup the code base so that it does not require recursive mutexes
 /// or at least minimise and document where they are required...
 ///                                           (22.03.2016.) (Domagoj Saric)
 #ifdef _WIN32
-#include <boost/signals2/mutex.hpp>
+#include <mutex>
 #else // POSIX
 #include <pthread.h>
 #endif // OS
-#include <boost/noncopyable.hpp>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -34,7 +33,7 @@ namespace Utility
 
 #ifdef _WIN32
 
-using CriticalSection = boost::signals2::mutex;
+using CriticalSection = std::mutex;
 
 #else // POSIX
 
@@ -49,15 +48,15 @@ class CriticalSection
 #else  // PTHREAD_RECURSIVE_MUTEX_INITIALIZER ...mrmlj...for osx10.6 only? recheck...
     {
         ::pthread_mutexattr_t attributes;
-        BOOST_VERIFY(::pthread_mutexattr_init(&attributes) == 0);
-        BOOST_VERIFY(::pthread_mutexattr_settype(&attributes, PTHREAD_RECURSIVE_MUTEX) == 0);
-        BOOST_VERIFY(::pthread_mutex_init(&mutex_, &attributes) == 0);
+        LE_VERIFY(::pthread_mutexattr_init(&attributes) == 0);
+        LE_VERIFY(::pthread_mutexattr_settype(&attributes, PTHREAD_RECURSIVE_MUTEX) == 0);
+        LE_VERIFY(::pthread_mutex_init(&mutex_, &attributes) == 0);
     }
 #endif // PTHREAD_RECURSIVE_MUTEX_INITIALIZER
-    LE_NOTHROW LE_COLD ~CriticalSection() { BOOST_VERIFY(::pthread_mutex_destroy(&mutex_) == 0); }
+    LE_NOTHROW LE_COLD ~CriticalSection() { LE_VERIFY(::pthread_mutex_destroy(&mutex_) == 0); }
 
-    LE_NOTHROW void lock() { BOOST_VERIFY(::pthread_mutex_lock(&mutex_) == 0); }
-    LE_NOTHROW void unlock() { BOOST_VERIFY(::pthread_mutex_unlock(&mutex_) == 0); }
+    LE_NOTHROW void lock() { LE_VERIFY(::pthread_mutex_lock(&mutex_) == 0); }
+    LE_NOTHROW void unlock() { LE_VERIFY(::pthread_mutex_unlock(&mutex_) == 0); }
 
     LE_NOTHROW bool try_lock() { return ::pthread_mutex_trylock(&mutex_) == 0; }
 
@@ -89,8 +88,12 @@ class CriticalSection
 
 #endif // OS
 
-class CriticalSectionLock : boost::noncopyable
+class CriticalSectionLock
 {
+  public:
+    CriticalSectionLock(CriticalSectionLock const &) = delete; // makes non-copyable
+    CriticalSectionLock &operator=(CriticalSectionLock const &) = delete;
+
 #if defined(__GNUC__) || _MSC_VER >= 1900 //...mrmlj...no 'RVO@compiletime'...
   public:
     explicit LE_NOTHROW CriticalSectionLock(CriticalSection &cs) : pCriticalSection_(&cs)

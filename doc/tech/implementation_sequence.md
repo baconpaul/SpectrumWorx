@@ -568,7 +568,7 @@ Things that would have cost real time later, all cheap here:
 
 ---
 
-### Stage 2 — Boost tier-1 sweep
+### Stage 2 — Boost tier-1 sweep ✅
 
 **1–2 weeks. Runs in parallel with stage 1, and still against a non-compiling
 tree** — which is exactly why it is here and not at the end. These are
@@ -578,27 +578,127 @@ working plugin for each one.
 
 Per scan §5.1 tier 1 — roughly 300 include sites:
 
-| Boost | → |
-|---|---|
-| `boost/assert.hpp` (77) | `assert` / a project macro |
-| `boost/config/abi_{prefix,suffix}.hpp` (102) | delete, pure noise |
-| `boost/range/iterator_range_core.hpp` (21) | `std::span` |
-| `boost/utility/string_ref.hpp` (17) | `std::string_view` |
-| `boost/smart_ptr/intrusive_ptr.hpp` (12) | keep a 40-line local `IntrusivePtr` |
-| `boost/noncopyable.hpp` (8) | `= delete` |
-| `boost/polymorphic_cast.hpp` (8) | `dynamic_cast` + assert |
-| `boost/optional` (6) | `std::optional` |
-| `boost/core/ignore_unused.hpp` (6) | `[[maybe_unused]]` |
-| `boost/range/algorithm/*` (~12) | `std::ranges::*` |
-| endian / cstdint / array / integer / ref / mem_fn / limits / scoped_array (~30) | `<bit>`, `<cstdint>`, `<array>`, `std::ref`, `std::mem_fn`, `<limits>`, `std::unique_ptr<T[]>` |
-| `boost::signals2::mutex` | `std::mutex` |
-| `boost::filesystem` (sandbox) | `std::filesystem` |
+| Boost | → | Done |
+|---|---|---|
+| `boost/assert.hpp` (77) | `assert` / a project macro | ✅ `LE_ASSERT` etc., ~1200 macro sites |
+| `boost/config/abi_{prefix,suffix}.hpp` (102) | delete, pure noise | ✅ |
+| `boost/range/iterator_range_core.hpp` (21) | `std::span` | ✅ `LE::Utility::Span`, see below |
+| `boost/utility/string_ref.hpp` (17) | `std::string_view` | ✅ |
+| `boost/smart_ptr/intrusive_ptr.hpp` (12) | keep a 40-line local `IntrusivePtr` | ✅ `le/utility/intrusivePtr.hpp` |
+| `boost/noncopyable.hpp` (8) | `= delete` | ✅ 14 classes |
+| `boost/polymorphic_cast.hpp` (8) | `dynamic_cast` + assert | ✅ `le/utility/polymorphicDowncast.hpp` |
+| `boost/optional` (6) | `std::optional` | ✅ incl. the in-place factories |
+| `boost/core/ignore_unused.hpp` (6) | `[[maybe_unused]]` | ✅ `LE::Utility::ignoreUnused` |
+| `boost/range/algorithm/*` (~12) | `std::ranges::*` | ✅ |
+| endian / cstdint / array / integer / ref / mem_fn / limits / scoped_array (~30) | `<bit>`, `<cstdint>`, `<array>`, `std::ref`, `std::mem_fn`, `<limits>`, `std::unique_ptr<T[]>` | ✅ |
+| `boost::signals2::mutex` | `std::mutex` | ✅ |
+| `boost::filesystem` (sandbox) | `std::filesystem` | ✅ `PresetBrowser::refresh()` |
+| *(not in the scan)* `boost::spirit` karma/qi | the CRT | ✅ `lexicalCast.cpp`, MSVC-only path |
 
-Add `scripts/check_boost_allowlist.sh` and wire it into `code-checks.yml`, with
-an allowlist that starts as `fusion|mpl|preprocessor` and empties in stage 7.
+`scripts/check_boost_allowlist.sh` is added and passes. Its allowlist is
+`fusion|mpl|preprocessor` (tier 3a, stage 7) plus `simd|dispatch` (NT2, stage
+4), `mmap` (stage 6) and `intrusive|type_traits`, each annotated in the script
+with the stage that removes it. **CI wiring is deferred with the rest of stage
+1.5**, so the script has to be run by hand for now.
 
 **Done when:** the only Boost includes left under `src/` are Fusion, MPL and
-Preprocessor, and CI fails if that changes.
+Preprocessor, and CI fails if that changes. — *Includes: done, with the wider
+allowlist above. CI: deferred.*
+
+#### What stage 2 found
+
+- **`boost::iterator_range` is not `std::span`, and pretending otherwise is a
+  stage 3 job.** The engine *slides* its ranges: `advance_begin`/`advance_end`
+  are how the moving average, the vocoder envelope, `SharedStorageBuffer::
+  resize` and the `SubRange` walkers are written, and `std::span` has no
+  mutating equivalent. Its iterators are also not raw pointers, while ~60 call
+  sites in `le/math/vector.cpp` alone pass `begin()` straight into a pointer
+  taking primitive. So tier 1 got `LE::Utility::Span` — the same begin/end
+  pointer pair, `LE_RESTRICT` intact, layout compatible for the existing
+  `Span<T>` ⇄ `Span<T const>` reinterpret_casts, with `operator std::span<T>()`
+  so the real migration can happen one call site at a time once the goldens
+  exist. **This is a deliberate deviation from the table above.**
+- **`std::optional` engages before its payload is constructed.**
+  `Module::createGUI` used a Boost typed in-place factory precisely so that a
+  re-entrant `gui()` during widget construction saw an empty optional;
+  `emplace()` cannot reproduce that. This is the one place the sweep gives up a
+  property the old code had rather than preserving it — the call site says so,
+  and **stage 6.7 has to establish whether anything depended on it.**
+- **`OptionalFromInstance` had the layout backwards.** It reinterpreted the
+  payload address as `boost::optional`'s by subtracting the engaged flag, which
+  Boost stores *first*. libstdc++, libc++ and the MS STL all put
+  `std::optional`'s payload at offset zero, so the offset is now zero and the
+  debug assert checks `&*optional == &instance`.
+- **`le/utility/rvalueReferences.hpp` was a live hazard.** On any standard
+  library that was not libc++ or the MS STL it defined `std::move`,
+  `std::forward` and `std::declval` *itself*. That would have fired the first
+  time anyone built on Linux. It is now `#include <utility>`.
+- **The 2016 PCH and ODR header carried most of the Boost tuning.**
+  `leConfigurationAndODRHeader.h` configured Spirit, Karma, Phoenix, TR1,
+  `boost/detail/endian.hpp` and `boost::throw_exception`; all of that went with
+  the libraries it configured, and `boost_compiler_config_msvc.hpp` (which
+  existed only to `#undef BOOST_NO_CXX11_CONSTEXPR`) is deleted.
+- **Boost.Range's restrict fix-ups in `tchar.hpp` are now NT2-only.** They
+  taught `boost::range_detail` about `__restrict` pointers; with Boost.Range
+  gone the only remaining consumer is Boost.SIMD, so the block moved inside
+  `#ifdef LE_HAS_NT2`.
+- **Nothing here is compile-verified.** The tree does not build until stage 3;
+  the checks that do exist are the allowlist script, a "uses X without
+  including Y" sweep over every substituted name, and clang-format. Expect the
+  first `sw-dsp` build to shake out residue.
+
+#### 2.1 — The shims stage 2 added, and when they go
+
+Removing Boost meant adding five headers and a handful of macros. Each one is a
+deliberate stopgap, not a design decision, and each should be revisited at the
+stage named. **None of them is load-bearing enough to justify surviving to
+ship unexamined.**
+
+| Added | Sites | Should become | Stage |
+|---|---:|---|---|
+| `le/utility/ignoreUnused.hpp` | 50 | `[[maybe_unused]]` on the declaration; `static_cast<void>()` for the two odr-use sites | 3 |
+| `le/utility/span.hpp` | ~90 | `std::span` | 3–4 |
+| `le/utility/staticLog2.hpp` | 20 | `std::bit_width(x) - 1` inline at the call sites | 3 |
+| `le/utility/polymorphicDowncast.hpp` | 15 | probably stays | — |
+| `le/utility/intrusivePtr.hpp` | 30 | *see below* — not obviously `std::shared_ptr` | 5 |
+| `LE_LIKELY` / `LE_UNLIKELY` (abi.hpp) | 50 | `[[likely]]`/`[[unlikely]]` where the site is a statement, delete where it is a no-op | 3 |
+| `LE_CURRENT_FUNCTION` (abi.hpp) | 2 | `std::source_location` in the assert handler | 3 |
+| `LE_LITTLE_ENDIAN` / `LE_BIG_ENDIAN` (abi.hpp) | 7 | `if constexpr (std::endian::native == …)`; the sites are `#if` only because Boost's were | 3 |
+| `LE_NO_RTTI` / `LE_NO_EXCEPTIONS` (abi.hpp) | few | keep; they are compiler feature detection, not a Boost artefact | — |
+| `LE_ASSERT` family (assert.hpp) | ~1200 | keep; revisit only if the handler should route to the DAW log | 9 |
+
+**`ignoreUnused` is the easy one and the least defensible.** 48 of the 50 sites
+are named parameters or locals where `[[maybe_unused]]` is strictly better —
+declaration-site, no codegen, no header. It exists only because a function let
+the sweep be a pure textual substitution instead of 48 declaration edits in a
+tree the compiler cannot check. Convert at first compile, when the warning
+either disappears or does not. The two exceptions are in
+`le/plugins/vst/2.4/plugin.inl` and are not variables at all — a template
+instantiation and an address-of on the exported entry point.
+
+**`IntrusivePtr` is the one to think hardest about, and `std::shared_ptr` is
+probably the wrong answer.** Four things in the module chain depend on the
+count living inside the object:
+
+- `moduleNode.hpp` asserts `sizeof(NodePtr) == sizeof(void *)`. `ModuleNode`
+  stores `next_` and `previous_` as `NodePtr`; `shared_ptr` is two words, so
+  this doubles every chain node and changes the layout the intrusive circular
+  list algorithms walk.
+- `ReferenceCount` is a *one byte* `std::atomic_uint_fast8_t`, packed into the
+  node next to the other module state.
+- `ModuleChainBase::chain_const_iterator` **derives from** the smart pointer.
+- `Module::createGUI` does `IntrusivePtr<Module>(this)` from inside a member
+  function. With `shared_ptr` that is `enable_shared_from_this`, which
+  constrains how modules may be created — and they are currently placement-new
+  constructed into engine-owned storage by `ModuleFactory`, not allocated.
+
+So the question at stage 5 is not "swap in `shared_ptr`" but "does the chain
+still need shared ownership at all, now that the CLAP host layer owns the
+lifecycle?" If it does, the 60-line local pointer is the cheap answer and
+should simply be kept and documented as such. If it does not, both the pointer
+and the `intrusive_ptr_add_ref`/`intrusive_ptr_release`/
+`intrusive_ptr_release_deleter` hooks scattered across `module.cpp`,
+`moduleNode.hpp`, `moduleDSP.hpp` and `pimpl.hpp` go with it.
 
 ---
 
@@ -637,6 +737,13 @@ C++20 `constexpr` table — 57 effects, entirely mechanical. This kills two doze
 source tree.
 
 **3.5** `tests/` with Catch2; target `sw-tests`.
+
+**3.5b — Retire the stage 2 shims that first compile validates.** Per §2.1:
+`ignoreUnused` → `[[maybe_unused]]`, `staticLog2` → `std::bit_width`,
+`LE_LIKELY`/`LE_UNLIKELY` → `[[likely]]`/`[[unlikely]]` or nothing,
+`LE_{LITTLE,BIG}_ENDIAN` → `if constexpr (std::endian::native …)`,
+`LE_CURRENT_FUNCTION` → `std::source_location`. Each is cheap here and only
+here, because the compiler confirms every single site.
 
 **3.6 — Golden fixtures.** For every one of the 57 effects, at two FFT sizes ×
 two overlap factors, render a fixed set of test signals (impulse, log sweep,
@@ -805,9 +912,21 @@ idiom already, which is why this is a small piece of work.
 Ship non-resizable (`shim->setResizable(false)`) or integer-scaled first. Do not
 block this stage on redrawing 67 PNGs.
 
+**6.7 — Re-check `Module::createGUI`'s half-built window.** Stage 2 lost a
+property the 2016 code had deliberately: its Boost typed in-place factory ran
+`doCreateGUI()` and `updateForEngineSetupChanges()` *before* the optional
+marked itself initialised, so anything that reached `Module::gui()` while the
+child widgets were being built saw an empty optional. `std::optional::emplace()`
+engages first and there is no portable way to defer that. Walk the
+`doCreateGUI()` call tree — the effect specific `ModuleControl` constructors and
+`ModuleUI::updateForEngineSetupChanges` — for anything that reads `gui()` or
+`gui()->` and would now get a partially constructed `ModuleUI` instead of
+nothing. If any does, hold the construction behind an explicit flag on
+`ModuleUI` rather than trying to reproduce the optional trick.
+
 **Done when:** the full editor works in CLAP, VST3, AUv2 and standalone on all
 three OSes; open/close cycles leak nothing; no separate desktop window exists
-anywhere in the process.
+anywhere in the process; 6.7 is resolved one way or the other.
 
 ---
 
@@ -918,9 +1037,9 @@ B takes 2 and 6 (Boost sweep, then GUI) and joins A on 7.
 
 | Stage | | Weeks |
 |---|---|---:|
-| 0 | Purge and amputate | 1 |
-| 1 | Walking skeleton | 1.5–2.5 |
-| 2 | Boost tier-1 sweep | 1–2 |
+| 0 | Purge and amputate ✅ | 1 |
+| 1 | Walking skeleton ✅ (CI, installers and signing deferred) | 1.5–2.5 |
+| 2 | Boost tier-1 sweep ✅ (CI wiring deferred) | 1–2 |
 | 3 | DSP core + goldens | 3–5 |
 | 4 | Portable SIMD/FFT + audio I/O | 2–3 |
 | 5 | CLAP host layer | 2.5–4 |

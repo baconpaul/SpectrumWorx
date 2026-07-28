@@ -71,7 +71,7 @@ void AhAhImpl::setup(IndexRange const &indexRange, Engine::Setup const &engineSe
     //                                        (21.10.2011.) (Domagoj Saric)
     using namespace Math::Constants;
     omega_ = pi / convert<float>(halfWidth * 2);
-    BOOST_ASSERT(omega_ == twoPi / 2.0f / convert<float>(halfWidth * 2));
+    LE_ASSERT(omega_ == twoPi / 2.0f / convert<float>(halfWidth * 2));
 
     IndexRange::signed_value_type userBeginBin(centre - halfWidth);
     IndexRange::value_type userEndBin(centre + halfWidth + 1);
@@ -102,7 +102,7 @@ void AhAhImpl::process(Engine::ChannelData_AmPh data, Engine::Setup const &) con
     {
         // http://courses.engr.illinois.edu/ece420/handouts/audio.pdf
         float const sine(std::sin(omega * i++));
-        BOOST_ASSERT(sine >= -1E-6);
+        LE_ASSERT(sine >= -1E-6);
         float const currentGain(((gain - 1) * sine) + 1);
         amp *= currentGain;
     }

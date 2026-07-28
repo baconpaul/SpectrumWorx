@@ -15,10 +15,9 @@
 //------------------------------------------------------------------------------
 #include "le/utility/platformSpecifics.hpp"
 
-#include <boost/range/iterator_range_core.hpp>
-
 #include <cstdint>
 #include <limits>
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -33,8 +32,8 @@ void *align(void *pointer);
 /// Range based interfaces (mostly unimplemented).
 ////////////////////////////////////////////////////////////////////////////////
 
-using InputRange = boost::iterator_range<float const *LE_RESTRICT>;
-using OutputRange = boost::iterator_range<float *LE_RESTRICT>;
+using InputRange = LE::Utility::Span<float const>;
+using OutputRange = LE::Utility::Span<float>;
 using InputOutputRange = OutputRange;
 
 void copy(InputRange const &, OutputRange const &);
@@ -218,11 +217,10 @@ LE_FORCEINLINE LE_HOT LE_NOTHROWNOALIAS void convertSample(float const LE_GNU_SP
                                                                output)
 {
 #if 0 // slower & not autovectorized
-    static auto BOOST_CONSTEXPR_OR_CONST scale( static_cast<float>( std::numeric_limits<std::int16_t>::max() ) );
+    static auto constexpr scale( static_cast<float>( std::numeric_limits<std::int16_t>::max() ) );
     output = Math::convert<std::int16_t>( Math::clamp( input, -1.0f, +1.0f ) * scale );
 #else
-    static auto BOOST_CONSTEXPR_OR_CONST scale(
-        static_cast<float>(std::numeric_limits<std::int32_t>::max()));
+    static auto constexpr scale(static_cast<float>(std::numeric_limits<std::int32_t>::max()));
     /// \note We can use a plain static_cast/truncation here because the one bit
     /// bit of precision lost here does not matter (we discard all of the lower
     /// 16 bits anyway + floats have only 24 bits of precision to begin with).
@@ -235,7 +233,7 @@ LE_FORCEINLINE LE_HOT LE_NOTHROWNOALIAS void
 convertSample(std::int16_t const LE_GNU_SPECIFIC(&__restrict) input,
               float &LE_GNU_SPECIFIC(__restrict) output)
 {
-    static float BOOST_CONSTEXPR_OR_CONST scale(-1.0f / std::numeric_limits<std::int16_t>::min());
+    static float constexpr scale(-1.0f / std::numeric_limits<std::int16_t>::min());
     output = input * scale;
 }
 
@@ -243,7 +241,7 @@ LE_FORCEINLINE LE_HOT LE_NOTHROWNOALIAS void
 convertSample(std::int32_t const LE_GNU_SPECIFIC(&__restrict) input,
               float &LE_GNU_SPECIFIC(__restrict) output)
 {
-    static float BOOST_CONSTEXPR_OR_CONST scale(-1.0f / std::numeric_limits<std::int32_t>::min());
+    static float constexpr scale(-1.0f / std::numeric_limits<std::int32_t>::min());
     output = input * scale;
 }
 

@@ -27,8 +27,8 @@
 
 #include "boost/simd/preprocessor/stack_buffer.hpp"
 
-#include <boost/assert.hpp>
-#include <boost/core/ignore_unused.hpp>
+#include "le/utility/assert.hpp"
+#include "le/utility/ignoreUnused.hpp"
 
 #if defined(_WIN32) && !defined(_XBOX)
 #include <windows.h> // CRITICAL_SECTION
@@ -36,6 +36,7 @@
 
 #include <cstdlib>
 #include <ctime>
+#include <string_view>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -47,8 +48,7 @@ namespace SW
 #if LE_SW_GUI
 namespace GUI
 {
-void LE_NOTHROW warningMessageBox(boost::string_ref title, boost::string_ref message,
-                                  bool canBlock);
+void LE_NOTHROW warningMessageBox(std::string_view title, std::string_view message, bool canBlock);
 } // namespace GUI
 #endif // LE_SW_GUI
 
@@ -112,9 +112,9 @@ LE_NOTHROWNOALIAS void SpectrumWorxCore::process /// \throws nothing
     {
 #endif // _DEBUG
 
-        BOOST_ASSERT_MSG(samples <= buffers_.blockSize(),
-                         "Process called with a too large block size.");
-        BOOST_ASSERT_MSG(!!buffers(), "Input buffers not initialised.");
+        LE_ASSERT_MSG(samples <= buffers_.blockSize(),
+                      "Process called with a too large block size.");
+        LE_ASSERT_MSG(!!buffers(), "Input buffers not initialised.");
 
         // If gain needs to be applied to input data we first need to copy it to
         // internal buffers:
@@ -157,7 +157,7 @@ void SpectrumWorxCore::suspend() // pause
 {
     //...mrmlj...could be called on startup when the flag is already set by the
     //constructor...
-    //BOOST_ASSERT( !suspended_ );
+    //LE_ASSERT( !suspended_ );
 #ifndef NDEBUG
     suspended_ = true;
 #endif // NDEBUG
@@ -166,7 +166,7 @@ void SpectrumWorxCore::suspend() // pause
 void SpectrumWorxCore::resume()
 {
 #ifndef __APPLE__ //...mrmlj...isHost( "Vst2Au2" )
-    BOOST_ASSERT(suspended_);
+    LE_ASSERT(suspended_);
 #endif // __APPLE__
     reset();
 #ifndef NDEBUG
@@ -215,7 +215,7 @@ bool SpectrumWorxCore::InputBuffers::resize(std::uint16_t const blockSize,
     sideChannels_.resize(numberOfSideChannels * baseChannelStorage, storage);
     initializeChannelPointers(blockBytes, mainChannels_, storage);
     initializeChannelPointers(blockBytes, sideChannels_, storage);
-    BOOST_ASSERT_MSG(storage.size() < 16, "Requested storage not consumed.");
+    LE_ASSERT_MSG(storage.size() < 16, "Requested storage not consumed.");
 
     return true;
 }
@@ -233,7 +233,7 @@ void SpectrumWorxCore::InputBuffers::initializeChannelPointers(unsigned int cons
             static_cast<unsigned int>(reinterpret_cast<char const *>(newBeginning) - pStorage));
         pointer = newBeginning;
         pStorage += alignmentFixup + blockBytes;
-        BOOST_ASSERT(pStorage <= storage.end());
+        LE_ASSERT(pStorage <= storage.end());
     }
     storage = Engine::Storage(pStorage, storage.end());
 }
@@ -292,7 +292,7 @@ SpectrumWorxCore::setNumberOfChannels(std::uint8_t const numberOfInputChannels,
 LE_NOTHROW bool SpectrumWorxCore::setNumberOfChannelsImpl(std::uint8_t const numberOfMainChannels,
                                                           std::uint8_t const numberOfSideChannels)
 {
-    BOOST_ASSERT(currentThreadOwnsTheProcessLock());
+    LE_ASSERT(currentThreadOwnsTheProcessLock());
 
     if (!buffers().resize(buffers().blockSize(), numberOfMainChannels, numberOfSideChannels))
         return false;
@@ -301,8 +301,8 @@ LE_NOTHROW bool SpectrumWorxCore::setNumberOfChannelsImpl(std::uint8_t const num
     newStorageFactors.numberOfChannels = numberOfMainChannels;
     if (!resize(newStorageFactors))
     {
-        BOOST_VERIFY(buffers().resize(buffers().blockSize(), engineSetup().numberOfChannels(),
-                                      engineSetup().numberOfSideChannels()));
+        LE_VERIFY(buffers().resize(buffers().blockSize(), engineSetup().numberOfChannels(),
+                                   engineSetup().numberOfSideChannels()));
         return false;
     }
 
@@ -322,10 +322,10 @@ SpectrumWorxCore::checkChannelConfiguration(std::uint8_t const numberOfInputChan
     /// PropertyHandler<kAudioUnitProperty_StreamFormat>::set() in the
     /// au/plugin.inl file.
     ///                                       (27.08.2014.) (Domagoj Saric)
-    BOOST_ASSERT_MSG(!(numberOfInputChannels < numberOfOutputChannels),
-                     "SW cannot/does not downmix side channels.");
-    BOOST_ASSERT_MSG(!(numberOfInputChannels > 2 * numberOfOutputChannels),
-                     "SW cannot 'produce' channels.");
+    LE_ASSERT_MSG(!(numberOfInputChannels < numberOfOutputChannels),
+                  "SW cannot/does not downmix side channels.");
+    LE_ASSERT_MSG(!(numberOfInputChannels > 2 * numberOfOutputChannels),
+                  "SW cannot 'produce' channels.");
 #endif // __APPLE__
 
     bool canDoIt((numberOfInputChannels == numberOfOutputChannels) ||
@@ -358,7 +358,7 @@ void SpectrumWorxCore::updateInputModeForIOConfig(std::uint8_t const numberOfMai
         break;
     }
 #else
-    boost::ignore_unused(numberOfMainChannels, numberOfSideChannels);
+    LE::Utility::ignoreUnused(numberOfMainChannels, numberOfSideChannels);
 #endif
 }
 
@@ -373,11 +373,11 @@ bool SpectrumWorxCore::currentThreadOwnsTheProcessLock() const
 #if defined(_WIN32) && !defined(_XBOX)
     CRITICAL_SECTION const &guard(
         reinterpret_cast<CRITICAL_SECTION const &>(processCriticalSection_));
-    //...mrmlj...FMOD...BOOST_ASSERT( guard.OwningThread || suspended_ );
+    //...mrmlj...FMOD...LE_ASSERT( guard.OwningThread || suspended_ );
     return !guard.OwningThread ||
            (guard.OwningThread == reinterpret_cast<HANDLE>(::GetCurrentThreadId()));
 #else
-    //...mrmlj...BOOST_ASSERT( !"Implement!" );
+    //...mrmlj...LE_ASSERT( !"Implement!" );
     return true;
 #endif // _WIN32
 }
@@ -386,7 +386,7 @@ bool SpectrumWorxCore::setBlockSize(unsigned int const newBlockSize)
 {
     if (newBlockSize == buffers().blockSize())
         return true;
-    BOOST_ASSERT(currentThreadOwnsTheProcessLock());
+    LE_ASSERT(currentThreadOwnsTheProcessLock());
     return buffers().resize(newBlockSize, engineSetup().numberOfChannels(),
                             engineSetup().numberOfSideChannels());
 }
@@ -406,7 +406,7 @@ bool SpectrumWorxCore::isEngineSetupUpToDate() const
 
 Engine::Setup const &SpectrumWorxCore::engineSetup() const
 {
-    BOOST_ASSERT(isEngineSetupUpToDate() || !currentStorageFactors().complete());
+    LE_ASSERT(isEngineSetupUpToDate() || !currentStorageFactors().complete());
     return uncheckedEngineSetup();
 }
 
@@ -417,7 +417,7 @@ Engine::Setup const &SpectrumWorxCore::uncheckedEngineSetup() const
 
 bool LE_NOTHROW SpectrumWorxCore::resize(Engine::StorageFactors const &newfactors)
 {
-    BOOST_ASSERT(currentThreadOwnsTheProcessLock());
+    LE_ASSERT(currentThreadOwnsTheProcessLock());
     return Engine::Processor::resize(
         currentStorageFactors_, newfactors,
         static_cast<Engine::Setup::Window>(parameters().get<WindowFunction>().getValue()),
@@ -428,14 +428,14 @@ LE_NOTHROW bool SpectrumWorxCore::updateEngineSetup()
 {
     using namespace Engine;
 
-    //...mrmlj...rethink this...BOOST_ASSERT( !isEngineSetupUpToDate() );
+    //...mrmlj...rethink this...LE_ASSERT( !isEngineSetupUpToDate() );
     Setup const &setup(uncheckedEngineSetup());
 
-    BOOST_ASSERT(currentThreadOwnsTheProcessLock());
+    LE_ASSERT(currentThreadOwnsTheProcessLock());
 
     Parameters &parameters(this->parameters());
 
-    BOOST_ASSERT(unsigned(setup.windowFunction()) == parameters.get<WindowFunction>());
+    LE_ASSERT(unsigned(setup.windowFunction()) == parameters.get<WindowFunction>());
 
 #if defined(_DEBUG) && LE_SW_ENGINE_INPUT_MODE >= 1
     {
@@ -465,10 +465,10 @@ LE_NOTHROW bool SpectrumWorxCore::updateEngineSetup()
                 break;
                 LE_DEFAULT_CASE_UNREACHABLE();
             }
-            BOOST_ASSERT_MSG(setup.numberOfChannels() == numberOfMainChannels,
-                             "Engine::Setup and InputMode out of sync");
-            BOOST_ASSERT_MSG(setup.numberOfSideChannels() == numberOfSideChannels,
-                             "Engine::Setup and InputMode out of sync");
+            LE_ASSERT_MSG(setup.numberOfChannels() == numberOfMainChannels,
+                          "Engine::Setup and InputMode out of sync");
+            LE_ASSERT_MSG(setup.numberOfSideChannels() == numberOfSideChannels,
+                          "Engine::Setup and InputMode out of sync");
         }
     }
 #endif // _DEBUG
@@ -497,7 +497,7 @@ LE_NOTHROW bool SpectrumWorxCore::updateEngineSetup()
 
 void SpectrumWorxCore::updateForWindowChange(unsigned int const window)
 {
-    BOOST_ASSERT(window == parameters().get<WindowFunction>());
+    LE_ASSERT(window == parameters().get<WindowFunction>());
     /// \note AU can set a preset before initialise() (and thus
     /// updateEngineSetup()) is called.
     ///                                       (05.03.2013.) (Domagoj Saric)
@@ -537,10 +537,10 @@ bool SpectrumWorxCore::initialise()
     }
     else
     {
-        BOOST_ASSERT(currentStorageFactors().numberOfChannels == engineSetup().numberOfChannels());
+        LE_ASSERT(currentStorageFactors().numberOfChannels == engineSetup().numberOfChannels());
         success = true;
     }
-    //...mrmlj...AU...BOOST_ASSERT_MSG( !!buffers(), "Input buffers not initialised." );
+    //...mrmlj...AU...LE_ASSERT_MSG( !!buffers(), "Input buffers not initialised." );
 #endif // LE_SW_ENGINE_INPUT_MODE >= 1
     success &= updateEngineSetup();
 
@@ -551,19 +551,19 @@ bool SpectrumWorxCore::initialise()
 
 void SpectrumWorxCore::uninitialise()
 {
-    BOOST_ASSERT_MSG(sharedStorage_, "Not initialised.");
+    LE_ASSERT_MSG(sharedStorage_, "Not initialised.");
     //Utility::clear( currentStorageFactors_ );
     setNumberOfChannelsImpl(0, 0);
-    BOOST_ASSERT(currentStorageFactors_.numberOfChannels == 0);
-    BOOST_ASSERT(buffers().mainChannels().size() == 0);
-    BOOST_ASSERT(buffers().sideChannels().size() == 0);
-    BOOST_VERIFY(moduleChain().resizeAll(currentStorageFactors(), currentStorageFactors()));
+    LE_ASSERT(currentStorageFactors_.numberOfChannels == 0);
+    LE_ASSERT(buffers().mainChannels().size() == 0);
+    LE_ASSERT(buffers().sideChannels().size() == 0);
+    LE_VERIFY(moduleChain().resizeAll(currentStorageFactors(), currentStorageFactors()));
     sharedStorage_.resize(0);
 }
 
 void SpectrumWorxCore::clearSideChannelData()
 {
-    BOOST_ASSERT(currentThreadOwnsTheProcessLock());
+    LE_ASSERT(currentThreadOwnsTheProcessLock());
     Engine::Processor::clearSideChannelData();
 }
 
@@ -580,7 +580,7 @@ void SpectrumWorxCore::resetChannelBuffers()
 #ifdef LE_SW_FMOD
     auto const lock(getProcessingLock());
 #endif // LE_SW_FMOD
-    BOOST_ASSERT(currentThreadOwnsTheProcessLock());
+    LE_ASSERT(currentThreadOwnsTheProcessLock());
     Engine::Processor::resetChannelBuffers();
 }
 
@@ -596,7 +596,7 @@ LE_NOTHROW void SpectrumWorxCore::handleTimingInformationChange(
 //namespace GUI { bool isThisTheGUIThread(); bool isGUIInitialised(); }
 SpectrumWorxCore const &SpectrumWorxCore::fromEngineSetup(Engine::Setup const &engineSetup)
 {
-    //BOOST_ASSERT_MSG( !GUI::isGUIInitialised() || !GUI::isThisTheGUIThread(), "Ambiguous!" ); //...mrmlj...
+    //LE_ASSERT_MSG( !GUI::isGUIInitialised() || !GUI::isThisTheGUIThread(), "Ambiguous!" ); //...mrmlj...
     return static_cast<SpectrumWorxCore const &>(Engine::Processor::fromEngineSetup(engineSetup));
 }
 

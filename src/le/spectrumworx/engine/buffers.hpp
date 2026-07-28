@@ -24,9 +24,8 @@
 #include "le/utility/typeTraits.hpp"
 #include "le/utility/platformSpecifics.hpp"
 
-#include "boost/range/iterator_range_core.hpp"
-
 #include <array>
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -175,8 +174,8 @@ template <typename T = real_t> class WindowBuffer : public Utility::SharedStorag
 // www.lysator.liu.se/c/restrict.html
 // http://cellperformance.beyond3d.com/articles/2006/05/demystifying-the-restrict-keyword.html
 // http://people.cs.pitt.edu/~mock/papers/clei2004.pdf
-using DataRange = boost::iterator_range<float *LE_RESTRICT>;
-using ReadOnlyDataRange = boost::iterator_range<float const *LE_RESTRICT>;
+using DataRange = LE::Utility::Span<float>;
+using ReadOnlyDataRange = LE::Utility::Span<float const>;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// \struct DataPair
@@ -403,7 +402,7 @@ class SubRange : public DataPairImpl<SubRangeHolder>
     template <class TargetBuffer>
     void copySkippedRanges(DataPair::Index sourceData, TargetBuffer &targetBuffer)
     {
-        BOOST_ASSERT_MSG(unsigned(targetBuffer.size()) >= this->size(), "Target buffer too small.");
+        LE_ASSERT_MSG(unsigned(targetBuffer.size()) >= this->size(), "Target buffer too small.");
         copySkippedRanges(sourceData, targetBuffer.begin());
     }
 

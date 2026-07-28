@@ -22,9 +22,9 @@
 #include "le/utility/cstdint.hpp"
 #include "le/utility/platformSpecifics.hpp"
 
-#include "boost/optional/optional.hpp" // Boost sandbox
+#include <optional>
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 
 #include <utility>
 //------------------------------------------------------------------------------
@@ -60,7 +60,7 @@ getAutomatedLFOParameter(std::uint8_t parameterIndex, std::uint8_t lfoParameterI
                          ModuleParameters const &);
 
 template <class AutomatedParameter>
-boost::optional<AutoAdjustedLFOParameter> LE_NOTHROW
+std::optional<AutoAdjustedLFOParameter> LE_NOTHROW
 setAutomatedLFOParameter(std::uint8_t parameterIndex, std::uint8_t lfoParameterIndex,
                          Plugins::AutomatedParameterValue, ModuleParameters &);
 
@@ -97,8 +97,8 @@ LE_NOTHROWNOALIAS char const *getParameterUnit(std::uint8_t parameterIndex,
 
 namespace Detail
 {
-boost::optional<AutoAdjustedLFOParameter> autoAdjustedLFOParameter(LFO &lfo,
-                                                                   std::uint8_t lfoParameterIndex);
+std::optional<AutoAdjustedLFOParameter> autoAdjustedLFOParameter(LFO &lfo,
+                                                                 std::uint8_t lfoParameterIndex);
 
 using value_type = Plugins::AutomatedParameterValue;
 
@@ -162,7 +162,7 @@ getAutomatedLFOParameter(std::uint8_t const parameterIndex, std::uint8_t const l
                          ModuleParameters const &module)
 {
     //...mrmlj...LE_ASSUME( parameterIndex < ( Constants::maxNumberOfParametersPerModule - 1 /*Bypass*/ ) );
-    if (BOOST_UNLIKELY(parameterIndex >= module.numberOfLFOControledParameters()))
+    if (LE_UNLIKELY(parameterIndex >= module.numberOfLFOControledParameters()))
         return getDefaultAutomatedLFOParameter<AutomatedParameter>(lfoParameterIndex);
 
     return LE::Parameters::invokeFunctorOnIndexedParameter(
@@ -184,7 +184,7 @@ getDefaultAutomatedLFOParameter(std::uint8_t const lfoParameterIndex)
 }
 
 template <class AutomatedParameter>
-boost::optional<AutoAdjustedLFOParameter> LE_NOTHROW
+std::optional<AutoAdjustedLFOParameter> LE_NOTHROW
 setAutomatedLFOParameter(std::uint8_t const parameterIndex, std::uint8_t const lfoParameterIndex,
                          Plugins::AutomatedParameterValue const value, ModuleParameters &module)
 {

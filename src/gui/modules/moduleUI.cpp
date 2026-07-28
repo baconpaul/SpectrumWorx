@@ -23,8 +23,8 @@
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/utility/platformSpecifics.hpp"
 
-#include "boost/assert.hpp"
-#include "boost/polymorphic_cast.hpp"
+#include "le/utility/assert.hpp"
+#include "le/utility/polymorphicDowncast.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -116,8 +116,8 @@ void TriggerButton::paintButton(juce::Graphics &graphics, bool const isMouseOver
 {
     unsigned int const imageWidth(51);
     unsigned int const imageHeight(51);
-    BOOST_ASSERT(getCurrentImage().getWidth() == imageWidth);
-    BOOST_ASSERT(getCurrentImage().getHeight() == imageHeight);
+    LE_ASSERT(getCurrentImage().getWidth() == imageWidth);
+    LE_ASSERT(getCurrentImage().getHeight() == imageHeight);
     Detail::paintTextButton(*this, graphics, 0, imageHeight + 2, (ModuleUI::width - imageWidth) / 2,
                             0, isMouseOverButton, isButtonDown);
     if (this->hasDirectFocus())
@@ -132,8 +132,8 @@ ModuleKnob::ModuleKnob(juce::Component &parent, unsigned int const x, unsigned i
            std::max<unsigned int>(marginForGlow * 2, spaceForText)),
       pImageStrip_(nullptr)
 {
-    //...mrmlj...BOOST_ASSERT( imageStrip.getHeight() / numberOfKnobSubbitmaps == 50 );
-    //...mrmlj...BOOST_ASSERT( imageStrip.getWidth ()                          == 50 );
+    //...mrmlj...LE_ASSERT( imageStrip.getHeight() / numberOfKnobSubbitmaps == 50 );
+    //...mrmlj...LE_ASSERT( imageStrip.getWidth ()                          == 50 );
 
     setScrollWheelEnabled(false);
 }
@@ -144,7 +144,7 @@ void ModuleKnob::setupForParameter(juce::Image const &imageStrip,
 {
     auto const &info(control().info());
     Knob::setupForParameter(info.name, imageStrip, info.default_);
-    //BOOST_ASSERT( !isLFOEnabled() ); //...mrmlj...when turning the GUI on or off...
+    //LE_ASSERT( !isLFOEnabled() ); //...mrmlj...when turning the GUI on or off...
     setDoubleClickReturnValue(!isLFOEnabled(), info.default_);
     quantization_ = quantizationType;
     pImageStrip_ = &imageStrip;
@@ -154,10 +154,10 @@ void ModuleKnob::setupForParameter(juce::Image const &imageStrip,
         setRange(info.minimum, info.maximum, quantizationStep);
         break;
     case FrequencyInHertz:
-        BOOST_ASSERT(quantizationStep == 1);
+        LE_ASSERT(quantizationStep == 1);
         break;
     case TimeInMilliseconds:
-        BOOST_ASSERT(quantizationStep == 0 || quantizationStep == 1);
+        LE_ASSERT(quantizationStep == 0 || quantizationStep == 1);
         break;
         LE_DEFAULT_CASE_UNREACHABLE();
     }
@@ -175,7 +175,7 @@ void ModuleKnob::mouseDown(juce::MouseEvent const &event) noexcept
 
 void ModuleKnob::mouseUp(juce::MouseEvent const &event) noexcept
 {
-    BOOST_ASSERT(isEnabled() == !isLFOEnabled());
+    LE_ASSERT(isEnabled() == !isLFOEnabled());
     Knob::mouseUp(event);
     setEnabled(true);
 }
@@ -193,8 +193,8 @@ void ModuleKnob::paint(juce::Graphics &graphics)
     {
         juce::Image const &selection(imageWidth < 51 ? resourceBitmap<SmallModuleKnobSelected>()
                                                      : resourceBitmap<ModuleKnobSelected>());
-        BOOST_ASSERT(selection.getWidth() == selection.getHeight());
-        BOOST_ASSERT(unsigned(selection.getWidth()) == imageWidth + 2);
+        LE_ASSERT(selection.getWidth() == selection.getHeight());
+        LE_ASSERT(unsigned(selection.getWidth()) == imageWidth + 2);
         unsigned int const selectionWidth(imageWidth + 2);
         unsigned int const xy(marginForGlow - (selectionWidth - imageWidth) / 2);
         paintImage(graphics, selection, xy, xy);
@@ -212,7 +212,7 @@ void ModuleKnob::paint(juce::Graphics &graphics)
 
 void ModuleKnob::valueChanged() noexcept
 {
-    BOOST_ASSERT(isMouseOverOrDragging());
+    LE_ASSERT(isMouseOverOrDragging());
     moduleParameterChanged();
 }
 
@@ -253,9 +253,9 @@ LE_NOTHROW void ModuleKnob::updateForEngineSetupChanges(Engine::Setup const &eng
                          : Math::convert<param_type>(ceil(minimum / quantization)) * quantization);
     double const adjustedMaximum(Math::convert<param_type>(floor(maximum / quantization)) *
                                  quantization);
-    BOOST_ASSERT(adjustedMinimum >= minimum);
-    BOOST_ASSERT(adjustedMaximum <=
-                 maximum + 250 * std::numeric_limits<float>::epsilon()); //...mrmlj...
+    LE_ASSERT(adjustedMinimum >= minimum);
+    LE_ASSERT(adjustedMaximum <=
+              maximum + 250 * std::numeric_limits<float>::epsilon()); //...mrmlj...
     setRange(adjustedMinimum, adjustedMaximum, quantization);
 }
 
@@ -273,7 +273,7 @@ DiscreteParameter::DiscreteParameter(juce::Component &parent, unsigned int const
 {
     setName(control().name());
     DiscreteParameter::setTopLeftPosition(x, y);
-    BOOST_ASSERT(control().info().default_ == 0);
+    LE_ASSERT(control().info().default_ == 0);
 }
 
 void DiscreteParameter::mouseDown(juce::MouseEvent const &)
@@ -302,15 +302,15 @@ ModuleUI::ModuleUI()
       eject_(*this, resourceBitmap<Eject>(), resourceBitmap<Eject>(),
              juce::Colours::darkgrey.withAlpha(0.4f))
 {
-    BOOST_ASSERT(isThisTheGUIThread() ||
-                 juce::MessageManager::getInstance()->currentThreadHasLockedMessageManager());
+    LE_ASSERT(isThisTheGUIThread() ||
+              juce::MessageManager::getInstance()->currentThreadHasLockedMessageManager());
 
-    BOOST_ASSERT(resourceBitmap<ModuleBgSelected>().getWidth() ==
-                 resourceBitmap<ModuleBg>().getWidth());
-    BOOST_ASSERT(resourceBitmap<ModuleBgSelected>().getHeight() ==
-                 resourceBitmap<ModuleBg>().getHeight());
-    BOOST_ASSERT(resourceBitmap<ModuleBgSelected>().getWidth() == width);
-    BOOST_ASSERT(resourceBitmap<ModuleBgSelected>().getHeight() == height);
+    LE_ASSERT(resourceBitmap<ModuleBgSelected>().getWidth() ==
+              resourceBitmap<ModuleBg>().getWidth());
+    LE_ASSERT(resourceBitmap<ModuleBgSelected>().getHeight() ==
+              resourceBitmap<ModuleBg>().getHeight());
+    LE_ASSERT(resourceBitmap<ModuleBgSelected>().getWidth() == width);
+    LE_ASSERT(resourceBitmap<ModuleBgSelected>().getHeight() == height);
 
     setSize(width, height);
 
@@ -337,21 +337,21 @@ ModuleUI::ModuleUI()
     //    0, 200, false, 0, 0
     //);
 
-    BOOST_ASSERT_MSG(unsigned(this->getNumChildComponents()) == baseWidgets,
-                     "Unexpected number of child widgets at end of ModuleUI constructor.");
+    LE_ASSERT_MSG(unsigned(this->getNumChildComponents()) == baseWidgets,
+                  "Unexpected number of child widgets at end of ModuleUI constructor.");
 }
 
 #pragma warning(pop)
 
 LE_NOTHROW ModuleUI::~ModuleUI()
 {
-    BOOST_ASSERT(isThisTheGUIThread() ||
-                 juce::MessageManager::getInstance()->currentThreadHasLockedMessageManager());
+    LE_ASSERT(isThisTheGUIThread() ||
+              juce::MessageManager::getInstance()->currentThreadHasLockedMessageManager());
 
     if (selectedModule() == this)
     {
         //...mrmlj...
-        //BOOST_ASSERT( hasFocus() || editor()./*...mrmlj...sharedModuleControls().hasFocus()*/ sharedModuleControlsActive() );
+        //LE_ASSERT( hasFocus() || editor()./*...mrmlj...sharedModuleControls().hasFocus()*/ sharedModuleControlsActive() );
 
         // Implementation note:
         //   Unforunately moveKeyboardFocusToSibling() does not just select the
@@ -366,7 +366,7 @@ LE_NOTHROW ModuleUI::~ModuleUI()
     }
     else
     {
-        BOOST_ASSERT(!hasFocus());
+        LE_ASSERT(!hasFocus());
     }
 
     fadeOutComponent(*this, 0, 600, true);
@@ -374,8 +374,8 @@ LE_NOTHROW ModuleUI::~ModuleUI()
 
 void ModuleUI::setUpForEffect(char const *const effectName, char const *const effectDescription)
 {
-    BOOST_ASSERT(getName().isEmpty());
-    BOOST_ASSERT(description_.isEmpty());
+    LE_ASSERT(getName().isEmpty());
+    LE_ASSERT(description_.isEmpty());
     setName(effectName);
     description_ = effectDescription;
 }
@@ -435,7 +435,7 @@ void ModuleUI::mouseExit(juce::MouseEvent const &event) noexcept
 void ModuleUI::focusGained(FocusChangeType)
 {
     activate();
-    BOOST_ASSERT(selected());
+    LE_ASSERT(selected());
 }
 
 void ModuleUI::focusLost(FocusChangeType)
@@ -448,7 +448,7 @@ void ModuleUI::focusLost(FocusChangeType)
         return;
 
     //...mrmlj...rethink this focus changing logic and assumptions
-    //BOOST_ASSERT( selected() );
+    //LE_ASSERT( selected() );
     if (selected())
         deactivate();
 }
@@ -463,7 +463,7 @@ void ModuleUI::focusOfChildComponentChanged(FocusChangeType const changeType)
 
 void ModuleUI::activate()
 {
-    BOOST_ASSERT(hasFocus() || selectionTracksMouseMovements());
+    LE_ASSERT(hasFocus() || selectionTracksMouseMovements());
     if (this->selected())
         return;
 
@@ -482,8 +482,8 @@ void ModuleUI::activate()
 
 void ModuleUI::deactivate()
 {
-    BOOST_ASSERT(selected());
-    BOOST_ASSERT(!hasFocus());
+    LE_ASSERT(selected());
+    LE_ASSERT(!hasFocus());
 
     editor().moduleDeactivated();
     pSelectedModule_ = nullptr;
@@ -607,7 +607,7 @@ void ModuleUI::buttonClicked(juce::Button *LE_RESTRICT const pButton)
     }
     else
     {
-        BOOST_ASSERT(pButton == &eject_);
+        LE_ASSERT(pButton == &eject_);
         //...mrmlj...investigate why this doesn't work when placed inside the ModuleUI destructor...
         if (ModuleControlBase::activeControl() &&
             (this == &ModuleControlBase::activeControl()->moduleUI()))
@@ -618,8 +618,8 @@ void ModuleUI::buttonClicked(juce::Button *LE_RESTRICT const pButton)
 
 SpectrumWorxEditor &ModuleUI::editor()
 {
-    BOOST_ASSERT_MSG(getParentComponent(), "ModuleUI detached from editor.");
-    return *boost::polymorphic_downcast<SpectrumWorxEditor *>(getParentComponent());
+    LE_ASSERT_MSG(getParentComponent(), "ModuleUI detached from editor.");
+    return *LE::Utility::polymorphicDowncast<SpectrumWorxEditor *>(getParentComponent());
 }
 
 SpectrumWorxEditor const &ModuleUI::editor() const
@@ -629,28 +629,28 @@ SpectrumWorxEditor const &ModuleUI::editor() const
 
 SharedModuleControls &ModuleUI::sharedControls()
 {
-    BOOST_ASSERT_MSG(selected(), "Inactive modules do not have an active shared controls UI.");
+    LE_ASSERT_MSG(selected(), "Inactive modules do not have an active shared controls UI.");
     return editor().sharedModuleControls();
 }
 
 void ModuleUI::holdSharedControls(bool const doHold) const
 {
-    BOOST_ASSERT(editor().holdSharedModuleControls_ != doHold);
-    //...mmrlj...BOOST_ASSERT( selected() == editor().sharedModuleControlsActive() );
+    LE_ASSERT(editor().holdSharedModuleControls_ != doHold);
+    //...mmrlj...LE_ASSERT( selected() == editor().sharedModuleControlsActive() );
     editor().holdSharedModuleControls_ = doHold;
 }
 
 bool ModuleUI::sharedControlsLocked() const
 {
-    BOOST_ASSERT_MSG(selected(), "Inactive modules do not have an active shared controls UI.");
+    LE_ASSERT_MSG(selected(), "Inactive modules do not have an active shared controls UI.");
     return editor().holdSharedModuleControls_;
 }
 
 ModuleControlBase &ModuleUI::effectSpecificParameterControl(std::uint8_t const parameterIndex)
 {
     std::uint8_t const actualChildIndex(parameterIndex + baseWidgets);
-    BOOST_ASSERT_MSG(actualChildIndex < unsigned(this->getNumChildComponents()),
-                     "Parameter index out of range.");
+    LE_ASSERT_MSG(actualChildIndex < unsigned(this->getNumChildComponents()),
+                  "Parameter index out of range.");
     juce::Component *LE_RESTRICT const pWidget(this->getChildComponent(actualChildIndex));
     LE_ASSUME(pWidget);
     return ModuleControlBase::controlForWidget(*pWidget);
@@ -682,8 +682,8 @@ ModuleWidgetConstructionState::ModuleWidgetConstructionState(ModuleUI &parent)
 
 EmptyWidgets::EmptyWidgets(ModuleWidgetConstructionState const &state)
 {
-    BOOST_ASSERT_MSG(state.yOffset < static_cast<unsigned int>(state.parent.getHeight()),
-                     "You added more parameters/controls to the effect than can fit into its UI");
+    LE_ASSERT_MSG(state.yOffset < static_cast<unsigned int>(state.parent.getHeight()),
+                  "You added more parameters/controls to the effect than can fit into its UI");
     (void)state;
 }
 
@@ -715,7 +715,7 @@ ModuleWidgetHolder<ModuleKnob>::ModuleWidgetHolder(ModuleWidgetConstructionState
 {
     state.yOffset += widget.getHeight();
     //...mrmlj...
-    BOOST_ASSERT(resourceBitmap<ModuleKnobStrip>().getWidth() == 51);
+    LE_ASSERT(resourceBitmap<ModuleKnobStrip>().getWidth() == 51);
     state.yOffset += 51;
 }
 

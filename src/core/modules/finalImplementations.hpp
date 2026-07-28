@@ -49,7 +49,7 @@ template <class Effect> class LE_NOVTABLE ModuleWidgets
     LE_NOALIAS void create(GUI::ModuleUI &uiBase)
     {
 #if !LE_SW_SEPARATED_DSP_GUI
-        BOOST_ASSERT(!uiBase.module().gui());
+        LE_ASSERT(!uiBase.module().gui());
 #endif // LE_SW_SEPARATED_DSP_GUI
         uiBase.setUpForEffect(Effect::title, Effect::description);
         parameterWidgets_.construct(uiBase);
@@ -58,7 +58,7 @@ template <class Effect> class LE_NOVTABLE ModuleWidgets
     LE_NOTHROWNOALIAS void destroy()
     {
 #if !LE_SW_SEPARATED_DSP_GUI
-        //BOOST_ASSERT( !uiBase.module().gui() );
+        //LE_ASSERT( !uiBase.module().gui() );
 #endif // LE_SW_SEPARATED_DSP_GUI
         parameterWidgets_.destroy();
     }

@@ -15,10 +15,11 @@
 #include "le/utility/tchar.hpp"
 #include "le/utility/trace.hpp"
 
-#include <boost/assert.hpp>
-#include <boost/core/ignore_unused.hpp>
+#include "le/utility/assert.hpp"
+#include "le/utility/ignoreUnused.hpp"
 
 #include <array>
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -62,12 +63,12 @@ Plugin<Impl, Protocol::Unity>::create(UnityAudioEffectState *LE_RESTRICT const p
 #ifndef NDEBUG
     bool const usesSideChain(Impl::maxNumberOfInputs == (Impl::maxNumberOfOutputs * 2));
 
-    BOOST_ASSERT(pState);
-    //BOOST_ASSERT( pState->currdsptick     == 0                                                              );
-    BOOST_ASSERT(pState->prevdsptick == 0);
-    BOOST_ASSERT(pState->sidechainbuffer == nullptr || usesSideChain);
-    BOOST_ASSERT(pState->effectdata == nullptr);
-    BOOST_ASSERT(pState->flags & UnityAudioEffectStateFlags_IsSideChainTarget || !usesSideChain);
+    LE_ASSERT(pState);
+    //LE_ASSERT( pState->currdsptick     == 0                                                              );
+    LE_ASSERT(pState->prevdsptick == 0);
+    LE_ASSERT(pState->sidechainbuffer == nullptr || usesSideChain);
+    LE_ASSERT(pState->effectdata == nullptr);
+    LE_ASSERT(pState->flags & UnityAudioEffectStateFlags_IsSideChainTarget || !usesSideChain);
 #endif // NDEBUG
 
     //std::uint16_t const defaultBlockSize( 2048 );
@@ -112,16 +113,16 @@ LE_NOTHROW UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK Plugin<Impl, Protocol::
 {
     Impl &impl(Plugin::impl(pState));
 
-    if (BOOST_UNLIKELY(inChannels != outChannels))
+    if (LE_UNLIKELY(inChannels != outChannels))
         return Unsupported;
 
-    //if ( BOOST_UNLIKELY( pState->structsize < sizeof( *pState ) ) ) // pre Unity 5.2
+    //if ( LE_UNLIKELY( pState->structsize < sizeof( *pState ) ) ) // pre Unity 5.2
     //{
     //    if ( !impl.setBlockSize( length ) )
     //        return OutOfMemory;
     //}
 
-    //BOOST_ASSERT_MSG( length <= impl.processBlockSize(), "Unity changed maximum processing block size in the middle of processing." );
+    //LE_ASSERT_MSG( length <= impl.processBlockSize(), "Unity changed maximum processing block size in the middle of processing." );
 
     auto const numberOfMainChannels(static_cast<std::uint8_t>(inChannels));
     auto const numberOfSideChannels(
@@ -134,8 +135,8 @@ LE_NOTHROW UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK Plugin<Impl, Protocol::
         impl.numberOfInputChannels(), impl.numberOfSideChannels(), numberOfMainChannels,
         numberOfSideChannels);
 
-    if (BOOST_UNLIKELY(!impl.setNumberOfChannels(numberOfMainChannels + numberOfSideChannels,
-                                                 numberOfMainChannels)))
+    if (LE_UNLIKELY(!impl.setNumberOfChannels(numberOfMainChannels + numberOfSideChannels,
+                                              numberOfMainChannels)))
         return OutOfMemory;
 
     impl.process(inBuffer, pState->sidechainbuffer, outBuffer, length);
@@ -179,7 +180,7 @@ LE_NOTHROW LE_COLD UNITY_AUDIODSP_RESULT UNITY_AUDIODSP_CALLBACK
 Plugin<Impl, Protocol::Unity>::getParameter(UnityAudioEffectState *const pState, int const index,
                                             float *const pValue, char *const pValueString)
 {
-    BOOST_ASSERT(pValue);
+    LE_ASSERT(pValue);
     Impl &effect(impl(pState));
     ParameterIndex const parameterIndex{static_cast<ParameterIndex::value_type>(index)};
     *pValue = effect.getParameter(parameterIndex);
@@ -188,9 +189,9 @@ Plugin<Impl, Protocol::Unity>::getParameter(UnityAudioEffectState *const pState,
 #if !LE_NO_PARAMETER_STRINGS
         pValueString[0] = 0;
         pValueString[15] = 0; //...mrmlj...
-        effect.getParameterDisplay(parameterIndex, boost::make_iterator_range_n(pValueString, 16),
+        effect.getParameterDisplay(parameterIndex, LE::Utility::makeSpan(pValueString, 16),
                                    nullptr);
-        BOOST_ASSERT(std::strlen(pValueString) < 16);
+        LE_ASSERT(std::strlen(pValueString) < 16);
 #endif // !LE_NO_PARAMETER_STRINGS
     }
     return Success;
@@ -203,7 +204,7 @@ Plugin<Impl, Protocol::Unity>::getSignal(UnityAudioEffectState *LE_RESTRICT cons
                                          float *LE_RESTRICT const pBuffer,
                                          int const numberOfSamples)
 {
-    boost::ignore_unused(pState, pName, pBuffer, numberOfSamples);
+    LE::Utility::ignoreUnused(pState, pName, pBuffer, numberOfSamples);
     return Unsupported;
 }
 

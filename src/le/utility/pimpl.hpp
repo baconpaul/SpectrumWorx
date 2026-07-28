@@ -12,6 +12,7 @@
 #define pimpl_hpp__9B6D22C9_F9CA_45F8_BEFC_BD3D6199A2EC
 //------------------------------------------------------------------------------
 #include "abi.hpp"
+#include "intrusivePtr.hpp"
 
 #if defined(_MSC_VER)
 #include <type_traits>
@@ -110,8 +111,8 @@ template <class Interface, class BaseInterface = Detail::PImplTerminator>
 class HeapPImpl : public PImpl<Interface, BaseInterface>
 {
   public:
-    typedef boost::intrusive_ptr<Interface> Ptr;
-    typedef boost::intrusive_ptr<Interface const> CPtr;
+    typedef LE::Utility::IntrusivePtr<Interface> Ptr;
+    typedef LE::Utility::IntrusivePtr<Interface const> CPtr;
 
     LE_NOTHROWNOALIAS static Ptr create();
     LE_NOTHROWNOALIAS static void operator delete(void *); ///< \internal
@@ -119,7 +120,7 @@ class HeapPImpl : public PImpl<Interface, BaseInterface>
   private:
     LE_NOTHROWNOALIAS HeapPImpl(); ///< \internal
 
-  private: // boost::intrusive_ptr required section
+  private: // LE::Utility::IntrusivePtr required section
     friend void LE_NOTHROWNOALIAS intrusive_ptr_add_ref(Interface const *);
     friend void LE_NOTHROW intrusive_ptr_release(Interface const *);
 }; // class HeapPImpl

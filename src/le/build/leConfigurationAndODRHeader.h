@@ -26,10 +26,8 @@
 
 // Include asserts in all "checked" builds.
 #undef NDEBUG
-#undef BOOST_DISABLE_ASSERTS
 #if !LE_CHECKED_BUILD
 #define NDEBUG
-#define BOOST_DISABLE_ASSERTS
 #ifndef LE_PUBLIC_BUILD
 #define LE_PUBLIC_BUILD
 #endif // LE_PUBLIC_BUILD
@@ -56,13 +54,13 @@
 #define LE_IMPL_NAMESPACE_END(namespaceName) }
 #endif // LE_SW_SDK_BUILD
 
-/// \note A quick way to disable the requriement for boost::assertion_failed to
-/// be defined in auxiliary projects when BOOST_ENABLE_ASSERT_HANDLER is
-/// globally defined in the CMakeLists.txt file.
+/// \note A quick way to disable the requriement for
+/// LE::Utility::assertionFailed to be defined in auxiliary projects when
+/// LE_ENABLE_ASSERT_HANDLER is globally defined in the CMakeLists.txt file.
 ///                                           (15.11.2013.) (Domagoj Saric)
-#ifdef LE_DISABLE_BOOST_ASSERT_HANDLER
-#undef BOOST_ENABLE_ASSERT_HANDLER
-#endif // LE_DISABLE_BOOST_ASSERT_HANDLER
+#ifdef LE_DISABLE_ASSERT_HANDLER
+#undef LE_ENABLE_ASSERT_HANDLER
+#endif // LE_DISABLE_ASSERT_HANDLER
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -246,11 +244,6 @@ DEFINE_SECURE_STRNFUNCTION(wcsncpy, wchar_t)
 
 #elif defined(__GNUC__) // compiler
 
-// http://boost.sourceforge.net/doc/html/boost_tr1/config.html
-// http://boost.2283326.n4.nabble.com/TR1-and-BOOST-HAS-GCC-TR1-td3337508.html
-#define BOOST_HAS_TR1
-#define BOOST_HAS_GCC_TR1
-
 #if defined(__SSE__)
 #define LE_HAS_SSE1
 // Implementation note:
@@ -293,119 +286,21 @@ typedef void const *const nullptr_t;
 // Boost.
 ////////////////////////////////////////////////////////////////////////////////
 
+/// \note What is left here only reaches Boost.Fusion, Boost.MPL and
+/// Boost.Preprocessor, the three libraries stage 2 kept. The Spirit, Karma,
+/// Phoenix, TR1, endian, throw_exception and compiler-config tuning that used
+/// to live here went with the libraries it configured.
+///                                           (28.07.2026.) (SW port)
 #define BOOST_NO_IOSTREAM
 #ifdef NDEBUG
-#define BOOST_NO_TYPEID // implies BOOST_NO_RTTI
+#define BOOST_NO_TYPEID // implies LE_NO_RTTI
 #endif                  // NDEBUG
 
 #ifndef BOOST_EXCEPTION_DISABLE
 #define BOOST_EXCEPTION_DISABLE
 #endif // BOOST_EXCEPTION_DISABLE
 
-#define BOOST_COMMON_TYPE_DONT_USE_TYPEOF
-
-#define BOOST_LEXICAL_CAST_ASSUME_C_LOCALE
-
-#define BOOST_PHOENIX_NO_PREDEFINED_TERMINALS
-#define BOOST_SPIRIT_NO_PREDEFINED_TERMINALS
-#define BOOST_SPIRIT_MAX_LOCALS_SIZE 3
-#define BOOST_SPIRIT_USE_PHOENIX_V3
-#define BOOST_KARMA_NUMERICS_LOOP_UNROLL 0
-#define SPIRIT_ARGUMENTS_LIMIT 3
-#define SPIRIT_ATTRIBUTES_LIMIT 3
-#define SPIRIT_NUMERICS_LOOP_UNROLL 1
-
-// boost/detail/endian.hpp configuration
-#if defined(__ANDROID__) && !(defined(__BIG_ENDIAN__) || defined(__LITTLE_ENDIAN__))
-// http://stackoverflow.com/questions/6212951/endianness-of-android-ndk
-#include "sys/endian.h"
-#if _BYTE_ORDER == BIG_ENDIAN
-#define __BIG_ENDIAN__
-#else
-#define __LITTLE_ENDIAN__
-#endif // _BYTE_ORDER
-#elif defined(_XBOX) && !defined(__BIG_ENDIAN__)
-#define __BIG_ENDIAN__
-#endif // platform
-
-// boost\tr1\detail\config_all.hpp configuration
-#if defined(__ANDROID__)
-#define BOOST_TR1_GCC_INCLUDE_PATH include
-#elif defined(_XBOX)
-#define BOOST_TR1_DETAIL_CONFIG_ALL_HPP_INCLUDED
-#include <cstddef>
-#include <cstdlib>
-#define BOOST_TR1_STD_HEADER(name) <../xbox/name>
-#define BOOST_TR1_STD_CHEADER(name) BOOST_TR1_STD_HEADER(name)
-#define BOOST_HAS_CPP_0X
-#include BOOST_TR1_STD_HEADER(utility)
-#include <boost/tr1/detail/config.hpp>
-#endif // _XBOX or __ANDROID__
-
-/// \note Boost does not yet provide a BOOST_NO_CXX11_HDR_ATOMIC macro:
-/// http://lists.boost.org/Archives/boost/2012/06/194554.php
-/// http://www.boost.org/doc/libs/release/libs/config/doc/html/boost_config/boost_macro_reference.html
-///                                           (10.10.2013.) (Domagoj Saric)
 #include <ciso646>
-#if defined(_MSC_VER)
-#if _MSC_VER == 1900
-#define BOOST_COMPILER_CONFIG "le/build/boost_compiler_config_msvc.hpp"
-#endif // MSVC14
-#elif defined(_LIBCPP_VERSION)
-#elif defined(__ANDROID__) &&                                                                      \
-    defined(                                                                                       \
-        __ARM_ARCH_5TE__) // libstdc++'s <atomic> does not seem to support ARMv5 (fails to compile)...
-#define BOOST_NO_CXX11_HDR_ATOMIC
-#elif defined(__GLIBC__) || defined(__GLIBCPP__) || defined(__GLIBCXX__) ||                        \
-    defined(__clang__) //...mrmlj...no __GLIBC*__ on OSX?
-#if (((__GNUC__ * 10) + __GNUC_MINOR__) < 46)
-#define BOOST_NO_CXX11_HDR_ATOMIC
-#endif
-#endif // STL version
-
-////////////////////////////////////////////////////////////////////////////////
-// boost::throw_exception()
-////////////////////////////////////////////////////////////////////////////////
-
-// http://llvm.org/releases/3.6.0/tools/clang/docs/ReleaseNotes.html#the-exceptions-macro
-#ifndef __clang__
-#define __has_feature(x) 0
-#endif // __clang__
-#if defined(__cplusplus) &&                                                                        \
-    ((defined(_MSC_VER) && !defined(_CPPUNWIND)) ||                                                \
-     (defined(__GNUC__) && (!defined(__EXCEPTIONS) || !__has_feature(cxx_exceptions))))
-#ifndef BOOST_NO_EXCEPTIONS
-#define BOOST_NO_EXCEPTIONS
-#endif
-#include <cassert>
-namespace boost
-{
-template <class E>
-#if defined(_MSC_VER)
-__declspec(noreturn)
-#elif defined(__GNUC__)
-__attribute__((noreturn))
-#endif
-inline void throw_exception(E const & /*e*/)
-{
-    assert(!"Exception!");
-#if defined(_MSC_VER)
-    __assume(false);
-#elif defined(__GNUC__)
-    __builtin_unreachable();
-#else
-    ::abort();
-#endif
-}
-} // namespace boost
-#elif !defined(JUCE_STRING_UTF_TYPE) &&                                                            \
-    defined(__cplusplus) //...mrmlj...quick-hack detection of JUCE builds...
-/// \note Avoid the overhead of boost::throw_exception.
-///                                       (30.08.2013.) (Domagoj Saric)
-#include "boost/throw_exception.hpp"
-#undef BOOST_THROW_EXCEPTION
-#define BOOST_THROW_EXCEPTION(x) throw x
-#endif // !JUCE
 
 /// \note Import the fixes/workarounds for Boost.Range's lack of restricted
 /// pointer support from NT2.

@@ -20,6 +20,7 @@
 #include "le/plugins/plugin.hpp"
 #include "le/utility/cstdint.hpp"
 #include "le/utility/platformSpecifics.hpp"
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -101,7 +102,7 @@ class LE_NOVTABLE Plugin2HostPassiveInteropImpl : public Plugin2HostPassiveInter
 #pragma warning(pop)
 
     LE_NOTHROWNOALIAS void
-    getParameterDisplay(ParameterID const parameterID, boost::iterator_range<char *> const text,
+    getParameterDisplay(ParameterID const parameterID, LE::Utility::Span<char> const text,
                         Plugins::AutomatedParameterValue const *LE_RESTRICT const pValue) const
     {
         //...mrmlj...duplicated in SpectrumWorxEditorFMOD as a quick-hack around fmod ugliness

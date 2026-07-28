@@ -22,7 +22,7 @@ LE_NOTHROW LE_COLD ModuleGUI::~ModuleGUI() {}
 LE_NOTHROW float ModuleGUI::getSharedParameter(std::uint_fast8_t const sharedParameterIndex) const
 {
     auto const result(ModuleParameters::getSharedParameter(sharedParameterIndex));
-    BOOST_ASSERT(result == GUI::ModuleUI::getSharedParameter(sharedParameterIndex));
+    LE_ASSERT(result == GUI::ModuleUI::getSharedParameter(sharedParameterIndex));
     return result;
 }
 

@@ -18,6 +18,7 @@
 
 #include "le/spectrumworx/engine/module.hpp"
 #include "le/utility/cstdint.hpp"
+#include <optional>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -47,7 +48,7 @@ class LE_NOVTABLE Module : public Engine::ModuleDSP,
 
   public: // Automation
     template <class AutomatedParameter>
-    boost::optional<std::pair<std::uint8_t, LFO::value_type>> LE_NOTHROW
+    std::optional<std::pair<std::uint8_t, LFO::value_type>> LE_NOTHROW
     setAutomatedLFOParameter(std::uint8_t const parameterIndex,
                              std::uint8_t const lfoParameterIndex,
                              Plugins::AutomatedParameterValue const value)
@@ -59,7 +60,7 @@ class LE_NOVTABLE Module : public Engine::ModuleDSP,
     }
 
   public:
-    using OptionalUI = boost::optional<GUI::ModuleUI>;
+    using OptionalUI = std::optional<GUI::ModuleUI>;
 
     OptionalUI &gui() { return ui_; }
     OptionalUI const &gui() const { return ui_; }

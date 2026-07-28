@@ -33,14 +33,13 @@
 #ifndef BOOST_SWITCH_HPP_INCLUDED
 #define BOOST_SWITCH_HPP_INCLUDED
 
-#include <boost/assert.hpp>
-#include <boost/config.hpp>
+#include "assert.hpp"
 #include <boost/preprocessor/config/limits.hpp>
 #include <boost/preprocessor/repetition/repeat.hpp>
 #include <boost/preprocessor/iteration/local.hpp>
 #include <boost/mpl/size.hpp>
 #include <boost/mpl/at.hpp>
-#include <boost/type_traits/remove_reference.hpp>
+#include <type_traits>
 
 #ifndef BOOST_SWITCH_LIMIT
 #define BOOST_SWITCH_LIMIT 50
@@ -66,8 +65,7 @@ template <int N> struct switch_impl;
 template <> struct switch_impl<0>
 {
     template <class V, class Int, class F, class Default>
-    static typename F::result_type apply(Int i, F &&,
-                                         Default d BOOST_APPEND_EXPLICIT_TEMPLATE_TYPE(V))
+    static typename F::result_type apply(Int i, F &&, Default d)
     {
         return (d(i));
     }
@@ -84,8 +82,7 @@ template <> struct switch_impl<0>
     template <> struct switch_impl<n>                                                              \
     {                                                                                              \
         template <class V, class I, class F, class D>                                              \
-        static typename F::result_type apply(I i, F &&f,                                           \
-                                             D d BOOST_APPEND_EXPLICIT_TEMPLATE_TYPE(V))           \
+        static typename F::result_type apply(I i, F &&f, D d)                                      \
         {                                                                                          \
             switch (i)                                                                             \
             {                                                                                      \
@@ -119,7 +116,7 @@ template <typename result_type> struct assert_no_default_case
 #endif
     result_type operator()(int) const
     {
-        BOOST_ASSERT(!"Default switch_ case executed!.");
+        LE_ASSERT(!"Default switch_ case executed!.");
 #if defined(_MSC_VER)
         __assume(false);
 #elif (__clang_major__ >= 2) || (((__GNUC__ * 10) + __GNUC_MINOR__) >= 45)
@@ -131,7 +128,7 @@ template <typename result_type> struct assert_no_default_case
 };
 
 template <class V, class N, class F, class D>
-inline typename F::result_type switch_(N n, F &&f, D d BOOST_APPEND_EXPLICIT_TEMPLATE_TYPE(V))
+inline typename F::result_type switch_(N n, F &&f, D d)
 {
     typedef switch_detail::switch_impl<boost::mpl::size<V>::value> impl;
     return (impl::template apply<V>(n, std::forward<F>(f), d));

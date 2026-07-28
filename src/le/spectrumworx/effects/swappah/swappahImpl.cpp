@@ -168,8 +168,8 @@ void SwappahImpl::swapBands(DataRange const &data) const
     {
         if (band.source != target)
         {
-            BOOST_ASSERT(band.source < unsigned(swapBuffer.size()));
-            BOOST_ASSERT(target <= unsigned(data.size()));
+            LE_ASSERT(band.source < unsigned(swapBuffer.size()));
+            LE_ASSERT(target <= unsigned(data.size()));
             copy(swapBuffer.begin() + band.source, data.begin() + target, band.size);
         }
         target += band.size;

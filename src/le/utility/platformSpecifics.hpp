@@ -16,7 +16,7 @@
 //------------------------------------------------------------------------------
 #include "abi.hpp"
 
-#include <boost/assert.hpp>
+#include "assert.hpp"
 //------------------------------------------------------------------------------
 
 /// \note Use a more elaborate version of assume for internal code.
@@ -40,10 +40,10 @@
 #define LE_WEAK_FUNCTION extern __declspec(noinline) inline
 
 #define LE_UNREACHABLE_CODE()                                                                      \
-    BOOST_ASSERT_MSG(false, "This code should not be reached.");                                   \
+    LE_ASSERT_MSG(false, "This code should not be reached.");                                      \
     __assume(false)
 #define LE_ASSUME(condition)                                                                       \
-    BOOST_ASSERT_MSG(condition, "Assumption broken.");                                             \
+    LE_ASSERT_MSG(condition, "Assumption broken.");                                                \
     __assume(condition)
 
 #define LE_MSVC_SPECIFIC(expression) expression
@@ -146,10 +146,10 @@
 
 #if LE_HAS_CLANG_BUILTIN(__builtin_assume)
 #define LE_ASSUME(condition)                                                                       \
-    BOOST_ASSERT_MSG(condition, "Assumption broken.");                                             \
+    LE_ASSERT_MSG(condition, "Assumption broken.");                                                \
     __builtin_assume(condition)
 #define LE_UNREACHABLE_CODE()                                                                      \
-    BOOST_ASSERT_MSG(false, "This code should not be reached.");                                   \
+    LE_ASSERT_MSG(false, "This code should not be reached.");                                      \
     __builtin_unreachable()
 #elif LE_HAS_CLANG_BUILTIN(__builtin_unreachable) || (((__GNUC__ * 10) + __GNUC_MINOR__) >= 45)
 // http://en.chys.info/2010/07/counterpart-of-assume-in-gcc
@@ -157,7 +157,7 @@
 // http://llvm-reviews.chandlerc.com/file/data/3qqhjnypd5j4vaxwuogy/PHID-FILE-q4turx3ss4xgvxyl2zht/D149.diff
 // http://gcc.gnu.org/ml/gcc-patches/2008-04/msg00059.html
 #define LE_UNREACHABLE_CODE()                                                                      \
-    BOOST_ASSERT_MSG(false, "This code should not be reached.");                                   \
+    LE_ASSERT_MSG(false, "This code should not be reached.");                                      \
     __builtin_unreachable()
 #if !defined(__clang__) && (((__GNUC__ * 10) + __GNUC_MINOR__) > 45) &&                            \
     (((__GNUC__ * 10) + __GNUC_MINOR__) < 48)
@@ -166,11 +166,11 @@
 //  http://gcc.gnu.org/bugzilla/show_bug.cgi?id=50385
 //  http://gcc.gnu.org/ml/gcc-patches/2012-07/msg00254.html
 //  http://gcc.gnu.org/bugzilla/show_bug.cgi?id=49054
-#define LE_ASSUME(condition) BOOST_ASSERT_MSG(condition, "Assumption broken.")
+#define LE_ASSUME(condition) LE_ASSERT_MSG(condition, "Assumption broken.")
 #pragma GCC diagnostic ignored "-Wunused-value"
 #else
 #define LE_ASSUME(condition)                                                                       \
-    BOOST_ASSERT_MSG(condition, "Assumption broken.");                                             \
+    LE_ASSERT_MSG(condition, "Assumption broken.");                                                \
     do                                                                                             \
     {                                                                                              \
         if (!(condition))                                                                          \
@@ -178,8 +178,8 @@
     } while (0)
 #endif
 #else
-#define LE_UNREACHABLE_CODE() BOOST_ASSERT_MSG(false, "This code should not be reached.")
-#define LE_ASSUME(condition) BOOST_ASSERT_MSG(condition, "Assumption broken.")
+#define LE_UNREACHABLE_CODE() LE_ASSERT_MSG(false, "This code should not be reached.")
+#define LE_ASSUME(condition) LE_ASSERT_MSG(condition, "Assumption broken.")
 #endif
 
 #define LE_MSVC_SPECIFIC(expression)

@@ -105,7 +105,7 @@ void Detail::BandGainImpl::setup(IndexRange const &workingRange, Engine::Setup c
             DataRange(&window_[leftAlignmentOffset], &window_[slopeSize + leftAlignmentOffset]);
         move(window_.begin(), downSlope_.begin(), slopeSize);
 
-        BOOST_ASSERT(downSlope_.end() <= pUpSlope_);
+        LE_ASSERT(downSlope_.end() <= pUpSlope_);
     }
 #else
     (void)workingRange;

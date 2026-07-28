@@ -32,7 +32,7 @@ template <class Parameter>
 char const *print(typename Parameter::value_type const parameterValue, SW::Engine::Setup const &,
                   PrintBuffer const &buffer, DynamicRangeParameterTag)
 {
-    BOOST_VERIFY(Utility::lexical_cast(parameterValue, buffer.begin()) < unsigned(buffer.size()));
+    LE_VERIFY(Utility::lexical_cast(parameterValue, buffer.begin()) < unsigned(buffer.size()));
     return buffer.begin();
 }
 } // namespace Detail

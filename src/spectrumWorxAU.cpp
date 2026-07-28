@@ -23,9 +23,10 @@
 #include "le/utility/cstdint.hpp"
 #include "le/utility/platformSpecifics.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 
 #include <cstring>
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -52,12 +53,11 @@ std::uint8_t const upperBoundIndex(IndexOf<LFO::Parameters, LFO::UpperBound>::va
 
 LE_NOTHROWNOALIAS void SpectrumWorxAU::getDependentParameters(
     ParameterID const parameterID,
-    boost::iterator_range<::AUDependentParameter *> const dependentParameters,
+    LE::Utility::Span<::AUDependentParameter> const dependentParameters,
     SpectrumWorxCore const *LE_RESTRICT const pEffect)
 {
-    BOOST_ASSERT_MSG(dependentParameters.size() ==
-                         numberOfDependentParameters(parameterID, pEffect),
-                     "Invalid dependent parameters buffer size.");
+    LE_ASSERT_MSG(dependentParameters.size() == numberOfDependentParameters(parameterID, pEffect),
+                  "Invalid dependent parameters buffer size.");
 
     ::AUDependentParameter *LE_RESTRICT pDependentParameter(dependentParameters.begin());
 
@@ -126,8 +126,7 @@ LE_NOTHROWNOALIAS void SpectrumWorxAU::getDependentParameters(
             break;
             LE_DEFAULT_CASE_UNREACHABLE();
         }
-        BOOST_ASSERT(!pEffect ||
-                     pEffect->moduleChain().module(parameterID.value._.lfo.moduleIndex));
+        LE_ASSERT(!pEffect || pEffect->moduleChain().module(parameterID.value._.lfo.moduleIndex));
         pDependentParameter->mScope = kAudioUnitScope_Global;
         pDependentParameter->mParameterID = moduleParameterID.binaryValue;
         ++pDependentParameter;
@@ -147,8 +146,7 @@ LE_NOTHROWNOALIAS void SpectrumWorxAU::getDependentParameters(
             break;
             LE_DEFAULT_CASE_UNREACHABLE();
         }
-        BOOST_ASSERT(!pEffect ||
-                     pEffect->moduleChain().module(parameterID.value._.lfo.moduleIndex));
+        LE_ASSERT(!pEffect || pEffect->moduleChain().module(parameterID.value._.lfo.moduleIndex));
         pDependentParameter->mScope = kAudioUnitScope_Global;
         pDependentParameter->mParameterID = lfoParameterID.binaryValue;
         ++pDependentParameter;
@@ -160,8 +158,8 @@ LE_NOTHROWNOALIAS void SpectrumWorxAU::getDependentParameters(
         LE_UNREACHABLE_CODE();
     }
 
-    BOOST_ASSERT(pDependentParameter <= dependentParameters.end());
-    BOOST_ASSERT(pDependentParameter == dependentParameters.end());
+    LE_ASSERT(pDependentParameter <= dependentParameters.end());
+    LE_ASSERT(pDependentParameter == dependentParameters.end());
 }
 
 LE_NOTHROWNOALIAS std::uint16_t
@@ -189,13 +187,13 @@ SpectrumWorxAU::numberOfDependentParameters(ParameterID const parameterID,
         }
 
     case ParameterID::ModuleParameter:
-        BOOST_ASSERT((parameterID.value._.module.moduleParameterIndex == startFrequencyIndex) ||
-                     (parameterID.value._.module.moduleParameterIndex == stopFrequencyIndex));
+        LE_ASSERT((parameterID.value._.module.moduleParameterIndex == startFrequencyIndex) ||
+                  (parameterID.value._.module.moduleParameterIndex == stopFrequencyIndex));
         return 1;
 
     case ParameterID::LFOParameter:
-        BOOST_ASSERT((parameterID.value._.lfo.lfoParameterIndex == lowerBoundIndex) ||
-                     (parameterID.value._.lfo.lfoParameterIndex == upperBoundIndex));
+        LE_ASSERT((parameterID.value._.lfo.lfoParameterIndex == lowerBoundIndex) ||
+                  (parameterID.value._.lfo.lfoParameterIndex == upperBoundIndex));
         if (pEffect)
             return (pEffect->moduleChain().module(parameterID.value._.lfo.moduleIndex)) ? 1 : 0;
         else

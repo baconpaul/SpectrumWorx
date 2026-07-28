@@ -43,13 +43,13 @@ template <class... ArgumentPack> struct PowerOfTwoParameterTraits
     using value_type = std::uint16_t;
     using param_type = value_type;
 
-    static value_type BOOST_CONSTEXPR_OR_CONST unscaledMinimum =
+    static value_type constexpr unscaledMinimum =
         GetTrait<Parameters::Traits::Tag::Minimum, ArgumentPack...>::type::value;
-    static value_type BOOST_CONSTEXPR_OR_CONST unscaledMaximum =
+    static value_type constexpr unscaledMaximum =
         GetTrait<Parameters::Traits::Tag::Maximum, ArgumentPack...>::type::value;
-    static value_type BOOST_CONSTEXPR_OR_CONST unscaledDefault =
+    static value_type constexpr unscaledDefault =
         GetTrait<Parameters::Traits::Tag::Default, ArgumentPack...>::type::value;
-    static value_type BOOST_CONSTEXPR_OR_CONST rangeValuesDenominator = 1;
+    static value_type constexpr rangeValuesDenominator = 1;
 
     static value_type minimum() { return unscaledMinimum; }
     static value_type maximum() { return unscaledMaximum; }

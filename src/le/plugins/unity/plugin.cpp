@@ -10,7 +10,7 @@
 //------------------------------------------------------------------------------
 #include "plugin.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -27,8 +27,8 @@ bool UnityHostProxy::reportNewNumberOfIOChannels(std::uint8_t const inputs,
                                                  std::uint8_t const sideInputs,
                                                  std::uint8_t const outputs)
 {
-    BOOST_ASSERT(sideInputs == 0);
-    BOOST_ASSERT(inputs == outputs);
+    LE_ASSERT(sideInputs == 0);
+    LE_ASSERT(inputs == outputs);
     (void)inputs;
     (void)sideInputs;
     (void)outputs;

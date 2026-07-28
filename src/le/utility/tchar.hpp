@@ -13,7 +13,7 @@
 #ifndef tchar_hpp__5137b405_2BF4_4714_8BB3_8F3342D64267
 #define tchar_hpp__5137b405_2BF4_4714_8BB3_8F3342D64267
 //------------------------------------------------------------------------------
-#include "boost/utility/string_ref.hpp"
+#include <string_view>
 #ifdef _MSC_VER
 #include "tchar.h"
 #else
@@ -73,12 +73,17 @@ extern "C" __declspec(dllimport) int __cdecl wsprintfW(__out wchar_t *,
 #define LE_INT_SPRINTF LE_INT_SPRINTFA
 #endif // _UNICODE
 
-//...mrmlj...quick-fixes for Boost.Range restrict support...
 #include "platformSpecifics.hpp"
+
+//...mrmlj...quick-fixes for Boost.Range restrict support...
+/// \note Boost.Range is gone; only NT2/Boost.SIMD still needs to be told about
+/// restrict qualified pointers, and it brings its own Boost with it.
+///                                           (28.07.2026.) (SW port)
 #ifdef LE_HAS_NT2
 #include "boost/dispatch/meta/is_iterator.hpp"
-#endif // LE_HAS_NT2
 #include "boost/type_traits/detail/yes_no_type.hpp"
+
+#include <type_traits>
 namespace boost
 {
 #ifdef BOOST_DISPATCH_NO_RESTRICT
@@ -99,30 +104,10 @@ template <typename T> struct remove_const<T const *LE_RESTRICT const>
 {
     typedef T const *LE_RESTRICT type;
 };
-
-namespace range_detail
-{
-using type_traits::no_type;
-using type_traits::yes_type;
-
-yes_type is_string_impl(char const *LE_RESTRICT);
-yes_type is_string_impl(wchar_t const *LE_RESTRICT);
-yes_type is_char_ptr_impl(char *LE_RESTRICT);
-yes_type is_const_char_ptr_impl(char const *LE_RESTRICT);
-yes_type is_wchar_t_ptr_impl(wchar_t *LE_RESTRICT);
-yes_type is_const_wchar_t_ptr_impl(wchar_t const *LE_RESTRICT);
-
-//inline bool is_char_ptr( char       * LE_RESTRICT ) { return true; }
-//inline bool is_char_ptr( char const * LE_RESTRICT ) { return true; }
-} // namespace range_detail
-
-//inline char       * LE_RESTRICT range_begin( char       * LE_RESTRICT const & pString ) { return pString                         ; }
-//inline char       * LE_RESTRICT range_end  ( char       * LE_RESTRICT const & pString ) { return pString + std::strlen( pString ); }
-//inline char const * LE_RESTRICT range_begin( char const * LE_RESTRICT const & pString ) { return pString                         ; }
-//inline char const * LE_RESTRICT range_end  ( char const * LE_RESTRICT const & pString ) { return pString + std::strlen( pString ); }
 } // namespace boost
+#endif // LE_HAS_NT2
 
-LE_COLD inline bool operator==(boost::string_ref const &left, boost::string_ref const &right)
+LE_COLD inline bool operator==(std::string_view const &left, std::string_view const &right)
 {
     return (left.size() == right.size()) &&
            (std::memcmp(left.begin(), right.begin(), right.size()) == 0);

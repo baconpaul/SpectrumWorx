@@ -15,6 +15,7 @@
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
 #include "le/parameters/uiElements.hpp"
+#include "le/utility/ignoreUnused.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -106,7 +107,7 @@ void LE_COLD TuneWorxBaseImpl::setup(IndexRange const &, Engine::Setup const &en
     {
         Music::Scale::ToneOffsets &userTones(userScale_.toneOffsets());
 
-        boost::int8_t pos(0);
+        std::int8_t pos(0);
 
 #ifdef LE_SW_SDK_BUILD
         if (parameters().get<Semi01>() && !parameters().get<BypassSemi01>())
@@ -158,7 +159,7 @@ void LE_COLD TuneWorxBaseImpl::setup(IndexRange const &, Engine::Setup const &en
             userTones[pos++] = 11;
         }
 
-        boost::int8_t const userNumTones(pos);
+        std::int8_t const userNumTones(pos);
 
         if (parameters().get<BypassSemi01>())
         {
@@ -209,9 +210,9 @@ void LE_COLD TuneWorxBaseImpl::setup(IndexRange const &, Engine::Setup const &en
             userTones[pos++] = 11;
         }
 
-        boost::int8_t const userBypassedTones(pos - userNumTones);
+        std::int8_t const userBypassedTones(pos - userNumTones);
 #else
-        boost::ignore_unused_variable_warning(engineSetup);
+        LE::Utility::ignoreUnused(engineSetup);
         if (parameters().get<Semi01>())
         {
             userTones[pos++] = 0;
@@ -260,8 +261,8 @@ void LE_COLD TuneWorxBaseImpl::setup(IndexRange const &, Engine::Setup const &en
         {
             userTones[pos++] = 11;
         }
-        boost::int8_t const userNumTones(pos);
-        boost::int8_t const userBypassedTones(0);
+        std::int8_t const userNumTones(pos);
+        std::int8_t const userBypassedTones(0);
 #endif // LE_SW_SDK_BUILD
 
         userScale_.tonesUpdated(userNumTones, userBypassedTones);
@@ -324,8 +325,8 @@ LE_HOT TuneWorxBaseImpl::findNewPitchScale(Engine::ChannelData_AmPh const &data,
 
 // Current pitch:
 #ifdef LE_MELODIFY_SDK_BUILD
-    boost::ignore_unused_variable_warning(data);
-    boost::ignore_unused_variable_warning(engineSetup);
+    LE::Utility::ignoreUnused(data);
+    LE::Utility::ignoreUnused(engineSetup);
 #endif // LE_MELODIFY_SDK_BUILD
     float const pitch(
 #if defined(LE_MELODIFY_SDK_BUILD)

@@ -23,10 +23,8 @@
 #include "le/spectrumworx/engine/moduleParameters.hpp"
 #include "le/spectrumworx/effects/baseParametersUIElements.hpp" //...mrmlj...required only for getParameterProperties()...
 
-#include "boost/config.hpp"
-#if !defined(BOOST_NO_RTTI) && (!defined(BOOST_NO_EXCEPTIONS) || defined(_MSC_VER))
-#include "boost/polymorphic_cast.hpp"
-#endif // no RTTI
+#include "le/utility/polymorphicDowncast.hpp"
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -266,7 +264,7 @@ bool Plugin2HostPassiveInteropImpl<Impl, Protocol>::getParameterProperties(
     auto *const pNameBuffer(parameterInfo.nameBuffer());
     if (pNameBuffer)
     {
-        getParameterName(parameterID, boost::make_iterator_range(*pNameBuffer), pProgram);
+        getParameterName(parameterID, LE::Utility::makeSpan(*pNameBuffer), pProgram);
         parameterInfo.nameSet(); //...mrmlj...
     }
     return true;
@@ -358,14 +356,14 @@ bool LE_NOTHROW Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::latencyChang
     ///                                       (04.10.2013.) (Domagoj Saric)
 #if defined(_WIN32) &&                                                                             \
     !defined(LE_SW_FMOD) //...mrmlj...vst specific...threading issues verification...
-    BOOST_ASSERT_MSG(((impl().host().getNumOutputs() == impl().engineSetup().numberOfChannels()) ||
-                      (impl().host().getNumOutputs() == impl().maxNumberOfOutputs)) &&
-                         ((impl().host().getNumInputs() ==
-                           unsigned(impl().engineSetup().numberOfChannels() +
-                                    impl().engineSetup().numberOfSideChannels())) ||
-                          (impl().host().getNumInputs() == impl().maxNumberOfInputs)),
-                     "Performing a latency change notification in the middle of an IO mode change "
-                     "(which cannot be separated in VST 2.4)");
+    LE_ASSERT_MSG(((impl().host().getNumOutputs() == impl().engineSetup().numberOfChannels()) ||
+                   (impl().host().getNumOutputs() == impl().maxNumberOfOutputs)) &&
+                      ((impl().host().getNumInputs() ==
+                        unsigned(impl().engineSetup().numberOfChannels() +
+                                 impl().engineSetup().numberOfSideChannels())) ||
+                       (impl().host().getNumInputs() == impl().maxNumberOfInputs)),
+                  "Performing a latency change notification in the middle of an IO mode change "
+                  "(which cannot be separated in VST 2.4)");
 #endif // _WIN32
     auto const newLatency(impl().engineSetup().latencyInSamples());
     return impl().host().reportNewLatencyInSamples(newLatency);
@@ -380,8 +378,8 @@ void LE_NOTHROW Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::moduleChange
     std::uint8_t const moduleIndex,
     Plugin2HostInteropControler::Module const *LE_RESTRICT const pModuleBase) const
 {
-    BOOST_ASSERT_MSG(!parameterListChanged(),
-                     "Should not get here if host supports parameter list changes");
+    LE_ASSERT_MSG(!parameterListChanged(),
+                  "Should not get here if host supports parameter list changes");
 
     using AutomatedParameterValue = typename AutomatedParameter::value_type;
 
@@ -395,14 +393,10 @@ void LE_NOTHROW Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::moduleChange
     fullLFOParameterID.value._.lfo.moduleIndex = moduleIndex;
     ParameterID::LFO &lfoParameterID(fullLFOParameterID.value._.lfo);
 
-    BOOST_ASSERT(impl().program().moduleChain().module(moduleIndex).get() == pModuleBase);
+    LE_ASSERT(impl().program().moduleChain().module(moduleIndex).get() == pModuleBase);
 
     typedef typename Impl::Module Module;
-#if !defined(BOOST_NO_RTTI) && (!defined(BOOST_NO_EXCEPTIONS) || defined(_MSC_VER))
-    auto const pModule(boost::polymorphic_downcast<Module const *>(pModuleBase));
-#else
-    auto const pModule(static_cast<Module const *>(pModuleBase));
-#endif
+    auto const pModule(LE::Utility::polymorphicDowncast<Module const *>(pModuleBase));
 
     ParameterGetter<Module, AutomatedParameter> /*const*/ getParameter; //...mrmlj...
 

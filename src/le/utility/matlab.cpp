@@ -15,7 +15,8 @@
 #include "engine.h"
 #include "matrix.h"
 
-#include "boost/assert.hpp"
+#include "assert.hpp"
+#include "span.hpp"
 //------------------------------------------------------------------------------
 #pragma comment(lib, LE_UTILITY_MATLAB_INTEROP_LIB_DIR "libmx.lib")
 #pragma comment(lib, LE_UTILITY_MATLAB_INTEROP_LIB_DIR "libmat.lib")
@@ -33,7 +34,7 @@ namespace Matlab
 
 Array::Array() : pArray_(mxCreateNumericMatrix(1, 0, mxSINGLE_CLASS, mxREAL))
 {
-    BOOST_VERIFY(pArray_);
+    LE_VERIFY(pArray_);
 }
 Array::~Array() { ::mxDestroyArray(pArray_); }
 
@@ -45,15 +46,15 @@ void Array::resize(unsigned int const size)
 
 float *Array::get() const { return static_cast<float *>(::mxGetData(pArray_)); }
 
-Engine::Engine() : pEngine_(::engOpen(nullptr)) { BOOST_ASSERT(pEngine_); }
-Engine::~Engine() { BOOST_VERIFY(::engClose(pEngine_) == 0); }
+Engine::Engine() : pEngine_(::engOpen(nullptr)) { LE_ASSERT(pEngine_); }
+Engine::~Engine() { LE_VERIFY(::engClose(pEngine_) == 0); }
 
 void Engine::setVariable(char const *const name, Array const &value)
 {
-    BOOST_VERIFY(::engPutVariable(pEngine_, name, value.pArray_) == 0);
+    LE_VERIFY(::engPutVariable(pEngine_, name, value.pArray_) == 0);
 }
 
-void Engine::setVariable(char const *const name, boost::iterator_range<float const *> const &value)
+void Engine::setVariable(char const *const name, LE::Utility::Span<float const> const &value)
 {
     static Matlab::Array array;
     auto const size(static_cast<unsigned int>(value.size()));
@@ -64,7 +65,7 @@ void Engine::setVariable(char const *const name, boost::iterator_range<float con
 
 void Engine::execute(char const *const commandString) const
 {
-    BOOST_VERIFY(::engEvalString(pEngine_, commandString) == 0);
+    LE_VERIFY(::engEvalString(pEngine_, commandString) == 0);
 }
 
 Engine &Engine::singleton()

@@ -19,13 +19,13 @@
 #include "le/utility/trace.hpp"
 #include "le/utility/typeTraits.hpp"
 
-#include "boost/assert.hpp"
-#include "boost/concept_check.hpp"
+#include "le/utility/assert.hpp"
+#include "le/utility/ignoreUnused.hpp"
 #include "boost/preprocessor/seq/for_each.hpp"
-#include "boost/range/iterator_range_core.hpp"
 
 #include <array>
 #include <cstddef>
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -102,7 +102,7 @@ template <typename PropertyType> struct PropertyTypeTraits
                     sizeof(value_type), static_cast<unsigned int>(size));
         LE_ASSUME(size >= sizeof(value_type));
         size = sizeof(value_type);
-        //BOOST_ASSERT_MSG( !pDataSize || *pDataSize == sizeof( value_type ), "Incorrect AU property value buffer size." );
+        //LE_ASSERT_MSG( !pDataSize || *pDataSize == sizeof( value_type ), "Incorrect AU property value buffer size." );
         return *static_cast<value_type *>(pOutData);
     }
 
@@ -120,17 +120,17 @@ template <typename PropertyType> struct PropertyTypeTraits<Array<PropertyType>>
 
     typedef PropertyType value_type;
     typedef PropertyType const const_value_type;
-    typedef boost::iterator_range<value_type *LE_RESTRICT> param_type;
-    typedef boost::iterator_range<const_value_type *LE_RESTRICT> const_param_type;
+    typedef LE::Utility::Span<value_type> param_type;
+    typedef LE::Utility::Span<const_value_type> const_param_type;
 
     static param_type make(void *const pOutData, UInt32 &size)
     {
         LE_ASSUME(pOutData);
         LE_ASSUME(size % sizeof(value_type) == 0);
-        //BOOST_ASSERT_MSG( !pDataSize || *pDataSize == sizeof( value_type ), "Incorrect AU property value buffer size." );
+        //LE_ASSERT_MSG( !pDataSize || *pDataSize == sizeof( value_type ), "Incorrect AU property value buffer size." );
         value_type *const pBegin(static_cast<value_type *>(pOutData));
         value_type *const pEnd(pBegin + size / sizeof(value_type));
-        return boost::make_iterator_range(pBegin, pEnd);
+        return LE::Utility::makeSpan(pBegin, pEnd);
     }
 
     static const_param_type make(void const *const pInData, UInt32 const size)
@@ -139,7 +139,7 @@ template <typename PropertyType> struct PropertyTypeTraits<Array<PropertyType>>
         LE_ASSUME(size % sizeof(value_type) == 0);
         const_value_type *const pBegin(static_cast<const_value_type *>(pInData));
         const_value_type *const pEnd(pBegin + size / sizeof(value_type));
-        return boost::make_iterator_range(pBegin, pEnd);
+        return LE::Utility::makeSpan(pBegin, pEnd);
     }
 }; // struct PropertyTypeTraits<Array<PropertyType>>
 
@@ -163,7 +163,7 @@ template <> struct PropertyTypeTraits<::HostCallbackInfo>
                     sizeof(value_type), static_cast<unsigned int>(size));
         LE_ASSUME(size >= sizeof(value_type));
         size = sizeof(value_type);
-        //BOOST_ASSERT_MSG( !pDataSize || *pDataSize == sizeof( value_type ), "Incorrect AU property value buffer size." );
+        //LE_ASSERT_MSG( !pDataSize || *pDataSize == sizeof( value_type ), "Incorrect AU property value buffer size." );
         return *static_cast<value_type *>(pOutData);
     }
 
@@ -172,7 +172,7 @@ template <> struct PropertyTypeTraits<::HostCallbackInfo>
         LE_ASSUME(pInData);
         LE_TRACE_IF((size > sizeof(value_type)),
                     "Storage provided for HostCallbackInfo larger than sizeof( HostCallbackInfo )");
-        if (BOOST_LIKELY(size >= sizeof(value_type)))
+        if (LE_LIKELY(size >= sizeof(value_type)))
             return *static_cast<const_value_type *>(pInData);
         else
         {
@@ -207,7 +207,7 @@ template <> struct PropertyTypeTraits<::AUHostVersionIdentifier> //...mrmlj...fo
                     sizeof(value_type), static_cast<unsigned int>(size));
         LE_ASSUME(size >= sizeof(value_type));
         size = sizeof(value_type);
-        //BOOST_ASSERT_MSG( !pDataSize || *pDataSize == sizeof( value_type ), "Incorrect AU property value buffer size." );
+        //LE_ASSERT_MSG( !pDataSize || *pDataSize == sizeof( value_type ), "Incorrect AU property value buffer size." );
         return *static_cast<value_type *>(pOutData);
     }
 
@@ -216,7 +216,7 @@ template <> struct PropertyTypeTraits<::AUHostVersionIdentifier> //...mrmlj...fo
         LE_ASSUME(pInData);
         LE_TRACE_IF((size > sizeof(value_type)), "Storage provided for AUHostVersionIdentifier "
                                                  "larger than sizeof( AUHostVersionIdentifier )");
-        if (BOOST_LIKELY(size >= sizeof(value_type)))
+        if (LE_LIKELY(size >= sizeof(value_type)))
             return *static_cast<const_value_type *>(pInData);
         else
         {
@@ -239,7 +239,7 @@ template <AudioUnitPropertyID PropertyID> struct PropertyChangeDetector
     template <class Impl>
     PropertyChangeDetector(Impl &impl, AudioUnitScope const scope, AudioUnitElement const element)
     {
-        BOOST_VERIFY(
+        LE_VERIFY(
             (PropertyHandler<Impl, PropertyID>::get(impl, scope, element, currentValue) == noErr));
     }
     template <class Impl>
@@ -247,7 +247,7 @@ template <AudioUnitPropertyID PropertyID> struct PropertyChangeDetector
     {
         typedef typename PropertyTraits<PropertyID>::value_type value_type;
         value_type newValue;
-        BOOST_VERIFY(
+        LE_VERIFY(
             (PropertyHandler<Impl, PropertyID>::get(impl, scope, element, newValue) == noErr));
         // http://boost.2283326.n4.nabble.com/TypeTraits-A-patch-for-clang-s-intrinsics-was-type-traits-is-enum-on-scoped-enums-doesn-t-works-as-e-td3781550.html
         static_assert(/*std::*/ /*is_pod*/ __has_trivial_assign(value_type),
@@ -421,12 +421,12 @@ LE_AU_PROPERTIES( // 0: ID                                          1: type     
 static void verifyScope(AudioUnitScope const specifiedScope, AudioUnitScope const allowedScope1,
                         AudioUnitScope const allowedScope2)
 {
-    BOOST_ASSERT_MSG((specifiedScope == allowedScope1) || (specifiedScope == allowedScope2) ||
-                         (allowedScope1 == -1),
-                     "Host specified an invalid property scope.");
-    boost::ignore_unused_variable_warning(specifiedScope);
-    boost::ignore_unused_variable_warning(allowedScope1);
-    boost::ignore_unused_variable_warning(allowedScope2);
+    LE_ASSERT_MSG((specifiedScope == allowedScope1) || (specifiedScope == allowedScope2) ||
+                      (allowedScope1 == -1),
+                  "Host specified an invalid property scope.");
+    LE::Utility::ignoreUnused(specifiedScope);
+    LE::Utility::ignoreUnused(allowedScope1);
+    LE::Utility::ignoreUnused(allowedScope2);
 }
 
 template <AudioUnitScope allowedScope1, AudioUnitScope allowedScope2>
@@ -621,9 +621,9 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_StreamForm
                         AudioUnitElement const element, ::AudioStreamBasicDescription &format)
     {
         //...mrmlj...SW HARDCODE...
-        BOOST_ASSERT_MSG(element == 0 || element == 1, "Invalid element");
-        BOOST_ASSERT_MSG(scope == kAudioUnitScope_Input || element == 0, "Invalid element");
-        boost::ignore_unused_variable_warning(element);
+        LE_ASSERT_MSG(element == 0 || element == 1, "Invalid element");
+        LE_ASSERT_MSG(scope == kAudioUnitScope_Input || element == 0, "Invalid element");
+        LE::Utility::ignoreUnused(element);
 
         format.mFormatID = kAudioFormatLinearPCM;
         format.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsNonInterleaved |
@@ -644,13 +644,13 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_StreamForm
             {
                 pSourceNumberOfChannels =
                     &hostProxy
-                         .inputChannels_; /*BOOST_ASSERT( *pSourceNumberOfChannels == impl.numberOfInputChannels() );*/
+                         .inputChannels_; /*LE_ASSERT( *pSourceNumberOfChannels == impl.numberOfInputChannels() );*/
             }
             else
             {
                 pSourceNumberOfChannels =
                     &hostProxy
-                         .sideChannels_; /*BOOST_ASSERT( *pSourceNumberOfChannels == impl.numberOfSideChannels () );*/
+                         .sideChannels_; /*LE_ASSERT( *pSourceNumberOfChannels == impl.numberOfSideChannels () );*/
             }
         }
         else
@@ -658,7 +658,7 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_StreamForm
             LE_ASSUME(scope == kAudioUnitScope_Output);
             LE_ASSUME(element == 0);
             pSourceNumberOfChannels = &impl.host().outputChannels_;
-            //BOOST_ASSERT( *pSourceNumberOfChannels == impl.numberOfOutputChannels() );
+            //LE_ASSERT( *pSourceNumberOfChannels == impl.numberOfOutputChannels() );
         }
 
         // http://forum.cockos.com/showthread.php?p=1065630
@@ -672,20 +672,20 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_StreamForm
                         ::AudioStreamBasicDescription const &format)
     {
         //...mrmlj...SW HARDCODE...
-        BOOST_ASSERT_MSG(element == 0 || element == 1, "Invalid element");
-        BOOST_ASSERT_MSG(scope == kAudioUnitScope_Input || element == 0, "Invalid element");
-        boost::ignore_unused_variable_warning(element);
+        LE_ASSERT_MSG(element == 0 || element == 1, "Invalid element");
+        LE_ASSERT_MSG(scope == kAudioUnitScope_Input || element == 0, "Invalid element");
+        LE::Utility::ignoreUnused(element);
 
-        BOOST_ASSERT_MSG((format.mFormatID == kAudioFormatLinearPCM) &&
-                             (format.mFormatFlags ==
-                              (kAudioFormatFlagIsFloat | kAudioFormatFlagIsNonInterleaved |
-                               kAudioFormatFlagIsPacked)) &&
-                             (format.mBytesPerPacket == sizeof(float)) &&
-                             (format.mFramesPerPacket == 1) &&
-                             (format.mBytesPerFrame == sizeof(float)) &&
-                             (format.mBitsPerChannel == sizeof(float) * 8) &&
-                             (format.mReserved == 0 || /*Audacity 2.0.3*/ format.mReserved == 4),
-                         "Invalid or unsupported AudioStreamBasicDescription");
+        LE_ASSERT_MSG((format.mFormatID == kAudioFormatLinearPCM) &&
+                          (format.mFormatFlags ==
+                           (kAudioFormatFlagIsFloat | kAudioFormatFlagIsNonInterleaved |
+                            kAudioFormatFlagIsPacked)) &&
+                          (format.mBytesPerPacket == sizeof(float)) &&
+                          (format.mFramesPerPacket == 1) &&
+                          (format.mBytesPerFrame == sizeof(float)) &&
+                          (format.mBitsPerChannel == sizeof(float) * 8) &&
+                          (format.mReserved == 0 || /*Audacity 2.0.3*/ format.mReserved == 4),
+                      "Invalid or unsupported AudioStreamBasicDescription");
 
         std::uint8_t *LE_RESTRICT pTargetNumberOfChannels;
         if (scope == kAudioUnitScope_Input)
@@ -715,9 +715,9 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_StreamForm
                 kAudioUnitErr_PropertyNotWritable /*kAudioUnitErr_Initialized*/,
                 "\tSW AU: host trying to change stream format while initialised.");
 
-        BOOST_ASSERT_MSG(impl.inputConnections_[element].type() !=
-                             AUPluginBase::RenderDelegate::Connection,
-                         "Cannot change input format while connected.");
+        LE_ASSERT_MSG(impl.inputConnections_[element].type() !=
+                          AUPluginBase::RenderDelegate::Connection,
+                      "Cannot change input format while connected.");
 
         /// \note Channel configuration changes are not passed directly to
         /// the plugin because the AU protocol supports only separate format
@@ -779,9 +779,9 @@ template <> struct PropertyValueCount<kAudioUnitProperty_SupportedNumChannels>
 template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_SupportedNumChannels>
 {
     static OSStatus get(Impl const &impl, AudioUnitScope, AudioUnitElement const bus,
-                        boost::iterator_range<::AUChannelInfo *> const channelConfigurations)
+                        LE::Utility::Span<::AUChannelInfo> const channelConfigurations)
     {
-        BOOST_ASSERT_MSG(channelConfigurations.size() == 1, "Incorrect AUChannelInfo array size.");
+        LE_ASSERT_MSG(channelConfigurations.size() == 1, "Incorrect AUChannelInfo array size.");
         channelConfigurations.front().inChannels = -1;
         channelConfigurations.front().outChannels = (bus == 0) ? -1 : 0;
         return noErr;
@@ -833,9 +833,9 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_ElementNam
     static OSStatus get(Impl const &impl, ::AudioUnitScope const scope,
                         ::AudioUnitElement const bus, ::CFStringRef &name)
     {
-        BOOST_ASSERT_MSG(scope == kAudioUnitScope_Input ||
-                             (scope == kAudioUnitScope_Output && bus == 0),
-                         "Invalid scope.");
+        LE_ASSERT_MSG(scope == kAudioUnitScope_Input ||
+                          (scope == kAudioUnitScope_Output && bus == 0),
+                      "Invalid scope.");
         switch (bus)
         {
         case 0:
@@ -886,7 +886,7 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_MaximumFra
     }
     static OSStatus set(Impl &impl, AudioUnitScope, AudioUnitElement, ::UInt32 const value)
     {
-        BOOST_ASSERT(!impl.initialised_);
+        LE_ASSERT(!impl.initialised_);
         return makeErrorCode(impl.setBlockSize(value));
     }
 }; // kAudioUnitProperty_MaximumFramesPerSlice
@@ -955,7 +955,7 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_MakeConnec
     static ::OSStatus set(Impl &impl, ::AudioUnitScope, ::AudioUnitElement const bus,
                           ::AudioUnitConnection const &connection)
     {
-        BOOST_ASSERT_MSG(connection.destInputNumber == bus, "Inconsistent connection input bus.");
+        LE_ASSERT_MSG(connection.destInputNumber == bus, "Inconsistent connection input bus.");
 
         if (connection.sourceAudioUnit)
         {
@@ -966,7 +966,7 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_MakeConnec
                 connection.sourceOutputNumber, &format, &size));
             if (getFormatResult != noErr)
                 return getFormatResult;
-            BOOST_ASSERT_MSG(size == sizeof(format), "Unexpected result size.");
+            LE_ASSERT_MSG(size == sizeof(format), "Unexpected result size.");
 
             ::OSStatus const setFormatResult(
                 PropertyHandler<Impl, kAudioUnitProperty_StreamFormat>::set(
@@ -980,10 +980,10 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_MakeConnec
             ::OSStatus const getFramesPerSliceResult(::AudioUnitGetProperty(
                 connection.sourceAudioUnit, kAudioUnitProperty_MaximumFramesPerSlice,
                 kAudioUnitScope_Global, connection.sourceOutputNumber, &framesPerSlice, &size));
-            BOOST_ASSERT_MSG(getFramesPerSliceResult == noErr, "Unexpected error.");
-            BOOST_ASSERT_MSG(size == sizeof(framesPerSlice), "Unexpected result size.");
-            BOOST_ASSERT_MSG(framesPerSlice >= impl.processBlockSize(),
-                             "Connecting AU has a too small maximum buffer size.");
+            LE_ASSERT_MSG(getFramesPerSliceResult == noErr, "Unexpected error.");
+            LE_ASSERT_MSG(size == sizeof(framesPerSlice), "Unexpected result size.");
+            LE_ASSERT_MSG(framesPerSlice >= impl.processBlockSize(),
+                          "Connecting AU has a too small maximum buffer size.");
 #endif // _DEBUG
         }
 
@@ -995,18 +995,18 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_MakeConnec
         OSStatus const getFastRenderResult(::AudioUnitGetProperty(
             connection.sourceAudioUnit, kAudioUnitProperty_FastDispatch, kAudioUnitScope_Global,
             kAudioUnitRenderSelect, &callback.inputProc, &size));
-        BOOST_ASSERT_MSG(size == sizeof(callback.inputProc), "Unexpected result size.");
+        LE_ASSERT_MSG(size == sizeof(callback.inputProc), "Unexpected result size.");
         if (getFastRenderResult == noErr)
         {
             callback.inputProcRefCon = ::GetComponentInstanceStorage(connection.sourceAudioUnit);
-            BOOST_ASSERT_MSG(callback.inputProcRefCon, "Null connecting AU instance.");
+            LE_ASSERT_MSG(callback.inputProcRefCon, "Null connecting AU instance.");
             delegate = std::make_pair(callback, connection.sourceOutputNumber);
         }
         else
         {
-            BOOST_ASSERT_MSG((getFastRenderResult == kAudioUnitErr_InvalidProperty) ||
-                                 !connection.sourceAudioUnit,
-                             "Unexpected error code.");
+            LE_ASSERT_MSG((getFastRenderResult == kAudioUnitErr_InvalidProperty) ||
+                              !connection.sourceAudioUnit,
+                          "Unexpected error code.");
             delegate = connection;
         }
 
@@ -1032,8 +1032,8 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_ShouldAllo
     static OSStatus get(Impl const &impl, AudioUnitScope const scope,
                         AudioUnitElement const element, ::UInt32 &value)
     {
-        BOOST_ASSERT(!impl.initialised_);
-        BOOST_ASSERT_MSG(element == 0 || scope == kAudioUnitScope_Input, "Invalid element.");
+        LE_ASSERT(!impl.initialised_);
+        LE_ASSERT_MSG(element == 0 || scope == kAudioUnitScope_Input, "Invalid element.");
         value = (scope == kAudioUnitScope_Output)
                     ? impl.shouldAllocateOutputBuffer_
                     : impl.inputConnections_[element].getShouldAllocateBuffer();
@@ -1042,7 +1042,7 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_ShouldAllo
     static OSStatus set(Impl &impl, AudioUnitScope const scope, AudioUnitElement const element,
                         ::UInt32 const &value)
     {
-        BOOST_ASSERT_MSG(element == 0 || scope == kAudioUnitScope_Input, "Invalid element.");
+        LE_ASSERT_MSG(element == 0 || scope == kAudioUnitScope_Input, "Invalid element.");
         bool const should(value != 0);
         if (scope == kAudioUnitScope_Output)
             impl.shouldAllocateOutputBuffer_ = should;
@@ -1085,8 +1085,8 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_PresentPre
     }
     static OSStatus set(Impl &impl, AudioUnitScope, AudioUnitElement, ::AUPreset const &preset)
     {
-        BOOST_ASSERT(preset.presetName != nullptr);
-        BOOST_ASSERT(preset.presetNumber == -1);
+        LE_ASSERT(preset.presetName != nullptr);
+        LE_ASSERT(preset.presetNumber == -1);
         char const *const pNewPresetName(::CFStringGetCStringPtr(
             preset.presetName,
             kCFStringEncodingUTF8)); // kCFStringEncodingMacRoman kCFStringEncodingASCII kCFStringEncodingNonLossyASCII
@@ -1140,7 +1140,7 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_ClassInfo>
         ::CFDictionarySetValue(dictionary, CFSTR(kAUPresetNameKey), currentPresetName);
         ::CFRelease(currentPresetName);
 
-        BOOST_ASSERT(impl.getProgram() == 0);
+        LE_ASSERT(impl.getProgram() == 0);
         unsigned int const maximumPresetSize(impl.maximumProgramSize());
         ::CFMutableDataRef const cfPresetData(::CFDataCreateMutable(0, maximumPresetSize));
         if (!cfPresetData)
@@ -1150,7 +1150,7 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_ClassInfo>
         }
         unsigned int const actualPresetSize(
             impl.saveProgramState(0, ::CFDataGetMutableBytePtr(cfPresetData), maximumPresetSize));
-        BOOST_ASSERT(actualPresetSize <= maximumPresetSize);
+        LE_ASSERT(actualPresetSize <= maximumPresetSize);
         ::CFDataSetLength(cfPresetData, actualPresetSize);
         ::CFDictionarySetValue(dictionary, CFSTR("LE.Plugin.State"), cfPresetData);
         ::CFRelease(cfPresetData);
@@ -1161,18 +1161,18 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_ClassInfo>
     static OSStatus set(Impl &impl, AudioUnitScope, AudioUnitElement,
                         ::CFPropertyListRef const &preset)
     {
-        BOOST_ASSERT_MSG(::CFGetTypeID(preset) == CFDictionaryGetTypeID(),
-                         "kAudioUnitErr_InvalidPropertyValue");
+        LE_ASSERT_MSG(::CFGetTypeID(preset) == CFDictionaryGetTypeID(),
+                      "kAudioUnitErr_InvalidPropertyValue");
         ::CFDictionaryRef const dictionary(static_cast<::CFDictionaryRef>(preset));
         ::CFDataRef const presetData(
             static_cast<::CFDataRef>(::CFDictionaryGetValue(dictionary, CFSTR("LE.Plugin.State"))));
         ::CFStringRef const presetName(static_cast<::CFStringRef>(
             ::CFDictionaryGetValue(dictionary, CFSTR(kAUPresetNameKey))));
-        BOOST_ASSERT_MSG(presetData, "Invalid AU preset");
+        LE_ASSERT_MSG(presetData, "Invalid AU preset");
         void const *const pPresetData(::CFDataGetBytePtr(presetData));
         unsigned int const presetSize(::CFDataGetLength(presetData));
-        BOOST_ASSERT_MSG(pPresetData, "Invalid AU preset");
-        BOOST_ASSERT_MSG(presetSize, "Invalid AU preset");
+        LE_ASSERT_MSG(pPresetData, "Invalid AU preset");
+        LE_ASSERT_MSG(presetSize, "Invalid AU preset");
         char const *pPresetName;
         static ::CFStringBuiltInEncodings constexpr encodings[] = {
             kCFStringEncodingMacRoman,      kCFStringEncodingUTF8,
@@ -1187,11 +1187,11 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_ClassInfo>
         char conversionBuffer[256];
         if (!pPresetName)
         {
-            BOOST_VERIFY(::CFStringGetCString(presetName, conversionBuffer,
-                                              sizeof(conversionBuffer), kCFStringEncodingUTF8));
+            LE_VERIFY(::CFStringGetCString(presetName, conversionBuffer, sizeof(conversionBuffer),
+                                           kCFStringEncodingUTF8));
             pPresetName = conversionBuffer;
         }
-        BOOST_ASSERT(impl.getProgram() == 0);
+        LE_ASSERT(impl.getProgram() == 0);
         OSStatus const result(
             Detail::makeErrorCode(impl.loadProgramState(0, pPresetName, pPresetData, presetSize)));
         if (result == noErr)
@@ -1229,8 +1229,8 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_CocoaUI>
     static OSStatus get(Impl const &, AudioUnitScope, AudioUnitElement,
                         ::AudioUnitCocoaViewInfo &viewInfo)
     {
-        //BOOST_ASSERT( viewInfo.mCocoaAUViewBundleLocation == nullptr );
-        //BOOST_ASSERT( viewInfo.mCocoaAUViewClass[ 0 ]     == nullptr );
+        //LE_ASSERT( viewInfo.mCocoaAUViewBundleLocation == nullptr );
+        //LE_ASSERT( viewInfo.mCocoaAUViewClass[ 0 ]     == nullptr );
 
         viewInfo.mCocoaAUViewBundleLocation = Detail::auBundlePath();
         viewInfo.mCocoaAUViewClass[0] = Detail::auCocoaViewFactoryClassName();
@@ -1271,11 +1271,11 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_ParameterL
     /// http://www.mailinglistarchive.com/html/coreaudio-api@lists.apple.com/2009-08/msg00133.html
     ///                                   (27.02.2013.) (Domagoj Saric)
     static OSStatus get(Impl const &impl, ::AudioUnitScope const scope, ::AudioUnitElement,
-                        boost::iterator_range<::AudioUnitParameterID *> const parameters)
+                        LE::Utility::Span<::AudioUnitParameterID> const parameters)
     {
         LE_ASSUME(scope == kAudioUnitScope_Global);
         Impl::getParameterIDs(
-            reinterpret_cast<boost::iterator_range<ParameterID *> const &>(parameters),
+            reinterpret_cast<LE::Utility::Span<ParameterID> const &>(parameters),
             (impl.host().canTryDynamicParameterList() && impl.staticParameterListReported_)
                 ? &impl.program()
                 : nullptr);
@@ -1302,7 +1302,7 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_DependentP
     // http://www.mailinglistarchive.com/html/coreaudio-api@lists.apple.com/2007-02/msg00102.html
     static OSStatus get(Impl const &impl, ::AudioUnitScope const scope,
                         ::AudioUnitElement const parameterID,
-                        boost::iterator_range<::AUDependentParameter *> const dependentParameters)
+                        LE::Utility::Span<::AUDependentParameter> const dependentParameters)
     {
         LE_ASSUME(scope == kAudioUnitScope_Global);
         Impl::getDependentParameters(
@@ -1335,7 +1335,7 @@ template <class Impl> struct PropertyHandler<Impl, kAudioUnitProperty_ParameterI
                         ::AudioUnitParameterInfo &parameterInfo)
     {
         LE_ASSUME(scope == kAudioUnitScope_Global);
-        BOOST_VERIFY(Impl::getParameterProperties(
+        LE_VERIFY(Impl::getParameterProperties(
             ParameterID{parameterID},
             static_cast<AUPluginBase::ParameterInformation &>(parameterInfo),
             (impl.host().canTryDynamicParameterList() && impl.staticParameterListReported_)

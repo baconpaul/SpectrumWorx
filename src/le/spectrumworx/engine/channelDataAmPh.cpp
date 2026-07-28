@@ -45,12 +45,12 @@ fftBufferSize(std::uint8_t const a, std::uint8_t const b, std::uint8_t const c,
               std::uint8_t const sizeOfT, std::uint16_t const fftSize)
 {
     using Utility::Constants::vectorAlignment;
-    BOOST_ASSERT_MSG(fftSize * a / b < std::numeric_limits<std::uint16_t>::max(),
-                     "Short integer overflow");
+    LE_ASSERT_MSG(fftSize * a / b < std::numeric_limits<std::uint16_t>::max(),
+                  "Short integer overflow");
     auto const storageBytes(std::uint16_t(std::uint16_t(std::uint32_t(fftSize * a) / b) + c) *
                             sizeOfT);
-    BOOST_ASSERT_MSG(storageBytes < std::numeric_limits<std::uint16_t>::max(),
-                     "Short integer overflow");
+    LE_ASSERT_MSG(storageBytes < std::numeric_limits<std::uint16_t>::max(),
+                  "Short integer overflow");
     return storageBytes;
 }
 } // namespace Detail
@@ -96,8 +96,8 @@ std::uint32_t ChannelData_AmPhStorage::requiredStorage(std::uint16_t const fftSi
 DataRange subRange(DataRange const &range, std::uint16_t const beginIndex,
                    std::uint16_t const endIndex)
 {
-    BOOST_ASSERT_MSG(beginIndex <= endIndex, "Backward range.");
-    BOOST_ASSERT_MSG(endIndex <= unsigned(range.size()), "Index out of range.");
+    LE_ASSERT_MSG(beginIndex <= endIndex, "Backward range.");
+    LE_ASSERT_MSG(endIndex <= unsigned(range.size()), "Index out of range.");
     return DataRange(&range.begin()[beginIndex], &range.begin()[endIndex]);
 }
 

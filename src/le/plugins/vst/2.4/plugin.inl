@@ -18,15 +18,17 @@
 #include "le/utility/tchar.hpp"
 #include "le/utility/trace.hpp"
 
-#include "boost/assert.hpp"
-#include "boost/concept_check.hpp"
+#include "le/utility/assert.hpp"
+#include "le/utility/ignoreUnused.hpp"
 #include "boost/mpl/integral_c.hpp"
 #include "boost/preprocessor/cat.hpp"
 #ifdef _DEBUG
-#include "boost/range/algorithm/find.hpp"
+#include <algorithm>
 #endif // _DEBUG
 
 #include <climits>
+#include <string_view>
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 
 //...mrmlj...debugging section...clean this up after beta testing...
@@ -36,8 +38,7 @@ namespace SW
 {
 namespace GUI
 {
-void LE_NOTHROW warningMessageBox(boost::string_ref title, boost::string_ref message,
-                                  bool canBlock);
+void LE_NOTHROW warningMessageBox(std::string_view title, std::string_view message, bool canBlock);
 bool LE_NOTHROW warningOkCancelBox(TCHAR const *title, TCHAR const *question);
 float LE_NOTHROWNOALIAS displayScale();
 bool LE_NOTHROWNOALIAS isGUIInitialised();
@@ -75,7 +76,7 @@ LE_ENTRY_POINT_BEGIN(AEffect *, VSTPluginMain, audioMasterCallback const audioMa
         LE_TRACE("\tSW VST2: host application does not support the VST 2.0 protocol. %s cannot "
                  "work with it.",
                  Plugin::name);
-        BOOST_ASSERT(!"Ancient host.");
+        LE_ASSERT(!"Ancient host.");
         return 0;
     }
 #if defined(_DEBUG)
@@ -156,8 +157,8 @@ LE_NOTHROW Plugin<Impl, Protocol::VST24>::Plugin(
     LE_TRACE("---- %s VST 2.4 instance %d created ----\n", Impl::name, pluginInstanceID_);
 
 #ifdef LE_HAS_FRIEND_INJECTION
-    boost::ignore_unused_variable_warning(::LE_PLUGIN_VST24_INJECTOR_NAME<Impl>());
-    boost::ignore_unused_variable_warning(&::LE_PLUGIN_VST24_ENTRY_POINT_NAME);
+    LE::Utility::ignoreUnused(::LE_PLUGIN_VST24_INJECTOR_NAME<Impl>());
+    LE::Utility::ignoreUnused(&::LE_PLUGIN_VST24_ENTRY_POINT_NAME);
 #else
 #endif // LE_HAS_FRIEND_INJECTION
 
@@ -178,15 +179,15 @@ LE_NOTHROW Plugin<Impl, Protocol::VST24>::Plugin(
     aEffect().uniqueID = Impl::vstUniqueID;
     aEffect().version = Impl::version;
 
-    BOOST_ASSERT(aEffect().object == this);
-    BOOST_ASSERT(aEffect().user == nullptr);
+    LE_ASSERT(aEffect().object == this);
+    LE_ASSERT(aEffect().user == nullptr);
 
 #ifndef NDEBUG
     reinterpret_cast<std::pair<std::uint16_t, std::uint16_t> &>(aEffect().user) =
         std::pair<std::uint16_t, std::uint16_t>(Impl::maxNumberOfInputs, Impl::maxNumberOfOutputs);
 #endif // NDEBUG
 
-    BOOST_ASSERT(aEffect().flags == 0);
+    LE_ASSERT(aEffect().flags == 0);
     aEffect().flags = (effFlagsHasEditor) | (effFlagsProgramChunks) |
                       (effFlagsCanReplacing) | // mandatory in VST 2.4.
                       (effFlagsNoSoundInStop * (Impl::maxTailSize == 0)) |
@@ -248,14 +249,14 @@ template <class Impl>
     ::AEffect *LE_RESTRICT const pEffect, ::VstInt32 const opCode, ::VstInt32 const index,
     ::VstIntPtr const integerParam, void *const pData, float const floatParam)
 {
-    BOOST_ASSERT_MSG(_MM_GET_ROUNDING_MODE() == _MM_ROUND_NEAREST, "Unexpected rounding mode.");
+    LE_ASSERT_MSG(_MM_GET_ROUNDING_MODE() == _MM_ROUND_NEAREST, "Unexpected rounding mode.");
 
 #ifndef NDEBUG
     // Properly typed opcode for better visualization to aid in debugging.
     ::AEffectOpcodes const vstOpCode(static_cast<::AEffectOpcodes>(opCode));
-    boost::ignore_unused_variable_warning(vstOpCode);
+    LE::Utility::ignoreUnused(vstOpCode);
     ::AEffectXOpcodes const vstOpCodeX(static_cast<::AEffectXOpcodes>(opCode));
-    boost::ignore_unused_variable_warning(vstOpCodeX);
+    LE::Utility::ignoreUnused(vstOpCodeX);
 #endif
 
     LE_ASSUME(opCode >= 0);
@@ -286,40 +287,40 @@ template <class Impl>
     switch (opCode)
     {
     case effOpen:
-        BOOST_VERIFY(impl.initialise());
+        LE_VERIFY(impl.initialise());
         break;
     case effClose:
         impl.finalise();
         return true;
 
     case effSetProgram:
-        BOOST_ASSERT(integerParam < pEffect->numPrograms);
+        LE_ASSERT(integerParam < pEffect->numPrograms);
         impl.setProgram(static_cast<unsigned int>(integerParam));
         break;
     case effGetProgram:
         return impl.getProgram();
 
     case effSetProgramName:
-        BOOST_ASSERT(std::strlen(static_cast<char const *>(pData)) <= kVstMaxProgNameLen);
+        LE_ASSERT(std::strlen(static_cast<char const *>(pData)) <= kVstMaxProgNameLen);
         impl.setProgramName(static_cast<char const *>(pData));
         break;
     case effGetProgramName:
-        impl.getProgramName(boost::make_iterator_range(castToReference<ProgramNameBuf>(pData)));
+        impl.getProgramName(LE::Utility::makeSpan(castToReference<ProgramNameBuf>(pData)));
         break;
     case effGetParamLabel:
-        Impl::getParameterLabel(
-            parameterIndex, boost::make_iterator_range(castToReference<ParameterStringBuf>(pData)),
-            pContextForDynamicParameterAccess);
+        Impl::getParameterLabel(parameterIndex,
+                                LE::Utility::makeSpan(castToReference<ParameterStringBuf>(pData)),
+                                pContextForDynamicParameterAccess);
         break;
     case effGetParamDisplay:
-        impl.getParameterDisplay(
-            parameterIndex, boost::make_iterator_range(castToReference<ParameterStringBuf>(pData)),
-            nullptr);
+        impl.getParameterDisplay(parameterIndex,
+                                 LE::Utility::makeSpan(castToReference<ParameterStringBuf>(pData)),
+                                 nullptr);
         break;
     case effGetParamName:
-        Impl::getParameterName(
-            parameterIndex, boost::make_iterator_range(castToReference<ParameterStringBuf>(pData)),
-            pContextForDynamicParameterAccess);
+        Impl::getParameterName(parameterIndex,
+                               LE::Utility::makeSpan(castToReference<ParameterStringBuf>(pData)),
+                               pContextForDynamicParameterAccess);
         impl.inspectedParameter(parameterIndex);
         break;
 
@@ -381,9 +382,9 @@ template <class Impl>
             auto LE_MA &programNameSize(castToReference<std::uint32_t>(pCurrentPosition));
             pCurrentPosition += sizeof(programNameSize);
             auto LE_MA &programName(castToReference<ProgramNameBuf>(pCurrentPosition));
-            impl.getProgramName(programIndex, boost::make_iterator_range(programName));
+            impl.getProgramName(programIndex, LE::Utility::makeSpan(programName));
             programNameSize = static_cast<std::uint32_t>(std::strlen(programName)) + 1;
-            BOOST_ASSERT(programNameSize <= sizeof(programName));
+            LE_ASSERT(programNameSize <= sizeof(programName));
             pCurrentPosition += programNameSize;
             auto LE_MA &programSize(castToReference<std::uint32_t>(pCurrentPosition));
             pCurrentPosition += sizeof(programSize);
@@ -394,11 +395,11 @@ template <class Impl>
         }
         auto const actualStorageUsed(static_cast<std::uint32_t>(
             pCurrentPosition - reinterpret_cast<char const *>(pChunkData)));
-        BOOST_ASSERT(actualStorageUsed <= totalAllocationSize);
+        LE_ASSERT(actualStorageUsed <= totalAllocationSize);
         void *LE_RESTRICT const pShrunkChunkData(std::realloc(pChunkData, actualStorageUsed));
-        BOOST_ASSERT(pShrunkChunkData);
+        LE_ASSERT(pShrunkChunkData);
 #if !(defined(__APPLE__) && __LP64__) //...mrmlj...investigate...
-        BOOST_ASSERT(pShrunkChunkData == impl.pChunkData_);
+        LE_ASSERT(pShrunkChunkData == impl.pChunkData_);
 #else
         LE_TRACE_IF(pShrunkChunkData == impl.pChunkData_,
                     "\tSW VST2.4: chunk storage relocated when shrinking (%u -> %u).",
@@ -446,8 +447,8 @@ template <class Impl>
             pCurrentPosition += sizeof(activeProgram);
             auto const &state(castToReference<SWPre28Data const>(pCurrentPosition));
             pCurrentPosition += sizeof(state);
-            BOOST_ASSERT(activeProgram == 0 || !currentProgramOnly);
-            boost::ignore_unused_variable_warning(activeProgram);
+            LE_ASSERT(activeProgram == 0 || !currentProgramOnly);
+            LE::Utility::ignoreUnused(activeProgram);
             typename SWPre28Data::ProgramData const *LE_RESTRICT pData(&state.data[0]);
             typename SWPre28Data::ProgramNameBuffer const *LE_RESTRICT pName(&state.names[0]);
 
@@ -462,8 +463,8 @@ template <class Impl>
             std::uint32_t const numberOfPrograms(
                 castToReference<std::uint32_t const>(pCurrentPosition));
             pCurrentPosition += sizeof(numberOfPrograms);
-            BOOST_ASSERT(numberOfPrograms == programsToGet);
-            boost::ignore_unused_variable_warning(numberOfPrograms);
+            LE_ASSERT(numberOfPrograms == programsToGet);
+            LE::Utility::ignoreUnused(numberOfPrograms);
             for (std::uint8_t programIndex(startProgramIndex); programIndex < endProgramIndex;
                  ++programIndex)
             {
@@ -473,7 +474,7 @@ template <class Impl>
                 pCurrentPosition += programNameSize;
                 auto const programSize(castToReference<std::uint32_t const>(pCurrentPosition));
                 pCurrentPosition += sizeof(programSize);
-                BOOST_ASSERT(pProgramName[programNameSize - 1] == 0);
+                LE_ASSERT(pProgramName[programNameSize - 1] == 0);
                 success &= impl.loadProgramState(programIndex, pProgramName, pCurrentPosition,
                                                  programSize);
                 pCurrentPosition += programSize;
@@ -498,14 +499,14 @@ template <class Impl>
         //   EnergyXT 2.5.2 sends zero-sized VST events so we must allow for
         // this value also.
         //                                (24.05.2010.) (Domagoj Saric)
-        BOOST_ASSERT(vstEvents.numEvents >= 0);
+        LE_ASSERT(vstEvents.numEvents >= 0);
         ::VstEvent const *LE_RESTRICT const *LE_RESTRICT ppEvent = &vstEvents.events[0];
         ::VstEvent const *LE_RESTRICT const *LE_RESTRICT const ppEventsEnd =
             &vstEvents.events[vstEvents.numEvents];
         while (ppEvent != ppEventsEnd)
         {
             ::VstEvent const &event(*(*ppEvent++));
-            BOOST_ASSERT(event.type == kVstMidiType);
+            LE_ASSERT(event.type == kVstMidiType);
             impl.processMIDIEvent(reinterpret_cast<::VstMidiEvent const &>(event));
         }
         // VST SDK 2.4 documentation states that the return value is ignored.
@@ -515,8 +516,8 @@ template <class Impl>
     //---Parameters and Programs----------------------
     case effCanBeAutomated:
         // http://www.asseca.org/vst-24-specs/efCanBeAutomated.html
-        BOOST_ASSERT_MSG(index < pEffect->numParams,
-                         "VST2.4 host specified parameter index out of range.");
+        LE_ASSERT_MSG(index < pEffect->numParams,
+                      "VST2.4 host specified parameter index out of range.");
         return impl.canParameterBeAutomated(parameterIndex, pContextForDynamicParameterAccess);
 
     case effGetParameterProperties:
@@ -527,14 +528,13 @@ template <class Impl>
             pContextForDynamicParameterAccess);
 
     case effGetProgramNameIndexed:
-        BOOST_ASSERT(index < pEffect->numPrograms);
+        LE_ASSERT(index < pEffect->numPrograms);
         //...mrmlj... Reaper still uses this...
-        //BOOST_ASSERT( !integerParam ); // category deprecated in VST 2.4
+        //LE_ASSERT( !integerParam ); // category deprecated in VST 2.4
         LE_TRACE_IF(integerParam && (integerParam != -1),
                     "\tSW VST2.4: a program category (deprecated in VST2.4) was specified (%d).",
                     integerParam);
-        impl.getProgramName(index,
-                            boost::make_iterator_range(castToReference<ProgramNameBuf>(pData)));
+        impl.getProgramName(index, LE::Utility::makeSpan(castToReference<ProgramNameBuf>(pData)));
         return true;
 
     case effBeginSetProgram:
@@ -549,8 +549,8 @@ template <class Impl>
 
     case effString2Parameter:
         // implement return string2parameter (index, (char*)ptr) ? 1 : 0;
-        BOOST_ASSERT(pData ==
-                     nullptr); // A null pointer is used to check the capability (return true).
+        LE_ASSERT(pData ==
+                  nullptr); // A null pointer is used to check the capability (return true).
         return false;
 
         //---Connections, Configuration----------------------
@@ -583,9 +583,9 @@ template <class Impl>
             pEffect->numInputs = inputArrangement.numChannels;
             pEffect->numOutputs = outputArrangement.numChannels;
             bool const callbackNotificationSucceeded(impl.host().ioChanged());
-            BOOST_ASSERT(callbackNotificationSucceeded ||
-                         !impl.host().template canDo<AcceptIOChanges>());
-            boost::ignore_unused_variable_warning(callbackNotificationSucceeded);
+            LE_ASSERT(callbackNotificationSucceeded ||
+                      !impl.host().template canDo<AcceptIOChanges>());
+            LE::Utility::ignoreUnused(callbackNotificationSucceeded);
         }
         return success;
     }
@@ -610,8 +610,8 @@ template <class Impl>
             std::realloc(impl.pSpeakerArrangementStorage_, totalArrangementStorage)));
         if (!pArrangementStorage)
         {
-            BOOST_ASSERT(pInputArrangement == nullptr);
-            BOOST_ASSERT(pOutputArrangement == nullptr);
+            LE_ASSERT(pInputArrangement == nullptr);
+            LE_ASSERT(pOutputArrangement == nullptr);
             return false;
         }
         LE_TRACE_IF(impl.pSpeakerArrangementStorage_ &&
@@ -624,11 +624,11 @@ template <class Impl>
             pArrangementStorage[inputArrangementStorage]);
 
         bool const success(impl.getSpeakerArrangement(*pInputArrangement, *pOutputArrangement));
-        BOOST_ASSERT(success);
+        LE_ASSERT(success);
         LE_ASSUME(unsigned(pInputArrangement->numChannels) == inputChannels);
         LE_ASSUME(unsigned(pOutputArrangement->numChannels) == outputChannels);
-        BOOST_ASSERT(impl.host().getNumInputs() == inputChannels);
-        BOOST_ASSERT(impl.host().getNumOutputs() == outputChannels);
+        LE_ASSERT(impl.host().getNumInputs() == inputChannels);
+        LE_ASSERT(impl.host().getNumOutputs() == outputChannels);
         return success;
     }
 
@@ -644,9 +644,9 @@ template <class Impl>
     case effGetTailSize:
     {
         unsigned int const tailSize(impl.getTailSize());
-        BOOST_ASSERT_MSG(tailSize <= Impl::maxTailSize,
-                         "You must not override getTailSize() and return more than you specified "
-                         "with the maxTailSize static constant.");
+        LE_ASSERT_MSG(tailSize <= Impl::maxTailSize,
+                      "You must not override getTailSize() and return more than you specified "
+                      "with the maxTailSize static constant.");
         return (Impl::maxTailSize == 0) ? 1 : tailSize;
     }
 
@@ -700,14 +700,14 @@ template <class Impl>
             static_cast<VstModifierKey>(static_cast<unsigned int>(floatParam)));
 
     case effEditGetRect:
-        BOOST_ASSERT(pData);
+        LE_ASSERT(pData);
         {
             /// \note Some hosts (like VSTScanner and
             /// Reaper) call GetRect before EditOpen so we
             /// must explicitly check for this...
             ///          (25.09.2014.) (Domagoj Saric)
             auto &rect(impl.rect_);
-            BOOST_ASSERT(!rect.left && !rect.top);
+            LE_ASSERT(!rect.left && !rect.top);
             // Implementation note:
             //   Wavelab does not check whether the editor
             // creation succeeded and seems to
@@ -727,7 +727,7 @@ template <class Impl>
             // true here, otherwise the Symbiosis VST-AU
             // wrapper fails.
             //           (05.05.2011.) (Domagoj Saric)
-            if (BOOST_UNLIKELY(!impl.gui()))
+            if (LE_UNLIKELY(!impl.gui()))
             {
                 LE_TRACE("\tSW VST2.4: host called EditGetRect before creating the editor.");
                 namespace GUI = SW::GUI;
@@ -735,7 +735,7 @@ template <class Impl>
                 rect.bottom = Math::convert<VstInt16>(Impl::Editor::estimatedHeight * scale);
                 rect.right = Math::convert<VstInt16>(Impl::Editor::estimatedWidth * scale);
             }
-            BOOST_ASSERT(rect.bottom && rect.right);
+            LE_ASSERT(rect.bottom && rect.right);
             *reinterpret_cast<ERect const **>(pData) = &rect;
             return true;
         }
@@ -797,8 +797,8 @@ template <class Impl>
 
     case effCanDo:
     {
-        BOOST_ASSERT(pData);
-        boost::string_ref const capability(static_cast<char const *>(pData));
+        LE_ASSERT(pData);
+        std::string_view const capability(static_cast<char const *>(pData));
 
         LE_TRACE("\tSW VST2.4: capability query: %s. Answer:\n\t", capability.begin());
 
@@ -876,7 +876,7 @@ template <class Impl>
     }
 
     case effShellGetNextPlugin:
-        BOOST_ASSERT(
+        LE_ASSERT(
             !"Currently we do not support nor plan 'shell plugins' so this should not get called;");
         LE_UNREACHABLE_CODE();
         break;
@@ -939,8 +939,8 @@ template <class Impl>
             -1,   // VST scanner
             65536 // FL Studio 9
         };
-        if (boost::find(knownUknownOpcodes, opCode) == boost::end(knownUknownOpcodes))
-            BOOST_ASSERT(!"Unhandled VST opcode.");
+        if (std::ranges::find(knownUknownOpcodes, opCode) == std::end(knownUknownOpcodes))
+            LE_ASSERT(!"Unhandled VST opcode.");
 #endif
     }
 
@@ -959,13 +959,13 @@ float LE_NOTHROWNOALIAS
 Plugin<Impl, Protocol::VST24>::getParameter(::AEffect *LE_RESTRICT const pEffect,
                                             ::VstInt32 const index) /// \throws nothing
 {
-    BOOST_ASSERT_MSG(_MM_GET_ROUNDING_MODE() == _MM_ROUND_NEAREST, "Unexpected rounding mode.");
+    LE_ASSERT_MSG(_MM_GET_ROUNDING_MODE() == _MM_ROUND_NEAREST, "Unexpected rounding mode.");
     auto const &impl(Plugin::impl(pEffect));
     auto const parameterIndex(ParameterIndex{static_cast<ParameterIndex::value_type>(index)});
     impl.inspectedParameter(parameterIndex);
     AutomatedParameterValue const result(impl.getParameter(parameterIndex));
-    BOOST_ASSERT(std ::isfinite(result));
-    BOOST_ASSERT(Math::isNormalisedValue(result));
+    LE_ASSERT(std ::isfinite(result));
+    LE_ASSERT(Math::isNormalisedValue(result));
     return result;
 }
 
@@ -981,9 +981,9 @@ void LE_NOTHROW Plugin<Impl, Protocol::VST24>::setParameter(::AEffect *LE_RESTRI
                                                             ::VstInt32 const index,
                                                             float const value) /// \throws nothing
 {
-    BOOST_ASSERT_MSG(_MM_GET_ROUNDING_MODE() == _MM_ROUND_NEAREST, "Unexpected rounding mode.");
+    LE_ASSERT_MSG(_MM_GET_ROUNDING_MODE() == _MM_ROUND_NEAREST, "Unexpected rounding mode.");
     LE_ASSUME(std::isfinite(value));
-    BOOST_ASSERT(Math::isNormalisedValue(value));
+    LE_ASSERT(Math::isNormalisedValue(value));
     auto const parameterIndex(ParameterIndex{static_cast<ParameterIndex::value_type>(index)});
     if (impl(pEffect).setParameter(parameterIndex, value) == ErrorCode::Success)
     {
@@ -996,7 +996,7 @@ void LE_NOTHROW Plugin<Impl, Protocol::VST24>::setParameter(::AEffect *LE_RESTRI
             (info.flags & (kVstParameterUsesIntegerMinMax | kVstParameterUsesFloatStep |
                            kVstParameterUsesIntStep)) == 0)
         {
-            BOOST_ASSERT(getParameter(pEffect, index) == value);
+            LE_ASSERT(getParameter(pEffect, index) == value);
         }
 #endif // NDEBUG
     }
@@ -1022,7 +1022,7 @@ VSTPluginBase::CanDoAnswer Plugin<Impl, Protocol::VST24>::queryImplementationCap
 {
 #ifndef NDEBUG
     Plugins::PluginCapability const capability(pluginCapability);
-    boost::ignore_unused_variable_warning(capability);
+    LE::Utility::ignoreUnused(capability);
 #endif
 
     bool const isImplementationCapable(

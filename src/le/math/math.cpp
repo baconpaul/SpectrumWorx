@@ -26,10 +26,10 @@
 
 #include "boost/simd/sdk/config/arch.hpp"
 
-#include <boost/assert.hpp>
-#include <boost/detail/endian.hpp>
-#include <boost/integer.hpp>
-#include <boost/integer_traits.hpp>
+#include "le/utility/assert.hpp"
+#include <bit>
+#include <cstdint>
+#include <limits>
 
 #include <cmath>
 #include <chrono>
@@ -43,7 +43,7 @@ LE_IMPL_NAMESPACE_BEGIN(Math)
 #ifdef _MSC_VER
 #pragma runtime_checks("", off)
 #pragma check_stack(off)
-#endif // BOOST_MSVC
+#endif // _MSC_VER
 
 LE_OPTIMIZE_FOR_SPEED_BEGIN()
 
@@ -68,7 +68,7 @@ LE_NOTHROWNOALIAS bool makeBool(unsigned int boolean);
 
 std::uint8_t abs(bool const value)
 {
-    BOOST_ASSERT_MSG(value == 0 || value == 1, "Invalid input");
+    LE_ASSERT_MSG(value == 0 || value == 1, "Invalid input");
     return static_cast<std::uint8_t>(value);
 }
 
@@ -89,9 +89,9 @@ bool isGreater(float const *LE_RESTRICT const pLeft, float const *LE_RESTRICT co
     rightBits = (rightBits ^ rightSign) + (rightSign & 0x80000001);
 
     auto const result(leftBits > rightBits);
-    BOOST_ASSERT_MSG((result == (*pLeft > *pRight)) || !std::isfinite(*pLeft) ||
-                         !std::isfinite(*pRight),
-                     "Unexpected result");
+    LE_ASSERT_MSG((result == (*pLeft > *pRight)) || !std::isfinite(*pLeft) ||
+                      !std::isfinite(*pRight),
+                  "Unexpected result");
     return result;
 }
 
@@ -111,9 +111,9 @@ bool isGreater(float const *LE_RESTRICT const pLeft, float const *LE_RESTRICT co
     LE_ASSUME(pRight);
     auto const result(reinterpret_cast<int const &>(*pLeft) >
                       reinterpret_cast<int const &>(*pRight));
-    BOOST_ASSERT_MSG((result == (*pLeft > *pRight)) || !std::isfinite(*pLeft) ||
-                         !std::isfinite(*pRight),
-                     "Unexpected result");
+    LE_ASSERT_MSG((result == (*pLeft > *pRight)) || !std::isfinite(*pLeft) ||
+                      !std::isfinite(*pRight),
+                  "Unexpected result");
     return result;
 }
 
@@ -121,7 +121,7 @@ bool isGreater(double const *LE_RESTRICT const pLeft, double const *LE_RESTRICT 
 {
     auto const result(reinterpret_cast<long long const &>(*pLeft) >
                       reinterpret_cast<long long const &>(*pRight));
-    BOOST_ASSERT_MSG(result == (*pLeft > *pRight), "Unexpected result");
+    LE_ASSERT_MSG(result == (*pLeft > *pRight), "Unexpected result");
     return result;
 }
 
@@ -130,7 +130,7 @@ unsigned int ceil(float const value)
     LE_ASSUME(value >= 0);
     float const belowHalf(0.45f); //...mrmlj...
     int const result(round(value + belowHalf));
-    BOOST_ASSERT_MSG(std::ceil(value) == static_cast<float>(result), "Unexpected result");
+    LE_ASSERT_MSG(std::ceil(value) == static_cast<float>(result), "Unexpected result");
     return result;
 }
 
@@ -138,7 +138,7 @@ unsigned int floor(float const value)
 {
     unsigned int const result(Math::truncate(value));
     //...mrmlj...need not hold when (mis)used for fast(er) phase mapping...
-    //BOOST_ASSERT( std::floorf( value ) == static_cast<float>( result ) );
+    //LE_ASSERT( std::floorf( value ) == static_cast<float>( result ) );
     return result;
 }
 
@@ -150,7 +150,7 @@ float modulo(float const dividend, float const divisor)
     /*unsigned*/ int const divisionFloor(truncate(dividend / divisor));
     float const mod(dividend - (divisionFloor * divisor));
     //...mrmlj...need not hold when (mis)used for fast(er) phase mapping...
-    //BOOST_ASSERT( std::floor( value ) == static_cast<float>( result ) );
+    //LE_ASSERT( std::floor( value ) == static_cast<float>( result ) );
     return mod;
 #else
     return Math::modulo(dividend, divisor);
@@ -159,7 +159,7 @@ float modulo(float const dividend, float const divisor)
 
 bool isZero(float const &value)
 {
-    BOOST_ASSERT_MSG(std::isfinite(value), "Invalid input");
+    LE_ASSERT_MSG(std::isfinite(value), "Invalid input");
     unsigned int const &valueBits(reinterpret_cast<unsigned int const &>(value));
     return valueBits == 0;
 }
@@ -170,7 +170,7 @@ int floor(float const value)
     // http://www.masm32.com/board/index.php?PHPSESSID=df3d20eef32d75578b6e4c0bf9b44819&action=printpage;topic=9515.0
     int const truncatedValue(truncate(value));
     int const result(truncatedValue - (isNegative(value) & (truncatedValue != value)));
-    BOOST_ASSERT_MSG(std::floor(value) == static_cast<float>(result), "Unexpected result");
+    LE_ASSERT_MSG(std::floor(value) == static_cast<float>(result), "Unexpected result");
     return result;
 }
 
@@ -180,7 +180,7 @@ int ceil(float const value)
 
     float const valueX2(value * 2);
     int const result(-(round(-0.5f - valueX2) >> 1));
-    BOOST_ASSERT_MSG(std::ceil(value) == static_cast<float>(result), "Unexpected result");
+    LE_ASSERT_MSG(std::ceil(value) == static_cast<float>(result), "Unexpected result");
     return result;
 }
 
@@ -199,12 +199,12 @@ float modulo(float const dividend, float const divisor)
     // mod result and will thus differ from the std::fmod() result so we skip
     // the below sanity check for those cases.
     //                                        (05.01.2011.) (Domagoj Saric)
-    BOOST_ASSERT_MSG(nearEqual(mod, std::fmod(dividend, divisor)) ||
-                         (static_cast<int>(static_cast<float>(static_cast<float>(dividend) /
-                                                              static_cast<float>(divisor))) !=
-                          static_cast<int>(static_cast<double>(static_cast<double>(dividend) /
-                                                               static_cast<double>(divisor)))),
-                     "Broken modulo.");
+    LE_ASSERT_MSG(nearEqual(mod, std::fmod(dividend, divisor)) ||
+                      (static_cast<int>(static_cast<float>(static_cast<float>(dividend) /
+                                                           static_cast<float>(divisor))) !=
+                       static_cast<int>(static_cast<double>(static_cast<double>(dividend) /
+                                                            static_cast<double>(divisor)))),
+                  "Broken modulo.");
     return mod;
 #elif defined(__GNUC__)
     return ::__builtin_fmodf(dividend, divisor);
@@ -234,7 +234,7 @@ std::uint32_t clamp(std::int32_t const value, std::uint32_t const lowerBound,
     // http://www.coranac.com/documents/bittrick
     // http://stackoverflow.com/questions/707370/clean-efficient-algorithm-for-wrapping-integers-in-c
 
-    BOOST_ASSERT_MSG(lowerBound <= upperBound, "Invalid input");
+    LE_ASSERT_MSG(lowerBound <= upperBound, "Invalid input");
 
 #ifdef BOOST_SIMD_HAS_SSE4_1_SUPPORT
     __m128i vectorResult(_mm_cvtsi32_si128(value));
@@ -389,7 +389,7 @@ bool isNegative(float const value)
 #else
     auto const result(isNegative(reinterpret_cast<int const &>(value)));
 #endif // BOOST_SIMD_HAS_SSE2_SUPPORT
-    BOOST_ASSERT_MSG((result == (value < 0)) || (value == -0.0f), "Unexpected result");
+    LE_ASSERT_MSG((result == (value < 0)) || (value == -0.0f), "Unexpected result");
     return result;
 }
 
@@ -398,7 +398,7 @@ bool isNegative(int const value)
     std::uint8_t const valueNumberOfBits(sizeof(value) * 8);
     std::uint8_t const valueSign(reinterpret_cast<unsigned int const &>(value) >>
                                  (valueNumberOfBits - 1));
-    BOOST_ASSERT_MSG(valueSign == (value < 0), "Unexpected result");
+    LE_ASSERT_MSG(valueSign == (value < 0), "Unexpected result");
     return reinterpret_cast<bool const &>(valueSign);
 }
 
@@ -418,7 +418,7 @@ LE_CONST_FUNCTION float exp2(float const value) { return std::exp2(value); }
 
 LE_CONST_FUNCTION std::uint8_t log2(int const value)
 {
-    BOOST_ASSERT_MSG(!isNegative(value), "Invalid input");
+    LE_ASSERT_MSG(!isNegative(value), "Invalid input");
     return log2(static_cast<unsigned long>(value));
 }
 
@@ -426,8 +426,8 @@ LE_CONST_FUNCTION std::uint8_t log2(unsigned int const value) { return firstSetB
 
 LE_CONST_FUNCTION std::uint8_t log2(unsigned long const value)
 {
-    BOOST_ASSERT_MSG(static_cast<unsigned int>(value) == value,
-                     "Value out of range."); //...mrmlj...
+    LE_ASSERT_MSG(static_cast<unsigned int>(value) == value,
+                  "Value out of range."); //...mrmlj...
     return log2(static_cast<unsigned int>(value));
 }
 
@@ -459,7 +459,7 @@ unsigned int round(unsigned int const value)
     // http://stackoverflow.com/questions/1983303/using-bts-assembly-instruction-with-gcc-compiler
     // http://gcc.gnu.org/bugzilla/show_bug.cgi?id=36473
 
-    BOOST_ASSERT_MSG(value != 0, "Invalid input");
+    LE_ASSERT_MSG(value != 0, "Invalid input");
     unsigned int const firstSetBitInValue(firstSetBit(value));
     unsigned int const isNextBitSet(
 #if defined(_MSC_VER) && !defined(_XBOX)
@@ -478,7 +478,7 @@ unsigned int round(unsigned int const value)
 
 std::uint8_t log2(unsigned int const value)
 {
-    BOOST_ASSERT_MSG(isPowerOfTwo(value), "Invalid input");
+    LE_ASSERT_MSG(isPowerOfTwo(value), "Invalid input");
     return firstSetBit(value);
 }
 } // namespace PowerOfTwo
@@ -527,14 +527,14 @@ std::uint8_t numberOfSetBits(int const value)
 
 std::uint8_t firstSetBit(int const value)
 {
-    BOOST_ASSERT_MSG(value, "Invalid input");
+    LE_ASSERT_MSG(value, "Invalid input");
 #if defined(_MSC_VER)
 #ifdef _XBOX
     std::uint8_t const leadingZeroBits(_CountLeadingZeros(value));
     return (sizeof(value) * 8) - 1 - leadingZeroBits;
 #else
     unsigned long firstSetBitIndex;
-    BOOST_VERIFY(_BitScanReverse(&firstSetBitIndex, value) && "No bits set in the passed value.");
+    LE_VERIFY(_BitScanReverse(&firstSetBitIndex, value) && "No bits set in the passed value.");
     return static_cast<std::uint8_t>(firstSetBitIndex);
 #endif
 #elif defined(__GNUC__)
@@ -547,14 +547,14 @@ std::uint8_t firstSetBit(int const value)
 
 std::uint8_t lastSetBit(int const value)
 {
-    BOOST_ASSERT_MSG(value, "Invalid input");
+    LE_ASSERT_MSG(value, "Invalid input");
 #if defined(_MSC_VER)
 #ifdef _XBOX
     return static_cast<std::uint8_t>((sizeof(value) * 8) -
                                      _CountLeadingZeros(~value & (value - 1)));
 #else
     unsigned long lastSetBitIndex;
-    BOOST_VERIFY(_BitScanForward(&lastSetBitIndex, value) && "No bits set in the passed value.");
+    LE_VERIFY(_BitScanForward(&lastSetBitIndex, value) && "No bits set in the passed value.");
     return static_cast<std::uint8_t>(lastSetBitIndex);
 #endif
 #elif defined(__GNUC__)
@@ -583,13 +583,13 @@ bool isPowerOfTwo(unsigned int const value)
     // http://graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
     bool const result((value & (value - 1)) == 0);
     // If only one bit is set then it is certainly a power-of-two value.
-    BOOST_ASSERT_MSG(result == (numberOfSetBits(value) == 1), "Power of two logic bug.");
+    LE_ASSERT_MSG(result == (numberOfSetBits(value) == 1), "Power of two logic bug.");
     return result;
 }
 
 bool isPowerOfTwo(int const value)
 {
-    BOOST_ASSERT_MSG(!isNegative(value), "Invalid input");
+    LE_ASSERT_MSG(!isNegative(value), "Invalid input");
     return isPowerOfTwo(static_cast<unsigned int>(value));
 }
 
@@ -667,7 +667,7 @@ using rand_t = std::size_t;
 #endif                          // _MSC_VER
 LE_NOINLINE LE_HOT rand_t xorshift128pRNG()
 {
-    BOOST_ASSERT_MSG(rng_state[0] && rng_state[1], "RNG not seeded.");
+    LE_ASSERT_MSG(rng_state[0] && rng_state[1], "RNG not seeded.");
 
     std::uint64_t s1(rng_state[0]);
     std::uint64_t const s0(rng_state[1]);
@@ -879,8 +879,8 @@ FPUDisableDenormalsGuard::FPUDisableDenormalsGuard()
 FPUDisableDenormalsGuard::~FPUDisableDenormalsGuard()
 {
 #if defined(_MSC_VER)
-    BOOST_VERIFY(::_controlfp(originalFloatingPointControlWord_, _MCW_DN) ==
-                 originalFloatingPointControlWord_);
+    LE_VERIFY(::_controlfp(originalFloatingPointControlWord_, _MCW_DN) ==
+              originalFloatingPointControlWord_);
 #elif defined(BOOST_SIMD_HAS_SSE_SUPPORT)
     _mm_setcsr(originalFloatingPointControlWord_);
 #elif defined(BOOST_SIMD_ARCH_ARM) && !defined(__SOFTFP__) && !defined(__aarch64__)
@@ -907,7 +907,7 @@ FPUExceptionsGuard::FPUExceptionsGuard()
 #endif // _MSC_VER
 {
 #ifdef _MSC_VER
-    BOOST_ASSERT((originalFloatingPointControlWord_ & EM_AMBIGUOUS) == 0);
+    LE_ASSERT((originalFloatingPointControlWord_ & EM_AMBIGUOUS) == 0);
     ::_clear87();
 #endif // _MSC_VER
 }

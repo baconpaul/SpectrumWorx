@@ -15,7 +15,7 @@
 //------------------------------------------------------------------------------
 #include "le/utility/intrinsics.hpp"
 #include "le/utility/platformSpecifics.hpp"
-#include "le/utility/tchar.hpp" //...mrmlj...for Boost.Range restrict support...
+#include "le/utility/tchar.hpp"
 
 #ifdef LE_HAS_NT2
 // NT2/Boost.SIMD
@@ -25,16 +25,12 @@
 #include "boost/simd/memory/aligned_reuse.hpp"
 #endif // LE_HAS_NT2
 
-#pragma warning(push)
-#pragma warning(disable : 4324) // Structure was padded due to __declspec(align())
-#include "boost/aligned_storage.hpp"
-#pragma warning(pop)
-#include "boost/assert.hpp"
-#include "boost/range/iterator_range_core.hpp"
-#include "boost/noncopyable.hpp"
+#include "assert.hpp"
+#include "span.hpp"
 
 #include <cstdint>
 #include <type_traits>
+#include <utility>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -101,7 +97,7 @@ class AlignedBuffer : public boost::simd::aligned_object<alignmentSize>
 
     Element &operator[](size_t const index)
     {
-        BOOST_ASSERT_MSG(index < numberOfElements, "Buffer index out of range!");
+        LE_ASSERT_MSG(index < numberOfElements, "Buffer index out of range!");
         return buffer()[index];
     }
     Element const &operator[](size_t const index) const
@@ -117,18 +113,21 @@ class AlignedBuffer : public boost::simd::aligned_object<alignmentSize>
   private:
     Element *buffer()
     {
-        BOOST_ASSERT_MSG((reinterpret_cast<std::size_t>(&storage_) % alignmentSize) == 0,
-                         "Aligned buffer misaligned.");
+        LE_ASSERT_MSG((reinterpret_cast<std::size_t>(&storage_) % alignmentSize) == 0,
+                      "Aligned buffer misaligned.");
         return reinterpret_cast<Element *>(&storage_);
     }
 
   private:
     // Implementation note:
     //   std::aligned_storage implementation does not give properly aligned
-    // storage for alignments larger than the largest builtin type.
+    // storage for alignments larger than the largest builtin type, hence
+    // boost::aligned_storage originally and an explicit alignas now.
     //                                        (15.11.2010.) (Domagoj Saric)
-    typedef typename boost::aligned_storage<sizeof(Element) * numberOfElements, alignmentSize>::type
-        Storage;
+    struct alignas(alignmentSize) Storage
+    {
+        char bytes[sizeof(Element) * numberOfElements];
+    };
     Storage storage_;
 
     static_assert(sizeof(Storage) >= (sizeof(Element) * numberOfElements),
@@ -141,19 +140,24 @@ class AlignedBuffer : public boost::simd::aligned_object<alignmentSize>
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-template <typename T>
-class AlignedHeapBuffer : public boost::iterator_range<T *LE_RESTRICT>, public boost::noncopyable
+template <typename T> class AlignedHeapBuffer : public Span<T>
 {
   public:
-    typedef boost::iterator_range<T *LE_RESTRICT> Range;
+    typedef Span<T> Range;
     typedef typename Range::value_type value_type;
 
-    AlignedHeapBuffer() { BOOST_ASSERT(!*this && !this->begin() && !this->end()); }
-    AlignedHeapBuffer(AlignedHeapBuffer &&source) : Range(source) { source = Range(); }
+    AlignedHeapBuffer(AlignedHeapBuffer const &) = delete; // makes non-copyable
+    AlignedHeapBuffer &operator=(AlignedHeapBuffer const &) = delete;
+
+    AlignedHeapBuffer() { LE_ASSERT(this->empty() && !this->data()); }
+    AlignedHeapBuffer(AlignedHeapBuffer &&source) : Range(source)
+    {
+        static_cast<Range &>(source) = Range();
+    }
 #if !defined(__APPLE__) && !defined(_WIN64)
-    ~AlignedHeapBuffer() { boost::simd::aligned_free(this->begin()); }
+    ~AlignedHeapBuffer() { boost::simd::aligned_free(this->data()); }
 #else
-    ~AlignedHeapBuffer() { std ::free(this->begin()); }
+    ~AlignedHeapBuffer() { std ::free(this->data()); }
 #endif
 
     unsigned int size() const { return static_cast<unsigned int>(Range::size()); }
@@ -169,8 +173,8 @@ class AlignedHeapBuffer : public boost::iterator_range<T *LE_RESTRICT>, public b
 #ifdef __APPLE__
         /// \note OSX std::realloc does not return a nullptr with 0 sizes so we
         /// explicitly handle this case out of paranoia in case some code uses
-        /// Range::begin() != nullptr instead of Range::operator bool() to check
-        /// for validity.
+        /// Range::data() != nullptr instead of Range::empty() to check for
+        /// validity.
         /// https://www.securecoding.cert.org/confluence/display/seccode/MEM30-C.+Do+not+access+freed+memory
         /// http://stackoverflow.com/questions/11455317/realloc-memory-for-a-pointer-which-has-been-freed
         /// http://www.open-std.org/jtc1/sc22/wg14/www/docs/dr_400.htm
@@ -183,21 +187,21 @@ class AlignedHeapBuffer : public boost::iterator_range<T *LE_RESTRICT>, public b
 #endif // __APPLE__
         value_type *const pNewMemory(static_cast<value_type *>(
 #if !defined(__APPLE__) && !defined(_WIN64)
-            boost::simd::aligned_reuse(this->begin(), numberOfElements * sizeof(value_type),
+            boost::simd::aligned_reuse(this->data(), numberOfElements * sizeof(value_type),
                                        Utility::Constants::vectorAlignment)
 #else
-            std::realloc(this->begin(), numberOfElements * sizeof(value_type))
+            std::realloc(this->data(), numberOfElements * sizeof(value_type))
 #endif
                 ));
         if (pNewMemory || !numberOfElements)
         {
-            BOOST_ASSERT_MSG((pNewMemory != nullptr) == (numberOfElements != 0),
-                             "Unexpected realloc result");
-            BOOST_ASSERT_MSG((reinterpret_cast<std::size_t>(pNewMemory) %
-                              Utility::Constants::vectorAlignment) == 0,
-                             "Aligned allocation misaligned.");
+            LE_ASSERT_MSG((pNewMemory != nullptr) == (numberOfElements != 0),
+                          "Unexpected realloc result");
+            LE_ASSERT_MSG((reinterpret_cast<std::size_t>(pNewMemory) %
+                           Utility::Constants::vectorAlignment) == 0,
+                          "Aligned allocation misaligned.");
             static_cast<Range &>(*this) = Range(pNewMemory, pNewMemory + numberOfElements);
-            BOOST_ASSERT(size() == numberOfElements);
+            LE_ASSERT(size() == numberOfElements);
             return true;
         }
         else
@@ -237,17 +241,17 @@ class AlignedHeapBuffer : public boost::iterator_range<T *LE_RESTRICT>, public b
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-typedef boost::iterator_range<char *LE_RESTRICT> Storage;
+typedef Span<char> Storage;
 
 #pragma warning(push)
 #pragma warning(disable : 4127) // Conditional expression is constant.
 
-template <typename T> class SharedStorageBuffer : public boost::iterator_range<T *LE_RESTRICT>
+template <typename T> class SharedStorageBuffer : public Span<T>
 {
   public:
     SharedStorageBuffer() {}
 
-    using Range = boost::iterator_range<T *LE_RESTRICT>;
+    using Range = Span<T>;
 
     LE_NOINLINE LE_NOTHROWNOALIAS LE_COLD void clear()
     {
@@ -258,11 +262,11 @@ template <typename T> class SharedStorageBuffer : public boost::iterator_range<T
 
     LE_NOINLINE LE_NOTHROW LE_COLD void resize(std::uint32_t const newSize, Storage &storage)
     {
-        BOOST_ASSERT_MSG(newSize % sizeof(T) == 0, "Invalid size.");
-        BOOST_ASSERT_MSG(static_cast<std::size_t>(storage.size()) >= newSize,
-                         "Not enough shared storage space.");
+        LE_ASSERT_MSG(newSize % sizeof(T) == 0, "Invalid size.");
+        LE_ASSERT_MSG(static_cast<std::size_t>(storage.size()) >= newSize,
+                      "Not enough shared storage space.");
 
-        using iterator = typename Range::iterator;
+        using iterator = T *LE_RESTRICT;
 
         bool const doAlign(!std::is_pointer<T>::value);
 
@@ -276,18 +280,18 @@ template <typename T> class SharedStorageBuffer : public boost::iterator_range<T
         auto const alignmentFixup(
             static_cast<std::uint8_t>(reinterpret_cast<std::size_t>(newBeginning) -
                                       reinterpret_cast<std::size_t>(storage.begin())));
-        BOOST_ASSERT_MSG(static_cast<std::size_t>(storage.size()) >= alignmentFixup + newSize,
-                         "Not enough shared storage space.");
+        LE_ASSERT_MSG(static_cast<std::size_t>(storage.size()) >= alignmentFixup + newSize,
+                      "Not enough shared storage space.");
         storage.advance_begin(alignmentFixup + newSize);
         iterator const newEnd(
             reinterpret_cast<T *>(reinterpret_cast<std::size_t>(storage.begin())));
-        BOOST_ASSERT_MSG(newBeginning <= newEnd, "Failed to generate a valid range.");
-        BOOST_ASSERT_MSG(
+        LE_ASSERT_MSG(newBeginning <= newEnd, "Failed to generate a valid range.");
+        LE_ASSERT_MSG(
             !doAlign ||
                 (reinterpret_cast<std::size_t>(newBeginning) % Constants::vectorAlignment == 0),
             "Failed to generate a properly aligned range.");
         static_cast<Range &>(*this) = Range(newBeginning, newEnd);
-        BOOST_ASSERT_MSG(size() == newSize / sizeof(T), "Generated range has an invalid size.");
+        LE_ASSERT_MSG(size() == newSize / sizeof(T), "Generated range has an invalid size.");
 
         if (!__has_trivial_constructor(T))
         {
@@ -309,9 +313,11 @@ template <typename T> class SharedStorageBuffer : public boost::iterator_range<T
         static_cast<Range &>(*this) = static_cast<Range const &>(other);
     }
 
-    operator boost::iterator_range<T const *LE_RESTRICT> const &() const
+    /// \note Span<T> and Span<T const> are both a begin/end pointer pair, so
+    /// this stays the free reinterpretation it was with boost::iterator_range.
+    operator Span<T const> const &() const
     {
-        return reinterpret_cast<boost::iterator_range<T const *LE_RESTRICT> const &>(*this);
+        return reinterpret_cast<Span<T const> const &>(*this);
     }
 
   private:

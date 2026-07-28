@@ -80,26 +80,26 @@ void LocalRefDeleter ::operator()(::jobject const pObject) const
 
 LE_NOTHROW LE_COLD void EnvDeleter::operator()(::JNIEnv *const pJNI) const
 {
-    BOOST_ASSERT(pJNI);
-    if (BOOST_UNLIKELY(detach))
+    LE_ASSERT(pJNI);
+    if (LE_UNLIKELY(detach))
     {
         LE_TRACE_LOGONLY("Detaching a native thread from the JVM.");
-        BOOST_VERIFY(pJVM->DetachCurrentThread() == JNI_OK);
+        LE_VERIFY(pJVM->DetachCurrentThread() == JNI_OK);
     }
 }
 } // namespace Detail
 
 LE_NOTHROW LE_COLD void setVM(::JNIEnv &jni)
 {
-    BOOST_ASSERT_MSG(!Detail::pJVM, "JVM singleton already set");
-    BOOST_VERIFY(jni.GetJavaVM(const_cast<JavaVM **>(&Detail::pJVM)) == JNI_OK);
+    LE_ASSERT_MSG(!Detail::pJVM, "JVM singleton already set");
+    LE_VERIFY(jni.GetJavaVM(const_cast<JavaVM **>(&Detail::pJVM)) == JNI_OK);
 }
 
 LE_NOTHROW LE_PURE_FUNCTION LE_COLD JNIEnv &preAttachedEnv()
 {
     JNIEnv *pJNI;
-    BOOST_VERIFY_MSG(vm().GetEnv(reinterpret_cast<void **>(&pJNI), JNI_VERSION_1_6) == JNI_OK,
-                     "Calling thread not attached to the JVM");
+    LE_VERIFY_MSG(vm().GetEnv(reinterpret_cast<void **>(&pJNI), JNI_VERSION_1_6) == JNI_OK,
+                  "Calling thread not attached to the JVM");
     return *pJNI;
 }
 
@@ -113,13 +113,13 @@ env()
     JNIEnv *pJNI;
     auto const result(vm().GetEnv(reinterpret_cast<void **>(&pJNI), JNI_VERSION_1_6));
     auto const preAttached(result == JNI_OK);
-    if (BOOST_UNLIKELY(!preAttached))
+    if (LE_UNLIKELY(!preAttached))
     {
         LE_ASSUME(result == JNI_EDETACHED);
         LE_ASSUME(pJNI == nullptr);
         LE_TRACE_LOGONLY(
             "Attaching a native thread to the JVM."); //...mrmlj...avoid infinite loops and showing this info in the example app gui...
-        BOOST_VERIFY(vm().AttachCurrentThread(&pJNI, nullptr) == JNI_OK);
+        LE_VERIFY(vm().AttachCurrentThread(&pJNI, nullptr) == JNI_OK);
     }
     return {pJNI, Detail::EnvDeleter{!preAttached}};
 }

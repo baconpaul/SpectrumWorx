@@ -107,8 +107,8 @@ void FreezeImpl::process(ChannelState &cs, Engine::ChannelData_AmPh data,
     cs.previousFreezeFlag = freeze_;
     cs.previousMeltFlag = melt_;
 
-    BOOST_ASSERT_MSG(!(freeze && melt), "Freezing and melting at the same time?");
-    //BOOST_ASSERT_MSG( cs.frameCounter <= 1 / inverseTransitionTime_, "Frame counter overflow."                ); //...mrmlj...
+    LE_ASSERT_MSG(!(freeze && melt), "Freezing and melting at the same time?");
+    //LE_ASSERT_MSG( cs.frameCounter <= 1 / inverseTransitionTime_, "Frame counter overflow."                ); //...mrmlj...
 
     if (freeze)
     {

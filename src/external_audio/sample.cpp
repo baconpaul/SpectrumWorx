@@ -14,6 +14,7 @@
 #include "le/math/vector.hpp"
 #endif // NDEBUG
 #include "le/utility/criticalSection.hpp"
+#include "le/utility/ignoreUnused.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -40,10 +41,10 @@ char const *Sample::load(juce::File const &sampleFile, unsigned int const desire
         samplePosition_ = 0;
 
         // Assert something was actually read.
-        BOOST_ASSERT(!channel1().empty());
+        LE_ASSERT(!channel1().empty());
 
         // Assert all channels are of equal size.
-        BOOST_ASSERT(channel1().size() == channel2().size());
+        LE_ASSERT(channel1().size() == channel2().size());
 
         /// \todo The Mac loader seems to return out-of-dynamic-range samples
         /// when loading MP3 files. Investigate.
@@ -57,12 +58,12 @@ char const *Sample::load(juce::File const &sampleFile, unsigned int const desire
         );
 
         // Assert data was correctly read (all values are in the normalised range).
-        BOOST_ASSERT(Math::max(channel1()) <= +maximumAbsoluteValue);
-        BOOST_ASSERT(Math::max(channel2()) <= +maximumAbsoluteValue);
-        BOOST_ASSERT(Math::min(channel1()) >= -maximumAbsoluteValue);
-        BOOST_ASSERT(Math::min(channel2()) >= -maximumAbsoluteValue);
+        LE_ASSERT(Math::max(channel1()) <= +maximumAbsoluteValue);
+        LE_ASSERT(Math::max(channel2()) <= +maximumAbsoluteValue);
+        LE_ASSERT(Math::min(channel1()) >= -maximumAbsoluteValue);
+        LE_ASSERT(Math::min(channel2()) >= -maximumAbsoluteValue);
 
-        boost::ignore_unused_variable_warning(maximumAbsoluteValue);
+        LE::Utility::ignoreUnused(maximumAbsoluteValue);
     }
     return pErrorString;
 }
@@ -98,7 +99,7 @@ Sample::ChannelData Sample::channel2() const
 
 unsigned int &Sample::samplePosition()
 {
-    BOOST_ASSERT(*this);
+    LE_ASSERT(*this);
     return samplePosition_;
 }
 

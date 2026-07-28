@@ -15,8 +15,10 @@
 #include "le/utility/tchar.hpp"
 #include "le/utility/trace.hpp"
 
-#include "boost/array.hpp"
-#include "boost/assert.hpp"
+#include <array>
+#include "le/utility/assert.hpp"
+#include "le/utility/ignoreUnused.hpp"
+#include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 template <class Impl> struct FMODFactoryInjector;
 
@@ -59,8 +61,8 @@ Plugin<Impl, Protocol::FMOD>::Plugin(ConstructionParameter const constructionPar
 #else
     ::FMODFactoryInjector<Impl> dummy;
     FMOD_DSP_DESCRIPTION *(F_API * pFMODGetDSPDescription)() = &::FMODGetDSPDescription;
-    boost::ignore_unused_variable_warning(dummy);
-    boost::ignore_unused_variable_warning(pFMODGetDSPDescription);
+    LE::Utility::ignoreUnused(dummy);
+    LE::Utility::ignoreUnused(pFMODGetDSPDescription);
 #endif
 #endif // LE_SW_FMOD_SHARED_BUILD && !HAS_FRIEND_INJECTION
 }
@@ -72,7 +74,7 @@ LE_NOTHROW void Plugin<Impl, Protocol::FMOD>::getParameterValueString(unsigned i
     if (pBuffer)
     {
 #if defined(LE_SW_PURE_FMOD) && !defined(_DEBUG)
-        boost::ignore_unused_variable_warning(index);
+        LE::Utility::ignoreUnused(index);
         LE_TRACE("FMOD requested parameter value printing in a low-level-only build.");
         pBuffer[0] = 0;
 #else
@@ -80,7 +82,7 @@ LE_NOTHROW void Plugin<Impl, Protocol::FMOD>::getParameterValueString(unsigned i
         pBuffer[15] = 0; //...mrmlj...
         impl().getParameterDisplay(ParameterIndex(index),
                                    *reinterpret_cast<ParameterStringBuf *>(pBuffer), nullptr);
-        BOOST_ASSERT(std::strlen(pBuffer) < 16);
+        LE_ASSERT(std::strlen(pBuffer) < 16);
 #endif // LE_SW_PURE_FMOD
     }
 }
@@ -100,18 +102,18 @@ template <class Impl>
 LE_NOTHROW FMOD_RESULT F_CALLBACK
 Plugin<Impl, Protocol::FMOD>::create(FMOD_DSP_STATE *LE_RESTRICT const pDSP)
 {
-    BOOST_ASSERT(pDSP);
-    BOOST_ASSERT(pDSP->instance);
-    BOOST_ASSERT(pDSP->callbacks);
-    BOOST_ASSERT(pDSP->sidechaindata == nullptr);
-    BOOST_ASSERT(pDSP->sidechainchannels == 0);
+    LE_ASSERT(pDSP);
+    LE_ASSERT(pDSP->instance);
+    LE_ASSERT(pDSP->callbacks);
+    LE_ASSERT(pDSP->sidechaindata == nullptr);
+    LE_ASSERT(pDSP->sidechainchannels == 0);
 
     int samplerate;
     unsigned int blockSize;
     {
         FMOD_DSP_STATE_SYSTEMCALLBACKS const &callbacks(*pDSP->callbacks);
-        BOOST_VERIFY(callbacks.getsamplerate(pDSP, &samplerate) == FMOD_OK);
-        BOOST_VERIFY(callbacks.getblocksize(pDSP, &blockSize) == FMOD_OK);
+        LE_VERIFY(callbacks.getsamplerate(pDSP, &samplerate) == FMOD_OK);
+        LE_VERIFY(callbacks.getblocksize(pDSP, &blockSize) == FMOD_OK);
         Detail::setMemoryCallbacks(callbacks);
     }
 
@@ -156,8 +158,8 @@ LE_NOTHROW FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::read(
 
     LE_ASSUME(inChannels == *pOutChannels);
 
-    BOOST_ASSERT_MSG(length <= impl.processBlockSize(),
-                     "FMOD changed maximum processing block size in the middle of processing.");
+    LE_ASSERT_MSG(length <= impl.processBlockSize(),
+                  "FMOD changed maximum processing block size in the middle of processing.");
 
     //pDSP->channelmask        == FMOD_CHANNELMASK_STEREO
     //pDSP->source_speakermode == FMOD_SPEAKERMODE_STEREO
@@ -202,7 +204,7 @@ template <typename T>
 LE_NOTHROW FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::getParameter(
     FMOD_DSP_STATE *const pDSP, int const index, T *const pValue, char *const pValueString)
 {
-    BOOST_ASSERT(pValue);
+    LE_ASSERT(pValue);
     Impl &effect(impl(pDSP));
     *pValue = /*...mrmlj...*/ Math::convert<T>(effect.getParameter(ParameterIndex(index)));
     effect.getParameterValueString(index, pValueString);
@@ -214,10 +216,10 @@ LE_NOTHROW FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::getParameter(
     FMOD_DSP_STATE *const pDSP, int const index, void **const data, unsigned int *const length,
     char *const pValueString)
 {
-    boost::ignore_unused_variable_warning(pDSP && index && pValueString);
-    BOOST_ASSERT_MSG(index == Impl::maxNumberOfParameters, "Unexpected index for data parameter");
-    BOOST_ASSERT_MSG(!pValueString,
-                     "FMOD requested parameter value printing for the side chain parameter.");
+    LE::Utility::ignoreUnused(pDSP && index && pValueString);
+    LE_ASSERT_MSG(index == Impl::maxNumberOfParameters, "Unexpected index for data parameter");
+    LE_ASSERT_MSG(!pValueString,
+                  "FMOD requested parameter value printing for the side chain parameter.");
     static FMOD_DSP_PARAMETER_SIDECHAIN const parameter = {true};
     *data = &const_cast<FMOD_DSP_PARAMETER_SIDECHAIN &>(parameter);
     *length = sizeof(parameter);
@@ -244,7 +246,7 @@ template <class Impl>
 LE_NOTHROW FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::setParameter(
     FMOD_DSP_STATE *const pDSP, int const index, void *const data, unsigned int const length)
 {
-    boost::ignore_unused_variable_warning(pDSP && index && data && length);
+    LE::Utility::ignoreUnused(pDSP && index && data && length);
     return FMOD_ERR_UNIMPLEMENTED;
 }
 
@@ -266,8 +268,8 @@ LE_NOTHROW FMOD_DSP_DESCRIPTION *Plugin<Impl, Protocol::FMOD>::getDescription()
 
     std::uint16_t const numberOfParameters(Impl::maxNumberOfParameters +
                                            useSideChain /*side chain specification parameter*/);
-    typedef boost::array<ParameterInformation, numberOfParameters> ParameterDescriptions;
-    typedef boost::array<FMOD_DSP_PARAMETER_DESC const *, numberOfParameters>
+    typedef std::array<ParameterInformation, numberOfParameters> ParameterDescriptions;
+    typedef std::array<FMOD_DSP_PARAMETER_DESC const *, numberOfParameters>
         ParameterDescriptionPointers;
 
     static ParameterDescriptions parameterDescriptions;
@@ -317,7 +319,7 @@ LE_NOTHROW FMOD_DSP_DESCRIPTION *Plugin<Impl, Protocol::FMOD>::getDescription()
         std::strncpy(description.name, Impl::name, _countof(description.name) - 1);
 
         ParameterIndex index(0);
-        for (auto const &parameterInfo : boost::make_iterator_range(
+        for (auto const &parameterInfo : LE::Utility::makeSpan(
                  parameterDescriptions.begin(), parameterDescriptions.end() - useSideChain))
         {
             Impl::getParameterProperties(
@@ -355,12 +357,12 @@ LE_NOTHROW FMOD_DSP_DESCRIPTION *Plugin<Impl, Protocol::FMOD>::getDescription()
             ParameterInformation &parameterInfo(const_cast<ParameterInformation &>(parameterInfo));
 #endif // _MSC_VER
             ParameterInformation const *const pDulpicateParameter(std::find_if(
-                &parameterInfo + 1, boost::end(parameterDescriptions),
+                &parameterInfo + 1, std::end(parameterDescriptions),
                 [&](ParameterInformation &info) mutable {
                     return std::strcmp(*info.nameBuffer(), *parameterInfo.nameBuffer()) == 0;
                 }));
-            BOOST_ASSERT_MSG(pDulpicateParameter == boost::end(parameterDescriptions),
-                             "Duplicate parameter name generated.");
+            LE_ASSERT_MSG(pDulpicateParameter == std::end(parameterDescriptions),
+                          "Duplicate parameter name generated.");
         }
 #endif // _DEBUG
     }

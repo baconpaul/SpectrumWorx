@@ -156,7 +156,7 @@ bool ModuleMenuHolder::isOwnerOfEntry(unsigned int const menuEntryID) const
 
 std::uint8_t ModuleMenuHolder::effectIndexForEntry(unsigned int const menuEntryID) const
 {
-    BOOST_ASSERT(isOwnerOfEntry(menuEntryID));
+    LE_ASSERT(isOwnerOfEntry(menuEntryID));
     return static_cast<std::uint8_t>(menuEntryID);
 }
 

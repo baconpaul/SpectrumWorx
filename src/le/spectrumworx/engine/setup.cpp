@@ -95,11 +95,11 @@ std::uint16_t Setup::numberOfBins() const
 
 std::uint16_t Setup::normalisedFrequencyToBin(float const normalisedFrequency) const
 {
-    BOOST_ASSERT_MSG(Math::isNormalisedValue(normalisedFrequency), "Frequency out of range.");
+    LE_ASSERT_MSG(Math::isNormalisedValue(normalisedFrequency), "Frequency out of range.");
     auto const result(Math::convert<std::uint16_t>(normalisedFrequency * fftSize<float>() / 2));
-    BOOST_ASSERT_MSG(result ==
-                         Math::convert<std::uint16_t>(normalisedFrequency * (numberOfBins() - 1)),
-                     "Frequency-bin calculation bug.");
+    LE_ASSERT_MSG(result ==
+                      Math::convert<std::uint16_t>(normalisedFrequency * (numberOfBins() - 1)),
+                  "Frequency-bin calculation bug.");
     return result;
 }
 
@@ -132,23 +132,23 @@ std::uint16_t Setup::frequencyPercentageToBin(float const percentage) const
 
 std::uint16_t Setup::frequencyPercentageToBin(std::uint8_t const percentage) const
 {
-    BOOST_ASSERT_MSG(percentage >= 0 && percentage <= 100, "Percentage value out of range.");
+    LE_ASSERT_MSG(percentage >= 0 && percentage <= 100, "Percentage value out of range.");
     auto const result(fftSize<unsigned int>() * percentage / 100 / 2);
-    BOOST_ASSERT_MSG(result == unsigned(percentage * (numberOfBins() - 1) / 100),
-                     "Percentage-bin calculation bug.");
+    LE_ASSERT_MSG(result == unsigned(percentage * (numberOfBins() - 1) / 100),
+                  "Percentage-bin calculation bug.");
     return static_cast<std::uint16_t>(result);
 }
 
 std::uint16_t Setup::frequencyInHzToBin(std::uint32_t const frequency) const
 {
     auto const maximumFrequency(sampleRate<unsigned int>() / 2);
-    BOOST_ASSERT_MSG(frequency <= maximumFrequency, "Frequency out of range.");
+    LE_ASSERT_MSG(frequency <= maximumFrequency, "Frequency out of range.");
     return static_cast<std::uint16_t>((numberOfBins() - 1) * frequency / maximumFrequency);
 }
 
 float Setup::normalisedFrequencyToHz(float const normalisedFrequency) const
 {
-    BOOST_ASSERT_MSG(Math::isNormalisedValue(normalisedFrequency), "Frequency out of range.");
+    LE_ASSERT_MSG(Math::isNormalisedValue(normalisedFrequency), "Frequency out of range.");
     return normalisedFrequency * sampleRate<float>() / 2;
 }
 
@@ -167,7 +167,7 @@ std::uint16_t Setup::milliSecondsToSteps(std::uint16_t const milliSeconds) const
 {
     auto const result(Math::roundUpUnsignedIntegerDivision(
         milliSeconds * sampleRate<std::uint32_t>() / stepSize<std::uint16_t>(), 1000U));
-    BOOST_ASSERT_MSG(result <= (std::numeric_limits<std::uint16_t>::max)(), "Step overflow");
+    LE_ASSERT_MSG(result <= (std::numeric_limits<std::uint16_t>::max)(), "Step overflow");
     return result;
 }
 
@@ -208,32 +208,32 @@ float Setup::latencyInMilliseconds() const
 
 void Setup::setWindowFunction(Window const window)
 {
-    BOOST_ASSERT_MSG(window >= 0, "Unknown window.");
-    BOOST_ASSERT_MSG(window < Constants::NumberOfWindows, "Unknown window.");
+    LE_ASSERT_MSG(window >= 0, "Unknown window.");
+    LE_ASSERT_MSG(window < Constants::NumberOfWindows, "Unknown window.");
     windowFunction_ = window;
 }
 
 void Setup::setNumberOfChannels(std::uint8_t const numberOfMainChannels,
                                 std::uint8_t const numberOfSideChannels)
 {
-    BOOST_ASSERT_MSG(numberOfSideChannels <= numberOfMainChannels, "Too many side channel inputs.");
+    LE_ASSERT_MSG(numberOfSideChannels <= numberOfMainChannels, "Too many side channel inputs.");
     numberOfChannels_ = numberOfMainChannels;
     numberOfSideChannels_ = numberOfSideChannels;
 }
 
 void Setup::updateMaximumAmplitude()
 {
-    BOOST_ASSERT_MSG(Engine::FFTSize::isValidValue(
-                         static_cast<std::uint16_t>(static_cast<unsigned int>(fftSize_))),
-                     "Invalid FFT size.");
+    LE_ASSERT_MSG(Engine::FFTSize::isValidValue(
+                      static_cast<std::uint16_t>(static_cast<unsigned int>(fftSize_))),
+                  "Invalid FFT size.");
     maximumAmplitude_ = Math::FFT_float_real_1D::maximumAmplitude(fftSize<float>());
 }
 
 void Setup::verifyOverlapFactor()
 {
-    BOOST_ASSERT_MSG(Engine::OverlapFactor::isValidValue(
-                         static_cast<std::uint8_t>(static_cast<unsigned int>(overlappingFactor_))),
-                     "Invalid overlap factor.");
+    LE_ASSERT_MSG(Engine::OverlapFactor::isValidValue(
+                      static_cast<std::uint8_t>(static_cast<unsigned int>(overlappingFactor_))),
+                  "Invalid overlap factor.");
 }
 
 //------------------------------------------------------------------------------

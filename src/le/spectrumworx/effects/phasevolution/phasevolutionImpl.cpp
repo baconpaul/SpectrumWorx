@@ -16,7 +16,7 @@
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 
-#include "boost/assert.hpp"
+#include "le/utility/assert.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -80,7 +80,7 @@ void PhasevolutionImpl::process(ChannelState &cs, Engine::ChannelData_AmPh data,
     for (auto &phase : data.phases())
     {
         phase = modulo(phase + phaseShift, twoPi);
-        BOOST_ASSERT(phase >= -twoPi && phase <= twoPi);
+        LE_ASSERT(phase >= -twoPi && phase <= twoPi);
     }
 }
 
