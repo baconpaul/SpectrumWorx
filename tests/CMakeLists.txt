@@ -8,6 +8,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 add_executable(sw-tests
+        clap/pluginTests.cpp
         effects/effectsListTests.cpp
         goldens/engineHarness.cpp
         goldens/goldenDigest.cpp
@@ -20,7 +21,10 @@ add_executable(sw-tests
         utility/spanTests.cpp
 )
 
-target_link_libraries(sw-tests PRIVATE sw-dsp sw-gui-resources Catch2::Catch2WithMain)
+# sw-impl brings sw-dsp with it, and brings the CLAP entry point the plugin
+# tests drive. No dlopen: the tests link the same static library the .clap
+# bundle does, so what they exercise is what ships.
+target_link_libraries(sw-tests PRIVATE sw-impl sw-gui-resources Catch2::Catch2WithMain)
 
 # \note LE_CHECKED_BUILD is deliberately *not* forced here. It decides whether
 # NDEBUG survives, and forcing it on for the test objects only would leave them
@@ -29,5 +33,9 @@ target_link_libraries(sw-tests PRIVATE sw-dsp sw-gui-resources Catch2::Catch2Wit
 # ~1200 asserts, Release renders the goldens at shipping speed.
 target_compile_definitions(sw-tests PRIVATE
         SW_GOLDEN_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/goldens/data")
+
+# So that clap/ can reach goldens/engineHarness.hpp: the CLAP-side tests need an
+# instantiable SpectrumWorxCore, and that is exactly what the golden harness is.
+target_include_directories(sw-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 catch_discover_tests(sw-tests)

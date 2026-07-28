@@ -25,6 +25,8 @@
 #ifndef stubParameters_hpp__0B7E4C31_59A8_42F6_8D1C_A46E93B0F572
 #define stubParameters_hpp__0B7E4C31_59A8_42F6_8D1C_A46E93B0F572
 //------------------------------------------------------------------------------
+#include "core/automatedModuleChain.hpp" // noModule
+
 #include <clap/clap.h>
 
 #include <array>
@@ -96,8 +98,9 @@ struct FakeEffect
     std::array<char const *, Skeleton::parametersPerModule> parameterNames;
 };
 
-/// -1 is an empty slot, matching AutomatedModuleChain's Minimum<noModule>.
-inline constexpr std::int8_t noModule{-1};
+/// \note This used to carry its own `noModule`, mirroring AutomatedModuleChain's
+/// Minimum<noModule> back when the skeleton could not see the engine. Now that
+/// it can, the real one is in scope and a second definition is an ODR error.
 
 std::vector<FakeEffect> const &fakeEffects();
 

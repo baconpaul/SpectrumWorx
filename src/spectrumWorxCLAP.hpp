@@ -21,6 +21,9 @@
 //------------------------------------------------------------------------------
 #include "stubParameters.hpp"
 
+#include "core/automatedModuleChain.hpp"
+#include "core/spectrumWorxCore.hpp"
+
 #include <clap/helpers/plugin.hh>
 #include <sst/clap_juce_shim/clap_juce_shim.h>
 
@@ -40,7 +43,13 @@ static constexpr auto checkingLevel = clap::helpers::CheckingLevel::Maximal;
 
 using PluginHelper = clap::helpers::Plugin<misbehaviourLevel, checkingLevel>;
 
-class SpectrumWorxCLAP final : public PluginHelper, public sst::clap_juce_shim::EditorProvider
+/// \note SpectrumWorxCore's constructor is protected and Engine::Processor
+/// downcasts to it, so the engine cannot exist except as a base of something.
+/// SpectrumWorxSharedImpl is what does that in the finished design; until the
+/// protocol template layer of 5.2/5.3 lands, this class is that something.
+class SpectrumWorxCLAP final : public PluginHelper,
+                               public sst::clap_juce_shim::EditorProvider,
+                               public SpectrumWorxCore
 {
   public:
     explicit SpectrumWorxCLAP(clap_host const *);
@@ -84,9 +93,10 @@ class SpectrumWorxCLAP final : public PluginHelper, public sst::clap_juce_shim::
     bool stateSave(clap_ostream const *) noexcept override;
     bool stateLoad(clap_istream const *) noexcept override;
 
-    // clap_plugin_latency - always zero until the STFT engine lands in stage 3.
+    // clap_plugin_latency. Cached at activate(): engineSetup() asserts that the
+    // setup is current, and the host may ask at any time.
     bool implementsLatency() const noexcept override { return true; }
-    std::uint32_t latencyGet() const noexcept override { return 0; }
+    std::uint32_t latencyGet() const noexcept override { return latencyInSamples_; }
 
     // clap_plugin_gui, entirely by way of the shim
     bool implementsGui() const noexcept override { return clapJuceShim_ != nullptr; }
@@ -106,7 +116,15 @@ class SpectrumWorxCLAP final : public PluginHelper, public sst::clap_juce_shim::
     /// Emits param value events for slot selectors the editor moved.
     void flushUIEdits(clap_output_events const *);
 
+    /// Feeds the engine the sidechain port when the host has one connected, and
+    /// the main input otherwise -- the engine reads a side channel whenever the
+    /// current input mode calls for one and does not check that it is real.
+    void runEngine(clap_process const *) noexcept;
+
     StubParameters parameters_;
+
+    /// The engine's own; SpectrumWorxCore only holds a pointer.
+    Program program_;
 
     std::unique_ptr<sst::clap_juce_shim::ClapJuceShim> clapJuceShim_;
 
@@ -114,6 +132,8 @@ class SpectrumWorxCLAP final : public PluginHelper, public sst::clap_juce_shim::
     std::atomic<std::uint32_t> uiEditedSlots_{0};
 
     double sampleRate_{0};
+    std::uint32_t latencyInSamples_{0};
+    bool engineRunning_{false};
 }; // class SpectrumWorxCLAP
 
 //------------------------------------------------------------------------------

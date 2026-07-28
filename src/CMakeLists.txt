@@ -15,6 +15,13 @@ add_library(sw-impl STATIC
         stubEditor.cpp
         swClapEntryImpl.cpp
         clapHelpersInstantiation.cpp
+
+        # The host-facing half of the core. Deliberately not in sw-dsp: these
+        # are what a plugin format talks to, and the golden tests must not need
+        # them. plugin2Host.cpp holds the real parameter enumeration -- the
+        # statics over Program const* that clap_plugin_params is made of.
+        core/host_interop/host2Plugin.cpp
+        core/host_interop/plugin2Host.cpp
 )
 
 target_include_directories(sw-impl PUBLIC .)
@@ -22,6 +29,16 @@ target_include_directories(sw-impl PUBLIC .)
 # PUBLIC: the per-format entry stubs compile against sw-impl's interface only,
 # and they include <clap/clap.h>.
 target_link_libraries(sw-impl PUBLIC clap)
+
+# The engine. PUBLIC because spectrumWorxCLAP.hpp derives from SpectrumWorxCore
+# and holds a Program by value, and because sw-dsp carries the force-include and
+# LE_SW_GUI=0 that every one of its headers assumes.
+#
+# \note LE_SW_GUI=0 is what makes SpectrumWorxCore's Module typedef ModuleDSP
+# rather than ModuleDSPAndGUI. Hosting the real editor means building the core
+# with LE_SW_GUI=1, which is a second configuration of sw-dsp, not a flag on
+# this target -- see the note in doc/tech/implementation_sequence.md.
+target_link_libraries(sw-impl PUBLIC sw-dsp)
 
 target_link_libraries(sw-impl PRIVATE
         clap-helpers

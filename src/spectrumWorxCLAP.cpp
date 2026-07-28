@@ -11,6 +11,13 @@
 #include "spectrumWorxCLAP.hpp"
 #include "stubEditor.hpp"
 
+#include "core/modules/factory.hpp"
+// \note Order matters and is not alphabetical: finalImplementations.hpp defines
+// ModuleDSP::Impl<> and needs ModuleDSP complete. factory.cpp includes them in
+// this order for the same reason.
+#include "core/modules/moduleDSP.hpp"
+#include "core/modules/finalImplementations.hpp"
+
 #include <sst/plugininfra/version_information.h>
 
 #include <algorithm>
@@ -82,6 +89,8 @@ clap_plugin const *createPlugin(clap_host const *const host)
 
 SpectrumWorxCLAP::SpectrumWorxCLAP(clap_host const *const host) : PluginHelper(descriptor(), host)
 {
+    setProgram(program_);
+
     clapJuceShim_ = std::make_unique<sst::clap_juce_shim::ClapJuceShim>(this);
     clapJuceShim_->setResizable(false);
 }
@@ -90,15 +99,44 @@ SpectrumWorxCLAP::~SpectrumWorxCLAP() = default;
 
 bool SpectrumWorxCLAP::init() noexcept { return true; }
 
-bool SpectrumWorxCLAP::activate(double const sampleRate, std::uint32_t, std::uint32_t) noexcept
+bool SpectrumWorxCLAP::activate(double const sampleRate, std::uint32_t,
+                                std::uint32_t const maxFrames) noexcept
 {
     sampleRate_ = sampleRate;
+
+    // Stereo in, stereo out. Anything else waits for 5.7 and the input-mode
+    // parameter; the engine supports far more, the port list above does not.
+    setNumberOfChannels(2, 2);
+    setSampleRate(static_cast<float>(sampleRate));
+
+    // The host promises never to exceed maxFrames, and SpectrumWorxCore asserts
+    // exactly that against its own buffers. A shorter final block is fine.
+    setBlockSize(maxFrames);
+
+    if (!initialise())
+        return false;
+
+    resume();
+    engineRunning_ = true;
+    latencyInSamples_ = engineSetup().latencyInSamples();
     return true;
 }
 
-void SpectrumWorxCLAP::deactivate() noexcept { sampleRate_ = 0; }
+void SpectrumWorxCLAP::deactivate() noexcept
+{
+    if (engineRunning_)
+    {
+        suspend();
+        engineRunning_ = false;
+    }
+    sampleRate_ = 0;
+}
 
-void SpectrumWorxCLAP::reset() noexcept {}
+void SpectrumWorxCLAP::reset() noexcept
+{
+    if (engineRunning_)
+        SpectrumWorxCore::reset();
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Audio ports
@@ -115,13 +153,17 @@ bool SpectrumWorxCLAP::audioPortsInfo(std::uint32_t const index, bool const isIn
     std::memset(info, 0, sizeof(*info));
     info->channel_count = 2;
     info->port_type = CLAP_PORT_STEREO;
+    /// \note Deliberately never an in-place pair. With an input gain of exactly
+    /// one SpectrumWorxCore hands the host's own input pointers straight to
+    /// Engine::Processor::process, and the WOLA path has not been audited for
+    /// aliasing input and output. Revisit under 5.7 with a test, not by
+    /// inspection.
     info->in_place_pair = CLAP_INVALID_ID;
 
     if (isInput && index == 0)
     {
         info->id = mainInputPort;
         info->flags = CLAP_AUDIO_PORT_IS_MAIN;
-        info->in_place_pair = mainOutputPort;
         std::strncpy(info->name, "Main In", CLAP_NAME_SIZE - 1);
         return true;
     }
@@ -136,7 +178,6 @@ bool SpectrumWorxCLAP::audioPortsInfo(std::uint32_t const index, bool const isIn
     {
         info->id = mainOutputPort;
         info->flags = CLAP_AUDIO_PORT_IS_MAIN;
-        info->in_place_pair = mainInputPort;
         std::strncpy(info->name, "Main Out", CLAP_NAME_SIZE - 1);
         return true;
     }
@@ -233,26 +274,42 @@ clap_process_status SpectrumWorxCLAP::process(clap_process const *const process)
     if (process->out_events)
         flushUIEdits(process->out_events);
 
-    // Stage 1 passes audio through untouched; the engine lands in stage 3.
-    if (process->audio_inputs_count > 0 && process->audio_outputs_count > 0)
-    {
-        auto const &input(process->audio_inputs[0]);
-        auto &output(process->audio_outputs[0]);
-        auto const channels(std::min(input.channel_count, output.channel_count));
-        for (std::uint32_t channel(0); channel < channels; ++channel)
-        {
-            if (!input.data32 || !output.data32)
-                break;
-            if (input.data32[channel] != output.data32[channel])
-                std::memcpy(output.data32[channel], input.data32[channel],
-                            process->frames_count * sizeof(float));
-        }
-        for (std::uint32_t channel(channels); channel < output.channel_count; ++channel)
-            if (output.data32)
-                std::memset(output.data32[channel], 0, process->frames_count * sizeof(float));
-    }
+    runEngine(process);
 
     return CLAP_PROCESS_CONTINUE;
+}
+
+void SpectrumWorxCLAP::runEngine(clap_process const *const process) noexcept
+{
+    if ((process->audio_inputs_count == 0) || (process->audio_outputs_count == 0))
+        return;
+
+    auto const &input(process->audio_inputs[0]);
+    auto &output(process->audio_outputs[0]);
+    if (!input.data32 || !output.data32)
+        return; // 64 bit hosts get silence rather than a crash until 5.7.
+
+    auto const channels(engineSetup().numberOfChannels());
+    if ((input.channel_count < channels) || (output.channel_count < channels))
+        return;
+
+    // The engine reads a side channel whenever the input mode calls for one, and
+    // does not check that the host actually connected the port.
+    auto const *const sideChannels(
+        ((process->audio_inputs_count > 1) && process->audio_inputs[1].data32)
+            ? process->audio_inputs[1].data32
+            : input.data32);
+
+    if (!engineRunning_)
+        return;
+
+    SpectrumWorxCore::process(input.data32, sideChannels, output.data32, 1.0f,
+                              process->frames_count);
+
+    // Ports beyond what the engine is configured for are the host's to see as
+    // silence, not as whatever was in the buffer.
+    for (std::uint32_t channel(channels); channel < output.channel_count; ++channel)
+        std::memset(output.data32[channel], 0, process->frames_count * sizeof(float));
 }
 
 void SpectrumWorxCLAP::onMainThread() noexcept
