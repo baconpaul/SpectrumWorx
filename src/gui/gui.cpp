@@ -102,7 +102,8 @@ ReferenceCountedGUIInitializationGuard::ReferenceCountedGUIInitializationGuard()
         {
             juce::initialiseJuce_GUI();
             juce::MessageManager::getInstance()->setCurrentThreadAsMessageThread();
-            juce::Desktop::create();
+            // juce::Desktop::create() is gone; initialiseJuce_GUI owns the
+            // Desktop's lifetime in JUCE 8 and its constructor is private.
             onGUIInitialization();
             juce::LookAndFeel::setDefaultLookAndFeel(&Theme::singleton());
         }
@@ -146,14 +147,17 @@ ReferenceCountedGUIInitializationGuard::~ReferenceCountedGUIInitializationGuard(
             // destroyed (so it thinks it is still running even though its
             // parent juce::InternalTimerThread has been destroyed).
             //                                (15.12.2011.) (Domagoj Saric)
+            // \note The stopTimer() that followed is unreachable in JUCE 8 --
+            // ComponentAnimator inherits Timer privately -- and the
+            // InternalTimerThread it was defending against no longer exists.
+            //                                (28.07.2026.) (SW port)
             juce::Desktop::getInstance().getAnimator().cancelAllAnimations(false);
-            juce::Desktop::getInstance().getAnimator().stopTimer();
 #if defined(_WIN32)
             LE_ASSERT(juce::Process::getCurrentModuleInstanceHandle() == &__ImageBase);
 #endif // _WIN32
+            // Desktop::destroy() and MessageManager::destroySingleton() are
+            // both gone; shutdownJuce_GUI() does both.
             juce::shutdownJuce_GUI();
-            juce::Desktop::destroy();
-            juce::MessageManager::destroySingleton();
 
             LE_ASSERT(guiInitializationReferenceCount == 0);
         }
@@ -434,17 +438,17 @@ bool initializePaths()
 }
 #endif // LE_SW_FMOD
 
-bool havePathsBeenInitialised() { return pluginRootPath != juce::File::nonexistent; }
+bool havePathsBeenInitialised() { return pluginRootPath != juce::File(); }
 
 juce::File const &rootPath()
 {
-    LE_ASSERT_MSG((pluginRootPath != juce::File::nonexistent), "Not initialized.");
+    LE_ASSERT_MSG((pluginRootPath != juce::File()), "Not initialized.");
     return pluginRootPath;
 }
 
 juce::File &presetsFolder()
 {
-    LE_ASSERT_MSG((mruPresetsFolder != juce::File::nonexistent), "Not initialized.");
+    LE_ASSERT_MSG((mruPresetsFolder != juce::File()), "Not initialized.");
     return mruPresetsFolder;
 }
 
@@ -1033,7 +1037,7 @@ BitmapButton::BitmapButton(juce::Component &parent, juce::Image const &on, juce:
               off,                   // normalImage
               normalOpacity(),       // imageOpacityWhenNormal,
               normalOverlay(),       // overlayColourWhenNormal,
-              juce::Image::null,     // overImage,
+              juce::Image(),         // overImage,
               overOpacity(),         // imageOpacityWhenOver,
               overlayColourWhenOver, // overlayColourWhenOver,
               on,                    // downImage,
@@ -1491,7 +1495,9 @@ void Knob::startedDragging() noexcept
         return;
 
     LE_ASSERT(juce::Desktop::getInstance().getNumMouseSources() == 1);
-    juce::MouseInputSource &mouseSource(juce::Desktop::getInstance().getMainMouseSource());
+    // \note By value: getMainMouseSource() returns a prvalue in JUCE 8, and
+    // enableUnboundedMouseMovement() is const, so a copy does the same work.
+    auto mouseSource(juce::Desktop::getInstance().getMainMouseSource());
     LE_ASSERT((juce::Desktop::getInstance().getDraggingMouseSource(0) ==
                nullptr) || //...mrmlj...double click...
               (juce::Desktop::getInstance().getDraggingMouseSource(0) == &mouseSource));
@@ -1517,10 +1523,10 @@ void Knob::stoppedDragging() noexcept
     //juce::Desktop::setMousePosition( this->localPointToGlobal( this->getBounds().getCentre() ) );
 }
 
-void Knob::removeValueListeners(juce::Slider &slider, juce::ValueListener &valueListener)
+void Knob::removeValueListeners(juce::Slider &slider, juce::Value::Listener &valueListener)
 {
     //...mrmlj...Slider::valueListener() is protected so we cannot access it here...
-    //juce::ValueListener & valueListener( slider.valueListener() );
+    //juce::Value::Listener & valueListener( slider.valueListener() );
     LE_ASSUME(&valueListener);
     slider.getValueObject().removeListener(&valueListener);
     slider.getMinValueObject().removeListener(&valueListener);
@@ -1785,7 +1791,6 @@ bool shouldUpdateLFOControl(ModuleControlBase const &control)
            (lfoUpdateBehaviour == Theme::WhenControlSelected &&
             Detail::hasDirectFocus(control.widget()));
 }
-
 
 namespace
 {

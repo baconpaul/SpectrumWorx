@@ -45,7 +45,7 @@ void addModuleToMenuEntry(Menu &menu, std::uint8_t const moduleIndex)
 #ifdef LE_SW_FULL
     LE_ASSUME(moduleEnabled == true);
 #endif // LE_SW_FULL
-    menu.addItem(menuEntryID, moduleName, juce::Image::null, moduleEnabled);
+    menu.addItem(menuEntryID, moduleName, juce::Image(), moduleEnabled);
 }
 
 template <unsigned int moduleIndex, unsigned int subMenuIndex>

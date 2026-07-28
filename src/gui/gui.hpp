@@ -265,8 +265,8 @@ bool isParentOf(juce::Component const &parent, juce::Component const *pPossibleC
 template <class BaseComponent = juce::Component> class LE_NOVTABLE WidgetBase : public BaseComponent
 {
   protected:
-    WidgetBase() : BaseComponent(juce::String::empty) {}
-    LE_NOINLINE WidgetBase(char const *const componentName) : BaseComponent(juce::String::empty)
+    WidgetBase() : BaseComponent(juce::String()) {}
+    LE_NOINLINE WidgetBase(char const *const componentName) : BaseComponent(juce::String())
     {
         setName(componentName);
     }
@@ -616,7 +616,7 @@ class PopupMenu
     PopupMenu();
     ~PopupMenu() {}
 
-    void addItem(ItemID, char const *newItemText, juce::Image const &icon = juce::Image::null,
+    void addItem(ItemID, char const *newItemText, juce::Image const &icon = juce::Image(),
                  bool enabled = true);
     void addSubMenu(PopupMenu &, char const *name);
     void addSectionHeader(char const *title);
@@ -818,7 +818,7 @@ class LE_NOVTABLE Knob : public WidgetBase<juce::Slider>
          unsigned int yMargin);
 
   public:
-    static void removeValueListeners(juce::Slider &, juce::ValueListener &);
+    static void removeValueListeners(juce::Slider &, juce::Value::Listener &);
 
   protected:
 #ifdef __clang__

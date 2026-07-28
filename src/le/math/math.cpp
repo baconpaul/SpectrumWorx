@@ -979,14 +979,10 @@ LE_IMPL_NAMESPACE_END(Math)
 } // namespace LE
 //------------------------------------------------------------------------------
 
-#if LE_SW_GUI
-namespace juce
-{
-float jmin(float const &value1, float const &value2) { return std::min(value1, value2); }
-float jmax(float const &value1, float const &value2) { return std::max(value1, value2); }
-float jlimit(float const &lowerLimit, float const &upperLimit, float const &valueToConstrain)
-{
-    return LE::Math::clamp(valueToConstrain, lowerLimit, upperLimit);
-}
-} // namespace juce
-#endif // LE_SW_GUI
+/// \note Non-template juce::jmin / jmax / jlimit overloads for float lived
+/// here, under LE_SW_GUI, so that the GUI's uses picked these up instead of
+/// the patched fork's. JUCE 8 declares all three as constexpr templates in
+/// juce_MathsFunctions.h, which does the same thing at least as well and does
+/// not need a definition in someone else's namespace. Redefining them is an
+/// ODR hazard for no gain.
+///                                       (28.07.2026.) (SW port)

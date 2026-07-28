@@ -429,7 +429,7 @@ class SpectrumWorxEditor
     /// \class LFODisplay
     ////////////////////////////////////////////////////////////////////////////
 
-    class LFODisplay : public WidgetBase, private juce::ButtonListener, private juce::SliderListener
+    class LFODisplay : public WidgetBase, private juce::Button::Listener, private juce::Slider::Listener
     {
       public: //...mrmlj...
         //class LE_NOVTABLE AsyncSlider : public WidgetBase<juce::Slider> { LE_IMPLEMENT_ASYNC_REPAINT };
@@ -547,8 +547,8 @@ class SpectrumWorxEditor
     ////////////////////////////////////////////////////////////////////////////
 
     class Settings : public juce::TabbedComponent,
-                     private juce::SliderListener,
-                     private juce::ButtonListener,
+                     private juce::Slider::Listener,
+                     private juce::Button::Listener,
                      public OwnedWindow<Settings>
     {
       public:

@@ -91,7 +91,7 @@ SpectrumWorx::~SpectrumWorx()
         try
         {
             savePreset(lastSessionPresetFile().getFullPathName(), currentSampleFile(),
-                       juce::String::empty, program());
+                       juce::String(), program());
         }
         catch (...)
         {
@@ -380,7 +380,7 @@ unsigned int SpectrumWorx::saveProgramState(std::uint8_t const programIndex, voi
                                             std::uint32_t const storageSize) const
 {
     unsigned int const bytesWritten(savePreset(static_cast<char *>(pStorage), currentSampleFile(),
-                                               juce::String::empty, programs()[programIndex]));
+                                               juce::String(), programs()[programIndex]));
     LE_ASSERT(bytesWritten < storageSize);
     LE::Utility::ignoreUnused(storageSize);
     return bytesWritten;
@@ -742,7 +742,7 @@ bool SpectrumWorx::setNewSampleWorker(juce::File const &newSampleFile)
         //...mrmlj...
         buffers().forceSideChannel(false);
 
-        succeeded = (newSampleFile == juce::File::nonexistent);
+        succeeded = (newSampleFile == juce::File());
     }
     return succeeded;
 }
@@ -792,7 +792,7 @@ void SpectrumWorx::sampleLoadingLoop()
     {
     }
 
-    pendingSampleToLoad_ = juce::File::nonexistent;
+    pendingSampleToLoad_ = juce::File();
 
     if (pListenerToNotifyWhenSampleLoaded_)
     {

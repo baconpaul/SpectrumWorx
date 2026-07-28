@@ -72,7 +72,7 @@ void Sample::clear()
 {
     data_.pBuffer.reset();
     //samplePosition_ = 0;
-    sampleFile_ = juce::File::nonexistent;
+    sampleFile_ = juce::File();
 }
 
 Sample::ChannelData Sample::channel(unsigned int const index) const

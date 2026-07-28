@@ -312,7 +312,7 @@ class ModuleUI
     final
 #endif // LE_SW_SEPARATED_DSP_GUI
     : public WidgetBase<>,
-      private juce::ButtonListener
+      private juce::Button::Listener
 {
   public:
     enum ParameterChangeSource

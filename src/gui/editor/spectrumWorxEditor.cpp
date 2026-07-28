@@ -411,7 +411,7 @@ void SpectrumWorxEditor::moduleDrag(ModuleUI &moduleUI, juce::MouseEvent const &
         gradient_.toFront(true);
         gradient_.setAlwaysOnTop(true);
 
-        startDragging(juce::var::null, &moduleUI);
+        startDragging(juce::var(), &moduleUI);
     }
 }
 
@@ -839,10 +839,10 @@ void SpectrumWorxEditor::savePreset(juce::File const &presetFile, bool const ign
 {
 #if LE_SW_SEPARATED_DSP_GUI
     LE_ASSUME(ignoreExternalSample);
-    SW::savePreset(presetFile, juce::File::nonexistent, comment, program());
+    SW::savePreset(presetFile, juce::File(), comment, program());
 #else
     SW::savePreset(presetFile,
-                   ignoreExternalSample ? juce::File::nonexistent : effect().currentSampleFile(),
+                   ignoreExternalSample ? juce::File() : effect().currentSampleFile(),
                    comment, program());
 #endif // LE_SW_SEPARATED_DSP_GUI
 }
@@ -871,7 +871,7 @@ void SpectrumWorxEditor::moduleActivated()
     if (!ModuleControlBase::activeControl())
     {
         setActiveControlName(module.description());
-        setActiveControlValue(juce::String::empty);
+        setActiveControlValue(juce::String());
     }
 
     /// \note
@@ -909,9 +909,9 @@ void SpectrumWorxEditor::moduleDeactivated()
 
     LE_ASSERT_MSG(!lfoDisplay_ || !lfoDisplay_->isEnabled(), "Module controls not deactivated.");
 
-    setActiveModuleName(juce::String::empty);
-    setActiveControlName(juce::String::empty);
-    setActiveControlValue(juce::String::empty);
+    setActiveModuleName(juce::String());
+    setActiveControlName(juce::String());
+    setActiveControlValue(juce::String());
 
     if (sharedModuleControls_)
     {
@@ -975,8 +975,8 @@ void SpectrumWorxEditor::moduleControlDectivated(ModuleControlBase const &contro
     LE::Utility::ignoreUnused(control);
 
     setActiveControlName(ModuleUI::selectedModule() ? ModuleUI::selectedModule()->description()
-                                                    : juce::String::empty);
-    setActiveControlValue(juce::String::empty);
+                                                    : juce::String());
+    setActiveControlValue(juce::String());
 
     if (lfoDisplay_)
     {
@@ -1797,14 +1797,14 @@ void SpectrumWorxEditor::SampleArea::mouseUp(juce::MouseEvent const &event)
     juce::ModifierKeys const mouseButtons(event.mods);
     if (mouseButtons.isRightButtonDown())
     {
-        editor.newSampleFileSelected(juce::File::nonexistent);
+        editor.newSampleFileSelected(juce::File());
     }
     else if (mouseButtons.isLeftButtonDown())
     {
         juce::FileChooser fileChooser(
             "Choose external audio file",
             //juce::File::getSpecialLocation( juce::File::userMusicDirectory ), //...mrmlj... for testing...
-            //juce::File::nonexistent,
+            //juce::File(),
             editor.effect().currentSampleFile(), Sample::supportedFormats(), true);
         if (fileChooser.browseForFileToOpen(0))
         {
@@ -2019,7 +2019,7 @@ void SpectrumWorxEditor::Settings::updateEnginePage()
     if ((inputModeValue == customInputMode) &&
         (inputMode_->numberOfItems() == SpectrumWorxCore::InputMode::numberOfDiscreteValues))
     {
-        inputMode_->addItem(customInputMode, "<custom>", juce::Image::null, false);
+        inputMode_->addItem(customInputMode, "<custom>", juce::Image(), false);
     }
     inputMode_->setValue(inputModeValue);
 #endif // LE_SW_ENGINE_INPUT_MODE
@@ -2103,7 +2103,7 @@ SpectrumWorxEditor::Settings::InterfacePage::InterfacePage()
     : BackgroundImage(resourceBitmap<SettingsIntrfcBg>()),
       opacityTitle_("Side window & menu opacity", xMargin + 7, yMargin + 3 * yStep + 15,
                     opacityWidth + 40, 16, juce::Justification::left),
-      globalOpacity_(juce::String::empty),
+      globalOpacity_(juce::String()),
       moduleUIMouseOverReaction_(*this, xMargin, yMargin + 0 * yStep, "Mouse over reaction"),
       lfoUpdateBehaviour_(*this, xMargin, yMargin + 1 * yStep, "LFO update behaviour"),
       loadLastSessionOnStartup_(*this, xMargin - 4, yMargin + 2 * yStep,
@@ -2251,7 +2251,7 @@ void SpectrumWorxEditor::Settings::buttonClicked(juce::Button *const pButton)
     {
         LE_VERIFY(juce::Process::openDocument(
             rootPath().getChildFile("Documents/User's Guide.PDF").getFullPathName(),
-            juce::String::empty));
+            juce::String()));
     }
 }
 

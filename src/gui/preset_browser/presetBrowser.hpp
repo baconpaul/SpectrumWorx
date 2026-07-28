@@ -35,8 +35,8 @@ class SpectrumWorxEditor;
 
 class PresetBrowser final : public BackgroundImage,
                             private juce::ListBoxModel,
-                            private juce::ButtonListener,
-                            private juce::TextEditorListener,
+                            private juce::Button::Listener,
+                            private juce::TextEditor::Listener,
                             public OwnedWindow<PresetBrowser>
 {
   public:

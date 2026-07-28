@@ -381,7 +381,7 @@ void PresetBrowser::textEditorFocusLost(juce::TextEditor &editor)
 ////////////////////////////////////////////////////////////////////////////////
 // Implementation note:
 //   Focus change monitoring and handling logic failed to work as desired
-// when a juce::TextEditorListener was used to 'listen' to the comment
+// when a juce::TextEditor::Listener was used to 'listen' to the comment
 // 'TextEditor' because JUCE sends notifications through listeners
 // asynchronously so a focus lost notification was received after the
 // ListBoxModel::selectedRowsChanged() notification was received when all

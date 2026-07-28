@@ -210,7 +210,7 @@ unsigned int Preset::saveTo(char *const pBuffer)
 {
 //...mrmlj...an ugly temporary way to verify that the header was set before saving...
 #ifndef NDEBUG
-    PresetHeader dummyHeader(juce::String::empty);
+    PresetHeader dummyHeader(juce::String());
     getHeader(dummyHeader);
 #endif // NDEBUG
     // Implementation note:
@@ -791,7 +791,7 @@ unsigned int savePreset(char *const data, juce::File const &externalSampleFile,
 
     boost::fusion::for_each(program.parameters(), parametersSaver);
 
-    if (externalSampleFile != juce::File::nonexistent)
+    if (externalSampleFile != juce::File())
     {
         /*  ...mrmlj...temporarily reverting to old code for the 2.1 release...
 
