@@ -107,7 +107,11 @@ using Storage = Utility::Storage;
 
 namespace Detail
 {
-std::uint16_t fftBufferSize(std::uint8_t a, std::uint8_t b, std::uint8_t c, std::uint8_t sizeoOfT,
+/// \note Returns *bytes*, and so is 32 bit: see the definition in
+/// channelDataAmPh.cpp for the truncation-to-zero this used to produce at the
+/// maximum FFT size.
+///                                           (29.07.2026.) (SW port)
+std::uint32_t fftBufferSize(std::uint8_t a, std::uint8_t b, std::uint8_t c, std::uint8_t sizeoOfT,
                             std::uint16_t fftSize);
 } // namespace Detail
 
@@ -117,7 +121,7 @@ class SharedStorageFFTBasedBuffer : public Utility::SharedStorageBuffer<T>
   public:
     SharedStorageFFTBasedBuffer() {}
 
-    LE_COLD static std::uint16_t requiredStorage(StorageFactors const &factors)
+    LE_COLD static std::uint32_t requiredStorage(StorageFactors const &factors)
     {
         auto const storageBytes(Engine::Detail::fftBufferSize(a, b, c, sizeof(T), factors.fftSize));
         return storageBytes;
@@ -145,7 +149,7 @@ template <typename T = real_t> struct DoubleFFTBuffer : SharedStorageFFTBasedBuf
 template <typename T = real_t> class WindowBuffer : public Utility::SharedStorageBuffer<T>
 {
   public:
-    LE_COLD static std::uint16_t requiredStorage(StorageFactors const &factors)
+    LE_COLD static std::uint32_t requiredStorage(StorageFactors const &factors)
     {
 #if LE_SW_ENGINE_WINDOW_PRESUM
         std::uint8_t const windowSizeFactor(factors.windowSizeFactor);
