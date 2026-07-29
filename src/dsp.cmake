@@ -175,6 +175,17 @@ target_link_libraries(sw-dsp PUBLIC juce::juce_gui_basics sw-gui-resources)
 # PresetParameters are compiled out and the goldens drive parameters directly.
 target_compile_definitions(sw-dsp PUBLIC LE_NO_PRESETS)
 
+# No external audio file as a side channel, for now. This is the *file* loader,
+# not the host's sidechain port -- that one is live and the CLAP feeds it. The
+# only macOS Sample::doLoad is external_audio/sampleMac.cpp over ExtAudioFile
+# and FSRef, neither of which builds against a current SDK. Stage 5.0 rewrites
+# it over juce::AudioFormatManager, ~50 lines, and this goes.
+#
+# PUBLIC, and next to LE_NO_PRESETS, for the same reason: both change the layout
+# of SpectrumWorxEditor, so every translation unit that sees the header has to
+# agree on them.
+target_compile_definitions(sw-dsp PUBLIC LE_SW_DISABLE_SIDE_CHANNEL)
+
 if (APPLE)
     # le/math/vector.cpp and le/math/dft/fft.cpp are vDSP/vForce on Apple.
     target_link_libraries(sw-dsp PUBLIC "-framework Accelerate")

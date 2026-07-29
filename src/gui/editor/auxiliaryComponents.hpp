@@ -38,10 +38,17 @@ class SharedModuleControls : public WidgetBase<>
     typedef ModuleControlImpl<ModuleKnob> Knob; //...mrmlj...are these logically "module knobs"?
 
   public:
-    class FrequencyRange final : public ModuleControlBase, public WidgetBase<juce::Slider>
+    class FrequencyRange final : public ModuleControlBase,
+                                 public WidgetBase<juce::Slider>,
+                                 public SliderWithSelectedThumb
     {
       public:
         FrequencyRange();
+
+        /// \note Which thumb this control currently stands for -- set by hover
+        /// as well as by dragging, which is why it is not
+        /// juce::Slider::getThumbBeingDragged(). See selectedThumb_.
+        int selectedThumb() const override { return selectedThumb_; }
 
       public: // module control traits
         typedef float value_type;
@@ -141,6 +148,11 @@ class SharedModuleControls : public WidgetBase<>
         ///                                   (12.02.2014.) (Domagoj Saric)
         std::uint8_t parameterIndexForInternalWriteAccess_;
         bool canUseWriteAccessIndex() const;
+
+        /// \note The 2016 code kept this in juce::Slider::sliderBeingDragged,
+        /// which was protected then and is private now -- and which JUCE clears
+        /// the moment a drag ends, whereas this must survive a hover. Ours.
+        int selectedThumb_;
     }; // class FrequencyRange
 
   public:

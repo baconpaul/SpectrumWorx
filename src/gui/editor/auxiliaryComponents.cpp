@@ -53,6 +53,11 @@ static std::uint8_t const stopFrequencyIndex =
 static std::uint8_t const invalidIndex = static_cast<std::uint8_t>(-1);
 static std::uint8_t const startFrequencyThumbIndex = 1;
 static std::uint8_t const stopFrequencyThumbIndex = 2;
+/// \note "No thumb", and -1 rather than invalidIndex. These are thumb indices,
+/// not parameter indices: JUCE spells the absent one -1, and
+/// verifyThumbAndParameterIndicies() below has always switched on -1 -- so the
+/// 2016 code storing 255 here reached that switch's unreachable default.
+static int const noThumb = -1;
 } // namespace Constants
 
 #pragma warning(push)
@@ -164,7 +169,8 @@ SpectrumWorxEditor const &SharedModuleControls::editor() const
 
 SharedModuleControls::FrequencyRange::FrequencyRange()
     : ModuleControlBase(Constants::invalidIndex, *ModuleUI::selectedModule()),
-      parameterIndexForInternalWriteAccess_(Constants::invalidIndex)
+      parameterIndexForInternalWriteAccess_(Constants::invalidIndex),
+      selectedThumb_(Constants::noThumb)
 {
     /// \note The removeValueListeners() call that was here went with the fork's
     /// Slider::valueListener(). See the note in the Knob constructor.
@@ -271,7 +277,7 @@ void SharedModuleControls::FrequencyRange::mouseDown(juce::MouseEvent const &eve
     // enabled in order to disable changing the parameter value through the GUI
     // (in juce::Slider mouseDown() or mouseDrag() member functions).
     //                                        (04.10.2011.) (Domagoj Saric)
-    if (getThumbBeingDragged() != Constants::invalidIndex)
+    if (selectedThumb_ != Constants::noThumb)
     {
         setEnabled(!lfo().enabled());
     }
@@ -328,7 +334,7 @@ void SharedModuleControls::FrequencyRange::reportActiveControl()
     std::uint8_t const currentParameterIndex(moduleParameterIndex());
     std::uint8_t newParameterIndex;
     char const *pName;
-    switch (getThumbBeingDragged())
+    switch (selectedThumb_)
     {
         using namespace Constants;
         using LE::Parameters::Name;
@@ -370,7 +376,7 @@ void SharedModuleControls::FrequencyRange::reportInactiveControl()
     if (ModuleControlBase::reportInactiveControl())
     {
         using Constants::invalidIndex;
-        sliderBeingDragged() = invalidIndex;
+        selectedThumb_ = Constants::noThumb;
         reassignTo(invalidIndex);
         parameterIndexForInternalWriteAccess_ = invalidIndex;
         repaint();
@@ -390,7 +396,7 @@ void SharedModuleControls::FrequencyRange::updateSliderSelection(juce::MouseEven
 {
     if (ModuleControlBase::activeControl() && !this->isActive())
     {
-        sliderBeingDragged() = Constants::invalidIndex;
+        selectedThumb_ = Constants::noThumb;
         return;
     }
 
@@ -404,11 +410,11 @@ void SharedModuleControls::FrequencyRange::updateSliderSelection(juce::MouseEven
     using namespace Constants;
     int const newSliderSelection((startPosDistance < stopPosDistance) ? startFrequencyThumbIndex
                                                                       : stopFrequencyThumbIndex);
-    bool const activeControlChanged(newSliderSelection != getThumbBeingDragged());
+    bool const activeControlChanged(newSliderSelection != selectedThumb_);
 
     if (activeControlChanged)
     {
-        sliderBeingDragged() = newSliderSelection;
+        selectedThumb_ = newSliderSelection;
         reportActiveControl();
         repaint();
     }
@@ -416,14 +422,14 @@ void SharedModuleControls::FrequencyRange::updateSliderSelection(juce::MouseEven
 
 std::uint8_t SharedModuleControls::FrequencyRange::thumbToParameterIndex() const
 {
-    return static_cast<std::uint8_t>(getThumbBeingDragged() - 1 + Constants::startFrequencyIndex);
+    return static_cast<std::uint8_t>(selectedThumb_ - 1 + Constants::startFrequencyIndex);
 }
 
 void SharedModuleControls::FrequencyRange::verifyThumbAndParameterIndicies() const
 {
 #ifndef NDEBUG
     std::uint8_t expectedParameterIndex;
-    switch (getThumbBeingDragged())
+    switch (selectedThumb_)
     {
     case +1:
         expectedParameterIndex = Constants::startFrequencyIndex;

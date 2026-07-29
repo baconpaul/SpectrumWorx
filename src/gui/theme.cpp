@@ -170,6 +170,12 @@ juce::Font Theme::getPopupMenuFont()
     return juce::Font(juce::FontOptions(regularTypeface()).withHeight(12.0f));
 }
 
+int selectedOrDraggedThumb(juce::Slider const &slider)
+{
+    auto const *const pSelectable(dynamic_cast<SliderWithSelectedThumb const *>(&slider));
+    return pSelectable ? pSelectable->selectedThumb() : slider.getThumbBeingDragged();
+}
+
 void Theme::drawLinearSliderBackground(juce::Graphics &graphics, int const x, int const y,
                                        int const width, int const height, float /*sliderPos*/,
                                        float /*minSliderPos*/, float /*maxSliderPos*/,
@@ -190,17 +196,17 @@ void Theme::drawLinearSliderThumb(juce::Graphics &graphics, int const /*x*/, int
 {
     auto const &thumb(resourceBitmap<LFOSliderThumb>());
 
+    auto const activeThumb(selectedOrDraggedThumb(slider));
+
     switch (style)
     {
     case juce::Slider::LinearHorizontal:
-        paintSliderThumb(graphics, thumb, sliderPos, y, height, slider.getThumbBeingDragged() == 0);
+        paintSliderThumb(graphics, thumb, sliderPos, y, height, activeThumb == 0);
         break;
 
     case juce::Slider::TwoValueHorizontal:
-        paintSliderThumb(graphics, thumb, minSliderPos, y, height,
-                         slider.getThumbBeingDragged() == 1);
-        paintSliderThumb(graphics, thumb, maxSliderPos, y, height,
-                         slider.getThumbBeingDragged() == 2);
+        paintSliderThumb(graphics, thumb, minSliderPos, y, height, activeThumb == 1);
+        paintSliderThumb(graphics, thumb, maxSliderPos, y, height, activeThumb == 2);
         break;
 
     default:

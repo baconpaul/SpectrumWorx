@@ -378,6 +378,33 @@ class Message final : public juce::MessageManager::MessageBase
     Functor functor_;
 }; // class Message
 
+/// \note Message above reference-counts the object that owns the widget and
+/// asks it for gui() at delivery time -- which is how a Module tracks its
+/// ModuleUI. The editor has no such owner: the host's window holds it. So this
+/// one tracks the widget itself through a SafePointer, which JUCE nulls when
+/// the component is destroyed.
+template <class Component, class Functor>
+class MessageToComponent final : public juce::MessageManager::MessageBase
+{
+  public:
+    MessageToComponent(Component &component, Functor &&functor)
+        : pComponent_(&component), functor_(std::move(functor))
+    {
+    }
+
+  private:
+    LE_COLD void messageCallback() final
+    {
+        if (pComponent_)
+            if (!functor_(*pComponent_))
+                this->post();
+    }
+
+  private:
+    juce::Component::SafePointer<Component> const pComponent_;
+    Functor functor_;
+}; // class MessageToComponent
+
 template <class Functor> class MessageDirect final : public juce::MessageManager::MessageBase
 {
   public:
@@ -401,6 +428,15 @@ template <class GUIHolder, class Functor> void postMessage(GUIHolder &guiHolder,
 {
     Detail::postMessage(new (std::nothrow)
                             Detail::Message<GUIHolder, Functor>(guiHolder, std::move(functor)));
+}
+
+/// \note Same contract as postMessage(): the functor returning false means
+/// "not yet", and the message re-posts itself.
+template <class Component, class Functor>
+void postMessageToComponent(Component &component, Functor &&functor)
+{
+    Detail::postMessage(new (std::nothrow) Detail::MessageToComponent<Component, Functor>(
+        component, std::move(functor)));
 }
 
 template <class Functor> void postMessage(Functor &&functor)

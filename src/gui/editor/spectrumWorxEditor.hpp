@@ -16,7 +16,9 @@
 #include "gui/gui.hpp"
 #include "gui/editor/auxiliaryComponents.hpp"
 #include "gui/editor/moduleMenuHolder.hpp"
+#ifndef LE_NO_PRESETS
 #include "gui/preset_browser/presetBrowser.hpp"
+#endif // !LE_NO_PRESETS
 
 #include "le/parameters/lfoImpl.hpp" //...mrmlj...member typedefs...
 #include "le/parameters/parametersUtilities.hpp"
@@ -29,6 +31,7 @@
 #include "le/utility/intrusivePtr.hpp"
 
 #include <array>
+#include <memory>
 #include <utility>
 #include <optional>
 //------------------------------------------------------------------------------
@@ -55,7 +58,8 @@ namespace SW
 
 class Module;
 class ModuleGUI;
-class SpectrumWorx;
+class SpectrumWorxCore;
+class Plugin2HostInteropControler;
 
 class AutomatedModuleChain;
 
@@ -66,6 +70,8 @@ namespace GUI
 {
 //------------------------------------------------------------------------------
 
+class EditorHost;
+
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \class SpectrumWorxEditor
@@ -75,12 +81,10 @@ namespace GUI
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class SpectrumWorxEditor
-    final :
-      private ReferenceCountedGUIInitializationGuard,
-      public WidgetBase<>,
-      public juce::DragAndDropContainer,
-      private juce::Button::Listener
+class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
+                                 public WidgetBase<>,
+                                 public juce::DragAndDropContainer,
+                                 private juce::Button::Listener
 {
   public:
     static unsigned short const estimatedWidth = 563;
@@ -95,61 +99,74 @@ class SpectrumWorxEditor
     static void idle() {}
 
   public:
-    SpectrumWorxEditor();
+    explicit SpectrumWorxEditor(EditorHost &);
     ~SpectrumWorxEditor();
 
 #if defined(_WIN32)
     void attachToHostWindow(HWND parentWindow);
 #elif defined(__APPLE__)
     void attachToHostWindow(ObjC::NSView *parentWindow);
-#if !defined(__x86_64__)
+/// \note Carbon, and 32 bit only. The guard used to read !__x86_64__, which is
+/// true on arm64 -- so this compiled on Apple Silicon and then failed to link
+/// against gui.mm, which has always guarded the same code with !JUCE_64BIT.
+///                                           (29.07.2026.) (SW port)
+#if !JUCE_64BIT
     void attachToHostWindow(WindowRef parentWindow);
     //...mrmlj...seems to be needed after all...reinvestigate...
   private:
     ObjC::NSWindow *pCocoaHostWindow_;
 
   public:
-#endif // !__x86_64__
+#endif // !JUCE_64BIT
 #endif // platform
 
   public:
     static SpectrumWorxEditor &fromChild(juce::Component const &);
+#ifndef LE_NO_PRESETS
     static SpectrumWorxEditor &fromPresetBrowser(PresetBrowser &);
+#endif // !LE_NO_PRESETS
 
     Engine::Setup const &engineSetup() const;
     AutomatedModuleChain &moduleChain();
     AutomatedModuleChain const &moduleChain() const;
 
+#ifndef LE_NO_PRESETS
     bool loadPreset(juce::File const &, bool ignoreExternalSample, juce::String &comment,
                     juce::String const &presetName);
     void savePreset(juce::File const &, bool ignoreExternalSample,
                     juce::String const &comment) const;
-    bool presetLoadingInProgress() const;
     char const *currentProgramName() const;
+#endif // !LE_NO_PRESETS
 
-    ///...mrmlj...cleanup:
+    bool presetLoadingInProgress() const;
+
   public:
-    SpectrumWorx &effect();
-    SpectrumWorx const &effect() const;
+    /// \note Was the SpectrumWorx VST2/AU class, recovered from this editor's
+    /// own address. It is the engine now: every one of these calls asked the
+    /// effect for something the engine owns.
+    SpectrumWorxCore &effect();
+    SpectrumWorxCore const &effect() const;
+
+    /// The rest -- sample, presets, settings -- which only a plugin can answer.
+    EditorHost &editorHost() const { return editorHost_; }
 
   private:
     using Module = SW::Module;
 
-    using Host = SpectrumWorx;
-    //using Host = Plugin2HostInteropControler;
+    /// \note The 2016 header carried this as a commented-out alternative to
+    /// `using Host = SpectrumWorx`. It is the whole of what the editor ever
+    /// wanted from the plugin in this direction, so it is the declaration now.
+    using Host = Plugin2HostInteropControler;
     Host &host();
     Host const &host() const;
 
     Program &program();
     Program const &program() const;
 
-    SpectrumWorx &moduleChainOwner() { return effect(); }
-    SpectrumWorx const &moduleChainOwner() const { return effect(); }
-
-    SpectrumWorx &owner() { return effect(); }
+    SpectrumWorxCore &moduleChainOwner() { return effect(); }
+    SpectrumWorxCore const &moduleChainOwner() const { return effect(); }
 
     Utility::CriticalSectionLock getProcessingLock() const;
-
 
   private:
   public: //...mrmlj...FMOD...
@@ -266,7 +283,9 @@ class SpectrumWorxEditor
 #endif // LE_SW_DISABLE_SIDE_CHANNEL
     void setDefaultFocusHandling();
 
+#ifndef LE_NO_PRESETS
     static void togglePresetBrowser(juce::Button const &);
+#endif // !LE_NO_PRESETS
 
   private:
     enum String
@@ -347,6 +366,9 @@ class SpectrumWorxEditor
 
       private:
         SpectrumWorxEditor &editor();
+
+        /// \note Outlives the async file dialog it launches.
+        std::unique_ptr<juce::FileChooser> fileChooser_;
     }; // class SampleArea
 #endif // LE_SW_DISABLE_SIDE_CHANNEL
 
@@ -583,6 +605,10 @@ class SpectrumWorxEditor
     }; // class Settings
 
   private:
+    /// \note First member, and a reference: everything below is built in the
+    /// constructor body and reaches through it.
+    EditorHost &editorHost_;
+
     std::uint8_t nextAvailableModuleSlot_;
 
     EditorKnob in_, out_, mix_;
@@ -606,7 +632,9 @@ class SpectrumWorxEditor
     friend class SharedModuleControls;
     std::optional<SharedModuleControls> sharedModuleControls_;
     std::optional<LFODisplay> lfoDisplay_;
+#ifndef LE_NO_PRESETS
     std::optional<PresetBrowser> presetBrowser_;
+#endif // !LE_NO_PRESETS
     std::optional<Settings> settings_;
 
     mutable bool holdSharedModuleControls_;

@@ -701,7 +701,11 @@ void OwnedWindowBase::adjustPositionsForPresetBrowser(SpectrumWorxEditor &parent
 void OwnedWindowBase::adjustPositionsForSettings(SpectrumWorxEditor &parent,
                                                  juce::Component *const pCurrentWindowState)
 {
+#ifdef LE_NO_PRESETS
+    adjustPositions(parent, nullptr, pCurrentWindowState);
+#else
     adjustPositions(parent, parent.presetBrowser_.operator->(), pCurrentWindowState);
+#endif // LE_NO_PRESETS
 }
 
 #if 0  //...mrmlj...does not work with the latest juce...cleanup...

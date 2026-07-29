@@ -34,6 +34,34 @@ namespace GUI
 {
 //------------------------------------------------------------------------------
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \class SliderWithSelectedThumb
+///
+/// \brief A slider that highlights a thumb the mouse is merely over, not only
+/// the one being dragged.
+///
+/// \note juce::Slider::getThumbBeingDragged() answers the narrower question,
+/// and its state is private. The 2016 code wrote to that private member -- it
+/// was protected then -- to widen the meaning. This declares the wider notion
+/// instead, and Theme asks for it where a slider offers one.
+///                                           (29.07.2026.) (SW port)
+////////////////////////////////////////////////////////////////////////////////
+
+class SliderWithSelectedThumb
+{
+  public:
+    /// 0 for a single thumb, 1 minimum, 2 maximum, -1 for none -- the same
+    /// encoding juce::Slider::getThumbBeingDragged() uses.
+    virtual int selectedThumb() const = 0;
+
+  protected:
+    ~SliderWithSelectedThumb() = default;
+}; // class SliderWithSelectedThumb
+
+/// The selected thumb if the slider tracks one, else the dragged thumb.
+int selectedOrDraggedThumb(juce::Slider const &);
+
 /// \note LookAndFeel_V2, not LookAndFeel_V4, and not LookAndFeel.
 ///
 ///   LookAndFeel is abstract in JUCE 8 -- it inherits some twenty-six

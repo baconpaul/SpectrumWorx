@@ -69,13 +69,9 @@ add_library(sw-gui STATIC
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/modules/moduleControl.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/modules/moduleUI.cpp
 
-        # TEMPORARY, and every function in it aborts. The module widgets call
-        # nineteen editor entry points, and spectrumWorxEditor.cpp cannot be
-        # compiled yet because it is still welded to the deleted 2016 VST2
-        # plugin class -- so without this, nothing that links the engine links.
-        # Delete this line and the file together when the editor is ported;
-        # do not grow it.
-        ${CMAKE_CURRENT_SOURCE_DIR}/gui/editor/placeholderEditor.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/gui/editor/auxiliaryComponents.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/gui/editor/moduleMenuHolder.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/gui/editor/spectrumWorxEditor.cpp
 )
 
 target_link_libraries(sw-gui PUBLIC sw-gui-widgets)

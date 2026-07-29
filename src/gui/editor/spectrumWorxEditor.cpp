@@ -10,8 +10,15 @@
 //------------------------------------------------------------------------------
 #include "spectrumWorxEditor.hpp"
 
+#ifndef LE_SW_DISABLE_SIDE_CHANNEL
+#include "external_audio/sample.hpp"
+#endif // !LE_SW_DISABLE_SIDE_CHANNEL
+
+#include "core/automatedModuleChain.hpp"
+#include "core/host_interop/plugin2Host.hpp"
 #include "core/modules/moduleDSPAndGUI.hpp"
-#include "spectrumWorx.hpp"
+#include "core/spectrumWorxCore.hpp"
+#include "gui/editor/editorHost.hpp"
 
 #include "le/parameters/lfo.hpp"
 #include "le/parameters/printer.hpp"
@@ -79,8 +86,10 @@ template <> void fillComboBoxForParameter<Engine::OverlapFactor>(ComboBox &combo
 #ifdef __APPLE__
 // gui.mmm forward declarations.
 extern void attachComponentToHostWindow(juce::Component &, ObjC::NSView *);
-extern ObjC::NSWindow *attachComponentToHostWindow(juce::Component &, WindowRef);
 extern void detachComponentFromHostWindow(juce::Component &, ObjC::NSWindow *);
+#if !JUCE_64BIT
+extern ObjC::NSWindow *attachComponentToHostWindow(juce::Component &, WindowRef);
+#endif // !JUCE_64BIT
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -108,8 +117,8 @@ unsigned int const sampleNameVerticalOffset = 306;
 #pragma warning(push)
 #pragma warning(disable : 4355) // 'this' used in base member initializer list.
 
-SpectrumWorxEditor::SpectrumWorxEditor()
-    : nextAvailableModuleSlot_(0),
+SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost)
+    : editorHost_(editorHost), nextAvailableModuleSlot_(0),
 
       in_(*this, 18, 37), out_(*this, 18, 110), mix_(*this, 18, 185),
 
@@ -171,6 +180,12 @@ SpectrumWorxEditor::SpectrumWorxEditor()
     preset_.addListener(this);
     settingsButton_.addListener(this);
 
+#ifdef LE_NO_PRESETS
+    /// \note There is no preset browser to open, so the button says so rather
+    /// than swallowing the click. Goes with the flag.
+    preset_.setEnabled(false);
+#endif // LE_NO_PRESETS
+
     createChainGUIs(moduleChain());
 
     setOpaque(true);
@@ -184,7 +199,7 @@ SpectrumWorxEditor::~SpectrumWorxEditor()
     LE_ASSERT(GUI::isThisTheGUIThread());
 
 #ifndef LE_SW_DISABLE_SIDE_CHANNEL
-    effect().deregisterSampleLoadedListener(*this);
+    editorHost_.deregisterSampleLoadedListener(*this);
 #endif // LE_SW_DISABLE_SIDE_CHANNEL
 
     while (static_cast<bool const volatile &>(holdLFODisplay_))
@@ -213,9 +228,11 @@ SpectrumWorxEditor::~SpectrumWorxEditor()
     ///                                       (12.01.2012.) (Domagoj Saric)
     //...mrmlj...think of a cleaner solution...
     settings_ = std::nullopt;
+#ifndef LE_NO_PRESETS
     presetBrowser_ = std::nullopt;
+#endif // !LE_NO_PRESETS
 
-#if defined(__APPLE__) && !defined(__x86_64__)
+#if defined(__APPLE__) && !JUCE_64BIT
     if (pCocoaHostWindow_)
     {
         //...mrmlj...manual detachment seems to be needed after all...otherwise
@@ -245,13 +262,13 @@ void SpectrumWorxEditor::attachToHostWindow(HWND const parentWindowHandle)
 
 void SpectrumWorxEditor::attachToHostWindow(ObjC::NSView *const pParentWindow)
 {
-#if !defined(__x86_64__)
+#if !JUCE_64BIT
     pCocoaHostWindow_ = nullptr;
 #endif
     attachComponentToHostWindow(*this, pParentWindow);
 }
 
-#if !defined(__x86_64__)
+#if !JUCE_64BIT
 void SpectrumWorxEditor::attachToHostWindow(WindowRef const parentWindow)
 {
     pCocoaHostWindow_ = attachComponentToHostWindow(*this, parentWindow);
@@ -268,12 +285,14 @@ SpectrumWorxEditor &SpectrumWorxEditor::fromChild(juce::Component const &widget)
     return *LE::Utility::polymorphicDowncast<SpectrumWorxEditor *>(pParent);
 }
 
+#ifndef LE_NO_PRESETS
 SpectrumWorxEditor &SpectrumWorxEditor::fromPresetBrowser(PresetBrowser &presetBrowser)
 {
     return Utility::ParentFromOptionalMember<SpectrumWorxEditor, PresetBrowser,
                                              &SpectrumWorxEditor::presetBrowser_, false>()(
         presetBrowser);
 }
+#endif // !LE_NO_PRESETS
 
 Engine::Setup const &SpectrumWorxEditor::engineSetup() const
 {
@@ -286,14 +305,17 @@ AutomatedModuleChain const &SpectrumWorxEditor::moduleChain() const
     return effect().moduleChain();
 }
 
-SpectrumWorx &SpectrumWorxEditor::effect() { return SpectrumWorx::effect(*this); }
-SpectrumWorx const &SpectrumWorxEditor::effect() const
+SpectrumWorxCore &SpectrumWorxEditor::effect() { return editorHost_.core(); }
+SpectrumWorxCore const &SpectrumWorxEditor::effect() const
 {
     return const_cast<SpectrumWorxEditor &>(*this).effect();
 }
 
-SpectrumWorxEditor::Host &SpectrumWorxEditor::host() { return effect(); }
-SpectrumWorxEditor::Host const &SpectrumWorxEditor::host() const { return effect(); }
+SpectrumWorxEditor::Host &SpectrumWorxEditor::host() { return editorHost_.automation(); }
+SpectrumWorxEditor::Host const &SpectrumWorxEditor::host() const
+{
+    return const_cast<SpectrumWorxEditor &>(*this).host();
+}
 
 Program &SpectrumWorxEditor::program() { return effect().program(); }
 Program const &SpectrumWorxEditor::program() const { return effect().program(); }
@@ -303,6 +325,7 @@ Utility::CriticalSectionLock SpectrumWorxEditor::getProcessingLock() const
     return effect().getProcessingLock();
 }
 
+#ifndef LE_NO_PRESETS
 void SpectrumWorxEditor::togglePresetBrowser(juce::Button const &button)
 {
     auto &editor(SpectrumWorxEditor::fromChild(button));
@@ -313,6 +336,7 @@ void SpectrumWorxEditor::togglePresetBrowser(juce::Button const &button)
     else
         editor.presetBrowser_ = std::nullopt;
 }
+#endif // !LE_NO_PRESETS
 
 void SpectrumWorxEditor::setDefaultFocusHandling()
 {
@@ -509,11 +533,13 @@ void SpectrumWorxEditor::buttonClicked(juce::Button *const pButton)
             settings_ = std::nullopt;
         }
     }
+#ifndef LE_NO_PRESETS
     else
     {
         LE_ASSERT(pButton == &preset_);
         togglePresetBrowser(*pButton);
     }
+#endif // !LE_NO_PRESETS
 }
 
 void LE_NOINLINE SpectrumWorxEditor::updateString(String const stringID,
@@ -570,17 +596,17 @@ void SpectrumWorxEditor::updateSampleName(juce::String const &newSampleName)
 
 void SpectrumWorxEditor::updateSampleName()
 {
-    updateSampleName(effect().sample_.sampleFile().getFileNameWithoutExtension());
+    updateSampleName(editorHost_.currentSampleFile().getFileNameWithoutExtension());
 }
 
 void SpectrumWorxEditor::updateSampleNameAsync()
 {
-    if (effect().isSampleLoadInProgress())
+    if (editorHost_.isSampleLoadInProgress())
     {
-        effect().registerSampleLoadedListener(*this);
+        editorHost_.registerSampleLoadedListener(*this);
         setSampleLoadingStatus();
         LE_ASSERT(
-            effect()
+            editorHost_
                 .isSampleLoadInProgress()); //...mrmlj...handle this threading issue properly....
     }
     else
@@ -595,7 +621,7 @@ void SpectrumWorxEditor::setSampleLoadingStatus()
 
 void SpectrumWorxEditor::newSampleFileSelected(juce::File const &file)
 {
-    effect().setNewSample(file);
+    editorHost_.setNewSample(file);
     updateSampleNameAsync();
 }
 #endif // LE_SW_DISABLE_SIDE_CHANNEL
@@ -696,30 +722,34 @@ void SpectrumWorxEditor::addUserAddedModule(std::uint8_t const effectIndex)
     }
 }
 
-
+#ifndef LE_NO_PRESETS
 bool SpectrumWorxEditor::loadPreset(juce::File const &presetFile, bool const ignoreExternalSample,
                                     juce::String &comment, juce::String const &presetName)
 {
     auto const pPresetName(presetName.getCharPointer().getAddress());
-    return effect().loadPreset(presetFile, ignoreExternalSample, &comment, pPresetName);
+    return editorHost_.loadPreset(presetFile, ignoreExternalSample, &comment, pPresetName);
 }
 
 void SpectrumWorxEditor::savePreset(juce::File const &presetFile, bool const ignoreExternalSample,
                                     juce::String const &comment) const
 {
-    SW::savePreset(presetFile, ignoreExternalSample ? juce::File() : effect().currentSampleFile(),
-                   comment, program());
-}
-
-bool SpectrumWorxEditor::presetLoadingInProgress() const
-{
-    return static_cast<Host2PluginInteropControler const &>(
-               moduleChainOwner()) /*...mrmlj...*/.presetLoadingInProgress();
+    SW::savePreset(presetFile,
+                   ignoreExternalSample ? juce::File() : editorHost_.currentSampleFile(), comment,
+                   program());
 }
 
 char const *SpectrumWorxEditor::currentProgramName() const
 {
-    return effect().currentProgramName();
+    return editorHost_.currentProgramName();
+}
+#endif // !LE_NO_PRESETS
+
+/// \note Not preset machinery despite the name: the flag lives on the engine
+/// side and guards automation while a whole program is being swapped in.
+bool SpectrumWorxEditor::presetLoadingInProgress() const
+{
+    return static_cast<Host2PluginInteropControler const &>(
+               moduleChainOwner()) /*...mrmlj...*/.presetLoadingInProgress();
 }
 
 void SpectrumWorxEditor::moduleActivated()
@@ -780,7 +810,7 @@ void SpectrumWorxEditor::moduleDeactivated()
         /// actually only activating a different module.
         ///                                   (17.01.2012.) (Domagoj Saric)
         sharedModuleControls_->setEnabled(false);
-        GUI::postMessage(owner(), [](GUI::SpectrumWorxEditor &editor) {
+        GUI::postMessageToComponent(*this, [](GUI::SpectrumWorxEditor &editor) {
             auto &sharedModuleControls(editor.sharedModuleControls_);
             if (sharedModuleControls && !sharedModuleControls->isEnabled())
             {
@@ -848,7 +878,7 @@ void SpectrumWorxEditor::moduleControlDectivated(ModuleControlBase const &contro
         /// destruction+recreation in case the user is actually only switching
         /// between controls.
         ///                                   (02.09.2013.) (Domagoj Saric)
-        postMessage(owner(), [](GUI::SpectrumWorxEditor &editor) {
+        postMessageToComponent(*this, [](GUI::SpectrumWorxEditor &editor) {
             auto &lfoDisplay(editor.lfoDisplay_);
             if (lfoDisplay && !lfoDisplay->isEnabled())
             {
@@ -1068,14 +1098,18 @@ void SpectrumWorxEditor::ModuleMenuButton::clicked()
     SpectrumWorxEditor &editor(
         *LE::Utility::polymorphicDowncast<SpectrumWorxEditor *>(this->getParentComponent()));
     LE_ASSERT(editor.nextAvailableModuleSlot_ < SW::Constants::maxNumberOfModules);
-    PopupMenu::OptionalID const chosenMenuEntryID(
-        editor.moduleMenu_.topMenu().showCenteredAtRight(*this));
-    if (chosenMenuEntryID.has_value())
-    {
-        LE_ASSERT(editor.moduleMenu_.isOwnerOfEntry(*chosenMenuEntryID));
-        std::uint8_t const effectIndex(editor.moduleMenu_.effectIndexForEntry(*chosenMenuEntryID));
-        editor.addUserAddedModule(effectIndex);
-    }
+    /// \note The menu no longer blocks, so the editor can be torn down while it
+    /// is open -- a host closing the window under it. A SafePointer to it, and
+    /// the reference is only taken once the callback has proved it is alive.
+    juce::Component::SafePointer<SpectrumWorxEditor> pEditor(&editor);
+    editor.moduleMenu_.topMenu().showCenteredAtRight(
+        *this, [pEditor](PopupMenu::OptionalID const chosenMenuEntryID) {
+            if (!pEditor || !chosenMenuEntryID.has_value())
+                return;
+            auto &editor(*pEditor);
+            LE_ASSERT(editor.moduleMenu_.isOwnerOfEntry(*chosenMenuEntryID));
+            editor.addUserAddedModule(editor.moduleMenu_.effectIndexForEntry(*chosenMenuEntryID));
+        });
 }
 
 SpectrumWorxEditor::Gradient::Gradient(juce::Component &parent)
@@ -1428,10 +1462,15 @@ void SpectrumWorxEditor::LFODisplay::buttonClicked(juce::Button *const pButton)
     else if (pButton == &typeArrow_)
     {
         //...mrmlj...
-        if (!type_.menuActive() && type_.showCenteredAtRight(typeArrow_))
+        if (!type_.menuActive())
         {
-            updateParameterAndNotifyHost<LFO::Waveform>(type_.getSelectedID());
-            this->repaint();
+            juce::Component::SafePointer<LFODisplay> pThis(this);
+            type_.showCenteredAtRight(typeArrow_, [pThis](bool const selectionChanged) {
+                if (!pThis || !selectionChanged)
+                    return;
+                pThis->updateParameterAndNotifyHost<LFO::Waveform>(pThis->type_.getSelectedID());
+                pThis->repaint();
+            });
         }
     }
     else
@@ -1544,7 +1583,10 @@ void SpectrumWorxEditor::LFODisplay::updatePeriodControl()
     period_.setRange(rangeBeginning, rangeEnd, step);
     period_.setSkewFactorFromMidPoint(1);
 
-    double const resnappedValue(period_.Period::snapValue(lfo.periodScale(), false));
+    /// \note JUCE 8 passes a DragMode where 2016 passed a bool; the override
+    /// ignores it, and notDragging is what "not a drag" spells now.
+    double const resnappedValue(
+        period_.Period::snapValue(lfo.periodScale(), juce::Slider::notDragging));
     lfo.setPeriodScale(static_cast<LFO::value_type>(
         resnappedValue)); //...mrmlj...rethink whether this should be done by the LFO class...
     period_.setValue(resnappedValue, juce::dontSendNotification);
@@ -1675,16 +1717,22 @@ void SpectrumWorxEditor::SampleArea::mouseUp(juce::MouseEvent const &event)
     }
     else if (mouseButtons.isLeftButtonDown())
     {
-        juce::FileChooser fileChooser(
+        /// \note Held rather than stack-allocated: launchAsync() returns
+        /// immediately and the chooser must outlive the dialog.
+        fileChooser_ = std::make_unique<juce::FileChooser>(
             "Choose external audio file",
             //juce::File::getSpecialLocation( juce::File::userMusicDirectory ), //...mrmlj... for testing...
             //juce::File(),
-            editor.effect().currentSampleFile(), Sample::supportedFormats(), true);
-        if (fileChooser.browseForFileToOpen(0))
-        {
-            LE_ASSERT(fileChooser.getResults().size() == 1);
-            editor.newSampleFileSelected(fileChooser.getResults().getReference(0));
-        }
+            editor.editorHost().currentSampleFile(), Sample::supportedFormats(), true);
+        juce::Component::SafePointer<SpectrumWorxEditor> pEditor(&editor);
+        fileChooser_->launchAsync(
+            juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+            [pEditor](juce::FileChooser const &chooser) {
+                if (!pEditor || chooser.getResults().isEmpty())
+                    return;
+                LE_ASSERT(chooser.getResults().size() == 1);
+                pEditor->newSampleFileSelected(chooser.getResults().getReference(0));
+            });
     }
 }
 
@@ -2101,10 +2149,9 @@ SpectrumWorxEditor &SpectrumWorxEditor::Settings::editor()
 
 void SpectrumWorxEditor::Settings::buttonClicked(juce::Button *const pButton)
 {
-    SpectrumWorx &effect(editor().effect());
     if (pButton == &interfacePage_.loadLastSessionOnStartup_)
     {
-        effect.shouldLoadLastSessionOnStartup(
+        editor().editorHost().shouldLoadLastSessionOnStartup(
             interfacePage_.loadLastSessionOnStartup_.getToggleState());
     }
     else if (pButton == &interfacePage_.hideCursorOnKnobDrag_)
@@ -2123,7 +2170,7 @@ void SpectrumWorxEditor::Settings::buttonClicked(juce::Button *const pButton)
 void SpectrumWorxEditor::Settings::updateLoadLastSessionOnStartup()
 {
     interfacePage_.loadLastSessionOnStartup_.setToggleState(
-        editor().effect().shouldLoadLastSessionOnStartup(), juce::dontSendNotification);
+        editor().editorHost().shouldLoadLastSessionOnStartup(), juce::dontSendNotification);
 }
 
 //------------------------------------------------------------------------------
