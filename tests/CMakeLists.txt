@@ -40,3 +40,20 @@ target_compile_definitions(sw-tests PRIVATE
 target_include_directories(sw-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 catch_discover_tests(sw-tests)
+
+# Guards the LE_SW_GUI configuration fork for as long as it exists. Compiles
+# every sw-dsp source both ways and compares the objects: at LE_SW_GUI=1 four
+# setters on Engine::ModuleParameters turn virtual, which in a *release* build
+# gives the class a vptr and shifts every member by 8 bytes. Debug builds hide
+# it entirely, so a source that quietly becomes configuration-dependent would
+# pass every local test and corrupt memory in a shipped build.
+#
+# ~30s, so it carries the `slow` label: `ctest -LE slow` is the fast loop.
+# It goes when the flag does.
+find_package(Python3 COMPONENTS Interpreter)
+if (Python3_FOUND)
+    add_test(NAME gui-flag-parity
+            COMMAND ${Python3_EXECUTABLE}
+            "${CMAKE_SOURCE_DIR}/scripts/check_gui_flag_parity.py" "${CMAKE_BINARY_DIR}")
+    set_tests_properties(gui-flag-parity PROPERTIES LABELS slow TIMEOUT 600)
+endif()

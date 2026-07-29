@@ -21,17 +21,13 @@
 #include "le/utility/rvalueReferences.hpp"
 #include "le/utility/tchar.hpp"
 
-// Boost sandbox
-#include "boost/mmap/mapped_view/mapped_view.hpp"
 #include <optional>
 #include <string_view>
 #include "le/utility/span.hpp"
 
-#ifndef _MSC_VER
-#include "boost/mpl/at.hpp"
-#endif // _MSC_VER
 #include "le/utility/intrusivePtr.hpp"
 
+#include "resources.hpp"
 #include "theme.hpp"
 
 /// \note Individual JUCE 8 headers have no include guards and open
@@ -76,67 +72,13 @@ namespace GUI
 {
 //------------------------------------------------------------------------------
 
-enum ResourceBitmaps
-{
-    EditorBackground = '01',
-    EditorKnobStrip = '02',
-    ModuleKnobStrip = '03',
-    ModuleOn = '04',
-    ModuleMuted = '05',
-    AddModule = '06',
-    PresetBackground = '07',
-    PresetOff = '08',
-    PresetOn = '09',
-    SettingsOff = '10',
-    SettingsOn = '11',
-    SymmetricKnobStrip = '12',
-    TriggerBtnOff = '13',
-    TriggerBtnOn = '14',
-    Eject = '16',
-    SettingsEngineBg = '17',
-    SettingsIntrfcBg = '17', // ...currently the same as the engine background...
-    SettingsAboutBg = '20',
-    SettingsEngineOff = '21',
-    SettingsEngineOn = '22',
-    SettingsGUIOff = '23',
-    SettingsGUIOn = '24',
-    SettingsAboutOff = '27',
-    SettingsAboutOn = '28',
-    PresetSaveUp = '30',
-    PresetSaveDown = '31',
-    PresetDeleteUp = '32',
-    PresetDeleteDown = '33',
-    PresetSaveAsUp = '34',
-    PresetSaveAsDown = '35',
-    LFOSliderThumb = '40',
-    LEDOff = '41',
-    LEDOn = '42',
-    LFOSine = '43',
-    LFOTriangle = '44',
-    LFOSawtooth = '45',
-    LFOReverseSaw = '46',
-    LFOSquare = '47',
-    LFOExponent = '48',
-    LFORandomHold = '49',
-    LFORandomSlide = '50',
-    LFORandomWhacko = '51',
-    LFODirac = '52',
-    LFOdIRAC = '53',
-    ModuleBg = '55',
-    ModuleBgSelected = '56',
-    ChangeWaveform = '57',
-    ModuleKnobSelected = '58',
-    ModuleCombo = '59',
-    ModuleComboOn = '60',
-    SettingsCombo = '61',
-    SettingsComboOn = '62',
-    SmallLinearKnobStrip = '63',
-    SmallSymmetricKnobStrip = '64',
-    SmallModuleKnobSelected = '65',
-    UsersGuideUp = '66',
-    UsersGuideDown = '67',
-    ModuleKnobLFOed = '68',
-}; // enum ResourceBitmaps
+/// \note `enum ResourceBitmaps` and `resourceBitmap()` used to be declared here
+/// too, numbered with multi-character literals ('01') and read off disk. Both
+/// now come from resources.hpp, which numbers them as plain integers, reads them
+/// out of the binary and can release the cache. The two spellings coexisted only
+/// while this header did not compile; the name sets were identical, so nothing
+/// at a call site changes.
+///                                       (28.07.2026.) (SW port)
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -159,39 +101,6 @@ class ReferenceCountedGUIInitializationGuard
     static std::uint8_t guiInitializationReferenceCount;
 }; // class ReferenceCountedGUIInitializationGuard
 
-////////////////////////////////////////////////////////////////////////////////
-//
-// resourceBitmap()
-// ----------------
-//
-//  Lazy-constructs a static juce::Image object from a resource ID. Implemented
-// as a template function so that a different object would be constructed for
-// different resource ID's.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-/// \note SUPERSEDED by gui/resources.hpp, which reads the same bitmaps out of
-/// the binary instead of off disk, numbers them with plain integers instead of
-/// multi-character literals, and has a cache that can be released. `enum
-/// ResourceBitmaps` above and everything in this block go when this file
-/// compiles again (stage 6.1) -- both exist only because this one does not
-/// compile yet and resources.hpp does. Do not add a call site here.
-///                                       (28.07.2026.) (SW port)
-juce::Image resourceBitmap(char const (&bitmapNumber)[2 + 1]);
-
-template <int bitmapID>
-#ifdef __clang__
-#else
-#endif // __clang__
-juce::Image const &resourceBitmap()
-{
-    using stringID = boost::mpl::string<bitmapID>;
-    static char const bitmapNumber[2 + 1] = {boost::mpl::at_c<stringID, 0>::type::value,
-                                             boost::mpl::at_c<stringID, 1>::type::value, '\0'};
-    static juce::Image const image(resourceBitmap(bitmapNumber));
-    return image;
-}
-
 void paintImage(juce::Graphics &, juce::Image const &);
 void paintImage(juce::Graphics &, juce::Image const &, int x, int y);
 
@@ -206,12 +115,16 @@ float displayScale();
 
 ////////////////////////////////////////////////////////////////////////////////
 // Global paths.
-//...mrmlj...clean this up...
 ////////////////////////////////////////////////////////////////////////////////
 
-boost::mmap::mapped_view<char const> mapPathsFile();
-boost::mmap::mapped_view<char> mapPathsFile(unsigned int desiredSize);
-
+/// \note The two mapPathsFile() overloads went with the boost::mmap dependency
+/// stage 2 removed. They mapped the `SpectrumWorx.paths` file the 2016 installer
+/// wrote, to find the skin and the most-recently-used presets folder; the skin
+/// is compiled in now (resources.hpp), so the only thing left worth keeping is
+/// the MRU folder, and that wants to be an ordinary user-data path rather than a
+/// writable mapping. The rest of this block goes with gui.cpp's implementation
+/// of it.
+///                                       (28.07.2026.) (SW port)
 bool initializePaths();
 bool havePathsBeenInitialised();
 
@@ -219,9 +132,9 @@ juce::File const &rootPath();
 juce::File &presetsFolder();
 juce::File resourcesPath();
 
-#ifdef __APPLE__
-FSRef makeFSRefFromPath(juce::String const &path);
-#endif // __APPLE__
+/// \note makeFSRefFromPath() went with it: FSRef is Carbon, which was never
+/// ported to arm64. Its one caller was external_audio/sampleMac.cpp, which
+/// stage 5.0 replaces with juce::AudioFormatManager.
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -425,7 +338,9 @@ void fadeOutComponent(juce::Component &, float finalAlpha, unsigned int duration
 class Lock : private juce::MessageManagerLock
 {
   public:
-    LE_NOINLINE Lock() : juce::MessageManagerLock(nullptr)
+    /// \note The cast picks the Thread* overload. JUCE 8 also has one taking a
+    /// ThreadPoolJob*, so a bare nullptr is ambiguous.
+    LE_NOINLINE Lock() : juce::MessageManagerLock(static_cast<juce::Thread *>(nullptr))
     {
         LE_ASSERT(lockWasGained() || !ReferenceCountedGUIInitializationGuard::isGUIInitialised());
     }
@@ -535,14 +450,22 @@ private:
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class LE_NOVTABLE DrawableText : public juce::GlyphArrangement
+/// \note Holds a GlyphArrangement rather than deriving from one: JUCE 8 marks
+/// GlyphArrangement final. Only the constructor and draw() were ever used, so
+/// forwarding the one is the whole of the change.
+class DrawableText
 {
   public:
     DrawableText(char const *text, unsigned int x, unsigned int y, unsigned int width,
                  unsigned int height, juce::Justification = juce::Justification::centredLeft,
                  juce::Font const &font = defaultFont());
 
+    void draw(juce::Graphics &graphics) const { glyphs_.draw(graphics); }
+
     static juce::Font defaultFont();
+
+  private:
+    juce::GlyphArrangement glyphs_;
 }; // class DrawableText
 
 ////////////////////////////////////////////////////////////////////////////////

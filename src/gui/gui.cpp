@@ -985,8 +985,9 @@ DrawableText::DrawableText(char const *const text, unsigned int const x, unsigne
                            unsigned int const width, unsigned int const height,
                            juce::Justification const justification, juce::Font const &font)
 {
-    addFittedText(font, text, Math::convert<float>(x), Math::convert<float>(y),
-                  Math::convert<float>(width), Math::convert<float>(height), justification, 1);
+    glyphs_.addFittedText(font, text, Math::convert<float>(x), Math::convert<float>(y),
+                          Math::convert<float>(width), Math::convert<float>(height), justification,
+                          1);
 }
 
 juce::Font DrawableText::defaultFont()
