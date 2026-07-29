@@ -1536,15 +1536,88 @@ notifications — appears only at runtime under a host, so removing the hack and
 declaring victory is not evidence. Get the parameter round-trip under test in
 stage 5 first, or accept that this one is verified by hand in a DAW.
 
-**Suggested order from here:** include hygiene (nothing compiles until it is
-done and it is mechanical) → the combined menu rewrite → the remaining widgets
-→ 6.4, whose scope is bounded by `OwnedWindow<>` having exactly two
-instantiations.
+> **The suggested order above was wrong about what blocks what.** See the next
+> section: measuring it moved the menu rewrite one step later and put something
+> else first.
+
+#### `LE_SW_GUI=1` becomes the only configuration
+
+Stage 5 wanted to host the real editor and ran into the flag. `sw-dsp` is built
+`LE_SW_GUI=0` so the goldens can run without JUCE; the plugin needs `=1`, which
+is not a cosmetic difference:
+
+- `Engine::ModuleParameters` gains four virtuals (`moduleParameters.hpp:99-109`,
+  `:235-239`), whose only job is to push a new parameter value into a knob so the
+  UI animates under automation and LFOs.
+- The module leaf class changes to a **sibling**, not a subclass: `SW::Module`
+  and `SW::ModuleDSP` both derive from `Engine::ModuleDSP`, and `SW::Module`
+  embeds a `std::optional<GUI::ModuleUI>`.
+- `lfoExportedParameters` is 7 without the GUI and 5 with it — a host-visible
+  parameter-count change, and the constant behind the overflow bug in stage 5.
+- `presets.hpp` reaches for JUCE.
+
+Measured rather than reasoned about: of the **85 sources in `sw-dsp`, 77 compile
+byte-identically** under both settings; 6 differ and 2 did not compile at all.
+And the divergence is **release-only** — under `NDEBUG` the flag gives
+`ModuleParameters` a vptr (`sizeof` 64 → 72, `pLFOs_` 56 → 64, the
+`ModuleDSP*`→`ModuleParameters*` adjustment +8 → +0), while a debug build is
+already identical because `ModuleNode` has an `!NDEBUG`-only virtual. **A mixing
+mistake is therefore invisible in every debug build and corrupts memory in
+release.**
+
+That measurement would support a shared-core plus per-configuration-slice split.
+**We are not building one.** The virtuals that fork the ABI exist only because a
+module holds a reference to its UI; under a proper two-queue design that
+reference does not exist and the fork evaporates. It is not worth engineering
+around a configuration whose function is needed anyway. `LE_SW_GUI=1` becomes
+the only one, starting with the tests, and how the layers ought to link is
+assessed once it all works rather than now on speculation.
+
+`scripts/check_gui_flag_parity.py` guards the fork for as long as it exists — it
+compiles every `sw-dsp` source both ways under `NDEBUG` and compares the objects,
+so a source that quietly becomes configuration-dependent fails a build instead of
+a customer. It is a ctest case labelled `slow` (~30 s; `ctest -LE slow` is the
+fast loop) and it goes when the flag does.
+
+**✅ The core now compiles at `LE_SW_GUI=1`** — all 85 sources, after seven edits:
+six in `gui.hpp` (drop the `boost::mmap` and `boost::mpl` includes; delete the
+duplicate `ResourceBitmaps` enum and `resourceBitmap<>` in favour of
+`resources.hpp`, whose name set is identical; delete the `mapPathsFile` overloads
+and the Carbon `FSRef` declaration; disambiguate `MessageManagerLock(nullptr)`,
+which JUCE 8 overloads on both `Thread*` and `ThreadPoolJob*`; stop deriving
+`DrawableText` from `GlyphArrangement`, now `final`) and one in `moduleUI.hpp`
+(fork include → umbrella).
+
+#### What blocks the link is not what the section above says
+
+Compiling was cheap. Linking is the job, and the blocker is **not** the two
+rewrites:
+
+`factory.cpp` instantiates `Module::Impl<Effect>` for all 57 effects, whose
+vtables ODR-use the whole module widget set, which pulls in `moduleUI.cpp` and
+`moduleControl.cpp`, which call ~14 out-of-line `SpectrumWorxEditor` members. And
+`spectrumWorxEditor.cpp` is welded to the deleted 2016 `SpectrumWorx` VST2/AU
+class (`effect().sample_`, `loadPreset`, … at `spectrumWorxEditor.cpp:196,321,
+615-640`). **That binding is what stands between `sw-tests` and a `LE_SW_GUI=1`
+link**, and it is a bigger job than either rewrite.
+
+The rewrites are still needed, one step later: `Knob`, `ComboBox`, `PopupMenu`
+and `PopupMenuWithSelection` all live in `gui.cpp` and are bases of `ModuleKnob`
+and `DiscreteParameter`, so the widget layer has to link before the module layer
+can. Revised order: **widget layer (`gui.cpp`, with both rewrites) → module layer
+plus a temporary editor seam → flip the flag → 6.4.**
+
+One thing that is *not* in the way: `GUI::ModuleUI` is a `std::optional` that
+stays empty until `createGUI()`, and `ParameterWidgets` is raw storage until
+`ModuleWidgets::create()`. A headless test can construct all 57 modules, process
+audio and never touch JUCE.
 
 > **Re-run the release goldens before pushing any of this.** Stage 6 has no
 > business changing DSP output, which is exactly why an unexplained golden
 > movement here would be worth stopping for. The checked build skips them; only
-> `build-release` runs them.
+> `build-release` runs them. Flipping the flag makes `set*Parameter` an indirect
+> call on the DSP path — the arithmetic is unchanged, the codegen is not, so
+> that flip is the one to check most carefully.
 
 ---
 
