@@ -157,8 +157,13 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost)
     updateSampleNameAsync();
 #endif // LE_SW_DISABLE_SIDE_CHANNEL
 
+    /// \note The focus grab that was here moved to parentHierarchyChanged().
+    /// A component can only take focus once it is on screen, and in 2016 the
+    /// editor was constructed by a plugin that had already parented it. The
+    /// CLAP shim builds it first and parents it after, so grabbing here asserts
+    /// in JUCE and does nothing.
+    ///                                       (29.07.2026.) (SW port)
     setDefaultFocusHandling();
-    grabKeyboardFocus();
 
     // Resizable VST GUI discussions:
     // http://www.kvraudio.com/forum/viewtopic.php?t=141313
@@ -190,6 +195,9 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost)
 
     setOpaque(true);
     setVisible();
+
+    // Last: nothing may reach a half-built editor.
+    editorHost_.editorOpened(*this);
 }
 
 #pragma warning(pop)
@@ -197,6 +205,9 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost)
 SpectrumWorxEditor::~SpectrumWorxEditor()
 {
     LE_ASSERT(GUI::isThisTheGUIThread());
+
+    // First: nothing may reach a dying editor.
+    editorHost_.editorClosed();
 
 #ifndef LE_SW_DISABLE_SIDE_CHANNEL
     editorHost_.deregisterSampleLoadedListener(*this);
@@ -218,7 +229,9 @@ SpectrumWorxEditor::~SpectrumWorxEditor()
     ///                                       (13.01.2012.) (Domagoj Saric)
     LE_ASSERT(getWantsKeyboardFocus());
     LE_ASSERT(getMouseClickGrabsKeyboardFocus());
-    grabKeyboardFocus();
+    // Only meaningful while on screen, and JUCE asserts otherwise.
+    if (isShowing() || isOnDesktop())
+        grabKeyboardFocus();
     destroyChainGUIs(moduleChain());
 
     /// \note
@@ -342,6 +355,14 @@ void SpectrumWorxEditor::setDefaultFocusHandling()
 {
     setWantsKeyboardFocus(true);
     setMouseClickGrabsKeyboardFocus(true);
+}
+
+/// \note Where the constructor's focus grab went. Fires when the host's window
+/// takes the editor, which is the first moment it can hold focus.
+void SpectrumWorxEditor::parentHierarchyChanged()
+{
+    if (isShowing() || isOnDesktop())
+        grabKeyboardFocus();
 }
 
 void SpectrumWorxEditor::moduleDrag(ModuleUI &moduleUI, juce::MouseEvent const &event)

@@ -261,6 +261,7 @@ class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
   private: // JUCE Component overrides.
     void mouseDown(juce::MouseEvent const &) override;
     void paint(juce::Graphics &) override;
+    void parentHierarchyChanged() override;
 
     LE_IMPLEMENT_ASYNC_REPAINT
 

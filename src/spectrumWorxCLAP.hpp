@@ -22,14 +22,18 @@
 #include "core/automatedModuleChain.hpp"
 #include "core/host_interop/host2PluginImpl.hpp"
 #include "core/host_interop/plugin2HostImpl.hpp"
+#include "core/modules/moduleDSPAndGUI.hpp"
 #include "core/spectrumWorxCore.hpp"
+#include "gui/editor/editorHost.hpp"
 
 #include "le/plugins/clap/tag.hpp"
 
 #include <clap/helpers/plugin.hh>
 #include <sst/clap_juce_shim/clap_juce_shim.h>
 
+#include <array>
 #include <atomic>
+#include <cstddef>
 #include <memory>
 #include <vector>
 //------------------------------------------------------------------------------
@@ -40,7 +44,8 @@ namespace LE::SW
 namespace GUI
 {
 class ModuleUI;
-}
+class SpectrumWorxEditor;
+} // namespace GUI
 
 clap_plugin_descriptor const *descriptor();
 clap_plugin const *createPlugin(clap_host const *);
@@ -64,11 +69,16 @@ class SpectrumWorxCLAP final
       public sst::clap_juce_shim::EditorProvider,
       public SpectrumWorxCore,
       public Plugin2HostPassiveInteropImpl<SpectrumWorxCLAP, Plugins::Protocol::CLAP>,
-      public Host2PluginInteropImpl<SpectrumWorxCLAP, Plugins::Protocol::CLAP>
+      public Plugin2HostActiveInteropImpl<SpectrumWorxCLAP, Plugins::Protocol::CLAP>,
+      public Host2PluginInteropImpl<SpectrumWorxCLAP, Plugins::Protocol::CLAP>,
+      public GUI::EditorHost
 {
   public:
     using Protocol = Plugins::Protocol::CLAP;
     using PassiveInterop = Plugin2HostPassiveInteropImpl<SpectrumWorxCLAP, Protocol>;
+    /// \note What makes this a Plugin2HostInteropControler, which is what the
+    /// editor talks to when the user moves something.
+    using Notifications = Plugin2HostActiveInteropImpl<SpectrumWorxCLAP, Protocol>;
     using ActiveInterop = Host2PluginInteropImpl<SpectrumWorxCLAP, Protocol>;
 
     /// \note Both bases and SpectrumWorxCore declare these; say which.
@@ -87,8 +97,60 @@ class SpectrumWorxCLAP final
     /// equivalence is the reason this port targets CLAP at all.
     using ParameterSelector = Plugins::ParameterID;
 
+    /// \note The engine's module class, not Engine::ModuleParameters -- the
+    /// interop downcasts to this to read a module's parameters, and this is the
+    /// one that carries the UI.
+    using Module = SW::Module;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \class UIEdits
+    ///
+    /// \brief What the editor did, on its way to the host.
+    ///
+    /// \note A host only accepts parameter changes through the output event
+    /// list it hands to process() or flush(), and the editor runs on neither of
+    /// those threads. So the edits queue here and drain there. Single producer
+    /// (the UI), single consumer (audio), and a full queue drops rather than
+    /// blocks -- the host re-reads values on the next rescan anyway, and a
+    /// priority inversion on the audio thread would be the worse trade.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    class UIEdits
+    {
+      public:
+        enum class Kind : std::uint8_t
+        {
+            Value,
+            GestureBegin,
+            GestureEnd
+        };
+
+        struct Edit
+        {
+            clap_id id;
+            double value;
+            Kind kind;
+        };
+
+        /// UI thread. Returns false if the queue was full and the edit dropped.
+        bool push(Edit const &) const;
+        /// Audio thread.
+        bool pop(Edit &);
+
+      private:
+        /// A power of two, so the mask is an and.
+        static constexpr std::size_t capacity{1024};
+        static constexpr std::size_t mask{capacity - 1};
+
+        mutable std::array<Edit, capacity> edits_{};
+        mutable std::atomic<std::size_t> written_{0};
+        std::atomic<std::size_t> read_{0};
+    }; // class UIEdits
+
     /// \note The 2016 host proxy answered a dozen questions about a VST or AU
-    /// host. Two are reached from the parameter path.
+    /// host. These are the ones the parameter path reaches.
     class HostProxy
     {
       public:
@@ -99,8 +161,31 @@ class SpectrumWorxCLAP final
         /// by being asked to go and look.
         static bool wantsManualDependentParameterNotifications() { return false; }
 
-        /// One parameter moving another -- an LFO bound dragging its partner.
+        /// One parameter moving another -- an LFO bound dragging its partner --
+        /// and every parameter the editor itself moves.
         void automatedParameterChanged(ParameterSelector, Plugins::AutomatedParameterValue) const;
+
+        /// A knob drag, which a host records as one undoable automation gesture.
+        void automatedParameterBeginEdit(ParameterSelector) const;
+        void automatedParameterEndEdit(ParameterSelector) const;
+
+        /// \note The engine's other notion of a gesture: a named block of edits
+        /// ("Add module"), for a host that can label an undo step. CLAP has no
+        /// call for it -- its gestures are per parameter, above.
+        static void gestureBegin(char const * /*description*/) {}
+        static void gestureEnd() {}
+
+        /// \note True, meaning "do not push me every parameter of a module that
+        /// just changed". The list itself is fixed (see rebuildParameterIDs);
+        /// what a slot's effect change alters is names and values, and the
+        /// CLAP_PARAM_RESCAN_INFO | TEXT | VALUES sent for it makes the host
+        /// re-read all of them.
+        static bool parameterListChanged() { return true; }
+
+        void presetChangeBegin() const;
+        void presetChangeEnd() const;
+
+        bool reportNewLatencyInSamples(unsigned int) const;
 
       private:
         SpectrumWorxCLAP const &plugin_;
@@ -108,15 +193,8 @@ class SpectrumWorxCLAP final
 
     HostProxy host() const { return HostProxy{*this}; }
 
-    /// \note `void const *` rather than an editor pointer, which selects the
-    /// interop's own guiless overload of updateGUIForChangedModule. Saying "no
-    /// GUI" in the type is more honest than handing over a null editor, and it
-    /// keeps the editor's definition out of this header. It becomes a real
-    /// SpectrumWorxEditor * when there is one.
-    void const *gui() const { return nullptr; }
-
-    /// A slot's effect changed, so its parameters are different ones now.
-    void moduleChanged(std::uint8_t moduleIndex, Engine::ModuleParameters const *) const;
+    /// The editor, while one is open, else nullptr.
+    GUI::SpectrumWorxEditor *gui() const { return pEditor_; }
 
     /// \note The VST program model prefixed a modified program's name with '*'.
     /// CLAP has a host call for it instead, and it is the host's business
@@ -133,9 +211,37 @@ class SpectrumWorxCLAP final
     /// an unsolicited rescan" probe.
     void requestRescanFromUI();
 
-    /// Which effect is in \p slot, or noModule. For the stub editor's labels.
+    /// Which effect is in \p slot, or noModule.
     std::int8_t effectIn(std::uint8_t slot) const;
-    std::uint16_t parameterCount() const { return numberOfParameters(&program()); }
+    /// \note Fixed for the plugin's lifetime -- see rebuildParameterIDs().
+    std::uint16_t parameterCount() const
+    {
+        return static_cast<std::uint16_t>(parameterIDs_.size());
+    }
+
+  protected: // GUI::EditorHost
+    /// \note All four are trivial: the engine and the notification layer are
+    /// both bases of this class. The interface exists because sw-impl links
+    /// sw-gui, so the editor cannot name this type.
+    SpectrumWorxCore &core() override { return *this; }
+    Plugin2HostInteropControler &automation() override { return *this; }
+
+    void editorOpened(GUI::SpectrumWorxEditor &) override;
+    void editorClosed() override;
+
+    /// \note Audio Units negotiate their channel layout with the host, and
+    /// clap-wrapper does present this plugin as one. It is not reachable from
+    /// here, though, and the CLAP itself declares its ports outright -- so the
+    /// honest answer at this layer is no, and 5.7 revisits it with the input
+    /// mode parameter.
+    bool completelyDisableIOChanges() const override { return false; }
+
+    /// \note There is no settings file to persist this to yet: the 2016 one
+    /// went with the plugin class that owned it, and the session state a host
+    /// hands back through clap_plugin_state is a better home for it anyway.
+    /// Held in memory so the checkbox at least tracks itself.
+    bool shouldLoadLastSessionOnStartup() const override { return loadLastSession_; }
+    void shouldLoadLastSessionOnStartup(bool const load) override { loadLastSession_ = load; }
 
   protected:
     bool init() noexcept override;
@@ -214,11 +320,20 @@ class SpectrumWorxCLAP final
     std::unique_ptr<sst::clap_juce_shim::ClapJuceShim> clapJuceShim_;
 
     std::atomic<std::uint32_t> pendingRescan_{0};
-    std::atomic<std::uint32_t> uiEditedSlots_{0};
+
+    /// What the editor moved, waiting for a process() or flush() to carry it to
+    /// the host.
+    UIEdits uiEdits_;
+
+    /// \note Owned by the shim, which destroys it before this. Cleared in the
+    /// editor's own destructor path so a queued notification cannot reach a
+    /// dead component.
+    GUI::SpectrumWorxEditor *pEditor_{nullptr};
 
     double sampleRate_{0};
     std::uint32_t latencyInSamples_{0};
     bool engineRunning_{false};
+    bool loadLastSession_{false};
 }; // class SpectrumWorxCLAP
 
 //------------------------------------------------------------------------------

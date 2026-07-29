@@ -11,6 +11,7 @@
 add_executable(sw-show-ui
         main.cpp
         page.cpp
+        pages/editorPage.cpp
         pages/environmentPage.cpp
         pages/skinPage.cpp
         pages/themePage.cpp
@@ -20,6 +21,17 @@ target_link_libraries(sw-show-ui PRIVATE
         juce::juce_gui_basics
         juce::juce_gui_extra
         sw-gui-resources
+
+        # The editor page.
+        sw-gui
+)
+
+# Plugin2HostInteropControler's out-of-line half. It lives in sw-impl, and
+# linking that would drag the CLAP entry point into a plain desktop app -- so
+# compile the two sources here instead.
+target_sources(sw-show-ui PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/host_interop/plugin2Host.cpp
+        ${CMAKE_SOURCE_DIR}/src/core/host_interop/host2Plugin.cpp
 )
 
 target_compile_definitions(sw-show-ui PRIVATE
@@ -40,7 +52,7 @@ target_compile_definitions(sw-show-ui PRIVATE
 # thing that notices a page which compiles but throws, asserts or draws
 # nothing -- which is most of how GUI code fails.
 if (SW_BUILD_TESTS)
-    foreach (page environment skin theme)
+    foreach (page editor environment skin theme)
         add_test(NAME show-ui-renders-${page}
                 COMMAND sw-show-ui --render ${page}
                 "${CMAKE_CURRENT_BINARY_DIR}/rendered-${page}.png")

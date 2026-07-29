@@ -50,6 +50,20 @@ void initialiseMac() noexcept
 #if !JUCE_64BIT
     LE_VERIFY(::NSApplicationLoad());
 #endif
+    /// \note This used to assert multithreaded mode rather than ask for it,
+    /// which held only because a DAW has spawned threads long before it opens
+    /// an editor. It is not true of a plain single threaded process -- the
+    /// sw-show-ui harness, say -- and the assert fired there for no fault of
+    /// the code under it.
+    ///
+    ///   Cocoa becomes thread safe once a second NSThread has been spawned and
+    /// never leaves that state, so a thread that returns immediately is the
+    /// documented way to enter it. Detaching one posts
+    /// NSWillBecomeMultiThreadedNotification before the thread runs, so the
+    /// mode is on by the time this returns.
+    ///                                       (29.07.2026.) (SW port)
+    if (![NSThread isMultiThreaded])
+        [NSThread detachNewThreadSelector:@selector(class) toTarget:[NSObject class] withObject:nil];
     LE_ASSERT([NSThread isMultiThreaded]);
 
 #if 0  //...mrmlj...experiments to 'fix' the fat fonts issue under ML...

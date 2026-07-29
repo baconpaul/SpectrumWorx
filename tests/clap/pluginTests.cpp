@@ -16,6 +16,8 @@
 //------------------------------------------------------------------------------
 #include "swClapEntryImpl.hpp"
 
+#include "core/host_interop/parameters.hpp" // the fixed parameter count
+
 #include <clap/clap.h>
 
 #include <catch2/catch_test_macros.hpp>
@@ -290,7 +292,9 @@ TEST_CASE("The host sees the engine's own parameters, not a stand-in", "[clap]")
         REQUIRE(params->get_info(&*plugin, index, &info));
         INFO("parameter " << index << " '" << info.name << "'");
         CHECK(std::strlen(info.name) > 0);
-        CHECK(info.min_value <= info.max_value);
+        // Strictly less: a host divides by this range, and one parameter in a
+        // fixed list that no effect currently owns must not hand it a zero.
+        CHECK(info.min_value < info.max_value);
         CHECK(info.default_value >= info.min_value);
         CHECK(info.default_value <= info.max_value);
         CHECK(std::strlen(info.module) > 0);
@@ -306,11 +310,44 @@ TEST_CASE("The host sees the engine's own parameters, not a stand-in", "[clap]")
     CHECK(sawAGlobal);
 }
 
-TEST_CASE("Filling a module slot grows the host's parameter list", "[clap]")
+TEST_CASE("A parameter no effect currently owns is hidden, not broken", "[clap]")
 {
-    // The whole reason this port targets CLAP. A slot's effect is itself a
-    // parameter, and setting it changes how many parameters exist and what they
-    // are called -- which a fixed parameter table cannot express.
+    // The cost of declaring every slot's parameters up front: on an empty
+    // instance most of them belong to no effect. They keep valid IDs and a
+    // usable range, and say so with CLAP_PARAM_IS_HIDDEN.
+    Entry const entry;
+    ActivePlugin plugin(48000, 512);
+
+    auto const *const params(
+        static_cast<clap_plugin_params const *>(plugin->get_extension(&*plugin, CLAP_EXT_PARAMS)));
+    REQUIRE(params != nullptr);
+
+    std::uint32_t hidden{0}, shown{0};
+    for (std::uint32_t index(0); index < params->count(&*plugin); ++index)
+    {
+        clap_param_info info{};
+        REQUIRE(params->get_info(&*plugin, index, &info));
+        INFO("parameter " << index << " '" << info.name << "'");
+        // Hidden or not, it must still be answerable.
+        double value{0};
+        CHECK(params->get_value(&*plugin, info.id, &value));
+        CHECK(info.min_value < info.max_value);
+        ((info.flags & CLAP_PARAM_IS_HIDDEN) ? hidden : shown)++;
+    }
+
+    // The globals and the five slot selectors are real with nothing loaded.
+    CHECK(shown > 0);
+    CHECK(hidden > 0);
+}
+
+TEST_CASE("Filling a module slot renames its parameters without adding any", "[clap]")
+{
+    // A slot's effect is itself a parameter, and setting it changes what the
+    // slot's other parameters *are*. What it must not change is how many there
+    // are: ext/params.h only lets a plugin add or remove parameters through
+    // clap_host->restart() and a deactivated CLAP_PARAM_RESCAN_ALL, so the
+    // count a host reads once has to stay good. Every slot's full complement is
+    // therefore declared up front and an unused one reads as N/A.
     Entry const entry;
     ActivePlugin plugin(48000, 512);
 
@@ -319,6 +356,21 @@ TEST_CASE("Filling a module slot grows the host's parameter list", "[clap]")
     REQUIRE(params != nullptr);
 
     auto const emptyCount(params->count(&*plugin));
+
+    // Every module parameter of every slot, plus the LFOs, plus the globals --
+    // present with no effect loaded at all, which is the point.
+    CHECK(emptyCount == LE::SW::ParameterCounts::maxNumberOfParameters);
+
+    // Slot 1's parameters exist already; they just have nothing to name them.
+    std::uint32_t slotOneBefore{0};
+    for (std::uint32_t index(0); index < emptyCount; ++index)
+    {
+        clap_param_info info{};
+        REQUIRE(params->get_info(&*plugin, index, &info));
+        if (std::strncmp(info.module, "Slot 1", 6) == 0)
+            ++slotOneBefore;
+    }
+    CHECK(slotOneBefore > 0);
 
     /// \note ParameterID's members are laid out in reverse so that the hex reads
     /// naturally on a little-endian machine: the type is the top byte and the
@@ -347,19 +399,26 @@ TEST_CASE("Filling a module slot grows the host's parameter list", "[clap]")
 
     params->flush(&*plugin, &one.list, &discardedOutputEvents());
 
+    // The count is the contract: it did not move.
     auto const filledCount(params->count(&*plugin));
-    CHECK(filledCount > emptyCount);
+    CHECK(filledCount == emptyCount);
 
-    // And the new ones are the slot's, named for it.
-    bool sawSlotOne{false};
+    // What did move is the description. An empty slot reports its module
+    // parameters as N/A -- a degenerate 0..0 range -- and a filled one gives
+    // them the effect's real ranges and names.
+    std::uint32_t slotOneAfter{0}, usableAfter{0};
     for (std::uint32_t index(0); index < filledCount; ++index)
     {
         clap_param_info info{};
         REQUIRE(params->get_info(&*plugin, index, &info));
-        if (std::strcmp(info.module, "Slot 1") == 0)
-            sawSlotOne = true;
+        if (std::strncmp(info.module, "Slot 1", 6) != 0)
+            continue;
+        ++slotOneAfter;
+        if (info.max_value > info.min_value)
+            ++usableAfter;
     }
-    CHECK(sawSlotOne);
+    CHECK(slotOneAfter == slotOneBefore);
+    CHECK(usableAfter > 0);
 }
 
 TEST_CASE("Silence in is silence out", "[clap]")

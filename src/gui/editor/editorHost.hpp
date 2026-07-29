@@ -65,6 +65,13 @@ class LE_NOVTABLE EditorHost
     /// Gestures, automation notifications and module chain changes.
     virtual Plugin2HostInteropControler &automation() = 0;
 
+    /// \note How the plugin comes to know about the editor at all. Called from
+    /// the editor's constructor and destructor, on the UI thread -- opened()
+    /// last, so nothing reaches a half-built editor, and closed() first, so
+    /// nothing reaches a dying one.
+    virtual void editorOpened(SpectrumWorxEditor &) = 0;
+    virtual void editorClosed() = 0;
+
 #ifndef LE_SW_DISABLE_SIDE_CHANNEL
     ////////////////////////////////////////////////////////////////////////////
     // The side channel's sample.

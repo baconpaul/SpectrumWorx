@@ -9,7 +9,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #include "spectrumWorxCLAP.hpp"
-#include "stubEditor.hpp"
+#include "gui/editor/spectrumWorxEditor.hpp"
 
 #include "core/modules/factory.hpp"
 // \note Order matters and is not alphabetical: finalImplementations.hpp defines
@@ -20,8 +20,7 @@
 
 // \note The interop templates are defined in .inl files that only their
 // instantiating translation unit includes -- this one. They call through to a
-// module's UI on a slot change, so the complete type is needed even though this
-// plugin's gui() is always null until the editor is ported.
+// module's UI on a slot change, so the complete type is needed.
 #include "gui/modules/moduleUI.hpp"
 
 #include "core/host_interop/host2PluginImpl.inl"
@@ -30,7 +29,6 @@
 #include <sst/plugininfra/version_information.h>
 
 #include <algorithm>
-#include <bit>
 #include <cstring>
 //------------------------------------------------------------------------------
 namespace LE::SW
@@ -203,16 +201,31 @@ bool SpectrumWorxCLAP::audioPortsInfo(std::uint32_t const index, bool const isIn
 // Parameters
 ////////////////////////////////////////////////////////////////////////////////
 
+/// \brief Every parameter the engine can ever have, once, at init().
+///
+/// \note Passing nullptr rather than the Program is the whole point: it asks
+/// for the *maximal* list -- every slot's full complement of module and LFO
+/// parameters -- instead of the list the current program happens to have.
+///
+///   The list has to be maximal because CLAP does not let a plugin change its
+/// parameter count while it is active. ext/params.h is explicit: adding or
+/// removing parameters means calling clap_host->restart() and waiting for
+/// deactivate() before CLAP_PARAM_RESCAN_ALL. Doing it from process() or
+/// flush() -- which is what following the Program does, since a host can swap a
+/// slot's effect with an event mid-block -- is not something a host has to cope
+/// with, and the ones that do not simply keep the count they first read. That
+/// is why an empty session showed eleven parameters: six globals and five slot
+/// selectors, with nothing for any module because no slot held an effect yet.
+///
+///   Nothing is lost by declaring them all. A parameter belonging to a slot
+/// whose effect does not have it reads as N/A rather than as an unknown ID, so
+/// a host's automation lane stays attached across an effect swap -- which is
+/// the behaviour isValidParamId() was already written for.
 void SpectrumWorxCLAP::rebuildParameterIDs()
 {
-    /// \note The reserve in the constructor is what makes this callable from
-    /// process(): the list changes when a slot's effect changes, which a host
-    /// can do with an event in the middle of a block, and resizing within a
-    /// reserved capacity does not allocate. maxNumberOfParameters is the bound
-    /// the engine itself is built to.
-    LE_ASSERT(numberOfParameters(&program()) <= parameterIDs_.capacity());
-    parameterIDs_.resize(numberOfParameters(&program()));
-    getParameterIDs({parameterIDs_.data(), parameterIDs_.size()}, &program());
+    parameterIDs_.resize(numberOfParameters(nullptr));
+    getParameterIDs({parameterIDs_.data(), parameterIDs_.size()}, nullptr);
+    LE_ASSERT(parameterIDs_.size() == ParameterCounts::maxNumberOfParameters);
 }
 
 bool SpectrumWorxCLAP::isValidParamId(clap_id const id) const noexcept
@@ -227,7 +240,9 @@ bool SpectrumWorxCLAP::isValidParamId(clap_id const id) const noexcept
 
 std::uint32_t SpectrumWorxCLAP::paramsCount() const noexcept
 {
-    return numberOfParameters(&program());
+    /// \note The list built at init(), not numberOfParameters(&program()). See
+    /// rebuildParameterIDs(): this count is fixed for the plugin's lifetime.
+    return static_cast<std::uint32_t>(parameterIDs_.size());
 }
 
 bool SpectrumWorxCLAP::paramsInfo(std::uint32_t const index,
@@ -249,16 +264,38 @@ bool SpectrumWorxCLAP::paramsInfo(std::uint32_t const index,
     info->default_value = properties.default_();
     info->cookie = nullptr;
 
-    info->flags = CLAP_PARAM_IS_AUTOMATABLE;
-    if (properties.isStepped())
-        info->flags |= CLAP_PARAM_IS_STEPPED;
-    /// \note A "meta" parameter is one whose value changes what the other
-    /// parameters *are* -- which effect a slot holds, chiefly. Telling the host
-    /// its value requires a rescan is exactly what this flag is for.
-    if (properties.isMeta())
-        info->flags |= CLAP_PARAM_REQUIRES_PROCESS;
-    if (!properties.isAutomatable())
-        info->flags = CLAP_PARAM_IS_READONLY;
+    /// \note A parameter belonging to a slot whose effect does not have it --
+    /// most of the list on an empty instance. The model spells that as an empty
+    /// range and "not automatable", which was enough while the list was dynamic
+    /// and such a parameter was simply absent from it. This list is fixed (see
+    /// rebuildParameterIDs), so the host sees them: an empty range is one it
+    /// would divide by, and read-only is not what they are -- they become
+    /// writable the moment the slot is filled.
+    ///
+    ///   CLAP_PARAM_IS_HIDDEN says just what is meant, "not shown, because it
+    /// is currently not used", and a usable range goes with it so that a host
+    /// which shows it anyway has something sane to draw.
+    bool const notInThisProgram(!properties.isAutomatable() ||
+                                (properties.maximum() <= properties.minimum()));
+
+    if (notInThisProgram)
+    {
+        info->min_value = 0;
+        info->max_value = 1;
+        info->default_value = 0;
+        info->flags = CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_HIDDEN;
+    }
+    else
+    {
+        info->flags = CLAP_PARAM_IS_AUTOMATABLE;
+        if (properties.isStepped())
+            info->flags |= CLAP_PARAM_IS_STEPPED;
+        /// \note A "meta" parameter is one whose value changes what the other
+        /// parameters *are* -- which effect a slot holds, chiefly. Telling the
+        /// host its value requires a rescan is exactly what this flag is for.
+        if (properties.isMeta())
+            info->flags |= CLAP_PARAM_REQUIRES_PROCESS;
+    }
 
     std::strncpy(info->name, properties.name(), CLAP_NAME_SIZE - 1);
     modulePathFor(parameterID, info->module);
@@ -364,15 +401,12 @@ void SpectrumWorxCLAP::paramsFlush(clap_input_events const *const in,
                                    clap_output_events const *const out) noexcept
 {
     auto const size(in->size(in));
-    bool listChanged(false);
+    bool effectChanged(false);
     for (std::uint32_t event(0); event < size; ++event)
-        listChanged |= handleEvent(in->get(in, event));
+        effectChanged |= handleEvent(in->get(in, event));
 
-    if (listChanged)
-    {
-        rebuildParameterIDs();
-        requestRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT);
-    }
+    if (effectChanged)
+        requestRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT | CLAP_PARAM_RESCAN_VALUES);
 
     flushUIEdits(out);
 }
@@ -383,19 +417,20 @@ void SpectrumWorxCLAP::paramsFlush(clap_input_events const *const in,
 
 clap_process_status SpectrumWorxCLAP::process(clap_process const *const process) noexcept
 {
-    bool listChanged(false);
+    bool effectChanged(false);
     if (auto const *const in = process->in_events)
     {
         auto const size(in->size(in));
         for (std::uint32_t event(0); event < size; ++event)
-            listChanged |= handleEvent(in->get(in, event));
+            effectChanged |= handleEvent(in->get(in, event));
     }
 
-    if (listChanged)
-    {
-        rebuildParameterIDs();
-        requestRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT);
-    }
+    /// \note Names, module paths and displayed values change; the parameter
+    /// *list* does not, so this never needs CLAP_PARAM_RESCAN_ALL -- which
+    /// would be illegal here, an active plugin having to go through
+    /// clap_host->restart() first. See rebuildParameterIDs().
+    if (effectChanged)
+        requestRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT | CLAP_PARAM_RESCAN_VALUES);
 
     if (process->out_events)
         flushUIEdits(process->out_events);
@@ -450,112 +485,121 @@ void SpectrumWorxCLAP::onMainThread() noexcept
 // Edits made in the editor
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace
+bool SpectrumWorxCLAP::UIEdits::push(Edit const &edit) const
 {
-/// The module-chain parameter for a slot: "which effect is in this slot".
-ParameterID moduleChainParameterID(std::uint8_t const slot)
-{
-    ParameterID parameterID;
-    parameterID.binaryValue = 0;
-    parameterID.value.type = ParameterID::ModuleChainParameter;
-    parameterID.value._.moduleChain.moduleIndex = slot;
-    return parameterID;
+    auto const written(written_.load(std::memory_order_relaxed));
+    // The consumer only ever advances read_, so a stale value here just makes
+    // the queue look fuller than it is -- never emptier.
+    if ((written - read_.load(std::memory_order_acquire)) >= capacity)
+        return false;
+    edits_[written & mask] = edit;
+    written_.store(written + 1, std::memory_order_release);
+    return true;
 }
-} // anonymous namespace
+
+bool SpectrumWorxCLAP::UIEdits::pop(Edit &edit)
+{
+    auto const read(read_.load(std::memory_order_relaxed));
+    if (read == written_.load(std::memory_order_acquire))
+        return false;
+    edit = edits_[read & mask];
+    read_.store(read + 1, std::memory_order_release);
+    return true;
+}
 
 void SpectrumWorxCLAP::flushUIEdits(clap_output_events const *const out)
 {
-    auto dirty(uiEditedSlots_.exchange(0));
-    while (dirty != 0)
+    UIEdits::Edit edit;
+    while (uiEdits_.pop(edit))
     {
-        auto const slot(static_cast<std::uint8_t>(std::countr_zero(dirty)));
-        dirty &= static_cast<std::uint32_t>(dirty - 1);
+        clap_event_param_gesture gesture{};
+        clap_event_param_value value{};
+        clap_event_header *pHeader{nullptr};
 
-        auto const parameterID(moduleChainParameterID(slot));
+        if (edit.kind == UIEdits::Kind::Value)
+        {
+            value.header.size = sizeof(value);
+            value.header.time = 0;
+            value.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+            value.header.type = CLAP_EVENT_PARAM_VALUE;
+            value.header.flags = 0;
+            value.param_id = edit.id;
+            value.cookie = nullptr;
+            value.note_id = value.port_index = value.channel = value.key = -1;
+            value.value = edit.value;
+            pHeader = &value.header;
+        }
+        else
+        {
+            gesture.header.size = sizeof(gesture);
+            gesture.header.time = 0;
+            gesture.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+            gesture.header.type = (edit.kind == UIEdits::Kind::GestureBegin)
+                                      ? CLAP_EVENT_PARAM_GESTURE_BEGIN
+                                      : CLAP_EVENT_PARAM_GESTURE_END;
+            gesture.header.flags = 0;
+            gesture.param_id = edit.id;
+            pHeader = &gesture.header;
+        }
 
-        clap_event_param_value event{};
-        event.header.size = sizeof(event);
-        event.header.time = 0;
-        event.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
-        event.header.type = CLAP_EVENT_PARAM_VALUE;
-        event.header.flags = 0;
-        event.param_id = parameterID.binaryValue;
-        event.cookie = nullptr;
-        event.note_id = -1;
-        event.port_index = -1;
-        event.channel = -1;
-        event.key = -1;
-        event.value = getParameter(parameterID);
-        out->try_push(out, &event.header);
+        out->try_push(out, pHeader);
     }
 }
 
-/// \note The only way to change an effect from inside the plugin until the real
-/// editor lands -- the stub editor drives it. It goes through setParameter like
-/// any host automation would, so it exercises the same path.
-void SpectrumWorxCLAP::cycleModuleFromUI(std::uint8_t const moduleIndex)
+////////////////////////////////////////////////////////////////////////////////
+// What the editor tells the host.
+//
+// \note All of it queues rather than calls. These run on the UI thread, and a
+// host takes parameter changes only through the output event list it hands to
+// process() or flush().
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxCLAP::HostProxy::automatedParameterChanged(
+    ParameterSelector const parameter, Plugins::AutomatedParameterValue const value) const
 {
-    if (moduleIndex >= Constants::maxNumberOfModules)
-        return;
-
-    auto const parameterID(moduleChainParameterID(moduleIndex));
-
-    auto const current(static_cast<int>(getParameter(parameterID)));
-    auto const next(static_cast<int>(current + 1) >=
-                            static_cast<int>(Effects::Constants::numberOfEffects)
-                        ? noModule
-                        : current + 1);
-
-    setParameter(parameterID, static_cast<Plugins::AutomatedParameterValue>(next));
-    rebuildParameterIDs();
-    uiEditedSlots_.fetch_or(std::uint32_t{1} << moduleIndex);
-
-    if (_host.canUseParams())
-    {
-        _host.paramsRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT);
-        _host.paramsRequestFlush();
-    }
+    plugin_.uiEdits_.push({parameter.value, value, UIEdits::Kind::Value});
+    plugin_.markCurrentProgramAsModified();
+    plugin_._host.paramsRequestFlush();
 }
 
-/// \note Unreachable, and deliberately so: the only call site is guarded by
-/// wantsManualDependentParameterNotifications(), which is false for CLAP. A host
-/// hears about a dependent parameter moving from the CLAP_EVENT_PARAM_VALUE the
-/// plugin queues into its output list, which is a better mechanism than the
-/// 2016 one and does not need this. It exists because the interop template
-/// names it.
-///                                       (29.07.2026.) (SW port)
-void SpectrumWorxCLAP::HostProxy::automatedParameterChanged(ParameterSelector,
-                                                            Plugins::AutomatedParameterValue) const
+void SpectrumWorxCLAP::HostProxy::automatedParameterBeginEdit(
+    ParameterSelector const parameter) const
 {
-    LE_ASSERT_MSG(false, "CLAP does not ask for manual dependent-parameter notifications.");
+    plugin_.uiEdits_.push({parameter.value, 0, UIEdits::Kind::GestureBegin});
+    plugin_._host.paramsRequestFlush();
 }
 
-void SpectrumWorxCLAP::moduleChanged(std::uint8_t const /*moduleIndex*/,
-                                     Engine::ModuleParameters const *) const
+void SpectrumWorxCLAP::HostProxy::automatedParameterEndEdit(ParameterSelector const parameter) const
 {
-    //...mrmlj...const because the interop calls it from a const context; the
-    //...mrmlj...rescan flag it sets is atomic, which is what makes that honest.
-    const_cast<SpectrumWorxCLAP &>(*this).requestRescan(
-        static_cast<clap_param_rescan_flags>(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT));
+    plugin_.uiEdits_.push({parameter.value, 0, UIEdits::Kind::GestureEnd});
+    plugin_._host.paramsRequestFlush();
+}
+
+/// \note A whole program is about to be swapped in, so the host should expect
+/// every value to move at once. Nothing to do until presets exist; the rescan
+/// at the end of stateLoad() is the equivalent for the state path.
+void SpectrumWorxCLAP::HostProxy::presetChangeBegin() const {}
+
+void SpectrumWorxCLAP::HostProxy::presetChangeEnd() const
+{
+    if (plugin_._host.canUseParams())
+        plugin_._host.paramsRescan(CLAP_PARAM_RESCAN_VALUES | CLAP_PARAM_RESCAN_TEXT);
+}
+
+bool SpectrumWorxCLAP::HostProxy::reportNewLatencyInSamples(unsigned int const latency) const
+{
+    auto &plugin(const_cast<SpectrumWorxCLAP &>(plugin_));
+    plugin.latencyInSamples_ = latency;
+    if (!plugin_._host.canUseLatency())
+        return false;
+    plugin._host.latencyChanged();
+    return true;
 }
 
 void SpectrumWorxCLAP::markCurrentProgramAsModified() const
 {
     if (_host.canUseState())
         _host.stateMarkDirty();
-}
-
-std::int8_t SpectrumWorxCLAP::effectIn(std::uint8_t const slot) const
-{
-    return program().moduleChain().getParameterForIndex(slot);
-}
-
-void SpectrumWorxCLAP::requestRescanFromUI()
-{
-    rebuildParameterIDs();
-    if (_host.canUseParams())
-        _host.paramsRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT |
-                           CLAP_PARAM_RESCAN_VALUES);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -629,8 +673,6 @@ bool SpectrumWorxCLAP::stateLoad(clap_istream const *const stream) noexcept
             setParameter(parameterID, static_cast<Plugins::AutomatedParameterValue>(value));
     }
 
-    rebuildParameterIDs();
-
     // Already on the main thread here.
     if (_host.canUseParams())
         _host.paramsRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT |
@@ -642,10 +684,16 @@ bool SpectrumWorxCLAP::stateLoad(clap_istream const *const stream) noexcept
 // Editor
 ////////////////////////////////////////////////////////////////////////////////
 
+/// \note The shim owns what this returns and destroys it before this plugin.
+/// The editor registers and deregisters itself through EditorHost, which is why
+/// this does not have to wrap it -- SpectrumWorxEditor is final anyway.
 std::unique_ptr<juce::Component> SpectrumWorxCLAP::createEditor()
 {
-    return std::make_unique<StubEditor>(*this);
+    return std::make_unique<GUI::SpectrumWorxEditor>(*this);
 }
+
+void SpectrumWorxCLAP::editorOpened(GUI::SpectrumWorxEditor &editor) { pEditor_ = &editor; }
+void SpectrumWorxCLAP::editorClosed() { pEditor_ = nullptr; }
 
 bool SpectrumWorxCLAP::registerOrUnregisterTimer(clap_id &id, int const milliseconds,
                                                  bool const registering)
