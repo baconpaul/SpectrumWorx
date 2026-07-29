@@ -11,6 +11,8 @@
 #include "stubEditor.hpp"
 #include "spectrumWorxCLAP.hpp"
 
+#include "le/spectrumworx/effects/configuration/effectNames.hpp"
+
 #include <sst/plugininfra/version_information.h>
 //------------------------------------------------------------------------------
 namespace LE::SW
@@ -19,7 +21,7 @@ namespace LE::SW
 
 StubEditor::StubEditor(SpectrumWorxCLAP &plugin) : plugin_(plugin)
 {
-    for (std::uint8_t slot(0); slot < Skeleton::modules; ++slot)
+    for (std::uint8_t slot(0); slot < Constants::maxNumberOfModules; ++slot)
     {
         auto button(std::make_unique<juce::TextButton>());
         button->onClick = [this, slot] {
@@ -42,14 +44,14 @@ StubEditor::~StubEditor() = default;
 
 void StubEditor::refreshLabels()
 {
-    auto const &effects(fakeEffects());
-    for (std::uint8_t slot(0); slot < Skeleton::modules; ++slot)
+    for (std::uint8_t slot(0); slot < Constants::maxNumberOfModules; ++slot)
     {
-        auto const effect(plugin_.parameters().effectIn(slot));
+        auto const effect(plugin_.effectIn(slot));
         slotButtons_[slot]->setButtonText(
             juce::String("Module ") + juce::String(slot + 1) + ": " +
             (effect == noModule ? juce::String("(empty)")
-                                : juce::String(effects[static_cast<std::size_t>(effect)].name)));
+                                : juce::String(Effects::effectName(
+                                      static_cast<std::uint8_t>(effect)))));
     }
 }
 
@@ -71,7 +73,7 @@ void StubEditor::paint(juce::Graphics &g)
                    sst::plugininfra::VersionInformation::project_version_and_hash,
                getLocalBounds().withTrimmedTop(46).withHeight(20).reduced(20, 0),
                juce::Justification::centredLeft);
-    g.drawText(juce::String(plugin_.parameters().count()) + " parameters",
+    g.drawText(juce::String(plugin_.parameterCount()) + " parameters",
                getLocalBounds().withTrimmedBottom(8).removeFromBottom(20).reduced(20, 0),
                juce::Justification::centredLeft);
 }

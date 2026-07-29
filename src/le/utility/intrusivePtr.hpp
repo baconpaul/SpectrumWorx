@@ -135,6 +135,10 @@ template <class T> void swap(IntrusivePtr<T> &left, IntrusivePtr<T> &right) noex
 /// LE::Utility::getPointer equivalent, for the call sites that used it.
 template <class T> T *getPointer(IntrusivePtr<T> const &p) noexcept { return p.get(); }
 
+/// \note And for a plain pointer, so that a caller holding one need not care
+/// which flavour of handle the thing it is asking about happens to use.
+template <class T> T *getPointer(T *const p) noexcept { return p; }
+
 //------------------------------------------------------------------------------
 } // namespace Utility
 //------------------------------------------------------------------------------

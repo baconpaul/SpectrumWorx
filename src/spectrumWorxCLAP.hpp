@@ -19,10 +19,12 @@
 #ifndef spectrumWorxCLAP_hpp__1F3B9A44_6C52_4D08_9E17_2AB5C7E0D391
 #define spectrumWorxCLAP_hpp__1F3B9A44_6C52_4D08_9E17_2AB5C7E0D391
 //------------------------------------------------------------------------------
-#include "stubParameters.hpp"
-
 #include "core/automatedModuleChain.hpp"
+#include "core/host_interop/host2PluginImpl.hpp"
+#include "core/host_interop/plugin2HostImpl.hpp"
 #include "core/spectrumWorxCore.hpp"
+
+#include "le/plugins/clap/tag.hpp"
 
 #include <clap/helpers/plugin.hh>
 #include <sst/clap_juce_shim/clap_juce_shim.h>
@@ -34,6 +36,11 @@
 namespace LE::SW
 {
 //------------------------------------------------------------------------------
+
+namespace GUI
+{
+class ModuleUI;
+}
 
 clap_plugin_descriptor const *descriptor();
 clap_plugin const *createPlugin(clap_host const *);
@@ -47,10 +54,75 @@ using PluginHelper = clap::helpers::Plugin<misbehaviourLevel, checkingLevel>;
 /// downcasts to it, so the engine cannot exist except as a base of something.
 /// SpectrumWorxSharedImpl is what does that in the finished design; until the
 /// protocol template layer of 5.2/5.3 lands, this class is that something.
-class SpectrumWorxCLAP final : public PluginHelper,
-                               public sst::clap_juce_shim::EditorProvider,
-                               public SpectrumWorxCore
+///
+///   The two interop bases are what make the parameter model real: the passive
+/// one reads a parameter's value, properties and display string out of the
+/// current Program, and the active one writes one back, including the module
+/// chain's "which effect is in this slot" selector.
+class SpectrumWorxCLAP final
+    : public PluginHelper,
+      public sst::clap_juce_shim::EditorProvider,
+      public SpectrumWorxCore,
+      public Plugin2HostPassiveInteropImpl<SpectrumWorxCLAP, Plugins::Protocol::CLAP>,
+      public Host2PluginInteropImpl<SpectrumWorxCLAP, Plugins::Protocol::CLAP>
 {
+  public:
+    using Protocol = Plugins::Protocol::CLAP;
+    using PassiveInterop = Plugin2HostPassiveInteropImpl<SpectrumWorxCLAP, Protocol>;
+    using ActiveInterop = Host2PluginInteropImpl<SpectrumWorxCLAP, Protocol>;
+
+    /// \note Both bases and SpectrumWorxCore declare these; say which.
+    using ActiveInterop::setParameter;
+    using PassiveInterop::getParameter;
+    using PassiveInterop::getParameterDisplay;
+
+    friend class Host2PluginInteropImpl<SpectrumWorxCLAP, Protocol>;
+
+    ////////////////////////////////////////////////////////////////////////////
+    // What the interop templates ask of an Impl.
+    ////////////////////////////////////////////////////////////////////////////
+
+    /// \note ParameterID rather than ParameterIndex -- the AU choice, not the
+    /// VST 2.4 one, because SW::ParameterID::binaryValue *is* a clap_id. That
+    /// equivalence is the reason this port targets CLAP at all.
+    using ParameterSelector = Plugins::ParameterID;
+
+    /// \note The 2016 host proxy answered a dozen questions about a VST or AU
+    /// host. Two are reached from the parameter path.
+    class HostProxy
+    {
+      public:
+        explicit HostProxy(SpectrumWorxCLAP const &plugin) : plugin_(plugin) {}
+
+        /// \note Flatly no for CLAP: a host learns that setting one parameter
+        /// moved another from the CLAP_EVENT_PARAM_VALUE the plugin queues, not
+        /// by being asked to go and look.
+        static bool wantsManualDependentParameterNotifications() { return false; }
+
+        /// One parameter moving another -- an LFO bound dragging its partner.
+        void automatedParameterChanged(ParameterSelector, Plugins::AutomatedParameterValue) const;
+
+      private:
+        SpectrumWorxCLAP const &plugin_;
+    }; // class HostProxy
+
+    HostProxy host() const { return HostProxy{*this}; }
+
+    /// \note `void const *` rather than an editor pointer, which selects the
+    /// interop's own guiless overload of updateGUIForChangedModule. Saying "no
+    /// GUI" in the type is more honest than handing over a null editor, and it
+    /// keeps the editor's definition out of this header. It becomes a real
+    /// SpectrumWorxEditor * when there is one.
+    void const *gui() const { return nullptr; }
+
+    /// A slot's effect changed, so its parameters are different ones now.
+    void moduleChanged(std::uint8_t moduleIndex, Engine::ModuleParameters const *) const;
+
+    /// \note The VST program model prefixed a modified program's name with '*'.
+    /// CLAP has a host call for it instead, and it is the host's business
+    /// whether that means anything.
+    void markCurrentProgramAsModified() const;
+
   public:
     explicit SpectrumWorxCLAP(clap_host const *);
     ~SpectrumWorxCLAP() override;
@@ -61,7 +133,9 @@ class SpectrumWorxCLAP final : public PluginHelper,
     /// an unsolicited rescan" probe.
     void requestRescanFromUI();
 
-    StubParameters const &parameters() const { return parameters_; }
+    /// Which effect is in \p slot, or noModule. For the stub editor's labels.
+    std::int8_t effectIn(std::uint8_t slot) const;
+    std::uint16_t parameterCount() const { return numberOfParameters(&program()); }
 
   protected:
     bool init() noexcept override;
@@ -116,12 +190,23 @@ class SpectrumWorxCLAP final : public PluginHelper,
     /// Emits param value events for slot selectors the editor moved.
     void flushUIEdits(clap_output_events const *);
 
+    /// CLAP's module path, which is how a host groups a parameter in its
+    /// generic panel -- and these group naturally, by module slot.
+    void modulePathFor(ParameterID, char (&path)[CLAP_PATH_SIZE]) const noexcept;
+
     /// Feeds the engine the sidechain port when the host has one connected, and
     /// the main input otherwise -- the engine reads a side channel whenever the
     /// current input mode calls for one and does not check that it is real.
     void runEngine(clap_process const *) noexcept;
 
-    StubParameters parameters_;
+    /// \brief index -> ParameterID, which is what CLAP's paramsInfo(index) needs
+    /// and the model does not offer directly.
+    ///
+    /// \note Rebuilt whenever the parameter list changes, which is what a rescan
+    /// means. Held rather than recomputed because the host walks it by index and
+    /// getParameterIDs is O(modules x parameters) each time.
+    void rebuildParameterIDs();
+    std::vector<Plugins::ParameterID> parameterIDs_;
 
     /// The engine's own; SpectrumWorxCore only holds a pointer.
     Program program_;

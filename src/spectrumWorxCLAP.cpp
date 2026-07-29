@@ -18,6 +18,15 @@
 #include "core/modules/moduleDSPAndGUI.hpp"
 #include "core/modules/finalImplementations.hpp"
 
+// \note The interop templates are defined in .inl files that only their
+// instantiating translation unit includes -- this one. They call through to a
+// module's UI on a slot change, so the complete type is needed even though this
+// plugin's gui() is always null until the editor is ported.
+#include "gui/modules/moduleUI.hpp"
+
+#include "core/host_interop/host2PluginImpl.inl"
+#include "core/host_interop/plugin2HostImpl.inl"
+
 #include <sst/plugininfra/version_information.h>
 
 #include <algorithm>
@@ -90,6 +99,7 @@ clap_plugin const *createPlugin(clap_host const *const host)
 SpectrumWorxCLAP::SpectrumWorxCLAP(clap_host const *const host) : PluginHelper(descriptor(), host)
 {
     setProgram(program_);
+    parameterIDs_.reserve(ParameterCounts::maxNumberOfParameters);
 
     clapJuceShim_ = std::make_unique<sst::clap_juce_shim::ClapJuceShim>(this);
     clapJuceShim_->setResizable(false);
@@ -97,7 +107,12 @@ SpectrumWorxCLAP::SpectrumWorxCLAP(clap_host const *const host) : PluginHelper(d
 
 SpectrumWorxCLAP::~SpectrumWorxCLAP() = default;
 
-bool SpectrumWorxCLAP::init() noexcept { return true; }
+bool SpectrumWorxCLAP::init() noexcept
+{
+    // The host may ask for the parameter list before activate(), and does.
+    rebuildParameterIDs();
+    return true;
+}
 
 bool SpectrumWorxCLAP::activate(double const sampleRate, std::uint32_t,
                                 std::uint32_t const maxFrames) noexcept
@@ -188,37 +203,133 @@ bool SpectrumWorxCLAP::audioPortsInfo(std::uint32_t const index, bool const isIn
 // Parameters
 ////////////////////////////////////////////////////////////////////////////////
 
-bool SpectrumWorxCLAP::isValidParamId(clap_id const id) const noexcept
+void SpectrumWorxCLAP::rebuildParameterIDs()
 {
-    return parameters_.byID(id) != nullptr;
+    /// \note The reserve in the constructor is what makes this callable from
+    /// process(): the list changes when a slot's effect changes, which a host
+    /// can do with an event in the middle of a block, and resizing within a
+    /// reserved capacity does not allocate. maxNumberOfParameters is the bound
+    /// the engine itself is built to.
+    LE_ASSERT(numberOfParameters(&program()) <= parameterIDs_.capacity());
+    parameterIDs_.resize(numberOfParameters(&program()));
+    getParameterIDs({parameterIDs_.data(), parameterIDs_.size()}, &program());
 }
 
-std::uint32_t SpectrumWorxCLAP::paramsCount() const noexcept { return parameters_.count(); }
+bool SpectrumWorxCLAP::isValidParamId(clap_id const id) const noexcept
+{
+    /// \note Every ParameterID that decodes is valid: the model answers "N/A"
+    /// for a slot whose effect does not have that parameter rather than
+    /// pretending the ID is unknown, which is what keeps a host's automation
+    /// lane attached across an effect swap.
+    ParameterID const parameterID{Plugins::ParameterID{id}};
+    return parameterID.type() <= ParameterID::LFOParameter;
+}
+
+std::uint32_t SpectrumWorxCLAP::paramsCount() const noexcept
+{
+    return numberOfParameters(&program());
+}
 
 bool SpectrumWorxCLAP::paramsInfo(std::uint32_t const index,
                                   clap_param_info *const info) const noexcept
 {
-    return parameters_.info(index, info);
+    if (index >= parameterIDs_.size())
+        return false;
+
+    auto const id(parameterIDs_[index]);
+    ParameterID const parameterID{id};
+
+    Plugins::ParameterInformation<Protocol> properties;
+    getParameterProperties(parameterID, properties, &program());
+
+    std::memset(info, 0, sizeof(*info));
+    info->id = id.value;
+    info->min_value = properties.minimum();
+    info->max_value = properties.maximum();
+    info->default_value = properties.default_();
+    info->cookie = nullptr;
+
+    info->flags = CLAP_PARAM_IS_AUTOMATABLE;
+    if (properties.isStepped())
+        info->flags |= CLAP_PARAM_IS_STEPPED;
+    /// \note A "meta" parameter is one whose value changes what the other
+    /// parameters *are* -- which effect a slot holds, chiefly. Telling the host
+    /// its value requires a rescan is exactly what this flag is for.
+    if (properties.isMeta())
+        info->flags |= CLAP_PARAM_REQUIRES_PROCESS;
+    if (!properties.isAutomatable())
+        info->flags = CLAP_PARAM_IS_READONLY;
+
+    std::strncpy(info->name, properties.name(), CLAP_NAME_SIZE - 1);
+    modulePathFor(parameterID, info->module);
+    return true;
+}
+
+void SpectrumWorxCLAP::modulePathFor(ParameterID const parameterID,
+                                     char (&path)[CLAP_PATH_SIZE]) const noexcept
+{
+    switch (parameterID.type())
+    {
+    case ParameterID::GlobalParameter:
+        std::strncpy(path, "Global", CLAP_PATH_SIZE - 1);
+        break;
+    case ParameterID::ModuleChainParameter:
+        std::snprintf(path, CLAP_PATH_SIZE, "Slot %u",
+                      parameterID.value._.moduleChain.moduleIndex + 1u);
+        break;
+    case ParameterID::ModuleParameter:
+        std::snprintf(path, CLAP_PATH_SIZE, "Slot %u", parameterID.value._.module.moduleIndex + 1u);
+        break;
+    case ParameterID::LFOParameter:
+        std::snprintf(path, CLAP_PATH_SIZE, "Slot %u/LFO",
+                      parameterID.value._.lfo.moduleIndex + 1u);
+        break;
+    }
 }
 
 bool SpectrumWorxCLAP::paramsValue(clap_id const id, double *const value) noexcept
 {
-    if (!parameters_.byID(id))
+    if (!isValidParamId(id))
         return false;
-    *value = parameters_.value(id);
+    *value = getParameter(ParameterID{Plugins::ParameterID{id}});
     return true;
 }
 
 bool SpectrumWorxCLAP::paramsValueToText(clap_id const id, double const value, char *const display,
                                          std::uint32_t const size) noexcept
 {
-    return parameters_.valueToText(id, value, display, size);
+    if (!isValidParamId(id))
+        return false;
+
+    std::array<char, 128> text{};
+    auto const automationValue(static_cast<Plugins::AutomatedParameterValue>(value));
+    getParameterDisplay(ParameterID{Plugins::ParameterID{id}}, {text.data(), text.size()},
+                        &automationValue);
+
+    std::array<char, 32> unit{};
+    getParameterLabel(ParameterID{Plugins::ParameterID{id}}, {unit.data(), unit.size()},
+                      &program());
+
+    std::snprintf(display, size, "%s%s", text.data(), unit.data());
+    return true;
 }
 
 bool SpectrumWorxCLAP::paramsTextToValue(clap_id const id, char const *const display,
                                          double *const value) noexcept
 {
-    return parameters_.textToValue(id, display, value);
+    /// \note The 2016 code never needed this: neither VST 2.4 nor AU asked a
+    /// plugin to parse a typed-in value, so there is no printer inverse to call.
+    /// A plain strtod covers the numeric parameters, which is what a user types
+    /// into; enumerated ones fall back to the host's own list.
+    if (!isValidParamId(id))
+        return false;
+
+    char *end{nullptr};
+    auto const parsed(std::strtod(display, &end));
+    if (end == display)
+        return false;
+    *value = parsed;
+    return true;
 }
 
 bool SpectrumWorxCLAP::handleEvent(clap_event_header const *const header)
@@ -229,7 +340,16 @@ bool SpectrumWorxCLAP::handleEvent(clap_event_header const *const header)
         return false;
 
     auto const *const event(reinterpret_cast<clap_event_param_value const *>(header));
-    return parameters_.setValue(event->param_id, event->value);
+    if (!isValidParamId(event->param_id))
+        return false;
+
+    ParameterID const parameterID{Plugins::ParameterID{event->param_id}};
+    setParameter(parameterID, static_cast<Plugins::AutomatedParameterValue>(event->value));
+
+    /// \note Only a module-chain parameter changes what the *other* parameters
+    /// are: it decides which effect a slot holds, and so how many parameters
+    /// that slot has and what they are called. Everything else is just a value.
+    return parameterID.type() == ParameterID::ModuleChainParameter;
 }
 
 void SpectrumWorxCLAP::requestRescan(clap_param_rescan_flags const flags)
@@ -249,7 +369,10 @@ void SpectrumWorxCLAP::paramsFlush(clap_input_events const *const in,
         listChanged |= handleEvent(in->get(in, event));
 
     if (listChanged)
+    {
+        rebuildParameterIDs();
         requestRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT);
+    }
 
     flushUIEdits(out);
 }
@@ -269,7 +392,10 @@ clap_process_status SpectrumWorxCLAP::process(clap_process const *const process)
     }
 
     if (listChanged)
+    {
+        rebuildParameterIDs();
         requestRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT);
+    }
 
     if (process->out_events)
         flushUIEdits(process->out_events);
@@ -324,6 +450,19 @@ void SpectrumWorxCLAP::onMainThread() noexcept
 // Edits made in the editor
 ////////////////////////////////////////////////////////////////////////////////
 
+namespace
+{
+/// The module-chain parameter for a slot: "which effect is in this slot".
+ParameterID moduleChainParameterID(std::uint8_t const slot)
+{
+    ParameterID parameterID;
+    parameterID.binaryValue = 0;
+    parameterID.value.type = ParameterID::ModuleChainParameter;
+    parameterID.value._.moduleChain.moduleIndex = slot;
+    return parameterID;
+}
+} // anonymous namespace
+
 void SpectrumWorxCLAP::flushUIEdits(clap_output_events const *const out)
 {
     auto dirty(uiEditedSlots_.exchange(0));
@@ -332,31 +471,43 @@ void SpectrumWorxCLAP::flushUIEdits(clap_output_events const *const out)
         auto const slot(static_cast<std::uint8_t>(std::countr_zero(dirty)));
         dirty &= static_cast<std::uint32_t>(dirty - 1);
 
+        auto const parameterID(moduleChainParameterID(slot));
+
         clap_event_param_value event{};
         event.header.size = sizeof(event);
         event.header.time = 0;
         event.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
         event.header.type = CLAP_EVENT_PARAM_VALUE;
         event.header.flags = 0;
-        event.param_id = packParameterID(ParameterType::ModuleChain, slot, 0, 0);
+        event.param_id = parameterID.binaryValue;
         event.cookie = nullptr;
         event.note_id = -1;
         event.port_index = -1;
         event.channel = -1;
         event.key = -1;
-        event.value = parameters_.value(event.param_id);
+        event.value = getParameter(parameterID);
         out->try_push(out, &event.header);
     }
 }
 
+/// \note The only way to change an effect from inside the plugin until the real
+/// editor lands -- the stub editor drives it. It goes through setParameter like
+/// any host automation would, so it exercises the same path.
 void SpectrumWorxCLAP::cycleModuleFromUI(std::uint8_t const moduleIndex)
 {
-    if (moduleIndex >= Skeleton::modules)
+    if (moduleIndex >= Constants::maxNumberOfModules)
         return;
 
-    // Main thread. The audio thread only reads these five doubles, and only to
-    // copy them back out to the host, so a plain store is good enough here.
-    parameters_.cycleEffectIn(moduleIndex);
+    auto const parameterID(moduleChainParameterID(moduleIndex));
+
+    auto const current(static_cast<int>(getParameter(parameterID)));
+    auto const next(static_cast<int>(current + 1) >=
+                            static_cast<int>(Effects::Constants::numberOfEffects)
+                        ? noModule
+                        : current + 1);
+
+    setParameter(parameterID, static_cast<Plugins::AutomatedParameterValue>(next));
+    rebuildParameterIDs();
     uiEditedSlots_.fetch_or(std::uint32_t{1} << moduleIndex);
 
     if (_host.canUseParams())
@@ -366,8 +517,42 @@ void SpectrumWorxCLAP::cycleModuleFromUI(std::uint8_t const moduleIndex)
     }
 }
 
+/// \note Unreachable, and deliberately so: the only call site is guarded by
+/// wantsManualDependentParameterNotifications(), which is false for CLAP. A host
+/// hears about a dependent parameter moving from the CLAP_EVENT_PARAM_VALUE the
+/// plugin queues into its output list, which is a better mechanism than the
+/// 2016 one and does not need this. It exists because the interop template
+/// names it.
+///                                       (29.07.2026.) (SW port)
+void SpectrumWorxCLAP::HostProxy::automatedParameterChanged(ParameterSelector,
+                                                            Plugins::AutomatedParameterValue) const
+{
+    LE_ASSERT_MSG(false, "CLAP does not ask for manual dependent-parameter notifications.");
+}
+
+void SpectrumWorxCLAP::moduleChanged(std::uint8_t const /*moduleIndex*/,
+                                     Engine::ModuleParameters const *) const
+{
+    //...mrmlj...const because the interop calls it from a const context; the
+    //...mrmlj...rescan flag it sets is atomic, which is what makes that honest.
+    const_cast<SpectrumWorxCLAP &>(*this).requestRescan(
+        static_cast<clap_param_rescan_flags>(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT));
+}
+
+void SpectrumWorxCLAP::markCurrentProgramAsModified() const
+{
+    if (_host.canUseState())
+        _host.stateMarkDirty();
+}
+
+std::int8_t SpectrumWorxCLAP::effectIn(std::uint8_t const slot) const
+{
+    return program().moduleChain().getParameterForIndex(slot);
+}
+
 void SpectrumWorxCLAP::requestRescanFromUI()
 {
+    rebuildParameterIDs();
     if (_host.canUseParams())
         _host.paramsRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT |
                            CLAP_PARAM_RESCAN_VALUES);
@@ -377,16 +562,33 @@ void SpectrumWorxCLAP::requestRescanFromUI()
 // State
 ////////////////////////////////////////////////////////////////////////////////
 
+/// \note Not the preset format, and not stage 5.6. This writes the current
+/// parameter list as (id, value) pairs, which is enough to survive a session
+/// and a reload. What it is not is *durable*: nothing here is versioned against
+/// a changing effect list, and the real thing goes through the preset
+/// serialisation that LE_NO_PRESETS still compiles out of the engine. Stage 8
+/// splits that out; until then this beats forgetting everything.
+///                                       (29.07.2026.) (SW port)
+
 bool SpectrumWorxCLAP::stateSave(clap_ostream const *const stream) noexcept
 {
-    auto const &values(parameters_.values());
-    auto const count(static_cast<std::uint32_t>(values.size()));
+    rebuildParameterIDs();
 
+    auto const count(static_cast<std::uint32_t>(parameterIDs_.size()));
     if (!writeFully(stream, stateMagic, sizeof(stateMagic)))
         return false;
     if (!writeFully(stream, &count, sizeof(count)))
         return false;
-    return writeFully(stream, values.data(), values.size() * sizeof(double));
+
+    for (auto const id : parameterIDs_)
+    {
+        auto const value(static_cast<double>(getParameter(ParameterID{id})));
+        if (!writeFully(stream, &id.value, sizeof(id.value)))
+            return false;
+        if (!writeFully(stream, &value, sizeof(value)))
+            return false;
+    }
+    return true;
 }
 
 bool SpectrumWorxCLAP::stateLoad(clap_istream const *const stream) noexcept
@@ -400,14 +602,34 @@ bool SpectrumWorxCLAP::stateLoad(clap_istream const *const stream) noexcept
     std::uint32_t count{0};
     if (!readFully(stream, &count, sizeof(count)))
         return false;
-    if (count != parameters_.count())
-        return false;
 
-    std::vector<double> values(count);
-    if (!readFully(stream, values.data(), values.size() * sizeof(double)))
-        return false;
+    std::vector<std::pair<Plugins::ParameterID::value_type, double>> saved(count);
+    for (auto &entry : saved)
+    {
+        if (!readFully(stream, &entry.first, sizeof(entry.first)))
+            return false;
+        if (!readFully(stream, &entry.second, sizeof(entry.second)))
+            return false;
+    }
 
-    parameters_.setValues(values);
+    /// \note Slot selectors first, and in a second pass everything else: a
+    /// module's parameters do not exist until its effect does, so applying them
+    /// in file order would drop every one that belongs to a slot the load has
+    /// not filled yet.
+    for (auto const &[id, value] : saved)
+    {
+        ParameterID const parameterID{Plugins::ParameterID{id}};
+        if (parameterID.type() == ParameterID::ModuleChainParameter)
+            setParameter(parameterID, static_cast<Plugins::AutomatedParameterValue>(value));
+    }
+    for (auto const &[id, value] : saved)
+    {
+        ParameterID const parameterID{Plugins::ParameterID{id}};
+        if (parameterID.type() != ParameterID::ModuleChainParameter)
+            setParameter(parameterID, static_cast<Plugins::AutomatedParameterValue>(value));
+    }
+
+    rebuildParameterIDs();
 
     // Already on the main thread here.
     if (_host.canUseParams())

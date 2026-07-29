@@ -270,6 +270,98 @@ TEST_CASE("A sine through the default chain comes out as audio, not silence", "[
     CHECK(largestOutput < 2.0f);
 }
 
+TEST_CASE("The host sees the engine's own parameters, not a stand-in", "[clap]")
+{
+    Entry const entry;
+    ActivePlugin plugin(48000, 512);
+
+    auto const *const params(
+        static_cast<clap_plugin_params const *>(plugin->get_extension(&*plugin, CLAP_EXT_PARAMS)));
+    REQUIRE(params != nullptr);
+
+    auto const count(params->count(&*plugin));
+    REQUIRE(count > 0);
+
+    // Every entry has to be nameable, in range, and grouped somewhere.
+    bool sawAGlobal{false};
+    for (std::uint32_t index(0); index < count; ++index)
+    {
+        clap_param_info info{};
+        REQUIRE(params->get_info(&*plugin, index, &info));
+        INFO("parameter " << index << " '" << info.name << "'");
+        CHECK(std::strlen(info.name) > 0);
+        CHECK(info.min_value <= info.max_value);
+        CHECK(info.default_value >= info.min_value);
+        CHECK(info.default_value <= info.max_value);
+        CHECK(std::strlen(info.module) > 0);
+        if (std::strcmp(info.module, "Global") == 0)
+            sawAGlobal = true;
+
+        double value{0};
+        CHECK(params->get_value(&*plugin, info.id, &value));
+
+        std::array<char, CLAP_NAME_SIZE> text{};
+        CHECK(params->value_to_text(&*plugin, info.id, value, text.data(), text.size()));
+    }
+    CHECK(sawAGlobal);
+}
+
+TEST_CASE("Filling a module slot grows the host's parameter list", "[clap]")
+{
+    // The whole reason this port targets CLAP. A slot's effect is itself a
+    // parameter, and setting it changes how many parameters exist and what they
+    // are called -- which a fixed parameter table cannot express.
+    Entry const entry;
+    ActivePlugin plugin(48000, 512);
+
+    auto const *const params(
+        static_cast<clap_plugin_params const *>(plugin->get_extension(&*plugin, CLAP_EXT_PARAMS)));
+    REQUIRE(params != nullptr);
+
+    auto const emptyCount(params->count(&*plugin));
+
+    /// \note ParameterID's members are laid out in reverse so that the hex reads
+    /// naturally on a little-endian machine: the type is the top byte and the
+    /// module index the one below it. See core/parameterID.hpp.
+    constexpr clap_id moduleChainType{1};
+    clap_id const slotZero((moduleChainType << 24) | (0u << 16));
+
+    clap_event_param_value event{};
+    event.header.size = sizeof(event);
+    event.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+    event.header.type = CLAP_EVENT_PARAM_VALUE;
+    event.param_id = slotZero;
+    event.note_id = event.port_index = event.channel = event.key = -1;
+    event.value = 0; // the first effect in the list
+
+    struct OneEvent
+    {
+        clap_input_events list;
+        clap_event_param_value const *event;
+    };
+    OneEvent one{{&one, [](clap_input_events const *) -> std::uint32_t { return 1; },
+                  [](clap_input_events const *self, std::uint32_t) -> clap_event_header const * {
+                      return &static_cast<OneEvent const *>(self->ctx)->event->header;
+                  }},
+                 &event};
+
+    params->flush(&*plugin, &one.list, &discardedOutputEvents());
+
+    auto const filledCount(params->count(&*plugin));
+    CHECK(filledCount > emptyCount);
+
+    // And the new ones are the slot's, named for it.
+    bool sawSlotOne{false};
+    for (std::uint32_t index(0); index < filledCount; ++index)
+    {
+        clap_param_info info{};
+        REQUIRE(params->get_info(&*plugin, index, &info));
+        if (std::strcmp(info.module, "Slot 1") == 0)
+            sawSlotOne = true;
+    }
+    CHECK(sawSlotOne);
+}
+
 TEST_CASE("Silence in is silence out", "[clap]")
 {
     constexpr std::uint32_t blockSize{512};

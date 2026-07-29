@@ -14,7 +14,6 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/dsp.cmake)
 
 add_library(sw-impl STATIC
         spectrumWorxCLAP.cpp
-        stubParameters.cpp
         stubEditor.cpp
         swClapEntryImpl.cpp
         clapHelpersInstantiation.cpp
