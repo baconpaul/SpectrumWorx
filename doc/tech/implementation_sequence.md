@@ -15,6 +15,41 @@ The reference implementation of this idiom in the Surge family is
 [six-sines](https://github.com/baconpaul/six-sines) is the small worked example
 that clap-wrapper's own docs point at. OB-Xf remains the reference for
 repo layout, CI and installers — just not for the host layer.
+**`../sst/surge-xt2`** is the reference for one specific thing: how a CLAP
+presents parameters whose meaning changes underneath the host.
+
+---
+
+## Where this stands
+
+Stages 0–3 are complete. Stage 5 is most of the way there and stage 6 is past
+its hard part: **the plugin builds in all four formats, loads, shows its real
+2016 editor, passes audio, exposes all 286 parameters and survives a reload.**
+
+Debug and release are both green — 73 tests, goldens included — and the goldens
+have not moved through any of it.
+
+**It has never been run in a DAW.** Everything above was verified headlessly,
+because the environment it was built in has no window server. That is the single
+most valuable next thing anyone can do with it, and it is why the list below
+starts where it does.
+
+What is left, in the order it is worth doing:
+
+| | | Where |
+|---|---|---|
+| 1 | **Load it in a DAW.** Reaper first. Nothing below is worth much until the thing has been driven by a mouse. | — |
+| 2 | **Normalise module and LFO parameter ranges to 0..1**, so a slot's effect change stops moving `min_value`/`max_value`. The last CLAP-correctness gap. | risk #6b, stage 5 |
+| 3 | **The audio file loader** — one `doLoad` over `juce::AudioFormatManager`, then drop `LE_SW_DISABLE_SIDE_CHANNEL`. | 5.0 |
+| 4 | **Threading.** The `UIEdits` queue is the first piece; the rest of the main/audio split is not done. | 5.8 |
+| 5 | **`clap-validator` and CI** across the four formats. | 5.9 |
+| 6 | **6.4**, the owned-window collapse, and the preset browser's two async save-path callers. | stage 6 |
+| 7 | **Presets** — the split that `LE_NO_PRESETS` stands in for, which then unblocks a real state format. | stage 8, then 5.6 |
+
+Two flags are switched on and stand in for unfinished work rather than for
+decisions: **`LE_NO_PRESETS`** (row 7) and **`LE_SW_DISABLE_SIDE_CHANNEL`**
+(row 3). Both are `PUBLIC` on `sw-dsp`; each changes the layout of
+`SpectrumWorxEditor`, so every translation unit has to agree on them.
 
 ---
 
@@ -497,10 +532,14 @@ have found in stage 9, tangled with 90 k lines of ported code.
 **1.4 ✅** `add_clap_juce_shim` + `ADD_SHIM_IMPLEMENTATION(clapJuceShim)`, with
 `createEditor()` returning a `juce::Component` that paints one rectangle.
 
-> Done — `src/stubEditor.{hpp,cpp}`. It paints the rectangle, and adds five
+> Done — `src/stubEditor.{hpp,cpp}`. It painted the rectangle, and added five
 > "cycle this slot's effect" buttons and a bare "rescan now" button, so the
-> dynamic-parameter path can be driven by hand from inside a DAW without
+> dynamic-parameter path could be driven by hand from inside a DAW without
 > writing automation first.
+>
+> **Deleted in stage 6**, along with the `cycleModuleFromUI`,
+> `requestRescanFromUI` and `effectIn` entry points that existed only to serve
+> it. `createEditor()` returns the real `SpectrumWorxEditor` now.
 
 **1.5 ⏸ deferred.** `include(basic_installer)`; CI modelled on OB-Xf's
 `.github/workflows/build-plugin.yml` using
@@ -1026,20 +1065,25 @@ resembles ordinary engineering rather than archaeology. **It runs directly after
 stage 3** — see the note under stage 4 for why nothing in the SIMD work stands
 in front of it.
 
-**5.0 — The audio file loader**, moved here out of stage 4 because it is the one
-thing in that stage stage 5 cannot link without. `spectrumWorx.hpp:15` includes
-`external_audio/sample.hpp` and the plugin holds a `Sample sample_`, so
-`SpectrumWorxCLAP` needs a `Sample::doLoad` to exist. `sample.hpp:87` shows the
-platform seam is exactly that one static function; today its only macOS
-implementation is `sampleMac.cpp` over `ExtAudioFile` and the long-removed
-`FSRef`, which will not build against a current SDK.
+**5.0 — The audio file loader.** ⏳ *Deferred, and cheaply: the side channel is
+switched off rather than half-built.* `sample.hpp:87` shows the platform seam is
+one static function, `Sample::doLoad`; its only macOS implementation is
+`sampleMac.cpp` over `ExtAudioFile` and the long-removed `FSRef`, which will not
+build against a current SDK.
 
-Delete `sampleWin.cpp` (DirectShow filter graphs) and `sampleMac.cpp`, and write
-one `doLoad` over `juce::AudioFormatManager` — JUCE is already linked here for
-clap-wrapper's standalone target, so this costs nothing extra. Roughly fifty
-lines. It is also what finally removes `FSRef` from `gui.hpp:226`.
+`dsp.cmake` now defines **`LE_SW_DISABLE_SIDE_CHANNEL`**, which compiles out
+`SampleArea` and every `sample_` reference and takes `external_audio/` out of the
+link entirely — the escape the stage 6 notes suggested for the harness, taken for
+the whole build. **This is the file loader, not the host's sidechain port**: that
+one is live and `SpectrumWorxCLAP::runEngine` feeds it.
 
-**5.1 — A new protocol tag.** `src/le/plugins/clap/tag.hpp`, mirroring the
+To finish: delete `sampleWin.cpp` (DirectShow filter graphs) and `sampleMac.cpp`,
+write one `doLoad` over `juce::AudioFormatManager` — JUCE is already linked here
+— and drop the flag. Roughly fifty lines, and the editor code inside the guard is
+already ported (the file chooser is `launchAsync`), so flipping it back on is one
+line plus that function. It is also what finally removes `FSRef` from `gui.hpp`.
+
+**5.1 — A new protocol tag.** ✅ `src/le/plugins/clap/tag.hpp`, mirroring the
 deleted `vst/2.4/tag.hpp`:
 
 ```cpp
@@ -1048,31 +1092,52 @@ namespace LE::Plugins::Protocol { struct CLAP {}; }
 
 with `using ParameterSelector = ParameterID` — the AU choice
 (`au/plugin.hpp:574`), not the VST2 one — because `SW::ParameterID::binaryValue`
-*is* a `clap_id`.
+*is* a `clap_id`. It also carries `ErrorCode<CLAP>` and
+`ParameterInformation<CLAP>`, the latter being what fills a `clap_param_info`.
 
-**5.2** `src/le/plugins/clap/plugin.{hpp,inl}` implementing
-`Plugins::Plugin<Impl, Protocol::CLAP>` on top of `clap::helpers::Plugin<>`.
-
-**5.3** `src/spectrumWorxCLAP.{hpp,cpp}`, mirroring the deleted
-`spectrumWorxVST24.{hpp,cpp}` almost line for line:
+**5.2 / 5.3 — ⚠️ Not built as planned, and deliberately.** The plan called for a
+`Plugins::Plugin<Impl, Protocol::CLAP>` layer under a `SpectrumWorxSharedImpl`,
+mirroring the VST2 shape. Neither exists. `clap::helpers::Plugin<>` already *is*
+that layer — it is the thing `le/plugins/vst/2.4/plugin.inl` was — so
+`SpectrumWorxCLAP` derives from it directly and mixes in the interop templates
+by hand:
 
 ```cpp
 class SpectrumWorxCLAP final
-    : public SpectrumWorxSharedImpl<SpectrumWorxCLAP, Plugins::Protocol::CLAP>
+    : public PluginHelper,                                   // clap::helpers
+      public sst::clap_juce_shim::EditorProvider,
+      public SpectrumWorxCore,                               // the engine
+      public Plugin2HostPassiveInteropImpl<SpectrumWorxCLAP, Protocol::CLAP>,
+      public Plugin2HostActiveInteropImpl <SpectrumWorxCLAP, Protocol::CLAP>,
+      public Host2PluginInteropImpl       <SpectrumWorxCLAP, Protocol::CLAP>,
+      public GUI::EditorHost
 ```
 
-**5.4 — Implement the eleven pure virtuals** of
+Writing the two missing layers would have meant one wrapper whose only job was to
+call another wrapper. Worth revisiting only if a second CLAP-first plugin ever
+shares this code, which is not a thing this repository is for.
+
+**5.4 — Implement the eleven pure virtuals** ✅ of
 `Plugin2HostInteropControler` (`core/host_interop/plugin2Host.hpp:136-152`):
 
 | Virtual | Implementation |
 |---|---|
 | `automatedParameterBeginEdit` / `EndEdit` | queue `CLAP_EVENT_PARAM_GESTURE_BEGIN` / `_END` |
 | `automatedParameterChanged(ParameterID, v)` | queue `CLAP_EVENT_PARAM_VALUE`, `param_id = id.binaryValue` |
-| `parameterListChanged` / `moduleChanged` | `clap_host_params::rescan(INFO\|TEXT)`, **main thread** |
-| `latencyChanged` | `clap_host_latency::changed()` + `request_restart` |
-| `presetChangeBegin` / `End` | suppress rescans between, then one rescan + `clap_host_state::mark_dirty` |
-| `hostTryIOConfigurationChange` | `clap_host_audio_ports::request_rescan` |
-| `gestureBegin` / `gestureEnd` | undo-block markers; no CLAP equivalent — record locally |
+| `parameterListChanged` | **`true`** — see the parameter-list note below. Says "do not push me every parameter of a module that changed"; the rescan covers it |
+| `moduleChanged` | unreachable: its only call site is guarded by `wantsManualDependentParameterNotifications()`, which is `false` for CLAP |
+| `latencyChanged` | `clap_host_latency::changed()` |
+| `presetChangeBegin` / `End` | nothing, then one `rescan(VALUES\|TEXT)` |
+| `hostTryIOConfigurationChange` | absent — needs `LE_SW_ENGINE_INPUT_MODE >= 2`, which nothing defines |
+| `gestureBegin` / `gestureEnd` | undo-block markers; no CLAP equivalent — its gestures are per parameter, above. No-ops |
+
+The queue is `SpectrumWorxCLAP::UIEdits`: a fixed-capacity single-producer,
+single-consumer ring drained into the host's output event list in `process()` and
+`paramsFlush()`, because that list is the only channel a host accepts parameter
+changes on and the editor runs on neither of those threads. A full queue drops
+rather than blocks — the host re-reads on the next rescan, and a priority
+inversion on the audio thread is the worse trade. It is also the first piece of
+5.8 in place.
 
 **5.5 — `clap_plugin_params`.** `count` / `get_info` / `value_to_text` /
 `text_to_value` delegate straight to
@@ -1084,9 +1149,68 @@ rescan model wants and the argument `AudioProcessorParameter` has no way to
 accept. This is the payoff for the whole decision, and it should be about a day
 of work.
 
-**5.6 — `clap_plugin_state`.** Port `effGetChunk` / `effSetChunk`
-(`vst/2.4/plugin.inl:303,355`) onto `save`/`load`. Version the blob explicitly
-this time.
+#### The parameter list is fixed. The *descriptions* are what change.
+
+This is the one place the plan's central bet needed correcting, and it is worth
+stating plainly because every earlier section is written the other way round.
+
+**CLAP does not allow a plugin to change how many parameters it has while it is
+active.** `ext/params.h` is explicit — adding or removing one means calling
+`clap_host->restart()`, waiting for `deactivate()`, and only then
+`CLAP_PARAM_RESCAN_ALL`. The first implementation followed the current `Program`,
+so `paramsCount()` was a function of which slots held effects and the list was
+rebuilt from inside `process()` and `paramsFlush()`. A host is not required to
+cope with that, and the ones that do not simply keep the count they first read:
+an empty session offered **eleven** parameters — six globals and five slot
+selectors — and no module parameter was ever reachable.
+
+Every slot's full complement is now declared at `init()`: **286 parameters**,
+fixed for the plugin's lifetime. Filling a slot renames its parameters rather
+than creating them, which is `CLAP_PARAM_RESCAN_INFO | TEXT | VALUES` — legal
+while active, and `RESCAN_INFO` names "module change" as one of its own cases.
+`getParameterIDs(ids, nullptr)` was already the way to ask for the maximal list;
+the machinery had the answer before the port needed it.
+
+Two consequences fell out:
+
+- **A parameter no effect currently owns** is described by the model as an empty
+  range and "not automatable". Fine while it was simply absent from the list;
+  with a fixed list the host sees it, and an empty range is one it will divide
+  by. It reports `CLAP_PARAM_IS_HIDDEN` — "not shown, because it is currently not
+  used" — over a usable 0..1, and stays writable, because it becomes real the
+  moment the slot is filled.
+- **`paramsInfo` was clobbering its own flags word**, `info->flags = READONLY`
+  rather than `|=`, so whichever flag was set first was lost. Pre-existing, and
+  invisible until a second flag existed to lose.
+
+> **⏳ Left deliberately unfinished: effect-specific parameter ranges still
+> move.** A module parameter's `min_value`/`max_value` depend on which effect is
+> in the slot, and CLAP counts those among the changes that want `RESCAN_ALL` —
+> which an active plugin may not send. Today the port sends `INFO|TEXT|VALUES`
+> anyway: hosts handle it, and the alternative is restarting audio every time the
+> user picks an effect.
+>
+> The fix is to report **module and LFO parameters normalised to 0..1**, so their
+> ranges never move and `INFO|TEXT|VALUES` becomes not merely tolerated but
+> correct. Globals and the slot selectors keep their real ranges and their
+> `IS_STEPPED` flags — those ranges are fixed, and they are the discrete ones, so
+> normalising them would only cost the host its step count. **`ParameterInformation`
+> and the `AutomatedParameter` traits already carry both scales**
+> (`NormalisedAutomatedParameter` vs `FullRangeAutomatedParameter`), so this is a
+> question of choosing per parameter type at the CLAP boundary rather than of new
+> conversion code.
+>
+> **Reference implementation: `../sst/surge-xt2`** does exactly this for its
+> dynamic CLAP parameters. Read it before writing this rather than after.
+
+**5.6 — `clap_plugin_state`.** ⏳ *Partial.* `stateSave`/`stateLoad` write and
+read real `(id, value)` pairs and apply slot selectors before anything else on
+load, because a module's parameters do not exist until its effect does. That
+survives a reload, which is what makes the plugin usable. What it is **not** is
+the preset format, or versioned against a changing effect list — the real thing
+goes through the serialisation `LE_NO_PRESETS` still compiles out. Port
+`effGetChunk` / `effSetChunk` (`vst/2.4/plugin.inl:303,355`) properly once stage
+8 has split it out, and version the blob explicitly this time.
 
 > **This sub-stage, not stage 4, is the one with a dependency in front of it.**
 > `dsp.cmake:160` defines `LE_NO_PRESETS`, which compiles out
@@ -1101,8 +1225,12 @@ this time.
 > — but forgets everything on reload — is a perfectly good intermediate target,
 > and it reaches the interesting risk (the dynamic parameter model, and the
 > threading in 5.8) sooner.
+>
+> **Taken, and then improved on.** 5.1–5.5, 5.7 and the GUI all ran ahead, and
+> the id/value blob above turned out to be enough that the plugin does *not*
+> forget everything on reload. The presets split is still stage 8's.
 
-**5.7 — Audio ports.** Main stereo in/out plus the sidechain gated by
+**5.7 — Audio ports.** ✅ Main stereo in/out plus the sidechain gated by
 `LE_SW_ENGINE_INPUT_MODE`.
 
 > **Not an in-place pair, for now.** With an input gain of exactly 1,
@@ -1128,13 +1256,28 @@ pattern:
 Budget 1–2 weeks of the stage total for this. It is a latent bug class in the
 2016 code regardless; CLAP just refuses to let you keep ignoring it.
 
-**5.9** `clap-validator` plus the wrapper-produced VST3 and AUv2 in CI.
+**5.9** ⏳ `clap-validator` plus the wrapper-produced VST3 and AUv2 in CI. All
+four formats **build** — CLAP, VST3, AUv2 and standalone — and none has been run
+in a host yet.
 
-**Done when:** audible in Reaper, Bitwig, Logic and Ableton **with no GUI**,
-driven entirely by the host's generic parameter panel; loading a different
-effect into a module renames that module's parameters in the host panel;
-automation round-trips; save/reload restores exactly; `clap-validator` clean;
-VST3, AUv2 and standalone all behave identically.
+> **The AUv2 and the standalone did not build in release at all**, for a reason
+> nothing to do with this port: clap-wrapper's `log.h` tests `#if NDEBUG`, which
+> is a syntax error rather than a false when CMake defines `NDEBUG` with no
+> value. `src/clap-first/CMakeLists.txt` sets `CLAP_WRAPPER_LOGLEVEL` in the
+> optimised configurations, which takes the branch out of play without patching
+> the submodule — and silent is what a shipping build wants anyway.
+
+**Done when:** audible in Reaper, Bitwig, Logic and Ableton, driven from the
+host's generic parameter panel *and* from the plugin's own editor; loading a
+different effect into a module renames that module's parameters in the host
+panel; automation round-trips; save/reload restores exactly; `clap-validator`
+clean; VST3, AUv2 and standalone all behave identically.
+
+**Where it actually stands:** everything above except 5.0, the range
+normalisation, 5.8 and 5.9. The plugin loads, shows its real UI, passes audio,
+exposes all 286 parameters, automates them, and survives a reload. **None of it
+has been run in a DAW yet** — the sandbox this was built in has no window server,
+so `sw-show-ui --render` is as far as verification goes.
 
 #### What compiling the host-interop layer found
 
@@ -1184,6 +1327,23 @@ checks them against each other, for every effect, which is what caught it.
 > port with the most novel risk. Proving it there, against five real DAWs,
 > before writing a line of GUI code, means that when the GUI misbehaves in
 > stage 6 you already know the parameter layer underneath it is sound.
+
+#### A link error that only release could produce
+
+Worth recording as a shape, because this tree has more of them.
+`ModuleParameters::parameterInfos()` was declared in `moduleParameters.hpp` and
+defined **`inline` in `moduleImpl.hpp`**, which only some of its callers include.
+An inline function is emitted with hidden visibility, so it can only ever satisfy
+its own translation unit — and once release inlined every call in
+`moduleParameters.cpp`, the compiler dropped the body it was entitled to drop.
+`automatedModule.cpp`, which sees the declaration alone, then had nothing to bind
+to. **Debug linked purely by luck**, having kept a body nobody could have used.
+
+It is now one out-of-line definition in the `.cpp` that owns the class, which is
+what the declaration always promised. The general shape: *a declaration in one
+header and an `inline` definition in another is a link error waiting for an
+optimiser*, and the 2016 tree is full of headers that were once single-inclusion
+and no longer are.
 
 ---
 
@@ -1664,20 +1824,66 @@ functions — and supplying them means defining `~SpectrumWorxEditor`, which emi
 the vtables of the four panels the editor owns *by value*, which needs every
 virtual each of those declares. Forty-seven functions, not fourteen.
 
-They live in `src/gui/editor/placeholderEditor.cpp` and every one aborts. It is
-the same kind of placeholder as `stubEditor.cpp`, which the plugin has been
-showing since stage 1 and still shows, so none of them are reachable today. Its
-size is the honest measure of the coupling, and the instruction on it is
-**replace, do not extend**: `spectrumWorxEditor.cpp` takes over once it is
-unbound from the deleted 2016 plugin class, and the file is deleted whole.
+They lived in `src/gui/editor/placeholderEditor.cpp` and every one aborted. The
+instruction on it was **replace, do not extend** — and it was: both it and
+`stubEditor.cpp` are deleted, and `spectrumWorxEditor.cpp` compiles.
 
-That unbinding is now the single thing standing between this port and a plugin
-with its real UI.
-
-One thing that is *not* in the way: `GUI::ModuleUI` is a `std::optional` that
+One thing that was *not* in the way: `GUI::ModuleUI` is a `std::optional` that
 stays empty until `createGUI()`, and `ParameterWidgets` is raw storage until
 `ModuleWidgets::create()`. A headless test can construct all 57 modules, process
 audio and never touch JUCE.
+
+#### ✅ The editor is unbound, compiled, and hosted
+
+`effect()` recovered the 2016 plugin class from the editor's own address, because
+that class owned the editor as a member. Most of what it was asked for was the
+engine's and is `SpectrumWorxCore` now. The rest — the sample file, presets, and
+two settings — is genuinely the host's and became **`GUI::EditorHost`**, a small
+abstract interface the plugin implements. The dependency had to invert regardless
+of taste: `sw-impl` links `sw-gui`, so the editor naming `SpectrumWorxCLAP` would
+have been a cycle.
+
+The editor registers and deregisters itself through that interface rather than
+being wrapped, because `SpectrumWorxEditor` is `final`.
+
+**Two feature flags are on, and the editor honours them rather than pretending.**
+`LE_NO_PRESETS` disables the preset button and compiles out the preset browser —
+`presetBrowser.cpp` is still in no target — and `LE_SW_DISABLE_SIDE_CHANNEL`
+removes the sample area. Both are `PUBLIC` on `sw-dsp` and next to each other,
+for the same reason: each changes the layout of `SpectrumWorxEditor`, so every
+translation unit that sees the header has to agree on them.
+
+**Four bugs, none of which could have been found by reading:**
+
+- **The Carbon window path was guarded on `!__x86_64__`**, which is *true* on
+  arm64 — so 32-bit Carbon code compiled on Apple Silicon and then failed to link
+  against `gui.mm`, which has always guarded the same code with `!JUCE_64BIT`.
+- **`FrequencyRange` stored 255 for "no thumb"** in a variable whose own verifier
+  switches on `-1` with an unreachable default. 2016 got away with it because the
+  variable was JUCE's `sliderBeingDragged`, protected then and private now; the
+  state is ours, and spells absence the way JUCE does. The concept was never
+  JUCE's anyway — it means "the thumb this control stands for", which hover sets
+  as well as dragging, so `Theme` asks through a `SliderWithSelectedThumb`
+  interface.
+- **The editor grabbed keyboard focus in its constructor.** The 2016 plugin had
+  already parented it; the CLAP shim parents it *after* `createEditor()` returns,
+  so the grab asserted in JUCE and did nothing. It is in
+  `parentHierarchyChanged()` now.
+- **`initialiseMac()` asserted Cocoa's multithreaded mode rather than entering
+  it** — true of a DAW by accident, since a host has spawned threads long before
+  it opens an editor, and false of any single-threaded process. It detaches a
+  thread that returns immediately, which is the documented way to ask.
+
+The last two would have been invisible without running the thing, which is what
+`sw-show-ui`'s new **`editor` page** is for: the whole editor over a headless
+engine (a `SpectrumWorxCore` plus a `Plugin2HostInteropControler` whose
+notifications go nowhere), rendered offscreen. `--render` needs no window server,
+so it is a ctest, and it caught both.
+
+**Still outstanding in stage 6:** 6.4, the owned-window collapse; the preset
+browser's two `warningOkCancelBox` save-path callers, which still need the async
+inversion before that file can compile; and the editor has never been driven by a
+mouse.
 
 > **Re-run the release goldens before pushing any of this.** Stage 6 has no
 > business changing DSP output, which is exactly why an unexplained golden
@@ -1819,8 +2025,8 @@ Rows below are in stage-number order, not running order. Running order is
 | 2 | Boost tier-1 sweep ✅ (CI wiring deferred) | 1–2 |
 | 3 | DSP core + goldens ✅ | 3–5 |
 | 4 | Portable SIMD/FFT — *deferred, runs after 6* | 1.5–2.5 |
-| 5 | CLAP host layer — *includes the audio loader as 5.0* | 2.5–4 |
-| 6 | GUI | 4–6 |
+| 5 | CLAP host layer — *5.1–5.7 done; 5.0, ranges, 5.8, 5.9 open* | 2.5–4 |
+| 6 | GUI — *widgets, module layer and editor done; 6.4 and the preset browser open* | 4–6 |
 | 7 | De-Boost the parameter system | 4–6 |
 | 8 | Presets and content | 1–2 |
 | 9 | Ship | 1–2 |
@@ -1839,7 +2045,8 @@ Rows below are in stage-number order, not running order. Running order is
 | 4 | **SIMD/FFT swap changes DSP output.** | macOS-first bring-up on Accelerate, goldens captured before the swap. Largely retired: the Apple path *is* Accelerate and never moves, so the swap only ever risks the platforms 4 brings up. | 4 |
 | 4b | **Deferring 4 past 5 and 6** means the first non-macOS build lands after the threading model and the GUI are set. | 4.1 holds the vector and FFT interfaces byte-identical, so a collision would have to be in the build, not the API; goldens arbitrate the rest. | 4 |
 | 5 | **Golden baseline is 2016 source on a 2026 compiler**, not 2016 behaviour. | If fidelity matters, diff once against renders from the original binaries (~2 days). | 3 |
-| 6 | **Host handling of `rescan(INFO\|TEXT)` varies.** The dynamic parameter model is the novel part of this plugin. | Exercise it with fake parameters in the stage 1 stub, across five DAWs, before writing the real thing. | 1 |
+| 6 | **Host handling of `rescan(INFO\|TEXT)` varies.** The dynamic parameter model is the novel part of this plugin. | ~~Exercise it with fake parameters in the stage 1 stub.~~ **Largely retired, by reading the spec rather than by testing.** CLAP forbids changing the parameter *count* while active, so the list is fixed and only descriptions change — which is `RESCAN_INFO`'s own documented case. What remains is #6b. | 5 |
+| 6b | **Effect-specific parameter ranges still move on a slot change**, which CLAP counts among the `RESCAN_ALL` cases an active plugin may not send. | Normalise module and LFO parameters to 0..1 so ranges never move; globals and slot selectors keep real ranges and their step counts. `../sst/surge-xt2` does this already. | 5 |
 | 7 | **clap-wrapper AUv2 on current macOS** — less DAW-exercised than `juce_audio_processors`. | Prove it in stage 1 with an empty plugin, not in stage 9 with a full one. | 1 |
 | 8 | **Preset compatibility** constrains stages 7 and 8. | Decide in 0.7, before any of it is designed. | 0 |
 | 9 | **Boost scaffold becomes permanent.** | CPM not a submodule; CI allowlist that only ever shrinks. | 2, 7 |
