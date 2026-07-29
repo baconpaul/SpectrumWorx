@@ -48,7 +48,7 @@ What is left, in the order it is worth doing:
 | | | Where |
 |---|---|---|
 | 1 | **Load it in a DAW.** Reaper first. Nothing below is worth much until the thing has been driven by a mouse. | — |
-| 2 | **Decide the cross-platform golden contract** for the ~19 effects whose output is chaotic, and mint a Linux fixture file. The measurement is done; the policy is a human call. | 4.4 |
+| 2 | **Decide the cross-platform golden contract**: fix the band floor, loosen `peak`, and choose what to do about the 8 chaotic effects. The measurement is done; the policy is a human call. | 4.4 |
 | 3 | **Normalise module and LFO parameter ranges to 0..1**, so a slot's effect change stops moving `min_value`/`max_value`. The last CLAP-correctness gap. | risk #6b, stage 5 |
 | 4 | **The audio file loader** — one `doLoad` over `juce::AudioFormatManager`, then drop `LE_SW_DISABLE_SIDE_CHANNEL`. | 5.0 |
 | 5 | **Threading.** The `UIEdits` queue is the first piece; the rest of the main/audio split is not done. | 5.8 |
@@ -1094,9 +1094,10 @@ had a guard to lose.
 
 **4.4** **Decide what the cross-platform golden contract is.** New, and the one
 thing 4.3 could not settle by measurement: 89 of 464 fixtures fall outside the
-existing tolerance and roughly 19 effects are chaotic enough that no honest
-tolerance covers them. Options are in "What the backend swap found"; picking one
-is a judgement about the product, not about the port.
+existing tolerance. Two thirds of that is the contract's own fault and two lines
+fix it; the rest is **8 effects** that no honest tolerance on a summary statistic
+covers. See "The cross-platform contract, measured" below — picking a policy is a
+judgement about the product, not about the port.
 
 **Done when:** `sw-tests` green on macOS (arm64 + x86_64), Windows (x64 +
 arm64), Linux (x64 + arm64); NT2 is gone with no golden outside an agreed and
@@ -1176,18 +1177,62 @@ worst "9.6 dB drift" in the whole matrix is −189 dB against −180 dB, i.e. si
 against slightly different silence). Zero fixtures differ in non-finite count —
 nothing NaNed, nothing ran away.
 
+#### The cross-platform contract, measured
+
+Before choosing a policy it is worth knowing that **two thirds of the 89 failures
+are the contract's own fault, not the backends'.**
+
+`compare()` skips a band only when it is silent in *both* digests, and "silent"
+means below −199 dB. Bands 120 dB under the signal are noise, and comparing their
+dB values measures nothing. Raising that floor to −60 dBFS — a scoping fix, not a
+loosening, since nothing audible changes — recovers 58 fixtures on its own.
+And `peak` is a single-sample statistic: one sample landing on the other side of a
+rounding step moves it, which is why nine of the remaining failures sit at
+1.1e-4, just over the line, while their RMS is at 4e-7. RMS is the robust
+statistic and should stay tight; peak should not be held to the same bound.
+
+Pass counts over the 464 fixtures, macOS/Accelerate against Linux/pffft:
+
+| policy | all 58 effects | minus the 8 chaotic |
+|---|---|---|
+| **P1** today — peak/rms/dc 1e-4, bands 0.01 dB, floor −199 | 375/464 | 339/400 |
+| **P2** P1 with the band floor at −60 dBFS | 433/464 | 391/400 |
+| **P3** P2 with bands at 0.1 dB | 434/464 | 391/400 |
+| **P4** P3 with peak at 1e-3 | 447/464 | **398/400** |
+| **P5** RMS only, 1e-4 | 453/464 | **400/400** |
+| **P6** RMS 1e-4 + bands 0.1 dB, floor −60 | 450/464 | 399/400 |
+| **P7** RMS 1e-3 + bands 0.5 dB, floor −60 | 457/464 | **400/400** |
+
+The eight are `Pitch_Spring`, `Octaver`, `Pitch_Magnet`, `PVD_start`, `PVD_stop`,
+`Exploder`, `Imploder` and `Pitch_Spring_(pvd)` — 64 fixtures. Forty-three of the
+58 effects are inside 1e-5 on every single fixture.
+
+**Do not read P5 as "RMS tests are enough".** RMS is a level meter: an effect can
+match it exactly while shifting the wrong way, inverting a phase, swapping
+channels or moving energy between octaves. What makes the digest a *fingerprint*
+rather than a level check is the eight log-spaced band energies next to it, and
+those are what P5 throws away. RMS is the right thing to hold *tight*; it is the
+wrong thing to hold *alone*.
+
+The recommended shape is therefore **P4** — fix the floor, loosen peak to 1e-3,
+keep RMS and DC at 1e-4 and bands at 0.1 dB — which leaves exactly the eight, and
+then treat those eight as their own problem rather than as a tolerance to widen.
+
 **So 4.4 is a policy question with three answers**, and it should be answered
 deliberately:
 1. *Per-platform fixture files.* Honest and strict, keeps bit-exactness as a
    real regression net on each machine, and costs a reviewed regeneration per
    platform. This is what the provenance marker already sets up.
-2. *A named exception list* — the ~19 chaotic effects get a much looser bound
+2. *A named exception list* — the 8 chaotic effects get a much looser bound
    (or only a "finite and bounded" check), everything else keeps 1e-4. Keeps one
    file, makes the chaotic set visible and reviewable, and is the honest version
    of "loosen the tolerance".
-3. *A perceptual comparison* for the chaotic set instead of a summary-statistic
-   one. Most defensible, most work, and it needs someone to decide what
-   "the same" means for a pitch shifter that picked a different bin.
+3. *Property tests for the chaotic eight* instead of fixtures — the detected
+   pitch lands within N cents of the input's, latency is exact, output is
+   bounded and finite, a bypassed slot is transparent. Most defensible, most
+   work, and the only option that actually tests those effects rather than
+   declining to. It needs someone to decide what "the same" means for a pitch
+   shifter that picked a different bin.
 
 Loosening the global tolerance until 464 rows pass is not on the list. It would
 have to reach 21% to do it, at which point the goldens stop being a test.
