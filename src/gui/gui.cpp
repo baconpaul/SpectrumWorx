@@ -1249,9 +1249,19 @@ void Knob::startedDragging() noexcept
     // \note By value: getMainMouseSource() returns a prvalue in JUCE 8, and
     // enableUnboundedMouseMovement() is const, so a copy does the same work.
     auto mouseSource(juce::Desktop::getInstance().getMainMouseSource());
-    LE_ASSERT((juce::Desktop::getInstance().getDraggingMouseSource(0) ==
-               nullptr) || //...mrmlj...double click...
-              (juce::Desktop::getInstance().getDraggingMouseSource(0) == &mouseSource));
+
+    /// \note Compared by value, not by address. In 2016 getMainMouseSource()
+    /// returned a reference into Desktop's own list, so taking its address and
+    /// comparing it with getDraggingMouseSource()'s pointer identified the
+    /// source. JUCE 8 returns a prvalue -- MouseInputSource is a handle around a
+    /// pimpl -- so `&mouseSource` is the address of the local copy above and
+    /// never equals anything Desktop owns. The assertion could then only pass
+    /// while nothing was dragging, i.e. it failed on every real knob drag.
+    /// operator== compares the pimpl, which is the identity that was meant.
+    ///                                       (29.07.2026.) (SW port)
+    auto const *const pDraggingSource(juce::Desktop::getInstance().getDraggingMouseSource(0));
+    LE_ASSERT(!pDraggingSource || //...mrmlj...double click...
+              (*pDraggingSource == mouseSource));
 
     /// \note setMouseCursor( juce::MouseCursor::NoCursor ) and
     /// enableUnboundedMouseMovement() result in a black box under VMWare.
