@@ -133,10 +133,13 @@ void Processor::process /// \throws nothing
                       engineSetup().windowOverlappingFactor<std::uint8_t>(),
                   "WOLA parameters not setup.");
 
-#ifdef LE_SW_SDK_BUILD
-    Math::FPUDisableDenormalsGuard const disableDenormals;
-#endif // LE_SW_SDK_BUILD
-
+    /// \note A Math::FPUDisableDenormalsGuard stood here under
+    /// #ifdef LE_SW_SDK_BUILD, which nothing defines, so it never ran. The guard
+    /// is one sst::plugininfra FPUStateGuard at the top of
+    /// SpectrumWorxCLAP::process() now -- the outermost point of the audio
+    /// callback, which is the right scope for it and the only one all four
+    /// formats share.
+    ///                                   (29.07.2026.) (SW port)
     preProcess();
 
     ProcessParameters processParameters(mainInputs, sideInputs, outputs, channels_, samples,
@@ -222,10 +225,13 @@ void Processor::process /// \throws nothing
                       engineSetup().windowOverlappingFactor<std::uint8_t>(),
                   "WOLA parameters not setup.");
 
-#ifdef LE_SW_SDK_BUILD
-    Math::FPUDisableDenormalsGuard const disableDenormals;
-#endif // LE_SW_SDK_BUILD
-
+    /// \note A Math::FPUDisableDenormalsGuard stood here under
+    /// #ifdef LE_SW_SDK_BUILD, which nothing defines, so it never ran. The guard
+    /// is one sst::plugininfra FPUStateGuard at the top of
+    /// SpectrumWorxCLAP::process() now -- the outermost point of the audio
+    /// callback, which is the right scope for it and the only one all four
+    /// formats share.
+    ///                                   (29.07.2026.) (SW port)
     preProcess();
 
     float const *LE_RESTRICT const *LE_RESTRICT mainInputs;

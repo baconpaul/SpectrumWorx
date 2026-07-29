@@ -1026,7 +1026,7 @@ residue, in the order it mattered.
 ### Stage 4 — Portable SIMD/FFT backend  *(resequenced: ran after stage 6)*
 
 **1.5–2.5 weeks**, down from 2–3 because audio file I/O left for stage 5.
-**Linux/arm64 is done; 4.2, 4.4, x86-64 and Windows are not.**
+**Linux/arm64 and denormals are done; 4.4, x86-64 and Windows are not.**
 
 > **Why this moved.** The original plan ran 4 before 5 and this section was
 > written as though the macOS build still had NT2 under it. It does not. On
@@ -1056,17 +1056,37 @@ loops. See "What the backend swap found" below — the reason is not performance
 it is that a scalar elementwise loop is the only formulation whose rounding a
 reviewer can reason about against vDSP's.*
 
-**4.2** Rekey the denormal guard, per the regression noted at the end of stage 3.
-`FPUDisableDenormalsGuard` (`math.cpp:895`) reaches `_mm_setcsr` only under
-`BOOST_SIMD_HAS_SSE_SUPPORT`, which nothing defines since NT2 went — so denormal
-flushing is off on every x86-64 target, **including an Intel Mac**. The
-`__aarch64__` arm at `math.cpp:906` is live and correct, which is the only reason
-this is not already a shipping bug. Rekey onto `LE_HAS_SSE1`/`LE_HAS_SSE2`.
+**✅ 4.2 — Denormals.** The plan said: rekey `FPUDisableDenormalsGuard`
+(`math.cpp:895`) off `BOOST_SIMD_HAS_SSE_SUPPORT`, which nothing has defined
+since NT2 went, onto `LE_HAS_SSE1`/`LE_HAS_SSE2` — and it consoled itself that
+"the `__aarch64__` arm is live and correct, which is the only reason this is not
+already a shipping bug."
 
-*Still open, and still not biting: this VM is arm64, so the `__aarch64__` arm is
-the one in force here too. It bites the first time either Linux or Windows is
-built for x86-64, which is the common case for both — so it is now much closer to
-the critical path than it was when only an arm64 Mac existed.*
+**It was already a shipping bug, and worse than described: nothing was flushing
+denormals at all, on any platform.** The guard had three call sites and none of
+them was on the audio path:
+
+- `Engine::Processor::process`, both overloads, guarded it with
+  `#ifdef LE_SW_SDK_BUILD` — which nothing defines;
+- the third was in `SpectrumWorx::process`, the 2016 host-facing class, which the
+  CLAP does not call. The path is `SpectrumWorxCLAP::process` → `runEngine()` →
+  `SpectrumWorxCore::process`.
+
+So there was no working guard to rekey. `FPUDisableDenormalsGuard` and its
+`getFPUControlWord()` helper — four `#elif` arms across MSVC, Boost.SIMD, ARM32
+and aarch64 — are deleted in favour of one
+`sst::plugininfra::cpufeatures::FPUStateGuard`, taken **at the top of
+`SpectrumWorxCLAP::process()`**. It sets FTZ and DAZ through MXCSR on x86-64 and
+FZ through FPCR on aarch64, and restores the caller's state on the way out, which
+a host is entitled to expect. At the top of the callback rather than inside
+`runEngine()` because event handling and `flushUIEdits()` convert parameter values
+too — and all four formats funnel through it, clap-wrapper driving the VST3, AUv2
+and standalone off the same entry point.
+
+Verified rather than assumed: on this arm64 box a subnormal computed inside the
+guard reads back as an exact zero with `FPCR.FZ` set, and both revert outside it.
+**The goldens do not move** — the harness drives the engine directly, so it never
+had a guard to lose.
 
 **4.3 ✅ *(Linux/arm64)*** Run the goldens on all three OSes and both architectures.
 
@@ -1080,7 +1100,8 @@ is a judgement about the product, not about the port.
 
 **Done when:** `sw-tests` green on macOS (arm64 + x86_64), Windows (x64 +
 arm64), Linux (x64 + arm64); NT2 is gone with no golden outside an agreed and
-written-down tolerance; denormals flush everywhere.
+written-down tolerance; denormals flush everywhere. *Denormals: done. The rest
+waits on 4.4 and on the two platforms nobody has built yet.*
 
 #### What the backend swap found
 

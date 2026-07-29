@@ -228,24 +228,18 @@ UnsignedInteger roundUpUnsignedIntegerDivision(UnsignedInteger const dividend,
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \class FPUDisableDenormalsGuard
-///
-/// None of its member functions may throw.
+/// \note FPUDisableDenormalsGuard stood here and is deleted. Its x86 arm was
+/// keyed on BOOST_SIMD_HAS_SSE_SUPPORT, which nothing has defined since NT2
+/// went, so denormal flushing was off on every x86-64 target including an Intel
+/// Mac -- and the guard was not on the CLAP's audio path in the first place. It
+/// is replaced by sst::plugininfra::cpufeatures::FPUStateGuard, which handles
+/// both architectures and is taken once, at the top of
+/// SpectrumWorxCLAP::process(). One guard, at the outermost point of the
+/// callback, rather than four spellings of one at three sites where two of them
+/// were compiled out.
+///                                           (29.07.2026.) (SW port)
 ///
 ////////////////////////////////////////////////////////////////////////////////
-
-class FPUDisableDenormalsGuard
-{
-  public:
-    FPUDisableDenormalsGuard(FPUDisableDenormalsGuard const &) = delete; // makes non-copyable
-    FPUDisableDenormalsGuard &operator=(FPUDisableDenormalsGuard const &) = delete;
-
-    FPUDisableDenormalsGuard();
-    ~FPUDisableDenormalsGuard();
-
-  protected:
-    unsigned int const originalFloatingPointControlWord_;
-}; // class FPUDisableDenormalsGuard
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
