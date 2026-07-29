@@ -10,11 +10,7 @@
 //------------------------------------------------------------------------------
 #include "spectrumWorxCore.hpp"
 
-#if LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
 #include "modules/moduleDSPAndGUI.hpp"
-#else
-#include "modules/moduleDSP.hpp"
-#endif // LE_SW_SEPARATED_DSP_GUI
 
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
@@ -44,12 +40,10 @@ namespace SW
 {
 //------------------------------------------------------------------------------
 
-#if LE_SW_GUI
 namespace GUI
 {
 void warningMessageBox(std::string_view title, std::string_view message, bool canBlock);
 } // namespace GUI
-#endif // LE_SW_GUI
 
 namespace Engine
 {
@@ -143,11 +137,7 @@ void SpectrumWorxCore::process /// \throws nothing
         static char const message[] =
             "A serious error has occurred. It is recommended that you save all your work and "
             "restart the host. Please report this inconvenience to Little Endian Ltd.";
-#if LE_SW_GUI
         GUI::warningMessageBox(MB_ERROR, message, false);
-#else
-        std::puts(message);
-#endif // LE_SW_GUI
     }
 #endif // DEBUG
 }

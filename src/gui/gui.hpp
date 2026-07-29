@@ -413,11 +413,7 @@ void postOrExecuteMessage(GUIHolder &guiHolder, Functor &&functor)
 {
     if (isThisTheGUIThread() && functor(*guiHolder.gui()))
         return;
-#if LE_SW_SEPARATED_DSP_GUI
-    LE_UNREACHABLE_CODE();
-#else
     postMessage(/*std::forward<GUIHolder>*/ (guiHolder), std::move(functor));
-#endif
 }
 
 #if 0 //...mrmlj...does not work with the latest juce...cleanup...

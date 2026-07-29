@@ -61,7 +61,6 @@ namespace SW
 
 using LFO = Parameters::LFOImpl;
 
-#if LE_SW_GUI
 void Plugin2HostInteropControler::moduleChangedByUser(std::uint8_t const chainParameterIndex,
                                                       Module const *LE_RESTRICT const pModule) const
 {
@@ -80,7 +79,6 @@ void Plugin2HostInteropControler::moduleChangedByUser(std::uint8_t const chainPa
     automatedParameterChanged(parameterID, automationValue);
     moduleChanged(chainParameterIndex, pModule);
 }
-#endif // LE_SW_GUI
 
 void Plugin2HostInteropControler::automatedParameterChanged(Module const &module,
                                                             std::uint8_t const moduleIndex,
@@ -138,7 +136,6 @@ void Plugin2HostInteropControler::globalParameterChanged(
         automatedParameterEndEdit(parameterID);
 }
 
-#if LE_SW_GUI
 void Plugin2HostInteropControler::modulesChanged(AutomatedModuleChain const &chain,
                                                  std::uint8_t /*const*/ firstModuleIndex,
                                                  std::uint8_t /*const*/ lastModuleIndex) const
@@ -168,7 +165,6 @@ void Plugin2HostInteropControler::modulesChanged(AutomatedModuleChain const &cha
         moduleChangedByUser(moduleIndex++, pModule);
     }
 }
-#endif // LE_SW_GUI
 
 ////////////////////////////////////////////////////////////////////////////////
 //

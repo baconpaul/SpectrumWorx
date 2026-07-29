@@ -110,12 +110,10 @@ bool Module::destroyGUI()
         LE_ASSERT(juce::MessageManager::getInstance()->currentThreadHasLockedMessageManager());
         LE_ASSERT(
             gui()); //...might not be true if not part of the "active chain"...checked outside for now...
-#if !LE_SW_SEPARATED_DSP_GUI
         /// \note Make sure the module is not 'used' from the processing thread
         /// (possibly updating its GUI from active LFOs).
         ///                                       (18.03.2014.) (Domagoj Saric)
         auto const processingLock(gui()->getProcessingLock());
-#endif
         gui() = std::nullopt;
         doDestroyGUI(*this);
         return true;

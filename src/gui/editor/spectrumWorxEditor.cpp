@@ -10,13 +10,8 @@
 //------------------------------------------------------------------------------
 #include "spectrumWorxEditor.hpp"
 
-#if LE_SW_SEPARATED_DSP_GUI
-#include "core/modules/automatedModuleImpl.inl" //...mrmlj...loadPresetParameters
-#include "core/modules/moduleGUI.hpp"
-#else
 #include "core/modules/moduleDSPAndGUI.hpp"
 #include "spectrumWorx.hpp"
-#endif // LE_SW_SEPARATED_DSP_GUI
 
 #include "le/parameters/lfo.hpp"
 #include "le/parameters/printer.hpp"
@@ -280,38 +275,6 @@ SpectrumWorxEditor &SpectrumWorxEditor::fromPresetBrowser(PresetBrowser &presetB
         presetBrowser);
 }
 
-#ifdef LE_SW_SEPARATED_DSP_GUI
-
-Engine::Setup const &SpectrumWorxEditor::engineSetup() const { return engineSetup_; }
-
-AutomatedModuleChain &SpectrumWorxEditor::moduleChain()
-{
-    return /*moduleChain_*/ program().moduleChain();
-}
-AutomatedModuleChain const &SpectrumWorxEditor::moduleChain() const
-{
-    return /*moduleChain_*/ program().moduleChain();
-}
-
-Program &SpectrumWorxEditor::program() { return program_; } //...mrmlj...for moduleChanged
-Program const &SpectrumWorxEditor::program() const
-{
-    return program_;
-} //...mrmlj...for moduleChanged
-
-SpectrumWorxEditor::Host &SpectrumWorxEditor::host() { return *this; }
-SpectrumWorxEditor::Host const &SpectrumWorxEditor::host() const { return *this; }
-
-bool SpectrumWorxEditor::ModuleInitialiser::operator()(Module &module,
-                                                       std::uint8_t const slotIndex) const
-{
-    module.moveToSlot(slotIndex);
-    module.updateForEngineSetupChanges(editor.engineSetup());
-    addToParentAndShow(editor, module);
-    return true;
-}
-
-#else
 Engine::Setup const &SpectrumWorxEditor::engineSetup() const
 {
     return effect().uncheckedEngineSetup();
@@ -339,7 +302,6 @@ Utility::CriticalSectionLock SpectrumWorxEditor::getProcessingLock() const
 {
     return effect().getProcessingLock();
 }
-#endif // LE_SW_SEPARATED_DSP_GUI
 
 void SpectrumWorxEditor::togglePresetBrowser(juce::Button const &button)
 {
@@ -734,112 +696,19 @@ void SpectrumWorxEditor::addUserAddedModule(std::uint8_t const effectIndex)
     }
 }
 
-#if LE_SW_SEPARATED_DSP_GUI
-#pragma warning(push)
-#pragma warning(disable : 4510) // Default constructor could not be generated.
-#pragma warning(disable                                                                            \
-                : 4610) // Class can never be instantiated - user-defined constructor required.
-
-struct SpectrumWorxEditor::PresetLoader
-{
-    typedef ModuleInitialiser::Module Module;
-
-    AutomationBlocker automationBlocker() const { return AutomationBlocker(editor); }
-
-    ModuleInitialiser moduleInitialiser() { return editor.moduleInitialiser(); }
-
-    static std::nullopt_t processingLock() { return std::nullopt; }
-
-    static bool onlySetParameters() { return false; }
-
-    GlobalParameters::Parameters &targetGlobalParameters()
-    {
-        LE_UNREACHABLE_CODE();
-        return editor.program().parameters();
-    }
-    AutomatedModuleChain &targetChain() { return editor.moduleChain(); }
-
-  private: //...mrmlj...MSVC(12) still does not support generic lambdas...
-    struct Notifyer
-    {
-        template <class Parameter> void operator()(Parameter const &parameter) const
-        {
-            editor.globalParameterChanged<Parameter>(
-                parameter, std::is_integral<typename Parameter::value_type>::value);
-        }
-        SpectrumWorxEditor &editor;
-    }; // struct Notifyer
-  public:
-    bool setNewGlobalParameters(GlobalParameters::Parameters const &newParameters)
-    {
-        editor.program().parameters() = newParameters;
-        editor.updateForGlobalParameterChange();
-        editor.updateForEngineSetupChanges();
-        Notifyer const notifyer = {editor};
-        boost::fusion::for_each(newParameters, notifyer);
-        return true;
-    }
-
-    void moduleChainFinished(std::uint8_t const moduleCount, bool const syncedLFOFound)
-    {
-        editor.setLastModulePosition(moduleCount);
-        if (syncedLFOFound && !LE::Parameters::LFOImpl::Timer::hasTempoInformation())
-        {
-            GUI::warningMessageBox(MB_WARNING,
-                                   "Loaded preset uses tempo-synced LFOs but the host does not "
-                                   "provide tempo information.",
-                                   false);
-        }
-        Host2PluginInteropControler::AutomationBlocker const automationBlocker(
-            editor./*host*/ moduleChainOwner /*mrmlj*/ ());
-        editor.host().modulesChanged(editor.moduleChain(), 0,
-                                     SW::Constants::maxNumberOfModules - 1);
-    }
-
-#ifndef LE_SW_DISABLE_SIDE_CHANNEL
-    bool wantsSampleFile() const { return false; }
-    void setSample(std::string_view /*const sampleFileName*/) { LE_UNREACHABLE_CODE(); }
-    bool const ignoreSampleFile;
-#endif // LE_SW_DISABLE_SIDE_CHANNEL
-
-    SpectrumWorxEditor &editor;
-}; // struct PresetLoader
-
-#pragma warning(push)
-
-SpectrumWorxEditor::PresetLoader SpectrumWorxEditor::presetLoader(bool const ignoreExternalSample)
-{
-#ifdef LE_SW_DISABLE_SIDE_CHANNEL
-    LE_ASSUME(ignoreExternalSample);
-    PresetLoader const loader = {*this};
-#else
-    PresetLoader const loader = {ignoreExternalSample, *this};
-#endif // LE_SW_DISABLE_SIDE_CHANNEL
-    return loader;
-}
-#endif // LE_SW_SEPARATED_DSP_GUI
 
 bool SpectrumWorxEditor::loadPreset(juce::File const &presetFile, bool const ignoreExternalSample,
                                     juce::String &comment, juce::String const &presetName)
 {
     auto const pPresetName(presetName.getCharPointer().getAddress());
-#if LE_SW_SEPARATED_DSP_GUI
-    return SW::loadPreset(presetFile, ignoreExternalSample, &comment, pPresetName, *this);
-#else
     return effect().loadPreset(presetFile, ignoreExternalSample, &comment, pPresetName);
-#endif // LE_SW_SEPARATED_DSP_GUI
 }
 
 void SpectrumWorxEditor::savePreset(juce::File const &presetFile, bool const ignoreExternalSample,
                                     juce::String const &comment) const
 {
-#if LE_SW_SEPARATED_DSP_GUI
-    LE_ASSUME(ignoreExternalSample);
-    SW::savePreset(presetFile, juce::File(), comment, program());
-#else
     SW::savePreset(presetFile, ignoreExternalSample ? juce::File() : effect().currentSampleFile(),
                    comment, program());
-#endif // LE_SW_SEPARATED_DSP_GUI
 }
 
 bool SpectrumWorxEditor::presetLoadingInProgress() const
@@ -850,11 +719,7 @@ bool SpectrumWorxEditor::presetLoadingInProgress() const
 
 char const *SpectrumWorxEditor::currentProgramName() const
 {
-#if LE_SW_SEPARATED_DSP_GUI
-    return program().name().begin();
-#else
     return effect().currentProgramName();
-#endif // LE_SW_SEPARATED_DSP_GUI
 }
 
 void SpectrumWorxEditor::moduleActivated()
@@ -1046,24 +911,16 @@ void EditorKnob::valueChanged() noexcept
 
 void SpectrumWorxEditor::createChainGUIs(AutomatedModuleChain &chain)
 {
-#if LE_SW_SEPARATED_DSP_GUI
-    LE::Utility::ignoreUnused(chain);
-#else
     // http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2012/n3424.pdf
     std::uint8_t moduleIndex(0);
     chain.forEach<Module>([&](Module &module) mutable { module.createGUI(*this, moduleIndex++); });
     setLastModulePosition(moduleIndex);
-#endif
 }
 
 void SpectrumWorxEditor::destroyChainGUIs(AutomatedModuleChain &chain)
 {
-#if LE_SW_SEPARATED_DSP_GUI
-    LE::Utility::ignoreUnused(chain);
-#else
     chain.forEach<Module>([](Module &module) { module.destroyGUI(); });
     setLastModulePosition(0);
-#endif
 }
 
 void SpectrumWorxEditor::mouseDown(juce::MouseEvent const &event)
@@ -1089,7 +946,6 @@ void SpectrumWorxEditor::updateSettings()
         settings_->updateEnginePage();
 }
 
-#if !LE_SW_SEPARATED_DSP_GUI
 void SpectrumWorxEditor::updateMainKnobs()
 {
     auto const &parameters(effect().parameters());
@@ -1098,7 +954,6 @@ void SpectrumWorxEditor::updateMainKnobs()
     out_.setValue(parameters.get<OutputGain>());
     mix_.setValue(parameters.get<MixPercentage>());
 }
-#endif
 
 void SpectrumWorxEditor::updateForGlobalParameterChange()
 {
@@ -1187,11 +1042,9 @@ void SpectrumWorxEditor::updateModuleParameterAndNotifyHost(ModuleUI &moduleUI,
 {
     auto &module(moduleUI.module());
     std::uint8_t const moduleIndex(moduleChain().getIndexForModule(module));
-#if !LE_SW_SEPARATED_DSP_GUI
     auto const snappedParameterValue(
         module.setParameterValueFromUI(moduleParameterIndex, parameterValue));
     parameterValue = snappedParameterValue;
-#endif // LE_SW_SEPARATED_DSP_GUI
     host().automatedParameterChanged(module, moduleIndex, moduleParameterIndex, parameterValue);
 }
 
@@ -2073,9 +1926,6 @@ void SpectrumWorxEditor::Settings::EnginePage::setNewQualityFactor(float const &
     engineQuality_ += "Ripple amount: ";
     engineQuality_ += buffer;
     engineQuality_ += description;
-#if LE_SW_SEPARATED_DSP_GUI //...mrmlj...
-    engineQuality_ = "N/A";
-#endif // LE_SW_SEPARATED_DSP_GUI
 }
 
 namespace
@@ -2251,17 +2101,11 @@ SpectrumWorxEditor &SpectrumWorxEditor::Settings::editor()
 
 void SpectrumWorxEditor::Settings::buttonClicked(juce::Button *const pButton)
 {
-#if !LE_SW_SEPARATED_DSP_GUI
     SpectrumWorx &effect(editor().effect());
-#endif
     if (pButton == &interfacePage_.loadLastSessionOnStartup_)
     {
-#if LE_SW_SEPARATED_DSP_GUI
-        LE_ASSERT_MSG(false, "Not yet implemented!");
-#else
         effect.shouldLoadLastSessionOnStartup(
             interfacePage_.loadLastSessionOnStartup_.getToggleState());
-#endif // LE_SW_SEPARATED_DSP_GUI
     }
     else if (pButton == &interfacePage_.hideCursorOnKnobDrag_)
     {
@@ -2278,10 +2122,8 @@ void SpectrumWorxEditor::Settings::buttonClicked(juce::Button *const pButton)
 
 void SpectrumWorxEditor::Settings::updateLoadLastSessionOnStartup()
 {
-#if !LE_SW_SEPARATED_DSP_GUI
     interfacePage_.loadLastSessionOnStartup_.setToggleState(
         editor().effect().shouldLoadLastSessionOnStartup(), juce::dontSendNotification);
-#endif
 }
 
 //------------------------------------------------------------------------------

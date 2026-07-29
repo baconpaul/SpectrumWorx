@@ -13,11 +13,7 @@
 //------------------------------------------------------------------------------
 #include "plugin2HostImpl.hpp"
 
-#if LE_SW_SEPARATED_DSP_GUI && LE_SW_GUI
-#include "core/modules/moduleGUI.hpp"
-#elif LE_SW_GUI
 #include "core/modules/moduleDSPAndGUI.hpp"
-#endif // module interface
 #include "le/parameters/parametersUtilities.hpp"
 #include "le/parameters/runtimeInformation.hpp"
 #include "le/spectrumworx/engine/moduleParameters.hpp"

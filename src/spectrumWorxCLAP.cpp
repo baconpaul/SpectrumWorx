@@ -13,9 +13,9 @@
 
 #include "core/modules/factory.hpp"
 // \note Order matters and is not alphabetical: finalImplementations.hpp defines
-// ModuleDSP::Impl<> and needs ModuleDSP complete. factory.cpp includes them in
-// this order for the same reason.
-#include "core/modules/moduleDSP.hpp"
+// Module::Impl<> and needs Module complete. factory.cpp includes them in this
+// order for the same reason.
+#include "core/modules/moduleDSPAndGUI.hpp"
 #include "core/modules/finalImplementations.hpp"
 
 #include <sst/plugininfra/version_information.h>

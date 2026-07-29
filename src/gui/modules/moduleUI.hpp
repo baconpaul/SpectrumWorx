@@ -308,9 +308,7 @@ class SharedModuleControls;
 class SpectrumWorxEditor;
 
 class ModuleUI
-#if !LE_SW_SEPARATED_DSP_GUI
     final
-#endif // LE_SW_SEPARATED_DSP_GUI
     : public WidgetBase<>,
       private juce::Button::Listener
 {
@@ -329,11 +327,6 @@ class ModuleUI
 
     void setBypass(bool);
 
-#if LE_SW_SEPARATED_DSP_GUI
-    bool bypass() const;
-    float getBaseParameter(std::uint8_t parameterIndex) const;
-    float getEffectParameter(std::uint8_t parameterIndex) const;
-#endif // LE_SW_SEPARATED_DSP_GUI
 
     void updateForEngineSetupChanges(Engine::Setup const &);
 
@@ -347,21 +340,13 @@ class ModuleUI
     SpectrumWorxEditor const &editor() const;
     SharedModuleControls &sharedControls();
 
-#if LE_SW_SEPARATED_DSP_GUI
-    static std::nullopt_t processingLock() { return std::nullopt; }
-#else
     Utility::CriticalSectionLock getProcessingLock() const; //...mrmlj...quick-fix...
-#endif // LE_SW_SEPARATED_DSP_GUI
 
     //...mrmlj...quick-fix...
     void holdSharedControls(bool doHold) const;
     bool sharedControlsLocked() const;
 
-#if LE_SW_SEPARATED_DSP_GUI
-    typedef SW::ModuleGUI Module;
-#else
     typedef SW::Module Module;
-#endif // LE_SW_SEPARATED_DSP_GUI
 
     Module &module();
     Module const &module() const;

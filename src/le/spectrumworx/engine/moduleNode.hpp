@@ -47,14 +47,7 @@ class LE_NOVTABLE ModuleNode
   protected:
     ModuleNode() = default;
 
-#if LE_SW_SEPARATED_DSP_GUI
-    /// \note Create a virtual destructor in order to be able to reuse the same
-    /// (Automated)ModuleChain class (and release/deleter functions) for both
-    /// GUI and DSP modules in separated-DSP-and-GUI builds.
-    ///                                       (18.03.2015.) (Domagoj Saric)
-  public:
-    virtual ~ModuleNode() {} /* = 0*/;
-#elif !defined(NDEBUG)
+#if   !defined(NDEBUG)
   protected:
     ~ModuleNode() = default;
     virtual void rtti_enforcer() {}
@@ -65,22 +58,14 @@ class LE_NOVTABLE ModuleNode
 }; // class ModuleNode
 
 void intrusive_ptr_add_ref(ModuleNode const *);
-#if !LE_SW_SEPARATED_DSP_GUI
 void intrusive_ptr_release_deleter(ModuleNode const *);
-#endif // LE_SW_SEPARATED_DSP_GUI
 
 inline void intrusive_ptr_release(ModuleNode const *LE_RESTRICT const pModuleNode)
 {
     LE_ASSUME(pModuleNode);
     if (!--pModuleNode->referenceCount_) [[unlikely]]
     {
-#if LE_SW_SEPARATED_DSP_GUI
-        static_assert(__has_virtual_destructor(ModuleNode),
-                      "Direct delete requires a virtual destructor.");
-        delete pModuleNode;
-#else
         intrusive_ptr_release_deleter(pModuleNode);
-#endif // LE_SW_SEPARATED_DSP_GUI
     }
 }
 

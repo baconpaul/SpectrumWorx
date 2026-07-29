@@ -6,8 +6,11 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/dsp.cmake)
+# gui.cmake first: sw-dsp links sw-gui-resources for the skin its module class
+# now reaches, and sw-gui-widgets links sw-dsp back. CMake resolves target names
+# at generate time either way, but reading it in dependency order is kinder.
 include(${CMAKE_CURRENT_SOURCE_DIR}/gui.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/dsp.cmake)
 
 add_library(sw-impl STATIC
         spectrumWorxCLAP.cpp
@@ -30,15 +33,11 @@ target_include_directories(sw-impl PUBLIC .)
 # and they include <clap/clap.h>.
 target_link_libraries(sw-impl PUBLIC clap)
 
-# The engine. PUBLIC because spectrumWorxCLAP.hpp derives from SpectrumWorxCore
-# and holds a Program by value, and because sw-dsp carries the force-include and
-# LE_SW_GUI=0 that every one of its headers assumes.
-#
-# \note LE_SW_GUI=0 is what makes SpectrumWorxCore's Module typedef ModuleDSP
-# rather than ModuleDSPAndGUI. Hosting the real editor means building the core
-# with LE_SW_GUI=1, which is a second configuration of sw-dsp, not a flag on
-# this target -- see the note in doc/tech/implementation_sequence.md.
-target_link_libraries(sw-impl PUBLIC sw-dsp)
+# The engine, by way of the module layer that its factory's vtables point at.
+# PUBLIC because spectrumWorxCLAP.hpp derives from SpectrumWorxCore and holds a
+# Program by value, and because sw-dsp carries the force-include every one of
+# its headers assumes.
+target_link_libraries(sw-impl PUBLIC sw-gui)
 
 target_link_libraries(sw-impl PRIVATE
         clap-helpers

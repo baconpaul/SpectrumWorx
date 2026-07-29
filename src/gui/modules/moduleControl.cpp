@@ -18,11 +18,7 @@
 #include "le/parameters/lfo.hpp"
 #include "le/parameters/printer.hpp"
 
-#if LE_SW_SEPARATED_DSP_GUI
-#include "core/modules/moduleGUI.hpp"
-#else
 #include "core/modules/moduleDSPAndGUI.hpp"
-#endif // LE_SW_SEPARATED_DSP_GUI
 
 #include "le/utility/polymorphicDowncast.hpp"
 

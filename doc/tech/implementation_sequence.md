@@ -1638,12 +1638,41 @@ and `Button` is no longer a `Value::Listener` at all, so the hack could not be
 expressed even if it were wanted. Read from JUCE's sources rather than observed,
 so watch for doubled automation writes the first time this runs under a host.
 
-> **One hazard the layering created.** `sw-dsp` still exports `LE_SW_GUI=0` and
-> `sw-gui-widgets` sets `1`, so both reach `gui.cpp`'s command line and the later
-> wins — an argument order deciding an ABI, silently, with no warning from
-> clang. `gui.cpp` carries a `static_assert(LE_SW_GUI == 1)` so a reordering
-> fails the build rather than corrupting memory. Both the duplicate and the
-> assert go when `sw-dsp` itself flips.
+#### ✅ `LE_SW_GUI` is deleted, not set
+
+Nobody should ever set it to anything but 1, so it is gone rather than pinned —
+along with `LE_SW_SEPARATED_DSP_GUI`, the never-finished separated-instances
+option that half its conditions were entangled with. `unifdef` resolved both
+across 30 files; the handful it could not evaluate (mixed with `defined(...)`)
+were done by hand, and the dead 2016 cache options went too so that nothing can
+define the macros back into existence.
+
+The layering that came out of it:
+
+```
+sw-gui-resources   skin bitmaps, fonts, Theme
+sw-dsp             the engine  — now links juce_gui_basics, because its module
+                   class embeds a GUI::ModuleUI
+sw-gui-widgets     gui.cpp: knobs, buttons, combo boxes, menus
+sw-gui             moduleUI, moduleControl, moduleDSPAndGUI
+sw-impl            the CLAP plugin
+```
+
+**The link closure was much bigger than "~14 entry points".** One factory
+instantiation pulls the whole module widget set, which calls nineteen editor
+functions — and supplying them means defining `~SpectrumWorxEditor`, which emits
+the vtables of the four panels the editor owns *by value*, which needs every
+virtual each of those declares. Forty-seven functions, not fourteen.
+
+They live in `src/gui/editor/placeholderEditor.cpp` and every one aborts. It is
+the same kind of placeholder as `stubEditor.cpp`, which the plugin has been
+showing since stage 1 and still shows, so none of them are reachable today. Its
+size is the honest measure of the coupling, and the instruction on it is
+**replace, do not extend**: `spectrumWorxEditor.cpp` takes over once it is
+unbound from the deleted 2016 plugin class, and the file is deleted whole.
+
+That unbinding is now the single thing standing between this port and a plugin
+with its real UI.
 
 One thing that is *not* in the way: `GUI::ModuleUI` is a `std::optional` that
 stays empty until `createGUI()`, and `ParameterWidgets` is raw storage until

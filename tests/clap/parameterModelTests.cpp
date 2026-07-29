@@ -22,7 +22,7 @@
 
 #include "core/host_interop/plugin2Host.hpp"
 #include "core/modules/factory.hpp"
-#include "core/modules/moduleDSP.hpp"
+#include "core/modules/moduleDSPAndGUI.hpp"
 #include "core/modules/finalImplementations.hpp"
 #include "core/parameterID.hpp"
 

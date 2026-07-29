@@ -169,11 +169,7 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
         return program();
     } //...mrmlj...for lack of implicit conversion to Program...
 
-#if !LE_SW_GUI || LE_SW_SEPARATED_DSP_GUI
-    typedef SW::ModuleDSP Module;
-#else
     typedef SW::Module Module;
-#endif // LE_SW_SEPARATED_DSP_GUI
 
 #ifdef _MSC_VER
 #pragma warning(push)

@@ -96,17 +96,8 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
     // that do not actually exist (i.e. requested parameter index is greater
     // than the number of parameters provided by the effect).
     //                                        (26.06.2009.) (Domagoj Saric)
-#if LE_SW_GUI //...mrmlj...for loadPresetParameters()
 #define LE_AUX_VIRTUAL_SET virtual
-#ifdef LE_SW_SEPARATED_DSP_GUI
-#define LE_AUX_VIRTUAL_GET virtual
-#else
 #define LE_AUX_VIRTUAL_GET
-#endif // LE_SW_SEPARATED_DSP_GUI
-#else
-#define LE_AUX_VIRTUAL_GET
-#define LE_AUX_VIRTUAL_SET
-#endif
     float getBaseParameter(std::uint8_t baseParameterIndex) const;
     LE_AUX_VIRTUAL_SET float setBaseParameter(std::uint8_t baseParameterIndex, float value);
 
@@ -232,11 +223,7 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
     parameter_value_t setEffectParameterFromLFOAux(std::uint8_t parameterIndex, LFO::value_type);
 
   private:
-#if LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
 #define LE_AUX_VIRTUAL virtual
-#else
-#define LE_AUX_VIRTUAL
-#endif
     LE_AUX_VIRTUAL void setBaseParameterFromLFO(std::uint8_t const parameterIndex,
                                                 LFO::value_type const value)
     {

@@ -75,14 +75,11 @@ SpectrumWorxSharedImpl<Impl, Protocol>::initialise()
 #ifdef __APPLE__
     if (!std::is_same<typename PluginPlatform::Protocol, Plugins::Protocol::AU>::value)
 #endif // __APPLE__
-#if LE_SW_GUI
         LE_VERIFY(GUI::initializePaths());
-#endif // LE_SW_GUI
     return Base::initialise() ? Plugins::ErrorCode<Protocol>::Success
                               : Plugins::ErrorCode<Protocol>::OutOfMemory;
 }
 
-#if LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
 template <class Impl, class Protocol>
 void SpectrumWorxSharedImpl<Impl, Protocol>::process(float const *const *const inputs,
                                                      float **const outputs,
@@ -123,7 +120,6 @@ bool SpectrumWorxSharedImpl<Impl, Protocol>::updateTimingInformation()
 
     return true;
 }
-#endif // LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
 
 //------------------------------------------------------------------------------
 } // namespace SW

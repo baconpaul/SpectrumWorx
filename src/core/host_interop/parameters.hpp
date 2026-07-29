@@ -24,16 +24,12 @@ namespace SW
 {
 namespace ParameterCounts
 {
-#if LE_SW_SEPARATED_DSP_GUI || !LE_SW_GUI
-static std::uint8_t const lfoExportedParameters = 7; //...mrmlj...LFO::Parameters::static_size;
-#else
 // Implementation note:
 //   The SyncTypes and Waveform parameters are not yet exported for
 // automation. Consider solving this cleaner with separate Parameters<> and
 // ExtendedParameters<> instantiations.
 //                                        (18.02.2011.) (Domagoj Saric)
 static std::uint8_t const lfoExportedParameters = 5;
-#endif // LE_SW_SEPARATED_DSP_GUI
 
 static std::uint8_t const lfoParametersPerModule =
     lfoExportedParameters * (Constants::maxNumberOfParametersPerModule - 1);

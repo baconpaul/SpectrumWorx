@@ -10,11 +10,7 @@
 //------------------------------------------------------------------------------
 #include "moduleUI.hpp"
 
-#if LE_SW_SEPARATED_DSP_GUI
-#include "core/modules/moduleGUI.hpp"
-#else
 #include "core/modules/moduleDSPAndGUI.hpp"
-#endif // LE_SW_SEPARATED_DSP_GUI
 #include "gui/editor/spectrumWorxEditor.hpp"
 
 #include "le/parameters/lfo.hpp"
@@ -218,8 +214,11 @@ void ModuleKnob::valueChanged() noexcept
 
 void ModuleKnob::lfoStateChanged()
 {
-    bool dontcare;
-    double const defaultValue(getDoubleClickReturnValue(dontcare));
+    /// \note JUCE 8 split the out-parameter off into isDoubleClickReturnEnabled();
+    /// getDoubleClickReturnValue() now just returns the value, which is all this
+    /// wanted -- the flag it had to pass a variable for was discarded.
+    ///                                       (28.07.2026.) (SW port)
+    double const defaultValue(getDoubleClickReturnValue());
     setDoubleClickReturnValue(!isLFOEnabled(), defaultValue);
     syncMouseWheelAndLFOState();
 }
@@ -284,9 +283,15 @@ void DiscreteParameter::mouseDown(juce::MouseEvent const &)
     }
     else if (!isLFOEnabled())
     {
-        bool const valueChanged(ComboBox::showMenu());
-        if (valueChanged)
-            moduleParameterChanged();
+        /// \note The menu is asynchronous now, so the notification happens in
+        /// the callback rather than on the next line. The SafePointer matters:
+        /// a module can be ejected while its menu is down.
+        ///                                   (28.07.2026.) (SW port)
+        ComboBox::showMenu([self = juce::Component::SafePointer<DiscreteParameter>(this)](
+                               bool const valueChanged) {
+            if (self && valueChanged)
+                self->moduleParameterChanged();
+        });
     }
 }
 
@@ -525,11 +530,6 @@ void ModuleUI::setBaseParameter(std::uint8_t const sharedParameterIndex, float c
     }
     else
     {
-#if LE_SW_SEPARATED_DSP_GUI
-        //module().Engine::ModuleParameters::setBaseParameter( sharedParameterIndex, parameterValue );
-        if (!getParentComponent())
-            return;
-#endif // LE_SW_SEPARATED_DSP_GUI
         holdSharedControls(true);
         if (selected())
             setParameterControl(sharedControls().controlForParameter(sharedParameterIndex),
@@ -556,26 +556,6 @@ void ModuleUI::setParameter(std::uint8_t const parameterIndex, float const param
 }
 
 void ModuleUI::setBypass(bool const bypass) { bypass_.setValue(bypass); }
-
-#if LE_SW_SEPARATED_DSP_GUI
-float ModuleUI::getBaseParameter(std::uint8_t const parameterIndex) const
-{
-    if (parameterIndex == 0)
-        return bypass();
-    /// \note See the note for the ModuleParameters::baseParameters_ data
-    /// member.
-    ///                                       (20.10.2014.) (Domagoj Saric)
-    //return editor().getModuleSharedParameter( module(), parameterIndex );
-    return module().Engine::ModuleParameters::getBaseParameter(parameterIndex);
-}
-
-float ModuleUI::getEffectParameter(std::uint8_t const parameterIndex) const
-{
-    return effectSpecificParameterControl(parameterIndex).getValue();
-}
-
-bool ModuleUI::bypass() const { return bypass_.getValue(); }
-#endif // LE_SW_SEPARATED_DSP_GUI
 
 LE_COLD void ModuleUI::updateForEngineSetupChanges(Engine::Setup const &engineSetup)
 {
@@ -663,12 +643,10 @@ ModuleUI::effectSpecificParameterControl(std::uint8_t const parameterIndex) cons
 ModuleUI::Module &ModuleUI::module() { return Module::fromGUI(*this); }
 ModuleUI::Module const &ModuleUI::module() const { return const_cast<ModuleUI &>(*this).module(); }
 
-#if !LE_SW_SEPARATED_DSP_GUI
 Utility::CriticalSectionLock ModuleUI::getProcessingLock() const
 {
     return editor().getProcessingLock();
 }
-#endif // LE_SW_SEPARATED_DSP_GUI
 
 //------------------------------------------------------------------------------
 namespace Detail

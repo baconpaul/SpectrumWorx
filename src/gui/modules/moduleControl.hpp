@@ -13,6 +13,12 @@
 //------------------------------------------------------------------------------
 #include "le/math/conversion.hpp"
 #include "le/utility/cstdint.hpp"
+
+/// \note This header names juce::Component and juce::Slider throughout but used
+/// to rely on whoever included it having pulled JUCE in first. That worked while
+/// there was exactly one includer.
+///                                       (28.07.2026.) (SW port)
+#include <juce_gui_basics/juce_gui_basics.h>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -131,11 +137,7 @@ class LE_NOVTABLE ModuleControlBase
 
     void moduleParameterChanged();
 
-#if LE_SW_SEPARATED_DSP_GUI
-    using Module = SW::ModuleGUI;
-#else
     using Module = SW::Module;
-#endif // LE_SW_SEPARATED_DSP_GUI
 
     using LFO = Parameters::LFOImpl;
 

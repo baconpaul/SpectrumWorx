@@ -3,19 +3,8 @@
 //------------------------------------------------------------------------------
 #include "gui.hpp"
 
-/// \note sw-dsp still exports LE_SW_GUI=0 and sw-gui-widgets sets it to 1, so
-/// both reach this translation unit's command line and the later one wins. That
-/// is an argument order deciding an ABI: at LE_SW_GUI=0 in a release build
-/// Engine::ModuleParameters loses its vptr and every member shifts eight bytes,
-/// which would link cleanly and corrupt memory. Fail the build instead. The
-/// duplicate -- and this check -- go when sw-dsp itself flips.
-///                                       (28.07.2026.) (SW port)
-static_assert(LE_SW_GUI == 1, "The widget layer must be built with the GUI enabled.");
-
 #include "core/host_interop/plugin2Host.hpp" //...mrmlj...only for Plugin2HostPassiveInteropController::ParameterLabelGetter...
 #include "gui/editor/spectrumWorxEditor.hpp"
-#if !LE_SW_SEPARATED_DSP_GUI
-#endif
 
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/utility/countof.hpp"
@@ -172,12 +161,7 @@ ReferenceCountedGUIInitializationGuard::~ReferenceCountedGUIInitializationGuard(
 
 bool ReferenceCountedGUIInitializationGuard::isGUIInitialised()
 {
-#if LE_SW_GUI
     return guiInitializationReferenceCount != 0;
-#else
-    LE_ASSERT(guiInitializationReferenceCount == 0);
-    return false;
-#endif // LE_SW_GUI
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -361,7 +345,6 @@ void fadeOutComponent(juce::Component &component, float const finalAlpha,
 
 LE_NOINLINE bool LE_COLD isThisTheGUIThread()
 {
-#if LE_SW_GUI
 #ifndef NDEBUG
     if (!GUI::
             isGUIInitialised()) //...mrmlj...to avoid an LE_ASSUME/assertion failure in juce::MessageManager::getInstance()...
@@ -372,9 +355,6 @@ LE_NOINLINE bool LE_COLD isThisTheGUIThread()
         return false; //...mrmlj...quick-hack to fix crashes on OSX when this function is called before the GUI is initialised...
 #endif                // __APPLE__
     return juce::MessageManager::getInstance()->isThisTheMessageThread();
-#else
-    return false;
-#endif // LE_SW_GUI
 }
 
 bool LE_COLD isGUIInitialised()
@@ -1293,14 +1273,6 @@ void Knob::stoppedDragging() noexcept
 void LE_NOINLINE Knob::setValue(param_type const newValue)
 {
 #ifndef NDEBUG
-#if LE_SW_SEPARATED_DSP_GUI
-    /// \note Skip the check in case the module GUI has not yet been attached to
-    /// its parent/editor (e.g. when setting values during preset loading right
-    /// after the module has been created).
-    /// See the related note for the ModuleUI::baseParameters_ data member.
-    ///                                       (20.10.2014.) (Domagoj Saric)
-    if (getParentComponent()->getParentComponent() != nullptr)
-#endif // LE_SW_SEPARATED_DSP_GUI
     {
         // Implementation note:
         //   A simple

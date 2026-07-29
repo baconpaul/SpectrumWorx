@@ -38,13 +38,15 @@ configure_file(
 # Features configuration
 ################################################################################
 
-set( LE_SW_GUI                    true  CACHE BOOL "GUI interface"                              )
-set( LE_SW_SEPARATED_DSP_GUI      false CACHE BOOL "separated DSP and GUI instances"            )
+# \note LE_SW_GUI and LE_SW_SEPARATED_DSP_GUI were options here. Both are gone
+# from the source: there is one configuration now, the one with the GUI, and the
+# separated-instances option was never finished. Removed from this dead 2016
+# build definition too, so that nothing can define the macros back into
+# existence.
+#                                         (28.07.2026.) (SW port)
 set( LE_SW_PRESETS                true  CACHE BOOL "persistent, filesystem based presets"       )
 set( LE_SW_PROGRAMS               true  CACHE BOOL "temporary in-memory presets (VST programs)" )
 
-LE_configureFeatureOption( LE_SW_GUI                    )
-LE_configureFeatureOption( LE_SW_SEPARATED_DSP_GUI      )
 LE_configureFeatureOption( LE_SW_PRESETS                )
 LE_configureFeatureOption( LE_SW_PROGRAMS               )
 

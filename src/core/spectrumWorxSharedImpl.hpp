@@ -11,11 +11,7 @@
 #ifndef spectrumWorxSharedImpl_hpp__41090002_3305_4404_9DB4_FCAEFB31B564
 #define spectrumWorxSharedImpl_hpp__41090002_3305_4404_9DB4_FCAEFB31B564
 //------------------------------------------------------------------------------
-#if LE_SW_SEPARATED_DSP_GUI || !LE_SW_GUI
-#include "core/spectrumWorxCore.hpp"
-#else
 #include "spectrumWorx.hpp"
-#endif
 
 #include "core/host_interop/host2PluginImpl.hpp"
 #include "core/host_interop/plugin2HostImpl.hpp"
@@ -46,18 +42,10 @@ class LE_NOVTABLE SpectrumWorxSharedImpl
     : public Plugins::Plugin<Impl, Protocol>,
       public SW ::Host2PluginInteropImpl<Impl, Protocol>,
       public SW ::Plugin2HostPassiveInteropImpl<Impl, Protocol>,
-#if !LE_SW_GUI || LE_SW_SEPARATED_DSP_GUI
-      public SpectrumWorxCore
-#else
       public SW ::Plugin2HostActiveInteropImpl<Impl, Protocol, SpectrumWorx>
-#endif // LE_SW_SEPARATED_DSP_GUI
 {
   protected:
-#if !LE_SW_GUI || LE_SW_SEPARATED_DSP_GUI
-    typedef SpectrumWorxCore Base;
-#else
     typedef Plugin2HostActiveInteropImpl<Impl, Protocol, SpectrumWorx> Base;
-#endif // !LE_SW_GUI || LE_SW_SEPARATED_DSP_GUI
 
 #if LE_SW_ENGINE_INPUT_MODE >= 1
     typedef SpectrumWorxCore::InputMode InputMode;
@@ -90,7 +78,6 @@ class LE_NOVTABLE SpectrumWorxSharedImpl
 
     void process(float const *const *inputs, float **outputs, std::uint32_t samples);
 
-#if LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
     typedef SpectrumWorx::Editor Editor;
 
     bool createGUI(typename PluginPlatform::Editor::WindowHandle const parentWindow)
@@ -110,7 +97,6 @@ class LE_NOVTABLE SpectrumWorxSharedImpl
         }
         return false;
     }
-#endif // LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
 
   public:
     using Base::setGlobalParameter;
@@ -118,7 +104,6 @@ class LE_NOVTABLE SpectrumWorxSharedImpl
   protected:
     using PluginPlatform::impl;
 
-#if LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
     ////////////////////////////////////////////////////////////////////////////
     // Programs and presets
     ////////////////////////////////////////////////////////////////////////////
@@ -152,7 +137,6 @@ class LE_NOVTABLE SpectrumWorxSharedImpl
 
   private:
     bool updateTimingInformation();
-#endif // LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
 }; // class SpectrumWorxSharedImpl
 
 #pragma warning(pop)

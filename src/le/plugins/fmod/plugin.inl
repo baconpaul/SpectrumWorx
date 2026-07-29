@@ -263,9 +263,7 @@ FMOD_RESULT F_CALLBACK Plugin<Impl, Protocol::FMOD>::canProcess(
     return FMOD_OK;
 }
 
-#if LE_SW_GUI
 extern FMOD_DSP_DESCRIPTION const *LE_RESTRICT pUgh;
-#endif
 template <class Impl> FMOD_DSP_DESCRIPTION *Plugin<Impl, Protocol::FMOD>::getDescription()
 {
     bool const useSideChain(true);
@@ -370,9 +368,7 @@ template <class Impl> FMOD_DSP_DESCRIPTION *Plugin<Impl, Protocol::FMOD>::getDes
         }
 #endif // _DEBUG
     }
-#if LE_SW_GUI
     pUgh = &description;
-#endif
     return const_cast<FMOD_DSP_DESCRIPTION *>(&description);
 }
 

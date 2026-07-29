@@ -11,12 +11,6 @@
 #ifndef spectrumWorxEditor_hpp__3D67D57C_4EAA_4263_8FA1_C8CA61C7A539
 #define spectrumWorxEditor_hpp__3D67D57C_4EAA_4263_8FA1_C8CA61C7A539
 //------------------------------------------------------------------------------
-#if LE_SW_SEPARATED_DSP_GUI
-#include "core/host_interop/host2Plugin.hpp"
-#include "core/host_interop/plugin2Host.hpp"
-#include "core/automatedModuleChain.hpp"
-#include "le/spectrumworx/engine/setup.hpp"
-#endif
 #include "core/host_interop/parameters.hpp"
 #include "core/parameterID.hpp"
 #include "gui/gui.hpp"
@@ -82,12 +76,7 @@ namespace GUI
 ////////////////////////////////////////////////////////////////////////////////
 
 class SpectrumWorxEditor
-#if LE_SW_SEPARATED_DSP_GUI
-    : public Host2PluginInteropControler,
-      public Plugin2HostInteropControler,
-#else
     final :
-#endif // LE_SW_SEPARATED_DSP_GUI
       private ReferenceCountedGUIInitializationGuard,
       public WidgetBase<>,
       public juce::DragAndDropContainer,
@@ -139,65 +128,6 @@ class SpectrumWorxEditor
     char const *currentProgramName() const;
 
     ///...mrmlj...cleanup:
-#if LE_SW_SEPARATED_DSP_GUI
-  public:
-    typedef ModuleGUI Module;
-
-    float getModuleSharedParameter(Module const &, std::uint8_t parameterIndex) const;
-
-    //typedef Plugin2HostActiveInteropImpl<SpectrumWorxEditor, Plugins::Protocol::FMOD> Host;
-    typedef Plugin2HostInteropControler Host;
-    //typedef SpectrumWorxEditor Host;
-    Host &host();
-    Host const &host() const;
-
-    SpectrumWorxEditor &owner() { return *this; }
-
-    SpectrumWorxEditor *gui() { return this; }
-
-    SpectrumWorxEditor &moduleChainOwner() { return *this; }
-    SpectrumWorxEditor const &moduleChainOwner() const { return *this; }
-
-#pragma warning(push)
-#pragma warning(disable : 4510) // Default constructor could not be generated.
-#pragma warning(disable                                                                            \
-                : 4610) // Class can never be instantiated - user-defined constructor required.
-    struct ModuleInitialiser
-    {
-        typedef SpectrumWorxEditor::Module Module;
-
-        bool operator()(Module &, std::uint8_t slotIndex) const;
-
-        SpectrumWorxEditor &editor;
-    }; // struct ModuleInitialiser
-    ModuleInitialiser moduleInitialiser()
-    {
-        ModuleInitialiser const initialiser = {*this};
-        return initialiser;
-    }
-#pragma warning(pop)
-
-    struct PresetLoader;
-    PresetLoader presetLoader(bool ignoreExternalSample);
-    void notifyHostAboutPresetChangeBegin() const { host().presetChangeBegin(); }
-    void notifyHostAboutPresetChangeEnd() const { host().presetChangeEnd(); }
-
-    Program &program();             //...mrmlj...
-    Program const &program() const; //...mrmlj...
-
-    friend void intrusive_ptr_add_ref(SpectrumWorxEditor const *const pEditor)
-    {
-        LE_ASSUME(pEditor); /*...mrmlj...for generic GUI::postMessage...*/
-    }
-    friend void intrusive_ptr_release(SpectrumWorxEditor const *const pEditor)
-    {
-        LE_ASSUME(pEditor); /*...mrmlj...for generic GUI::postMessage...*/
-    }
-
-  protected:
-    Engine::Setup &mutableEngineSetup() { return engineSetup_; }
-
-#else // LE_SW_SEPARATED_DSP_GUI
   public:
     SpectrumWorx &effect();
     SpectrumWorx const &effect() const;
@@ -220,7 +150,6 @@ class SpectrumWorxEditor
 
     Utility::CriticalSectionLock getProcessingLock() const;
 
-#endif // LE_SW_SEPARATED_DSP_GUI
 
   private:
   public: //...mrmlj...FMOD...
@@ -237,13 +166,7 @@ class SpectrumWorxEditor
     template <class Parameter, class Effect>
     static bool setGlobalParameter(Effect &effect, typename Parameter::value_type const value)
     {
-#if LE_SW_SEPARATED_DSP_GUI
-        effect.program().parameters().template set<Parameter>(value);
-        effect.template updateGlobalParameterWidget<Parameter>();
-        return true;
-#else
         return Effect::template setGlobalParameter<Parameter>(effect, value);
-#endif
     }
 
   public: // for EditorKnob
@@ -691,10 +614,6 @@ class SpectrumWorxEditor
 
     std::array<juce::String, numberOfStrings> strings_;
 
-#if LE_SW_SEPARATED_DSP_GUI
-    Engine::Setup engineSetup_;
-    Program program_;
-#endif // LE_SW_SEPARATED_DSP_GUI
 }; // class SpectrumWorxEditor
 
 //------------------------------------------------------------------------------

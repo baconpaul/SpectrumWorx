@@ -14,7 +14,7 @@
 #ifndef LE_SW_SDK_BUILD
 #include "configuration/constants.hpp"
 
-#if !defined(_MSC_VER) && LE_SW_GUI
+#ifndef _MSC_VER
 #include "configuration/versionConfiguration.hpp"
 #include "gui/gui.hpp" // warningMessageBox()
 #endif
@@ -467,11 +467,7 @@ struct Parameters;
 }
 #endif // _MSC_VER
 
-#if LE_SW_GUI
 using char_t = juce::String::CharPointerType::CharType;
-#else
-using char_t = char;
-#endif
 
 template <class PresetConsumer>
 LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignoreExternalSample,
@@ -488,16 +484,12 @@ LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignor
             return false;
         }
 
-#if LE_SW_GUI
         if (pComment)
         {
             auto const comment(preset.getComment());
             *pComment =
                 juce::String::fromUTF8(comment.begin(), static_cast<unsigned int>(comment.size()));
         }
-#else
-    LE_ASSUME(!pComment);
-#endif
 
         ParametersLoader parametersLoader(preset);
 
@@ -506,15 +498,10 @@ LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignor
 #if defined(LE_SW_DISABLE_SIDE_CHANNEL)
         if (!parametersLoader.getSampleFileName().empty())
         {
-#if LE_SW_GUI
             GUI::warningMessageBox(MB_WARNING,
                                    "Loaded preset uses external sample files which are not "
                                    "supported by this edition of SpectrumWorx.",
                                    false);
-#else
-            LE_TRACE("Preset uses an external sample file which must be manually setup/loaded by "
-                     "the client application.");
-#endif
         }
 #else  // "normal plugin build"
     if (loader.wantsSampleFile())

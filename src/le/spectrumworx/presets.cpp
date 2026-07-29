@@ -16,11 +16,7 @@
 #include "configuration/versionConfiguration.hpp"
 #include "core/automatedModuleChain.hpp"
 #include "core/modules/factory.hpp"
-#if LE_SW_SEPARATED_DSP_GUI //...mrmlj...
-#include "core/modules/moduleGUI.hpp"
-#else
 #include "core/modules/moduleDSPAndGUI.hpp"
-#endif // LE_SW_SEPARATED_DSP_GUI
 #endif // LE_SW_SDK_BUILD
 
 #include "le/math/conversion.hpp"
@@ -81,12 +77,10 @@ LE_NOINLINE LE_COLD void parse_error_handler(char const *const what, void *const
 namespace LE
 {
 //------------------------------------------------------------------------------
-#if LE_SW_GUI
 namespace GUI
 {
 void warningMessageBox(std::string_view title, std::string_view message, bool canBlock);
 }
-#endif // LE_SW_GUI
 //------------------------------------------------------------------------------
 namespace SW
 {
@@ -94,13 +88,10 @@ namespace SW
 
 #if defined(LE_SW_SDK_BUILD)
 using PresetModule = Engine::ModuleDSP;
-#elif LE_SW_SEPARATED_DSP_GUI
-using PresetModule = SW::ModuleGUI;
 #else
 using PresetModule = SW::Module;
-#endif // LE_SW_SEPARATED_DSP_GUI
+#endif // LE_SW_SDK_BUILD
 
-#if LE_SW_GUI
 PresetHeader::PresetHeader(juce::String const &commentParam)
 {
     LE_ASSERT(commentParam.length() < _countof(comment) - 1);
@@ -114,7 +105,6 @@ PresetHeader::PresetHeader(juce::String const &commentParam)
     setCurrentTime();
     commentParam.copyToUTF8(comment, sizeof(comment));
 }
-#endif // LE_SW_GUI
 
 void PresetHeader::setCurrentTime()
 {
@@ -183,7 +173,6 @@ Preset::load_result_t Preset::loadFrom(char *const pBuffer)
 }
 #pragma warning(pop)
 
-#if LE_SW_GUI
 Preset::InMemoryPreset Preset::loadIntoMemory(juce::File const &file)
 {
     using namespace boost;
@@ -203,7 +192,6 @@ Preset::InMemoryPreset Preset::loadIntoMemory(juce::File const &file)
     }
     return pInMemoryPreset;
 }
-#endif // LE_SW_GUI
 
 #ifndef LE_SW_SDK_BUILD
 unsigned int Preset::saveTo(char *const pBuffer)
@@ -286,9 +274,7 @@ std::string_view Preset::getComment() const
 void Preset::reportPresetLoadingError()
 {
     LE_TRACE("Unable to load preset.");
-#if LE_SW_GUI
     GUI::warningMessageBox(MB_ERROR, "Unable to load preset.", false);
-#endif // LE_SW_GUI
 }
 
 #ifdef _DEBUG
@@ -441,15 +427,9 @@ LE_COLD ParametersLoader::ModuleChain ParametersLoader::loadModuleChain(ModuleCh
         }
         else
         {
-#if LE_SW_GUI
             GUI::warningMessageBox(foundEffect ? MB_WARNING " effect not available in this edition."
                                                : MB_ERROR " unknown effect in preset.",
                                    effectName, false);
-#else
-            LE_TRACE(foundEffect ? MB_WARNING " effect (%s) not available in this edition."
-                                 : MB_ERROR " unknown effect (%s) in preset.",
-                     effectName.begin());
-#endif
         }
         pParameters_ = static_cast<Utility::XML::Element const *>(pParameters_->next_sibling());
     }
@@ -607,9 +587,7 @@ LE_COLD void ParametersLoader::warnAboutMissingParameter(char const *const pPara
         (parameterName != "Gate"))
     {
         LE_TRACE_LOGONLY("Missing parameter value in preset (%s).", pParameterName);
-#if LE_SW_GUI
         GUI::warningMessageBox("Missing parameter value in preset", parameterName, true);
-#endif
     }
 }
 

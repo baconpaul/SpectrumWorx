@@ -1,8 +1,19 @@
-# sw-dsp: the engine, the effects and everything they need. No host, no GUI.
+# sw-dsp: the engine, the effects and everything they need. No host.
 #
 # This is the target the golden tests run against, and the one stage 4 swaps the
-# SIMD/FFT backend underneath. Nothing in here may include JUCE, clap, or
-# anything from src/gui or src/core/host_interop.
+# SIMD/FFT backend underneath.
+#
+# \note It used to say "no GUI", and forbid JUCE, by way of LE_SW_GUI=0. That
+# macro is gone: it decided whether four setters on Engine::ModuleParameters were
+# virtual, which in a release build decided the layout of every module object, so
+# the engine had two ABIs and only the debug ones matched. The GUI configuration
+# is the one the plugin needs, the UI reference that forces the virtuals is an
+# artefact this design will lose to a two-queue model anyway, and one engine that
+# is always right beats two that agree only in debug.
+#
+# The consequence is that JUCE is now on this target's include path, and the
+# module widget set is on its link line. Nothing here may include clap or
+# src/core/host_interop.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -149,10 +160,15 @@ target_link_libraries(sw-dsp PUBLIC rapidxml)
 # asserts degrade to the CRT's and the DAW never sees them.
 target_compile_definitions(sw-dsp PUBLIC LE_ENABLE_ASSERT_HANDLER)
 
-# No GUI in this target: ModuleDSP must not drag in ModuleUI.
-target_compile_definitions(sw-dsp PUBLIC LE_SW_GUI=0)
+# The module class is SW::Module now, which embeds a GUI::ModuleUI, so the
+# headers reach JUCE and the skin. PUBLIC: they are in sw-dsp's own headers.
+#
+# \note The optional<ModuleUI> stays empty until createGUI(), and the per-effect
+# widget storage is raw until ModuleWidgets::create(), so a headless test still
+# constructs all 57 modules and processes audio without touching JUCE.
+target_link_libraries(sw-dsp PUBLIC juce::juce_gui_basics sw-gui-resources)
 
-# No presets either, for now. le/spectrumworx/presets.cpp reads and writes
+# No presets, for now. le/spectrumworx/presets.cpp reads and writes
 # preset files through juce::File and boost::mmap in the same translation unit
 # as the parameter (de)serialisation, so the DSP cannot have the second without
 # the first. Stage 8 splits them; until then ModuleParameters::{load,save}

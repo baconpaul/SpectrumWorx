@@ -388,7 +388,6 @@ class LE_NOVTABLE SpectrumWorx : public SpectrumWorxCore, public Plugin2HostInte
     }
     /* </Parameters> */
 
-#if LE_SW_GUI
     ////////////////////////////////////////////////////////////////////////////
     // GUI
     ////////////////////////////////////////////////////////////////////////////
@@ -417,7 +416,6 @@ class LE_NOVTABLE SpectrumWorx : public SpectrumWorxCore, public Plugin2HostInte
     friend class GUI::SpectrumWorxEditor; // ...mrmlj... clean up this encapsulation/design error...
 
     /* </GUI> */
-#endif // LE_SW_GUI
 
     ////////////////////////////////////////////////////////////////////////////
     // Settings

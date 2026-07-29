@@ -12,14 +12,7 @@
 
 #include "configuration/versionConfiguration.hpp"
 
-#if LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
 #include "core/modules/moduleDSPAndGUI.hpp"
-#else
-#include "core/modules/moduleDSP.hpp"
-#if LE_SW_GUI
-#include "core/modules/moduleGUI.hpp"
-#endif
-#endif
 #include "core/modules/finalImplementations.hpp"
 
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
@@ -29,14 +22,12 @@
 #include "le/utility/rvalueReferences.hpp"
 #include "le/utility/switch.hpp"
 
-#if LE_SW_GUI && !defined(LE_SW_FMOD)
 // Implementation note:
 //   Required for the (PVD)PitchMagnet::Target-unnecessarily-quantized
 // workaround. Included here to avoid slowing down the compilation of
 // modules that include gui.hpp.
 //                                        (13.12.2011.) (Domagoj Saric)
 #include "le/spectrumworx/effects/pitch_magnet/pitchMagnet.hpp"
-#endif // LE_SW_GUI
 
 #include "le/utility/assert.hpp"
 #include "le/utility/intrusivePtr.hpp"
@@ -48,7 +39,6 @@ namespace SW
 {
 //------------------------------------------------------------------------------
 
-#if LE_SW_GUI && !defined(LE_SW_FMOD)
 namespace GUI
 {
 // Implementation note:
@@ -65,7 +55,6 @@ template <> struct ModuleKnob::QuantizationFor<Effects::Detail::PitchMagnetBase:
     static ModuleKnob::Quantization const value = ModuleKnob::Fixed;
 };
 } // namespace GUI
-#endif // LE_SW_GUI
 
 namespace
 {
@@ -121,13 +110,7 @@ template <class ModuleInterface> struct ModuleConstructor
                       "Internal inconsistency");
         auto const pModule(new (storage) ModuleImplementation(ArmonizerIndex()));
         LE_ASSUME(pModule);
-#if LE_SW_SEPARATED_DSP_GUI
-        pModule->setBaseParameter(LE::Parameters::IndexOf<Effects::BaseParameters::Parameters,
-                                                          Effects::BaseParameters::Wet>::value,
-                                  50);
-#else
         pModule->baseParameters().template set<Effects::BaseParameters::Wet>(50.0f);
-#endif // LE_SW_SEPARATED_DSP_GUI
         return pModule;
     }
 
@@ -179,10 +162,8 @@ LE::Utility::IntrusivePtr<ModuleInterface> ModuleFactory::create(std::int8_t con
 #endif // LE_SW_FULL
     if (!moduleEnabled)
     {
-#if LE_SW_GUI
         GUI::warningMessageBox(MB_WARNING " effect not available in this edition.",
                                Effects::effectName(effectIndex), false);
-#endif // LE_SW_GUI
         return nullptr;
     }
 
@@ -220,17 +201,8 @@ template <class ModuleInterface> void ModuleFactory::destroy(ModuleInterface con
                                    assert_no_default_case<typename Destroyer::result_type>());
 }
 
-#if LE_SW_GUI && !LE_SW_SEPARATED_DSP_GUI
 template LE::Utility::IntrusivePtr<SW::Module> ModuleFactory::create(std::int8_t effectIndex);
 template void ModuleFactory::destroy(SW::Module const &);
-#else
-template LE::Utility::IntrusivePtr<SW::ModuleDSP> ModuleFactory::create(std::int8_t effectIndex);
-template void ModuleFactory::destroy(SW::ModuleDSP const &);
-#if LE_SW_GUI
-template LE::Utility::IntrusivePtr<SW::ModuleGUI> ModuleFactory::create(std::int8_t effectIndex);
-template void ModuleFactory::destroy(SW::ModuleGUI const &);
-#endif
-#endif
 
 /// \note The definition lived in moduleDSP.hpp, under a
 /// "//...mrmlj...for TalkBox4Unity" comment and with no `inline`. Every
@@ -241,15 +213,6 @@ template void ModuleFactory::destroy(SW::ModuleGUI const &);
 /// in one translation unit now, which is what moduleDSPAndGUI.cpp does for the
 /// GUI build.
 ///                                       (28.07.2026.) (SW port)
-#if !LE_SW_GUI
-namespace Engine
-{
-void intrusive_ptr_release_deleter(ModuleNode const *LE_RESTRICT const pModuleNode)
-{
-    ModuleFactory::destroy(actualModule<SW::ModuleDSP>(*pModuleNode));
-}
-} // namespace Engine
-#endif // !LE_SW_GUI
 
 //------------------------------------------------------------------------------
 } // namespace SW

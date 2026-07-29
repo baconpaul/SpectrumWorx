@@ -304,11 +304,7 @@ bool equal(float const &left, float const &right)
 #pragma clang diagnostic pop
 #endif // __clang__
 
-#if defined(BOOST_SIMD_HAS_SSE2_SUPPORT) && 0
-    unsigned int const leftBits(_mm_cvtsi128_si32(_mm_castps_si128(_mm_set_ss(left))));
-    unsigned int const rightBits(_mm_cvtsi128_si32(_mm_castps_si128(_mm_set_ss(right))));
-    return leftBits == rightBits;
-#elif defined(_MSC_VER)
+#if defined(_MSC_VER)
     unsigned int const &leftBits(reinterpret_cast<unsigned int const &>(left));
     unsigned int const &rightBits(reinterpret_cast<unsigned int const &>(right));
     return leftBits == rightBits;
@@ -980,8 +976,9 @@ LE_IMPL_NAMESPACE_END(Math)
 //------------------------------------------------------------------------------
 
 /// \note Non-template juce::jmin / jmax / jlimit overloads for float lived
-/// here, under LE_SW_GUI, so that the GUI's uses picked these up instead of
-/// the patched fork's. JUCE 8 declares all three as constexpr templates in
+/// here, gated on the GUI being built, so that the GUI's uses picked these up
+/// instead of the patched fork's. JUCE 8 declares all three as constexpr
+/// templates in
 /// juce_MathsFunctions.h, which does the same thing at least as well and does
 /// not need a definition in someone else's namespace. Redefining them is an
 /// ODR hazard for no gain.

@@ -10,11 +10,7 @@
 //------------------------------------------------------------------------------
 #include "auxiliaryComponents.hpp"
 
-#if LE_SW_SEPARATED_DSP_GUI
-#include "core/modules/moduleGUI.hpp"
-#else
 #include "core/modules/moduleDSPAndGUI.hpp"
-#endif // LE_SW_SEPARATED_DSP_GUI
 #include "spectrumWorxEditor.hpp"
 
 #include "le/math/math.hpp"
@@ -104,15 +100,6 @@ void SharedModuleControls::updateForActiveModule()
     wet_.reassignTo(moduleUI);
     frequencyRange_.reassignTo(moduleUI);
 
-#if !LE_SW_SEPARATED_DSP_GUI && 0
-    auto const &parameters(moduleUI.module().baseParameters());
-
-    gain_.ModuleKnob::setValue(parameters.get<Gain>());
-    wet_.ModuleKnob::setValue(parameters.get<Wet>());
-
-    frequencyRange_.setStartValue(parameters.get<StartFrequency>());
-    frequencyRange_.setStopValue(parameters.get<StopFrequency>());
-#else
     auto const &module(moduleUI.module());
 
     gain_.ModuleKnob::setValue(module.getBaseParameter(IndexOf<Parameters, Gain>::value));
@@ -122,7 +109,6 @@ void SharedModuleControls::updateForActiveModule()
         module.getBaseParameter(IndexOf<Parameters, StartFrequency>::value));
     frequencyRange_.setStopValue(
         module.getBaseParameter(IndexOf<Parameters, StopFrequency>::value));
-#endif // LE_SW_SEPARATED_DSP_GUI
 }
 
 ModuleControlBase &SharedModuleControls::controlForParameter(std::uint8_t const parameterIndex)
@@ -459,14 +445,8 @@ void SharedModuleControls::FrequencyRange::verifyThumbAndParameterIndicies() con
 bool SharedModuleControls::FrequencyRange::canUseWriteAccessIndex() const
 {
     //...mrmlj...see the comment for parameterIndexForInternalWriteAccess_...
-#if LE_SW_SEPARATED_DSP_GUI
-    LE_ASSERT_MSG(isThisTheGUIThread(),
-                  "All calls are expected to be serialized to the GUI thread.");
-    return true;
-#else
     return (!isThisTheGUIThread() || editor().presetLoadingInProgress()) &&
            (parameterIndexForInternalWriteAccess_ != Constants::invalidIndex);
-#endif
 }
 
 SharedModuleControls &SharedModuleControls::FrequencyRange::parent()
