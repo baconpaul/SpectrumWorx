@@ -2,8 +2,8 @@
 # one above it compiles. Stage 6 has ~10 k lines of JUCE 2.1.2 to port and the
 # harness (tools/show-ui) shows whatever is ready.
 #
-#   sw-gui-resources    skin bitmaps and fonts        <- builds today
-#   sw-gui-widgets      gui.{hpp,cpp}, the widget set
+#   sw-gui-resources    skin bitmaps and fonts        <- builds
+#   sw-gui-widgets      gui.{hpp,cpp}, the widget set <- builds
 #   sw-gui              editor, modules, preset browser
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -35,3 +35,28 @@ set_source_files_properties(${SW_GUI_RESOURCE_SOURCES}
         DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         PROPERTIES COMPILE_OPTIONS
         "-include;${CMAKE_CURRENT_SOURCE_DIR}/le/build/leConfigurationAndODRHeader.h")
+
+################################################################################
+# sw-gui-widgets -- the widget set: knobs, buttons, combo boxes, menus.
+#
+# Built at LE_SW_GUI=1, which is the configuration the whole port is moving to.
+# It does not link yet: gui.cpp still calls into SpectrumWorxEditor, whose
+# translation unit is bound to the deleted 2016 VST2 plugin class. Compiling it
+# is the milestone -- the two JUCE 8 rewrites (asynchronous menus and dialogs,
+# and a PopupMenu that owns its items instead of reaching into JUCE's private
+# state) both live here and both are done.
+################################################################################
+
+add_library(sw-gui-widgets STATIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/gui/gui.cpp
+)
+
+target_link_libraries(sw-gui-widgets PUBLIC sw-gui-resources sw-dsp)
+
+# The configuration this target exists to prove.
+target_compile_definitions(sw-gui-widgets PUBLIC LE_SW_GUI=1)
+
+if (APPLE)
+    target_sources(sw-gui-widgets PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/gui/gui.mm)
+    target_link_libraries(sw-gui-widgets PRIVATE "-framework Carbon" "-framework Cocoa")
+endif()

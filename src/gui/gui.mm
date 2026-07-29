@@ -25,8 +25,11 @@
 #include <Carbon/Carbon.h>
 #include <Cocoa/Cocoa.h>
 
-#include "juce/AppConfig.h"
-#include "juce/juce_gui_basics/juce_gui_basics.h"
+/// \note AppConfig.h was the fork's generated per-project settings header. The
+/// JUCE 8 CMake build passes those settings on the command line, and no such
+/// file exists.
+///                                       (28.07.2026.) (SW port)
+#include <juce_gui_basics/juce_gui_basics.h>
 
 #if !JUCE_64BIT
 #define JUCE_MAC_WINDOW_VISIBITY_BODGE 1 // see note below..

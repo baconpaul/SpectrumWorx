@@ -3,10 +3,18 @@
 //------------------------------------------------------------------------------
 #include "gui.hpp"
 
+/// \note sw-dsp still exports LE_SW_GUI=0 and sw-gui-widgets sets it to 1, so
+/// both reach this translation unit's command line and the later one wins. That
+/// is an argument order deciding an ABI: at LE_SW_GUI=0 in a release build
+/// Engine::ModuleParameters loses its vptr and every member shifts eight bytes,
+/// which would link cleanly and corrupt memory. Fail the build instead. The
+/// duplicate -- and this check -- go when sw-dsp itself flips.
+///                                       (28.07.2026.) (SW port)
+static_assert(LE_SW_GUI == 1, "The widget layer must be built with the GUI enabled.");
+
 #include "core/host_interop/plugin2Host.hpp" //...mrmlj...only for Plugin2HostPassiveInteropController::ParameterLabelGetter...
 #include "gui/editor/spectrumWorxEditor.hpp"
 #if !LE_SW_SEPARATED_DSP_GUI
-#include "spectrumWorx.hpp" //...mrmlj..only for SpectrumWorxEditor::globalParameterChanged()...
 #endif
 
 #include "le/spectrumworx/engine/setup.hpp"
@@ -14,8 +22,6 @@
 #include "le/utility/cstdint.hpp"
 #include "le/utility/lexicalCast.hpp"
 #include "le/utility/platformSpecifics.hpp"
-
-#include "boost/mmap/mappble_objects/file/utility.hpp" // Boost sandbox
 
 #include "le/utility/assert.hpp"
 #include "le/utility/polymorphicDowncast.hpp"
@@ -83,10 +89,10 @@ ReferenceCountedGUIInitializationGuard::ReferenceCountedGUIInitializationGuard()
 {
     if (guiInitializationReferenceCount && !isThisTheGUIThread())
     {
-        juce::AlertWindow::showNativeDialogBox("SpectrumWorx error:",
+        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
+                                               "SpectrumWorx error:",
                                                "We are sorry but SpectrumWorx does not currently "
-                                               "support multiple editor instances with this host.",
-                                               false);
+                                               "support multiple editor instances with this host.");
         throw std::exception();
     }
 
@@ -184,66 +190,41 @@ bool ReferenceCountedGUIInitializationGuard::isGUIInitialised()
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace
-{
-bool useJUCEAlertBox(bool const canBlock)
-{
-    return ReferenceCountedGUIInitializationGuard::isGUIInitialised() &&
-           (canBlock || isThisTheGUIThread());
-}
-} // anonymous namespace
-
-#pragma warning(push)
-#pragma warning(disable : 4127) // Conditional expression is constant.
+/// \note Both of these were synchronous. JUCE 8 defaults JUCE_MODAL_LOOPS_PERMITTED
+/// to 0, and a plugin has no business spinning a modal loop inside a host's
+/// message thread anyway, so neither blocks now.
+///
+///   showNativeDialogBox is gone from JUCE 8 outright, and the
+/// isGUIInitialised() / isThisTheGUIThread() dance that chose between it and the
+/// JUCE box went with it: showMessageBoxAsync is safe to call from anywhere and
+/// simply posts.
+///                                       (28.07.2026.) (SW port)
 
 void warningMessageBox(std::string_view const title, std::string_view const message,
-                       bool const canBlock)
+                       bool const /*canBlock*/)
 {
-    LE_ASSERT(ReferenceCountedGUIInitializationGuard::isGUIInitialised() || canBlock);
+    //...mrmlj...canBlock no longer means anything and should come off the ~15
+    //...mrmlj...call sites once they are ported.
     JUCE_AUTORELEASEPOOL
     {
-        try
-        {
-            juce::String const alertWindowTitle(title.begin(), title.size());
-            juce::String const alertWindowMessage(message.begin(), message.size());
-            if (useJUCEAlertBox(canBlock))
-            {
-                if (canBlock)
-                    juce::AlertWindow::showMessageBox(juce::AlertWindow::WarningIcon,
-                                                      alertWindowTitle, alertWindowMessage);
-                else
-                    juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-                                                           alertWindowTitle, alertWindowMessage);
-            }
-            else
-                juce::AlertWindow::showNativeDialogBox(alertWindowTitle, alertWindowMessage, false);
-        }
-        catch (...)
-        {
-        }
+        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
+                                               juce::String(title.begin(), title.size()),
+                                               juce::String(message.begin(), message.size()));
     }
 }
 
-#pragma warning(pop)
-
-bool warningOkCancelBox(TCHAR const *const title, TCHAR const *const question)
+void warningOkCancelBox(TCHAR const *const title, TCHAR const *const question,
+                        std::function<void(bool)> onResult)
 {
     JUCE_AUTORELEASEPOOL
     {
-        try
-        {
-            juce::String const alertWindowTitle(title);
-            juce::String const alertWindowMessage(question);
-            return useJUCEAlertBox(true)
-                       ? juce::AlertWindow::showOkCancelBox(juce::AlertWindow::WarningIcon,
-                                                            alertWindowTitle, alertWindowMessage)
-                       : juce::AlertWindow::showNativeDialogBox(alertWindowTitle,
-                                                                alertWindowMessage, true);
-        }
-        catch (...)
-        {
-            return false;
-        }
+        juce::AlertWindow::showOkCancelBox(
+            juce::MessageBoxIconType::WarningIcon, juce::String(title), juce::String(question), {},
+            {}, nullptr,
+            juce::ModalCallbackFunction::create([onResult = std::move(onResult)](int const result) {
+                if (onResult)
+                    onResult(result == 1);
+            }));
     }
 }
 
@@ -303,140 +284,30 @@ unsigned int getBinaryPath(path_t &path)
 }
 } // anonymous namespace
 
-#ifdef LE_SW_FMOD
+/// \note What used to live here: the plugin found its skin, its presets and its
+/// documentation by mmapping a `SpectrumWorx.paths` file that the 2016 installer
+/// wrote next to the binary. The skin is compiled into the binary now
+/// (resources.hpp), the installer is gone, and boost::mmap went with stage 2, so
+/// the file, the two mapPathsFile() overloads that read and rewrote it, and the
+/// on-disk resourceBitmap() that used it are all deleted.
+///
+///   rootPath() and presetsFolder() survive because the editor still wants a
+/// place for the user's guide and the preset browser still wants a folder to
+/// open in. Both now answer from ordinary locations rather than from an
+/// installer artefact. **Stage 8 owns where presets actually live** -- this is a
+/// placeholder that keeps the callers honest, not a decision.
+///                                       (28.07.2026.) (SW port)
 
 bool initializePaths()
 {
-    try
+    if (!havePathsBeenInitialised())
     {
-        if (!havePathsBeenInitialised())
-        {
-            path_t path;
-            getBinaryPath(path);
-            juce::File const binaryPath(path);
-
-            pluginRootPath = binaryPath.getSiblingFile(_T( "SpectrumWorx" ));
-            mruPresetsFolder = pluginRootPath.getChildFile(_T( "Presets"      ));
-        }
-
-        bool const result(pluginRootPath.isDirectory());
-        if (!result)
-        { //...mrmlj...
-            warningMessageBox("SpectrumWorx critical error: unable to access installation folder.",
-                              pluginRootPath.getFullPathName().toUTF8().getAddress(), true);
-        }
-
-        return true;
+        pluginRootPath = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+                             .getChildFile("SpectrumWorx");
+        mruPresetsFolder = pluginRootPath.getChildFile("Presets");
     }
-    catch (...)
-    {
-        return false;
-    }
+    return true;
 }
-
-#else // FMOD
-
-namespace
-{
-path_t &getPathsFilePath(path_t &storage)
-{
-    unsigned int const insertionIndex(getBinaryPath(storage));
-
-    /// \todo Add a singleton plugin host access/getter providing
-    /// functionality available without a plugin instance. Afterwards
-    /// uncomment and properly implement the below (commented out)
-    /// check/assert.
-    ///                                   (22.09.2009.) (Domagoj Saric)
-    //assert( !effect().host().getPluginDirectory() || ( effect().host().getPluginDirectory() == path ) );
-
-    static TCHAR const pathsSuffix[] = _T( "paths" );
-    /*std*/ ::_tcscpy(&storage[insertionIndex], pathsSuffix);
-
-    return storage;
-}
-} // anonymous namespace
-
-boost::mmap::mapped_view<char const> mapPathsFile()
-{
-    path_t path;
-    return boost::mmap::mapped_view<char const>(
-        boost::mmap::map_read_only_file(getPathsFilePath(path)));
-}
-
-boost::mmap::mapped_view<char> mapPathsFile(unsigned int const desiredSize)
-{
-    path_t path;
-    return boost::mmap::mapped_view<char>(
-        boost::mmap::map_file(getPathsFilePath(path), desiredSize));
-}
-
-bool initializePaths()
-{
-    try
-    {
-        if (!havePathsBeenInitialised())
-        {
-            boost::mmap::mapped_view<char const> const pathsFile(mapPathsFile());
-            if (!pathsFile)
-            { //...mrmlj...
-                path_t path;
-                warningMessageBox(
-                    "SpectrumWorx critical error: unable to open a configuration file.",
-#ifdef _UNICODE
-                    juce::String(getPathsFilePath(path)).toUTF8().getAddress(),
-#else
-                    getPathsFilePath(path),
-#endif // _UNICODE
-                    true);
-                return false;
-            }
-            std::string_view const rootPath(reinterpret_cast<char const *>(pathsFile.begin()),
-                                            std::find(pathsFile.begin(), pathsFile.end(), '\n') -
-                                                pathsFile.begin());
-            std::string_view const presetsPath(rootPath.end() + 1,
-                                               pathsFile.end() - (rootPath.end() + 1));
-            pluginRootPath = juce::String::fromUTF8(rootPath.begin(),
-                                                    static_cast<unsigned int>(rootPath.size()));
-            mruPresetsFolder = juce::String::fromUTF8(
-                presetsPath.begin(), static_cast<unsigned int>(presetsPath.size()));
-#ifdef __APPLE__
-            // Implementation note:
-            //   A temporary workaround to allow user-folder installations
-            // on OS X.
-            //                            (01.12.2010.) (Domagoj Saric)
-            if (!pluginRootPath.isDirectory())
-            {
-                JUCE_AUTORELEASEPOOL
-                {
-                    LE_ASSERT(!mruPresetsFolder.isDirectory());
-                    LE_ASSERT(rootPath.front() == '/');
-                    LE_ASSERT(presetsPath.front() == '/');
-                    juce::File const userFolder(
-                        juce::File::getSpecialLocation(juce::File::userHomeDirectory));
-                    pluginRootPath = userFolder.getChildFile(
-                        juce::String(rootPath.begin() + 1, rootPath.size() - 1));
-                    mruPresetsFolder = userFolder.getChildFile(
-                        juce::String(presetsPath.begin() + 1, presetsPath.size() - 1));
-                }
-            }
-#endif // __APPLE__
-        }
-
-        bool const result(pluginRootPath.isDirectory());
-        if (!result)
-            //...mrmlj...
-            warningMessageBox(
-                "SpectrumWorx critical error: unable to access installation folder.",
-                pluginRootPath.getFullPathName().toUTF8() /*getCharPointer()*/.getAddress(), true);
-
-        return result;
-    }
-    catch (...)
-    {
-        return false;
-    }
-}
-#endif // LE_SW_FMOD
 
 bool havePathsBeenInitialised() { return pluginRootPath != juce::File(); }
 
@@ -450,96 +321,6 @@ juce::File &presetsFolder()
 {
     LE_ASSERT_MSG((mruPresetsFolder != juce::File()), "Not initialized.");
     return mruPresetsFolder;
-}
-
-juce::File resourcesPath() { return rootPath().getChildFile("Resources"); }
-
-#ifdef __APPLE__
-::FSRef makeFSRefFromPath(juce::String const &path)
-{
-    // FSPathMakeRef broken on relative paths
-    // http://lists.apple.com/archives/carbon-development/2003/Mar/msg00997.html
-    FSRef result;
-    LE_VERIFY(::FSPathMakeRef(reinterpret_cast<UInt8 const *>(path.getCharPointer().getAddress()),
-                              &result, nullptr) == noErr);
-    return result;
-}
-
-::CFURLRef makeCFURLFromPath(juce::File const &path)
-{
-    //::CFStringRef const pathString( ::CFStringCreateWithCStringNoCopy( nullptr, path.getFullPathName().getCharPointer().getAddress(), kCFStringEncodingUTF8, kCFAllocatorNull ) );
-    //::CFURLRef    const pathURL   ( ::CFURLCreateWithFileSystemPath  ( nullptr, pathString, kCFURLPOSIXPathStyle, false ) );
-    //LE_ASSERT( pathString );
-    //LE_ASSERT( pathURL    );
-    //::CFRelease( pathString );
-    ::FSRef const pathFSRef(makeFSRefFromPath(path.getFullPathName()));
-    ::CFURLRef const pathURL(::CFURLCreateFromFSRef(nullptr, &pathFSRef));
-    LE_ASSERT(pathURL);
-    return pathURL;
-}
-#endif // __APPLE__
-
-juce::Image resourceBitmap(char const (&bitmapNumber)[2 + 1])
-{
-    char const extension[] = ".png";
-    std::array<char, _countof(bitmapNumber) - 1 + _countof(extension) - 1> fileName;
-    LE_ASSERT(bitmapNumber[2] == '\0');
-    fileName[0] = bitmapNumber[0];
-    fileName[1] = bitmapNumber[1];
-    fileName[2] = extension[0];
-    fileName[3] = extension[1];
-    fileName[4] = extension[2];
-    fileName[5] = extension[3];
-
-    juce::File const file(
-        resourcesPath().getChildFile(juce::String(&fileName[0], fileName.size())));
-#ifndef NDEBUG
-    try
-    {
-#endif // NDEBUG
-        juce::FileInputStream fileInputStream(file);
-        juce::PNGImageFormat pngReader;
-        juce::Image const bitmap(pngReader.decodeImage(fileInputStream));
-        LE_ASSERT_MSG(bitmap.isValid() && bitmap.getWidth() && bitmap.getHeight(),
-                      "Error loading bitmap from disk.");
-
-#ifdef __APPLE__
-        // PC to Mac gamma correction
-        // http://www.giassa.net/?page_id=475
-        {
-            juce::Image::BitmapData pixels(bitmap, juce::Image::BitmapData::readWrite);
-            LE_ASSERT(((bitmap.getFormat() == juce::Image::ARGB) && (pixels.pixelStride == 4)) ||
-                      ((bitmap.getFormat() == juce::Image::RGB) && (pixels.pixelStride == 3)));
-
-            {
-                float const pcGamma(2.2f);
-                float const macGamma(1.8f);
-
-                unsigned char *const p_image_data(pixels.getLinePointer(0));
-                unsigned char *LE_RESTRICT p_current_channel(p_image_data);
-                unsigned char const *const p_image_end(p_image_data +
-                                                       (pixels.lineStride * bitmap.getHeight()));
-
-                while (p_current_channel != p_image_end)
-                {
-                    *p_current_channel = static_cast<unsigned char>(Math::convert<unsigned int>(
-                        /*std*/ ::powf(*p_current_channel / 255.0f, pcGamma / macGamma) * 255));
-                    ++p_current_channel;
-                }
-            }
-        }
-#endif // __APPLE__
-
-        return bitmap;
-#ifndef NDEBUG
-    }
-    catch (...)
-    {
-        std::printf("Error loading bitmap (%s) from disk.\n",
-                    file.getFullPathName().toUTF8().getAddress());
-        throw;
-    }
-#endif // NDEBUG
 }
 
 void paintImage(juce::Graphics &graphics, juce::Image const &image)
@@ -1018,16 +799,22 @@ BitmapButton::BitmapButton(juce::Component &parent, juce::Image const &on, juce:
     LE_ASSERT((on.getHeight() == off.getHeight()) || (&on == &resourceBitmap<SettingsOn>()));
     LE_ASSERT(on.getWidth() == off.getWidth());
 
-    /// \note JUCE's ugly Value chemistry tends to backfire when the button's
-    /// 'value' is updated through automation/LFOing: juce::Button registers
-    /// itself as a listener of its own Value object and the value we set gets
-    /// assigned to the internal Value object which in turn sends an
-    /// asynchronous notification which, when arrives, may try to reset an
-    /// already changed value and this in turn generates a bogus "value changed"
-    /// notification. As we do not use the Value objects/interface directly, it
-    /// is safe to simply cut this Button->Value->Button loop.
-    ///                                       (20.03.2013.) (Domagoj Saric)
-    getToggleStateValue().removeListener(this);
+    /// \note The 2013 comment here explained that juce::Button registered itself
+    /// as a listener of its own Value, so a value set through automation or an
+    /// LFO came back asynchronously and generated a bogus "value changed"; the
+    /// fix was to cut the Button->Value->Button loop with
+    /// getToggleStateValue().removeListener(this).
+    ///
+    ///   That is neither possible nor needed against JUCE 8. Button is no longer
+    /// a Value::Listener -- it holds a private helper object (juce_Button.cpp:40)
+    /// which this class cannot reach -- and that helper calls setToggleState
+    /// with dontSendNotification for the click notification (juce_Button.cpp:58),
+    /// on top of an early-out when the state has not actually changed
+    /// (juce_Button.cpp:174). JUCE cuts the loop itself now.
+    ///
+    ///   Read from JUCE's sources rather than observed, so it is worth watching
+    /// for doubled automation writes the first time this runs under a host.
+    ///                                       (28.07.2026.) (SW port)
 
     setWantsKeyboardFocus(false);
     setMouseClickGrabsKeyboardFocus(false);
@@ -1081,67 +868,6 @@ juce::Colour const &BitmapButton::normalOverlay() { return juce::Colours::transp
 // all items etc...) or to workaround bugs (e.g. the menu displaying in wrong
 // places when in lower and/or right half of the screen)...
 //                                            (17.03.2010.) (Domagoj Saric)
-/// \todo Properly document the following hacks if they persist.
-///                                           (26.02.2010.) (Domagoj Saric)
-namespace JuceHackery
-{
-#pragma warning(push)
-#pragma warning(disable : 4510) // Default constructor could not be generated.
-#pragma warning(disable : 4512) // Assignment operator could not be generated.
-#pragma warning(disable                                                                            \
-                : 4610) // Class can never be instantiated - user-defined constructor required.
-
-class MenuItemInfo
-{
-  public:
-    const int itemID;
-    juce::String text;
-    const juce::Colour textColour;
-    /*const*/ bool active, isSeparator, isTicked, usesColour;
-    juce::Image image;
-    juce::ReferenceCountedObjectPtr<juce::PopupMenu::CustomComponent> customComp;
-    juce::ScopedPointer<juce::PopupMenu> subMenu;
-    juce::ApplicationCommandManager *const commandManager;
-}; // class MenuItemInfo
-
-#pragma warning(pop)
-
-static unsigned int getNumberOfItems(juce::PopupMenu const &menu) { return menu.items.size(); }
-
-static MenuItemInfo &getItemInfo(juce::PopupMenu &menu, unsigned int const itemIndex)
-{
-    MenuItemInfo &item(*reinterpret_cast<MenuItemInfo *>(menu.items.getUnchecked(itemIndex)));
-
-#ifdef _DEBUG
-    juce::PopupMenu::MenuItemIterator menuIterator(menu);
-    LE_VERIFY(menuIterator.next());
-    unsigned int currentItemIndex(0);
-    while (currentItemIndex++ != itemIndex)
-        LE_VERIFY(menuIterator.next());
-    LE_ASSERT(menuIterator.itemName == item.text);
-    LE_ASSERT(menuIterator.itemId == item.itemID);
-    LE_ASSERT(menuIterator.isTicked == item.isTicked);
-#endif // _DEBUG
-
-    return item;
-}
-
-static MenuItemInfo const &getItemInfo(juce::PopupMenu const &menu, unsigned int const itemIndex)
-{
-    return getItemInfo(const_cast<juce::PopupMenu &>(menu), itemIndex);
-}
-
-static unsigned int getItemIndexForItemID(juce::PopupMenu &menu, int const itemID)
-{
-    for (unsigned int index(0); index < getNumberOfItems(menu); ++index)
-    {
-        if (getItemInfo(menu, index).itemID == itemID)
-            return index;
-    }
-    LE_UNREACHABLE_CODE();
-}
-} // namespace JuceHackery
-
 bool PopupMenu::menuActive_(false);
 
 PopupMenu::PopupMenu() : menuHeight_(0), menuWidth_(0) {}
@@ -1149,30 +875,29 @@ PopupMenu::PopupMenu() : menuHeight_(0), menuWidth_(0) {}
 void PopupMenu::addItem(ItemID const newItemId, char const *const newItemText,
                         juce::Image const &icon, bool const enabled)
 {
-    juce::String const text(newItemText);
+    juce::String text(newItemText);
     updateDimensionsForNewItem(text);
-    menu_.addItem(mangleID(newItemId), text, enabled, false, icon);
+    items_.push_back({newItemId, std::move(text), icon, enabled, false, nullptr});
 }
 
 void PopupMenu::addSubMenu(PopupMenu &subMenu, char const *const name)
 {
     LE_ASSERT(name);
-    juce::String const text(name);
+    juce::String text(name);
     updateDimensionsForNewItem(text);
-    menu_.addSubMenu(text, subMenu.menu_, true);
+    items_.push_back({0, std::move(text), juce::Image(), true, false, &subMenu});
 }
 
 void PopupMenu::addSectionHeader(char const *const title)
 {
     LE_ASSERT(title);
-    juce::String const text(title);
+    juce::String text(title);
     updateDimensionsForNewItem(text);
-    menu_.addSectionHeader(text);
+    items_.push_back({0, std::move(text), juce::Image(), false, true, nullptr});
 }
 
 void PopupMenu::updateDimensionsForNewItem(juce::String const &itemText)
 {
-    //...mrmlj...menuWidth_ = std::max( menuWidth_, Theme::singleton().getPopupMenuFont().getStringWidth( text ) );
     int idealWidth, idealHeight;
     Theme::singleton().Theme::getIdealPopupMenuItemSize(itemText, false, -1, idealWidth,
                                                         idealHeight);
@@ -1180,18 +905,47 @@ void PopupMenu::updateDimensionsForNewItem(juce::String const &itemText)
     menuHeight_ += idealHeight;
 }
 
-PopupMenu::OptionalID PopupMenu::showCenteredAtRight(juce::Component const &owner) const
+/// \note juce::PopupMenu reserves 0 for "the user dismissed the menu", so the
+/// IDs handed to it are ours plus one. The 2016 code masked the top byte
+/// instead, which cost it the top byte of the ID space.
+namespace
+{
+constexpr int toJuceID(PopupMenu::ItemID const id) { return static_cast<int>(id) + 1; }
+constexpr PopupMenu::ItemID fromJuceID(int const id)
+{
+    return static_cast<PopupMenu::ItemID>(id - 1);
+}
+} // anonymous namespace
+
+juce::PopupMenu PopupMenu::build(int const tickedIndex) const
+{
+    juce::PopupMenu menu;
+    for (int index(0); index < static_cast<int>(items_.size()); ++index)
+    {
+        auto const &item(items_[static_cast<std::size_t>(index)]);
+        if (item.isSectionHeader)
+            menu.addSectionHeader(item.text);
+        else if (item.pSubMenu)
+            menu.addSubMenu(item.text, item.pSubMenu->build(item.pSubMenu->tickedIndex_), true);
+        else
+            menu.addItem(toJuceID(item.id), item.text, item.enabled, index == tickedIndex,
+                         item.icon);
+    }
+    return menu;
+}
+
+void PopupMenu::showCenteredAtRight(juce::Component const &owner, OnChosen onChosen) const
 {
     juce::Point<int> const ownerPosition(owner.getScreenPosition());
     unsigned int const ownerRight(ownerPosition.getX() + owner.getWidth());
     unsigned int const ownerVerticalMiddle(ownerPosition.getY() + (owner.getHeight() / 2));
-    return showAt(
-        ownerRight + 6, ownerVerticalMiddle - (menuHeight_ / 2), 1,
-        1 //...mrmlj...required with latest juce to actually get the menu on the right side...
-    );
+    showAt(ownerRight + 6, ownerVerticalMiddle - (menuHeight_ / 2), 1,
+           1 //...mrmlj...required with latest juce to actually get the menu on the right side...
+           ,
+           std::move(onChosen));
 }
 
-PopupMenu::OptionalID PopupMenu::showCenteredBelow(juce::Component const &owner) const
+void PopupMenu::showCenteredBelow(juce::Component const &owner, OnChosen onChosen) const
 {
     juce::Point<int> point(owner.localPointToGlobal(juce::Point<int>()));
 
@@ -1201,92 +955,84 @@ PopupMenu::OptionalID PopupMenu::showCenteredBelow(juce::Component const &owner)
         point.setX(point.getX() - ((menuWidth_ - width) / 2));
     }
 
-    return showAt(point.getX(), point.getY(), width, owner.getHeight());
+    showAt(point.getX(), point.getY(), width, owner.getHeight(), std::move(onChosen));
 }
 
-PopupMenu::OptionalID PopupMenu::showAt(unsigned int x, unsigned int const y,
-                                        unsigned int const width, unsigned int const height) const
+void PopupMenu::showAt(unsigned int const x, unsigned int const y, unsigned int const width,
+                       unsigned int const height, OnChosen onChosen) const
 {
     menuActive_ = true;
-    //...mrmlj...NEW JUCE juce::Component::leHack_modalComponentsShouldFocusBackToPreviouslyFocusedComponent = false;
-    MangledID const chosenMenuEntryID(const_cast<juce::PopupMenu &>(menu_).showMenu(
-        juce::PopupMenu::Options()
-            .withTargetScreenArea(juce::Rectangle<int>(x, y, width, height))
-            .withMinimumWidth(width)));
-    //...mrmlj...NEW JUCE juce::Component::leHack_modalComponentsShouldFocusBackToPreviouslyFocusedComponent = true;
-    menuActive_ = false;
-    /// \note juce::PopupMenu uses zero to indicate that the user dismissed the
-    /// menu/didn't click an item and therefor disallows the use of 0 as an item
-    /// ID. Since we want to support 0 as a legal item ID, we work around this
-    /// by '(un)mangling' the ID when crossing the JUCE API boundary.
-    ///                                       (13.02.2014.) (Domagoj Saric)
-    if (chosenMenuEntryID)
-        return unmangleID(chosenMenuEntryID);
-    else
-        return std::nullopt;
+    build(tickedIndex_)
+        .showMenuAsync(juce::PopupMenu::Options()
+                           .withTargetScreenArea(juce::Rectangle<int>(x, y, width, height))
+                           .withMinimumWidth(width),
+                       [onChosen = std::move(onChosen)](int const chosenID) {
+                           menuActive_ = false;
+                           if (onChosen)
+                               onChosen(chosenID ? OptionalID(fromJuceID(chosenID)) : std::nullopt);
+                       });
 }
 
 void PopupMenu::clear()
 {
-    menu_.clear();
+    items_.clear();
+    tickedIndex_ = -1;
     menuHeight_ = 0;
     menuWidth_ = 0;
 }
 
-unsigned int PopupMenu::numberOfItems() const { return JuceHackery::getNumberOfItems(menu_); }
-
-PopupMenu::MangledID PopupMenu::mangleID(ItemID const id)
-{
-    LE_ASSERT(id < zeroIDMaskWorkaround);
-    return id | zeroIDMaskWorkaround;
-}
-
-PopupMenu::ItemID PopupMenu::unmangleID(MangledID const mangledID)
-{
-    return mangledID & (~zeroIDMaskWorkaround);
-}
+unsigned int PopupMenu::numberOfItems() const { return static_cast<unsigned int>(items_.size()); }
 
 PopupMenuWithSelection::PopupMenuWithSelection() : currentSelection_(0), currentSelectionID_(0) {}
 
 unsigned int PopupMenuWithSelection::getSelectedIndex() const
 {
     LE_ASSERT(hasValidSelection());
-    return currentSelection_;
+    return static_cast<unsigned int>(currentSelection_);
+}
+
+unsigned int PopupMenuWithSelection::indexForID(unsigned int const id) const
+{
+    for (unsigned int index(0); index < numberOfItems(); ++index)
+        if (items()[index].id == id)
+            return index;
+    LE_UNREACHABLE_CODE();
 }
 
 void PopupMenuWithSelection::setSelectedIndex(unsigned int const newSelectionIndex)
 {
     updateSelection(newSelectionIndex);
-    currentSelectionID_ = JuceHackery::getItemInfo(menu_, newSelectionIndex).itemID;
+    currentSelectionID_ = items()[newSelectionIndex].id + 1;
 }
 
 unsigned int PopupMenuWithSelection::getSelectedID() const
 {
     LE_ASSERT(hasValidSelection());
-    return unmangleID(currentSelectionID_);
+    return currentSelectionID_ - 1;
 }
 
 void PopupMenuWithSelection::setSelectedID(unsigned int const newSelectionID)
 {
-    currentSelectionID_ = mangleID(newSelectionID);
-    updateSelection(JuceHackery::getItemIndexForItemID(menu_, currentSelectionID_));
+    currentSelectionID_ = newSelectionID + 1;
+    updateSelection(indexForID(newSelectionID));
 }
 
 juce::String const &PopupMenuWithSelection::getSelectedItemText() const
 {
-    return getItemText(currentSelection_);
+    return getItemText(static_cast<unsigned int>(currentSelection_));
 }
 
 juce::Image const &PopupMenuWithSelection::getSelectedItemIcon() const
 {
-    return JuceHackery::getItemInfo(menu_, currentSelection_).image;
+    /// \note A reference into our own storage now, so it stays valid for as
+    /// long as the item does. It used to point into juce::PopupMenu's internals.
+    return items()[static_cast<std::size_t>(currentSelection_)].icon;
 }
 
 void PopupMenuWithSelection::updateSelection(unsigned int const newSelectionIndex)
 {
-    JuceHackery::getItemInfo(menu_, currentSelection_).isTicked = false;
-    JuceHackery::getItemInfo(menu_, newSelectionIndex).isTicked = true;
-    currentSelection_ = newSelectionIndex;
+    currentSelection_ = static_cast<int>(newSelectionIndex);
+    tickedIndex_ = currentSelection_;
 }
 
 void PopupMenuWithSelection::clear()
@@ -1299,34 +1045,41 @@ void PopupMenuWithSelection::clear()
 bool PopupMenuWithSelection::hasValidSelection() const
 {
     return (currentSelectionID_ != 0) &&
-           static_cast<std::size_t>(currentSelection_) < numberOfItems();
+           (static_cast<unsigned int>(currentSelection_) < numberOfItems());
 }
 
 bool PopupMenuWithSelection::handleNewSelection(OptionalID const &chosenMenuEntryID)
 {
     if (chosenMenuEntryID.has_value())
     {
-        currentSelectionID_ = mangleID(*chosenMenuEntryID);
-        updateSelection(JuceHackery::getItemIndexForItemID(menu_, currentSelectionID_));
+        currentSelectionID_ = *chosenMenuEntryID + 1;
+        updateSelection(indexForID(*chosenMenuEntryID));
         return true;
     }
-    else
-        return false;
+    return false;
 }
 
-bool PopupMenuWithSelection::showCenteredAtRight(juce::Component const &owner)
+void PopupMenuWithSelection::showCenteredAtRight(juce::Component const &owner,
+                                                 OnSelection onSelection)
 {
-    return handleNewSelection(PopupMenu::showCenteredAtRight(owner));
+    PopupMenu::showCenteredAtRight(
+        owner, [this, onSelection = std::move(onSelection)](OptionalID const &chosen) {
+            onSelection(handleNewSelection(chosen));
+        });
 }
 
-bool PopupMenuWithSelection::showCenteredBelow(juce::Component const &owner)
+void PopupMenuWithSelection::showCenteredBelow(juce::Component const &owner,
+                                               OnSelection onSelection)
 {
-    return handleNewSelection(PopupMenu::showCenteredBelow(owner));
+    PopupMenu::showCenteredBelow(
+        owner, [this, onSelection = std::move(onSelection)](OptionalID const &chosen) {
+            onSelection(handleNewSelection(chosen));
+        });
 }
 
 juce::String const &PopupMenuWithSelection::getItemText(unsigned int const itemIndex) const
 {
-    return JuceHackery::getItemInfo(menu_, itemIndex).text;
+    return items()[itemIndex].text;
 }
 
 ComboBox::ComboBox(juce::Component &parent, juce::Image const &normalBackground,
@@ -1351,21 +1104,31 @@ void ComboBox::paint(juce::Graphics &graphics)
                             0.1f);
 }
 
-bool ComboBox::showMenu()
+/// \note \p onValueChanged runs later, on the message thread, and only if the
+/// menu actually opened. The SafePointer is the point: a menu can outlive the
+/// widget that opened it -- the host can close the editor while it is down --
+/// and the 2016 code could not have this problem because the call blocked.
+void ComboBox::showMenu(std::function<void(bool)> onValueChanged)
 {
     //...mrmlj...temporary workaround for the temporary zero padding workaround...
     if (!isEnabled())
-        return false;
+        return;
 
     if (menuActive())
-        return false;
+        return;
 
-    if (!showCenteredBelow(*this))
-        return false;
-
-    grabKeyboardFocus();
-    repaint();
-    return true;
+    showCenteredBelow(*this, [self = juce::Component::SafePointer<ComboBox>(this),
+                              onValueChanged = std::move(onValueChanged)](bool const valueChanged) {
+        if (!self)
+            return;
+        if (valueChanged)
+        {
+            self->grabKeyboardFocus();
+            self->repaint();
+        }
+        if (onValueChanged)
+            onValueChanged(valueChanged);
+    });
 }
 
 LE_NOINLINE void ComboBox::setSelectedID(unsigned int const newSelectionID)
@@ -1456,9 +1219,12 @@ void TextButton::paintButton(juce::Graphics &g, bool const isMouseOverButton, bo
 Knob::Knob(juce::Component &parent, unsigned int const x, unsigned int const y,
            unsigned int const xMargin, unsigned int const yMargin)
 {
-    /// \note See the note in the BitmapButton constructor.
-    ///                                       (20.03.2013.) (Domagoj Saric)
-    removeValueListeners(*this, valueListener());
+    /// \note The Slider half of the same 2013 fix, and it went the same way.
+    /// Slider::valueListener() never existed in stock JUCE -- it was an addition
+    /// in the patched fork -- and JUCE 8's own Value listener already calls
+    /// setValue with dontSendNotification (juce_Slider.cpp:433), which is what
+    /// unhooking it was for. See the note in the BitmapButton constructor.
+    ///                                       (28.07.2026.) (SW port)
 
     setBounds(x, y, xMargin, yMargin);
     //setTooltip             ( title                 );
@@ -1522,16 +1288,6 @@ void Knob::stoppedDragging() noexcept
     //...mrmlj...automatically (but imprecisely)...
     //juce::Desktop::setMousePosition( juce::Desktop::getLastMouseDownPosition() );
     //juce::Desktop::setMousePosition( this->localPointToGlobal( this->getBounds().getCentre() ) );
-}
-
-void Knob::removeValueListeners(juce::Slider &slider, juce::Value::Listener &valueListener)
-{
-    //...mrmlj...Slider::valueListener() is protected so we cannot access it here...
-    //juce::Value::Listener & valueListener( slider.valueListener() );
-    LE_ASSUME(&valueListener);
-    slider.getValueObject().removeListener(&valueListener);
-    slider.getMinValueObject().removeListener(&valueListener);
-    slider.getMaxValueObject().removeListener(&valueListener);
 }
 
 void LE_NOINLINE Knob::setValue(param_type const newValue)
@@ -1674,27 +1430,13 @@ void EditorKnob::paint(juce::Graphics &graphics)
                             juce::Justification::centred, 1, 0.1f);
 }
 
-void EditorKnob::valueChanged() noexcept
-{
-    using LE::Parameters::IndexOf;
-    using namespace GlobalParameters;
-    typedef GlobalParameters::Parameters GlobalParams;
-    auto &editor(this->editor());
-    auto const &value(this->getValue());
-    switch (parameterIndex_)
-    {
-    case IndexOf<GlobalParams, InputGain>::value:
-        LE_VERIFY(editor.globalParameterChanged<InputGain>(value, false));
-        break;
-    case IndexOf<GlobalParams, OutputGain>::value:
-        LE_VERIFY(editor.globalParameterChanged<OutputGain>(value, false));
-        break;
-    case IndexOf<GlobalParams, MixPercentage>::value:
-        LE_VERIFY(editor.globalParameterChanged<MixPercentage>(value, false));
-        break;
-        LE_DEFAULT_CASE_UNREACHABLE();
-    }
-}
+/// \note EditorKnob::valueChanged() lives in spectrumWorxEditor.cpp. It is the
+/// only thing in this file that instantiates
+/// SpectrumWorxEditor::globalParameterChanged<>, which reaches host() and so
+/// needs the complete SpectrumWorx -- and that is what used to drag the whole
+/// 2016 VST2 plugin class, and the deleted VST 2.4 SDK behind it, into the
+/// widget layer. Everything else here needs the editor declared, not defined.
+///                                       (28.07.2026.) (SW port)
 
 void EditorKnob::startedDragging() noexcept
 {
@@ -1733,10 +1475,12 @@ void TitledComboBox::paint(juce::Graphics &graphics)
 
 void TitledComboBox::mouseDown(juce::MouseEvent const &)
 {
-    bool const valueChanged(ComboBox::showMenu());
-    if (valueChanged)
-        //...mrmlj...move...editor/settings specific...
-        SpectrumWorxEditor::Settings::comboBoxValueChanged(*this);
+    ComboBox::showMenu(
+        [self = juce::Component::SafePointer<TitledComboBox>(this)](bool const valueChanged) {
+            if (self && valueChanged)
+                //...mrmlj...move...editor/settings specific...
+                SpectrumWorxEditor::Settings::comboBoxValueChanged(*self);
+        });
 }
 
 namespace Detail

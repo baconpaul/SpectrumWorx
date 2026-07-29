@@ -26,11 +26,7 @@
 #include "le/utility/objcfwdhelpers.hpp"
 #include "le/utility/parentFromMember.hpp"
 
-#include "juce/beginIncludes.hpp"
-//#include "juce/juce_core/network/juce_URL.h"
-#include "juce/juce_core/threads/juce_Process.h"
-#include "juce/juce_gui_basics/windows/juce_ComponentPeer.h"
-#include "juce/endIncludes.hpp"
+#include <juce_gui_basics/juce_gui_basics.h>
 
 #include "le/utility/assert.hpp"
 #include "le/utility/polymorphicDowncast.hpp"
@@ -841,8 +837,7 @@ void SpectrumWorxEditor::savePreset(juce::File const &presetFile, bool const ign
     LE_ASSUME(ignoreExternalSample);
     SW::savePreset(presetFile, juce::File(), comment, program());
 #else
-    SW::savePreset(presetFile,
-                   ignoreExternalSample ? juce::File() : effect().currentSampleFile(),
+    SW::savePreset(presetFile, ignoreExternalSample ? juce::File() : effect().currentSampleFile(),
                    comment, program());
 #endif // LE_SW_SEPARATED_DSP_GUI
 }
@@ -1020,6 +1015,33 @@ void SpectrumWorxEditor::mainKnobDragStopped(std::uint8_t const index) const
     parameterID.value.type = ParameterID::GlobalParameter;
     parameterID.value._.global.index = index;
     host().automatedParameterEndEdit(parameterID);
+}
+
+/// \note Moved here from gui.cpp. It instantiates globalParameterChanged<>,
+/// which reaches host() and so needs the complete SpectrumWorx; leaving it in
+/// the widget layer meant every widget translation unit pulled in the 2016 VST2
+/// plugin class and the deleted VST 2.4 SDK behind it.
+///                                       (28.07.2026.) (SW port)
+void EditorKnob::valueChanged() noexcept
+{
+    using LE::Parameters::IndexOf;
+    using namespace GlobalParameters;
+    typedef GlobalParameters::Parameters GlobalParams;
+    auto &editor(this->editor());
+    auto const &value(this->getValue());
+    switch (parameterIndex_)
+    {
+    case IndexOf<GlobalParams, InputGain>::value:
+        LE_VERIFY(editor.globalParameterChanged<InputGain>(value, false));
+        break;
+    case IndexOf<GlobalParams, OutputGain>::value:
+        LE_VERIFY(editor.globalParameterChanged<OutputGain>(value, false));
+        break;
+    case IndexOf<GlobalParams, MixPercentage>::value:
+        LE_VERIFY(editor.globalParameterChanged<MixPercentage>(value, false));
+        break;
+        LE_DEFAULT_CASE_UNREACHABLE();
+    }
 }
 
 void SpectrumWorxEditor::createChainGUIs(AutomatedModuleChain &chain)
@@ -1204,16 +1226,16 @@ void SpectrumWorxEditor::ModuleMenuButton::clicked()
 }
 
 SpectrumWorxEditor::Gradient::Gradient(juce::Component &parent)
-    : juce::ColourGradient(juce::Colours::transparentWhite, 0, 0, juce::Colours::transparentWhite,
-                           static_cast<float>(ModuleUI::width), 0, false)
+    : gradient_(juce::Colours::transparentWhite, 0, 0, juce::Colours::transparentWhite,
+                static_cast<float>(ModuleUI::width), 0, false)
 {
-    juce::ColourGradient::addColour(0.5, juce::Colours::darkgrey);
+    gradient_.addColour(0.5, juce::Colours::darkgrey);
     addToParentAndShow(parent, *this);
 }
 
 void SpectrumWorxEditor::Gradient::paint(juce::Graphics &graphics)
 {
-    graphics.setGradientFill(*this);
+    graphics.setGradientFill(gradient_);
     graphics.fillAll();
 }
 
@@ -1759,8 +1781,7 @@ SpectrumWorxEditor const &SpectrumWorxEditor::LFODisplay::editor() const
 }
 
 double SpectrumWorxEditor::LFODisplay::Period::snapValue(double const attemptedValue,
-                                                         bool /*userIsDragging*/)
-    LE_GNU_SPECIFIC(noexcept)
+                                                         DragMode /*dragMode*/)
 {
     LFO::SnappedPeriod const result(
         LFO::snapPeriodScale(static_cast<float>(attemptedValue), parent().lfo().syncTypes()));

@@ -18,19 +18,10 @@
 #include "le/utility/countof.hpp"
 #include "le/utility/tchar.hpp"
 
-#include "juce/beginIncludes.hpp"
-//...mrmlj...juce missing includes...
-#include "juce/juce_core/files/juce_DirectoryIterator.h"
-#include "juce/juce_core/threads/juce_TimeSliceThread.h"
+#include <juce_gui_basics/juce_gui_basics.h>
 
-#include "juce/juce_gui_basics/filebrowser/juce_DirectoryContentsDisplayComponent.h"
-#include "juce/juce_gui_basics/filebrowser/juce_FileChooser.h"
-#include "juce/endIncludes.hpp"
-
-// Boost sandbox
 #include <filesystem>
 #include <system_error>
-#include "boost/mmap/mappble_objects/file/utility.hpp"
 
 #include "le/utility/assert.hpp"
 //------------------------------------------------------------------------------

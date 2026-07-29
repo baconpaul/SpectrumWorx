@@ -26,7 +26,7 @@
 
 #include "le/utility/polymorphicDowncast.hpp"
 
-#include "juce/juce_gui_basics/juce_gui_basics.h"
+#include <juce_gui_basics/juce_gui_basics.h>
 #include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 namespace LE

@@ -180,9 +180,9 @@ SharedModuleControls::FrequencyRange::FrequencyRange()
     : ModuleControlBase(Constants::invalidIndex, *ModuleUI::selectedModule()),
       parameterIndexForInternalWriteAccess_(Constants::invalidIndex)
 {
-    /// \note See the note in the Knob constructor.
-    ///                                       (12.02.2014.) (Domagoj Saric)
-    Knob::removeValueListeners(*this, valueListener());
+    /// \note The removeValueListeners() call that was here went with the fork's
+    /// Slider::valueListener(). See the note in the Knob constructor.
+    ///                                       (28.07.2026.) (SW port)
 
     setWantsKeyboardFocus(true);
     setSliderStyle(juce::Slider::TwoValueHorizontal);

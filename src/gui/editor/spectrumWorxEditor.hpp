@@ -31,9 +31,7 @@
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/objcfwdhelpers.hpp"
 
-#include "juce/beginIncludes.hpp"
-#include "juce/juce_gui_basics/mouse/juce_DragAndDropContainer.h"
-#include "juce/endIncludes.hpp"
+#include <juce_gui_basics/juce_gui_basics.h>
 #include "le/utility/intrusivePtr.hpp"
 
 #include <array>
@@ -394,7 +392,9 @@ class SpectrumWorxEditor
     /// \class Gradient
     ////////////////////////////////////////////////////////////////////////////
 
-    class Gradient final : public WidgetBase, private juce::ColourGradient
+    /// \note Holds a ColourGradient rather than deriving from one: JUCE 8 marks
+    /// it final.
+    class Gradient final : public WidgetBase
     {
       public:
         Gradient(juce::Component &parent);
@@ -402,6 +402,9 @@ class SpectrumWorxEditor
 
       private: // JUCE component overrides.
         void paint(juce::Graphics &) override;
+
+      private:
+        juce::ColourGradient gradient_;
     }; // class Gradient
 
   public:
@@ -429,7 +432,9 @@ class SpectrumWorxEditor
     /// \class LFODisplay
     ////////////////////////////////////////////////////////////////////////////
 
-    class LFODisplay : public WidgetBase, private juce::Button::Listener, private juce::Slider::Listener
+    class LFODisplay : public WidgetBase,
+                       private juce::Button::Listener,
+                       private juce::Slider::Listener
     {
       public: //...mrmlj...
         //class LE_NOVTABLE AsyncSlider : public WidgetBase<juce::Slider> { LE_IMPLEMENT_ASYNC_REPAINT };
@@ -447,8 +452,9 @@ class SpectrumWorxEditor
 
           private: // JUCE component overrides.
             friend class LFODisplay;
-            double snapValue(double attemptedValue, bool userIsDragging)
-                LE_GNU_SPECIFIC(noexcept) override;
+            /// \note JUCE 8 passes a DragMode where 2016 passed a bool. The
+            /// implementation ignored it either way.
+            double snapValue(double attemptedValue, DragMode) override;
 
           private:
             LFODisplay const &parent() const;

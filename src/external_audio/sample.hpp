@@ -14,7 +14,7 @@
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/span.hpp"
 
-#include <juce/juce_core/juce_core.h>
+#include <juce_core/juce_core.h>
 
 #include <memory>
 #include <mutex>

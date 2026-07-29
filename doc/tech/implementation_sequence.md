@@ -1607,6 +1607,44 @@ and `DiscreteParameter`, so the widget layer has to link before the module layer
 can. Revised order: **widget layer (`gui.cpp`, with both rewrites) → module layer
 plus a temporary editor seam → flip the flag → 6.4.**
 
+**✅ `sw-gui-widgets` compiles, at `LE_SW_GUI=1`, with both rewrites done.**
+
+- **Rewrite 1, modal loops.** `warningMessageBox` is `showMessageBoxAsync`, and
+  the `isGUIInitialised()`/`isThisTheGUIThread()` dance that chose between it and
+  the now-deleted `showNativeDialogBox` went with it — the async call is safe
+  from anywhere. `warningOkCancelBox` cannot return a `bool` any more and takes a
+  callback; its only live callers are the preset browser's two save-path
+  questions, so inverting them is that file's job. `PopupMenu::showAt` is
+  `showMenuAsync`, which inverts `ComboBox::showMenu` → `TitledComboBox::mouseDown`
+  → `Settings::comboBoxValueChanged` exactly as predicted. Every converted site
+  captures a `Component::SafePointer`, because a menu can now outlive the widget
+  that opened it — a problem the blocking version could not have.
+  `menuActive_` survives with its meaning intact: it is now true from show until
+  the callback runs, which is what the callers were asking anyway.
+- **Rewrite 2, `PopupMenu`.** `namespace JuceHackery` is gone. `PopupMenu` holds
+  its own item vector and builds a `juce::PopupMenu` at show time. **The 2016
+  "rebuilding is too slow" judgement was re-decided, not inherited** — building a
+  menu of a few dozen items on a click is free now, and it buys: JUCE's layout
+  stops being our business, `getSelectedItemText()` and `getSelectedItemIcon()`
+  return references into storage we own rather than into JUCE internals, and the
+  ID mangling that burned the top byte of the ID space becomes a plain `+1`.
+
+Two 2013 workarounds went at the same time, and they turned out to be the *same*
+workaround: `Button` unhooking itself from its own `Value`, and the fork-only
+`Slider::valueListener()`. Both cut a widget→`Value`→widget loop that produced
+spurious automation writes. JUCE 8 cuts it itself — `juce_Slider.cpp:433` and
+`juce_Button.cpp:58` both pass `dontSendNotification` on the `Value` round-trip,
+and `Button` is no longer a `Value::Listener` at all, so the hack could not be
+expressed even if it were wanted. Read from JUCE's sources rather than observed,
+so watch for doubled automation writes the first time this runs under a host.
+
+> **One hazard the layering created.** `sw-dsp` still exports `LE_SW_GUI=0` and
+> `sw-gui-widgets` sets `1`, so both reach `gui.cpp`'s command line and the later
+> wins — an argument order deciding an ABI, silently, with no warning from
+> clang. `gui.cpp` carries a `static_assert(LE_SW_GUI == 1)` so a reordering
+> fails the build rather than corrupting memory. Both the duplicate and the
+> assert go when `sw-dsp` itself flips.
+
 One thing that is *not* in the way: `GUI::ModuleUI` is a `std::optional` that
 stays empty until `createGUI()`, and `ParameterWidgets` is raw storage until
 `ModuleWidgets::create()`. A headless test can construct all 57 modules, process

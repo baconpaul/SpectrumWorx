@@ -21,10 +21,7 @@
 #include "le/plugins/vst/2.4/plugin.hpp"
 #include "le/utility/cstdint.hpp"
 
-#include "juce/beginIncludes.hpp"
-#include "juce/juce_core/text/juce_String.h"
-#include "juce/juce_core/threads/juce_Thread.h"
-#include "juce/endIncludes.hpp"
+#include <juce_core/juce_core.h>
 
 #include "le/utility/intrusivePtr.hpp"
 

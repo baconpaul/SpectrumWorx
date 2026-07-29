@@ -328,7 +328,15 @@ template <class Window> class OwnedWindow : private OwnedWindowBase
 #pragma warning(pop)
 
 void warningMessageBox(std::string_view title, std::string_view message, bool canBlock);
-bool warningOkCancelBox(TCHAR const *title, TCHAR const *question);
+
+/// \note Was `bool warningOkCancelBox(title, question)`, answered synchronously.
+/// It cannot be: JUCE 8 defaults JUCE_MODAL_LOOPS_PERMITTED to 0, so
+/// showOkCancelBox returns immediately and delivers the answer to a callback.
+/// The two callers that want an answer are both in the preset browser's save
+/// path, and inverting them is that file's job.
+///                                       (28.07.2026.) (SW port)
+void warningOkCancelBox(TCHAR const *title, TCHAR const *question,
+                        std::function<void(bool)> onResult);
 
 void addToParentAndShow(juce::Component &parent, juce::Component &childToBe);
 
@@ -526,6 +534,19 @@ class BitmapButton : public WidgetBase<juce::ImageButton>
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
+/// \note This used to hold a juce::PopupMenu and reach into its private `items`
+/// array through a shadow copy of JUCE's internal item struct -- to tick an
+/// entry, to read an entry's text or icon, and to map an ID to an index. The
+/// 2016 comment justified that by saying rebuilding the menu whenever the
+/// selection changed was too slow.
+///
+///   That judgement was made against 2010 hardware and a menu of a few dozen
+/// entries, and it is not true now: the items live here, and a juce::PopupMenu
+/// is built from them at the moment of showing. JUCE's layout is then nobody's
+/// business but JUCE's, getSelectedItemText() and getSelectedItemIcon() return
+/// references into storage we own rather than into menu internals, and the
+/// whole class survives a JUCE upgrade.
+///                                       (28.07.2026.) (SW port)
 class PopupMenu
 {
   public:
@@ -534,6 +555,8 @@ class PopupMenu
 
     using ItemID = std::uint32_t;
     using OptionalID = std::optional<ItemID>;
+    /// Called on the message thread when the menu closes; no value if dismissed.
+    using OnChosen = std::function<void(OptionalID)>;
 
   public:
     PopupMenu();
@@ -548,27 +571,45 @@ class PopupMenu
 
     unsigned int numberOfItems() const;
 
-    OptionalID showCenteredAtRight(juce::Component const &) const;
-    OptionalID showCenteredBelow(juce::Component const &) const;
+    /// \note Asynchronous. JUCE 8 defaults JUCE_MODAL_LOOPS_PERMITTED to 0, and
+    /// showMenu() -- which blocked until the user chose -- is gone with it.
+    void showCenteredAtRight(juce::Component const &, OnChosen) const;
+    void showCenteredBelow(juce::Component const &, OnChosen) const;
 
+    /// True from the moment a menu is shown until its callback has run.
     static bool menuActive() { return menuActive_; };
 
   protected:
-    typedef unsigned int MangledID;
-    static MangledID mangleID(ItemID);
-    static ItemID unmangleID(MangledID);
+    struct Item
+    {
+        ItemID id;
+        juce::String text;
+        juce::Image icon;
+        bool enabled;
+        bool isSectionHeader;
+        /// Non-owning, as it was when this held a juce::PopupMenu: sub-menus are
+        /// members of the owning widget and outlive the menu.
+        PopupMenu const *pSubMenu;
+    }; // struct Item
+
+    std::vector<Item> const &items() const { return items_; }
 
   private:
     void updateDimensionsForNewItem(juce::String const &itemText);
 
-    OptionalID showAt(unsigned int x, unsigned int y, unsigned int width,
-                      unsigned int height) const;
+    /// Builds the JUCE menu from items_, ticking \p tickedIndex if in range.
+    juce::PopupMenu build(int tickedIndex) const;
 
-  protected: //...mrmlj...
-    juce::PopupMenu menu_;
+    void showAt(unsigned int x, unsigned int y, unsigned int width, unsigned int height,
+                OnChosen) const;
+
+  protected:
+    /// Which entry build() should tick. PopupMenuWithSelection drives it; a
+    /// plain PopupMenu leaves it at -1.
+    int tickedIndex_{-1};
 
   private:
-    static unsigned int const zeroIDMaskWorkaround = 0xFF000000;
+    std::vector<Item> items_;
 
     unsigned short menuHeight_;
     unsigned short menuWidth_;
@@ -585,6 +626,10 @@ class PopupMenu
 class PopupMenuWithSelection : public PopupMenu
 {
   public:
+    /// True if the selection changed.
+    using OnSelection = std::function<void(bool)>;
+
+  public:
     PopupMenuWithSelection();
 
     unsigned int getSelectedID() const;
@@ -596,8 +641,8 @@ class PopupMenuWithSelection : public PopupMenu
     juce::String const &getSelectedItemText() const;
     juce::Image const &getSelectedItemIcon() const;
 
-    bool showCenteredAtRight(juce::Component const &);
-    bool showCenteredBelow(juce::Component const &);
+    void showCenteredAtRight(juce::Component const &, OnSelection);
+    void showCenteredBelow(juce::Component const &, OnSelection);
 
     void clear();
 
@@ -608,10 +653,14 @@ class PopupMenuWithSelection : public PopupMenu
   private:
     bool handleNewSelection(OptionalID const &chosenMenuEntryID);
     void updateSelection(unsigned int newSelectionIndex);
+    unsigned int indexForID(unsigned int id) const;
 
   private:
     int currentSelection_;
-    int currentSelectionID_;
+    /// 0 means "nothing chosen yet"; a real ID is stored as id + 1 so that 0 is
+    /// a legal item ID. This replaces the old mangling into the top byte, which
+    /// existed because juce::PopupMenu reserves 0 for "dismissed".
+    unsigned int currentSelectionID_;
 }; // class PopupMenuWithSelection
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -641,7 +690,7 @@ class LE_NOVTABLE ComboBox : public WidgetBase<>, public PopupMenuWithSelection
     ComboBox(juce::Component &parent, juce::Image const &normalBackground,
              juce::Image const &selectedBackground);
 
-    bool showMenu();
+    void showMenu(std::function<void(bool)> onValueChanged);
 
   protected: // juce::Component overrides
     void paint(juce::Graphics &) override;
@@ -741,7 +790,8 @@ class LE_NOVTABLE Knob : public WidgetBase<juce::Slider>
          unsigned int yMargin);
 
   public:
-    static void removeValueListeners(juce::Slider &, juce::Value::Listener &);
+    /// \note removeValueListeners() went with the fork's Slider::valueListener().
+    /// See the note in the Knob constructor.
 
   protected:
 #ifdef __clang__
