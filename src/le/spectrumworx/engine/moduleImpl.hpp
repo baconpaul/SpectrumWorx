@@ -554,13 +554,14 @@ template <class Effect> class ModuleDSP::Impl final : public ModuleEffectImpl<Ef
 #endif // _MSC_VER
 }; // class ModuleDSP::Impl
 
-/// \note The comment here used to read "assummes single inclusion", and the
-/// assumption held only while core/modules/factory.cpp was the sole includer.
-///                                           (28.07.2026.) (SW port)
-inline ModuleParameters::ParameterInfos const &ModuleParameters::parameterInfos()
-{
-    return Engine::Detail::ParametersInformation<ModuleParameters::BaseParameters>::data;
-}
+/// \note parameterInfos() is defined in moduleParameters.cpp. It lived here
+/// once, under a comment reading "assummes single inclusion" - an assumption
+/// that held only while core/modules/factory.cpp was the sole includer. Making
+/// it inline to survive more includers traded a link error for a worse one: an
+/// inline function is hidden, so it can only ever satisfy its own translation
+/// unit, and once release inlined every call the body was dropped outright.
+/// Callers outside this header see the declaration alone and must get a real
+/// symbol.                                    (29.07.2026.) (SW port)
 
 //------------------------------------------------------------------------------
 } // namespace Engine

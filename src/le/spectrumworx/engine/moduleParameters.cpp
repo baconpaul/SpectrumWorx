@@ -10,9 +10,8 @@
 //------------------------------------------------------------------------------
 #include "moduleParameters.hpp"
 
-// \note For parameterInfos(), which this file calls twice. It used to be a
-// non-inline definition in moduleImpl.hpp that only factory.cpp's translation
-// unit emitted, and every other caller borrowed at link time.
+// \note For Detail::ParametersInformation, which parameterInfos() - defined
+// below, and declared in the header for callers everywhere - returns.
 //                                            (28.07.2026.) (SW port)
 #include "moduleImpl.hpp"
 
@@ -109,6 +108,14 @@ LE_COLD float ModuleParameters::setBaseParameter(std::uint8_t const baseParamete
 {
     return LE::Parameters::invokeFunctorOnIndexedParameter(baseParameters(), baseParameterIndex,
                                                            ValueSetter(parameterValue));
+}
+
+/// \note The shared base parameters' static descriptions. One definition, in
+/// the one translation unit that can see the template that builds them; every
+/// other caller has the declaration in the header and a call here.
+LE_COLD ModuleParameters::ParameterInfos const &ModuleParameters::parameterInfos()
+{
+    return Detail::ParametersInformation<ModuleParameters::BaseParameters>::data;
 }
 
 #ifdef __clang__
