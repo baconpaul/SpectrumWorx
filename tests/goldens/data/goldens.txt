@@ -7,6 +7,7 @@
 # hash is FNV-1a over the raw sample bits and is a same-platform
 # contract only; the numeric columns are what a different
 # architecture or compiler is held to.
+# provenance macos-arm64/accelerate
 (bypass)/impulse/512/4                       b6b2c8c7ffdee3ad 0.99999994 0.00781249953 6.10351526e-05 0 -25.4495 -25.4495 -25.4495 -25.4495 -25.4495 -25.4495 -25.4495 -25.4495
 (bypass)/sweep/512/4                         fc3d2704e0756201 0.49999994 0.349259466 0.0103959274 0 27.9715 28.6505 23.6244 14.8247 10.3728 6.7600 2.1352 -37.9991
 (bypass)/pink/512/4                          4ca7fe257b857031 0.464104235 0.132746696 -0.000620906532 0 18.7809 19.7650 20.3236 16.8338 12.4168 8.8388 5.5151 2.2504

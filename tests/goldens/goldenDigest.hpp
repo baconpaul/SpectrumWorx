@@ -57,6 +57,38 @@ struct Fixture
     static Fixture parse(std::string const &line);
 };
 
+/// \brief What produced a fixture file, to the granularity that decides whether
+/// its bit-exact hashes mean anything here.
+///
+///   OS, architecture and FFT backend. A compiler or libm change on one machine
+/// can also move the last bit, so a matching provenance is a necessary and not a
+/// sufficient condition for the hashes to agree -- but keying on the compiler
+/// version too would mean the hash was effectively never checked, and its whole
+/// value is catching a same-machine regression.
+///                                           (29.07.2026.) (SW port)
+std::string provenance();
+
+/// The measured distance between two digests, before any verdict is passed on
+/// it. Separated out from compare() so a cross-platform run can rank and report
+/// the drift rather than only announce the first field that exceeded a limit.
+struct Deltas
+{
+    float peak{0};                ///< relative
+    float rms{0};                 ///< relative
+    float dcOffset{0};            ///< absolute, against the render's own RMS
+    float band{0};                ///< worst dB difference over bands audible in either
+    unsigned int worstBand{0};    ///< which band that was
+    bool bandsNearSilence{false}; ///< ...and whether both sides of it are near the floor
+    bool nonFiniteDiffers{false};
+
+    /// For ranking: the amplitude fields only, since a dB difference between two
+    /// near-silent bands is not comparable to a relative error on a peak.
+    float worst() const;
+    bool withinTolerance() const;
+}; // struct Deltas
+
+Deltas deltas(Digest const &golden, Digest const &actual);
+
 /// \brief Cross-platform comparison.
 ///
 /// The hash is checked only when \p exact -- it is the same-platform contract,
