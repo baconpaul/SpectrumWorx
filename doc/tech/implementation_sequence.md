@@ -26,11 +26,20 @@ Stages 0–3 are complete. Stage 5 is most of the way there and stage 6 is past
 its hard part: **the plugin builds in all four formats, loads, shows its real
 2016 editor, passes audio, exposes all 286 parameters and survives a reload.**
 
-Debug and release are both green — 73 tests, goldens included — and the goldens
-have not moved through any of it.
+**Stage 4 is now done on Linux/arm64** — pffft is under the FFT, the `le/math`
+vector primitives have a portable arm at last, and the whole tree builds and runs
+there: CLAP, VST3 and standalone, 76 tests, goldens rendering. See **stage 4**
+and its "What the backend swap found" for what the swap costs numerically. The
+short version: the FFT itself is exact to a float ulp and the engine's own bypass
+path agrees to 1.2e-7, but a dozen branchy effects amplify that ulp into
+percent-level output differences, and the bit-exact hashes cannot survive a
+platform change at all.
+
+Debug and release are both green on macOS — 73 tests, goldens included — and the
+goldens have not moved through any of it.
 
 **It has never been run in a DAW.** Everything above was verified headlessly,
-because the environment it was built in has no window server. That is the single
+because the environments it was built in have no window server. That is the single
 most valuable next thing anyone can do with it, and it is why the list below
 starts where it does.
 
@@ -39,12 +48,13 @@ What is left, in the order it is worth doing:
 | | | Where |
 |---|---|---|
 | 1 | **Load it in a DAW.** Reaper first. Nothing below is worth much until the thing has been driven by a mouse. | — |
-| 2 | **Normalise module and LFO parameter ranges to 0..1**, so a slot's effect change stops moving `min_value`/`max_value`. The last CLAP-correctness gap. | risk #6b, stage 5 |
-| 3 | **The audio file loader** — one `doLoad` over `juce::AudioFormatManager`, then drop `LE_SW_DISABLE_SIDE_CHANNEL`. | 5.0 |
-| 4 | **Threading.** The `UIEdits` queue is the first piece; the rest of the main/audio split is not done. | 5.8 |
-| 5 | **`clap-validator` and CI** across the four formats. | 5.9 |
-| 6 | **6.4**, the owned-window collapse, and the preset browser's two async save-path callers. | stage 6 |
-| 7 | **Presets** — the split that `LE_NO_PRESETS` stands in for, which then unblocks a real state format. | stage 8, then 5.6 |
+| 2 | **Decide the cross-platform golden contract** for the ~19 effects whose output is chaotic, and mint a Linux fixture file. The measurement is done; the policy is a human call. | 4.4 |
+| 3 | **Normalise module and LFO parameter ranges to 0..1**, so a slot's effect change stops moving `min_value`/`max_value`. The last CLAP-correctness gap. | risk #6b, stage 5 |
+| 4 | **The audio file loader** — one `doLoad` over `juce::AudioFormatManager`, then drop `LE_SW_DISABLE_SIDE_CHANNEL`. | 5.0 |
+| 5 | **Threading.** The `UIEdits` queue is the first piece; the rest of the main/audio split is not done. | 5.8 |
+| 6 | **`clap-validator` and CI** across the four formats and now three OSes. | 5.9 |
+| 7 | **6.4**, the owned-window collapse, and the preset browser's two async save-path callers. | stage 6 |
+| 8 | **Presets** — the split that `LE_NO_PRESETS` stands in for, which then unblocks a real state format. | stage 8, then 5.6 |
 
 Two flags are switched on and stand in for unfinished work rather than for
 decisions: **`LE_NO_PRESETS`** (row 7) and **`LE_SW_DISABLE_SIDE_CHANNEL`**
@@ -1013,9 +1023,10 @@ residue, in the order it mattered.
 
 ---
 
-### Stage 4 — Portable SIMD/FFT backend  *(resequenced: runs after stage 6)*
+### Stage 4 — Portable SIMD/FFT backend  *(resequenced: ran after stage 6)*
 
 **1.5–2.5 weeks**, down from 2–3 because audio file I/O left for stage 5.
+**Linux/arm64 is done; 4.2, 4.4, x86-64 and Windows are not.**
 
 > **Why this moved.** The original plan ran 4 before 5 and this section was
 > written as though the macOS build still had NT2 under it. It does not. On
@@ -1033,12 +1044,17 @@ residue, in the order it mattered.
 > is the audio file loader, and its platform seam is a single static function.
 > It moved to **5.0** rather than dragging a two-week stage forward.
 
-**4.1** Replace `LE_MATH_USE_NT2`, keeping the interfaces in `le/math/vector.hpp`
+**✅ 4.1** Replace `LE_MATH_USE_NT2`, keeping the interfaces in `le/math/vector.hpp`
 and `le/math/dft/fft.hpp` byte-identical so the 203 effect files do not move:
 - vector primitives → `sst-basic-blocks` SIMD helpers over `simde` (which gives
   you SSE-on-NEON), or plain loops where the compiler auto-vectorises just as
   well — measure, don't assume
 - FFT → `pffft` off Apple; Accelerate/vDSP stays on Apple and does not move
+
+*Done on Linux/arm64, and the second bullet is what it turned out to be: plain
+loops. See "What the backend swap found" below — the reason is not performance,
+it is that a scalar elementwise loop is the only formulation whose rounding a
+reviewer can reason about against vDSP's.*
 
 **4.2** Rekey the denormal guard, per the regression noted at the end of stage 3.
 `FPUDisableDenormalsGuard` (`math.cpp:895`) reaches `_mm_setcsr` only under
@@ -1047,14 +1063,223 @@ flushing is off on every x86-64 target, **including an Intel Mac**. The
 `__aarch64__` arm at `math.cpp:906` is live and correct, which is the only reason
 this is not already a shipping bug. Rekey onto `LE_HAS_SSE1`/`LE_HAS_SSE2`.
 
-*This is the one item that can bite before stage 4 runs: if the macOS-first
-build is ever x86_64 rather than arm64-only, pull it forward. It is two lines.*
+*Still open, and still not biting: this VM is arm64, so the `__aarch64__` arm is
+the one in force here too. It bites the first time either Linux or Windows is
+built for x86-64, which is the common case for both — so it is now much closer to
+the critical path than it was when only an arm64 Mac existed.*
 
-**4.3** Run the goldens on all three OSes and both architectures.
+**4.3 ✅ *(Linux/arm64)*** Run the goldens on all three OSes and both architectures.
+
+*Rendering, and quantified. Linux/arm64 is done; x86-64 and Windows are not.*
+
+**4.4** **Decide what the cross-platform golden contract is.** New, and the one
+thing 4.3 could not settle by measurement: 89 of 464 fixtures fall outside the
+existing tolerance and roughly 19 effects are chaotic enough that no honest
+tolerance covers them. Options are in "What the backend swap found"; picking one
+is a judgement about the product, not about the port.
 
 **Done when:** `sw-tests` green on macOS (arm64 + x86_64), Windows (x64 +
-arm64), Linux (x64 + arm64); NT2 is gone with no golden outside tolerance;
-denormals flush everywhere.
+arm64), Linux (x64 + arm64); NT2 is gone with no golden outside an agreed and
+written-down tolerance; denormals flush everywhere.
+
+#### What the backend swap found
+
+The FFT swap itself was the easy half. Everything below either had no portable
+implementation at all, or was a `__clang__`/`_MSC_VER` conditional that GCC
+answered differently and wrongly.
+
+**The FFT is exact, and that is now testable rather than assumed.**
+`fft.cpp`'s non-Apple arm is `pffft_transform_ordered` with the packed real
+layout unpacked into the split reals/imags the engine reads. Getting it right
+means matching three things vDSP's arm establishes: the `1/sqrt(N)` unitary
+normalisation, the `size/2 + 1` split layout with exact zeros in the imaginary DC
+and Nyquist slots, and *where* the scale is applied (on the way out of the
+forward, on the way in to the inverse) so the rounding matches step for step.
+vDSP's real forward transform carries a factor of two that pffft's does not,
+which is the whole difference between the two scale constants.
+
+An identity test cannot distinguish a correct unpacking from a self-consistently
+wrong one, so `fftTests.cpp` gained three `[backend]` cases that compare against
+a **double-precision DFT** at every FFT size the engine can ask for. Measured:
+
+| | worst error |
+|---|---|
+| forward vs. double-precision DFT | **1.0e-7** of full scale (float eps is 1.2e-7) |
+| forward → inverse round trip | **3.4e-7** of peak |
+
+**The engine's own analysis/synthesis agrees to a float ulp.** The bypassed chain
+— the fixture that exists precisely to separate a WOLA change from an effect
+change — comes out at **1.2e-7 relative** on peak and RMS across all four signals
+and both configurations, and 0.00 dB in seven of eight bands. Accelerate and
+pffft put the same samples out the other end.
+
+**Every non-silent fixture's bit hash changed, and all 439 legitimately.** A
+FNV-1a over raw float bits cannot survive a different FFT implementation, a
+different libm or a different compiler, and was never meant to. The 25 that *did*
+match are all renders of pure silence — `Convolver`, `Frecho`, `Frevcho` produce
+nothing at default parameters, because they need a loaded sample and
+`LE_SW_DISABLE_SIDE_CHANNEL` compiles that away. **Those 25 fixtures pin nothing
+on any platform**, which is a gap in the 3.6 matrix rather than anything stage 4
+did: they are silent in the committed file too.
+
+The fixture file now carries a `# provenance macos-arm64/accelerate` marker and
+`goldenTests.cpp` compares it against `SWTest::provenance()` (OS, architecture,
+FFT backend). The hash is checked only on the build that minted the file;
+elsewhere the numeric contract is checked and a drift report is printed. Before
+that change the cross-platform result was 439 identical lines reading "bit-exact
+hash mismatch", which answers nothing.
+
+**Where the drift actually lives: the effects, not the arithmetic.** Over all 464
+fixtures the median relative difference is **1.0e-7** on peak and **8.1e-8** on
+RMS — one ulp — and p90 is 3.2e-5. The tail is what matters:
+
+| fixture | rel. peak | rel. RMS |
+|---|---|---|
+| `Pitch_Spring/sweep/512/4` | **0.21** | 0.0064 |
+| `Octaver/impulse/2048/8` | 0.0032 | **0.107** |
+| `Pitch_Spring/sweep/2048/8` | 0.047 | 0.0059 |
+| `Pitch_Magnet/sweep/512/4` | 0.033 | 6.5e-5 |
+| `PVD_stop/sweep/2048/8` | 0.012 | 0.0014 |
+
+That list is not a list of numerically fragile arithmetic; it is a list of
+**effects that make a decision**. Pitch detection picks a maximum, the phase
+vocoder unwraps a phase, `Imploder`/`Exploder` threshold a bin. A one-ulp
+difference flips a comparison, the chosen bin moves by one, and the output
+diverges by percent. Twenty percent on a peak is that, and no tightening of the
+FFT will remove it — the same thing would happen between two compilers on one
+machine.
+
+Of the 89 fixtures outside tolerance: **30** differ in peak or RMS, **46** only in
+a band energy, and **13** only in a band where both sides are below −120 dB (the
+worst "9.6 dB drift" in the whole matrix is −189 dB against −180 dB, i.e. silence
+against slightly different silence). Zero fixtures differ in non-finite count —
+nothing NaNed, nothing ran away.
+
+**So 4.4 is a policy question with three answers**, and it should be answered
+deliberately:
+1. *Per-platform fixture files.* Honest and strict, keeps bit-exactness as a
+   real regression net on each machine, and costs a reviewed regeneration per
+   platform. This is what the provenance marker already sets up.
+2. *A named exception list* — the ~19 chaotic effects get a much looser bound
+   (or only a "finite and bounded" check), everything else keeps 1e-4. Keeps one
+   file, makes the chaotic set visible and reviewable, and is the honest version
+   of "loosen the tolerance".
+3. *A perceptual comparison* for the chaotic set instead of a summary-statistic
+   one. Most defensible, most work, and it needs someone to decide what
+   "the same" means for a pitch shifter that picked a different bin.
+
+Loosening the global tolerance until 464 rows pass is not on the list. It would
+have to reach 21% to do it, at which point the goldens stop being a test.
+
+**`le/math`'s portable path did not exist.** Stage 3.1 recorded that "NT2 is
+opt-in now: without `LE_HAS_NT2` the primitives fall back to scalar loops". For
+about half of them that was true. For twelve of them there was no arm at all —
+`add`, four `multiply` overloads, `addProduct`, `ln` ×2, `exp`, `square`,
+`squareRoot` — and the reason it was invisible is that `le/math/vector.cpp`
+carries *two* interfaces, "pointer + count" and "pointer + pointer-end", each of
+which delegated to the other:
+
+- with `LE_MATH_NATIVE_POINTER_SIZE_INTERFACE` (Apple only) the pointer-pair form
+  forwards to the count form;
+- without it the count form forwards to the pointer-pair form, whose only real
+  implementations were vDSP and NT2 and whose fallback was a bare
+  `LE_UNREACHABLE_CODE`.
+
+On Linux that resolves to mutual delegation with nothing at the bottom. The
+`LE_UNREACHABLE_CODE` was additionally written without its parentheses, so it was
+not even a macro invocation — twelve `error: 'LE_UNREACHABLE_CODE' was not
+declared in this scope`, which is the only reason this surfaced as a build failure
+rather than as silence in the output. The fix puts a real elementwise loop at each
+of the twelve, in the caller's order so that both GCC and Clang vectorise them
+without needing reassociation, and deliberately **without** the NT2 arm's
+`scalar == 0`/`scalar == 1` short circuits, because `vDSP_vsmul` has none and the
+difference is observable on a non-finite input.
+
+**`requiredStorage()` returned 0 at the maximum FFT size — on macOS too.**
+`Detail::fftBufferSize()` returns the size in *bytes* as a `std::uint16_t`. A
+buffer of 2N floats at `maximumFFTSize` is 2 × 8192 × 4 = 65536 bytes, which
+truncates to zero. `FFT_float_real_1D`'s work buffer on the Accelerate path is
+exactly such a `DoubleFFTBuffer`, and `WindowBuffer` with a presum factor of 2 is
+another, so **an FFT size of 8192 has always sized those buffers to nothing in a
+release build** on the platform the goldens came from. The debug assert caught it;
+`NDEBUG` dropped the assert and kept the truncation. Widened to `std::uint32_t`
+(element counts still fit in 16 bits and every caller already sums into 32). The
+new `[backend]` FFT cases run at 8192 specifically so this cannot come back.
+
+The pffft path sidesteps the same trap by construction: it needs 2N floats but
+takes them as two N-float `FFTBuffer`s rather than one `DoubleFFTBuffer`, because
+pffft wants a scratch area and the alternative — passing `nullptr` and letting it
+use the stack — is a 32 KB VLA on the audio thread at the maximum FFT size.
+
+**Eight compiler conditionals were wrong rather than merely absent.** These are
+worth listing because the pattern is uniform: a workaround gated on `__clang__`
+or on a `_MSC_VER` comparison, where the thing being worked around is what the
+standard requires of everyone, and GCC gets neither branch or the wrong one.
+
+| | |
+|---|---|
+| `_Pragma("thum" "b")` in `platformSpecifics.hpp` | Split into two adjacent literals by the 0.6 reformat, which `_Pragma` rejects outright — so GCC's whole `LE_OPTIMIZE_FOR_*` / `LE_FAST_MATH_*` block had not compiled since then. Clang never reached it: the gate is `__GNUC__ * 10 + __GNUC_MINOR__ >= 44` and Clang answers 42. **The family is now a no-op everywhere**, which is what Clang has always had — and deliberately so, because `LE_FAST_MATH_ON()` was `#pragma GCC optimize("associative-math")` and GCC 15 *acts* on it, reassociating float reductions that macOS never reassociated. Enabling that on one platform only would have made every golden difference unattributable. |
+| `LE_COLD` = `__attribute__((minsize))` | `minsize` is a Clang attribute; GCC has no such thing and warned at several hundred sites. Not merely ignorable, either: GCC rejects a GNU attribute in the trailing declarator position of a function *definition*, which is how `le/plugins/clap/tag.hpp` writes it. Empty on GCC. `((cold))` is deliberately *not* substituted — the original comment says cold was switched off on purpose. |
+| `EffectMetaData::GetParameterValueString` and `EffectParameterPrinter::print` | Both carried `LE_GNU_SPECIFIC(__fastcall)`, added for a 2013 Clang crash. Clang accepts and ignores `__fastcall` on every target; GCC/aarch64 does not declare it, and the typedef simply failed to parse — which then produced 57 "too many initializers for `EffectMetaData`". The same dead convention 0.6 deleted `LE_FASTCALL` for, hand-written so the sweep missed it. |
+| `ParameterWidget<Parameter>` | The `ParameterWidgetHolder` indirection was `#ifdef __clang__`, commented "ambiguity compilation errors". The ambiguity is real: `WidgetsStorage` folds one base per parameter, so an effect with two knobs inherits `ModuleWidgetHolder<ModuleKnob>` twice, and converting to a twice-inherited base is ambiguous for everyone. MSVC accepted it (hence its own 4584 suppression) and silently picked one. Now unconditional. |
+| `WidgetBase::operator new`/`delete` | The plain pair was `#ifdef __clang__`. Declaring the *placement* pair puts `operator delete` in class scope, and lookup for the one a deleting destructor needs stops there instead of falling back to `::operator delete`; every widget has a virtual destructor via `juce::Component`. Required, not a workaround. |
+| `ModuleDSP::Impl`'s constructor | `#if (_MSC_VER < 1900) && !defined(__clang__)` — vacuously true on GCC, where undefined `_MSC_VER` preprocesses to 0. GCC then took the VS2013 branch, which names its base as a bare `ModuleEffectImpl`. Branch deleted. |
+| `Parameters::LFO`'s special members | `#if _MSC_VER < 1800`, same vacuous truth. Linux was getting `LFO() {}` / `~LFO() {}` and a merely *declared* copy constructor where macOS gets defaulted members and a deleted copy — which changes triviality and turns a compile error into a link error. Branch deleted. |
+| `AutomationBlocker`'s move constructor | `#if defined(__clang__) \|\| _MSC_VER >= 1900` is *false* on GCC, so GCC alone got no move constructor, and NRVO on a named local is permitted rather than guaranteed. Unconditional. |
+
+**`Utility::CriticalSection` was two disagreeing mutexes, and the POSIX one had
+never compiled.** `std::mutex` on Windows, a hand-rolled `pthread_mutex_t`
+wrapper elsewhere. The wrapper's recursive initialiser was spelled
+`PTHREAD_RECURSIVE_MUTEX_INITIALIZER`, which is Apple's name — glibc's is
+`…_NP` — and its fallback for platforms lacking that named
+`PTHREAD_RECURSIVE_MUTEX`, which is not a constant anywhere (the value is
+`PTHREAD_MUTEX_RECURSIVE`), so that branch had never built on any platform. Worse
+than the spelling: POSIX got a *recursive* mutex and Windows a non-recursive one
+from the same type name, which is a macOS-works/Windows-deadlocks split if
+anything relocks. Now one `std::recursive_mutex` everywhere. Nothing needed the
+parts that had to go — the `NonRecursive` constructor has no callers and
+`ConditionVariable`, the `friend` that reached for the raw `pthread_mutex_t`, is
+included by nothing.
+
+**Three smaller Linux gaps.** `le/utility/trace.cpp`'s non-Apple, non-Android
+`#else` was Windows-only in everything but its spelling, so Linux reached
+`OutputDebugStringA`. `gui.cpp`'s `OwnedWindowBase::detach` had a `#else` that
+called `detachFromEditor`, which is defined in `gui.mm` — on Linux there is
+nothing to undo, since `attach()` has a `_WIN32` block and an `__APPLE__` block
+and no third one, and collapsing that asymmetry is 6.4's job. And `gui.cpp` still
+carried `maxPathLength`/`path_t`/`getBinaryPath()` — the `SpectrumWorx.paths`
+locator that 6.3 orphaned and left behind — whose `maxPathLength` had a `_WIN32`
+arm and an `__APPLE__` arm and no third one, making it a declaration with no
+initialiser on Linux. Deleted, along with `swDLLAddress`, its only writer's only
+output, which nothing ever read.
+
+**The checked build needed one more include, and reports JUCE leaks at exit.**
+`assertionHandler.cpp`'s `breakIntoDebugger()` falls back to `raise( SIGINT )` on
+anything that is not Android or MSVC, but included `signal.h` only under
+`__APPLE__` — so every other POSIX target took an arm whose declarations it had
+not seen. One `#include <csignal>`; release builds never noticed because they
+have no assert handler to break from.
+
+With that, the Linux debug build is **70 passed / 2 skipped, 16,232 assertions**,
+the two skips being the golden cases that a checked build has always skipped (see
+the `Smoother` note in `goldenTests.cpp`) — so the whole engine runs with all
+~1200 `LE_ASSERT`s live and none of them fires, the new pffft path included.
+Worth knowing: on the way out, the debug runner prints JUCE
+`*** Leaked objects detected:` for `KnownTypeface`, `FTTypefaceList` and
+`FTLibWrapper`. That is JUCE's FreeType typeface cache — a `juce::Singleton` the
+Linux font backend never tears down — reported after the suite has finished and
+passed. It is a static-destruction artefact of linking `juce_graphics` into a
+plain executable, not a DSP or test failure, but it is the sort of thing a host
+will also see and it should be looked at with 6.4.
+
+**`sw-dsp` has to carry JUCE's module settings itself.** Linking a JUCE module
+compiles that module's sources into the *consuming* target, so `sw-dsp` — not the
+shim — is what builds `juce_core.cpp`. `add_clap_juce_shim()` puts `JUCE_USE_CURL=0`
+on `clap_juce_shim_requirements`, which is not on `sw-dsp`'s link line, so
+`juce_core.cpp` reached for `-lcurl` in a plugin that does no networking. Invisible
+on macOS, whose URL backend is NSURLSession. Two definitions added to `dsp.cmake`;
+the shim's other four are deliberately not, because they change what compiles in
+`gui/`.
 
 ---
 
