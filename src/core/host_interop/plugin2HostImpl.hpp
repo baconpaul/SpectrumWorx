@@ -56,6 +56,13 @@ class LE_NOVTABLE Plugin2HostPassiveInteropImpl : public Plugin2HostPassiveInter
     static bool getParameterProperties(ParameterID, Plugins::ParameterInformation<Protocol> &,
                                        Program const *);
 
+    /// \note getParameterProperties() without the name. The name is the only
+    /// part of it that formats a string; a caller that just needs the range --
+    /// the audio thread denormalising a parameter event, see clapParameterEdge
+    /// -- has no business building one.
+    static bool getParameterRanges(ParameterID, Plugins::ParameterInformation<Protocol> &,
+                                   Program const *);
+
 #pragma warning(push)
 #pragma warning(disable : 4510) // Default constructor could not be generated.
 #pragma warning(disable                                                                            \

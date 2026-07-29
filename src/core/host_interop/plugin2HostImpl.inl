@@ -197,7 +197,16 @@ template <class Protocol> class ParameterInfoGetter : public Plugins::ParameterI
     {
         auto const pModule(pProgram ? pProgram->moduleChain().module(id.moduleIndex) : nullptr);
 
-        if (pProgram && (!pModule || (id.moduleParameterIndex >= pModule->numberOfParameters())))
+        /// \note The + 1 is the Bypass parameter an LFO ID skips: an LFO
+        /// parameter with moduleParameterIndex k modulates module parameter
+        /// k + 1, which is how ParameterNameGetter builds the module ID it
+        /// delegates to. This getter used to test k, so the last module
+        /// parameter's LFO reported a real range while the name and the printer
+        /// both said "N/A" -- harmless while the exported list was dynamic and
+        /// the ID was simply absent from it, wrong now that the list is fixed and
+        /// a host walks all of it.
+        if (pProgram && (!pModule || (id.moduleParameterIndex + 1U /*Bypass*/ >=
+                                      pModule->numberOfParameters())))
         { // Dynamic parameter list:
             using namespace LE::Parameters::Traits;
             typedef LE::Parameters::LinearUnsignedInteger::Modify<
@@ -248,7 +257,7 @@ Plugin2HostPassiveInteropImpl<Impl, Protocol>::getParameter(ParameterID const pa
 }
 
 template <class Impl, class Protocol>
-bool Plugin2HostPassiveInteropImpl<Impl, Protocol>::getParameterProperties(
+bool Plugin2HostPassiveInteropImpl<Impl, Protocol>::getParameterRanges(
     ParameterID const parameterID, Plugins::ParameterInformation<Protocol> &parameterInfo,
     Program const *LE_RESTRICT const pProgram)
 {
@@ -257,6 +266,16 @@ bool Plugin2HostPassiveInteropImpl<Impl, Protocol>::getParameterProperties(
     using InfoGetter = ParameterInfoGetter<Protocol>;
     invokeFunctorOnIdentifiedParameter(
         parameterID, std::forward<InfoGetter>(static_cast<InfoGetter &>(parameterInfo)), pProgram);
+    return true;
+}
+
+template <class Impl, class Protocol>
+bool Plugin2HostPassiveInteropImpl<Impl, Protocol>::getParameterProperties(
+    ParameterID const parameterID, Plugins::ParameterInformation<Protocol> &parameterInfo,
+    Program const *LE_RESTRICT const pProgram)
+{
+    getParameterRanges(parameterID, parameterInfo, pProgram);
+
     auto *const pNameBuffer(parameterInfo.nameBuffer());
     if (pNameBuffer)
     {

@@ -300,6 +300,18 @@ class SpectrumWorxCLAP final
     /// generic panel -- and these group naturally, by module slot.
     void modulePathFor(ParameterID, char (&path)[CLAP_PATH_SIZE]) const noexcept;
 
+    /// \brief The range a parameter has *right now*, in the effect's own units.
+    ///
+    /// \note What CLAPEdge normalises against, and deliberately not what
+    /// paramsInfo() advertises -- that has to stay put for the plugin's lifetime.
+    /// The caller owns the description because the callers are on three different
+    /// threads; see the definition.
+    ///
+    /// \return whether the slot's effect actually owns this parameter. When it
+    /// does not, \p ranges is filled with the maximal description instead, so
+    /// there is always a usable scale.
+    bool liveRanges(ParameterID, Plugins::ParameterInformation<Protocol> &) const;
+
     /// Feeds the engine the sidechain port when the host has one connected, and
     /// the main input otherwise -- the engine reads a side channel whenever the
     /// current input mode calls for one and does not check that it is real.
@@ -320,6 +332,12 @@ class SpectrumWorxCLAP final
     std::unique_ptr<sst::clap_juce_shim::ClapJuceShim> clapJuceShim_;
 
     std::atomic<std::uint32_t> pendingRescan_{0};
+
+    /// \note `mark_dirty` is main-thread-only and the interop layer marks the
+    /// program modified for any automated change, including one that arrived as a
+    /// parameter event in process(). Mutable because marking is a const
+    /// operation on the plugin -- it tells the host something, it changes nothing.
+    mutable std::atomic<bool> pendingMarkDirty_{false};
 
     /// What the editor moved, waiting for a process() or flush() to carry it to
     /// the host.

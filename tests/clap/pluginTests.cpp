@@ -21,8 +21,10 @@
 #include <clap/clap.h>
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <numbers>
@@ -169,6 +171,78 @@ float peak(std::vector<float> const &buffer)
     for (auto const sample : buffer)
         largest = std::max(largest, std::abs(sample));
     return largest;
+}
+
+/// \note ParameterID's members are laid out in reverse so that the hex reads
+/// naturally on a little-endian machine: the type is the top byte and the module
+/// index the one below it. See core/parameterID.hpp.
+enum ParameterType : clap_id
+{
+    globalType = 0,
+    moduleChainType = 1,
+    moduleType = 2,
+    lfoType = 3
+};
+
+clap_id parameterID(ParameterType const type, unsigned const moduleIndex = 0,
+                    unsigned const parameterIndex = 0)
+{
+    return (static_cast<clap_id>(type) << 24) | (moduleIndex << 16) | parameterIndex;
+}
+
+/// An input event list holding exactly one parameter value, which is how a host
+/// delivers an edit to flush() or process().
+class OneParameterEvent
+{
+  public:
+    OneParameterEvent(clap_id const id, double const value) : list_{this, size, get}, event_{}
+    {
+        event_.header.size = sizeof(event_);
+        event_.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+        event_.header.type = CLAP_EVENT_PARAM_VALUE;
+        event_.param_id = id;
+        event_.note_id = event_.port_index = event_.channel = event_.key = -1;
+        event_.value = value;
+    }
+
+    OneParameterEvent(OneParameterEvent const &) = delete; // self-referential ctx
+    OneParameterEvent &operator=(OneParameterEvent const &) = delete;
+
+    clap_input_events const &operator*() const { return list_; }
+
+  private:
+    static std::uint32_t size(clap_input_events const *) { return 1; }
+    static clap_event_header const *get(clap_input_events const *self, std::uint32_t)
+    {
+        return &static_cast<OneParameterEvent const *>(self->ctx)->event_.header;
+    }
+
+    clap_input_events list_;
+    clap_event_param_value event_;
+}; // class OneParameterEvent
+
+/// Every parameter's description, indexed the way the host reads them.
+std::vector<clap_param_info> allParameterInfo(clap_plugin const &plugin,
+                                              clap_plugin_params const &params)
+{
+    std::vector<clap_param_info> infos(params.count(&plugin));
+    for (std::uint32_t index(0); index < infos.size(); ++index)
+        REQUIRE(params.get_info(&plugin, index, &infos[index]));
+    return infos;
+}
+
+clap_plugin_params const &parameters(clap_plugin const &plugin)
+{
+    auto const *const params(
+        static_cast<clap_plugin_params const *>(plugin.get_extension(&plugin, CLAP_EXT_PARAMS)));
+    REQUIRE(params != nullptr);
+    return *params;
+}
+
+bool isNormalisedType(clap_id const id)
+{
+    auto const type(id >> 24);
+    return (type == moduleType) || (type == lfoType);
 }
 
 //------------------------------------------------------------------------------
@@ -351,74 +425,197 @@ TEST_CASE("Filling a module slot renames its parameters without adding any", "[c
     Entry const entry;
     ActivePlugin plugin(48000, 512);
 
-    auto const *const params(
-        static_cast<clap_plugin_params const *>(plugin->get_extension(&*plugin, CLAP_EXT_PARAMS)));
-    REQUIRE(params != nullptr);
+    auto const &params(parameters(*plugin));
 
-    auto const emptyCount(params->count(&*plugin));
+    auto const before(allParameterInfo(*plugin, params));
 
     // Every module parameter of every slot, plus the LFOs, plus the globals --
     // present with no effect loaded at all, which is the point.
-    CHECK(emptyCount == LE::SW::ParameterCounts::maxNumberOfParameters);
+    CHECK(before.size() == LE::SW::ParameterCounts::maxNumberOfParameters);
 
     // Slot 1's parameters exist already; they just have nothing to name them.
-    std::uint32_t slotOneBefore{0};
-    for (std::uint32_t index(0); index < emptyCount; ++index)
-    {
-        clap_param_info info{};
-        REQUIRE(params->get_info(&*plugin, index, &info));
-        if (std::strncmp(info.module, "Slot 1", 6) == 0)
-            ++slotOneBefore;
-    }
+    auto const slotOne(
+        [](clap_param_info const &info) { return std::strncmp(info.module, "Slot 1", 6) == 0; });
+    auto const slotOneBefore(std::count_if(before.begin(), before.end(), slotOne));
     CHECK(slotOneBefore > 0);
 
-    /// \note ParameterID's members are laid out in reverse so that the hex reads
-    /// naturally on a little-endian machine: the type is the top byte and the
-    /// module index the one below it. See core/parameterID.hpp.
-    constexpr clap_id moduleChainType{1};
-    clap_id const slotZero((moduleChainType << 24) | (0u << 16));
+    // None of slot 1's module or LFO parameters is usable yet, and every one of
+    // them says so. The slot's *selector* is not one of them -- it is what fills
+    // the slot, so it is always live -- and "Slot 1" is its module path too.
+    for (auto const &info : before)
+        if (slotOne(info) && isNormalisedType(info.id))
+            CHECK((info.flags & CLAP_PARAM_IS_HIDDEN) != 0);
 
-    clap_event_param_value event{};
-    event.header.size = sizeof(event);
-    event.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
-    event.header.type = CLAP_EVENT_PARAM_VALUE;
-    event.param_id = slotZero;
-    event.note_id = event.port_index = event.channel = event.key = -1;
-    event.value = 0; // the first effect in the list
+    OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0),
+                                        0 /*the first effect in the list*/);
+    params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
 
-    struct OneEvent
-    {
-        clap_input_events list;
-        clap_event_param_value const *event;
-    };
-    OneEvent one{{&one, [](clap_input_events const *) -> std::uint32_t { return 1; },
-                  [](clap_input_events const *self, std::uint32_t) -> clap_event_header const * {
-                      return &static_cast<OneEvent const *>(self->ctx)->event->header;
-                  }},
-                 &event};
-
-    params->flush(&*plugin, &one.list, &discardedOutputEvents());
+    auto const after(allParameterInfo(*plugin, params));
 
     // The count is the contract: it did not move.
-    auto const filledCount(params->count(&*plugin));
-    CHECK(filledCount == emptyCount);
+    REQUIRE(after.size() == before.size());
+    CHECK(std::count_if(after.begin(), after.end(), slotOne) == slotOneBefore);
 
-    // What did move is the description. An empty slot reports its module
-    // parameters as N/A -- a degenerate 0..0 range -- and a filled one gives
-    // them the effect's real ranges and names.
-    std::uint32_t slotOneAfter{0}, usableAfter{0};
-    for (std::uint32_t index(0); index < filledCount; ++index)
+    // What moved is the description, and only the parts CLAP_PARAM_RESCAN_INFO
+    // names: the parameters stopped being hidden and picked up the effect's names.
+    // Their ranges did not move, and could not have -- see the range test below.
+    std::uint32_t revealed{0}, renamed{0};
+    for (std::size_t index(0); index < after.size(); ++index)
     {
-        clap_param_info info{};
-        REQUIRE(params->get_info(&*plugin, index, &info));
-        if (std::strncmp(info.module, "Slot 1", 6) != 0)
+        if (!slotOne(after[index]))
             continue;
-        ++slotOneAfter;
-        if (info.max_value > info.min_value)
-            ++usableAfter;
+        if ((after[index].flags & CLAP_PARAM_IS_HIDDEN) == 0)
+            ++revealed;
+        if (std::strcmp(after[index].name, before[index].name) != 0)
+            ++renamed;
     }
-    CHECK(slotOneAfter == slotOneBefore);
-    CHECK(usableAfter > 0);
+    CHECK(revealed > 0);
+    CHECK(renamed > 0);
+}
+
+TEST_CASE("A module parameter's range and step flag survive an effect swap", "[clap]")
+{
+    // The reason module and LFO parameters present a fixed 0..1 edge instead of
+    // their effect's real range. ext/params.h puts min_value, max_value and the
+    // is_stepped flag in the CLAP_PARAM_RESCAN_ALL list -- "can only be used
+    // while the plugin is deactivated" -- and a slot's effect changes through an
+    // ordinary parameter event, while active. So none of the three may move, for
+    // any effect, ever.
+    Entry const entry;
+    ActivePlugin plugin(48000, 512);
+
+    auto const &params(parameters(*plugin));
+    auto const empty(allParameterInfo(*plugin, params));
+
+    // Every effect the slot selector can hold, not just the first.
+    clap_param_info selector{};
+    bool foundSelector{false};
+    for (auto const &info : empty)
+        if (info.id == parameterID(moduleChainType, 0))
+        {
+            selector = info;
+            foundSelector = true;
+        }
+    REQUIRE(foundSelector);
+
+    // The selector itself is one of the parameters that keeps its real range, so
+    // it is a discrete choice in a host's generic panel rather than a bare 0..1.
+    CHECK((selector.flags & CLAP_PARAM_IS_STEPPED) != 0);
+    CHECK(selector.max_value > selector.min_value);
+
+    for (double effect(selector.min_value); effect <= selector.max_value; ++effect)
+    {
+        OneParameterEvent const swap(selector.id, effect);
+        params.flush(&*plugin, &*swap, &discardedOutputEvents());
+
+        auto const filled(allParameterInfo(*plugin, params));
+        REQUIRE(filled.size() == empty.size());
+
+        for (std::size_t index(0); index < filled.size(); ++index)
+        {
+            REQUIRE(filled[index].id == empty[index].id);
+            CHECK(filled[index].min_value == empty[index].min_value);
+            CHECK(filled[index].max_value == empty[index].max_value);
+            CHECK((filled[index].flags & CLAP_PARAM_IS_STEPPED) ==
+                  (empty[index].flags & CLAP_PARAM_IS_STEPPED));
+
+            // And the edge those module parameters sit on is the unit interval.
+            if (isNormalisedType(filled[index].id))
+            {
+                CHECK(filled[index].min_value == 0);
+                CHECK(filled[index].max_value == 1);
+                CHECK((filled[index].flags & CLAP_PARAM_IS_STEPPED) == 0);
+            }
+        }
+    }
+}
+
+TEST_CASE("A normalised parameter round-trips through the host edge", "[clap]")
+{
+    // What the host writes is what the host reads back, even though the engine
+    // stored it in the effect's own units in between.
+    Entry const entry;
+    ActivePlugin plugin(48000, 512);
+
+    auto const &params(parameters(*plugin));
+
+    OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
+    params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+
+    /// \note Every module parameter the effect in slot 1 owns, not just the
+    /// first: some of them are discrete underneath -- a bool, an enumeration --
+    /// and a 0..1 edge cannot represent that. Writing 0.25 to a boolean and
+    /// reading back 0 is correct behaviour, not a round-trip failure.
+    ///
+    ///   So the property asserted for all of them is the weaker one a host
+    /// actually relies on: whatever comes back is *stable*. Write it again and it
+    /// does not drift. Exactness is then asserted separately, over the
+    /// continuous ones, so that "everything snapped to zero" cannot pass.
+    std::uint32_t stable{0}, exact{0};
+    for (auto const &info : allParameterInfo(*plugin, params))
+    {
+        if (!isNormalisedType(info.id) || ((info.flags & CLAP_PARAM_IS_HIDDEN) != 0))
+            continue;
+
+        constexpr double wanted{0.25};
+        OneParameterEvent const edit(info.id, wanted);
+        params.flush(&*plugin, &*edit, &discardedOutputEvents());
+
+        double read{-1};
+        REQUIRE(params.get_value(&*plugin, info.id, &read));
+        CHECK(read >= 0);
+        CHECK(read <= 1);
+
+        OneParameterEvent const again(info.id, read);
+        params.flush(&*plugin, &*again, &discardedOutputEvents());
+
+        double reread{-1};
+        REQUIRE(params.get_value(&*plugin, info.id, &reread));
+        CAPTURE(info.id, info.name);
+        CHECK_THAT(reread, Catch::Matchers::WithinAbs(read, 1e-4));
+        ++stable;
+
+        if (std::abs(read - wanted) < 1e-4)
+            ++exact;
+    }
+    CHECK(stable > 0);
+    CHECK(exact > 0);
+}
+
+TEST_CASE("A normalised parameter still reads in the effect's own units", "[clap]")
+{
+    // Normalising the range is only tolerable because the *text* is not
+    // normalised: a host showing 0.25 also shows what 0.25 means. This is where
+    // the enumerated module parameters keep their names, too, now that they can
+    // no longer advertise a step count.
+    Entry const entry;
+    ActivePlugin plugin(48000, 512);
+
+    auto const &params(parameters(*plugin));
+
+    OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
+    params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+
+    std::uint32_t checked{0}, differedFromTheEdge{0};
+    for (auto const &info : allParameterInfo(*plugin, params))
+    {
+        if (!isNormalisedType(info.id) || ((info.flags & CLAP_PARAM_IS_HIDDEN) != 0))
+            continue;
+
+        std::array<char, 128> text{};
+        REQUIRE(params.value_to_text(&*plugin, info.id, 1.0, text.data(), text.size()));
+        CAPTURE(info.id, info.name, info.module);
+        CHECK(text[0] != '\0');
+        ++checked;
+
+        // At the top of the edge a real range reads as its own maximum, which is
+        // "1" only by coincidence. Some parameter, somewhere in the slot, must
+        // disagree with the raw edge value or nothing is being converted at all.
+        if (std::strncmp(text.data(), "1", 2) != 0)
+            ++differedFromTheEdge;
+    }
+    CHECK(checked > 0);
+    CHECK(differedFromTheEdge > 0);
 }
 
 TEST_CASE("Silence in is silence out", "[clap]")

@@ -23,6 +23,7 @@
 // module's UI on a slot change, so the complete type is needed.
 #include "gui/modules/moduleUI.hpp"
 
+#include "core/host_interop/clapParameterEdge.hpp"
 #include "core/host_interop/host2PluginImpl.inl"
 #include "core/host_interop/plugin2HostImpl.inl"
 
@@ -254,50 +255,68 @@ bool SpectrumWorxCLAP::paramsInfo(std::uint32_t const index,
     auto const id(parameterIDs_[index]);
     ParameterID const parameterID{id};
 
-    Plugins::ParameterInformation<Protocol> properties;
-    getParameterProperties(parameterID, properties, &program());
+    /// \note Two queries, and which one answers what is the whole contract.
+    ///
+    ///   The *fixed* description -- the maximal one, over a null Program, as in
+    /// rebuildParameterIDs -- supplies every number and every flag a host may
+    /// not see move: min_value, max_value, is_stepped. ext/params.h lists those
+    /// three together under CLAP_PARAM_RESCAN_ALL, which is legal only while
+    /// deactivated, and a slot's effect changes mid-block.
+    ///
+    ///   The *live* one supplies only what RESCAN_INFO explicitly covers: the
+    /// name, the module path, and whether the parameter is currently used at
+    /// all. Those may follow whichever effect the slot holds.
+    Plugins::ParameterInformation<Protocol> fixed;
+    getParameterRanges(parameterID, fixed, nullptr);
+
+    Plugins::ParameterInformation<Protocol> live;
+    getParameterProperties(parameterID, live, &program());
 
     std::memset(info, 0, sizeof(*info));
     info->id = id.value;
-    info->min_value = properties.minimum();
-    info->max_value = properties.maximum();
-    info->default_value = properties.default_();
     info->cookie = nullptr;
+    info->flags = CLAP_PARAM_IS_AUTOMATABLE;
 
     /// \note A parameter belonging to a slot whose effect does not have it --
     /// most of the list on an empty instance. The model spells that as an empty
     /// range and "not automatable", which was enough while the list was dynamic
-    /// and such a parameter was simply absent from it. This list is fixed (see
-    /// rebuildParameterIDs), so the host sees them: an empty range is one it
-    /// would divide by, and read-only is not what they are -- they become
-    /// writable the moment the slot is filled.
-    ///
-    ///   CLAP_PARAM_IS_HIDDEN says just what is meant, "not shown, because it
-    /// is currently not used", and a usable range goes with it so that a host
-    /// which shows it anyway has something sane to draw.
-    bool const notInThisProgram(!properties.isAutomatable() ||
-                                (properties.maximum() <= properties.minimum()));
+    /// and such a parameter was simply absent from it. This list is fixed, so
+    /// the host sees them, and CLAP_PARAM_IS_HIDDEN says just what is meant:
+    /// "not shown, because it is currently not used". It is a RESCAN_INFO flag,
+    /// so it may come and go as slots are filled.
+    if (!live.isAutomatable() || !CLAPEdge::isPresent(live))
+        info->flags |= CLAP_PARAM_IS_HIDDEN;
 
-    if (notInThisProgram)
+    /// \note A "meta" parameter is one whose value changes what the other
+    /// parameters *are* -- which effect a slot holds, chiefly. Telling the host
+    /// its value requires a rescan is exactly what this flag is for. Taken from
+    /// the fixed description so that filling a slot does not flip it.
+    if (fixed.isMeta())
+        info->flags |= CLAP_PARAM_REQUIRES_PROCESS;
+
+    if (CLAPEdge::isNormalised(parameterID))
     {
+        /// \note The 0..1 edge over a natural range that belongs to the effect.
+        /// No CLAP_PARAM_IS_STEPPED either, for the same reason there is no real
+        /// range: a step count is a property of the effect in the slot, and the
+        /// flag is in the same RESCAN_ALL list. The enumerated ones still read
+        /// as their names through paramsValueToText.
         info->min_value = 0;
         info->max_value = 1;
-        info->default_value = 0;
-        info->flags = CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_HIDDEN;
+        info->default_value = CLAPEdge::defaultToHost(parameterID, fixed);
     }
     else
     {
-        info->flags = CLAP_PARAM_IS_AUTOMATABLE;
-        if (properties.isStepped())
+        // Global and slot-selector parameters: ranges the plugin owns, and which
+        // therefore never move. They keep their real values and their steps.
+        info->min_value = fixed.minimum();
+        info->max_value = fixed.maximum();
+        info->default_value = fixed.default_();
+        if (fixed.isStepped())
             info->flags |= CLAP_PARAM_IS_STEPPED;
-        /// \note A "meta" parameter is one whose value changes what the other
-        /// parameters *are* -- which effect a slot holds, chiefly. Telling the
-        /// host its value requires a rescan is exactly what this flag is for.
-        if (properties.isMeta())
-            info->flags |= CLAP_PARAM_REQUIRES_PROCESS;
     }
 
-    std::strncpy(info->name, properties.name(), CLAP_NAME_SIZE - 1);
+    std::strncpy(info->name, live.name(), CLAP_NAME_SIZE - 1);
     modulePathFor(parameterID, info->module);
     return true;
 }
@@ -324,11 +343,50 @@ void SpectrumWorxCLAP::modulePathFor(ParameterID const parameterID,
     }
 }
 
+/// \note The *live* range, not the fixed one paramsInfo advertises: normalising
+/// is exactly the act of expressing a value that belongs to the effect currently
+/// in the slot on an edge that does not.
+///
+///   A local rather than a member, at each of the four call sites below, because
+/// they run on three different threads -- the host's main thread, the audio
+/// thread and the UI thread -- and one shared scratch description between them
+/// would be a race. It costs a clear() and a dispatch; neither allocates nor
+/// formats a string, which is what getParameterRanges() is for.
+bool SpectrumWorxCLAP::liveRanges(ParameterID const parameterID,
+                                  Plugins::ParameterInformation<Protocol> &ranges) const
+{
+    getParameterRanges(parameterID, ranges, &program());
+    if (CLAPEdge::isPresent(ranges))
+        return true;
+
+    /// \note An empty slot has no range at all -- the model spells that as a
+    /// degenerate 0..0 -- so fall back to the maximal description, which is also
+    /// the one paramsInfo advertised. Nothing sensible can be normalised against
+    /// 0..0, and a caller still needs a scale to work on.
+    getParameterRanges(parameterID, ranges, nullptr);
+    return false;
+}
+
 bool SpectrumWorxCLAP::paramsValue(clap_id const id, double *const value) noexcept
 {
     if (!isValidParamId(id))
         return false;
-    *value = getParameter(ParameterID{Plugins::ParameterID{id}});
+
+    ParameterID const parameterID{Plugins::ParameterID{id}};
+    Plugins::ParameterInformation<Protocol> ranges;
+
+    /// \note A parameter no effect currently owns has no value of its own, and
+    /// what the engine answers for one is not the default it was advertised with.
+    /// It reads as that advertised default instead -- `ranges` is the maximal
+    /// description by then, the same one paramsInfo used, so the two agree by
+    /// construction. A host checks exactly this at init (param-default-values).
+    if (!liveRanges(parameterID, ranges))
+    {
+        *value = CLAPEdge::defaultToHost(parameterID, ranges);
+        return true;
+    }
+
+    *value = CLAPEdge::toHost(parameterID, ranges, getParameter(parameterID));
     return true;
 }
 
@@ -338,36 +396,44 @@ bool SpectrumWorxCLAP::paramsValueToText(clap_id const id, double const value, c
     if (!isValidParamId(id))
         return false;
 
+    ParameterID const parameterID{Plugins::ParameterID{id}};
+    Plugins::ParameterInformation<Protocol> ranges;
+    liveRanges(parameterID, ranges);
+
+    /// \note The printer works in the effect's own units, so the host's value
+    /// comes back off the 0..1 edge before it is formatted. This is what keeps a
+    /// normalised parameter readable: the range the host sees is meaningless, and
+    /// the text is where the real number -- or the enumerated name -- shows up.
+    auto const automationValue(CLAPEdge::fromHost(parameterID, ranges, value));
     std::array<char, 128> text{};
-    auto const automationValue(static_cast<Plugins::AutomatedParameterValue>(value));
-    getParameterDisplay(ParameterID{Plugins::ParameterID{id}}, {text.data(), text.size()},
-                        &automationValue);
+    getParameterDisplay(parameterID, {text.data(), text.size()}, &automationValue);
 
     std::array<char, 32> unit{};
-    getParameterLabel(ParameterID{Plugins::ParameterID{id}}, {unit.data(), unit.size()},
-                      &program());
+    getParameterLabel(parameterID, {unit.data(), unit.size()}, &program());
 
     std::snprintf(display, size, "%s%s", text.data(), unit.data());
     return true;
 }
 
-bool SpectrumWorxCLAP::paramsTextToValue(clap_id const id, char const *const display,
-                                         double *const value) noexcept
-{
-    /// \note The 2016 code never needed this: neither VST 2.4 nor AU asked a
-    /// plugin to parse a typed-in value, so there is no printer inverse to call.
-    /// A plain strtod covers the numeric parameters, which is what a user types
-    /// into; enumerated ones fall back to the host's own list.
-    if (!isValidParamId(id))
-        return false;
-
-    char *end{nullptr};
-    auto const parsed(std::strtod(display, &end));
-    if (end == display)
-        return false;
-    *value = parsed;
-    return true;
-}
+/// \brief Declined, deliberately, until the printers can be run backwards.
+///
+/// \note The 2016 code never needed this -- neither VST 2.4 nor AU asks a plugin
+/// to parse a typed-in value -- so nothing in the parameter system inverts a
+/// display transform. `Parameters::DisplayValueTransformer` has `transform` and
+/// no counterpart, and the effect-specific printers go through
+/// `AutomatedParameterPrinter` the same one way.
+///
+///   The previous implementation here ran `strtod` over the text and returned the
+/// result as if display units were storage units. For anything with a transform
+/// that is simply a wrong value: clap-validator caught the input gain going
+/// `0.001` -> `"-60dB"` -> `-60.0` -> `"nandB"`, a NaN written straight into the
+/// engine. Returning false is the honest answer -- `text_to_value` is optional,
+/// and a host falls back to its own editing -- and it cannot corrupt state.
+///
+/// \todo Give `DisplayValueTransformer` an `inverse` alongside `transform` (four
+/// specialisations: two dB, two percentage) and teach the effect-specific
+/// printers the same, then parse here and invert per parameter.
+bool SpectrumWorxCLAP::paramsTextToValue(clap_id, char const *, double *) noexcept { return false; }
 
 bool SpectrumWorxCLAP::handleEvent(clap_event_header const *const header)
 {
@@ -381,7 +447,10 @@ bool SpectrumWorxCLAP::handleEvent(clap_event_header const *const header)
         return false;
 
     ParameterID const parameterID{Plugins::ParameterID{event->param_id}};
-    setParameter(parameterID, static_cast<Plugins::AutomatedParameterValue>(event->value));
+    Plugins::ParameterInformation<Protocol> ranges;
+    liveRanges(parameterID, ranges);
+
+    setParameter(parameterID, CLAPEdge::fromHost(parameterID, ranges, event->value));
 
     /// \note Only a module-chain parameter changes what the *other* parameters
     /// are: it decides which effect a slot holds, and so how many parameters
@@ -478,6 +547,11 @@ void SpectrumWorxCLAP::onMainThread() noexcept
     auto const flags(pendingRescan_.exchange(0));
     if (flags && _host.canUseParams())
         _host.paramsRescan(static_cast<clap_param_rescan_flags>(flags));
+
+    // What the audio thread was not allowed to do itself.
+    if (pendingMarkDirty_.exchange(false) && _host.canUseState())
+        _host.stateMarkDirty();
+
     PluginHelper::onMainThread();
 }
 
@@ -554,10 +628,20 @@ void SpectrumWorxCLAP::flushUIEdits(clap_output_events const *const out)
 // process() or flush().
 ////////////////////////////////////////////////////////////////////////////////
 
+/// \note The editor works in the effect's own units throughout -- a knob knows
+/// its parameter's real range -- so an edit it made is normalised here, on the
+/// way out, and nowhere else.
 void SpectrumWorxCLAP::HostProxy::automatedParameterChanged(
     ParameterSelector const parameter, Plugins::AutomatedParameterValue const value) const
 {
-    plugin_.uiEdits_.push({parameter.value, value, UIEdits::Kind::Value});
+    ParameterID const parameterID{parameter};
+    Plugins::ParameterInformation<Protocol> ranges;
+    plugin_.liveRanges(parameterID, ranges);
+
+    plugin_.uiEdits_.push({parameter.value,
+                           static_cast<Plugins::AutomatedParameterValue>(
+                               CLAPEdge::toHost(parameterID, ranges, value)),
+                           UIEdits::Kind::Value});
     plugin_.markCurrentProgramAsModified();
     plugin_._host.paramsRequestFlush();
 }
@@ -596,10 +680,29 @@ bool SpectrumWorxCLAP::HostProxy::reportNewLatencyInSamples(unsigned int const l
     return true;
 }
 
+/// \note `clap_host_state.mark_dirty` is `[main-thread]`, and this is reached
+/// from both threads: the editor calls it on the UI thread, and a host parameter
+/// event calls it from process() -- the interop layer marks the program modified
+/// for *any* automated change, without knowing where the change came from.
+/// clap-validator fails six of its parameter tests on exactly that.
+///
+///   So the audio thread only records that it wants to; onMainThread() does it.
+/// The same deferral the rescan flags already use, for the same reason.
 void SpectrumWorxCLAP::markCurrentProgramAsModified() const
 {
-    if (_host.canUseState())
-        _host.stateMarkDirty();
+    if (!_host.canUseState())
+        return;
+
+    auto &plugin(const_cast<SpectrumWorxCLAP &>(*this));
+
+    if (_host.isMainThread())
+    {
+        plugin._host.stateMarkDirty();
+        return;
+    }
+
+    if (!pendingMarkDirty_.exchange(true))
+        plugin._host.requestCallback();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -614,6 +717,11 @@ void SpectrumWorxCLAP::markCurrentProgramAsModified() const
 /// splits that out; until then this beats forgetting everything.
 ///                                       (29.07.2026.) (SW port)
 
+/// \note Values here are the engine's own, not CLAPEdge's 0..1 -- deliberately.
+/// The edge exists because a *host* may not see a range move; a file has no such
+/// problem, and storing natural units means the state does not encode the edge
+/// policy and so survives a change to it. Save and load use the same pair of
+/// accessors, so the two stay consistent by construction.
 bool SpectrumWorxCLAP::stateSave(clap_ostream const *const stream) noexcept
 {
     rebuildParameterIDs();

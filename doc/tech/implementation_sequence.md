@@ -39,12 +39,15 @@ What is left, in the order it is worth doing:
 | | | Where |
 |---|---|---|
 | 1 | **Load it in a DAW.** Reaper first. Nothing below is worth much until the thing has been driven by a mouse. | — |
-| 2 | **Normalise module and LFO parameter ranges to 0..1**, so a slot's effect change stops moving `min_value`/`max_value`. The last CLAP-correctness gap. | risk #6b, stage 5 |
-| 3 | **The audio file loader** — one `doLoad` over `juce::AudioFormatManager`, then drop `LE_SW_DISABLE_SIDE_CHANNEL`. | 5.0 |
-| 4 | **Threading.** The `UIEdits` queue is the first piece; the rest of the main/audio split is not done. | 5.8 |
-| 5 | **`clap-validator` and CI** across the four formats. | 5.9 |
-| 6 | **6.4**, the owned-window collapse, and the preset browser's two async save-path callers. | stage 6 |
-| 7 | **Presets** — the split that `LE_NO_PRESETS` stands in for, which then unblocks a real state format. | stage 8, then 5.6 |
+| 2 | **The audio file loader** — one `doLoad` over `juce::AudioFormatManager`, then drop `LE_SW_DISABLE_SIDE_CHANNEL`. | 5.0 |
+| 3 | **Threading.** The `UIEdits` queue is the first piece; the rest of the main/audio split is not done. | 5.8 |
+| 4 | **`clap-validator` and CI** across the four formats. | 5.9 |
+| 5 | **6.4**, the owned-window collapse, and the preset browser's two async save-path callers. | stage 6 |
+| 6 | **Presets** — the split that `LE_NO_PRESETS` stands in for, which then unblocks a real state format. | stage 8, then 5.6 |
+
+Done since: **module and LFO parameter ranges are normalised to 0..1**, so a slot's
+effect change no longer moves `min_value`, `max_value` or `is_stepped` — the last
+CLAP-correctness gap (stage 5).
 
 Two flags are switched on and stand in for unfinished work rather than for
 decisions: **`LE_NO_PRESETS`** (row 7) and **`LE_SW_DISABLE_SIDE_CHANNEL`**
@@ -1183,25 +1186,60 @@ Two consequences fell out:
   rather than `|=`, so whichever flag was set first was lost. Pre-existing, and
   invisible until a second flag existed to lose.
 
-> **⏳ Left deliberately unfinished: effect-specific parameter ranges still
-> move.** A module parameter's `min_value`/`max_value` depend on which effect is
-> in the slot, and CLAP counts those among the changes that want `RESCAN_ALL` —
-> which an active plugin may not send. Today the port sends `INFO|TEXT|VALUES`
-> anyway: hosts handle it, and the alternative is restarting audio every time the
-> user picks an effect.
->
-> The fix is to report **module and LFO parameters normalised to 0..1**, so their
-> ranges never move and `INFO|TEXT|VALUES` becomes not merely tolerated but
-> correct. Globals and the slot selectors keep their real ranges and their
-> `IS_STEPPED` flags — those ranges are fixed, and they are the discrete ones, so
-> normalising them would only cost the host its step count. **`ParameterInformation`
-> and the `AutomatedParameter` traits already carry both scales**
-> (`NormalisedAutomatedParameter` vs `FullRangeAutomatedParameter`), so this is a
-> question of choosing per parameter type at the CLAP boundary rather than of new
-> conversion code.
->
-> **Reference implementation: `../sst/surge-xt2`** does exactly this for its
-> dynamic CLAP parameters. Read it before writing this rather than after.
+#### ✅ Module and LFO parameters present a fixed 0..1 edge
+
+The last CLAP-correctness gap, and it closes the section above. A module
+parameter's natural range belongs to whichever effect is in the slot — Gain runs
+0..2, a filter's cutoff 20..20000 — and swapping the effect moved both ends.
+`ext/params.h` puts `min_value`, `max_value` **and the `is_stepped` flag** in the
+same `CLAP_PARAM_RESCAN_ALL` list, the one that "can only be used while the plugin
+is deactivated". A slot's effect changes through an ordinary parameter event,
+while active, so none of the three may move.
+
+So module and LFO parameters now report a **fixed 0..1 range, unstepped, for the
+plugin's lifetime**, and the natural value is normalised across it. What is left
+to change is exactly the set `RESCAN_INFO` and `_TEXT` name: the parameter's name,
+its module path, its hidden flag, and its displayed text. `INFO|TEXT|VALUES` is
+now correct rather than merely tolerated.
+
+The policy is `CLAPEdge` in `core/host_interop/clapParameterEdge.hpp` — free
+functions over a `ParameterInformation`, deliberately not members of the plugin,
+so `tests/clap` can exercise what the host sees without a host. That is
+[surge-xt2](../../../sst/surge-xt2)'s `clap_edge::` (`src/clap/param_edge.h`)
+shape, and the reason for it is the same.
+
+Two things worth knowing about the implementation:
+
+- **`paramsInfo` asks the model twice, and which query answers what is the
+  contract.** Every number and flag a host may not see move comes from the
+  *maximal* description — the one over a null `Program`, as in
+  `rebuildParameterIDs`. Only the name, the module path and the hidden flag come
+  from the live one. The invariant is structural rather than a comment: there is
+  no live range in reach of the fields that must not move.
+- **State is stored in natural units, not on the edge.** The edge exists because a
+  *host* may not see a range move; a file has no such problem, and natural units
+  mean the state does not encode the edge policy.
+
+Two costs, both accepted:
+
+- **A host can no longer tell which module parameters are discrete.** An
+  enumerated or boolean module parameter is a continuous 0..1 knob in a generic
+  panel. It still *reads* as its name through `paramsValueToText`, which is what
+  makes this bearable, but the step count is genuinely gone — it could not stay,
+  being in the `RESCAN_ALL` list. Writing 0.25 to a boolean and reading back 0 is
+  therefore correct behaviour; the test asserts stability rather than exactness
+  for that reason, and exactness separately over the continuous ones.
+- **The advertised default for an effect-specific parameter is the generic 0**
+  rather than the live effect's own default, for the same
+  must-not-move reason.
+
+> **An off-by-one this uncovered.** `ParameterInfoGetter`'s LFO case tested
+> `moduleParameterIndex >= numberOfParameters()` where `ParameterNameGetter` tests
+> `moduleParameterIndex + 1 /*Bypass*/ >=` — an LFO ID addresses the module
+> parameter one above it. So the *last* module parameter's LFO reported a real
+> range while its name and its printer both said "N/A". Harmless while the
+> exported list was dynamic and that ID was simply absent; wrong once the list is
+> fixed and a host walks all of it. The name getter was the correct one.
 
 **5.6 — `clap_plugin_state`.** ⏳ *Partial.* `stateSave`/`stateLoad` write and
 read real `(id, value)` pairs and apply slot selectors before anything else on
@@ -2046,7 +2084,7 @@ Rows below are in stage-number order, not running order. Running order is
 | 4b | **Deferring 4 past 5 and 6** means the first non-macOS build lands after the threading model and the GUI are set. | 4.1 holds the vector and FFT interfaces byte-identical, so a collision would have to be in the build, not the API; goldens arbitrate the rest. | 4 |
 | 5 | **Golden baseline is 2016 source on a 2026 compiler**, not 2016 behaviour. | If fidelity matters, diff once against renders from the original binaries (~2 days). | 3 |
 | 6 | **Host handling of `rescan(INFO\|TEXT)` varies.** The dynamic parameter model is the novel part of this plugin. | ~~Exercise it with fake parameters in the stage 1 stub.~~ **Largely retired, by reading the spec rather than by testing.** CLAP forbids changing the parameter *count* while active, so the list is fixed and only descriptions change — which is `RESCAN_INFO`'s own documented case. What remains is #6b. | 5 |
-| 6b | **Effect-specific parameter ranges still move on a slot change**, which CLAP counts among the `RESCAN_ALL` cases an active plugin may not send. | Normalise module and LFO parameters to 0..1 so ranges never move; globals and slot selectors keep real ranges and their step counts. `../sst/surge-xt2` does this already. | 5 |
+| 6b | ~~**Effect-specific parameter ranges still move on a slot change**, which CLAP counts among the `RESCAN_ALL` cases an active plugin may not send.~~ | **Retired.** Module and LFO parameters present a fixed, unstepped 0..1 edge (`CLAPEdge`, after surge-xt2's `clap_edge::`); globals and slot selectors keep real ranges and step counts. Nothing in the `RESCAN_ALL` list moves any more. The residual cost — a host cannot see which module parameters are discrete — is recorded in stage 5. | 5 |
 | 7 | **clap-wrapper AUv2 on current macOS** — less DAW-exercised than `juce_audio_processors`. | Prove it in stage 1 with an empty plugin, not in stage 9 with a full one. | 1 |
 | 8 | **Preset compatibility** constrains stages 7 and 8. | Decide in 0.7, before any of it is designed. | 0 |
 | 9 | **Boost scaffold becomes permanent.** | CPM not a submodule; CI allowlist that only ever shrinks. | 2, 7 |
