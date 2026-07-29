@@ -131,13 +131,24 @@
 // https://gcc.gnu.org/onlinedocs/gcc/ARM-Function-Attributes.html
 #define LE_HOT __attribute__((hot))
 //...mrmlj...disable 'cold' until we split cold and minsize (as cold can slow down calling code)...
-#if (defined(__arm__) && !defined(__aarch64__)) && !defined(__clang__)
-//...mrmlj...Clang claims support for 'target' but does not work with
-//...3.6 or Xcode7
-//...http://clang.llvm.org/docs/AttributeReference.html#target-gnu-target
-#define LE_COLD __attribute__((/*cold,*/ minsize, target("thumb")))
-#else
+#if defined(__clang__)
 #define LE_COLD __attribute__((/*cold,*/ minsize))
+#else
+/// \note `minsize` is a Clang attribute; GCC has no such thing and warned
+/// "'minsize' attribute directive ignored" at every one of the several hundred
+/// `LE_COLD` sites. It was therefore already a no-op there — but not an inert
+/// one: GCC rejects a GNU attribute in the trailing declarator position of a
+/// function *definition*, which is how `le/plugins/clap/tag.hpp` writes it, so
+/// the macro had to expand to nothing rather than to something ignorable.
+///
+///   `__attribute__((cold))` is the GCC equivalent in spirit and is deliberately
+/// *not* used: the comment above records that it was switched off on purpose,
+/// because marking a callee cold pessimises the call sites too. If per-function
+/// size optimisation is wanted back on GCC it needs `optimize("Os")`, which
+/// GCC's own documentation restricts to debugging — see the note over
+/// LE_OPTIMIZE_FOR_SIZE_BEGIN below.
+///                                           (29.07.2026.) (SW port)
+#define LE_COLD
 #endif
 
 #define LE_WEAK_SYMBOL __attribute__((weak))
@@ -190,36 +201,35 @@
 #define LE_CLANG_SPECIFIC(expression)
 #endif // Clang
 
-// No support in Clang yet...
-// http://lists.cs.uiuc.edu/pipermail/llvmdev/2013-April/061527.html
-// http://comments.gmane.org/gmane.comp.compilers.clang.devel/28958
-#if (((__GNUC__ * 10) + __GNUC_MINOR__) >= 44)
-// http://gcc.gnu.org/bugzilla/show_bug.cgi?id=41201
-// http://gcc.gnu.org/bugzilla/show_bug.cgi?id=52144
-#define LE_OPTIMIZE_FOR_SPEED_BEGIN()                                                              \
-    _Pragma("push") _Pragma("GCC push_options") _Pragma("GCC optimize ( \"O3\" )") _Pragma("arm")
-
-#define LE_OPTIMIZE_FOR_SPEED_END() _Pragma("GCC pop_options") _Pragma("pop")
-
-#define LE_OPTIMIZE_FOR_SIZE_BEGIN()                                                               \
-    _Pragma("push") _Pragma("GCC push_options") _Pragma("GCC optimize ( \"Os\" )") _Pragma("thum"  \
-                                                                                           "b")
-
-#define LE_OPTIMIZE_FOR_SIZE_END LE_OPTIMIZE_FOR_SPEED_END
-
-// http://lists.cs.uiuc.edu/pipermail/llvmdev/2013-April/061527.html
-// http://gcc.gnu.org/bugzilla/show_bug.cgi?id=50782
-#define LE_FAST_MATH_ON() _Pragma("GCC optimize ( \"associative-math\"    )")
-#define LE_FAST_MATH_OFF() _Pragma("GCC optimize ( \"no-associative-math\" )")
-
-#define LE_FAST_MATH_ON_BEGIN() _Pragma("GCC push_options") LE_FAST_MATH_ON()
-
-#define LE_FAST_MATH_ON_END() _Pragma("GCC pop_options")
-
-#define LE_FAST_MATH_OFF_BEGIN() _Pragma("GCC push_options") LE_FAST_MATH_OFF()
-
-#define LE_FAST_MATH_OFF_END() _Pragma("GCC pop_options")
-#else
+/// \note Per-translation-unit optimisation and fast-math pragmas: no-ops on
+/// every compiler that reaches this branch, deliberately.
+///
+///   The GCC arm of this block was written in 2013 and gated on
+/// `__GNUC__ * 10 + __GNUC_MINOR__ >= 44`. Clang answers that test with 42, so
+/// **Clang has always taken the empty arm** — which means the whole family has
+/// been inert on macOS, and the stage 3.6 goldens were rendered without any of
+/// it. Real GCC does honour the pragmas, and three things follow:
+///
+///   - `LE_FAST_MATH_ON()` was `#pragma GCC optimize("associative-math")`, and
+///     GCC 15 acts on it: a float reduction inside the pragma's scope gets
+///     vectorised, i.e. reassociated. Enabling that on Linux only would reorder
+///     sums macOS never reordered, and would make any golden difference
+///     impossible to attribute to the FFT backend it is supposed to be
+///     measuring.
+///   - `_Pragma("arm")` / `_Pragma("thumb")` are ARM32 (RVCT) directives GCC
+///     never implemented, and bare `_Pragma("push")` / `_Pragma("pop")` are not
+///     GCC pragmas either. The `thumb` one had additionally been split into two
+///     adjacent literals by the stage 0.6 reformat, which `_Pragma` rejects
+///     outright — so this arm had not compiled at all since then.
+///   - GCC's own documentation says of the underlying attribute: "the optimize
+///     attribute should be used for debugging purposes only. It is not suitable
+///     in production code."
+///
+///   `-O3` / `-Os` per translation unit is a size/speed knob, not a semantic
+/// one, so nothing is lost by letting the build type decide it uniformly. If a
+/// cold-code size win is ever wanted back, it should arrive measured, and as
+/// `__attribute__((cold))` on the declarations rather than a file-scope pragma.
+///                                       (29.07.2026.) (SW port)
 #define LE_OPTIMIZE_FOR_SPEED_BEGIN()
 #define LE_OPTIMIZE_FOR_SPEED_END()
 #define LE_OPTIMIZE_FOR_SIZE_BEGIN()
@@ -230,7 +240,6 @@
 #define LE_FAST_MATH_ON_END()
 #define LE_FAST_MATH_OFF_BEGIN()
 #define LE_FAST_MATH_OFF_END()
-#endif // GCC 4.4+
 
 // http://llvm.org/docs/Vectorizers.html#pragma-loop-hint-directives
 #define LE_DISABLE_LOOP_VECTORIZATION()                                                            \

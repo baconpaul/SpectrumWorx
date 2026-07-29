@@ -346,24 +346,22 @@ struct MakeEmptyChannelStateHolder
 }; // struct MakeEmptyChannelStateHolder
 
 #if !LE_NO_PARAMETER_STRINGS
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wignored-attribute"
-#endif // __clang__
+/// \note The `__fastcall` this carried is gone for the reason given over
+/// `EffectMetaData::GetParameterValueString`, which is the type this function
+/// has to match: a dead calling convention that Clang accepts and ignores and
+/// that GCC on aarch64 does not declare at all. The two spellings had to agree,
+/// and now they agree on not having one.
+///                                           (29.07.2026.) (SW port)
 template <class Parameters> struct EffectParameterPrinter
 {
-    LE_COLD static char const *LE_GNU_SPECIFIC(/*mrmlj clang crash*/ __fastcall) LE_MSVC_SPECIFIC()
-        print(std::uint8_t const parameterIndex,
-              LE::Parameters::AutomatedParameterPrinter const &printer)
+    LE_COLD static char const *print(std::uint8_t const parameterIndex,
+                                     LE::Parameters::AutomatedParameterPrinter const &printer)
     {
         LE_ASSUME(parameterIndex < Parameters::static_size);
         return LE::Parameters::invokeFunctorOnIndexedParameter<Parameters>(
             parameterIndex, std::forward<LE::Parameters::AutomatedParameterPrinter const>(printer));
     }
 }; // class EffectParameterPrinter
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif // __clang__
 #endif // !LE_NO_PARAMETER_STRINGS
 
 template <class Effect, typename TypeIndex> struct MakeEffectMetaData
@@ -545,13 +543,15 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
 template <class Effect> class ModuleDSP::Impl final : public ModuleEffectImpl<Effect, ModuleDSP>
 {
   public:
-#if (_MSC_VER < 1900) && !defined(__clang__)
-    template <typename... T> LE_COLD Impl(T &&...args) : ModuleEffectImpl(std::forward<T>(args)...)
-    {
-    }
-#else
+    /// \note The `#if (_MSC_VER < 1900) && !defined(__clang__)` that used to
+    /// select a hand-written forwarding constructor here stood for "VS2013,
+    /// which has no inherited constructors". GCC satisfies it vacuously —
+    /// undefined `_MSC_VER` preprocesses to 0 — and then failed on the branch
+    /// body, which named the base as a bare `ModuleEffectImpl`. VS2013 predates
+    /// everything this project now requires, so the branch is gone rather than
+    /// re-gated.
+    ///                                       (29.07.2026.) (SW port)
     using ModuleEffectImpl<Effect, ModuleDSP>::ModuleEffectImpl;
-#endif // _MSC_VER
 }; // class ModuleDSP::Impl
 
 /// \note parameterInfos() is defined in moduleParameters.cpp. It lived here

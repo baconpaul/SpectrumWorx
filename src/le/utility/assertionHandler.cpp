@@ -36,6 +36,12 @@
 #include "windowsLite.hpp"
 #endif
 
+/// \note breakIntoDebugger()'s fallback arm below is `raise( SIGINT )`, and
+/// `signal.h` was included only under `__APPLE__` — so every other POSIX target
+/// took an arm whose declarations it had not seen. Debug-build-only, since a
+/// release build has no assert handler to break from.
+///                                           (29.07.2026.) (SW port)
+#include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <source_location>
@@ -147,7 +153,7 @@ void breakIntoDebugger()
     _CrtDbgBreak();
 #else
     // http://iphone.m20.nl/wp/2010/10/xcode-iphone-debugger-halt-assertions
-    raise(SIGINT);
+    std::raise(SIGINT);
 #endif
 }
 

@@ -160,16 +160,20 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
 #pragma warning(disable                                                                            \
                 : 4610) // Class can never be instantiated - user-defined constructor required.
 #endif                  // _MSC_VER
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wignored-attribute"
-#endif // __clang__
     struct EffectMetaData
     {
 #if !LE_NO_PARAMETER_STRINGS
-        typedef char const *(LE_GNU_SPECIFIC(/*mrmlj clang crash*/ __fastcall) LE_MSVC_SPECIFIC()
-                                 GetParameterValueString)(std::uint8_t index,
-                                                          ParameterPrinter const &)/*noexcept*/;
+        /// \note This carried an explicit `__fastcall` on the GNU side, added as
+        /// a workaround for a 2013-era Clang crash. It is the same dead calling
+        /// convention stage 0.6 deleted `LE_FASTCALL` for — meaningless on
+        /// x86-64 SysV and on arm64 — but hand-written, so the sweep missed it.
+        /// Clang accepts and ignores it on every target, which is why it
+        /// survived a macOS build; GCC on aarch64 does not declare it at all and
+        /// the typedef simply failed to parse. Gone, along with the
+        /// `-Wignored-attribute` suppression that existed only to silence it.
+        ///                               (29.07.2026.) (SW port)
+        typedef char const *(GetParameterValueString)(std::uint8_t index,
+                                                      ParameterPrinter const &)/*noexcept*/;
 #endif // !LE_NO_PARAMETER_STRINGS
 
         std::uint8_t const numberOfExtraParameters;
@@ -187,9 +191,6 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
         /// instances are the per-effect statics, handed out by reference.
         ///                               (28.07.2026.) (SW port)
     }; // struct EffectMetaData
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif // __clang__
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif // _MSC_VER
