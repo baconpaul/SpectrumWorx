@@ -21,9 +21,7 @@ LE_FAST_MATH_ON()
 
 #include "fft.hpp"
 
-#ifdef LE_ACC_FFT
 #include <cmath>
-#endif // LE_ACC_FFT
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
 #include "le/math/vector.hpp"
@@ -42,10 +40,9 @@ LE_FAST_MATH_ON()
 #if defined(LE_SORENSEN_PURE_REAL_FFT_TEST) && defined(LE_PURE_REAL_FFT_TEST)
 #error Cannot test Sorensen and our own internal pure real fft at the same time...
 #endif
-#if defined(__APPLE__)
-#undef nil
-#endif // __APPLE__
-#include "nt2/signal/static_fft.hpp"
+#include "pffft.h"
+
+#include "le/spectrumworx/engine/configuration.hpp"
 #endif // LE_ACC_FFT
 //------------------------------------------------------------------------------
 namespace LE
@@ -63,10 +60,10 @@ LE_IMPL_NAMESPACE_BEGIN(Math)
 
 FFT_float_real_1D::FFT_float_real_1D() /// \throws nothing
     : size_(0)
-#ifdef LE_ACC_FFT
+#if defined(LE_ACC_FFT) || defined(LE_PFFFT)
       ,
-      fftSetup_(0)
-#endif // LE_ACC_FFT
+      fftSetup_(nullptr)
+#endif // a backend that owns a setup object
 {
 }
 
@@ -84,6 +81,14 @@ FFT_float_real_1D::~FFT_float_real_1D() /// \throws nothing
         vDSP_destroy_fftsetup(fftSetup_);
 }
 #endif // LE_ACC_FFT
+
+#ifdef LE_PFFFT
+FFT_float_real_1D::~FFT_float_real_1D() /// \throws nothing
+{
+    if (fftSetup_)
+        pffft::pffft_destroy_setup(fftSetup_);
+}
+#endif // LE_PFFFT
 
 #ifdef LE_ACC_FFT
 ::DSPSplitComplex &FFT_float_real_1D::workBufferSplit() const
@@ -147,6 +152,38 @@ void FFT_float_real_1D::resize(SW::Engine::StorageFactors const &factors,
     }
 #endif // LE_ACC_FFT
 
+#if defined(LE_PFFFT)
+    /// \note Order matters: requiredStorage() below promises the sum of the two
+    /// buffers, and SharedStorageBuffer::resize() carves them out of the span
+    /// in call order.
+    ///                                       (29.07.2026.) (SW port)
+    scratch_.resize(factors, storage);
+
+    if (size != size_)
+    {
+        /// pffft only accepts N = (2^a)(3^b)(5^c) with a >= 5. Every size the
+        /// engine can ask for is a power of two in [128, 8192], so this holds
+        /// by construction — but a setup for a size it rejects would be a null
+        /// pointer dereference in process(), so it is checked rather than
+        /// assumed.
+        LE_ASSERT_MSG(size >= LE::SW::Engine::Constants::minimumFFTSize, "FFT size too small.");
+        LE_ASSERT_MSG((size % 32) == 0, "FFT size not a multiple of 32.");
+        auto *const newFFTSetup((size >= 32) && ((size % 32) == 0)
+                                    ? pffft::pffft_new_setup(size, pffft::PFFFT_REAL)
+                                    : nullptr);
+        if (newFFTSetup)
+        {
+            if (fftSetup_)
+                pffft::pffft_destroy_setup(fftSetup_);
+            fftSetup_ = newFFTSetup;
+        }
+        else
+        {
+            LE_ASSERT(!"FFT failure"); /*...mrmlj...proper error handling...*/
+        }
+    }
+#endif // LE_PFFFT
+
     size_ = size;
 }
 
@@ -174,10 +211,56 @@ void FFT_float_real_1D::transform(float *LE_RESTRICT const data /*in time, out D
     imaginaryTargetSubRange[0] = 0;
     imaginaryTargetSubRange[halfSize] = 0;
 #else
-    float const scale(std::sqrt(nt2::real_fft_normalization_factor<float>(size)));
-    multiply(data, scale, workBuffer_.begin(), size);
-    nt2::static_fft<128, 8192, float>::real_forward_transform(workBuffer_.begin(), data,
-                                                              imaginaryTargetSubRange, size);
+    ////////////////////////////////////////////////////////////////////////////
+    /// pffft
+    ////////////////////////////////////////////////////////////////////////////
+    /// The contract this has to meet, which is set by the Accelerate branch
+    /// above and by what the 3.6 goldens were rendered through:
+    ///
+    ///   - `data` arrives holding `size` real time-domain samples and leaves
+    ///     holding the `size/2 + 1` real parts, bin 0 (DC) through bin size/2
+    ///     (Nyquist).
+    ///   - `imaginaryTargetSubRange` receives the matching `size/2 + 1`
+    ///     imaginary parts, with bins 0 and size/2 forced to an exact zero —
+    ///     they are real by construction, and downstream code reads them.
+    ///   - the transform is unitary rather than unnormalised: the result is the
+    ///     textbook DFT divided by sqrt(size), which is what makes
+    ///     `maximumAmplitude()` = sqrt(size)/2 the 0 dB reference and what makes
+    ///     the inverse below its exact undo.
+    ///
+    /// `pffft_transform_ordered` produces the textbook DFT unscaled, in the
+    /// packed real layout: slot 0 holds Re(X[0]) and slot 1 holds Re(X[size/2]),
+    /// then interleaved (Re, Im) for bins 1 .. size/2-1. Verified against a
+    /// naive DFT, sign convention included, rather than taken from the header
+    /// comment.
+    ///
+    /// The transform runs inside workBuffer_ — pffft wants SIMD-aligned input
+    /// and output and several callers hand us interior pointers — and pffft
+    /// documents input and output as allowed to alias, so the copy in is the
+    /// only one needed.
+    ///                                       (29.07.2026.) (SW port)
+    LE_ASSERT_MSG(size == this->size(), "A pffft setup is per FFT size.");
+    LE_ASSUME(fftSetup_);
+    auto *const LE_RESTRICT packed(workBuffer_.begin());
+    copy(data, packed, size);
+    pffft::pffft_transform_ordered(fftSetup_, packed, packed, scratch_.begin(),
+                                   pffft::PFFFT_FORWARD);
+
+    std::uint16_t const halfSize(size / 2);
+    /// \note Scaled on the way out rather than on the way in, so that the
+    /// rounding matches the Accelerate branch step for step. The two differ by
+    /// the factor of two vDSP's real forward transform carries and pffft's does
+    /// not.
+    float const scale(1 / std::sqrt(convert<float>(size)));
+    data[0] = packed[0] * scale;
+    imaginaryTargetSubRange[0] = 0;
+    for (std::uint16_t bin(1); bin < halfSize; ++bin)
+    {
+        data[bin] = packed[2 * bin + 0] * scale;
+        imaginaryTargetSubRange[bin] = packed[2 * bin + 1] * scale;
+    }
+    data[halfSize] = packed[1] * scale;
+    imaginaryTargetSubRange[halfSize] = 0;
 #endif // LE_ACC_FFT
 }
 
@@ -197,10 +280,27 @@ void FFT_float_real_1D::inverseTransform(float *LE_RESTRICT const data /*in DFT 
     vDSP_fft_zrip(fftSetup_, &workBufferSplit(), 1, log2(size), FFT_INVERSE);
     vDSP_ztoc(&workBufferSplit(), 1, reinterpret_cast<DSPComplex *>(data), 2, halfSize);
 #else
-    nt2::static_fft<128, 8192, float>::real_inverse_transform(
-        data, const_cast<float *>(imaginarySourceSubRange), workBuffer_.begin(), size);
-    float const scale(std::sqrt(nt2::real_fft_normalization_factor<float>(size)));
-    multiply(workBuffer_.begin(), scale, data, size);
+    /// The exact undo of the forward above. pffft's backward transform of an
+    /// unscaled forward result gives size * x, so scaling the spectrum by
+    /// 1/sqrt(size) on the way in turns the X/sqrt(size) the forward produced
+    /// back into x — the same place, and the same order, the Accelerate branch
+    /// applies its scale.
+    ///                                       (29.07.2026.) (SW port)
+    LE_ASSERT_MSG(size == this->size(), "A pffft setup is per FFT size.");
+    LE_ASSUME(fftSetup_);
+    std::uint16_t const halfSize(size / 2);
+    float const scale(1 / std::sqrt(convert<float>(size)));
+    auto *const LE_RESTRICT packed(workBuffer_.begin());
+    packed[0] = data[0] * scale;
+    packed[1] = data[halfSize] * scale;
+    for (std::uint16_t bin(1); bin < halfSize; ++bin)
+    {
+        packed[2 * bin + 0] = data[bin] * scale;
+        packed[2 * bin + 1] = imaginarySourceSubRange[bin] * scale;
+    }
+    pffft::pffft_transform_ordered(fftSetup_, packed, packed, scratch_.begin(),
+                                   pffft::PFFFT_BACKWARD);
+    copy(packed, data, size);
 #endif // LE_ACC_FFT
 }
 
@@ -234,32 +334,25 @@ void FFT_float_real_1D::inverseTransform(float *const dftData,
 /// Complex DFT
 ////////////////////////////////////////////////////////////////////////////////
 
-void FFT_float_real_1D::transform(float *LE_RESTRICT const pReals,
-                                  float *LE_RESTRICT const pImags) const
+/// \note The complex pair is unimplemented on every live backend. Accelerate
+/// has always said so here; the NT2 arm that did implement it was reachable only
+/// from the three `LE_PURE_REAL_FFT_TEST` call sites below and in
+/// channelData.cpp, all of which are compiled out, so no shipped configuration
+/// has ever called it and no golden depends on it. Left asserting rather than
+/// filled in with pffft, because an untested complex path is worse than an
+/// absent one — and note that in a release build the assert is gone and these
+/// silently do nothing, which was already true on macOS.
+///                                           (29.07.2026.) (SW port)
+void FFT_float_real_1D::transform([[maybe_unused]] float *LE_RESTRICT const pReals,
+                                  [[maybe_unused]] float *LE_RESTRICT const pImags) const
 {
-#if defined(LE_ACC_FFT)
     LE_ASSERT(!"Not implemented!");
-#else  // NT2
-    std::uint16_t const halfSize(size() / 2);
-    nt2::static_fft<128 / 2, 8192 / 2, float>::forward_transform(pReals, pImags, halfSize);
-    float const scale(std::sqrt(2 / convert<float>(halfSize) / 4 /*mrmlj?*/));
-    multiply(pReals, scale, halfSize);
-    multiply(pImags, scale, halfSize);
-#endif // LE_ACC_FFT
 }
 
-void FFT_float_real_1D::inverseTransform(float *LE_RESTRICT const pReals,
-                                         float *LE_RESTRICT const pImags) const
+void FFT_float_real_1D::inverseTransform([[maybe_unused]] float *LE_RESTRICT const pReals,
+                                         [[maybe_unused]] float *LE_RESTRICT const pImags) const
 {
-#if defined(LE_ACC_FFT)
     LE_ASSERT(!"Not implemented!");
-#else
-    std::uint16_t const halfSize(size() / 2);
-    nt2::static_fft<128 / 2, 8192 / 2, float>::inverse_transform(pReals, pImags, halfSize);
-    float const scale(std::sqrt(2 / convert<float>(halfSize) / 4 /*mrmlj?*/));
-    multiply(pReals, scale, halfSize);
-    multiply(pImags, scale, halfSize);
-#endif // LE_ACC_FFT
 }
 
 #ifdef LE_PURE_REAL_FFT_TEST
@@ -406,7 +499,11 @@ float FFT_float_real_1D::maximumAmplitude(float const size) { return std::sqrt(s
 
 LE_COLD std::uint32_t FFT_float_real_1D::requiredStorage(SW::Engine::StorageFactors const &factors)
 {
-    return WorkBuffer::requiredStorage(factors);
+    return WorkBuffer::requiredStorage(factors)
+#ifdef LE_PFFFT
+           + ScratchBuffer::requiredStorage(factors)
+#endif // LE_PFFFT
+        ;
 }
 
 //------------------------------------------------------------------------------

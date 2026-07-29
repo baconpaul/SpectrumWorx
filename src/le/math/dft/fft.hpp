@@ -13,9 +13,16 @@
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/engine/buffers.hpp"
 
+/// \note Two backends, one interface. Apple keeps Accelerate/vDSP, which is
+/// what the stage 3.6 goldens were rendered through; everywhere else uses
+/// pffft, replacing the NT2 `static_fft` that stage 0.3 retained as reference
+/// material only. The two are held to the same layout and the same
+/// normalisation — see the notes over the transform pair in fft.cpp.
+///                                           (29.07.2026.) (SW port)
 #if defined(__APPLE__)
 #define LE_ACC_FFT
 #else
+#define LE_PFFFT
 //#define LE_PURE_REAL_FFT_TEST
 //#define LE_SORENSEN_PURE_REAL_FFT_TEST
 #endif
@@ -25,6 +32,16 @@ typedef struct OpaqueFFTSetup *FFTSetup;
 typedef unsigned long vDSP_Length;
 struct DSPSplitComplex;
 #endif // LE_ACC_FFT
+
+#ifdef LE_PFFFT
+/// \note pffft.h wraps its C declarations in `namespace pffft`, so the setup
+/// type is ::pffft::PFFFT_Setup and can be forward declared — nothing that
+/// includes this header has to see pffft.h.
+namespace pffft
+{
+struct PFFFT_Setup;
+} // namespace pffft
+#endif // LE_PFFFT
 
 #include <cstdint>
 #include "le/utility/span.hpp"
@@ -57,9 +74,9 @@ class FFT_float_real_1D
 {
   public:
     FFT_float_real_1D();
-#ifdef LE_ACC_FFT
+#if defined(LE_ACC_FFT) || defined(LE_PFFFT)
     ~FFT_float_real_1D();
-#endif // __APPLE__
+#endif // a backend that owns a setup object
 
     // real
     void transform(float *data /*inplace: in time     , out DFT reals*/,
@@ -110,10 +127,21 @@ class FFT_float_real_1D
     };
     DSPSplitComplex workBufferSplit_;
     typedef SW::Engine::DoubleFFTBuffer<> WorkBuffer;
-#else  // NT2
-    typedef SW::Engine::SharedStorageFFTBasedBuffer<
-        SW::Engine::real_t, 1, 1, Utility::Constants::vectorAlignment / sizeof(SW::Engine::real_t)>
-        WorkBuffer;
+#elif defined(LE_PFFFT)
+    pffft::PFFFT_Setup *fftSetup_;
+
+    /// \note pffft transforms N contiguous floats into its own packed layout,
+    /// so the transform runs inside workBuffer_ and is (de)interleaved out of
+    /// it rather than out of the caller's buffers. That also means neither
+    /// caller-supplied pointer has to carry pffft's SIMD alignment, which not
+    /// all of them do.
+    typedef SW::Engine::FFTBuffer<> WorkBuffer;
+    /// pffft's own scratch. Passing nullptr makes it use the stack instead,
+    /// which at the maximum FFT size is 32 KB on the audio thread.
+    typedef SW::Engine::FFTBuffer<> ScratchBuffer;
+    mutable ScratchBuffer scratch_;
+#else
+#error No FFT backend selected
 #endif // FFT implementation
 
     mutable WorkBuffer workBuffer_;
