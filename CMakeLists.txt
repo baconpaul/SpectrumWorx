@@ -80,6 +80,10 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
+# Here rather than in src/, so that tests/ and tools/ -- siblings, not
+# subdirectories -- inherit sw_force_include_odr_header() too.
+include(sw-odr-header)
+
 option(SW_COPY_AFTER_BUILD "Install the built plugins into the user plugin folders" OFF)
 option(SW_BUILD_TESTS "Build sw-tests" ON)
 option(SW_BUILD_TOOLS "Build the developer tools (sw-show-ui)" ON)

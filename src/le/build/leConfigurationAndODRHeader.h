@@ -16,17 +16,23 @@
 //------------------------------------------------------------------------------
 
 // Implementation note:
-//   Nothing here applies to C, and <cstddef> below is a hard error in it. That
-// matters because this header is force-included rather than #included: it
-// reaches every translation unit of every target that links sw-dsp, and linking
-// a JUCE module adds that module's own sources to the consuming target --
-// juce_graphics ships Sheenbidi as C.
+//   This header is force-included rather than #included, because the macros
+// below have to be seen before any other header and 47 files assume them without
+// saying so. cmake/sw-odr-header.cmake attaches it per source file, to files
+// under src/, tests/ and tools/ and to nothing else; tests/checkODRHeaderScope.cmake
+// fails the build if that ever stops being true.
 //
-//   dsp.cmake asks for the flag only on CXX and OBJCXX, via
-// $<COMPILE_LANGUAGE:...>. The Ninja and Makefile generators honour that; the
-// Visual Studio generator does not, and hands it to the C sources too. Guarding
-// here rather than there is the version that cannot be got wrong by a generator:
-// a header that is inert in C can be force-included into anything.
+//   It used to be a PUBLIC compile option on sw-dsp, so it reached every
+// translation unit of every target that links sw-dsp -- JUCE, fmt and
+// clap-wrapper included. Five separate Windows failures came of that, none of
+// them in our code; stage 7.5 of doc/tech/implementation_sequence.md lists them.
+//
+//   Nothing here applies to C, and <cstddef> below is a hard error in it. Now
+// that the header only reaches our own sources, none of which are C, this guard
+// is belt rather than braces -- kept because the guard that was *supposed* to do
+// this job, $<COMPILE_LANGUAGE:CXX>, is silently ignored for compile options by
+// the Visual Studio generator, and a header that is inert in C cannot be
+// mis-applied by a generator.
 //                                        (30.07.2026.) (SW port)
 #ifdef __cplusplus
 //------------------------------------------------------------------------------

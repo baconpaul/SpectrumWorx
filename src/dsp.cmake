@@ -140,16 +140,10 @@ configure_file(
 
 target_include_directories(sw-dsp PUBLIC . "${swGeneratedIncludeDir}")
 
-# The 2016 build force-included this and every header assumes it. The flag
-# itself is spelled per compiler; see SW_FORCE_INCLUDE_ODR_HEADER in
-# ../CMakeLists.txt.
-#
-# C and OBJC are excluded: the header includes <cstddef>, so it was never
-# valid for them. It went unnoticed until a target linked both sw-dsp and a
-# JUCE module -- linking a JUCE module adds that module's own .c to the
-# consuming target, and juce_graphics ships Sheenbidi as C.
-target_compile_options(sw-dsp PUBLIC
-        "$<$<COMPILE_LANGUAGE:CXX,OBJCXX>:${SW_FORCE_INCLUDE_ODR_HEADER}>")
+# The 2016 build force-included this and every header assumes it. Ours only --
+# see cmake/sw-odr-header.cmake for why a target-wide option cannot express that,
+# PUBLIC or PRIVATE.
+sw_force_include_odr_header(sw-dsp)
 
 # TEMPORARY — Fusion/MPL/Preprocessor for le/parameters only. Goes at stage 7.
 target_link_libraries(sw-dsp PUBLIC sw-boost-scaffold)

@@ -11,6 +11,11 @@
 #ifndef intrinsics_hpp__B8B5626D_0778_4184_BA27_3999746AEA17
 #define intrinsics_hpp__B8B5626D_0778_4184_BA27_3999746AEA17
 //------------------------------------------------------------------------------
+// LE_HAS_SSE1 decides what SIMDVector *is*, so a translation unit that misses it
+// disagrees about the layout of everything holding one -- silently. Included
+// rather than left to the force-include for that reason alone.
+#include "le/build/leConfigurationAndODRHeader.h"
+
 #if defined(_XBOX)
 #include "ppcintrinsics.h"
 #include "vectorintrinsics.h"

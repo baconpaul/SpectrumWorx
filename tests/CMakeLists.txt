@@ -22,6 +22,11 @@ add_executable(sw-tests
         utility/spanTests.cpp
 )
 
+# The tests include the engine's headers, so they need what those headers assume
+# just as much as the engine does. It used to arrive across the link line from
+# sw-dsp, along with everything else that linked it.
+sw_force_include_odr_header(sw-tests)
+
 # sw-impl brings sw-dsp with it, and brings the CLAP entry point the plugin
 # tests drive. No dlopen: the tests link the same static library the .clap
 # bundle does, so what they exercise is what ships.
@@ -40,6 +45,15 @@ target_compile_definitions(sw-tests PRIVATE
 target_include_directories(sw-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 catch_discover_tests(sw-tests)
+
+# Not a Catch2 case: what it checks is a property of the build, not of the code,
+# and it has to run against the generated compile lines rather than against
+# anything that got compiled.
+add_test(NAME odr-header-stays-in-our-sources
+        COMMAND ${CMAKE_COMMAND}
+        -D "BUILD_DIR=${CMAKE_BINARY_DIR}"
+        -D "SOURCE_DIR=${CMAKE_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/checkODRHeaderScope.cmake")
 
 # \note check_gui_flag_parity.py was wired in here, to compile every sw-dsp
 # source at both settings of LE_SW_GUI and compare the objects. It did its job:

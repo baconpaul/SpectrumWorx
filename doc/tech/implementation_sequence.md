@@ -2329,10 +2329,10 @@ give you `Unit<"dB">`.
 **7.4** Delete the CPM Boost scaffold; empty the CI allowlist from stage 2.
 
 **7.5 — Stop force-including `leConfigurationAndODRHeader.h` into other people's
-code.** `dsp.cmake` adds it as a `PUBLIC` compile option, so it is prepended to
-every translation unit of every target that links `sw-dsp` — which, through the
-JUCE modules and clap-wrapper, means most of the build. It is a 2016
-configuration header for a 2016 codebase, and it is being applied to JUCE, fmt
+code. — done.** `dsp.cmake` added it as a `PUBLIC` compile option, so it was
+prepended to every translation unit of every target that links `sw-dsp` — which,
+through the JUCE modules and clap-wrapper, meant most of the build. It is a 2016
+configuration header for a 2016 codebase, and it was being applied to JUCE, fmt
 and clap-wrapper as though it spoke for them.
 
 The Windows bring-up produced five separate failures from this one decision, none
@@ -2346,26 +2346,66 @@ of them in our own code, none of them saying anything about the real cause:
 | `#define WIN32_LEAN_AND_MEAN` | clap-wrapper's standalone — it excludes `shellapi.h`, and with it `CommandLineToArgvW` |
 | `#define _CRT_SECURE_NO_WARNINGS` | JUCE's Harfbuzz, which defines it too — macro redefinition warning |
 
-Each was fixed where it stood, and the category remains. The fix is to make the
-option `PRIVATE` and have our own headers include what they depend on, which is
-the same include-what-you-use pass 7.1–7.3 want anyway: the header is currently
-doing the job that `#include` is for, which is why nothing declares its
-dependencies and why removing it is a stage of its own rather than a line in
-`dsp.cmake`.
+Each was fixed where it stood, and the category was what remained.
 
-Two hazards worth knowing before starting. The `COMPILE_LANGUAGE` generator
-expression that is supposed to keep it away from C sources **is not honoured by
-the Visual Studio generator**, so a language guard there is not a guard; the
-header now begins with `#ifdef __cplusplus` for that reason, and that belt should
-stay until the force-include itself is gone. And it defines `LE_CHECKED_BUILD`,
-which the ODR-sensitive macros below it consume — so making it private is only
-safe once every header that reads those macros includes it directly, not once the
-build stops passing it.
+**`PRIVATE` is not the fix.** Linking a JUCE module adds *that module's own
+sources* to the **consuming** target, so even a private option on `sw-dsp` still
+lands on `juce_graphics`'s Sheenbidi. Nor is `$<COMPILE_LANGUAGE:CXX>` — the
+Visual Studio generator silently ignores it for compile options, which is how the
+C++-only guard reached C in the first place. Neither mechanism can express "our
+sources", because neither knows which sources are ours.
+
+So membership is decided by the one thing CMake cannot be wrong about: where a
+file lives. `cmake/sw-odr-header.cmake` provides
+`sw_force_include_odr_header(<target>)`, which walks the target's `SOURCES`,
+keeps those under `src/`, `tests/` or `tools/`, and attaches the flag per source
+file. Every target that compiles our code calls it — `sw-dsp`, the three `sw-gui*`
+layers, `sw-impl`, `sw-tests`, `sw-show-ui`.
+
+The measurement, on macOS, where the `COMPILE_LANGUAGE` guard *was* honoured and
+so the leak was at its smallest: **81 third-party translation units before, none
+after**; 122 of ours keep it. `juce_graphics_Harfbuzz.cpp` is on the before list,
+which is the `_CRT_SECURE_NO_WARNINGS` redefinition from the table above.
+
+`tests/checkODRHeaderScope.cmake` is the ctest that keeps it that way, and it
+checks **both** directions over `compile_commands.json`. The second is the one
+worth having: the header decides whether `NDEBUG` survives, `NDEBUG` decides
+whether `ModuleNode` has a virtual, and so a single file quietly dropping out is a
+layout disagreement about every module object — a thing no test of behaviour is
+going to catch. One file is exempt and says why: `clap-first/swClapEntry.cpp`,
+whose only header of ours declares three functions and needs nothing.
+
+**Is it safe for third-party code to stop getting the MSVC half?** The header
+sets `_ITERATOR_DEBUG_LEVEL`, `_SECURE_SCL` and `_HAS_ITERATOR_DEBUGGING`, which
+have to agree across everything linked together. They already do: the values it
+computes from `LE_CHECKED_BUILD` are MSVC's own defaults in both configurations
+(2 under `_DEBUG`, 0 under `NDEBUG`), and `LE_CHECKED_BUILD` follows `NDEBUG`,
+which CMake passes to every target alike. The remainder are warning suppressions
+and `NOMINMAX`, which JUCE asks for itself. And the one that would matter carries
+a `detect_mismatch` pragma, so a disagreement is a link error naming the macro
+rather than silent corruption — which is the property that makes this change
+checkable on a platform we cannot run the tests on.
+
+Two notes for whoever finishes the job. `LE_HAS_SSE1` decides what `SIMDVector`
+*is*, so `le/utility/intrinsics.hpp` now includes the header itself rather than
+trusting the build to have passed it — that one is ABI, and silent. And the
+`#ifdef __cplusplus` the header opens with is belt rather than braces now that
+nothing of ours is C; keep it anyway, as the guard it replaced is the one the
+Visual Studio generator ignores.
+
+**What is still owed.** The header is still force-included rather than
+`#include`d — it is still doing the job that `#include` is for, and 47 files still
+use `LE_IMPL_NAMESPACE_BEGIN` without declaring where it comes from. That is the
+same include-what-you-use pass 7.1–7.3 want. Worth knowing before starting it:
+`LE_SW_SDK_BUILD` is defined nowhere and cannot be, so `LE_IMPL_NAMESPACE_BEGIN(X)`
+is unconditionally `namespace X {`. The macro wants deleting across those 47
+files, not including — which makes the tail of this stage a mechanical
+substitution rather than an argument.
 
 **Done when:** `rg 'boost/' src` returns nothing; every golden and the parameter
-snapshot are unchanged; the CI gate is an exact-zero check; `dsp.cmake` carries no
-`PUBLIC` force-include and no third-party target is compiled with a header of
-ours it did not ask for.
+snapshot are unchanged; the CI gate is an exact-zero check; ~~`dsp.cmake` carries
+no `PUBLIC` force-include and no third-party target is compiled with a header of
+ours it did not ask for~~ — done in 7.5, and `ctest -R odr-header` is the check.
 
 ---
 

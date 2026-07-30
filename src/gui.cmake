@@ -8,14 +8,14 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-set(SW_GUI_RESOURCE_SOURCES
+add_library(sw-gui-resources STATIC
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/resources.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/theme.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/le/utility/assertionHandler.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/le/utility/trace.cpp # assertionHandler routes through it
 )
 
-add_library(sw-gui-resources STATIC ${SW_GUI_RESOURCE_SOURCES})
+sw_force_include_odr_header(sw-gui-resources)
 
 target_include_directories(sw-gui-resources PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -27,13 +27,6 @@ target_link_libraries(sw-gui-resources
 )
 
 target_compile_definitions(sw-gui-resources PRIVATE LE_ENABLE_ASSERT_HANDLER)
-
-# Per source file, not per target: linking a JUCE module target adds that
-# module's own .c/.cpp/.mm to *this* target, and leConfigurationAndODRHeader.h
-# is C++ (it includes <cstddef>), so a target-wide force-include breaks JUCE's C.
-set_source_files_properties(${SW_GUI_RESOURCE_SOURCES}
-        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        PROPERTIES COMPILE_OPTIONS "${SW_FORCE_INCLUDE_ODR_HEADER}")
 
 ################################################################################
 # sw-gui-widgets -- the widget set: knobs, buttons, combo boxes, menus.
@@ -54,6 +47,9 @@ if (APPLE)
     target_link_libraries(sw-gui-widgets PRIVATE "-framework Carbon" "-framework Cocoa")
 endif()
 
+# After the .mm above, so that it gets the header too.
+sw_force_include_odr_header(sw-gui-widgets)
+
 ################################################################################
 # sw-gui -- the module layer: a module's UI and its parameter controls.
 #
@@ -72,5 +68,7 @@ add_library(sw-gui STATIC
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/editor/moduleMenuHolder.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/editor/spectrumWorxEditor.cpp
 )
+
+sw_force_include_odr_header(sw-gui)
 
 target_link_libraries(sw-gui PUBLIC sw-gui-widgets)

@@ -34,6 +34,10 @@ target_sources(sw-show-ui PRIVATE
         ${CMAKE_SOURCE_DIR}/src/core/host_interop/host2Plugin.cpp
 )
 
+# After the target_sources() above -- the two src/ files need the header rather
+# more than this directory's own do.
+sw_force_include_odr_header(sw-show-ui)
+
 target_compile_definitions(sw-show-ui PRIVATE
         JUCE_STANDALONE_APPLICATION=1
         JUCE_USE_CURL=0
