@@ -2328,8 +2328,44 @@ give you `Unit<"dB">`.
 
 **7.4** Delete the CPM Boost scaffold; empty the CI allowlist from stage 2.
 
+**7.5 — Stop force-including `leConfigurationAndODRHeader.h` into other people's
+code.** `dsp.cmake` adds it as a `PUBLIC` compile option, so it is prepended to
+every translation unit of every target that links `sw-dsp` — which, through the
+JUCE modules and clap-wrapper, means most of the build. It is a 2016
+configuration header for a 2016 codebase, and it is being applied to JUCE, fmt
+and clap-wrapper as though it spoke for them.
+
+The Windows bring-up produced five separate failures from this one decision, none
+of them in our own code, none of them saying anything about the real cause:
+
+| what it did | what broke |
+|---|---|
+| includes `<cstddef>` | JUCE's Sheenbidi, which is C — `error STL1003: Unexpected compiler, expected C++ compiler` |
+| pinned `_WIN32_WINNT` to Vista SP2 | JUCE 8's Direct2D backend, ~100 errors in JUCE's own sources for interfaces the SDK was hiding |
+| `#define _CRT_DISABLE_PERFCRIT_LOCKS` | fmt — MSVC's `<stdio.h>` rewrites `fwrite` to `_fwrite_nolock`, so `std::fwrite` names nothing |
+| `#define WIN32_LEAN_AND_MEAN` | clap-wrapper's standalone — it excludes `shellapi.h`, and with it `CommandLineToArgvW` |
+| `#define _CRT_SECURE_NO_WARNINGS` | JUCE's Harfbuzz, which defines it too — macro redefinition warning |
+
+Each was fixed where it stood, and the category remains. The fix is to make the
+option `PRIVATE` and have our own headers include what they depend on, which is
+the same include-what-you-use pass 7.1–7.3 want anyway: the header is currently
+doing the job that `#include` is for, which is why nothing declares its
+dependencies and why removing it is a stage of its own rather than a line in
+`dsp.cmake`.
+
+Two hazards worth knowing before starting. The `COMPILE_LANGUAGE` generator
+expression that is supposed to keep it away from C sources **is not honoured by
+the Visual Studio generator**, so a language guard there is not a guard; the
+header now begins with `#ifdef __cplusplus` for that reason, and that belt should
+stay until the force-include itself is gone. And it defines `LE_CHECKED_BUILD`,
+which the ODR-sensitive macros below it consume — so making it private is only
+safe once every header that reads those macros includes it directly, not once the
+build stops passing it.
+
 **Done when:** `rg 'boost/' src` returns nothing; every golden and the parameter
-snapshot are unchanged; the CI gate is an exact-zero check.
+snapshot are unchanged; the CI gate is an exact-zero check; `dsp.cmake` carries no
+`PUBLIC` force-include and no third-party target is compiled with a header of
+ours it did not ask for.
 
 ---
 

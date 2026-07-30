@@ -116,10 +116,19 @@
 #endif // _WIN32_WINNT
 
 #ifndef LEB_INCLUDE_FULL_WINDOWS_HEADERS
-// Exclude rarely-used stuff from Windows headers.
-#define WIN32_LEAN_AND_MEAN
+// Implementation note:
+//   WIN32_LEAN_AND_MEAN was defined here too, and is not any more. It trims
+// <windows.h> down, which is a fine thing to ask for in our own translation
+// units and not ours to ask for in anybody else's -- and this header is
+// force-included into every one of them. Among the headers it excludes is
+// shellapi.h, so clap-wrapper's standalone entry point lost CommandLineToArgvW.
+//
+//   le/utility/windowsLite.hpp defines it for itself, which is where the request
+// belongs: in the header that then includes <windows.h>.
+//                                        (30.07.2026.) (SW port)
 
-// We use std::min/std::max().
+// We use std::min/std::max(). Kept: NOMINMAX only suppresses two macros that
+// nothing wants, and the third-party code here defines it for itself anyway.
 #define NOMINMAX
 #endif // LEB_INCLUDE_FULL_WINDOWS_HEADERS
 #endif // _WIN32
@@ -186,9 +195,23 @@
 #ifndef _SCL_SECURE_NO_WARNINGS
 #define _SCL_SECURE_NO_WARNINGS
 #endif
-#ifndef _CRT_DISABLE_PERFCRIT_LOCKS
-#define _CRT_DISABLE_PERFCRIT_LOCKS
-#endif
+// Implementation note:
+//   _CRT_DISABLE_PERFCRIT_LOCKS was defined here. It is not a hint: MSVC's
+// <stdio.h> reads it and rewrites the standard names as macros --
+//
+//     #define fwrite _fwrite_nolock
+//     #define fflush _fflush_nolock
+//     #define fputc  _fputc_nolock
+//
+// -- so any qualified call turns into one naming a function that does not exist
+// there. `std::fwrite( ... )` becomes `std::_fwrite_nolock( ... )`, and fmt,
+// which qualifies properly, stopped compiling: "'_fwrite_nolock': is not a
+// member of 'std'".
+//
+//   Force-included, so this was done to every dependency in the build to save a
+// lock acquisition per stdio call in ours. It also silently makes stdio
+// non-thread-safe, which is a poor trade to impose on code that never asked.
+//                                        (30.07.2026.) (SW port)
 
 #define __STDC_WANT_SECURE_LIB__ LE_CHECKED_BUILD
 #define _CRT_SECURE_CPP_OVERLOAD_SECURE_NAMES LE_CHECKED_BUILD

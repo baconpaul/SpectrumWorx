@@ -9,9 +9,21 @@ cmake_minimum_required(VERSION 3.28)
 
 cmake_policy(SET CMP0091 NEW) # MSVC runtime via CMAKE_MSVC_RUNTIME_LIBRARY
 cmake_policy(SET CMP0063 NEW) # visibility presets honoured for all target types
+cmake_policy(SET CMP0141 NEW) # MSVC debug info via CMAKE_MSVC_DEBUG_INFORMATION_FORMAT
 
 # Must precede project() — project() runs the compiler checks that consume them.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+# Debug info in the object files (/Z7) rather than a per-target program database
+# (/Zi). A .pdb is one file that every compiler invocation for that target must
+# write to, so a target with enough sources to be worth compiling in parallel
+# fails: "cannot open program database ...; if multiple CL.EXE write to the same
+# .PDB file, please use /FS". /FS is the documented remedy and serialises those
+# writes; /Z7 removes the shared file, and with it the thing to contend over.
+# The linker still produces a program database for the binary, so debugging is
+# unaffected -- what changes is that the object files carry the information into
+# it instead of the compiler writing it there directly.
+set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>")
 set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15 CACHE STRING "Minimum macOS version")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -43,8 +55,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Directory scope rather than per target: the dependencies are compiled here too,
 # and a project where the macro means one thing in our sources and another in
 # JUCE's is harder to reason about than one where it is simply right.
+#
+# Note the absence of $<COMPILE_LANGUAGE:...>. The Visual Studio generator does
+# not apply it to compile options the way the Ninja and Makefile generators do --
+# the same limitation that let the C++-only force-include reach JUCE's C sources
+# (see src/le/build/leConfigurationAndODRHeader.h). A flag guarded that way may
+# land on everything or on nothing, and which it was is not something to discover
+# from a missing conformance mode. CMAKE_CXX_FLAGS is per language by
+# construction, and /FS is valid in both languages, so neither needs one.
 if (MSVC)
-    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>)
+    string(APPEND CMAKE_CXX_FLAGS " /Zc:__cplusplus")
+    add_compile_options(/FS) # belt and braces beside /Z7 above
 endif ()
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_C_VISIBILITY_PRESET hidden)

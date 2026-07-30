@@ -368,17 +368,18 @@ bool Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::latencyChanged()
     /// reason this notification is now performed synchronously hoping that
     /// deadlock-problematic hosts have or will be fixed.
     ///                                       (04.10.2013.) (Domagoj Saric)
-#if defined(_WIN32) &&                                                                             \
-    !defined(LE_SW_FMOD) //...mrmlj...vst specific...threading issues verification...
-    LE_ASSERT_MSG(((impl().host().getNumOutputs() == impl().engineSetup().numberOfChannels()) ||
-                   (impl().host().getNumOutputs() == impl().maxNumberOfOutputs)) &&
-                      ((impl().host().getNumInputs() ==
-                        unsigned(impl().engineSetup().numberOfChannels() +
-                                 impl().engineSetup().numberOfSideChannels())) ||
-                       (impl().host().getNumInputs() == impl().maxNumberOfInputs)),
-                  "Performing a latency change notification in the middle of an IO mode change "
-                  "(which cannot be separated in VST 2.4)");
-#endif // _WIN32
+    ///
+    /// \note And there was an assertion here, under _WIN32, checking that the
+    /// host's input and output counts still matched the engine's -- that a
+    /// latency notification had not landed in the middle of an IO mode change.
+    /// Its own message names the reason it existed: "which cannot be separated in
+    /// VST 2.4", the format where one callback carried both. CLAP has separate
+    /// extensions for latency and for audio ports, so the situation it guarded
+    /// against cannot arise, and getNumInputs()/getNumOutputs() went with the VST
+    /// 2.4 host proxy that had them.
+    ///
+    ///   Windows-only, so nothing has compiled it since the port began.
+    ///                                       (30.07.2026.) (SW port)
     auto const newLatency(impl().engineSetup().latencyInSamples());
     return impl().host().reportNewLatencyInSamples(newLatency);
 }

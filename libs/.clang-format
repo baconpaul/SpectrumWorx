@@ -1,0 +1,13 @@
+# Vendored and third-party sources. Their formatting is upstream's business, not
+# ours: reformatting them destroys the ability to diff against upstream and
+# buries any real local patch inside a whole-file rewrite. rapidxml is also CRLF,
+# which a reformat would silently normalise.
+#
+# clang-format resolves the nearest .clang-format in the directory hierarchy, so
+# this covers everything below libs/ that does not bring its own -- the
+# submodules do, and theirs wins, which is equally correct.
+#
+# SortIncludes is named explicitly because DisableFormat has not always
+# suppressed include sorting on its own.
+DisableFormat: true
+SortIncludes: Never
