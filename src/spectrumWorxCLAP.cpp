@@ -449,7 +449,22 @@ bool SpectrumWorxCLAP::handleEvent(clap_event_header const *const header)
 
     ParameterID const parameterID{Plugins::ParameterID{event->param_id}};
     Plugins::ParameterInformation<Protocol> ranges;
-    liveRanges(parameterID, ranges);
+    /// \note Dropped rather than stored when no effect in that slot owns it. The
+    /// list is maximal (see rebuildParameterIDs), so a host can and does write to
+    /// every ID in it, including a slot's tenth parameter while the slot holds a
+    /// two-parameter effect. Reading one is safe --
+    /// Automation::getAutomatedLFOParameter answers with the default -- but
+    /// *writing* one is not: setAutomatedLFOParameter has no matching guard and
+    /// indexes straight into module.lfo(), past the end. clap-validator's
+    /// param-set-events and state-reproducibility tests both walk into it.
+    ///
+    ///   Dropping is also the right answer rather than merely the safe one: the
+    /// value has nowhere to live, and filling the slot later brings the new
+    /// effect's own default -- which is what paramsValue() reports for it in the
+    /// meantime.
+    ///                                       (29.07.2026.) (SW port)
+    if (!liveRanges(parameterID, ranges))
+        return false;
 
     setParameter(parameterID, CLAPEdge::fromHost(parameterID, ranges, event->value));
 
@@ -662,6 +677,18 @@ void SpectrumWorxCLAP::HostProxy::automatedParameterChanged(
                            static_cast<Plugins::AutomatedParameterValue>(
                                CLAPEdge::toHost(parameterID, ranges, value)),
                            UIEdits::Kind::Value});
+
+    /// \note The same rescan handleEvent() asks for when the *host* fills a slot.
+    /// A slot selector is the one parameter whose value changes what the others
+    /// are called and what they mean, and it can be moved from either side; the
+    /// rescan was only wired to the host's side, so a module added from the
+    /// plugin's own UI left every one of that slot's parameters showing the name
+    /// it was first read with.
+    ///                                       (29.07.2026.) (SW port)
+    if (parameterID.type() == ParameterID::ModuleChainParameter)
+        const_cast<SpectrumWorxCLAP &>(plugin_).requestRescan(
+            CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT | CLAP_PARAM_RESCAN_VALUES);
+
     plugin_.markCurrentProgramAsModified();
     plugin_._host.paramsRequestFlush();
 }
@@ -794,11 +821,21 @@ bool SpectrumWorxCLAP::stateLoad(clap_istream const *const stream) noexcept
         if (parameterID.type() == ParameterID::ModuleChainParameter)
             setParameter(parameterID, static_cast<Plugins::AutomatedParameterValue>(value));
     }
+    /// \note And skipping, in that second pass, whatever no effect owns -- the
+    /// saved file holds all 286 IDs, most of them belonging to slots that are
+    /// empty in the state being restored. Writing one of those is the same
+    /// out-of-range write handleEvent() guards against; see the note there.
     for (auto const &[id, value] : saved)
     {
         ParameterID const parameterID{Plugins::ParameterID{id}};
-        if (parameterID.type() != ParameterID::ModuleChainParameter)
-            setParameter(parameterID, static_cast<Plugins::AutomatedParameterValue>(value));
+        if (parameterID.type() == ParameterID::ModuleChainParameter)
+            continue;
+
+        Plugins::ParameterInformation<Protocol> ranges;
+        if (!liveRanges(parameterID, ranges))
+            continue;
+
+        setParameter(parameterID, static_cast<Plugins::AutomatedParameterValue>(value));
     }
 
     // Already on the main thread here.

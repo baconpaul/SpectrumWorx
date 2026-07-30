@@ -66,9 +66,6 @@ void Plugin2HostInteropControler::moduleChangedByUser(std::uint8_t const chainPa
 {
     LE_ASSERT(GUI::isThisTheGUIThread());
 
-    if (parameterListChanged())
-        return;
-
     ParameterID parameterID;
     parameterID.value.type = ParameterID::ModuleChainParameter;
     parameterID.value._.moduleChain.moduleIndex = chainParameterIndex;
@@ -76,7 +73,24 @@ void Plugin2HostInteropControler::moduleChangedByUser(std::uint8_t const chainPa
     ParameterValueForAutomation const automationValue = {
         Plugins::FullRangeAutomatedParameter ::convertParameterToAutomationValue(parameter),
         Plugins::NormalisedAutomatedParameter::convertParameterToAutomationValue(parameter)};
+
+    /// \note The slot selector is a parameter like any other and the user just
+    /// moved it, so the host hears about it either way. What
+    /// parameterListChanged() governs is only whether the *rest* of that slot's
+    /// parameters are then pushed one by one -- see the assertion at the top of
+    /// Plugin2HostActiveInteropImpl::moduleChanged, which is that push.
+    ///
+    ///   This notification used to sit below the early return, so a host that
+    /// re-reads the list itself was told nothing at all when a module was added
+    /// from the plugin's own UI. Under CLAP that is every host: the parameters
+    /// kept the names they were first read with, which for an empty slot is
+    /// "N/A".
+    ///                                       (29.07.2026.) (SW port)
     automatedParameterChanged(parameterID, automationValue);
+
+    if (parameterListChanged())
+        return;
+
     moduleChanged(chainParameterIndex, pModule);
 }
 

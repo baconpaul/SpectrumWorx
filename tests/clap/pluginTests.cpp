@@ -52,6 +52,76 @@ clap_host const &nullHost()
     return host;
 }
 
+/// \brief A host that supports clap_host_params and counts what it is asked.
+///
+/// \note nullHost() above deliberately has no extensions, which makes it useless
+/// for the one thing a slot change is supposed to cause. Rescans are deferred to
+/// the main thread, so a test has to pump on_main_thread() before looking.
+class RecordingHost
+{
+  public:
+    RecordingHost()
+        : params_{[](clap_host const *, clap_param_rescan_flags const flags) {
+                      instance().rescanFlags |= flags;
+                  },
+                  [](clap_host const *, clap_id, clap_param_clear_flags) {},
+                  [](clap_host const *) { ++instance().flushRequests; }},
+          host_{CLAP_VERSION, nullptr, "sw-tests", "SpectrumWorx", "", "0",
+                [](clap_host const *, char const *const id) -> void const * {
+                    return (std::strcmp(id, CLAP_EXT_PARAMS) == 0) ? &instance().params_ : nullptr;
+                },
+                // request_restart, request_process, request_callback -- in that
+                // order; the last is the one a deferred rescan asks for.
+                [](clap_host const *) {}, [](clap_host const *) {},
+                [](clap_host const *) { ++instance().mainThreadCallbacks; }}
+    {
+        rescanFlags = 0;
+        flushRequests = 0;
+        mainThreadCallbacks = 0;
+    }
+
+    RecordingHost(RecordingHost const &) = delete; // the callbacks reach the singleton
+    RecordingHost &operator=(RecordingHost const &) = delete;
+
+    clap_host const &operator*() const { return host_; }
+
+    clap_param_rescan_flags rescanFlags{0};
+    unsigned flushRequests{0};
+    unsigned mainThreadCallbacks{0};
+
+    /// \note The C callbacks carry no context of their own -- clap_host::host_data
+    /// is the plugin's, not ours -- so there is one of these at a time.
+    static RecordingHost &instance()
+    {
+        REQUIRE(pInstance != nullptr);
+        return *pInstance;
+    }
+    static RecordingHost *pInstance;
+
+  private:
+    clap_host_params params_;
+    clap_host host_;
+}; // class RecordingHost
+
+RecordingHost *RecordingHost::pInstance{nullptr};
+
+/// Scopes RecordingHost::instance() to one test.
+class CurrentRecordingHost
+{
+  public:
+    CurrentRecordingHost() { RecordingHost::pInstance = &host_; }
+    ~CurrentRecordingHost() { RecordingHost::pInstance = nullptr; }
+
+    CurrentRecordingHost(CurrentRecordingHost const &) = delete;
+    CurrentRecordingHost &operator=(CurrentRecordingHost const &) = delete;
+
+    RecordingHost &operator*() { return host_; }
+    RecordingHost *operator->() { return &host_; }
+
+  private:
+    RecordingHost host_;
+}; // class CurrentRecordingHost
+
 clap_input_events const &noInputEvents()
 {
     static clap_input_events events{
@@ -93,9 +163,11 @@ class Entry
 class ActivePlugin
 {
   public:
-    ActivePlugin(double const sampleRate, std::uint32_t const blockSize) : blockSize_(blockSize)
+    ActivePlugin(double const sampleRate, std::uint32_t const blockSize,
+                 clap_host const &host = nullHost())
+        : blockSize_(blockSize)
     {
-        pPlugin_ = factory().create_plugin(&factory(), &nullHost(), descriptorID());
+        pPlugin_ = factory().create_plugin(&factory(), &host, descriptorID());
         REQUIRE(pPlugin_ != nullptr);
         REQUIRE(pPlugin_->init(pPlugin_));
         REQUIRE(pPlugin_->activate(pPlugin_, sampleRate, 1, blockSize));
@@ -471,6 +543,44 @@ TEST_CASE("Filling a module slot renames its parameters without adding any", "[c
     }
     CHECK(revealed > 0);
     CHECK(renamed > 0);
+}
+
+TEST_CASE("Filling a slot makes the host re-read the descriptions", "[clap]")
+{
+    // The names, the module paths and the hidden flags of a slot's parameters
+    // all change when its effect does, and a host only learns that from
+    // CLAP_PARAM_RESCAN_INFO. Without it the parameters keep the names they were
+    // first read with -- "N/A" for a slot that was empty at startup -- which is
+    // what a host shows however correct get_info would be if it were asked again.
+    Entry const entry;
+    CurrentRecordingHost host;
+    ActivePlugin plugin(48000, 512, **host);
+
+    auto const &params(parameters(*plugin));
+
+    OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
+    params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+
+    // Deferred, because a rescan is main-thread-only and flush() is not: the
+    // plugin asks for a callback and does it there.
+    CHECK(host->mainThreadCallbacks > 0);
+    plugin->on_main_thread(&*plugin);
+
+    CHECK((host->rescanFlags & CLAP_PARAM_RESCAN_INFO) != 0);
+    CHECK((host->rescanFlags & CLAP_PARAM_RESCAN_TEXT) != 0);
+    CHECK((host->rescanFlags & CLAP_PARAM_RESCAN_VALUES) != 0);
+
+    /// \note And never RESCAN_ALL, which is the one a host may only be given
+    /// while the plugin is deactivated. This one is active.
+    CHECK((host->rescanFlags & CLAP_PARAM_RESCAN_ALL) == 0);
+
+    // The names really did move, so the rescan had something to find.
+    std::uint32_t named{0};
+    for (auto const &info : allParameterInfo(*plugin, params))
+        if (isNormalisedType(info.id) && (std::strncmp(info.module, "Slot 1", 6) == 0) &&
+            (std::strcmp(info.name, "N/A") != 0))
+            ++named;
+    CHECK(named > 0);
 }
 
 TEST_CASE("A module parameter's range and step flag survive an effect swap", "[clap]")
