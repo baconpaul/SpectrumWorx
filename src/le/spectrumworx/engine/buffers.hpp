@@ -15,9 +15,7 @@
 //------------------------------------------------------------------------------
 #include "configuration.hpp"
 
-#ifdef __GNUC__
 #include "le/math/vector.hpp"
-#endif // __GNUC__
 
 #include "le/utility/buffers.hpp"
 #include "le/utility/cstdint.hpp"

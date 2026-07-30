@@ -729,16 +729,25 @@ void SpectrumWorxEditor::addUserAddedModule(std::uint8_t const effectIndex)
     // automatically gain focus.
     //                                        (09.02.2010.) (Domagoj Saric)
 #ifdef _WIN32
-    /// \note Force emptying the message queue as a quick-fix for weird crashes
-    /// in SoundForge 10 that happen when the first (any) module is added. These
-    /// crashes seem to be caused by a loadProgramState() call "in the middle"
-    /// of the grabKeyboardFocus() call (when JUCE calls SetFocus() Windows
-    /// starts pumping messages seemingly queued by SoundForge at some point,
-    /// one of which causes a call to loadProgramState()).
-    ///                                       (24.01.2013.) (Domagoj Saric)
+    /// \note There was a runDispatchLoopUntil( 2 ) here, pumping the message
+    /// queue before taking focus. It was a 2013 quick-fix for crashes in
+    /// SoundForge 10, whose own diagnosis -- recorded at the time -- was that
+    /// SetFocus() let Windows deliver a queued message that called
+    /// loadProgramState() in the middle of adding a module. That is a re-entrancy
+    /// hazard being treated by draining the queue *first*, which is the same
+    /// hazard a moment earlier.
+    ///
+    ///   It cannot survive the port in any case: runDispatchLoopUntil() only
+    /// exists when JUCE_MODAL_LOOPS_PERMITTED is 1, and this build sets it to 0 --
+    /// the premise of the stage 6 rewrite that made the menus and dialogs
+    /// asynchronous. A nested dispatch loop in the middle of a slot change is
+    /// precisely what that setting exists to forbid.
+    ///
+    ///   If SoundForge 10 ever matters again, the fix is to make the add-module
+    /// path re-entrancy-safe rather than to pick a quieter moment for it.
+    ///                                       (30.07.2026.) (SW port)
     LE_ASSERT(getWantsKeyboardFocus());
     LE_ASSERT(getMouseClickGrabsKeyboardFocus());
-    juce::MessageManager::getInstance()->runDispatchLoopUntil(2);
     this->grabKeyboardFocus();
 #endif // _WIN32
 

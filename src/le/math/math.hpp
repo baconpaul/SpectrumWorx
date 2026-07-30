@@ -587,13 +587,18 @@ LE_FORCEINLINE std::int32_t round(float const floatingPointValue)
 #ifdef _XBOX
     return __frnd(floatingPointValue);
 #else
-    std::int32_t integerValue;
-    __asm
-    {
-            fld   floatingPointValue
-            fistp integerValue
-    }
-    return integerValue;
+    /// \note Was x86-32 inline assembly, fld/fistp, and reached because
+    /// BOOST_SIMD_HAS_SSE_SUPPORT above is defined nowhere in the tree -- so this
+    /// is the arm every MSVC build takes, not the fallback it reads as. MSVC
+    /// accepts __asm only when targeting 32-bit x86, so x64 and ARM64 both failed
+    /// to compile it rather than merely missing a fast path.
+    ///
+    ///   std::lrintf is the same operation under the same rounding mode as both
+    /// the assembly it replaces and the __builtin_lrintf arm below: fistp and
+    /// lrintf alike follow the current mode, and nothing here changes it from the
+    /// default nearest-even.
+    ///                                   (30.07.2026.) (SW port)
+    return static_cast<std::int32_t>(std::lrintf(floatingPointValue));
 #endif
 #elif defined(BOOST_SIMD_ARCH_ARM) && defined(__GNUC__)
 #if defined(__SOFTFP__) || (defined(__thumb__) && (__ARM_ARCH < 7))
@@ -665,6 +670,14 @@ LE_FORCEINLINE int round(double const floatingPointValue)
     return static_cast<int>(::__builtin_lrint(floatingPointValue));
 #elif defined(_XBOX)
     return __frnd(floatingPointValue);
+#elif defined(_MSC_VER)
+    /// \note As for round( float ) above: the SSE2 arm is keyed on a macro
+    /// nothing defines, so MSVC fell through to the magic-number union below --
+    /// which carried an __asm cross-check of its own result, in a debug build, on
+    /// an architecture where MSVC cannot assemble it. std::lrint is the same
+    /// rounding under the same mode and needs neither.
+    ///                                   (30.07.2026.) (SW port)
+    return static_cast<int>(std::lrint(floatingPointValue));
 #elif 1 //...mrmlj...was LE_LITTLE_ENDIAN; the union below is byte-order dependent
     double const magic((1ULL << 52) * 1.5);
     union
@@ -672,17 +685,7 @@ LE_FORCEINLINE int round(double const floatingPointValue)
         double asDouble;
         int asInteger;
     } bits = {floatingPointValue + magic};
-    int const result(bits.asInteger);
-#if defined(_DEBUG) && !defined(LE_PUBLIC_BUILD) && defined(_MSC_VER) && !defined(_XBOX)
-    int integerValue;
-    __asm
-        {
-            fld   floatingPointValue
-            fistp integerValue
-        }
-    LE_ASSERT(result == integerValue);
-#endif // internal DEBUG build
-    return result;
+    return bits.asInteger;
 #endif
 }
 

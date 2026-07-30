@@ -44,6 +44,12 @@
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
+/// \note std::terminate lives here. Both uses of it are inside _WIN32 or
+/// LE_PUBLIC_BUILD arms, so no other configuration compiles the line that needs
+/// the declaration -- and libc++ hands it over transitively anyway, which is why
+/// only MSVC ever asked.
+///                                           (30.07.2026.) (SW port)
+#include <exception>
 #include <source_location>
 //------------------------------------------------------------------------------
 namespace LE

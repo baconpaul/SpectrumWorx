@@ -107,11 +107,13 @@ template <typename T> struct remove_const<T const *LE_RESTRICT const>
 } // namespace boost
 #endif // LE_HAS_NT2
 
-LE_COLD inline bool operator==(std::string_view const &left, std::string_view const &right)
-{
-    return (left.size() == right.size()) &&
-           (std::memcmp(left.begin(), right.begin(), right.size()) == 0);
-}
+/// \note There was a global operator==( std::string_view, std::string_view )
+/// here, comparing with memcmp over begin(). The standard library has provided
+/// that comparison since C++17, so it was a second candidate for every
+/// string_view comparison in the codebase -- and it only ever compiled because a
+/// string_view iterator happens to be a `char const *` in libc++ and libstdc++.
+/// MSVC's is a class type, which is what finally objected.
+///                                           (30.07.2026.) (SW port)
 
 //------------------------------------------------------------------------------
 #endif // tchar_hpp

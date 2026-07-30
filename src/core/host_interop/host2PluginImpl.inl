@@ -13,9 +13,7 @@
 //------------------------------------------------------------------------------
 #include "host2PluginImpl.hpp"
 
-#ifdef __GNUC__
 #include "plugin2Host.hpp"
-#endif // __GNUC__
 
 #include "core/modules/automatedModuleImpl.inl"
 

@@ -13,9 +13,7 @@
 //------------------------------------------------------------------------------
 #include "tag.hpp"
 
-#ifdef __GNUC__
 #include "le/math/conversion.hpp"
-#endif // __GNUC__
 #include "le/math/math.hpp"
 //------------------------------------------------------------------------------
 namespace LE

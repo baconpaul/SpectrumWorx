@@ -14,9 +14,13 @@
 #include "fusionAdaptors.hpp"
 
 #include "le/utility/cstdint.hpp"
-#ifdef __GNUC__
+/// \note The #ifdef __GNUC__ around this is gone. forEachIndexed() below calls
+/// Utility::forEach() unconditionally, so on MSVC it was calling a function
+/// whose declaration had never been included -- and an unknown name followed by
+/// '<' parses as a comparison, so the error arrived as a syntax error about the
+/// '>' rather than as an undeclared identifier.
+///                                           (30.07.2026.) (SW port)
 #include "le/utility/staticForEach.hpp"
-#endif // __GNUC__
 #pragma warning(push)
 #pragma warning(disable : 4702) // Unreachable code.
 #include "le/utility/switch.hpp"
@@ -80,7 +84,12 @@ template <class Parameters, class Functor> class StaticInvoker : public Functor
     {
         typedef typename boost::fusion::result_of::template value_at<Parameters, TypeIndex>::type
             Parameter;
-        return Functor::LE_GNU_SPECIFIC(template) operator()<Parameter>();
+        /// \note Was LE_GNU_SPECIFIC( template ), which expands to nothing on
+        /// MSVC. Functor is a template parameter, so the keyword is required
+        /// rather than a GNU extension; see the note in
+        /// le/utility/staticForEach.hpp.
+        ///                                   (30.07.2026.) (SW port)
+        return Functor::template operator()<Parameter>();
     }
 
     template <class TypeIndex> result_type operator()(TypeIndex const &typeIndex) const

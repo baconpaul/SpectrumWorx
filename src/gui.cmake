@@ -30,11 +30,10 @@ target_compile_definitions(sw-gui-resources PRIVATE LE_ENABLE_ASSERT_HANDLER)
 
 # Per source file, not per target: linking a JUCE module target adds that
 # module's own .c/.cpp/.mm to *this* target, and leConfigurationAndODRHeader.h
-# is C++ (it includes <cstddef>), so a target-wide -include breaks JUCE's C.
+# is C++ (it includes <cstddef>), so a target-wide force-include breaks JUCE's C.
 set_source_files_properties(${SW_GUI_RESOURCE_SOURCES}
         DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        PROPERTIES COMPILE_OPTIONS
-        "-include;${CMAKE_CURRENT_SOURCE_DIR}/le/build/leConfigurationAndODRHeader.h")
+        PROPERTIES COMPILE_OPTIONS "${SW_FORCE_INCLUDE_ODR_HEADER}")
 
 ################################################################################
 # sw-gui-widgets -- the widget set: knobs, buttons, combo boxes, menus.

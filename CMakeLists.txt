@@ -34,6 +34,18 @@ endif()
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+# MSVC reports __cplusplus as 199711L unless told not to -- a compatibility
+# default kept since 2017, and one that silently defeats every `__cplusplus >=`
+# test in this tree and its dependencies however new the compiler is. Asking for
+# C++20 above and then lying about it in the macro is the worst of both.
+#
+# Directory scope rather than per target: the dependencies are compiled here too,
+# and a project where the macro means one thing in our sources and another in
+# JUCE's is harder to reason about than one where it is simply right.
+if (MSVC)
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>)
+endif ()
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)

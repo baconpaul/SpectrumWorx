@@ -66,11 +66,14 @@ void executeMPL(F &&f, std::false_type)
 
     typedef typename mpl::deref<Iterator>::type item;
 
-    f.
-#ifndef _MSC_VER
-        template
-#endif // _MSC_VER
-        operator()<item>();
+    /// \note The `template` was `#ifndef _MSC_VER` here and in executeFusion()
+    /// below. `f` has a dependent type, so the keyword is required of any
+    /// conforming compiler -- it was the MSVC of 2010 that rejected it, and the
+    /// MSVC of today that insists. Without it `<` parses as less-than, and the
+    /// error surfaces wherever this header's forEach() is *used* rather than
+    /// here, because the declaration never survives to be found.
+    ///                                       (30.07.2026.) (SW port)
+    f.template operator()<item>();
 
     typedef typename mpl::next<Iterator>::type iter;
 
@@ -101,11 +104,7 @@ void executeFusion(F &&f, std::false_type)
 
     typedef typename result_of::value_of<Iterator>::type item;
 
-    f.
-#ifndef _MSC_VER
-        template
-#endif // _MSC_VER
-        operator()<item>();
+    f.template operator()<item>(); // see executeMPL() above
 
     typedef typename result_of::next<Iterator>::type iter;
 

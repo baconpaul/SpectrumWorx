@@ -6,6 +6,28 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+# leConfigurationAndODRHeader.h is force-included into every C++ translation
+# unit, as the 2016 build did: it defines LE_IMPL_NAMESPACE_BEGIN,
+# LE_CHECKED_BUILD and the SSE feature macros, and the headers assume all of
+# them. Missing it does not fail cleanly -- LE_IMPL_NAMESPACE_BEGIN( Math ) then
+# parses as a variable declaration, and le/math alone produces thirty-odd errors
+# that name everything except the cause.
+#
+# MSVC spells it /FI with the path attached; everything else takes -include and
+# the path as two arguments. Given only the latter, MSVC took the header for a
+# source file and reported that it could not open it.
+#
+# Absolute, because the two consumers below are a target-wide option and a
+# per-source one, and a relative path is resolved against the include search
+# path rather than against this directory.
+if (MSVC)
+    set(SW_FORCE_INCLUDE_ODR_HEADER
+            "/FI${CMAKE_CURRENT_SOURCE_DIR}/le/build/leConfigurationAndODRHeader.h")
+else ()
+    set(SW_FORCE_INCLUDE_ODR_HEADER
+            "-include" "${CMAKE_CURRENT_SOURCE_DIR}/le/build/leConfigurationAndODRHeader.h")
+endif ()
+
 # gui.cmake first: sw-dsp links sw-gui-resources for the skin its module class
 # now reaches, and sw-gui-widgets links sw-dsp back. CMake resolves target names
 # at generate time either way, but reading it in dependency order is kinder.

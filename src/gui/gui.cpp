@@ -188,9 +188,15 @@ void warningMessageBox(std::string_view const title, std::string_view const mess
     //...mrmlj...call sites once they are ported.
     JUCE_AUTORELEASEPOOL
     {
+        /// \note data(), not begin(): a std::string_view iterator is a `char
+        /// const *` in libc++ and libstdc++, so juce::String's (pointer, length)
+        /// constructor took it by accident. MSVC's is a class type, and the two
+        /// failed conversions then collapsed the call into a third error saying
+        /// showMessageBoxAsync does not take one argument.
+        ///                                   (30.07.2026.) (SW port)
         juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
-                                               juce::String(title.begin(), title.size()),
-                                               juce::String(message.begin(), message.size()));
+                                               juce::String(title.data(), title.size()),
+                                               juce::String(message.data(), message.size()));
     }
 }
 
@@ -599,8 +605,21 @@ LRESULT CALLBACK OwnedWindowBase::callWndHookProc(int const nCode, WPARAM const 
                 LE_ASSERT(Math::abs(newEditorLocation.x - editor.getScreenX()) <=
                           1); //...mrmlj...rounding error...
                 LE_ASSERT(Math::abs(newEditorLocation.y - editor.getScreenY()) <= 1);
-                adjustPositions(editor.presetBrowser_.operator->(), editor.settings_.operator->(),
-                                newEditorLocation.x, newEditorLocation.y, wp.flags);
+                /// \note LE_NO_PRESETS compiles presetBrowser_ out of the editor,
+                /// and this hook is the one place that reached it without a
+                /// guard -- unnoticed because the whole function is _WIN32 and
+                /// nothing has compiled it since the port began. adjustPositions
+                /// takes plain component pointers and adjustOwnedWindow() checks
+                /// them, so an absent browser is simply a window that is not
+                /// there to move.
+                ///                           (30.07.2026.) (SW port)
+#ifndef LE_NO_PRESETS
+                juce::Component *const pPresetBrowser(editor.presetBrowser_.operator->());
+#else
+                juce::Component *const pPresetBrowser(nullptr);
+#endif // LE_NO_PRESETS
+                adjustPositions(pPresetBrowser, editor.settings_.operator->(), newEditorLocation.x,
+                                newEditorLocation.y, wp.flags);
             }
         }
     }

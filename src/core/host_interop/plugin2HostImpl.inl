@@ -142,7 +142,7 @@ template <class Protocol> class ParameterInfoGetter : public Plugins::ParameterI
 
     result_type operator()(ParameterID::ModuleChain /*const id*/, Program const *)
     {
-        Base::LE_GNU_SPECIFIC(template) operator()<ModuleChainParameter>();
+        Base::template operator()<ModuleChainParameter>();
         this->markAsMeta();
     }
 
@@ -158,7 +158,7 @@ template <class Protocol> class ParameterInfoGetter : public Plugins::ParameterI
 
         if (pProgram && (!pModule || (moduleParameterIndex >= pModule->numberOfParameters())))
         { // Dynamic parameter list:
-            Base::LE_GNU_SPECIFIC(template) operator()<NotAvailableParameter>();
+            Base::template operator()<NotAvailableParameter>();
             return;
         }
 
@@ -188,7 +188,7 @@ template <class Protocol> class ParameterInfoGetter : public Plugins::ParameterI
             {
                 typedef LE::Parameters::LinearFloat::Modify<
                     Minimum<0>, Maximum<1>, Default<0>>::type GenericModuleChainParameter;
-                Base::LE_GNU_SPECIFIC(template) operator()<GenericModuleChainParameter>();
+                Base::template operator()<GenericModuleChainParameter>();
             }
         }
     }
@@ -211,7 +211,7 @@ template <class Protocol> class ParameterInfoGetter : public Plugins::ParameterI
             using namespace LE::Parameters::Traits;
             typedef LE::Parameters::LinearUnsignedInteger::Modify<
                 Minimum<0>, Maximum<0>, Default<0>>::type NotAvailableParameter;
-            Base::LE_GNU_SPECIFIC(template) operator()<NotAvailableParameter>();
+            Base::template operator()<NotAvailableParameter>();
         }
         else
         {

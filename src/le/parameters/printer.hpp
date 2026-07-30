@@ -21,9 +21,7 @@
 #include "symmetric/printer.hpp"
 #include "trigger/printer.hpp"
 
-#ifdef __GNUC__ //...ugh...mrmlj...for Plugins::*AutomatedParameter...clean this up...
-#include "le/plugins/plugin.hpp"
-#endif // __GNUC__
+#include "le/plugins/plugin.hpp" //...ugh...mrmlj...for Plugins::*AutomatedParameter...clean this up...
 
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/tchar.hpp"

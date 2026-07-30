@@ -15,6 +15,22 @@
 #endif // _MSC_VER
 //------------------------------------------------------------------------------
 
+// Implementation note:
+//   Nothing here applies to C, and <cstddef> below is a hard error in it. That
+// matters because this header is force-included rather than #included: it
+// reaches every translation unit of every target that links sw-dsp, and linking
+// a JUCE module adds that module's own sources to the consuming target --
+// juce_graphics ships Sheenbidi as C.
+//
+//   dsp.cmake asks for the flag only on CXX and OBJCXX, via
+// $<COMPILE_LANGUAGE:...>. The Ninja and Makefile generators honour that; the
+// Visual Studio generator does not, and hands it to the C sources too. Guarding
+// here rather than there is the version that cannot be got wrong by a generator:
+// a header that is inert in C can be force-included into anything.
+//                                        (30.07.2026.) (SW port)
+#ifdef __cplusplus
+//------------------------------------------------------------------------------
+
 #ifndef LE_CHECKED_BUILD
 // By default we use checked builds in all non-release builds.
 #ifdef NDEBUG
@@ -76,16 +92,27 @@
 #ifdef _WIN32
 #include "sdkddkver.h"
 
-#undef WINVER
-#undef _WIN32_WINNT
-#undef _WIN32_IE
-#undef NTDDI_VERSION
+// Implementation note:
+//   There were four #undefs above this block -- of WINVER, _WIN32_WINNT,
+// _WIN32_IE and NTDDI_VERSION -- which made the #ifndef below unconditionally
+// true. So whatever the build, or sdkddkver.h above, had settled on was thrown
+// away and every translation unit was pinned to Vista SP2.
+//
+//   This header is force-included into all of them, JUCE's among them, and JUCE
+// 8 draws through Direct2D: pinned to a 2009 API surface its backend cannot see
+// ID2D1DeviceContext3/4, IDWriteFactory4, IDCompositionDevice or the
+// DWRITE_GLYPH_IMAGE_FORMATS_* enumerators, and fails to compile in its own
+// sources -- a hundred errors, none of them in this project's code.
+//
+//   Without the #undefs sdkddkver.h has already chosen, and it chooses the
+// newest the installed SDK supports. What remains is a floor for the case where
+// nothing has: Windows 10, which is what JUCE 8 requires.
+//                                        (30.07.2026.) (SW port)
 #ifndef _WIN32_WINNT
-// If not specified, allow use of features specific to Windows Vista SP2 or later.
-#define WINVER _WIN32_WINNT_VISTA
-#define _WIN32_WINNT _WIN32_WINNT_VISTA
-#define _WIN32_IE 0x0900
-#define NTDDI_VERSION NTDDI_VISTASP2
+#define WINVER _WIN32_WINNT_WIN10
+#define _WIN32_WINNT _WIN32_WINNT_WIN10
+#define _WIN32_IE 0x0A00
+#define NTDDI_VERSION NTDDI_WIN10
 #endif // _WIN32_WINNT
 
 #ifndef LEB_INCLUDE_FULL_WINDOWS_HEADERS
@@ -122,8 +149,16 @@
 #undef _MBCS
 #endif // _MBCS
 
-#if (_MSC_VER < 1400) || (_MSC_VER > 1900)
-#pragma message("WARNING: LEBuild was not tested with your version of MSVC...")
+// Implementation note:
+//   Was ( _MSC_VER < 1400 ) || ( _MSC_VER > 1900 ) -- VS 2005 through VS 2015,
+// which means every compiler newer than 2015 was warned about, once per
+// translation unit. A ceiling on a supported compiler version is a guess about
+// the future that ages into noise; only the floor is a fact, and the fact is now
+// C++20 rather than whatever VS 2005 could manage.
+//                                        (30.07.2026.) (SW port)
+#if _MSC_VER < 1929
+#pragma message(                                                                                   \
+    "WARNING: SpectrumWorx needs an MSVC with C++20 support -- 19.29 (VS 2019 16.10) or newer.")
 #endif
 
 #if (defined(_M_IX86) && (_M_IX86_FP == 1))
@@ -135,10 +170,25 @@
 #define LE_HAS_SSE2
 #endif
 
+// Implementation note:
+//   Guarded because this header is force-included ahead of everything, ours and
+// third-party alike, and the third party sets some of these too: JUCE's Harfbuzz
+// unit defines _CRT_SECURE_NO_WARNINGS itself and got a macro-redefinition
+// warning for its trouble. Defining a macro someone else also defines is only
+// silent when both spell it the same way, which is not a thing to rely on.
+//                                        (30.07.2026.) (SW port)
+#ifndef _ATL_SECURE_NO_WARNINGS
 #define _ATL_SECURE_NO_WARNINGS
+#endif
+#ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
+#endif
+#ifndef _SCL_SECURE_NO_WARNINGS
 #define _SCL_SECURE_NO_WARNINGS
+#endif
+#ifndef _CRT_DISABLE_PERFCRIT_LOCKS
 #define _CRT_DISABLE_PERFCRIT_LOCKS
+#endif
 
 #define __STDC_WANT_SECURE_LIB__ LE_CHECKED_BUILD
 #define _CRT_SECURE_CPP_OVERLOAD_SECURE_NAMES LE_CHECKED_BUILD
@@ -309,5 +359,7 @@ typedef void const *const nullptr_t;
 #include "boost/dispatch/meta/is_iterator.hpp"
 #endif // LE_HAS_NT2
 
+//------------------------------------------------------------------------------
+#endif // __cplusplus
 //------------------------------------------------------------------------------
 #endif // leConfigurationAndODRHeader_h

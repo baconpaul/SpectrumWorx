@@ -20,9 +20,7 @@
 #ifndef uiElements_hpp__E78E35E8_D163_442F_84C0_19427B8844BA
 #define uiElements_hpp__E78E35E8_D163_442F_84C0_19427B8844BA
 //------------------------------------------------------------------------------
-#ifdef __GNUC__
 #include "linear/parameter.hpp"
-#endif // __GNUC__
 
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/tchar.hpp"

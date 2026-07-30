@@ -13,9 +13,7 @@
 //------------------------------------------------------------------------------
 #include "plugin2Host.hpp"
 
-#ifdef __GNUC__
 #include "core/automatedModuleChain.hpp" //...mrmlj...SW::Program...
-#endif                                   // __GNUC__
 
 #include "le/plugins/plugin.hpp"
 #include "le/utility/cstdint.hpp"

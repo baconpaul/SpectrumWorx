@@ -335,15 +335,21 @@ lfo_value_t diracUpsideDown(lfo_value_t /*position*/, LFOState &, bool const new
         return static_cast<lfo_value_t>(LFOImpl::maximumValue);
 }
 
-/// \note Workaround for a Clang 3.5 crash.
-///                                       (02.01.2015.) (Domagoj Saric)
-#ifdef __clang__
-typedef decltype(&sine) GetWaveformAmplitudeForPosition;
-#else
+/// \note Was two typedefs: a `decltype( &sine )` arm working around a Clang 3.5
+/// crash, and an arm that appended `LE_MSVC_SPECIFIC( throw() )` -- a 2005-era
+/// hint that let MSVC omit unwind setup for the call.
+///
+///   `throw()` became a synonym for `noexcept` in C++17 and was removed from the
+/// language in C++20, and none of the waveform functions is noexcept. So on MSVC
+/// the table below was initialising noexcept function pointers from throwing
+/// functions, which C++17 made ill-formed -- eleven errors, one per entry, saying
+/// only that a reinterpret_cast would be needed.
+///
+///   The Clang arm expanded to this same signature, top-level parameter const
+/// being no part of a function's type, so one plain typedef replaces both.
+///                                       (30.07.2026.) (SW port)
 typedef lfo_value_t (*GetWaveformAmplitudeForPosition)(lfo_value_t position, LFOState &,
-                                                       bool newPeriodBegun)
-    LE_MSVC_SPECIFIC(throw());
-#endif // __clang__
+                                                       bool newPeriodBegun);
 
 LE_MSVC_SPECIFIC(LE_WEAK_SYMBOL_CONST)
 GetWaveformAmplitudeForPosition const lfoFunctions[] = {

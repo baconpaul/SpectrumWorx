@@ -24,6 +24,7 @@
 #include <boost/fusion/support/category_of.hpp>
 #include <boost/fusion/support/iterator_base.hpp>
 #include <boost/mpl/if.hpp>
+#include <boost/mpl/int.hpp>
 
 #include <type_traits>
 //------------------------------------------------------------------------------
@@ -155,6 +156,22 @@ template <> struct end_impl<LE::Parameters::Tag>
     {
         typedef ::LE::Parameters::Iterator<Parameters, Parameters::static_size> type;
         static type call(Parameters &parameters) { return type(parameters); }
+    };
+};
+
+/// \note Never provided, because nothing here ever called fusion::size() -- but
+/// value_at() calls it for us. Boost's detail::value_at_impl bounds-checks N
+/// against `size_impl< Tag >::apply< Sequence >::type`, and naming that type as a
+/// template argument requires the specialisation to exist even on the branch
+/// mpl::or_ would not have evaluated. Clang lets it slide; MSVC instantiates it
+/// and finds only the forward declaration, then reports the failure from inside
+/// Boost, several layers below the value_at_c() that asked.
+///                                           (30.07.2026.) (SW port)
+template <typename Tag> struct size_impl;
+template <> struct size_impl<LE::Parameters::Tag>
+{
+    template <typename Parameters> struct apply : mpl::int_<Parameters::static_size>
+    {
     };
 };
 

@@ -307,10 +307,7 @@ using WidgetForParameter = WidgetForParameterAux<typename Parameter::Tag>;
 class SharedModuleControls;
 class SpectrumWorxEditor;
 
-class ModuleUI
-    final
-    : public WidgetBase<>,
-      private juce::Button::Listener
+class ModuleUI final : public WidgetBase<>, private juce::Button::Listener
 {
   public:
     enum ParameterChangeSource
@@ -326,7 +323,6 @@ class ModuleUI
     void setParameter(std::uint8_t parameterIndex, float parameterValue, ParameterChangeSource);
 
     void setBypass(bool);
-
 
     void updateForEngineSetupChanges(Engine::Setup const &);
 
@@ -627,10 +623,15 @@ template <class Interface> struct ParameterWidgetsVTable
     {
     }
 
-    void(/*mrmlj clang crash LE_GNU_SPECIFIC( __fastcall )*/ LE_MSVC_SPECIFIC() *const doCreateGUI)(
-        ModuleUI &);
-    void(/*mrmlj clang crash LE_GNU_SPECIFIC( __fastcall )*/ LE_MSVC_SPECIFIC() *const
-             doDestroyGUI)(ModuleUI::Module &) /*noexcept*/;
+    /// \note Both of these once carried a calling convention -- __fastcall for
+    /// GNU, whatever LE_MSVC_SPECIFIC held for MSVC -- and both were emptied out,
+    /// the GNU one to a comment and the MSVC one to `LE_MSVC_SPECIFIC()` with no
+    /// argument at all. That is a function-like macro invoked with nothing, which
+    /// MSVC warns about (C4003) once per declaration and every other compiler
+    /// expands to the same nothing. Said plainly instead.
+    ///                                       (30.07.2026.) (SW port)
+    void (*const doCreateGUI)(ModuleUI &);
+    void (*const doDestroyGUI)(ModuleUI::Module &) /*noexcept*/;
 
 #ifdef _MSC_VER
   private:
