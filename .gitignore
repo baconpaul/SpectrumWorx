@@ -1,6 +1,8 @@
-build/
-build-*/
-cmake-build-*/
+# Anchored: unanchored `build/` matches a directory of that name at any depth,
+# and src/le/build/ is source. New files there were silently unaddable.
+/build/
+/build-*/
+/cmake-build-*/
 ignore/
 .DS_Store
 .idea/
