@@ -410,16 +410,36 @@ bool SpectrumWorxCLAP::paramsValueToText(clap_id const id, double const value, c
         return false;
 
     ParameterID const parameterID{Plugins::ParameterID{id}};
-    Plugins::ParameterInformation<Protocol> ranges;
-    liveRanges(parameterID, ranges);
 
-    /// \note The printer works in the effect's own units, so the host's value
-    /// comes back off the 0..1 edge before it is formatted. This is what keeps a
-    /// normalised parameter readable: the range the host sees is meaningless, and
-    /// the text is where the real number -- or the enumerated name -- shows up.
-    auto const automationValue(CLAPEdge::fromHost(parameterID, ranges, value));
+    /// \note Renders the parameter's *own* value and ignores \p value, which is
+    /// not what CLAP asks for and is deliberate until the printer can do better.
+    ///
+    ///   Asking it to render a supplied value means
+    /// AutomatedParameterPrinter's `Linear` arm, and that arm default-constructs
+    /// the parameter to assign the value to: `Parameter parameterValue;`
+    /// (printer.hpp). Some of these parameters do not have a range of their own to
+    /// be valid against -- an LFO's bounds and its period scale are
+    /// DynamicRangeParameterTag, and find their limits by walking from their own
+    /// address to the LFO that owns them (LFOImpl::snapPeriodScaleFromAutomation
+    /// does it explicitly). A detached temporary has no owner, so it validates
+    /// against whatever that walk lands on. Assigning the lower bound of a
+    /// 20..2000 Hz target then asserts, in a throwaway object, having corrupted
+    /// nothing -- but in a checked build the assertion ends the host, which is
+    /// what a debug plugin did as soon as a rescan made a host read the list.
+    ///
+    ///   The `Internal` arm has none of that: it prints `parameter.getValue()` on
+    /// the real parameter, which is the arm every other format has always used --
+    /// Windows asserts outright that this is the only one it ever takes. So a host
+    /// asking "what would 0.25 read as" is told what the parameter reads as now.
+    /// Wrong for an automation lane's tooltip, right for the common case of
+    /// rendering the current value, and it cannot assert.
+    ///
+    /// \todo Give the printer an arm that takes the value *and* the live
+    /// parameter, so a dynamic range has an owner to ask. That is the same
+    /// machinery paramsTextToValue needs below, and worth doing once for both.
+    ///                                       (30.07.2026.) (SW port)
     std::array<char, 128> text{};
-    getParameterDisplay(parameterID, {text.data(), text.size()}, &automationValue);
+    getParameterDisplay(parameterID, {text.data(), text.size()}, nullptr);
 
     std::array<char, 32> unit{};
     getParameterLabel(parameterID, {unit.data(), unit.size()}, &program());

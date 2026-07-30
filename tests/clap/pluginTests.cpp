@@ -594,6 +594,15 @@ TEST_CASE("Every parameter accepts the bounds it advertises", "[clap]")
                 REQUIRE(params.get_value(&*plugin, info.id, &read));
                 CHECK(read >= info.min_value);
                 CHECK(read <= info.max_value);
+
+                /// \note And asked to render it, which is the other half of what
+                /// a host does when it rescans -- get_info, get_value,
+                /// value_to_text over the whole list. The renderer builds a
+                /// throwaway parameter and assigns the value to it, so a value it
+                /// considers invalid asserts there rather than anywhere that
+                /// matters (printer.hpp's AutomatedParameterPrinter).
+                std::array<char, 128> text{};
+                CHECK(params.value_to_text(&*plugin, info.id, value, text.data(), text.size()));
             }
         }
     }
@@ -800,6 +809,13 @@ TEST_CASE("A normalised parameter still reads in the effect's own units", "[clap
     // normalised: a host showing 0.25 also shows what 0.25 means. This is where
     // the enumerated module parameters keep their names, too, now that they can
     // no longer advertise a step count.
+    //
+    /// \note What is checked is that the text is in the effect's units, not that
+    /// it answers about the value passed in. paramsValueToText deliberately
+    /// renders the parameter's own value and ignores the argument -- see the note
+    /// there on the printer and dynamic ranges -- so asking about a particular
+    /// value would be asserting the opposite of what the code does. The value
+    /// below is arbitrary for that reason.
     Entry const entry;
     ActivePlugin plugin(48000, 512);
 
@@ -820,9 +836,9 @@ TEST_CASE("A normalised parameter still reads in the effect's own units", "[clap
         CHECK(text[0] != '\0');
         ++checked;
 
-        // At the top of the edge a real range reads as its own maximum, which is
-        // "1" only by coincidence. Some parameter, somewhere in the slot, must
-        // disagree with the raw edge value or nothing is being converted at all.
+        // Some parameter in the slot has to read as something other than a bare
+        // edge value, or nothing is being converted into the effect's units at
+        // all -- which is the whole justification for a 0..1 range.
         if (std::strncmp(text.data(), "1", 2) != 0)
             ++differedFromTheEdge;
     }
