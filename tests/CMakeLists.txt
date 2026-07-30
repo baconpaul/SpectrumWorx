@@ -18,6 +18,7 @@ add_executable(sw-tests
         math/fftTests.cpp
         math/scalarTests.cpp
         math/vectorTests.cpp
+        parameters/parameterTableTests.cpp
         utility/buffersTests.cpp
         utility/spanTests.cpp
 )
@@ -38,7 +39,8 @@ target_link_libraries(sw-tests PRIVATE sw-impl sw-gui-resources Catch2::Catch2Wi
 # test runner follows CMAKE_BUILD_TYPE like everything else: Debug runs the
 # ~1200 asserts, Release renders the goldens at shipping speed.
 target_compile_definitions(sw-tests PRIVATE
-        SW_GOLDEN_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/goldens/data")
+        SW_GOLDEN_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/goldens/data"
+        SW_PARAMETER_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/parameters/data")
 
 # So that clap/ can reach goldens/engineHarness.hpp: the CLAP-side tests need an
 # instantiable SpectrumWorxCore, and that is exactly what the golden harness is.
