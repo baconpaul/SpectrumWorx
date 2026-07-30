@@ -31,7 +31,7 @@ namespace Detail
 struct BandGain
 {
     LE_DEFINE_PARAMETERS(
-        ((Attenuation)(LinearFloat)(Minimum<0>)(Maximum<60>)(Default<0>)(Unit<' dB'>)));
+        ((Attenuation)(LinearFloat)(Minimum<0>)(Maximum<60>)(Default<0>)(Unit<" dB">)));
 
     /// \typedef Attenuation
     /// \brief Amount of signal attenuation (within the selected frequency

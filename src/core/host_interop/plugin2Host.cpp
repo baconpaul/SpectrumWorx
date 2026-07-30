@@ -416,8 +416,7 @@ struct UnitGetter
     typedef char const *LE_RESTRICT result_type;
     template <class Parameter> result_type operator()() const
     {
-        return boost::mpl::c_str<
-            typename LE::Parameters::DisplayValueTransformer<Parameter>::Suffix>::value;
+        return LE::Parameters::DisplayValueTransformer<Parameter>::Suffix::c_str();
     }
 };
 

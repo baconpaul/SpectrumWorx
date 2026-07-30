@@ -91,15 +91,6 @@ namespace Detail
 {
 template <class TraitTag, class TraitsPack, class... DefaultTraits> struct GetTraitDefaulted;
 }
-namespace Traits
-{
-namespace Tag
-{
-struct Unit;
-}
-template <int stringLiteralPart1, int stringLiteralPart2> struct Unit;
-} // namespace Traits
-
 template <class Parameter> struct DisplayValueTransformer
 {
     template <typename Source>

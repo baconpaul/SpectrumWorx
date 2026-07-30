@@ -40,9 +40,9 @@ namespace Effects
 struct Synth
 {
     LE_DEFINE_PARAMETERS(((Frequency)(LinearFloat)(Minimum<40>)(Maximum<8000>)(Default<110>))(
-        (HarmonicSlope)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<50>)(Unit<'%'>))(
-        (FlangeIntensity)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<0>)(Unit<'%'>))(
-        (FlangeOffset)(SymmetricFloat)(MaximumOffset<180>)(Default<10>)(Unit<'\xB0'>)));
+        (HarmonicSlope)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<50>)(Unit<"%">))(
+        (FlangeIntensity)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<0>)(Unit<"%">))(
+        (FlangeOffset)(SymmetricFloat)(MaximumOffset<180>)(Default<10>)(Unit<"\xB0">)));
 
     /// \typedef Frequency
     /// \brief .

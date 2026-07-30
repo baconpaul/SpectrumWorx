@@ -238,7 +238,7 @@ template <class Parameter> constexpr ParameterInfo info()
         nullptr,
         nullptr
 #else
-        boost::mpl::c_str<typename Parameters::DisplayValueTransformer<Parameter>::Suffix>::value,
+        Parameters::DisplayValueTransformer<Parameter>::Suffix::c_str(),
         EnumeratedValueStrings<Parameter, Tag>::type::strings
 #endif // LE_NO_PARAMETER_STRINGS
     };

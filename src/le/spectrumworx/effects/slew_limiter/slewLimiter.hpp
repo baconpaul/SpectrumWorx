@@ -17,7 +17,6 @@
 #include "le/parameters/enumerated/parameter.hpp"
 #include "le/parameters/linear/parameter.hpp"
 
-#include "boost/mpl/string.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -44,14 +43,11 @@ namespace Effects
 
 struct SlewLimiter
 {
-  private:
-    typedef boost::mpl::string<' dB/', 's'> DecibelsPerSecond;
-
   public:
     LE_ENUMERATED_PARAMETER(Direction, (RiseFall)(Rise)(Fall));
 
     LE_DEFINE_PARAMETERS(((Direction))(
-        (SlewRate)(LinearFloat)(Minimum<0>)(Maximum<300>)(Default<50>)(Unit2<DecibelsPerSecond>)));
+        (SlewRate)(LinearFloat)(Minimum<0>)(Maximum<300>)(Default<50>)(Unit<" dB/s">)));
 
     /// \typedef Direction
     /// \brief Determines the slew direction.

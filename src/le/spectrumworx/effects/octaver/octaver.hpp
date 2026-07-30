@@ -48,10 +48,10 @@ struct Octaver
     LE_ENUMERATED_PARAMETER(Octave2, (Down2)(Down1)(Off)(Up1)(Up2));
 
     LE_DEFINE_PARAMETERS(((Octave1))(
-        (GainOctave1)(LinearFloat)(Minimum<-48>)(Maximum<+24>)(Default<0>)(Unit<' dB'>))((Octave2))(
-        (GainOctave2)(LinearFloat)(Minimum<-48>)(Maximum<+24>)(Default<0>)(Unit<' dB'>))(
+        (GainOctave1)(LinearFloat)(Minimum<-48>)(Maximum<+24>)(Default<0>)(Unit<" dB">))((Octave2))(
+        (GainOctave2)(LinearFloat)(Minimum<-48>)(Maximum<+24>)(Default<0>)(Unit<" dB">))(
         (CutoffFrequency)(LinearUnsignedInteger)(Minimum<0>)(Maximum<16000>)(Default<
-                                                                             350>)(Unit<' Hz'>)));
+                                                                             350>)(Unit<" Hz">)));
 
     /// \typedef Octave1
     /// \brief Controls the first octave to be added.

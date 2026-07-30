@@ -43,9 +43,9 @@ namespace Effects
 struct QuietBoost
 {
     LE_DEFINE_PARAMETERS(
-        ((Threshold)(LinearFloat)(Minimum<-60>)(Maximum<0>)(Default<-25>)(Unit<' dB'>))(
+        ((Threshold)(LinearFloat)(Minimum<-60>)(Maximum<0>)(Default<-25>)(Unit<" dB">))(
             (Ratio)(LinearFloat)(Minimum<1>)(Maximum<15>)(Default<3>))((
-            NoiseGateThreshold)(LinearFloat)(Minimum<-60>)(Maximum<0>)(Default<-45>)(Unit<' dB'>)));
+            NoiseGateThreshold)(LinearFloat)(Minimum<-60>)(Maximum<0>)(Default<-45>)(Unit<" dB">)));
 
     /// \typedef Threshold
     /// \brief Noise threshold.

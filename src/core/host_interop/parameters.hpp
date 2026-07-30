@@ -64,7 +64,7 @@ template <> struct DisplayValueTransformer<SW::GlobalParameters::InputGain>
     {
         return Math::normalisedLinear2dB(value);
     }
-    typedef boost::mpl::string<'dB'> Suffix;
+    using Suffix = UnitString<"dB">;
 };
 
 template <>
@@ -80,7 +80,7 @@ template <> struct DisplayValueTransformer<SW::GlobalParameters::MixPercentage>
     {
         return Math::normalisedLinear2Percentage(value);
     }
-    typedef boost::mpl::string<'%'> Suffix;
+    using Suffix = UnitString<"%">;
 };
 
 template <> struct DisplayValueTransformer<SW::GlobalParameters::OverlapFactor>
@@ -91,7 +91,7 @@ template <> struct DisplayValueTransformer<SW::GlobalParameters::OverlapFactor>
         float const percentage((value - 1) * 100 / value);
         return percentage;
     }
-    typedef boost::mpl::string<'%'> Suffix;
+    using Suffix = UnitString<"%">;
 };
 } // namespace Parameters
 

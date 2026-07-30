@@ -44,8 +44,7 @@ struct Freeze
     ////////////////////////////////////////////////////////////////////////////
 
     LE_DEFINE_PARAMETERS(((FreezeTrigger)(TriggerParameter))((MeltTrigger)(TriggerParameter))(
-        (TransitionTime)(LinearUnsignedInteger)(Minimum<0>)(Maximum<10000>)(Default<500>)(Unit<
-                                                                                          ' ms'>)));
+        (TransitionTime)(LinearUnsignedInteger)(Minimum<0>)(Maximum<10000>)(Default<500>)(Unit<" ms">)));
 
     /// \typedef FreezeTrigger
     /// \brief Initiates the freezing process.

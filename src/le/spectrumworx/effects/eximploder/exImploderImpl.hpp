@@ -103,7 +103,7 @@ template <> struct DisplayValueTransformer<SW::Effects::Detail::ExImPloder::Gate
             return -std::numeric_limits<float>::infinity();
         return static_cast<float>(value);
     }
-    using Suffix = boost::mpl::string<' dB'>;
+    using Suffix = LE::Parameters::UnitString<" dB">;
 }; // struct DisplayValueTransformer<SW::Effects::Detail::ExImPloder::Gate>
 //------------------------------------------------------------------------------
 } // namespace Parameters

@@ -44,7 +44,7 @@ namespace Effects
 
 struct Armonizer
 {
-    LE_DEFINE_PARAMETERS(((Interval)(SymmetricFloat)(MaximumOffset<24>)(Unit<'\''>)));
+    LE_DEFINE_PARAMETERS(((Interval)(SymmetricFloat)(MaximumOffset<24>)(Unit<"'">)));
 
     /// \typedef Interval
     /// \brief Controls the amount of pitch shifting.

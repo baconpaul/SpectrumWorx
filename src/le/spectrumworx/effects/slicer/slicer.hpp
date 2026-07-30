@@ -45,8 +45,8 @@ struct Slicer
     LE_ENUMERATED_PARAMETER(Mode, (Hold)(Silence)(Side));
 
     LE_DEFINE_PARAMETERS(
-        ((TimeOn)(LinearUnsignedInteger)(Minimum<10>)(Maximum<1000>)(Default<250>)(Unit<' ms'>))((
-            TimeOff)(LinearUnsignedInteger)(Minimum<10>)(Maximum<1000>)(Default<100>)(Unit<' ms'>))(
+        ((TimeOn)(LinearUnsignedInteger)(Minimum<10>)(Maximum<1000>)(Default<250>)(Unit<" ms">))((
+            TimeOff)(LinearUnsignedInteger)(Minimum<10>)(Maximum<1000>)(Default<100>)(Unit<" ms">))(
             (Mode)));
 
     /// \typedef TimeOn

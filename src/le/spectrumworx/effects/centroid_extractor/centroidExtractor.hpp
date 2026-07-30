@@ -49,8 +49,8 @@ struct CentroidExtractor
     LE_ENUMERATED_PARAMETER(Mode, (Centroid)(Peak)(Dominant));
 
     LE_DEFINE_PARAMETERS(((Mode))(
-        (Bandwidth)(LinearUnsignedInteger)(Minimum<0>)(Maximum<6000>)(Default<1000>)(Unit<' Hz'>))(
-        (Attenuation)(LinearSignedInteger)(Minimum<0>)(Maximum<100>)(Default<10>)(Unit<' dB'>)));
+        (Bandwidth)(LinearUnsignedInteger)(Minimum<0>)(Maximum<6000>)(Default<1000>)(Unit<" Hz">))(
+        (Attenuation)(LinearSignedInteger)(Minimum<0>)(Maximum<100>)(Default<10>)(Unit<" dB">)));
 
     /// \typedef Mode
     /// \brief

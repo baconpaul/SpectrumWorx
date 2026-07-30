@@ -31,7 +31,7 @@ namespace Detail ///< \internal
 template <class... ArgumentPack> struct PowerOfTwoParameterTraits
 {
   public:
-    using Defaults = TraitPack<Traits::Unit<0, 0>>;
+    using Defaults = TraitPack<Traits::Unit<"">>;
     using Traits = TraitPack<ArgumentPack...>; //...mrmlj...FMOD param info...
 
     using Tag = PowerOfTwoParameterTag;

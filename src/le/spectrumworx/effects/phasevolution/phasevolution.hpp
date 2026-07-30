@@ -44,7 +44,7 @@ struct Phasevolution
 {
     LE_DEFINE_PARAMETERS(
         ((PhasePeriod)(LinearFloat)(Minimum<1>)(Maximum<5000>)(Default<500>)(ValuesDenominator<
-                                                                             1000>)(Unit<' s'>)));
+                                                                             1000>)(Unit<" s">)));
 
     /// \typedef PhasePeriod
     /// \brief Controls the rate at which the phase comes full circle.

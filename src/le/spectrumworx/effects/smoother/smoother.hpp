@@ -42,8 +42,7 @@ namespace Effects
 struct Smoother
 {
     LE_DEFINE_PARAMETERS(
-        ((AveragingWidth)(LinearUnsignedInteger)(Minimum<0>)(Maximum<2000>)(Default<500>)(Unit<
-                                                                                          ' Hz'>)));
+        ((AveragingWidth)(LinearUnsignedInteger)(Minimum<0>)(Maximum<2000>)(Default<500>)(Unit<" Hz">)));
 
     /// \typedef AveragingWidth
     /// \brief Width of the region to be smoothed.

@@ -52,9 +52,9 @@ struct Inserter
     /// @}
 
     LE_DEFINE_PARAMETERS(
-        ((Mode))((Source)(LinearFloat)(Minimum<0>)(Maximum<100>)(Default<0>)(Unit<' bw%'>))(
-            (Destination)(LinearFloat)(Minimum<0>)(Maximum<100>)(Default<0>)(Unit<' bw%'>))(
-            (InsertSize)(LinearFloat)(Minimum<0>)(Maximum<100>)(Default<5>)(Unit<' bw%'>)));
+        ((Mode))((Source)(LinearFloat)(Minimum<0>)(Maximum<100>)(Default<0>)(Unit<" bw%">))(
+            (Destination)(LinearFloat)(Minimum<0>)(Maximum<100>)(Default<0>)(Unit<" bw%">))(
+            (InsertSize)(LinearFloat)(Minimum<0>)(Maximum<100>)(Default<5>)(Unit<" bw%">)));
 
     /// \typedef Mode
     /// \brief Specifies what is to be inserted.

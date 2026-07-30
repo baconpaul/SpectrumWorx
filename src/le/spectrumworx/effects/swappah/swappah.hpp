@@ -52,8 +52,8 @@ struct Swappah
                             (LowHighMid)(MidLowHigh)(MidHighLow)(HighLowMid)(HighMidLow));
 
     LE_DEFINE_PARAMETERS(((Mode))((BandOrder))(
-        (BandLowMid)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<33>)(Unit<' bw%'>))(
-        (BandMidHigh)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<66>)(Unit<' bw%'>)));
+        (BandLowMid)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<33>)(Unit<" bw%">))(
+        (BandMidHigh)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<66>)(Unit<" bw%">)));
 
     /// \typedef Mode
     /// \brief Specifies what is to be swapped.

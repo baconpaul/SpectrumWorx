@@ -103,8 +103,8 @@ class LE_NOVTABLE ModuleKnob : public Knob, public ModuleControl<ModuleKnob>
 #pragma warning(pop)
 
   private:
-    typedef boost::mpl::string<' Hz'> Hertz;
-    typedef boost::mpl::string<' ms'> Millisecond;
+    using Hertz = LE::Parameters::UnitString<" Hz">;
+    using Millisecond = LE::Parameters::UnitString<" ms">;
 
     template <typename Unit> struct QuantizationImpl;
 

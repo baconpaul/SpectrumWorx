@@ -38,7 +38,7 @@ template <> struct DisplayValueTransformer<SW::Effects::BaseParameters::StartFre
 {
     static float transform(float const &value, SW::Engine::Setup const &);
 
-    typedef boost::mpl::string<' Hz'> Suffix;
+    using Suffix = UnitString<" Hz">;
 };
 
 template <>

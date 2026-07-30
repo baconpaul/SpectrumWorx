@@ -44,7 +44,7 @@ namespace Effects
 
 struct Exaggerator
 {
-    LE_DEFINE_PARAMETERS(((Exaggerate)(SymmetricFloat)(MaximumOffset<100>)(Unit<' %'>)));
+    LE_DEFINE_PARAMETERS(((Exaggerate)(SymmetricFloat)(MaximumOffset<100>)(Unit<" %">)));
 
     /// \typedef Exaggerate
     /// \brief Controls the amount and direction of peak exaggeration.

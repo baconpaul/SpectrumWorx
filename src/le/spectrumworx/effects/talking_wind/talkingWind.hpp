@@ -47,8 +47,8 @@ struct TalkingWind
 {
     LE_DEFINE_PARAMETERS(
         ((EnvelopeBorder)(LinearUnsignedInteger)(Minimum<0>)(Maximum<12000>)(Default<
-                                                                             1000>)(Unit<' Hz'>))(
-            (EnvelopeGain)(LinearFloat)(Minimum<-10>)(Maximum<10>)(Default<0>)(Unit<' dB'>)));
+                                                                             1000>)(Unit<" Hz">))(
+            (EnvelopeGain)(LinearFloat)(Minimum<-10>)(Maximum<10>)(Default<0>)(Unit<" dB">)));
 
     /// \typedef EnvelopeBorder
     /// \brief Controls the perceived "smoothness" of the modulator.

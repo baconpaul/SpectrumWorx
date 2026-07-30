@@ -16,8 +16,6 @@
 #include "le/parameters/printer_fwd.hpp"
 #include "le/utility/lexicalCast.hpp"
 
-#include "boost/mpl/string.hpp"
-
 #include <cstdio>
 #include <type_traits>
 //------------------------------------------------------------------------------

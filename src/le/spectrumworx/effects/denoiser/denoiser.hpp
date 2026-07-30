@@ -46,7 +46,7 @@ struct Denoiser
     LE_ENUMERATED_PARAMETER(Mode, (Main)(Side)(Sum));
 
     LE_DEFINE_PARAMETERS(((Mode))(
-        (Intensity)(LinearUnsignedInteger)(Minimum<1>)(Maximum<100>)(Default<5>)(Unit<' %'>)));
+        (Intensity)(LinearUnsignedInteger)(Minimum<1>)(Maximum<100>)(Default<5>)(Unit<" %">)));
 
     /// \typedef Mode
     /// \brief Controls the noise footprint.

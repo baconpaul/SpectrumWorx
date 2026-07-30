@@ -45,8 +45,8 @@ namespace Effects
 struct Quantizer
 {
     LE_DEFINE_PARAMETERS(
-        ((Width)(LinearUnsignedInteger)(Minimum<0>)(Maximum<2000>)(Default<500>)(Unit<' Hz'>))(
-            (Origami)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<0>)(Unit<' %'>)));
+        ((Width)(LinearUnsignedInteger)(Minimum<0>)(Maximum<2000>)(Default<500>)(Unit<" Hz">))(
+            (Origami)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<0>)(Unit<" %">)));
 
     /// \typedef Width
     /// \brief Width of the frequency region to be quantized.

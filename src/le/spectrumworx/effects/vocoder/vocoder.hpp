@@ -50,9 +50,8 @@ struct Vocoder
         (CepstrumUdoBrick)(CepstrumBrick)(CepstrumHamming)(MovingAverage)(Envelope)(MelEnvelope)(Passthrough));
 
     LE_DEFINE_PARAMETERS((
-        (EnvelopeBorder)(LinearUnsignedInteger)(Minimum<0>)(Maximum<12000>)(Default<1000>)(Unit<
-                                                                                           ' Hz'>))(
-        (NoiseIntensity)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<0>)(Unit<' %'>))(
+        (EnvelopeBorder)(LinearUnsignedInteger)(Minimum<0>)(Maximum<12000>)(Default<1000>)(Unit<" Hz">))(
+        (NoiseIntensity)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<0>)(Unit<" %">))(
         (FilterMethod)));
 
     /// \typedef EnvelopeBorder

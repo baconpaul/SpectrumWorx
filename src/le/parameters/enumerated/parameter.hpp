@@ -38,7 +38,7 @@ struct EnumeratedParameterTraits : LinearParameterTraitsBase<0, numberOfValues -
     using param_type = value_type;
     using binary_type = value_type;
 
-    using Defaults = TraitPack<Traits::Unit<0, 0>>;
+    using Defaults = TraitPack<Traits::Unit<"">>;
     using Traits = TraitPack<>;
 
   public: // Values

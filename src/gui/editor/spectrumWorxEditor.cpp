@@ -78,7 +78,7 @@ template <> void fillComboBoxForParameter<Engine::OverlapFactor>(ComboBox &combo
                          LE::Utility::makeSpan(&buffer[0], buffer.size()));
         std::strcat(
             &buffer[0],
-            boost::mpl::c_str<DisplayValueTransformer<Engine::OverlapFactor>::Suffix>::value);
+            DisplayValueTransformer<Engine::OverlapFactor>::Suffix::c_str());
         comboBox.addItem(value, &buffer[0]);
         value *= 2;
     }

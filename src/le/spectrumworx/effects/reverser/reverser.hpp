@@ -41,7 +41,7 @@ namespace Effects
 struct Reverser
 {
     LE_DEFINE_PARAMETERS(
-        ((Length)(LinearUnsignedInteger)(Minimum<1>)(Maximum<5000>)(Default<1000>)(Unit<' ms'>)));
+        ((Length)(LinearUnsignedInteger)(Minimum<1>)(Maximum<5000>)(Default<1000>)(Unit<" ms">)));
 
     /// \typedef Length
     /// \brief The length of the chunks to be reversed.

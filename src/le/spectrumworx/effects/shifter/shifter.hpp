@@ -51,7 +51,7 @@ struct Shifter
     LE_ENUMERATED_PARAMETER(Tail, (Leave)(Clear)(Circular));
 
     LE_DEFINE_PARAMETERS(
-        ((ShiftTarget))((Offset)(SymmetricFloat)(MaximumOffset<10>)(Unit<' bw%'>))((Tail)));
+        ((ShiftTarget))((Offset)(SymmetricFloat)(MaximumOffset<10>)(Unit<" bw%">))((Tail)));
 
     /// \typedef ShiftTarget
     /// \brief Specifies what is to be shifted.

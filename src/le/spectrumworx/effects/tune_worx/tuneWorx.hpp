@@ -49,14 +49,14 @@ struct TuneWorxBase ///<
         (BypassSemi06)(Boolean))((BypassSemi07)(Boolean))((BypassSemi08)(Boolean))(
         (BypassSemi09)(Boolean))((BypassSemi10)(Boolean))((BypassSemi11)(Boolean))(
         (BypassSemi12)(Boolean))((Vibrato)(Boolean))(
-        (PitchMinFreq)(LinearFloat)(Minimum<50>)(Maximum<2000>)(Default<70>)(Unit<'Hz'>))(
-        (PitchMaxFreq)(LinearFloat)(Minimum<100>)(Maximum<10000>)(Default<2000>)(Unit<'Hz'>))(
-        (TuneTolerance)(LinearFloat)(Minimum<0>)(Maximum<50>)(Default<0>)(Unit<'Hz'>))(
-        (RetuneTime)(LinearUnsignedInteger)(Minimum<0>)(Maximum<500>)(Default<50>)(Unit<'ms'>))((
-        VibratoDelay)(LinearUnsignedInteger)(Minimum<0>)(Maximum<1000>)(Default<100>)(Unit<'ms'>))((
-        VibratoPeriod)(LinearUnsignedInteger)(Minimum<10>)(Maximum<250>)(Default<100>)(Unit<'ms'>))(
-        (VibratoDepth)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<50>)(Unit<'\"'>))(
-        (PitchShift)(SymmetricInteger)(MaximumOffset<1200>)(Default<0>)(Unit<'\"'>)));
+        (PitchMinFreq)(LinearFloat)(Minimum<50>)(Maximum<2000>)(Default<70>)(Unit<"Hz">))(
+        (PitchMaxFreq)(LinearFloat)(Minimum<100>)(Maximum<10000>)(Default<2000>)(Unit<"Hz">))(
+        (TuneTolerance)(LinearFloat)(Minimum<0>)(Maximum<50>)(Default<0>)(Unit<"Hz">))(
+        (RetuneTime)(LinearUnsignedInteger)(Minimum<0>)(Maximum<500>)(Default<50>)(Unit<"ms">))((
+        VibratoDelay)(LinearUnsignedInteger)(Minimum<0>)(Maximum<1000>)(Default<100>)(Unit<"ms">))((
+        VibratoPeriod)(LinearUnsignedInteger)(Minimum<10>)(Maximum<250>)(Default<100>)(Unit<"ms">))(
+        (VibratoDepth)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<50>)(Unit<"\"">))(
+        (PitchShift)(SymmetricInteger)(MaximumOffset<1200>)(Default<0>)(Unit<"\"">)));
 #else  // LE_SIMPLE_TUNEWORX
     LE_DEFINE_PARAMETERS(
         ((Key))((Semi01)(Boolean))((Semi02)(Boolean))((Semi03)(Boolean))((Semi04)(Boolean))(

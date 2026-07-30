@@ -22,6 +22,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+/// \note Was arriving transitively through boost/mpl/string.hpp, which the Unit
+/// trait no longer includes. Goes with ValidIndices and Groups themselves.
+#include <boost/mpl/size.hpp>
+
 #include <algorithm>
 #include <cstdint>
 #include <set>

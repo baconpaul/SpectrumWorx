@@ -43,7 +43,7 @@ template <typename TraitTag, typename... TraitsSequence> struct GetTraitImpl;
 
 template <typename TraitTag> struct GetTraitImpl<TraitTag>
 {
-    using type = boost::mpl::void_;
+    using type = Traits::NoTrait;
 };
 
 template <typename TraitTag, typename FirstTrait, typename... TraitsSequence>
@@ -53,7 +53,7 @@ struct GetTraitImpl<TraitTag, FirstTrait, TraitsSequence...>
 };
 
 template <typename TraitTag, typename Value, typename... TraitsSequence>
-struct GetTraitImpl<TraitTag, boost::mpl::pair<TraitTag, Value>, TraitsSequence...>
+struct GetTraitImpl<TraitTag, Traits::TraitPair<TraitTag, Value>, TraitsSequence...>
 {
     using type = Value;
 };
@@ -227,7 +227,7 @@ struct LinearSignedInteger
     template <class... NewTraits> struct Modify
     {
         using type =
-            Detail::LinearSignedIntegerParameterTraits<TraitPack<NewTraits...>, Traits::Unit<0>>;
+            Detail::LinearSignedIntegerParameterTraits<TraitPack<NewTraits...>, Traits::Unit<"">>;
     };
 }; // struct LinearSignedInteger
 
@@ -241,7 +241,7 @@ struct LinearUnsignedInteger
     template <class... NewTraits> struct Modify
     {
         using type =
-            Detail::LinearUnsignedIntegerParameterTraits<TraitPack<NewTraits...>, Traits::Unit<0>>;
+            Detail::LinearUnsignedIntegerParameterTraits<TraitPack<NewTraits...>, Traits::Unit<"">>;
     };
 }; // struct LinearUnsignedInteger
 
@@ -256,7 +256,7 @@ struct LinearFloat
     {
         using type =
             Detail::LinearFloatParameterTraits<TraitPack<NewTraits...>,
-                                               Traits::ValuesDenominator<1>, Traits::Unit<0>>;
+                                               Traits::ValuesDenominator<1>, Traits::Unit<"">>;
     };
 }; // struct LinearFloat
 

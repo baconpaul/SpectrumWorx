@@ -24,11 +24,6 @@ namespace Parameters
 {
 //------------------------------------------------------------------------------
 
-namespace Traits
-{
-template <int stringLiteralPart1, int stringLiteralPart2> struct Unit;
-}
-
 template <typename... Traits> struct TraitPack;
 
 namespace Detail ///< \internal
@@ -41,7 +36,7 @@ template <bool defaultValue = false> struct BooleanParameterTraits
     using value_type = bool;
     using param_type = value_type;
 
-    using Defaults = TraitPack<Traits::Unit<0, 0>>;
+    using Defaults = TraitPack<Traits::Unit<"">>;
     using Traits = TraitPack<Traits::Default<defaultValue>>; //...mrmlj...FMOD param info...
 
   public:

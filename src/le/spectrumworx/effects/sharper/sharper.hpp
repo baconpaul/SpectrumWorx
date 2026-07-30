@@ -43,10 +43,9 @@ namespace Effects
 struct Sharper
 {
     LE_DEFINE_PARAMETERS(
-        ((AveragingWidth)(LinearUnsignedInteger)(Minimum<0>)(Maximum<5000>)(Default<1000>)(Unit<
-                                                                                           ' Hz'>))(
-            (Intensity)(LinearFloat)(Minimum<0>)(Maximum<+72>)(Default<20>)(Unit<' dB'>))(
-            (Limiter)(LinearFloat)(Minimum<-80>)(Maximum<0>)(Default<-20>)(Unit<' dB'>)));
+        ((AveragingWidth)(LinearUnsignedInteger)(Minimum<0>)(Maximum<5000>)(Default<1000>)(Unit<" Hz">))(
+            (Intensity)(LinearFloat)(Minimum<0>)(Maximum<+72>)(Default<20>)(Unit<" dB">))(
+            (Limiter)(LinearFloat)(Minimum<-80>)(Maximum<0>)(Default<-20>)(Unit<" dB">)));
 
     /// \typedef AveragingWidth
     /// \brief Width of the region to be sharpened.

@@ -49,10 +49,10 @@ struct Freqverb
 {
     LE_DEFINE_PARAMETERS((
         (Time60dB)(LinearFloat)(Minimum<100>)(Maximum<20000>)(Default<2500>)(ValuesDenominator<
-                                                                             1000>)(Unit<' s'>))(
-        (RoomSize)(LinearFloat)(Minimum<-24>)(Maximum<0>)(Default<-3>)(Unit<' dB'>))(
-        (ReverbPitch)(SymmetricFloat)(MaximumOffset<48>)(Unit<' \'/s'>))(
-        (HFAbsorption)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<5>)(Unit<' %'>)));
+                                                                             1000>)(Unit<" s">))(
+        (RoomSize)(LinearFloat)(Minimum<-24>)(Maximum<0>)(Default<-3>)(Unit<" dB">))(
+        (ReverbPitch)(SymmetricFloat)(MaximumOffset<48>)(Unit<" '/s">))(
+        (HFAbsorption)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<5>)(Unit<" %">)));
 
     /// \typedef Time60dB
     /// \brief Specifies the life time of reverberation (time needed for

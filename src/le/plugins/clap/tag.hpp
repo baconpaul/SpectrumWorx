@@ -27,8 +27,6 @@
 #include "le/plugins/plugin.hpp"
 #include "le/utility/staticLog2.hpp"
 
-#include <boost/mpl/size.hpp>
-#include <boost/mpl/string.hpp> // c_str
 
 #include <array>
 #include <cstring>
@@ -120,7 +118,7 @@ template <> class ParameterInformation<Protocol::CLAP>
                        (Parameter::unscaledMinimum != 0 /*LFO::PeriodScale*/);
 
         using Label = typename Parameters::DisplayValueTransformer<Parameter>::Suffix;
-        setUnit(boost::mpl::c_str<Label>::value, boost::mpl::size<Label>::value);
+        setUnit(Label::c_str(), Label::size());
     }
 
     void clear()

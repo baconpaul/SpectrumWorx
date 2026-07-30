@@ -48,7 +48,7 @@ struct Vaxateer
     LE_ENUMERATED_PARAMETER(Mode, (M1)(M2)(M3)(M4)(M5)(M6)(M7)(M8));
 
     LE_DEFINE_PARAMETERS(
-        ((RMSTarget))((RMSGain)(SymmetricInteger)(MaximumOffset<24>)(Unit<' dB'>))((Mode)));
+        ((RMSTarget))((RMSGain)(SymmetricInteger)(MaximumOffset<24>)(Unit<" dB">))((Mode)));
 
     /// \typedef RMSTarget
     /// \brief Target channel for RMS calculation, can be Main or Side.

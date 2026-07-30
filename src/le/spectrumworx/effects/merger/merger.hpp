@@ -48,7 +48,7 @@ struct Merger
         (MainLargerThanSide)(SideLargerThanMain)(MainAboveThreshold)(SideAboveThreshold)(MainBelowThreshold)(SideBelowThreshold));
 
     LE_DEFINE_PARAMETERS(((Operation))(
-        (Threshold)(LinearFloat)(Minimum<-120>)(Maximum<0>)(Default<-20>)(Unit<' dB'>)));
+        (Threshold)(LinearFloat)(Minimum<-120>)(Maximum<0>)(Default<-20>)(Unit<" dB">)));
 
     /// \typedef Operation
     /// \brief Defines the operation to be executed.

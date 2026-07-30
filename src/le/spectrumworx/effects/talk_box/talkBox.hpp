@@ -49,7 +49,7 @@ struct TalkBox
 
     LE_DEFINE_PARAMETERS(((ExternalCarrier)(Boolean))(
         (BaseFrequency)(LinearFloat)(Minimum<40>)(Maximum<400>)(Default<100>))(
-        (CutOff)(LinearUnsignedInteger)(Minimum<0>)(Maximum<12000>)(Default<9000>)(Unit<'Hz'>))(
+        (CutOff)(LinearUnsignedInteger)(Minimum<0>)(Maximum<12000>)(Default<9000>)(Unit<"Hz">))(
         (HarmonicSlope))((FlangeIntensity))((FlangeOffset)));
 
     /// \typedef BaseFrequency

@@ -46,8 +46,8 @@ namespace BaseParameters
 /// \brief Basic parameters included by all effects
 /// @{
 
-LE_DEFINE_PARAMETERS(((Bypass)(Boolean))((Gain)(SymmetricFloat)(MaximumOffset<20>)(Unit<' dB'>))(
-    (Wet)(LinearFloat)(Minimum<0>)(Maximum<100>)(Default<100>)(Unit<' %'>))(
+LE_DEFINE_PARAMETERS(((Bypass)(Boolean))((Gain)(SymmetricFloat)(MaximumOffset<20>)(Unit<" dB">))(
+    (Wet)(LinearFloat)(Minimum<0>)(Maximum<100>)(Default<100>)(Unit<" %">))(
     (StartFrequency)(LinearFloat)(Minimum<0>)(Maximum<1>)(Default<0>))(
     (StopFrequency)(LinearFloat)(Minimum<0>)(Maximum<1>)(Default<1>)));
 

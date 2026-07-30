@@ -107,7 +107,7 @@ class LFOImpl : public LFO
               Parameters::TraitPack //...mrmlj...
               <Parameters::Traits::Minimum<1>, Parameters::Traits::Maximum<1>,
                Parameters::Traits::Default<1>, Parameters::Traits::ValuesDenominator<1>,
-               Parameters::Traits::Unit<0>>>
+               Parameters::Traits::Unit<"">>>
     {
         using Tag = Parameters::DynamicRangeParameterTag;
 
@@ -124,7 +124,7 @@ class LFOImpl : public LFO
                          LinearFloat)(Minimum<minimumValue>)(Maximum<maximumValue>)(Default<
                                                                                     minimumValue>))(
         (UpperBound)(LowerBound)(Default<maximumValue>)/*...mrmlj...*/ (
-            ValuesDenominator<1>)(Unit<0>))((SyncTypes))((Waveform)));
+            ValuesDenominator<1>)(Unit<"">))((SyncTypes))((Waveform)));
 
     Parameters &parameters() { return parameters_; }
     Parameters const &parameters() const { return const_cast<LFOImpl &>(*this).parameters(); }

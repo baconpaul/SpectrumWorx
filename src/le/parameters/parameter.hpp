@@ -11,11 +11,9 @@
 #ifndef parameter_hpp__B49E51E6_E59F_4C49_A702_B6533579846D
 #define parameter_hpp__B49E51E6_E59F_4C49_A702_B6533579846D
 //------------------------------------------------------------------------------
-#include "le/utility/assert.hpp"
+#include "unitString.hpp"
 
 #include "le/utility/assert.hpp"
-#include "boost/mpl/pair.hpp"
-#include "boost/mpl/string.hpp"
 #include "boost/preprocessor/comparison/greater.hpp"
 #include "boost/preprocessor/seq/seq.hpp"
 #include "boost/preprocessor/seq/enum.hpp"
@@ -72,6 +70,36 @@ namespace Traits
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \struct TraitPair
+/// \internal
+/// \brief A {tag, value} association, which is all a trait ever was.
+///
+////////////////////////////////////////////////////////////////////////////////
+// Implementation note:
+//   Was boost::mpl::pair. Nothing here uses an MPL sequence algorithm on a
+// trait; GetTraitImpl (linear/parameter.hpp) partially specialises on the pair
+// and reads `second` off it, and that is the entire protocol.
+//                                            (30.07.2026.) (SW port)
+////////////////////////////////////////////////////////////////////////////////
+
+template <class Tag, class Value> struct TraitPair
+{
+    /// \note GetTrait (linear/parameter.hpp) expands `TraitsSequence::type...`,
+    /// so a trait has to answer to that the way an MPL metafunction did.
+    using type = TraitPair;
+    using first = Tag;
+    using second = Value;
+};
+
+/// \brief What GetTrait answers with when a trait is in neither the parameter's
+/// own list nor its defaults. Was boost::mpl::void_.
+struct NoTrait
+{
+    using type = NoTrait;
+};
+
 // Helper verbosity-reducing macros for Parameter trait declarations.
 
 #define DECLARE_PARAMETER_TRAIT(name, valueType)                                                   \
@@ -80,7 +108,7 @@ namespace Traits
     struct name;                                                                                   \
     }                                                                                              \
     template <valueType vvalue>                                                                    \
-    struct name : boost::mpl::pair<Tag::name, boost::mpl::integral_c<valueType, vvalue>>           \
+    struct name : TraitPair<Tag::name, std::integral_constant<valueType, vvalue>>                  \
     {                                                                                              \
     }
 
@@ -101,10 +129,12 @@ DECLARE_PARAMETER_TRAIT(ValuesDenominator, unsigned int); /// \ingroup Parameter
 ///
 ////////////////////////////////////////////////////////////////////////////////
 // Implementation note:
-//   The template parameters are simple ints instead of a boost::mpl::string<>
-// because it simplifies usage/reduces verbosity and the maximum of eight
-// characters incurred with this design seems enough for all current usages.
-//                                            (25.09.2009.) (Domagoj Saric)
+//   Was a pair of ints holding multi-character literals -- Unit< ' dB' > --
+// with a four-characters-per-argument ceiling and a companion `Unit2` trait
+// that existed only because a comma cannot appear inside a Boost.PP sequence
+// element. A C++20 class-type NTTP has neither problem, so `Unit2` is gone and
+// the two effects that needed it (frecho, slew_limiter) say their unit inline.
+//                                            (30.07.2026.) (SW port)
 ////////////////////////////////////////////////////////////////////////////////
 
 namespace Tag
@@ -112,24 +142,7 @@ namespace Tag
 struct Unit;
 }
 
-template <int stringLiteralPart1, int stringLiteralPart2 = 0>
-struct Unit
-    : boost::mpl::pair<Tag::Unit, boost::mpl::string<stringLiteralPart1, stringLiteralPart2>>
-{
-};
-
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \struct Unit2
-/// \ingroup ParameterProperties
-/// The comma, required with the Unit trait template for unit suffixes longer
-/// than four characters, does not work well with (the LE_DEFINE_PARAMETER(S))
-/// macros so this helper/alternative unit specifying trait template, that takes
-/// a boost::mpl::string instance, can be used instead for such cases.
-///
-////////////////////////////////////////////////////////////////////////////////
-
-template <typename MPLString> struct Unit2 : boost::mpl::pair<Tag::Unit, MPLString>
+template <FixedString text> struct Unit : TraitPair<Tag::Unit, UnitString<text>>
 {
 };
 

@@ -30,13 +30,13 @@ namespace Detail
 {
 struct TonalBase ///<
 {
-    LE_DEFINE_PARAMETER((Strength)(LinearFloat)(Minimum<0>)(Maximum<90>)(Default<15>)(Unit<' dB'>));
+    LE_DEFINE_PARAMETER((Strength)(LinearFloat)(Minimum<0>)(Maximum<90>)(Default<15>)(Unit<" dB">));
     LE_DEFINE_PARAMETER(
-        (GlobalThreshold)(LinearFloat)(Minimum<10>)(Maximum<120>)(Default<30>)(Unit<' dB'>));
+        (GlobalThreshold)(LinearFloat)(Minimum<10>)(Maximum<120>)(Default<30>)(Unit<" dB">));
     LE_DEFINE_PARAMETER(
-        (LocalThreshold)(LinearFloat)(Minimum<0>)(Maximum<120>)(Default<10>)(Unit<' dB'>));
+        (LocalThreshold)(LinearFloat)(Minimum<0>)(Maximum<120>)(Default<10>)(Unit<" dB">));
     LE_DEFINE_PARAMETER(
-        (Attenuation)(LinearFloat)(Minimum<0>)(Maximum<60>)(Default<20>)(Unit<' dB'>));
+        (Attenuation)(LinearFloat)(Minimum<0>)(Maximum<60>)(Default<20>)(Unit<" dB">));
 
     /// \typedef Strength
     /// \brief How strong the peak must be to be considered tonal.

@@ -17,7 +17,6 @@
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
 
-#include "boost/mpl/string.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -48,14 +47,11 @@ namespace Effects
 
 struct Frecho
 {
-  private:
-    typedef boost::mpl::string<' \'/e', 'cho'> SemitonesPerEcho;
-
   public:
     LE_DEFINE_PARAMETERS(
-        ((Distance)(LinearUnsignedInteger)(Minimum<17>)(Maximum<500>)(Default<100>)(Unit<' m'>))(
-            (Absorption)(LinearFloat)(Minimum<0>)(Maximum<18>)(Default<6>)(Unit<' dB'>))(
-            (EchoPitch)(SymmetricFloat)(MaximumOffset<12>)(Unit2<SemitonesPerEcho>)));
+        ((Distance)(LinearUnsignedInteger)(Minimum<17>)(Maximum<500>)(Default<100>)(Unit<" m">))(
+            (Absorption)(LinearFloat)(Minimum<0>)(Maximum<18>)(Default<6>)(Unit<" dB">))(
+            (EchoPitch)(SymmetricFloat)(MaximumOffset<12>)(Unit<" '/echo">)));
 
     /// \typedef Distance
     /// \brief Perceived distance of the reflection.

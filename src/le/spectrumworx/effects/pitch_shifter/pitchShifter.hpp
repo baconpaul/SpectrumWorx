@@ -32,13 +32,13 @@ struct PitchShifterBase
 {
 #ifdef LE_PV_USE_TSS
 #define LE_PV_TSS_SENSITIVITY()                                                                    \
-    ((TSSSensitivity)(LinearFloat)(Minimum<0>)(Default<65>)(Maximum<100>)(Unit<'%'>))
+    ((TSSSensitivity)(LinearFloat)(Minimum<0>)(Default<65>)(Maximum<100>)(Unit<"%">))
 #else
 #define LE_PV_TSS_SENSITIVITY()
 #endif // LE_PV_USE_TSS
 
-    LE_DEFINE_PARAMETERS(((SemiTones)(SymmetricFloat)(MaximumOffset<24>)(Unit<'\''>))(
-        (Cents)(SymmetricInteger)(MaximumOffset<100>)(Unit<'\'\''>))LE_PV_TSS_SENSITIVITY());
+    LE_DEFINE_PARAMETERS(((SemiTones)(SymmetricFloat)(MaximumOffset<24>)(Unit<"'">))(
+        (Cents)(SymmetricInteger)(MaximumOffset<100>)(Unit<"''">))LE_PV_TSS_SENSITIVITY());
 
 #undef LE_PV_TSS_SENSITIVITY
 

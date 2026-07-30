@@ -31,8 +31,8 @@ namespace Detail
 struct PitchMagnetBase
 {
     LE_DEFINE_PARAMETERS(
-        ((Target)(LinearUnsignedInteger)(Minimum<20>)(Maximum<2000>)(Default<200>)(Unit<' Hz'>))(
-            (Speed)(LinearFloat)(Minimum<0>)(Maximum<60>)(Default<1>)(Unit<' \'/s'>)));
+        ((Target)(LinearUnsignedInteger)(Minimum<20>)(Maximum<2000>)(Default<200>)(Unit<" Hz">))(
+            (Speed)(LinearFloat)(Minimum<0>)(Maximum<60>)(Default<1>)(Unit<" '/s">)));
 
     /// \typedef Target
     /// \brief Target frequency to shift to.

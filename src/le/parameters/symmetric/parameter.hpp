@@ -16,7 +16,6 @@
 #include "le/parameters/linear/parameter.hpp"
 
 #include "le/utility/assert.hpp"
-#include <boost/mpl/pair.hpp>
 
 #include <cstdint>
 #include <type_traits>
@@ -38,8 +37,7 @@ struct MaximumOffset;
 }
 
 template <std::uint16_t value>
-using MaximumOffset =
-    boost::mpl::pair<Tag::MaximumOffset, std::integral_constant<std::int16_t, value>>;
+using MaximumOffset = TraitPair<Tag::MaximumOffset, std::integral_constant<std::int16_t, value>>;
 
 //------------------------------------------------------------------------------
 } // namespace Traits
@@ -123,7 +121,7 @@ struct SymmetricInteger
     {
         using type =
             Detail::SymmetricIntegerParameterTraits<TraitPack<NewTraits...>,
-                                                    Traits::ValuesDenominator<1>, Traits::Unit<0>>;
+                                                    Traits::ValuesDenominator<1>, Traits::Unit<"">>;
     };
 };
 
@@ -138,7 +136,7 @@ struct SymmetricFloat
     {
         using type =
             Detail::SymmetricFloatParameterTraits<TraitPack<NewTraits...>,
-                                                  Traits::ValuesDenominator<1>, Traits::Unit<0>>;
+                                                  Traits::ValuesDenominator<1>, Traits::Unit<"">>;
     };
 };
 

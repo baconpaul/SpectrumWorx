@@ -48,7 +48,7 @@ struct Colorifer
     LE_ENUMERATED_PARAMETER(ReplacePhase, (No)(Yes));
 
     LE_DEFINE_PARAMETERS(((SpectrumPreprocess))(
-        (BandWidth)(LinearUnsignedInteger)(Minimum<0>)(Maximum<6000>)(Default<1000>)(Unit<' Hz'>))(
+        (BandWidth)(LinearUnsignedInteger)(Minimum<0>)(Maximum<6000>)(Default<1000>)(Unit<" Hz">))(
         (ReplacePhase)));
 
     /// \typedef SpectrumPreprocess
