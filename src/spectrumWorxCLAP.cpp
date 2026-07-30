@@ -27,6 +27,7 @@
 #include "core/host_interop/host2PluginImpl.inl"
 #include "core/host_interop/plugin2HostImpl.inl"
 
+#include <sst/plugininfra/cpufeatures.h>
 #include <sst/plugininfra/version_information.h>
 
 #include <algorithm>
@@ -486,6 +487,25 @@ void SpectrumWorxCLAP::paramsFlush(clap_input_events const *const in,
 
 clap_process_status SpectrumWorxCLAP::process(clap_process const *const process) noexcept
 {
+    /// \note Stage 4.2, and the reason it is one line here rather than a fix to
+    /// `Math::FPUDisableDenormalsGuard`: **nothing was flushing denormals at
+    /// all**, on any platform. The engine's own two guards are inside
+    /// `#ifdef LE_SW_SDK_BUILD`, which nothing defines, and the third is in
+    /// `SpectrumWorx::process` — the 2016 host-facing class, which the CLAP does
+    /// not call. The audio path is this function, `runEngine()` and
+    /// `SpectrumWorxCore::process()`. So there was no working guard to rekey off
+    /// the long-dead `BOOST_SIMD_HAS_SSE_SUPPORT`; there was no guard.
+    ///
+    ///   `FPUStateGuard` covers x86-64 (FTZ and DAZ via MXCSR) and aarch64 (FZ
+    ///   via FPCR) and restores the caller's state on the way out, which a host
+    ///   is entitled to expect. Here rather than in `runEngine()` because event
+    ///   handling and `flushUIEdits()` convert parameter values, and because
+    ///   the whole callback is the unit a host cares about. All four formats
+    ///   funnel through here: clap-wrapper drives the VST3, AUv2 and standalone
+    ///   off this same entry point.
+    ///                                   (29.07.2026.) (SW port)
+    sst::plugininfra::cpufeatures::FPUStateGuard const denormalGuard;
+
     bool effectChanged(false);
     if (auto const *const in = process->in_events)
     {

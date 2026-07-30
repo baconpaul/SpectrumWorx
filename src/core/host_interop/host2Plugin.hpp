@@ -78,16 +78,18 @@ class Host2PluginInteropControler::AutomationBlocker
         *pBlockAutomation_ = false;
     }
 
-#if defined(__clang__) || _MSC_VER >= 1900
     /// \note Clang lame RVO support workaround.
     ///                                        (02.07.2014.) (Domagoj Saric)
+    /// \note The gate was `defined(__clang__) || _MSC_VER >= 1900`, which is
+    /// false on GCC, so GCC alone would have got no move constructor at all —
+    /// and NRVO on a named local is permitted, not guaranteed. Unconditional.
+    ///                                       (29.07.2026.) (SW port)
     AutomationBlocker(AutomationBlocker &&other) : pBlockAutomation_(other.pBlockAutomation_)
     {
         static bool dummy;
         dummy = true;
         other.pBlockAutomation_ = &dummy;
     }
-#endif // __clang__
 
   private:
     bool *LE_RESTRICT pBlockAutomation_;

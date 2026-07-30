@@ -40,7 +40,18 @@ DataRange resize(DataRange const &range, IndexRange const &workingRange)
     return DataRange(&range[workingRange.begin()], &range[workingRange.end() - 1] + 1);
 }
 
-LE_WEAK_FUNCTION LE_COLD std::uint16_t fftBufferSize(std::uint8_t const a, std::uint8_t const b,
+/// \note This returned `std::uint16_t`, and the byte count does not fit: a buffer
+/// of 2N floats at the maximum FFT size is 2 * 8192 * 4 = 65536 bytes, which
+/// truncates to **zero**. That is not hypothetical — `FFT_float_real_1D`'s work
+/// buffer on the Accelerate path is exactly such a `DoubleFFTBuffer`, so
+/// `requiredStorage()` answered 0 for it at fftSize 8192, and so did
+/// `WindowBuffer` with a presum factor of 2. The debug assert below caught it;
+/// a release build silently sized the buffer to nothing.
+///
+///   The element counts still fit in 16 bits and the callers all sum into 32,
+/// so widening the byte count is the whole fix.
+///                                           (29.07.2026.) (SW port)
+LE_WEAK_FUNCTION LE_COLD std::uint32_t fftBufferSize(std::uint8_t const a, std::uint8_t const b,
                                                      std::uint8_t const c,
                                                      std::uint8_t const sizeOfT,
                                                      std::uint16_t const fftSize)
@@ -48,10 +59,8 @@ LE_WEAK_FUNCTION LE_COLD std::uint16_t fftBufferSize(std::uint8_t const a, std::
     using Utility::Constants::vectorAlignment;
     LE_ASSERT_MSG(fftSize * a / b < std::numeric_limits<std::uint16_t>::max(),
                   "Short integer overflow");
-    auto const storageBytes(std::uint16_t(std::uint16_t(std::uint32_t(fftSize * a) / b) + c) *
-                            sizeOfT);
-    LE_ASSERT_MSG(storageBytes < std::numeric_limits<std::uint16_t>::max(),
-                  "Short integer overflow");
+    std::uint32_t const elements(std::uint16_t(std::uint32_t(fftSize * a) / b) + c);
+    auto const storageBytes(elements * sizeOfT);
     return storageBytes;
 }
 } // namespace Detail

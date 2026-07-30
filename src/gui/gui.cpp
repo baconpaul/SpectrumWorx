@@ -31,9 +31,6 @@
 #include <string_view>
 #include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
-#ifdef __APPLE__
-void const *swDLLAddress;
-#endif // __APPLE__
 #ifdef _WIN32
 extern "C" IMAGE_DOS_HEADER __ImageBase;
 #endif // _WIN32
@@ -215,58 +212,15 @@ void warningOkCancelBox(TCHAR const *const title, TCHAR const *const question,
 static juce::File pluginRootPath;
 static juce::File mruPresetsFolder;
 
-namespace
-{
-unsigned int const maxPathLength =
-#if defined(_WIN32)
-    // https://visualstudio.uservoice.com/forums/121579-visual-studio/suggestions/2156195-fix-260-character-file-name-length-limitation
-    // http://blogs.msdn.com/b/bclteam/archive/2007/02/13/long-paths-in-net-part-1-of-3-kim-hamilton.aspx
-    MAX_PATH;
-#elif defined(__APPLE__)
-    PATH_MAX + 1;
-#endif
-
-typedef TCHAR path_t[maxPathLength];
-
-unsigned int getBinaryPath(path_t &path)
-{
-#if defined(_WIN32)
-
-    DWORD const fullPathLength(
-        ::GetModuleFileName(reinterpret_cast<HMODULE>(&__ImageBase), path, _countof(path)));
-    LE_ASSERT((fullPathLength > 0) && (fullPathLength < _countof(path)));
-    LE_ASSERT(path[fullPathLength] == '\0');
-    static TCHAR const extension[] = _T( ".dll" );
-
-#elif defined(__APPLE__)
-
-    // http://developer.apple.com/library/mac/#documentation/DeveloperTools/Reference/MachOReference/Reference/reference.html
-    // http://lists.apple.com/archives/xcode-users/2004/Feb/msg00428.html
-
-    //unsigned long fullPathLength( PATH_MAX );
-    //NSGetExecutablePath( path, &fullPathLength );
-    Dl_info exeInfo;
-    LE_VERIFY(dladdr(&pluginRootPath, &exeInfo) != 0);
-    ::swDLLAddress = exeInfo.dli_fbase;
-    unsigned long fullPathLength(std::strlen(exeInfo.dli_fname));
-    LE_ASSERT(fullPathLength <= _countof(path) + _countof(".paths"));
-    std::memcpy(path, exeInfo.dli_fname, fullPathLength);
-    //static TCHAR const extension[] = _T( ".dylib" );...mrmlj...does not see through symlink...
-    static TCHAR const extension[] = _T( "." );
-    path[fullPathLength++] = _T('.');
-    path[fullPathLength] = _T('\0');
-
-#endif // OS
-
-    unsigned int const dotIndex(fullPathLength - sizeof('\0') -
-                                (_countof(extension) - sizeof('\0') - sizeof('.')));
-    unsigned int const insertionIndex(dotIndex + sizeof('\0'));
-
-    LE_ASSERT(path[dotIndex] == _T('.'));
-    LE_ASSERT(std::_tcscmp(&path[dotIndex], extension) == 0);
-    return insertionIndex;
-}
-} // anonymous namespace
+/// \note `maxPathLength`, `path_t` and `getBinaryPath()` stood here and are
+/// deleted. They existed only to locate the `SpectrumWorx.paths` file the note
+/// below describes, and nothing had called them since 6.3 removed the two
+/// `mapPathsFile()` overloads that did — the note said as much and then left the
+/// helper behind. It was not harmless: `maxPathLength` had a `_WIN32` arm and an
+/// `__APPLE__` arm and no third one, so on Linux it was a declaration with no
+/// initialiser, and `path_t` was an array of `TCHAR`. `swDLLAddress`, whose only
+/// writer was `getBinaryPath`, went with it — nothing ever read it.
+///                                       (29.07.2026.) (SW port)
 
 /// \note What used to live here: the plugin found its skin, its presets and its
 /// documentation by mmapping a `SpectrumWorx.paths` file that the 2016 installer
@@ -542,7 +496,8 @@ void OwnedWindowBase::attach(SpectrumWorxEditor &parent, juce::Component &window
     window.juce::Component::setVisible(true);
 }
 
-void OwnedWindowBase::detach(SpectrumWorxEditor &editor, juce::Component &ownee)
+void OwnedWindowBase::detach([[maybe_unused]] SpectrumWorxEditor &editor,
+                             [[maybe_unused]] juce::Component &ownee)
 {
 #ifdef _WIN32
     LE_ASSERT(wndProcHook != 0);
@@ -554,10 +509,16 @@ void OwnedWindowBase::detach(SpectrumWorxEditor &editor, juce::Component &ownee)
         LE_VERIFY(::UnhookWindowsHookEx(wndProcHook));
         wndProcHook = 0;
     }
-    LE::Utility::ignoreUnused(editor);
-    LE::Utility::ignoreUnused(ownee);
-#else
+#elif defined(__APPLE__)
     detachFromEditor(*editor.getPeer(), *ownee.getPeer());
+#else
+    /// \note `detachFromEditor` is defined in gui.mm, so the `#else` this
+    /// replaces reached an Objective-C++ function on Linux. There is nothing to
+    /// undo here: `attach()` above has a `_WIN32` block and an `__APPLE__` block
+    /// and no third one, so on Linux no separate desktop window is ever created
+    /// and the ownee is simply a visible child. Stage 6.4 -- the owned-window
+    /// collapse -- removes the asymmetry properly on all three platforms.
+    ///                                   (29.07.2026.) (SW port)
 #endif // _WIN32
 }
 

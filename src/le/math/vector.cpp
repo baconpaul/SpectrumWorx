@@ -83,6 +83,14 @@ LE_FAST_MATH_ON()
 
 #include "le/utility/intrinsics.hpp"
 
+/// \note These were reached transitively through the NT2 and Accelerate headers.
+/// The portable arms below use std::memcpy / memmove / memset, std::log, exp,
+/// sqrt, sin, cos and std::{min,max}_element with neither in the include graph.
+///                                           (29.07.2026.) (SW port)
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+
 #ifdef LE_MATH_USE_NT2
 
 // NT2
@@ -908,7 +916,17 @@ void add(float const *const pInputData, float *const pInputOutput, float const *
         pack += *pInput++;
     }
 #else
-    LE_UNREACHABLE_CODE
+    /// \note The portable arm, replacing what was an unreachable stub: with
+    /// neither Accelerate nor NT2 these had no implementation at all in
+    /// either interface -- the pointer-pair form fell through to here and the
+    /// count form delegated straight back to it. Elementwise and in the
+    /// caller's order, so both GCC and Clang vectorise them at -O2 and above
+    /// without needing reassociation, and the rounding is the scalar loop's.
+    ///                                   (29.07.2026.) (SW port)
+    float const *LE_RESTRICT pInput(pInputData);
+    float *LE_RESTRICT pOutput(pInputOutput);
+    while (pOutput != pOutputEnd)
+        *pOutput++ += *pInput++;
 #endif // LE_MATH_USE_NT2
 }
 
@@ -927,7 +945,17 @@ void add(float const *const pInputData, float const scalar, float *const pOutput
         pack = *pInput++ + constant;
     }
 #else
-    LE_UNREACHABLE_CODE
+    /// \note The portable arm, replacing what was an unreachable stub: with
+    /// neither Accelerate nor NT2 these had no implementation at all in
+    /// either interface -- the pointer-pair form fell through to here and the
+    /// count form delegated straight back to it. Elementwise and in the
+    /// caller's order, so both GCC and Clang vectorise them at -O2 and above
+    /// without needing reassociation, and the rounding is the scalar loop's.
+    ///                                   (29.07.2026.) (SW port)
+    float const *LE_RESTRICT pInput(pInputData);
+    float *LE_RESTRICT pOutputValue(pOutput);
+    while (pOutputValue != pOutputEnd)
+        *pOutputValue++ = *pInput++ + scalar;
 #endif // LE_MATH_USE_NT2
 }
 
@@ -947,7 +975,18 @@ LE_NOINLINE_NT2 void multiply(float const *const pFirstArray, float const *const
         pack = *pInput1++ * *pInput2++;
     }
 #else
-    LE_UNREACHABLE_CODE
+    /// \note The portable arm, replacing what was an unreachable stub: with
+    /// neither Accelerate nor NT2 these had no implementation at all in
+    /// either interface -- the pointer-pair form fell through to here and the
+    /// count form delegated straight back to it. Elementwise and in the
+    /// caller's order, so both GCC and Clang vectorise them at -O2 and above
+    /// without needing reassociation, and the rounding is the scalar loop's.
+    ///                                   (29.07.2026.) (SW port)
+    float const *LE_RESTRICT pInput1(pFirstArray);
+    float const *LE_RESTRICT pInput2(pSecondArray);
+    float *LE_RESTRICT pOutputValue(pOutput);
+    while (pOutputValue != pOutputEnd)
+        *pOutputValue++ = *pInput1++ * *pInput2++;
 #endif // LE_MATH_USE_NT2
 }
 
@@ -965,7 +1004,17 @@ LE_NOINLINE_NT2 void multiply(float const *const pInputData, float *const pInput
         pack *= *pInput++;
     }
 #else
-    LE_UNREACHABLE_CODE
+    /// \note The portable arm, replacing what was an unreachable stub: with
+    /// neither Accelerate nor NT2 these had no implementation at all in
+    /// either interface -- the pointer-pair form fell through to here and the
+    /// count form delegated straight back to it. Elementwise and in the
+    /// caller's order, so both GCC and Clang vectorise them at -O2 and above
+    /// without needing reassociation, and the rounding is the scalar loop's.
+    ///                                   (29.07.2026.) (SW port)
+    float const *LE_RESTRICT pInput(pInputData);
+    float *LE_RESTRICT pOutput(pInputOutput);
+    while (pOutput != pOutputEnd)
+        *pOutput++ *= *pInput++;
 #endif // LE_MATH_USE_NT2
 }
 
@@ -1002,7 +1051,20 @@ LE_NOINLINE_NT2 void multiply(float const scalar, float const *LE_RESTRICT const
         }
     }
 #else
-    LE_UNREACHABLE_CODE
+    /// \note The portable arm, replacing what was an unreachable stub: with
+    /// neither Accelerate nor NT2 these had no implementation at all in
+    /// either interface -- the pointer-pair form fell through to here and the
+    /// count form delegated straight back to it. Elementwise and in the
+    /// caller's order, so both GCC and Clang vectorise them at -O2 and above
+    /// without needing reassociation, and the rounding is the scalar loop's.
+    ///                                   (29.07.2026.) (SW port)
+    /// \note No scalar == 0 / scalar == 1 short circuits, unlike the NT2 arm
+    /// above: vDSP_vsmul has none either, and the difference is observable on a
+    /// non-finite input.
+    float const *LE_RESTRICT pInput(pInputData);
+    float *LE_RESTRICT pOutputValue(pOutput);
+    while (pOutputValue != pOutputEnd)
+        *pOutputValue++ = scalar * *pInput++;
 #endif // LE_MATH_USE_NT2
 }
 
@@ -1024,7 +1086,16 @@ LE_NOINLINE_NT2 void multiply(float const scalar, float *LE_RESTRICT const pInpu
         pack *= constant;
     }
 #else
-    LE_UNREACHABLE_CODE
+    /// \note The portable arm, replacing what was an unreachable stub: with
+    /// neither Accelerate nor NT2 these had no implementation at all in
+    /// either interface -- the pointer-pair form fell through to here and the
+    /// count form delegated straight back to it. Elementwise and in the
+    /// caller's order, so both GCC and Clang vectorise them at -O2 and above
+    /// without needing reassociation, and the rounding is the scalar loop's.
+    ///                                   (29.07.2026.) (SW port)
+    float *LE_RESTRICT pOutput(pInputOutput);
+    while (pOutput != pOutputEnd)
+        *pOutput++ *= scalar;
 #endif // LE_MATH_USE_NT2
 }
 
@@ -1069,7 +1140,17 @@ LE_NOINLINE_NT2 void addProduct(float const *LE_RESTRICT const pInputData1,
     }
 
 #else
-    LE_UNREACHABLE_CODE
+    /// \note The portable arm, replacing what was an unreachable stub: with
+    /// neither Accelerate nor NT2 these had no implementation at all in
+    /// either interface -- the pointer-pair form fell through to here and the
+    /// count form delegated straight back to it. Elementwise and in the
+    /// caller's order, so both GCC and Clang vectorise them at -O2 and above
+    /// without needing reassociation, and the rounding is the scalar loop's.
+    ///                                   (29.07.2026.) (SW port)
+    float const *LE_RESTRICT pInput1(pInputData1);
+    float const *LE_RESTRICT pInput2(pInputData2);
+    while (pInput3AndOutput != pOutputEnd)
+        *pInput3AndOutput++ += *pInput1++ * *pInput2++;
 #endif // LE_MATH_USE_NT2
 }
 
@@ -1092,7 +1173,19 @@ void ln(float *LE_RESTRICT const pInputOutput, float const *LE_RESTRICT const pO
 #elif defined(LE_MATH_NATIVE_POINTER_SIZE_INTERFACE)
     ln(pInputOutput, static_cast<unsigned int>(pOutputEnd - pInputOutput));
 #else
-    LE_UNREACHABLE_CODE
+    /// \note The portable arm, replacing what was an unreachable stub: with
+    /// neither Accelerate nor NT2 these had no implementation at all in
+    /// either interface -- the pointer-pair form fell through to here and the
+    /// count form delegated straight back to it. Elementwise and in the
+    /// caller's order, so both GCC and Clang vectorise them at -O2 and above
+    /// without needing reassociation, and the rounding is the scalar loop's.
+    ///                                   (29.07.2026.) (SW port)
+    float *LE_RESTRICT pOutput(pInputOutput);
+    while (pOutput != pOutputEnd)
+    {
+        *pOutput = std::log(*pOutput);
+        ++pOutput;
+    }
 #endif // LE_MATH_USE_NT2
 }
 
@@ -1110,7 +1203,17 @@ void ln(float const *LE_RESTRICT const pInput, float *LE_RESTRICT const pOutput,
 #elif defined(LE_MATH_NATIVE_POINTER_SIZE_INTERFACE)
     ln(pInput, pOutput, static_cast<unsigned int>(pOutputEnd - pOutput));
 #else
-    LE_UNREACHABLE_CODE
+    /// \note The portable arm, replacing what was an unreachable stub: with
+    /// neither Accelerate nor NT2 these had no implementation at all in
+    /// either interface -- the pointer-pair form fell through to here and the
+    /// count form delegated straight back to it. Elementwise and in the
+    /// caller's order, so both GCC and Clang vectorise them at -O2 and above
+    /// without needing reassociation, and the rounding is the scalar loop's.
+    ///                                   (29.07.2026.) (SW port)
+    float const *LE_RESTRICT pInputValue(pInput);
+    float *LE_RESTRICT pOutputValue(pOutput);
+    while (pOutputValue != pOutputEnd)
+        *pOutputValue++ = std::log(*pInputValue++);
 #endif // LE_MATH_USE_NT2
 }
 
@@ -1125,7 +1228,19 @@ void exp(float *LE_RESTRICT const pInputOutput, float const *LE_RESTRICT const p
 #elif defined(LE_MATH_NATIVE_POINTER_SIZE_INTERFACE)
     exp(pInputOutput, static_cast<unsigned int>(pOutputEnd - pInputOutput));
 #else
-    LE_UNREACHABLE_CODE
+    /// \note The portable arm, replacing what was an unreachable stub: with
+    /// neither Accelerate nor NT2 these had no implementation at all in
+    /// either interface -- the pointer-pair form fell through to here and the
+    /// count form delegated straight back to it. Elementwise and in the
+    /// caller's order, so both GCC and Clang vectorise them at -O2 and above
+    /// without needing reassociation, and the rounding is the scalar loop's.
+    ///                                   (29.07.2026.) (SW port)
+    float *LE_RESTRICT pOutput(pInputOutput);
+    while (pOutput != pOutputEnd)
+    {
+        *pOutput = std::exp(*pOutput);
+        ++pOutput;
+    }
 #endif // LE_MATH_USE_NT2
 }
 
@@ -1140,7 +1255,19 @@ void square(float *const pInputOutput, float const *const pOutputEnd)
 #elif defined(LE_MATH_NATIVE_POINTER_SIZE_INTERFACE)
     square(pInputOutput, static_cast<unsigned int>(pOutputEnd - pInputOutput));
 #else
-    LE_UNREACHABLE_CODE
+    /// \note The portable arm, replacing what was an unreachable stub: with
+    /// neither Accelerate nor NT2 these had no implementation at all in
+    /// either interface -- the pointer-pair form fell through to here and the
+    /// count form delegated straight back to it. Elementwise and in the
+    /// caller's order, so both GCC and Clang vectorise them at -O2 and above
+    /// without needing reassociation, and the rounding is the scalar loop's.
+    ///                                   (29.07.2026.) (SW port)
+    float *LE_RESTRICT pOutput(pInputOutput);
+    while (pOutput != pOutputEnd)
+    {
+        float const value(*pOutput);
+        *pOutput++ = value * value;
+    }
 #endif // LE_MATH_USE_NT2
 }
 
@@ -1155,7 +1282,19 @@ void squareRoot(float *const pInputOutput, float const *const pOutputEnd)
 #elif defined(LE_MATH_NATIVE_POINTER_SIZE_INTERFACE)
     squareRoot(pInputOutput, static_cast<unsigned int>(pOutputEnd - pInputOutput));
 #else
-    LE_UNREACHABLE_CODE
+    /// \note The portable arm, replacing what was an unreachable stub: with
+    /// neither Accelerate nor NT2 these had no implementation at all in
+    /// either interface -- the pointer-pair form fell through to here and the
+    /// count form delegated straight back to it. Elementwise and in the
+    /// caller's order, so both GCC and Clang vectorise them at -O2 and above
+    /// without needing reassociation, and the rounding is the scalar loop's.
+    ///                                   (29.07.2026.) (SW port)
+    float *LE_RESTRICT pOutput(pInputOutput);
+    while (pOutput != pOutputEnd)
+    {
+        *pOutput = std::sqrt(*pOutput);
+        ++pOutput;
+    }
 #endif // LE_MATH_USE_NT2
 }
 
@@ -1591,7 +1730,7 @@ void ln(float const *LE_RESTRICT pInput, float *LE_RESTRICT pOutput,
 #elif !defined(LE_MATH_NATIVE_POINTER_SIZE_INTERFACE)
     ln(pInput, pOutput, pOutput + numberOfElements);
 #else
-    LE_UNREACHABLE_CODE
+    LE_UNREACHABLE_CODE();
 #endif
 }
 

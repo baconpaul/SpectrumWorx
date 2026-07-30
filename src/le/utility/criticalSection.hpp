@@ -18,11 +18,33 @@
 /// \todo  Cleanup the code base so that it does not require recursive mutexes
 /// or at least minimise and document where they are required...
 ///                                           (22.03.2016.) (Domagoj Saric)
-#ifdef _WIN32
+///
+/// \note One `std::recursive_mutex`, on every platform, replacing what were two
+/// disagreeing implementations: `std::mutex` on Windows and a hand-rolled
+/// pthread wrapper everywhere else. Three reasons.
+///
+///   - **The pthread arm did not build on glibc.** Its recursive initialiser was
+///     spelled `PTHREAD_RECURSIVE_MUTEX_INITIALIZER`, which is Apple's name;
+///     glibc's is `..._NP`. The fallback for platforms lacking it named
+///     `PTHREAD_RECURSIVE_MUTEX`, which is not a constant on *any* platform —
+///     the type value is `PTHREAD_MUTEX_RECURSIVE` — so that branch had never
+///     compiled anywhere.
+///   - **The two arms disagreed on the one property that matters.** POSIX got a
+///     recursive mutex, Windows a non-recursive one, from the same type name. If
+///     anything in the code base does relock, that is a macOS-works /
+///     Windows-deadlocks split, and the comment above says recursion is what was
+///     wanted.
+///   - Nothing needed the parts that had to go: the `NonRecursive` constructor
+///     has no callers, and `ConditionVariable` (the `friend` that reached for the
+///     raw `pthread_mutex_t`) is included by nothing. `lock`/`unlock`/`try_lock`
+///     are the whole of the used interface, and `std::recursive_mutex` has them.
+///
+/// `SpectrumWorxCore::currentThreadOwnsTheProcessLock` reinterpret_casts this to
+/// a `CRITICAL_SECTION` under `_WIN32`. That was already invalid for the MS STL's
+/// `std::mutex` and stays invalid here; it is Windows bring-up's to fix, and it
+/// is a debug helper that already returns a hardcoded `true` off Windows.
+///                                           (29.07.2026.) (SW port)
 #include <mutex>
-#else // POSIX
-#include <pthread.h>
-#endif // OS
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -31,62 +53,7 @@ namespace Utility
 {
 //------------------------------------------------------------------------------
 
-#ifdef _WIN32
-
-using CriticalSection = std::mutex;
-
-#else // POSIX
-
-class CriticalSection
-{
-  public:
-    LE_COLD CriticalSection()
-#ifdef PTHREAD_RECURSIVE_MUTEX_INITIALIZER
-        : mutex_(PTHREAD_RECURSIVE_MUTEX_INITIALIZER)
-    {
-    }
-#else  // PTHREAD_RECURSIVE_MUTEX_INITIALIZER ...mrmlj...for osx10.6 only? recheck...
-    {
-        ::pthread_mutexattr_t attributes;
-        LE_VERIFY(::pthread_mutexattr_init(&attributes) == 0);
-        LE_VERIFY(::pthread_mutexattr_settype(&attributes, PTHREAD_RECURSIVE_MUTEX) == 0);
-        LE_VERIFY(::pthread_mutex_init(&mutex_, &attributes) == 0);
-    }
-#endif // PTHREAD_RECURSIVE_MUTEX_INITIALIZER
-    LE_COLD ~CriticalSection() { LE_VERIFY(::pthread_mutex_destroy(&mutex_) == 0); }
-
-    void lock() { LE_VERIFY(::pthread_mutex_lock(&mutex_) == 0); }
-    void unlock() { LE_VERIFY(::pthread_mutex_unlock(&mutex_) == 0); }
-
-    bool try_lock() { return ::pthread_mutex_trylock(&mutex_) == 0; }
-
-    enum RecursiveType
-    {
-        NonRecursive
-    }; //...mrmlj...
-    LE_COLD explicit CriticalSection(RecursiveType)
-#ifdef NDEBUG
-        : mutex_(PTHREAD_MUTEX_INITIALIZER){}
-#else
-        : mutex_(PTHREAD_ERRORCHECK_MUTEX_INITIALIZER)
-    {
-    }
-#endif // NDEBUG
-
-          CriticalSection(CriticalSection && other)
-        : mutex_(other.mutex_)
-    {
-        other.mutex_ = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
-    }
-
-    CriticalSection(CriticalSection const &) = delete;
-
-  private:
-    friend class ConditionVariable; //...mrmlj...
-    ::pthread_mutex_t mutex_;
-}; // class CriticalSection
-
-#endif // OS
+using CriticalSection = std::recursive_mutex;
 
 class CriticalSectionLock
 {

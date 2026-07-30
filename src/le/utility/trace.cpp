@@ -146,11 +146,19 @@ void Tracer::error(char const *const pFormatString, ...)
     ///                                   (28.07.2026.) (SW port)
     std::fputs(&formattedError[1], stderr);
     std::fputc('\n', stderr);
-#else
+#elif defined(_WIN32)
     std::fputs(&formattedError[1], stderr);
     pFormattedError[charactersWritten + 0] = '\n';
     pFormattedError[charactersWritten + 1] = '\0';
     ::OutputDebugStringA(&formattedError[1]);
+#else
+    /// \note The #else this replaces was Windows-only in everything but its
+    /// spelling, so Linux reached OutputDebugStringA. There is no
+    /// debugger-attached log channel to mirror to here: stderr is what a DAW
+    /// log and a test runner both capture.
+    ///                                   (29.07.2026.) (SW port)
+    std::fputs(&formattedError[1], stderr);
+    std::fputc('\n', stderr);
 #endif
 #endif // platform/compiler
     va_end(arglist);
@@ -178,11 +186,11 @@ void Tracer::message(char const *const pFormatString, ...)
     va_start(arglist, pFormatString);
     ::vsyslog(LOG_INFO, pFormatString, arglist);
 #pragma clang diagnostic pop
-#else
+#elif defined(_WIN32)
     formattedMessage[charactersWritten + 0] = '\n';
     formattedMessage[charactersWritten + 1] = '\0';
     ::OutputDebugStringA(formattedMessage);
-#endif
+#endif // the std::puts above is the whole of it on a plain POSIX target
 #endif // platform/compiler
     va_end(arglist);
 }

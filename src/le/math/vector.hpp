@@ -15,6 +15,7 @@
 //------------------------------------------------------------------------------
 #include "le/utility/platformSpecifics.hpp"
 
+#include <algorithm> // std::copy_n, in convertSamples below
 #include <cstdint>
 #include <limits>
 #include "le/utility/span.hpp"

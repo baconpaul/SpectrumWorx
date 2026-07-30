@@ -143,15 +143,17 @@ class LFO
     bool hasEnabledSync(SyncType) const; ///< is a specific SyncType enabled?
 
   protected:
-#if _MSC_VER < 1800
-    LFO() {}
-    LFO(LFO const &);
-    ~LFO() {}
-#else
+    /// \note The `#if _MSC_VER < 1800` that used to pick user-provided special
+    /// members here was vacuously true on GCC, where undefined `_MSC_VER`
+    /// preprocesses to 0 — so Linux was getting `LFO() {}` / `~LFO() {}` and a
+    /// merely *declared* copy constructor where macOS gets defaulted members and
+    /// a deleted copy. That is not cosmetic: user-provided versus defaulted
+    /// decides triviality, and a declared-not-defined copy turns a compile error
+    /// into a link error. VS2013 is long out of scope, so the branch is gone.
+    ///                                       (29.07.2026.) (SW port)
     LFO() = default;
     LFO(LFO const &) = delete;
     ~LFO() = default;
-#endif // _MSC_VER
 }; // class LFO
 
 /// @} // group Parameters

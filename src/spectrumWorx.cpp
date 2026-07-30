@@ -29,6 +29,8 @@
 #include "le/utility/ignoreUnused.hpp"
 #include <boost/fusion/algorithm/iteration/for_each.hpp>
 
+#include <sst/plugininfra/cpufeatures.h>
+
 #ifdef __GNUC__
 #include <cstdlib>
 #include <iconv.h>
@@ -38,12 +40,12 @@
 #include <string_view>
 #include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
-#ifdef __APPLE__
-extern void const *swDLLAddress;
-#endif // __APPLE__
+/// \note `swDLLAddress` stood here, extern on Apple and a file-static on Windows,
+/// and was read by nothing on either. Its only writer was gui.cpp's
+/// `getBinaryPath()`, which 6.3 orphaned and which is now deleted.
+///                                           (29.07.2026.) (SW port)
 #ifdef _WIN32
 extern "C" IMAGE_DOS_HEADER __ImageBase;
-static void const *const swDLLAddress(&__ImageBase);
 #endif // _WIN32
 //------------------------------------------------------------------------------
 namespace LE
@@ -168,7 +170,13 @@ void SpectrumWorx::process /// \throws nothing
         return;
     ProcessLockUnlocker const processingLockUnlocker(*this);
 
-    Math::FPUDisableDenormalsGuard const disableDenormals;
+    /// \note Was Math::FPUDisableDenormalsGuard, whose x86 arm was keyed on
+    /// BOOST_SIMD_HAS_SSE_SUPPORT and so had been dead since NT2 went. This
+    /// class is not on the CLAP's audio path -- see the note in
+    /// SpectrumWorxCLAP::process(), which is -- but it takes the same guard so
+    /// that there is only one of them in the tree.
+    ///                                   (29.07.2026.) (SW port)
+    sst::plugininfra::cpufeatures::FPUStateGuard const denormalGuard;
 
     // We give higher priority to external samples loaded through SW rather than
     // side channel data provided by the host:

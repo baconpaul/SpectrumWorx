@@ -215,10 +215,15 @@ template <class BaseComponent = juce::Component> class LE_NOVTABLE WidgetBase : 
     {
     }
 
-#ifdef __clang__
+    /// \note Not a Clang workaround, which is how this was gated: declaring the
+    /// placement pair above puts `operator delete` in class scope, and lookup for
+    /// the one the *deleting destructor* needs stops there rather than falling
+    /// back to `::operator delete`. Every widget here has a virtual destructor
+    /// (juce::Component does), so a usable single-argument form is required, and
+    /// GCC says so as plainly as Clang does. Only MSVC let it pass.
+    ///                                       (29.07.2026.) (SW port)
     void *operator new(std::size_t const count) { return ::operator new(count); }
     void operator delete(void *const pObject) { return ::operator delete(pObject); }
-#endif // __clang__
 
   private:
     using BaseComponent::isParentOf;

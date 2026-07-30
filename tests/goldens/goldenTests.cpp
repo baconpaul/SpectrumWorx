@@ -34,6 +34,7 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <sstream>
 #include <string>
 #include <vector>
 //------------------------------------------------------------------------------
@@ -92,19 +93,34 @@ std::vector<SWTest::Fixture> renderAll()
     return fixtures;
 }
 
-std::map<std::string, SWTest::Digest> readFixtures()
+/// The fixture file, plus the one thing about it that is not a fixture: what
+/// produced it.
+struct FixtureFile
 {
-    std::map<std::string, SWTest::Digest> golden;
-    std::ifstream file(fixturePath());
+    std::string provenance; ///< empty if the file predates the marker
+    std::map<std::string, SWTest::Digest> fixtures;
+};
+
+constexpr char provenanceMarker[]{"# provenance "};
+
+FixtureFile readFixtures()
+{
+    FixtureFile file;
+    std::ifstream stream(fixturePath());
     std::string line;
-    while (std::getline(file, line))
+    while (std::getline(stream, line))
     {
+        if (line.compare(0, std::string(provenanceMarker).size(), provenanceMarker) == 0)
+        {
+            file.provenance = line.substr(std::string(provenanceMarker).size());
+            continue;
+        }
         if (line.empty() || (line.front() == '#'))
             continue;
         auto const fixture(SWTest::Fixture::parse(line));
-        golden.emplace(fixture.key, fixture.digest);
+        file.fixtures.emplace(fixture.key, fixture.digest);
     }
-    return golden;
+    return file;
 }
 
 void writeFixtures(std::vector<SWTest::Fixture> const &fixtures)
@@ -118,9 +134,93 @@ void writeFixtures(std::vector<SWTest::Fixture> const &fixtures)
             "#\n"
             "# hash is FNV-1a over the raw sample bits and is a same-platform\n"
             "# contract only; the numeric columns are what a different\n"
-            "# architecture or compiler is held to.\n";
+            "# architecture or compiler is held to.\n"
+         << provenanceMarker << SWTest::provenance() << '\n';
     for (auto const &fixture : fixtures)
         file << fixture.serialise() << '\n';
+}
+
+/// \brief What the drift actually is, rather than which field noticed it first.
+///
+///   On a platform that did not mint the file, `compare( …, exact )` reports
+/// "bit-exact hash mismatch" for nearly every row and stops there, which says
+/// only that the two builds are not the same build. This says how far apart they
+/// are, which is the question a backend swap actually raises.
+///                                       (29.07.2026.) (SW port)
+std::string driftReport(std::vector<SWTest::Fixture> const &rendered,
+                        std::map<std::string, SWTest::Digest> const &golden,
+                        std::string const &goldenProvenance)
+{
+    struct Row
+    {
+        std::string key;
+        SWTest::Deltas deltas;
+    };
+    std::vector<Row> rows;
+    std::vector<float> peaks, rmss;
+    unsigned int identicalHashes{0}, silent{0};
+    for (auto const &fixture : rendered)
+    {
+        auto const entry(golden.find(fixture.key));
+        if (entry == golden.end())
+            continue;
+        rows.push_back({fixture.key, SWTest::deltas(entry->second, fixture.digest)});
+        peaks.push_back(rows.back().deltas.peak);
+        rmss.push_back(rows.back().deltas.rms);
+        if (entry->second.hash == fixture.digest.hash)
+        {
+            ++identicalHashes;
+            // A silent render hashes identically on any machine and pins nothing.
+            if ((entry->second.peak == 0) && (fixture.digest.peak == 0))
+                ++silent;
+        }
+    }
+
+    auto const percentile([](std::vector<float> values, double const fraction) {
+        if (values.empty())
+            return 0.0f;
+        std::sort(values.begin(), values.end());
+        auto const index(
+            std::min(values.size() - 1, static_cast<std::size_t>(fraction * values.size())));
+        return values[index];
+    });
+
+    std::vector<Row> over;
+    for (auto const &row : rows)
+        if (!row.deltas.withinTolerance())
+            over.push_back(row);
+    std::sort(over.begin(), over.end(),
+              [](Row const &a, Row const &b) { return a.deltas.worst() > b.deltas.worst(); });
+
+    std::ostringstream report;
+    report << "\ngolden drift: " << (goldenProvenance.empty() ? "(unmarked)" : goldenProvenance)
+           << "  ->  " << SWTest::provenance() << '\n'
+           << "  " << rows.size() << " fixtures compared; " << (rows.size() - over.size())
+           << " within tolerance (relative 1e-4, bands 0.01 dB), " << over.size() << " outside\n"
+           << "  bit-identical: " << identicalHashes << " (" << silent
+           << " of them a silent render, which pins nothing)\n"
+           << "  relative peak: median " << percentile(peaks, 0.5) << "  p90 "
+           << percentile(peaks, 0.9) << "  max " << percentile(peaks, 1.0) << '\n'
+           << "  relative rms : median " << percentile(rmss, 0.5) << "  p90 "
+           << percentile(rmss, 0.9) << "  max " << percentile(rmss, 1.0) << '\n';
+
+    if (!over.empty())
+    {
+        constexpr std::size_t listed{25};
+        report << "  worst " << std::min(listed, over.size()) << ", by relative amplitude:\n";
+        for (std::size_t index(0); (index < listed) && (index < over.size()); ++index)
+        {
+            auto const &row(over[index]);
+            report << "    " << row.key << "  peak " << row.deltas.peak << "  rms "
+                   << row.deltas.rms << "  dc " << row.deltas.dcOffset << "  band"
+                   << row.deltas.worstBand << " " << row.deltas.band << " dB"
+                   << (row.deltas.bandsNearSilence ? " (both near the silence floor)" : "")
+                   << (row.deltas.nonFiniteDiffers ? "  NON-FINITE COUNT DIFFERS" : "") << '\n';
+        }
+        if (over.size() > listed)
+            report << "    ... and " << (over.size() - listed) << " more\n";
+    }
+    return report.str();
 }
 
 bool updateRequested()
@@ -166,27 +266,41 @@ TEST_CASE("Golden fixtures", "[golden]")
     }
 
     auto const golden(readFixtures());
-    REQUIRE_FALSE(golden.empty());
+    REQUIRE_FALSE(golden.fixtures.empty());
 
-    // The hash is a contract against the machine that produced the file; the
-    // numeric summary is what has to hold anywhere else. Until CI runs this on
-    // a second architecture there is nothing to distinguish the two cases by,
-    // so the hash is checked and a cross-platform failure will say so loudly.
-    constexpr bool exact{true};
+    /// The hash is a contract against the build that produced the file; the
+    /// numeric summary is what has to hold anywhere else. Which of the two is
+    /// being checked is now decided by the file's own provenance marker rather
+    /// than assumed.
+    ///
+    ///   Stage 4 is what made this necessary. The fixtures were minted on
+    /// macOS/arm64 over Accelerate; on Linux over pffft, 439 of 464 rows have a
+    /// different hash and every one of them is legitimate -- a bit-exact hash
+    /// over float output cannot survive a different FFT implementation, a
+    /// different libm or a different compiler, and was never meant to. Checking
+    /// it anyway turned the whole cross-platform question into 439 identical
+    /// "bit-exact hash mismatch" lines that answered nothing.
+    ///                                   (29.07.2026.) (SW port)
+    auto const sameBuild(golden.provenance == SWTest::provenance());
 
     std::vector<std::string> failures;
     for (auto const &fixture : fixtures)
     {
-        auto const entry(golden.find(fixture.key));
-        if (entry == golden.end())
+        auto const entry(golden.fixtures.find(fixture.key));
+        if (entry == golden.fixtures.end())
         {
             failures.push_back(fixture.key + ": no golden");
             continue;
         }
-        auto const result(SWTest::compare(entry->second, fixture.digest, exact));
+        auto const result(SWTest::compare(entry->second, fixture.digest, sameBuild));
         if (!result.matches)
             failures.push_back(fixture.key + ": " + result.explanation);
     }
+
+    if (!sameBuild)
+        UNSCOPED_INFO(driftReport(fixtures, golden.fixtures, golden.provenance));
+    else
+        UNSCOPED_INFO("bit-exact against " << golden.provenance);
 
     for (auto const &failure : failures)
         UNSCOPED_INFO(failure);

@@ -437,7 +437,16 @@ template <class Widget> struct ModuleWidgetHolder
     ModuleControlImpl<Widget> widget;
 }; // struct ModuleWidgetHolder
 
-#ifdef __clang__ //...mrmlj...ambiguity compilation errors...
+/// \note Was `#ifdef __clang__ //...mrmlj...ambiguity compilation errors...`, and
+/// the ambiguity is real rather than a Clang quirk. `WidgetsStorage` below folds
+/// one base class per parameter onto the chain, so an effect with two parameters
+/// of the same widget type — and most have several knobs — inherits
+/// `ModuleWidgetHolder<ModuleKnob>` twice. Converting to a base that appears
+/// twice is ambiguous, full stop; MSVC accepted it (hence the 4584 suppression
+/// on WidgetsStorage) and resolved to whichever it saw first. Interposing a
+/// holder keyed on the *parameter* makes every base distinct, which is the fix
+/// for all three compilers rather than for one.
+///                                           (29.07.2026.) (SW port)
 template <typename Parameter>
 struct ParameterWidgetHolder : ModuleWidgetHolder<typename WidgetForParameter<Parameter>::type>
 {
@@ -446,15 +455,10 @@ struct ParameterWidgetHolder : ModuleWidgetHolder<typename WidgetForParameter<Pa
     {
     }
 };
-#endif // __clang__
 
 template <typename Parameter> struct ParameterWidget
 {
-#ifdef __clang__
     typedef ParameterWidgetHolder<Parameter> type;
-#else
-    typedef ModuleWidgetHolder<typename WidgetForParameter<Parameter>::type> type;
-#endif // __clang__
 }; // struct ParameterWidget
 
 ////////////////////////////////////////////////////////////////////////////

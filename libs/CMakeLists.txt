@@ -24,6 +24,11 @@ target_include_directories(rapidxml INTERFACE rapidxml)
 
 add_subdirectory(fmt EXCLUDE_FROM_ALL)
 
+# The FFT off Apple, replacing nt2/signal/static_fft.hpp. Apple keeps
+# Accelerate/vDSP, so the target is only needed on the other platforms -- but it
+# is configured everywhere so that a macOS build still notices if it breaks.
+add_subdirectory(pffft EXCLUDE_FROM_ALL)
+
 if (SW_BUILD_TESTS)
     add_subdirectory(catch2 EXCLUDE_FROM_ALL)
     list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/catch2/extras")

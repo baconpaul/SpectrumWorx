@@ -168,6 +168,23 @@ target_compile_definitions(sw-dsp PUBLIC LE_ENABLE_ASSERT_HANDLER)
 # constructs all 57 modules and processes audio without touching JUCE.
 target_link_libraries(sw-dsp PUBLIC juce::juce_gui_basics sw-gui-resources)
 
+# Linking a JUCE module compiles that module's own sources into the consuming
+# target, so sw-dsp -- not the shim -- is what builds juce_core.cpp. It therefore
+# has to carry the module settings itself: add_clap_juce_shim() puts these on
+# clap_juce_shim_requirements and clap_juce_shim, neither of which is on this
+# link line.
+#
+# It shows up as a Linux-only link failure. JUCE's macOS URL backend is
+# NSURLSession, its Linux one is libcurl, so juce_core.cpp reached for -lcurl on
+# a plugin that does no networking. PUBLIC, so every translation unit that sees
+# a JUCE header agrees with the ones the shim compiles.
+#
+# \note Only the two. The shim also sets JUCE_MODAL_LOOPS_PERMITTED=0,
+# JUCE_USE_CAMERA and JUCE_REPORT_APP_USAGE; those would change what compiles in
+# gui/, and the preset browser's two async save-path callers (stage 6.4) are
+# exactly the code that would notice. Not this commit's business.
+target_compile_definitions(sw-dsp PUBLIC JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+
 # No presets, for now. le/spectrumworx/presets.cpp reads and writes
 # preset files through juce::File and boost::mmap in the same translation unit
 # as the parameter (de)serialisation, so the DSP cannot have the second without
@@ -189,4 +206,9 @@ target_compile_definitions(sw-dsp PUBLIC LE_SW_DISABLE_SIDE_CHANNEL)
 if (APPLE)
     # le/math/vector.cpp and le/math/dft/fft.cpp are vDSP/vForce on Apple.
     target_link_libraries(sw-dsp PUBLIC "-framework Accelerate")
+else()
+    # ...and pffft everywhere else, per le/math/dft/fft.hpp's LE_PFFFT. PRIVATE:
+    # fft.hpp forward declares pffft::PFFFT_Setup rather than including pffft.h,
+    # so nothing outside fft.cpp needs the include path.
+    target_link_libraries(sw-dsp PRIVATE pffft)
 endif()
