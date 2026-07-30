@@ -18,7 +18,6 @@
 #include "core/spectrumWorxCore.hpp"
 #include "gui/editor/spectrumWorxEditor.hpp"
 
-#include "le/plugins/vst/2.4/plugin.hpp"
 #include "le/utility/cstdint.hpp"
 
 #include <juce_core/juce_core.h>

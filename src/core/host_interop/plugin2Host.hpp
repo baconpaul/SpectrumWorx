@@ -18,13 +18,6 @@
 #include "le/parameters/printer.hpp"
 #include "le/parameters/parametersUtilities.hpp" // IndexOf, Clang
 #include "le/plugins/plugin.hpp"
-/// \note Was keyed on "are we on Windows or macOS and not FMOD", i.e. "is a
-/// VST2 SDK around". Nothing defines LE_SW_VST24, so the VST 2.4 traits below
-/// are dead until stage 5 replaces them with their CLAP equivalents.
-///                                           (28.07.2026.) (SW port)
-#ifdef LE_SW_VST24
-#include "le/plugins/vst/2.4/plugin.hpp"
-#endif // LE_SW_VST24
 
 #include "le/utility/cstdint.hpp"
 
@@ -165,13 +158,6 @@ class LE_NOVTABLE Plugin2HostInteropControler
 
 class LE_NOVTABLE Plugin2HostPassiveInteropController
 {
-#ifdef LE_SW_VST24
-  public: // VST 2.4 protocol required traits.
-    static std::uint8_t const maxNumberOfPrograms = Constants::numberOfPrograms;
-    static ::VstPlugCategory const category = kPlugCategEffect;
-    static ::VstInt32 const vstUniqueID = 'LESW';
-#endif // LE_SW_VST24
-
   public:
     ////////////////////////////////////////////////////////////////////////////
     // Parameters
