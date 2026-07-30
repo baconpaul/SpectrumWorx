@@ -28,6 +28,7 @@
 #include <cmath>
 #include <cstring>
 #include <numbers>
+#include <functional>
 #include <vector>
 //------------------------------------------------------------------------------
 namespace
@@ -163,13 +164,19 @@ class Entry
 class ActivePlugin
 {
   public:
+    /// \param beforeActivate run against the initialised-but-inactive plugin,
+    /// which is when a host restores state and when params.flush() is legal but
+    /// the engine has no sample rate yet.
     ActivePlugin(double const sampleRate, std::uint32_t const blockSize,
-                 clap_host const &host = nullHost())
+                 clap_host const &host = nullHost(),
+                 std::function<void(clap_plugin const &)> const &beforeActivate = {})
         : blockSize_(blockSize)
     {
         pPlugin_ = factory().create_plugin(&factory(), &host, descriptorID());
         REQUIRE(pPlugin_ != nullptr);
         REQUIRE(pPlugin_->init(pPlugin_));
+        if (beforeActivate)
+            beforeActivate(*pPlugin_);
         REQUIRE(pPlugin_->activate(pPlugin_, sampleRate, 1, blockSize));
         REQUIRE(pPlugin_->start_processing(pPlugin_));
     }
@@ -543,6 +550,101 @@ TEST_CASE("Filling a module slot renames its parameters without adding any", "[c
     }
     CHECK(revealed > 0);
     CHECK(renamed > 0);
+}
+
+TEST_CASE("Every parameter accepts the bounds it advertises", "[clap]")
+{
+    // A host is entitled to write min_value and max_value to anything it is
+    // shown, and clap-validator's param-fuzz-bounds does exactly that. Whatever
+    // the plugin then does with the value, it may not be out of the range the
+    // parameter itself considers valid.
+    Entry const entry;
+    ActivePlugin plugin(48000, 512);
+
+    auto const &params(parameters(*plugin));
+
+    /// \note Every effect in turn, not just the first. The parameters that have
+    /// gone out of range are effect-specific ones, and a slot only ever has the
+    /// parameters of whatever is currently in it -- so a sweep that fills the
+    /// slot once tests one effect's parameters and calls it coverage.
+    clap_param_info selector{};
+    for (auto const &info : allParameterInfo(*plugin, params))
+        if (info.id == parameterID(moduleChainType, 0))
+            selector = info;
+    REQUIRE(selector.max_value > selector.min_value);
+
+    for (double effect(selector.min_value); effect <= selector.max_value; ++effect)
+    {
+        OneParameterEvent const fill(selector.id, effect);
+        params.flush(&*plugin, &*fill, &discardedOutputEvents());
+
+        for (auto const &info : allParameterInfo(*plugin, params))
+        {
+            if ((std::strncmp(info.module, "Slot 1", 6) != 0) || (info.id == selector.id))
+                continue;
+
+            for (double const value :
+                 {info.min_value, info.max_value, (info.min_value + info.max_value) / 2})
+            {
+                CAPTURE(effect, info.id, info.name, value);
+                OneParameterEvent const edit(info.id, value);
+                params.flush(&*plugin, &*edit, &discardedOutputEvents());
+
+                double read{0};
+                REQUIRE(params.get_value(&*plugin, info.id, &read));
+                CHECK(read >= info.min_value);
+                CHECK(read <= info.max_value);
+            }
+        }
+    }
+}
+
+TEST_CASE("An effect chosen before activate still processes audio", "[clap]")
+{
+    // The order a session restore happens in, and the order a standalone starts
+    // in: the parameter that fills a slot arrives while the plugin is merely
+    // initialised, so the engine has no sample rate, no bins and no step time to
+    // configure the effect against. Configuring it anyway is what asserted --
+    // Bandpass and Bandstop indexed an empty spectrum, Denoiser divided an empty
+    // amplitude range -- so it is deferred to the resize that activate() performs.
+    //
+    //   Which makes this the test that matters: deferring is only correct if the
+    // effect really is set up by the time audio arrives.
+    constexpr std::uint32_t blockSize{512};
+    constexpr float sampleRate{48000};
+
+    Entry const entry;
+    ActivePlugin plugin(sampleRate, blockSize, nullHost(), [](clap_plugin const &inactive) {
+        auto const *const params(static_cast<clap_plugin_params const *>(
+            inactive.get_extension(&inactive, CLAP_EXT_PARAMS)));
+        REQUIRE(params != nullptr);
+
+        OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
+        params->flush(&inactive, &*fillSlotOne, &discardedOutputEvents());
+    });
+
+    // The slot really is filled, and by an effect rather than by nothing.
+    auto const &params(parameters(*plugin));
+    double selector{-1};
+    REQUIRE(params.get_value(&*plugin, parameterID(moduleChainType, 0), &selector));
+    CHECK(selector >= 0);
+
+    std::vector<float> leftIn(blockSize), rightIn(blockSize);
+    std::vector<float> leftOut(blockSize), rightOut(blockSize);
+    fillWithSine(leftIn, sampleRate, 440, 0);
+    fillWithSine(rightIn, sampleRate, 440, 0);
+
+    // Long enough to clear the analysis latency, so silence would be a real answer
+    // rather than a not-yet-answer.
+    for (std::uint32_t block(0); block < 16; ++block)
+    {
+        fillWithSine(leftIn, sampleRate, 440, block * blockSize);
+        fillWithSine(rightIn, sampleRate, 440, block * blockSize);
+        plugin.process(leftIn, rightIn, leftOut, rightOut);
+        CHECK(allFinite(leftOut));
+        CHECK(allFinite(rightOut));
+    }
+    CHECK(peak(leftOut) > 0);
 }
 
 TEST_CASE("Filling a slot makes the host re-read the descriptions", "[clap]")

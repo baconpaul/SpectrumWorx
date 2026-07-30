@@ -55,7 +55,9 @@ if (SW_BUILD_TESTS)
     # \note editor-module is the one that exercises a filled slot: building a
     # module's widgets is what reaches SpectrumWorxEditor::fromChild and
     # EditorModuleInitialiser, neither of which the empty editor touches.
-    foreach (page editor editor-module environment skin theme)
+    # editor-module-cold does it against an engine with no sample rate, which is
+    # the order a session restore arrives in and the one that used to assert.
+    foreach (page editor editor-module editor-module-cold environment skin theme)
         add_test(NAME show-ui-renders-${page}
                 COMMAND sw-show-ui --render ${page}
                 "${CMAKE_CURRENT_BINARY_DIR}/rendered-${page}.png")

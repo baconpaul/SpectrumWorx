@@ -268,8 +268,18 @@ class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
   private: // JUCE ButtonListener overrides.
     void buttonClicked(juce::Button *) override;
 
-  private:
+  public:
+    /// \brief What the add-module menu calls when an entry is chosen.
+    ///
+    /// \note Public so that sw-show-ui can drive it. Adding a module is not one
+    /// step but five -- create, build the region, take focus, select, notify --
+    /// and only the first two are reachable through the module chain. Everything
+    /// that has gone wrong here has gone wrong in the other three, so a harness
+    /// that stops short of them is not testing the thing that breaks.
+    ///                                       (29.07.2026.) (SW port)
     void addUserAddedModule(std::uint8_t effectIndex);
+
+  private:
     void moveModules(ModuleUI &targetSlotUI, std::uint8_t numberOfModules, std::int16_t offset);
     std::pair<LE::Utility::IntrusivePtr<Module>, std ::int8_t>
     setModuleInSlot(std::uint8_t slotIndex, std::int8_t effectIndex);

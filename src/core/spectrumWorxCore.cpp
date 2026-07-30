@@ -238,7 +238,25 @@ bool SpectrumWorxCore::ModuleInitialiser::operator()(Module &module,
 #if defined(_WIN32) || defined(LE_SW_FMOD)
     LE_ASSUME(initialised);
 #endif // _WIN32
-    if (!initialised || module.resize(storageFactors))
+    /// \note A module accepted into the chain before the engine has been set up
+    /// is *not* set up here. It used to be, against whatever Setup happened to
+    /// exist -- which before activate() means no sample rate, no bins and no step
+    /// time. An effect asked to work that out lands anywhere from a harmless zero
+    /// to indexing off the end of an empty spectrum: Bandpass and Bandstop read
+    /// bin[0] of nothing, Denoiser divides an amplitude range it computed as
+    /// empty, and every knob whose range quantises to a step time has nothing to
+    /// quantise against.
+    ///
+    ///   Deferring is safe because it is not a special case: the engine resizes
+    /// its whole chain whenever its setup changes, which is how a runtime FFT
+    /// size change already works, and activate() is just the first such change.
+    /// Returning true is still right -- the module belongs in the chain, it
+    /// simply has nothing to be configured against yet.
+    ///                                       (29.07.2026.) (SW port)
+    if (!initialised)
+        return true;
+
+    if (module.resize(storageFactors))
     {
         /// \note resize() must also call reset() so we don't have to.
         ///                                   (05.04.2012.) (Domagoj Saric)

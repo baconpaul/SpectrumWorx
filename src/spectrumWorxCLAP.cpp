@@ -134,6 +134,18 @@ bool SpectrumWorxCLAP::activate(double const sampleRate, std::uint32_t,
     resume();
     engineRunning_ = true;
     latencyInSamples_ = engineSetup().latencyInSamples();
+
+    /// \note An editor that opened before this point built its module knobs
+    /// against an engine with no sample rate, so the ranges that quantise to a
+    /// step time or a bin width could not be derived and were left alone. Now
+    /// they can be. Nothing else re-ranges them -- the editor's own
+    /// updateForEngineSetupChanges() was wired only to the four settings
+    /// combo boxes -- and restoring a session before activate() is exactly the
+    /// order a standalone starts in.
+    ///                                       (29.07.2026.) (SW port)
+    if (pEditor_)
+        pEditor_->updateForEngineSetupChanges();
+
     return true;
 }
 

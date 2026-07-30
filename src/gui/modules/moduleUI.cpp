@@ -241,6 +241,24 @@ void ModuleKnob::updateForEngineSetupChanges(Engine::Setup const &engineSetup)
     ParameterInfo const &parameterInfo(control().info());
     param_type const minimum(parameterInfo.minimum);
     param_type const maximum(parameterInfo.maximum);
+
+    /// \note There is nothing to quantise against until the engine has been set
+    /// up: with no sample rate there is no step time and no bin width, so
+    /// stepTime() is zero and every assumption below is false. That is reachable
+    /// rather than theoretical -- a session restored before activate() builds its
+    /// module GUIs against an empty Setup, which is the "quantization > 0"
+    /// assertion a standalone hits on startup -- and it is an ordering, not an
+    /// error. SpectrumWorxEditor::updateForEngineSetupChanges() re-ranges every
+    /// module once a real setup exists, which activate() now asks it to do.
+    ///
+    ///   A quantum as coarse as the parameter's whole range is the same problem
+    /// from the other end, and it is what a large FFT size at a low sample rate
+    /// produces for a parameter measured in milliseconds. Leaving the range alone
+    /// beats deriving one whose minimum has been rounded up past its maximum.
+    ///                                       (29.07.2026.) (SW port)
+    if ((quantization <= 0) || (quantization >= maximum))
+        return;
+
     using namespace Math::PositiveFloats;
     LE_ASSUME(minimum >= 0);
     LE_ASSUME(maximum > 0);
