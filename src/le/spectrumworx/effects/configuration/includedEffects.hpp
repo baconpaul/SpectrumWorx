@@ -18,7 +18,7 @@
 //------------------------------------------------------------------------------
 #include "constants.hpp"
 
-#include "boost/mpl/range_c.hpp"
+#include "le/utility/typeList.hpp"
 
 #include <array>
 //------------------------------------------------------------------------------
@@ -40,8 +40,8 @@ inline constexpr IncludedEffects includedEffects{[] {
     return result;
 }()};
 
-/// Shared list of module indices, for Utility::switch_ and Utility::forEach.
-using ValidIndices = boost::mpl::range_c<unsigned, 0, Constants::numberOfEffects>;
+/// Shared list of module indices, for Utility::switchOn and Utility::forEach.
+using ValidIndices = LE::Utility::IndexList<unsigned, Constants::numberOfEffects>;
 
 //------------------------------------------------------------------------------
 } // namespace Effects

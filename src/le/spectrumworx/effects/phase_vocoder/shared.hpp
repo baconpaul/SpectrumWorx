@@ -26,6 +26,7 @@
 #include "le/utility/assert.hpp"
 
 #include <cstdint>
+#include <type_traits>
 #include <utility>
 //------------------------------------------------------------------------------
 namespace LE
@@ -254,7 +255,14 @@ class StandaloneEffect : private PVDEffect,
 
 namespace Detail
 {
-BOOST_MPL_HAS_XXX_TRAIT_DEF(ChannelState);
+/// \note Was BOOST_MPL_HAS_XXX_TRAIT_DEF( ChannelState ), which generates the
+/// same detection idiom out of SFINAE and a nested-type probe. A requires-clause
+/// says it in one line and does not need the macro to have been included by
+/// somebody else.
+///                                           (30.07.2026.) (SW port)
+template <class T> struct has_ChannelState : std::bool_constant<requires { typename T::ChannelState; }>
+{
+};
 
 struct DummyChannelStateHolder
 {
@@ -333,12 +341,12 @@ class CombineAndOverrideChannelState : public ChannelStateHolder1, public Channe
 {
   private:
     using ChannelState1 =
-        typename boost::mpl::if_c<hasChannelState1, ChannelStateHolder1,
-                                  Detail::DummyChannelStateHolder>::type::ChannelState;
+        typename std::conditional_t<hasChannelState1, ChannelStateHolder1,
+                                    Detail::DummyChannelStateHolder>::ChannelState;
 
     using ChannelState2 =
-        typename boost::mpl::if_c<hasChannelState2, ChannelStateHolder2,
-                                  Detail::DummyChannelStateHolder>::type::ChannelState;
+        typename std::conditional_t<hasChannelState2, ChannelStateHolder2,
+                                    Detail::DummyChannelStateHolder>::ChannelState;
 
   public:
     using ChannelState = CompoundChannelState<ChannelState1, ChannelState2>;

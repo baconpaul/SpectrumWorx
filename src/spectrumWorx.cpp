@@ -15,7 +15,7 @@
 
 #include "le/math/math.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/fusionAdaptors.hpp"
+#include "le/parameters/parametersUtilities.hpp"
 #include "le/parameters/uiElements.hpp"
 #include "le/spectrumworx/presets.hpp"
 #include "le/utility/parentFromMember.hpp"
@@ -27,7 +27,6 @@
 
 #include "le/utility/assert.hpp"
 #include "le/utility/ignoreUnused.hpp"
-#include <boost/fusion/algorithm/iteration/for_each.hpp>
 
 #include <sst/plugininfra/cpufeatures.h>
 
@@ -504,7 +503,7 @@ void SpectrumWorx::resetForGlobalParameters(Parameters const &parameters)
 {
     //...mrmlj...this can possibly cause multiple engine setup updates/memory reallocations...
     //...mrmlj...no error reporting...
-    boost::fusion::for_each(parameters, static_cast<GlobalParameterUpdater &>(*this));
+    LE::Parameters::forEach(parameters, static_cast<GlobalParameterUpdater &>(*this));
 }
 
 bool SpectrumWorx::canParameterBeAutomated(ParameterID const parameter,

@@ -13,7 +13,7 @@
 #include "le/spectrumworx/effects/configuration/effectIndexToGroupMapping.hpp"
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
 #include "le/spectrumworx/effects/configuration/includedEffects.hpp"
-#include "le/utility/staticForEach.hpp"
+#include "le/utility/typeList.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -49,25 +49,23 @@ void addModuleToMenuEntry(Menu &menu, std::uint8_t const moduleIndex)
 }
 
 template <unsigned int moduleIndex, unsigned int subMenuIndex>
-void addModulesToMenu(Menus &, boost::mpl::true_ /*end reached*/)
+void addModulesToMenu(Menus &, std::true_type /*end reached*/)
 {
 }
 
 template <unsigned int moduleIndex, unsigned int subMenuIndex>
-LE_FORCEINLINE void addModulesToMenu(Menus &menus, boost::mpl::false_ /*end not reached*/)
+LE_FORCEINLINE void addModulesToMenu(Menus &menus, std::false_type /*end not reached*/)
 {
-    using namespace boost;
-
     std::uint8_t const menuIndex(1 + subMenuIndex);
     addModuleToMenuEntry(menus[menuIndex], moduleIndex);
 
-    typedef mpl::bool_<(moduleIndex + 1) == Effects::Constants::numberOfEffects> LastModule;
+    using LastModule = std::bool_constant<(moduleIndex + 1) == Effects::Constants::numberOfEffects>;
     unsigned int const nextModuleIndex(moduleIndex + !LastModule::value);
 
     typedef typename Effects::Group<moduleIndex>::type CurrentModuleGroup;
     typedef typename Effects::Group<nextModuleIndex>::type NextModuleGroup;
-    unsigned int const nextSubMenuIndex(subMenuIndex +
-                                        !is_same<CurrentModuleGroup, NextModuleGroup>::value);
+    unsigned int const nextSubMenuIndex(
+        subMenuIndex + !std::is_same_v<CurrentModuleGroup, NextModuleGroup>);
 
     addModulesToMenu<nextModuleIndex, nextSubMenuIndex>(menus, LastModule());
 }
@@ -115,20 +113,20 @@ struct FlatMenuAdder
 
 #pragma warning(pop)
 
-void fillMenu(Menus &menus, boost::mpl::true_ /*has sub menus*/)
+void fillMenu(Menus &menus, std::true_type /*has sub menus*/)
 {
     // Implementation note:
     //   Our own implementation of the boost::mpl::detail::execute() helper
     // template function that passes along all intermediate results for
     // vastly improved compilation times (on GCC atleast).
     //                                    (23.09.2010.) (Domagoj Saric)
-    addModulesToMenu<0, 0>(menus, boost::mpl::false_());
+    addModulesToMenu<0, 0>(menus, std::false_type());
 
     TopMenusAdder topMenusAdder(menus);
     Utility::forEach<Effects::Groups>(topMenusAdder);
 }
 
-void fillMenu(Menus &menus, boost::mpl::false_ /*does not have sub menus*/)
+void fillMenu(Menus &menus, std::false_type /*does not have sub menus*/)
 {
     FlatMenuAdder const adder = {menus};
     Utility::forEach<Effects::ValidIndices>(adder);
@@ -146,7 +144,7 @@ void fillMenu(Menus &menus, boost::mpl::false_ /*does not have sub menus*/)
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-ModuleMenuHolder::ModuleMenuHolder() { fillMenu(menus_, boost::mpl::bool_<hasSubMenus>()); }
+ModuleMenuHolder::ModuleMenuHolder() { fillMenu(menus_, std::bool_constant<hasSubMenus>()); }
 
 bool ModuleMenuHolder::isOwnerOfEntry(unsigned int const menuEntryID) const
 {

@@ -23,12 +23,12 @@
 #include "le/parameters/powerOfTwo/tag.hpp"
 #include "le/parameters/trigger/tag.hpp"
 #include "le/parameters/symmetric/tag.hpp"
+#include "le/parameters/parametersUtilities.hpp"
 #include "le/parameters/printer_fwd.hpp"
 #include "le/utility/cstdint.hpp"
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/tchar.hpp"
 
-#include "boost/mpl/fold.hpp"
 #include "le/utility/polymorphicDowncast.hpp"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -528,6 +528,36 @@ struct WidgetsStorage : PreviousWidgets, ParameterWidget<Parameter>::type
     }
 }; // struct WidgetsStorage
 #pragma warning(pop)
+
+////////////////////////////////////////////////////////////////////////////
+///
+/// \struct FoldWidgets
+/// \internal
+/// \brief One WidgetsStorage per parameter, each deriving from the last.
+///
+////////////////////////////////////////////////////////////////////////////
+// Implementation note:
+//   Was boost::mpl::fold< Parameters, EmptyWidgets, WidgetsStorage<_1, _2> >
+// over the Fusion-adapted parameter container. The placeholder expression is
+// the only thing MPL was contributing; the traversal is a left fold over the
+// indices the container already knows about.
+//                                        (30.07.2026.) (SW port)
+////////////////////////////////////////////////////////////////////////////
+
+template <class Accumulated, class Parameters, std::size_t index,
+          bool done = (index == Parameters::static_size)>
+struct FoldWidgets
+{
+    using type =
+        typename FoldWidgets<WidgetsStorage<Accumulated, LE::Parameters::ParameterAt<Parameters, index>>,
+                             Parameters, index + 1>::type;
+};
+
+template <class Accumulated, class Parameters, std::size_t index>
+struct FoldWidgets<Accumulated, Parameters, index, true>
+{
+    using type = Accumulated;
+};
 } // namespace Detail
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -541,9 +571,7 @@ template <class ParametersParam> class ParameterWidgets
   public:
     typedef ParametersParam Parameters;
 
-    typedef typename boost::mpl::fold<Parameters, Detail::EmptyWidgets,
-                                      Detail::WidgetsStorage<boost::mpl::_1, boost::mpl::_2>>::type
-        Container;
+    using Container = typename Detail::FoldWidgets<Detail::EmptyWidgets, Parameters, 0>::type;
 
   public:
 #ifndef NDEBUG

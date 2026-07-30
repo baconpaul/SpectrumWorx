@@ -18,7 +18,7 @@
 #include "effectGroups.hpp"
 #include "effectsList.hpp"
 
-#include "boost/mpl/vector/vector10.hpp"
+#include "le/utility/typeList.hpp"
 
 #include <tuple>
 //------------------------------------------------------------------------------
@@ -41,7 +41,7 @@ template <unsigned int effectIndex> struct Group
     using type = std::tuple_element_t<effectIndex, EffectGroups>;
 };
 
-using Groups = boost::mpl::vector9<
+using Groups = LE::Utility::TypeList<
     ModuleGroups::Pitch,
     ModuleGroups::Timbre,
     ModuleGroups::Time,

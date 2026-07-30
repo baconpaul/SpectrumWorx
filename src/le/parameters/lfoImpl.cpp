@@ -27,7 +27,7 @@
 #include "le/math/constants.hpp"
 #include "le/math/math.hpp"
 #include "le/parameters/conversion.hpp"
-#include "le/parameters/fusionAdaptors.hpp"
+#include "le/parameters/parametersUtilities.hpp"
 #include "le/parameters/uiElements.hpp"
 #include "le/parameters/parametersUtilities.hpp"
 #include "le/utility/countof.hpp"
@@ -432,7 +432,7 @@ LFOImpl::PeriodScale::value_type LFOImpl::adjustValueFromPreset<LFOImpl::PeriodS
 
 void LFOImpl::snapPeriodScaleFromAutomation(PeriodScale &periodScale)
 {
-    auto const &parameters(Utility::FusionContainerFromMember<Parameters, 1>()(periodScale));
+    auto const &parameters(Utility::ParametersFromMember<Parameters, 1>()(periodScale));
     auto const &lfo(
         Utility::ParentFromMember<LFOImpl, Parameters, &LFOImpl::parameters_>()(parameters));
 

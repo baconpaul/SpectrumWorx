@@ -11,26 +11,11 @@
 #ifndef parametersUtilities_hpp__EB1C0F5A_FC45_4407_A713_9197376BC784
 #define parametersUtilities_hpp__EB1C0F5A_FC45_4407_A713_9197376BC784
 //------------------------------------------------------------------------------
-#include "fusionAdaptors.hpp"
-
 #include "le/utility/cstdint.hpp"
-/// \note The #ifdef __GNUC__ around this is gone. forEachIndexed() below calls
-/// Utility::forEach() unconditionally, so on MSVC it was calling a function
-/// whose declaration had never been included -- and an unknown name followed by
-/// '<' parses as a comparison, so the error arrived as a syntax error about the
-/// '>' rather than as an undeclared identifier.
-///                                           (30.07.2026.) (SW port)
-#include "le/utility/staticForEach.hpp"
-#pragma warning(push)
-#pragma warning(disable : 4702) // Unreachable code.
-#include "le/utility/switch.hpp"
-#pragma warning(pop)
-
-#include <boost/fusion/sequence/intrinsic/at.hpp>
-#include <boost/fusion/sequence/intrinsic/value_at.hpp>
-#include <boost/mpl/range_c.hpp>
+#include "le/utility/typeList.hpp"
 
 #include <type_traits>
+#include <utility>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -38,6 +23,54 @@ namespace LE
 namespace Parameters
 {
 //------------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// The Parameters sequence
+// -----------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief The index'th parameter *type* of a Parameters container, and a
+/// reference to the index'th parameter *object* in one.
+///
+////////////////////////////////////////////////////////////////////////////////
+// Implementation note:
+//   These two were boost::fusion::result_of::value_at and boost::fusion::at,
+// reaching the container through 200 lines of at_impl / value_at_impl /
+// begin_impl / deref_impl specialisations in fusionAdaptors.hpp. Every one of
+// them forwarded to ParameterAt and get<>(), which LE_DEFINE_PARAMETERS
+// generates and which are right here -- so the adaptation was a translation of
+// the container's own interface into a vocabulary nothing else spoke.
+//                                            (30.07.2026.) (SW port)
+////////////////////////////////////////////////////////////////////////////////
+
+template <class Parameters, std::size_t index>
+using ParameterAt = typename std::remove_const_t<Parameters>::template ParameterAt<index>::type;
+
+template <std::size_t index, class Parameters> constexpr decltype(auto) at(Parameters &parameters)
+{
+    return parameters.template get<ParameterAt<Parameters, index>>();
+}
+
+/// \brief Calls f(parameter) for every parameter in the container, in
+/// declaration order. Was boost::fusion::for_each.
+template <class Parameters, class Functor> void forEach(Parameters &parameters, Functor &&functor)
+{
+    [&]<std::size_t... indices>(std::index_sequence<indices...>) {
+        (functor(at<indices>(parameters)), ...);
+    }(std::make_index_sequence<std::remove_const_t<Parameters>::static_size>());
+}
+
+/// \brief The same, last parameter first.
+template <class Parameters, class Functor>
+void forEachReversed(Parameters &parameters, Functor &&functor)
+{
+    [&]<std::size_t... indices>(std::index_sequence<indices...>) {
+        constexpr std::size_t last{std::remove_const_t<Parameters>::static_size - 1};
+        (functor(at<last - indices>(parameters)), ...);
+    }(std::make_index_sequence<std::remove_const_t<Parameters>::static_size>());
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -67,7 +100,7 @@ template <class Parameters, class Functor> class Invoker : private Functor
 
     template <class TypeIndex> result_type operator()(TypeIndex const &) const
     {
-        return Functor::operator()(boost::fusion::at<TypeIndex>(*pParameters_));
+        return Functor::operator()(at<TypeIndex::value>(*pParameters_));
     }
 
   private:
@@ -82,12 +115,11 @@ template <class Parameters, class Functor> class StaticInvoker : public Functor
 
     template <class TypeIndex> result_type operator()(TypeIndex const &)
     {
-        typedef typename boost::fusion::result_of::template value_at<Parameters, TypeIndex>::type
-            Parameter;
+        using Parameter = ParameterAt<Parameters, TypeIndex::value>;
         /// \note Was LE_GNU_SPECIFIC( template ), which expands to nothing on
         /// MSVC. Functor is a template parameter, so the keyword is required
-        /// rather than a GNU extension; see the note in
-        /// le/utility/staticForEach.hpp.
+        /// rather than a GNU extension -- without it `<` parses as less-than and
+        /// the error surfaces at the call site rather than here.
         ///                                   (30.07.2026.) (SW port)
         return Functor::template operator()<Parameter>();
     }
@@ -120,11 +152,9 @@ typename Functor::result_type invokeFunctorOnIndexedParameter(std::uint8_t const
                                                               Functor &&functor)
 {
     LE_ASSUME(parameterIndex < Parameters::static_size);
-    using namespace boost;
 
-    typedef mpl::range_c<std::uint8_t, 0, Parameters::static_size> ValidIndices;
-    return switch_<ValidIndices>(parameterIndex, std::forward<Functor>(functor),
-                                 assert_no_default_case<typename Functor::result_type>());
+    using ValidIndices = Utility::IndexList<std::uint8_t, Parameters::static_size>;
+    return Utility::switchOn<ValidIndices>(parameterIndex, std::forward<Functor>(functor));
 }
 } // namespace Detail
 
@@ -135,7 +165,7 @@ typename Functor::result_type invokeFunctorOnIndexedParameter(std::uint8_t const
 //
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \brief An extension to boost::fusion::for_each() that also passes the index
+/// \brief An extension to forEach() above that also passes the index
 /// of the parameter as a template parameter to the passed functor.
 ///
 /// \throws <anything_the_passed_functor's_operator()_may_throw>
@@ -145,9 +175,7 @@ typename Functor::result_type invokeFunctorOnIndexedParameter(std::uint8_t const
 template <class Parameters, class Functor>
 void forEachIndexed(Parameters &parameters, Functor &&functor)
 {
-    using namespace boost;
-
-    using ValidIndices = mpl::range_c<std::uint8_t, 0, Parameters::static_size>;
+    using ValidIndices = Utility::IndexList<std::uint8_t, Parameters::static_size>;
     using WrappedFunctor = Detail::Invoker<Parameters, Functor>;
     WrappedFunctor wrappedFunctor(parameters, functor);
     Utility::forEach<ValidIndices>(wrappedFunctor);
@@ -155,9 +183,7 @@ void forEachIndexed(Parameters &parameters, Functor &&functor)
 
 template <class Parameters, class Functor> void forEachIndexed(Functor &&functor)
 {
-    using namespace boost;
-
-    using ValidIndices = mpl::range_c<std::uint8_t, 0, Parameters::static_size>;
+    using ValidIndices = Utility::IndexList<std::uint8_t, Parameters::static_size>;
     using Invoker = Detail::StaticInvoker<Parameters, Functor>;
     Utility::forEach<ValidIndices>(Detail::forwardDownCast<Invoker>(functor));
 }

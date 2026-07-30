@@ -22,7 +22,7 @@
 #include "le/parameters/printer.hpp" // printers for module parameters
 #include "le/parameters/uiElements.hpp"
 #endif // LE_SW_SDK_BUILD
-#include "le/parameters/fusionAdaptors.hpp"
+#include "le/parameters/parametersUtilities.hpp"
 #include "le/parameters/trigger/tag.hpp"
 #include "le/spectrumworx/effects/effects.hpp"
 #include "le/spectrumworx/engine/channelData.hpp"
@@ -247,7 +247,7 @@ template <class Parameter> constexpr ParameterInfo info()
 template <typename Parameters, index_t... Indices>
 typename array_aux<Parameters, ParameterInfo, std::index_sequence<Indices...>>::DataArray const
     array_aux<Parameters, ParameterInfo, std::index_sequence<Indices...>>::data = {
-        {info<typename boost::fusion::result_of::value_at_c<Parameters, Indices>::type>()...}};
+        {info<typename LE::Parameters::ParameterAt<Parameters, Indices>>()...}};
 
 template <class Parameters>
 struct ParametersInformation
@@ -432,9 +432,11 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
     using Effect = EffectParam;
 
   private:
-    using ChannelStatesHolder = typename boost::mpl::if_<
-        Engine::Detail::has_ChannelState<Effect>, Engine::Detail::MakeChannelStateHolder,
-        Engine::Detail::MakeEmptyChannelStateHolder>::type::template ChannelStates<Effect>;
+    using ChannelStatesHolder =
+        typename std::conditional_t<Engine::Detail::has_ChannelState<Effect>::value,
+                                    Engine::Detail::MakeChannelStateHolder,
+                                    Engine::Detail::MakeEmptyChannelStateHolder>::
+            template ChannelStates<Effect>;
 
   public:
 #ifdef __clang__

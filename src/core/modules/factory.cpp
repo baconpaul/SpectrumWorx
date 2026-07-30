@@ -20,7 +20,7 @@
 #include "le/spectrumworx/effects/configuration/includedEffects.hpp"
 #include "le/spectrumworx/engine/moduleParameters.hpp"
 #include "le/utility/rvalueReferences.hpp"
-#include "le/utility/switch.hpp"
+#include "le/utility/typeList.hpp"
 
 // Implementation note:
 //   Required for the (PVD)PitchMagnet::Target-unnecessarily-quantized
@@ -167,11 +167,9 @@ LE::Utility::IntrusivePtr<ModuleInterface> ModuleFactory::create(std::int8_t con
         return nullptr;
     }
 
-    using namespace boost;
-
     using SizeGetter = ModuleSizeGetter<ModuleInterface>;
-    auto const storageSize(switch_<Effects::ValidIndices>(
-        effectIndex, SizeGetter(), assert_no_default_case<typename SizeGetter::result_type>()));
+    auto const storageSize(
+        Utility::switchOn<Effects::ValidIndices>(effectIndex, SizeGetter()));
     void *const pStorage(std::malloc(storageSize));
 
     if (!pStorage) [[unlikely]]
@@ -179,9 +177,8 @@ LE::Utility::IntrusivePtr<ModuleInterface> ModuleFactory::create(std::int8_t con
 
     using Constructor = ModuleConstructor<ModuleInterface>;
     Constructor &moduleConstructor(*static_cast<Constructor *>(pStorage));
-    return switch_<Effects::ValidIndices>(
-        effectIndex, std::forward<Constructor>(moduleConstructor),
-        assert_no_default_case<typename Constructor::result_type>());
+    return Utility::switchOn<Effects::ValidIndices>(
+        effectIndex, std::forward<Constructor>(moduleConstructor));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -193,12 +190,10 @@ LE::Utility::IntrusivePtr<ModuleInterface> ModuleFactory::create(std::int8_t con
 
 template <class ModuleInterface> void ModuleFactory::destroy(ModuleInterface const &module)
 {
-    using namespace boost;
-
     auto const effectIndex(module.effectTypeIndex());
     using Destroyer = ModuleDestroyer<ModuleInterface>;
-    switch_<Effects::ValidIndices>(effectIndex, Destroyer{const_cast<ModuleInterface *>(&module)},
-                                   assert_no_default_case<typename Destroyer::result_type>());
+    Utility::switchOn<Effects::ValidIndices>(effectIndex,
+                                             Destroyer{const_cast<ModuleInterface *>(&module)});
 }
 
 template LE::Utility::IntrusivePtr<SW::Module> ModuleFactory::create(std::int8_t effectIndex);

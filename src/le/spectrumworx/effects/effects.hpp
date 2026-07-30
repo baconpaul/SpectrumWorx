@@ -19,7 +19,6 @@
 #include "le/spectrumworx/effects/channelStateStatic.hpp"
 #include "le/spectrumworx/engine/channelData_fwd.hpp"
 
-#include "boost/fusion/support/category_of.hpp"
 
 #include <cstdint>
 #include <utility>
@@ -151,18 +150,11 @@ namespace Detail
 struct EmptyParameters
 {
     static std::size_t const static_size = 0;
-    struct category : boost::fusion::forward_traversal_tag, boost::fusion::associative_tag
-    {
-    };
-    using fusion_tag = LE::Parameters::Tag;
-    using tag = boost::fusion::fusion_sequence_tag;
-    using is_view = std::false_type;
     using size = std::integral_constant<std::size_t, static_size>;
     template <unsigned int, int dummy = 0> struct ParameterAt;
     template <class Parameter, int dummy = 0> struct IndexOf : size
     {
     };
-    operator boost::fusion::detail::from_sequence_convertible_type() const;
 };
 } // namespace Detail
 

@@ -17,7 +17,7 @@
 #include "le/parameters/linear/tag.hpp"
 #include "le/parameters/symmetric/tag.hpp"
 #include "le/parameters/trigger/tag.hpp"
-#include "le/parameters/fusionAdaptors.hpp"
+#include "le/parameters/parametersUtilities.hpp"
 #include "le/parameters/parametersUtilities.hpp"
 #include "le/spectrumworx/effects/effects.hpp"
 #include "le/spectrumworx/engine/moduleImpl.hpp"

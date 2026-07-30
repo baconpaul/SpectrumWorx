@@ -22,7 +22,7 @@
 
 #ifndef _MSC_VER // for eager compilers
 #include "le/math/conversion.hpp"
-#include "le/parameters/fusionAdaptors.hpp"
+#include "le/parameters/parametersUtilities.hpp"
 #include "le/spectrumworx/engine/parameters.hpp"
 #endif // _MSC_VER
 #include "le/utility/countof.hpp"
@@ -34,8 +34,7 @@
 
 #include <optional>
 
-#include <boost/fusion/algorithm/iteration/for_each_fwd.hpp>
-#include <boost/mpl/bool_fwd.hpp>
+#include "le/parameters/parametersUtilities.hpp"
 #include "le/utility/intrusivePtr.hpp"
 #include "le/utility/ignoreUnused.hpp"
 #include <string_view>
@@ -119,7 +118,7 @@ class Preset
 
   public:
 #ifdef LE_EXCEPTION_ON
-    typedef boost::mpl::true_ load_result_t;
+    using load_result_t = std::true_type;
 #else
     typedef bool load_result_t;
 #endif // LE_EXCEPTION_ON
@@ -399,13 +398,13 @@ class ParametersSaver : private PresetHandler
 
     template <class Parameter> void operator()(Parameter const &parameter) const
     {
-        const_cast<ParametersSaver &>(*this). //...mrmlj...because of boost::fusion::for_each...
+        const_cast<ParametersSaver &>(*this). //...mrmlj...because of forEach()...
             saveParameter<typename Parameter::param_type>(LE::Parameters::Name<Parameter>::string_,
                                                           parameter.getValue());
     }
     template <class Parameter> void operator()(Parameter const &parameter, LFO const &lfo) const
     {
-        const_cast<ParametersSaver &>(*this). //...mrmlj...because of boost::fusion::for_each...
+        const_cast<ParametersSaver &>(*this). //...mrmlj...because of forEach()...
             saveParameter<typename Parameter::param_type>(LE::Parameters::Name<Parameter>::string_,
                                                           parameter.getValue(), lfo);
     }
@@ -518,7 +517,7 @@ LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignor
 #endif // side channel handling
 
         GlobalParameters::Parameters newParameters;
-        boost::fusion::for_each(newParameters, parametersLoader);
+        LE::Parameters::forEach(newParameters, parametersLoader);
         auto &currentChain(loader.targetChain());
         //...mrmlj...clang's early template instantiation...AutomatedModuleChain newChain;
         typename std::remove_reference<decltype(currentChain)>::type newChain;

@@ -16,8 +16,7 @@
 //------------------------------------------------------------------------------
 #include "le/utility/platformSpecifics.hpp"
 
-#include <boost/fusion/sequence/intrinsic/at.hpp>
-#include <boost/fusion/sequence/intrinsic/value_at.hpp>
+#include "le/parameters/parametersUtilities.hpp"
 
 #include <optional>
 #include <type_traits>
@@ -99,40 +98,40 @@ class ParentFromMember
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \class FusionContainerFromMember
+/// \class ParametersFromMember
 ///
-/// \brief Retrieves a reference to a FusionContainer given a member index
-/// (needed because generally a boost::fusion container need not be unique so
-/// an index to a member cannot be deduced from its type) and a reference to a
+/// \brief Retrieves a reference to a Parameters container given a member index
+/// (needed because a container may hold two parameters of the same type, so an
+/// index to a member cannot be deduced from its type) and a reference to a
 /// corresponding member (assumes that the member referenced is actually a part
-/// of the FusionContainer object).
+/// of the container object).
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-template <class FusionContainerParam, unsigned int memberIndex> class FusionContainerFromMember
+template <class ParametersParam, unsigned int memberIndex> class ParametersFromMember
 {
   public:
-    using FusionContainer = FusionContainerParam;
-    using Member =
-        typename boost::fusion::result_of::value_at_c<FusionContainer, memberIndex>::type;
+    using Parameters = ParametersParam;
+    using Member = LE::Parameters::ParameterAt<Parameters, memberIndex>;
 
   public:
-    LE_FORCEINLINE FusionContainer &operator()(Member &member) const
+    LE_FORCEINLINE Parameters &operator()(Member &member) const
     {
-        DummyStorage<FusionContainer> const fakeContainer;
+        DummyStorage<Parameters> const fakeContainer;
 
-        ptrdiff_t const offset(reinterpret_cast<char const *>(&boost::fusion::at_c<memberIndex>(
-                                   reinterpret_cast<FusionContainer const &>(fakeContainer))) -
-                               reinterpret_cast<char const *>(&fakeContainer));
+        ptrdiff_t const offset(
+            reinterpret_cast<char const *>(&LE::Parameters::at<memberIndex>(
+                reinterpret_cast<Parameters const &>(fakeContainer))) -
+            reinterpret_cast<char const *>(&fakeContainer));
 
-        return *reinterpret_cast<FusionContainer *>(reinterpret_cast<char *>(&member) - offset);
+        return *reinterpret_cast<Parameters *>(reinterpret_cast<char *>(&member) - offset);
     }
 
-    LE_FORCEINLINE FusionContainer const &operator()(Member const &member) const
+    LE_FORCEINLINE Parameters const &operator()(Member const &member) const
     {
         return operator()(const_cast<Member &>(member));
     }
-}; // class FusionContainerFromMember
+}; // class ParametersFromMember
 
 ////////////////////////////////////////////////////////////////////////////////
 ///

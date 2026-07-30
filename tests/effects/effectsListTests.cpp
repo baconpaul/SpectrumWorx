@@ -22,10 +22,6 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-/// \note Was arriving transitively through boost/mpl/string.hpp, which the Unit
-/// trait no longer includes. Goes with ValidIndices and Groups themselves.
-#include <boost/mpl/size.hpp>
-
 #include <algorithm>
 #include <cstdint>
 #include <set>
@@ -69,10 +65,10 @@ TEST_CASE("Every effect ships now that editions are gone", "[effects]")
 
 TEST_CASE("ValidIndices covers every effect", "[effects]")
 {
-    // Utility::switch_ and Utility::forEach dispatch over this, and
-    // BOOST_SWITCH_LIMIT had to grow past 50 to accommodate it.
-    static_assert(boost::mpl::size<Effects::ValidIndices>::value ==
-                  Effects::Constants::numberOfEffects);
+    // Utility::switchOn and Utility::forEach dispatch over this. It used to be
+    // a boost::mpl::range_c walked by a Boost.Preprocessor-generated switch,
+    // whose BOOST_SWITCH_LIMIT had to grow past 50 to accommodate it.
+    static_assert(Effects::ValidIndices::size == Effects::Constants::numberOfEffects);
 }
 
 TEST_CASE("Every index maps to a distinct implementation type", "[effects]")
@@ -95,7 +91,7 @@ TEST_CASE("Every index maps to one of the nine groups", "[effects]")
                   Effects::Constants::numberOfEffects + 1);
     static_assert(
         std::is_same_v<Effects::Group<0>::type, std::tuple_element_t<0, Effects::EffectGroups>>);
-    static_assert(boost::mpl::size<Effects::Groups>::value == Effects::Constants::numberOfGroups);
+    static_assert(Effects::Groups::size == Effects::Constants::numberOfGroups);
 }
 
 TEST_CASE("Effect names are present and unique", "[effects]")

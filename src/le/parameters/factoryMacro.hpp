@@ -13,7 +13,6 @@
 //------------------------------------------------------------------------------
 #include "parameter.hpp"
 
-#include "boost/fusion/support/category_of.hpp"
 #include "boost/preprocessor/cat.hpp"
 #include "boost/preprocessor/comparison/greater.hpp"
 #include "boost/preprocessor/control/iif.hpp"
@@ -22,8 +21,6 @@
 #include "boost/preprocessor/seq/for_each_i.hpp"
 #include "boost/preprocessor/seq/enum.hpp"
 #include "boost/preprocessor/seq/size.hpp"
-
-#include "boost/mpl/integral_c.hpp" //...mrmlj...
 
 #include <cstdint>
 #include <type_traits>
@@ -152,13 +149,7 @@ namespace Parameters
     struct Parameters                                                                              \
     {                                                                                              \
         static std::uint8_t const static_size = BOOST_PP_SEQ_SIZE(parameters);                     \
-        struct category : boost::fusion::forward_traversal_tag, boost::fusion::associative_tag     \
-        {                                                                                          \
-        };                                                                                         \
-        using fusion_tag = ::LE::Parameters::Tag;                                                  \
-        using tag = boost::fusion::fusion_sequence_tag;                                            \
-        using is_view = std::false_type;                                                           \
-        using size = boost::mpl::integral_c /*std::integral_constant*/<std::uint8_t, static_size>; \
+        using size = std::integral_constant<std::uint8_t, static_size>;                            \
         template <unsigned int, int dummy = 0> struct ParameterAt;                                 \
         template <class Parameter, int dummy = 0> struct IndexOf : size                            \
         {                                                                                          \
@@ -172,54 +163,14 @@ namespace Parameters
         {                                                                                          \
             get<Parameter>().setValue(value);                                                      \
         }                                                                                          \
-        operator boost::fusion::detail::from_sequence_convertible_type() const;                    \
         LE_ENUMERATE_PARAMETERS(parameters)                                                        \
     };
-
-struct Tag;
 
 //------------------------------------------------------------------------------
 } // namespace Parameters
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------
-
-// Implementation note:
-//   Forward declarations for Boost.Fusion adaptation code.
-//                                            (28.06.2011.) (Domagoj Saric)
-namespace boost
-{
-namespace fusion
-{
-struct fusion_sequence_tag;
-
-namespace detail
-{
-struct from_sequence_convertible_type;
-}
-
-namespace extension
-{
-template <typename> struct begin_impl;
-template <> struct begin_impl<LE::Parameters::Tag>;
-
-template <typename> struct end_impl;
-template <> struct end_impl<LE::Parameters::Tag>;
-
-template <typename Tag> struct value_at_key_impl;
-template <> struct value_at_key_impl<LE::Parameters::Tag>;
-
-template <typename Tag> struct value_at_impl;
-template <> struct value_at_impl<LE::Parameters::Tag>;
-
-template <typename Tag> struct at_impl;
-template <> struct at_impl<LE::Parameters::Tag>;
-
-template <typename Tag> struct has_key_impl;
-template <> struct has_key_impl<LE::Parameters::Tag>;
-} // namespace extension
-} // namespace fusion
-} // namespace boost
 
 //------------------------------------------------------------------------------
 #endif // factoryMacro_hpp

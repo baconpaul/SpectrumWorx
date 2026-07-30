@@ -21,7 +21,7 @@
 
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
-#include "le/parameters/fusionAdaptors.hpp"
+#include "le/parameters/parametersUtilities.hpp"
 #include "le/parameters/lfo.hpp"
 #include "le/parameters/uiElements.hpp" //...mrmlj...only for the warnAboutMissingParameter() temporary workaround
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
@@ -29,14 +29,11 @@
 #include "le/utility/countof.hpp"
 #include "le/utility/tracePrivate.hpp"
 
-#include "boost/mmap/mappble_objects/file/utility.hpp" // Boost sandbox
+#include "boost/mmap/mappble_objects/file/utility.hpp" // Boost sandbox -- stage 8
 
 #include "le/utility/assert.hpp"
 #include "le/utility/ignoreUnused.hpp"
 #include "le/utility/intrusivePtr.hpp"
-#include <boost/fusion/algorithm/iteration/for_each.hpp>
-#include <boost/fusion/view/reverse_view.hpp>
-#include <boost/preprocessor/stringize.hpp>
 #include <algorithm>
 
 #ifndef LE_EXCEPTION_ON
@@ -96,12 +93,17 @@ PresetHeader::PresetHeader(juce::String const &commentParam)
 {
     LE_ASSERT(commentParam.length() < _countof(comment) - 1);
 
-    std::strcpy(version,
-                BOOST_PP_STRINGIZE( SW_VERSION_MAJOR ) "." BOOST_PP_STRINGIZE( SW_VERSION_MINOR )
+/// \note Two levels, so that the argument is macro-expanded before it is
+/// stringized. Was BOOST_PP_STRINGIZE, which is the same two lines.
+#define LE_STRINGIZE_(x) #x
+#define LE_STRINGIZE(x) LE_STRINGIZE_(x)
+    std::strcpy(version, LE_STRINGIZE(SW_VERSION_MAJOR) "." LE_STRINGIZE(SW_VERSION_MINOR)
 #if SW_VERSION_PATCH
-                    BOOST_PP_STRINGIZE( SW_VERSION_PATCH )
+                             LE_STRINGIZE(SW_VERSION_PATCH)
 #endif // SW_VERSION_PATCH
     );
+#undef LE_STRINGIZE
+#undef LE_STRINGIZE_
     setCurrentTime();
     commentParam.copyToUTF8(comment, sizeof(comment));
 }
@@ -166,10 +168,10 @@ Preset::load_result_t Preset::loadFrom(char *const pBuffer)
 {
 #ifndef LE_EXCEPTION_ON
     if (setjmp(rapidxml::preParseEnvironment))
-        return boost::mpl::false_();
+        return std::false_type();
 #endif // LE_EXCEPTION_ON
     xml().parse(const_cast<char *>(pBuffer));
-    return boost::mpl::true_();
+    return std::true_type();
 }
 #pragma warning(pop)
 
@@ -558,7 +560,7 @@ bool ParametersLoader::loadLFO(Utility::XML::Element const &parameterNode, LFO &
     // LFO::adjustvalueFromPreset<PeriodScale>() function assumes the SyncTypes
     // parameter to already be loaded/set.
     //                                        (18.02.2011.) (Domagoj Saric)
-    boost::fusion::for_each(boost::fusion::reverse_view<LFO::Parameters>(lfo.parameters()),
+    LE::Parameters::forEachReversed(lfo.parameters(),
                             LFODataLoader(parameterNode, lfo));
     syncedLFOFound_ |= lfo.enabled() & (lfo.syncTypes() != LFO::Free);
     return lfo.enabled();
@@ -710,7 +712,7 @@ void ParametersSaver::saveParameter(char const *const parameterName,
         rapidxml::node_element, fixedParameterName.begin(), parameterValue.begin(),
         fixedParameterName.size(), parameterValue.size()));
 
-    boost::fusion::for_each(parameterLFO.parameters(),
+    LE::Parameters::forEach(parameterLFO.parameters(),
                             LFODataSaver(*this, parameterNode, parameterLFO));
 
     parameters().append_node(&parameterNode);
@@ -767,7 +769,7 @@ unsigned int savePreset(char *const data, juce::File const &externalSampleFile,
 
     preset.setHeader(presetHeader);
 
-    boost::fusion::for_each(program.parameters(), parametersSaver);
+    LE::Parameters::forEach(program.parameters(), parametersSaver);
 
     if (externalSampleFile != juce::File())
     {
