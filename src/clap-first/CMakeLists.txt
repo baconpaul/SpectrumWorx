@@ -15,12 +15,7 @@ endif()
 
 message(STATUS "SpectrumWorx plugin formats: ${SW_FORMATS}")
 
-# clap-wrapper's log.h tests `#if NDEBUG`, and CMake defines NDEBUG with no
-# value in the optimised configurations, so the test is a syntax error rather
-# than a false. Setting the log level outright takes the branch out of play --
-# and silent is what a shipping build wants anyway. Directory scope, so it
-# reaches the format targets the macro below creates.
-add_compile_definitions($<$<NOT:$<CONFIG:Debug>>:CLAP_WRAPPER_LOGLEVEL=0>)
+add_compile_definitions(CLAP_WRAPPER_LOGLEVEL=0)
 
 make_clapfirst_plugins(
         TARGET_NAME ${SW_CLAPFIRST_TARGET}
