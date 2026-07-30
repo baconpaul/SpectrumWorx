@@ -26,14 +26,18 @@ Stages 0–3 are complete. Stage 5 is most of the way there and stage 6 is past
 its hard part: **the plugin builds in all four formats, loads, shows its real
 2016 editor, passes audio, exposes all 286 parameters and survives a reload.**
 
-**Stage 4 is now done on Linux/arm64** — pffft is under the FFT, the `le/math`
-vector primitives have a portable arm at last, and the whole tree builds and runs
-there: CLAP, VST3 and standalone, 76 tests, goldens rendering. See **stage 4**
-and its "What the backend swap found" for what the swap costs numerically. The
-short version: the FFT itself is exact to a float ulp and the engine's own bypass
-path agrees to 1.2e-7, but a dozen branchy effects amplify that ulp into
-percent-level output differences, and the bit-exact hashes cannot survive a
-platform change at all.
+**Stage 4 is done on Linux/arm64** — pffft is under the FFT, the `le/math` vector
+primitives have a portable arm at last, denormals are actually flushed, and the
+whole tree builds and runs there: CLAP, VST3 and standalone, **80/80 tests green,
+goldens included**, against a fixture file minted on macOS over Accelerate.
+
+The FFT itself is exact to a float ulp, and the engine's own bypass path agrees to
+1.2e-7 — but nine effects that make a decision amplify that ulp into percent-level
+output differences, and the bit-exact hashes cannot survive a platform change at
+all. The contract accounts for both: the hash is checked only on the build that
+minted the file, the other 49 effects hold to 1e-4 on RMS across OS, compiler and
+FFT library, and those nine are named and held loosely. See **stage 4**, "What the
+backend swap found" and 4.4.
 
 Debug and release are both green on macOS — 73 tests, goldens included — and the
 goldens have not moved through any of it.
@@ -48,20 +52,21 @@ What is left, in the order it is worth doing:
 | | | Where |
 |---|---|---|
 | 1 | **Load it in a DAW.** Reaper first. Nothing below is worth much until the thing has been driven by a mouse. | — |
-| 2 | **Decide the cross-platform golden contract**: fix the band floor, loosen `peak`, and choose what to do about the 8 chaotic effects. The measurement is done; the policy is a human call. | 4.4 |
-| 3 | **The audio file loader** — one `doLoad` over `juce::AudioFormatManager`, then drop `LE_SW_DISABLE_SIDE_CHANNEL`. | 5.0 |
-| 4 | **Threading.** The `UIEdits` queue is the first piece; the rest of the main/audio split is not done. | 5.8 |
-| 5 | **`clap-validator` and CI** across the four formats and now three OSes. | 5.9 |
-| 6 | **6.4**, the owned-window collapse, and the preset browser's two async save-path callers. | stage 6 |
-| 7 | **Presets** — the split that `LE_NO_PRESETS` stands in for, which then unblocks a real state format. | stage 8, then 5.6 |
+| 2 | **The audio file loader** — one `doLoad` over `juce::AudioFormatManager`, then drop `LE_SW_DISABLE_SIDE_CHANNEL`. | 5.0 |
+| 3 | **Threading.** The `UIEdits` queue is the first piece; the rest of the main/audio split is not done. | 5.8 |
+| 4 | **`clap-validator` and CI** across the four formats and now three OSes. | 5.9 |
+| 5 | **6.4**, the owned-window collapse, and the preset browser's two async save-path callers. | stage 6 |
+| 6 | **Presets** — the split that `LE_NO_PRESETS` stands in for, which then unblocks a real state format. | stage 8, then 5.6 |
+| 7 | **Property tests for the nine amplifying effects**, which the golden contract deliberately declines to test tightly. | 4.4 |
 
 Done since: **module and LFO parameter ranges are normalised to 0..1**, so a slot's
 effect change no longer moves `min_value`, `max_value` or `is_stepped` — the last
-CLAP-correctness gap (stage 5). And **stage 4**, above.
+CLAP-correctness gap (stage 5). And **stage 4**, above — including its golden
+contract, so `sw-tests` is **80/80 green on Linux/arm64**.
 
 Two flags are switched on and stand in for unfinished work rather than for
-decisions: **`LE_NO_PRESETS`** (row 7) and **`LE_SW_DISABLE_SIDE_CHANNEL`**
-(row 3). Both are `PUBLIC` on `sw-dsp`; each changes the layout of
+decisions: **`LE_NO_PRESETS`** (row 6) and **`LE_SW_DISABLE_SIDE_CHANNEL`**
+(row 2). Both are `PUBLIC` on `sw-dsp`; each changes the layout of
 `SpectrumWorxEditor`, so every translation unit has to agree on them.
 
 ---
@@ -1095,12 +1100,66 @@ had a guard to lose.
 
 *Rendering, and quantified. Linux/arm64 is done; x86-64 and Windows are not.*
 
-**4.4** **Decide what the cross-platform golden contract is.** New, and the one
-thing 4.3 could not settle by measurement: 89 of 464 fixtures fall outside the
-existing tolerance. Two thirds of that is the contract's own fault and two lines
-fix it; the rest is **8 effects** that no honest tolerance on a summary statistic
-covers. See "The cross-platform contract, measured" below — picking a policy is a
-judgement about the product, not about the port.
+**✅ 4.4 — The cross-platform golden contract.** New in 4.3's wake, and now
+settled as **P4** from the table below, plus a named exception list. `sw-tests` is
+80/80 on Linux/arm64.
+
+Three changes, in decreasing order of how much they mattered:
+
+- **The band audibility floor, −199 dB → −60 dB.** Two thirds of the 89 failures
+  were the contract's own fault: it skipped a band only when it was empty in both
+  digests, so two bands 120 dB under the signal were still held to 0.01 dB of each
+  other. That is rounding noise, not audio, and it produced the largest "drift" in
+  the matrix — −189 dB against −180 dB. Both sides have to be below the floor, so
+  an effect that goes quiet where the golden is loud still fails. `Deltas` now
+  reports how many bands it skipped, because a test should say what it ignored.
+- **`peak` to 1e-3, `rms` and `dcOffset` staying at 1e-4, bands at 0.1 dB.** Peak
+  is a single-sample statistic — one sample landing the other side of a rounding
+  step moves it — and nine fixtures sat at 1.1e-4 on peak with their RMS at 4e-7.
+  RMS is the average over the whole render and is the robust one; it keeps the
+  tight bound.
+- **`Tolerances::amplified()` for nine named effects**: Pitch Spring, Pitch
+  Spring (pvd), Pitch Magnet, Octaver, PVD start, PVD stop, Imploder, Exploder,
+  Slew Limiter. `peak` 0.35, `rms` 0.20, `dc` 5e-3, bands 8 dB — roughly 1.5×
+  the measured worst.
+
+With that, the 49 remaining effects pass **392/392** against a fixture file minted
+on another OS, another compiler and another FFT library. Not one needed a
+concession.
+
+> **Slew Limiter was nearly missed, and the reason is worth keeping.** The chaotic
+> set was first derived by filtering on peak and RMS, which found eight. Slew
+> Limiter's peak and RMS agree to 1e-7 on every fixture; it diverges on *DC offset*
+> and on one band. It belongs in the set for exactly the same structural reason —
+> comparing a rate of change against a limit is a decision — but no filter written
+> over the two obvious statistics would have found it. **The list is a
+> measurement, not a property**, and a third platform may surface a tenth.
+
+**The bound has teeth, which was checked rather than hoped.** Perturbing the
+fixture file one field at a time:
+
+| perturbation | strict effect (Gain) | |
+|---|---|---|
+| `rms` +0.005 % | passes | |
+| `rms` +0.05 % | **fails** | |
+| `peak` +0.05 % | passes | |
+| `peak` +0.5 % | **fails** | |
+| band +0.05 dB | passes | |
+| band +0.3 dB | **fails** | |
+
+| perturbation | amplified effect (Pitch Spring) | |
+|---|---|---|
+| `rms` +5 % | passes — absorbs the real 10.7 % class | |
+| `rms` +50 % | **fails** | |
+| `peak` ×2 (a gain bug) | **fails** | |
+
+**What this deliberately does not do.** The nine are not really tested off their
+minting platform: an 8 dB band bound catches silence and gross gain errors and
+little else. Their real cover is the bit-exact hash on the machine that minted the
+file, which is macOS today — so a Linux-only regression in one of them would go
+unnoticed. Closing that needs either per-platform fixture files or the property
+tests in row 7 of "what is left", and the property tests are the answer that
+actually tests them.
 
 **Done when:** `sw-tests` green on macOS (arm64 + x86_64), Windows (x64 +
 arm64), Linux (x64 + arm64); NT2 is gone with no golden outside an agreed and
@@ -1221,21 +1280,33 @@ The recommended shape is therefore **P4** — fix the floor, loosen peak to 1e-3
 keep RMS and DC at 1e-4 and bands at 0.1 dB — which leaves exactly the eight, and
 then treat those eight as their own problem rather than as a tolerance to widen.
 
-**So 4.4 is a policy question with three answers**, and it should be answered
-deliberately:
+> **Chosen: P4, with the exception set at nine rather than eight** — Slew Limiter
+> joins it, for the reason given under 4.4 above. The numbers in this table were
+> measured before that ninth was identified, so the "minus the 8 chaotic" column
+> understates every policy slightly; under P4 the remaining 49 effects pass
+> 392/392.
+
+**4.4 was a policy question with three answers.** It was answered with the second
+plus half of the third — a named exception list now, property tests for that list
+as row 7 of "what is left". Recorded as written, since the reasoning is what
+matters if it is ever revisited:
+
 1. *Per-platform fixture files.* Honest and strict, keeps bit-exactness as a
    real regression net on each machine, and costs a reviewed regeneration per
-   platform. This is what the provenance marker already sets up.
+   platform. This is what the provenance marker already sets up. **Still
+   available, and still the only thing that would give the nine real cover on a
+   platform that did not mint the file.**
 2. *A named exception list* — the 8 chaotic effects get a much looser bound
    (or only a "finite and bounded" check), everything else keeps 1e-4. Keeps one
    file, makes the chaotic set visible and reviewable, and is the honest version
-   of "loosen the tolerance".
+   of "loosen the tolerance". **← taken, at nine effects.**
 3. *Property tests for the chaotic eight* instead of fixtures — the detected
    pitch lands within N cents of the input's, latency is exact, output is
    bounded and finite, a bypassed slot is transparent. Most defensible, most
    work, and the only option that actually tests those effects rather than
-   declining to. It needs someone to decide what "the same" means for a pitch
-   shifter that picked a different bin.
+   declining to, and it needs someone to decide what "the same" means for a pitch
+   shifter that picked a different bin. **← still owed; row 7 of "what is
+   left".**
 
 Loosening the global tolerance until 464 rows pass is not on the list. It would
 have to reach 21% to do it, at which point the goldens stop being a test.

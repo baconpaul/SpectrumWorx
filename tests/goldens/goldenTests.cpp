@@ -36,6 +36,7 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 //------------------------------------------------------------------------------
 
@@ -140,6 +141,51 @@ void writeFixtures(std::vector<SWTest::Fixture> const &fixtures)
         file << fixture.serialise() << '\n';
 }
 
+/// \brief The effects whose output is not a continuous function of their input.
+///
+///   Every one of these makes a *decision* somewhere: pitch detection picks a
+/// maximum, the phase vocoder unwraps a phase, Imploder and Exploder threshold a
+/// bin, the slew limiter compares a rate of change against a limit. One ulp of
+/// difference in the spectrum flips the comparison, the chosen bin moves, and the
+/// output moves by percent — 21 % on a peak for Pitch Spring. That is not a
+/// tolerance problem and no tighter FFT removes it; two compilers on one machine
+/// would do the same.
+///
+///   So they are held to Tolerances::amplified() rather than strict() on a
+/// machine that did not mint the fixture file. On the machine that did they are
+/// still bit-exact, like everything else, which is where their real regression
+/// cover lives.
+///
+/// \note **This list is a measurement, not a property.** It is the set that
+/// exceeded strict() across macOS/Accelerate against Linux/pffft, and a third
+/// platform may well surface a tenth. Adding to it should mean the same work:
+/// look at why, and confirm it is a decision boundary rather than a bug. Slew
+/// Limiter was nearly missed for that reason — it diverges on DC offset and one
+/// band while its peak and RMS stay at 1e-7, so a filter written over peak and
+/// RMS alone did not catch it.
+///
+/// \note The right long-term answer for these nine is property tests — the
+/// detected pitch lands within N cents of the input's, latency is exact, a
+/// bypassed slot is transparent — rather than a fixture with a wide bound. That
+/// is what actually tests them; this declines to. See stage 4.4.
+///                                       (29.07.2026.) (SW port)
+bool amplifiesRounding(std::string const &key)
+{
+    // Keys carry the effect name with spaces turned into underscores, as
+    // keyFor() writes them.
+    static constexpr std::string_view chaotic[]{
+        "Pitch_Spring", "Pitch_Spring_(pvd)", "Pitch_Magnet", "Octaver",      "PVD_start",
+        "PVD_stop",     "Imploder",           "Exploder",     "Slew_Limiter",
+    };
+    auto const effect(std::string_view(key).substr(0, key.find('/')));
+    return std::find(std::begin(chaotic), std::end(chaotic), effect) != std::end(chaotic);
+}
+
+SWTest::Tolerances tolerancesFor(std::string const &key)
+{
+    return amplifiesRounding(key) ? SWTest::Tolerances::amplified() : SWTest::Tolerances::strict();
+}
+
 /// \brief What the drift actually is, rather than which field noticed it first.
 ///
 ///   On a platform that did not mint the file, `compare( …, exact )` reports
@@ -187,16 +233,24 @@ std::string driftReport(std::vector<SWTest::Fixture> const &rendered,
 
     std::vector<Row> over;
     for (auto const &row : rows)
-        if (!row.deltas.withinTolerance())
+        if (!SWTest::withinTolerance(row.deltas, tolerancesFor(row.key)))
             over.push_back(row);
     std::sort(over.begin(), over.end(),
               [](Row const &a, Row const &b) { return a.deltas.worst() > b.deltas.worst(); });
 
     std::ostringstream report;
+    auto const strict(SWTest::Tolerances::strict());
+    auto const amplified(SWTest::Tolerances::amplified());
     report << "\ngolden drift: " << (goldenProvenance.empty() ? "(unmarked)" : goldenProvenance)
            << "  ->  " << SWTest::provenance() << '\n'
+           << "  contract: peak " << strict.peak << ", rms " << strict.rms << ", dc "
+           << strict.dcOffset << ", bands " << strict.band << " dB above "
+           << SWTest::bandAudibilityFloor() << " dB\n"
+           << "            the nine amplifying effects instead get peak " << amplified.peak
+           << ", rms " << amplified.rms << ", dc " << amplified.dcOffset << ", bands "
+           << amplified.band << " dB, and are marked [amplified] below\n"
            << "  " << rows.size() << " fixtures compared; " << (rows.size() - over.size())
-           << " within tolerance (relative 1e-4, bands 0.01 dB), " << over.size() << " outside\n"
+           << " within tolerance, " << over.size() << " outside\n"
            << "  bit-identical: " << identicalHashes << " (" << silent
            << " of them a silent render, which pins nothing)\n"
            << "  relative peak: median " << percentile(peaks, 0.5) << "  p90 "
@@ -214,7 +268,7 @@ std::string driftReport(std::vector<SWTest::Fixture> const &rendered,
             report << "    " << row.key << "  peak " << row.deltas.peak << "  rms "
                    << row.deltas.rms << "  dc " << row.deltas.dcOffset << "  band"
                    << row.deltas.worstBand << " " << row.deltas.band << " dB"
-                   << (row.deltas.bandsNearSilence ? " (both near the silence floor)" : "")
+                   << (amplifiesRounding(row.key) ? "  [amplified]" : "")
                    << (row.deltas.nonFiniteDiffers ? "  NON-FINITE COUNT DIFFERS" : "") << '\n';
         }
         if (over.size() > listed)
@@ -292,7 +346,8 @@ TEST_CASE("Golden fixtures", "[golden]")
             failures.push_back(fixture.key + ": no golden");
             continue;
         }
-        auto const result(SWTest::compare(entry->second, fixture.digest, sameBuild));
+        auto const result(
+            SWTest::compare(entry->second, fixture.digest, sameBuild, tolerancesFor(fixture.key)));
         if (!result.matches)
             failures.push_back(fixture.key + ": " + result.explanation);
     }

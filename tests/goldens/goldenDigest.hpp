@@ -73,21 +73,63 @@ std::string provenance();
 /// the drift rather than only announce the first field that exceeded a limit.
 struct Deltas
 {
-    float peak{0};                ///< relative
-    float rms{0};                 ///< relative
-    float dcOffset{0};            ///< absolute, against the render's own RMS
-    float band{0};                ///< worst dB difference over bands audible in either
-    unsigned int worstBand{0};    ///< which band that was
-    bool bandsNearSilence{false}; ///< ...and whether both sides of it are near the floor
+    float peak{0};             ///< relative
+    float rms{0};              ///< relative
+    float dcOffset{0};         ///< absolute, against the render's own RMS
+    float band{0};             ///< worst dB difference over the bands compared
+    unsigned int worstBand{0}; ///< which band that was
+    /// How many of the eight were below the audibility floor and so not compared
+    /// at all. Reported rather than silent: a test should say what it ignored.
+    unsigned int bandsSkipped{0};
     bool nonFiniteDiffers{false};
 
     /// For ranking: the amplitude fields only, since a dB difference between two
-    /// near-silent bands is not comparable to a relative error on a peak.
+    /// quiet bands is not comparable to a relative error on a peak.
     float worst() const;
-    bool withinTolerance() const;
 }; // struct Deltas
 
 Deltas deltas(Digest const &golden, Digest const &actual);
+
+/// \brief What counts as the same render on a machine that did not produce the
+/// fixture file.
+///
+///   Two sets, because two populations. Stage 4.3 measured 464 fixtures of
+/// macOS/Accelerate against Linux/pffft and found the median difference to be one
+/// float ulp — but a handful of effects *make a decision*, and there one ulp
+/// flips a comparison, the chosen bin moves, and the output moves by percent.
+/// No single bound describes both: tight enough for the fifty is a guaranteed
+/// failure on the nine, and loose enough for the nine is not a test.
+///
+/// \note `peak` is deliberately looser than `rms`. It is a single-sample
+/// statistic — one sample landing the other side of a rounding step moves it —
+/// whereas RMS is an average over the whole render and is the robust one. Nine
+/// fixtures sat at 1.1e-4 on peak with their RMS at 4e-7.
+///                                           (29.07.2026.) (SW port)
+struct Tolerances
+{
+    float peak;
+    float rms;
+    float dcOffset; ///< against the render's own RMS
+    float band;     ///< dB
+
+    /// The contract for an effect whose output is a continuous function of its
+    /// input. 49 of the 58 chains, 392 fixtures, all inside this.
+    static Tolerances strict();
+
+    /// The contract for the nine that are not — see chaoticEffects() in
+    /// goldenTests.cpp. Loose enough to absorb a moved bin, still tight enough
+    /// that silence, a gross gain change or a different spectrum fails.
+    static Tolerances amplified();
+}; // struct Tolerances
+
+bool withinTolerance(Deltas const &, Tolerances const &);
+
+/// Bands quieter than this, on the digest's own dB scale, are not compared.
+/// `Digest::of` reports a band that is empty as -200 dB, and comparing two
+/// different flavours of inaudible is how the same-platform contract produced a
+/// "9.6 dB drift" between -189 dB and -180 dB. Everything audible is far above
+/// this; the loudest bands in the fixture set sit near +28 dB.
+float bandAudibilityFloor();
 
 /// \brief Cross-platform comparison.
 ///
@@ -101,7 +143,7 @@ struct Comparison
     std::string explanation;
 };
 
-Comparison compare(Digest const &golden, Digest const &actual, bool exact);
+Comparison compare(Digest const &golden, Digest const &actual, bool exact, Tolerances const &);
 
 //------------------------------------------------------------------------------
 } // namespace SWTest

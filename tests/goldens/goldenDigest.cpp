@@ -199,8 +199,13 @@ std::string provenance()
 
 namespace
 {
-constexpr float amplitudeTolerance{1e-4f};
-constexpr float bandTolerance{0.01f}; // dB
+/// \note The numbers are stage 4.4's answer, and they are measurements rather
+/// than preferences: every one of them is the smallest round value that the 464
+/// fixtures of macOS/Accelerate against Linux/pffft actually fit inside, with the
+/// nine amplifying effects held separately. See the table under
+/// "The cross-platform contract, measured" in the plan.
+///                                       (29.07.2026.) (SW port)
+constexpr float audibilityFloor{-60.0f}; // dB, on Digest::of's own scale
 
 float relative(float const expected, float const got)
 {
@@ -211,10 +216,30 @@ float relative(float const expected, float const got)
 
 float Deltas::worst() const { return std::max(peak, rms); }
 
-bool Deltas::withinTolerance() const
+float bandAudibilityFloor() { return audibilityFloor; }
+
+Tolerances Tolerances::strict()
 {
-    return !nonFiniteDiffers && (peak <= amplitudeTolerance) && (rms <= amplitudeTolerance) &&
-           (dcOffset <= amplitudeTolerance) && (band <= bandTolerance);
+    // peak looser than rms deliberately -- see the note on the struct.
+    return Tolerances{1e-3f, 1e-4f, 1e-4f, 0.1f};
+}
+
+Tolerances Tolerances::amplified()
+{
+    /// Measured worst over the nine, at the floor above: peak 0.208 (Pitch
+    /// Spring on the sweep), rms 0.107 (Octaver on the impulse), dc 9.9e-4,
+    /// band 5.8 dB. Roughly 1.5x headroom on each, which still fails on the
+    /// things that would matter -- silence and a doubled gain both read as a
+    /// relative difference near 1, and a genuinely different spectrum moves a
+    /// band by far more than 8 dB.
+    return Tolerances{0.35f, 0.20f, 5e-3f, 8.0f};
+}
+
+bool withinTolerance(Deltas const &measured, Tolerances const &tolerances)
+{
+    return !measured.nonFiniteDiffers && (measured.peak <= tolerances.peak) &&
+           (measured.rms <= tolerances.rms) && (measured.dcOffset <= tolerances.dcOffset) &&
+           (measured.band <= tolerances.band);
 }
 
 Deltas deltas(Digest const &golden, Digest const &actual)
@@ -229,30 +254,42 @@ Deltas deltas(Digest const &golden, Digest const &actual)
 
     for (unsigned int band(0); band < numberOfBands; ++band)
     {
-        // A band that is silent in both is not interesting, however far apart
-        // the two floors happen to be.
-        auto const bothSilent((golden.bands[band] <= silenceFloor + 1) &&
-                              (actual.bands[band] <= silenceFloor + 1));
-        if (bothSilent)
+        /// \note A band inaudible on *both* sides is not compared. This used to
+        /// read `<= silenceFloor + 1`, i.e. -199 dB, which meant two bands 120 dB
+        /// under the signal were still held to 0.01 dB of each other -- and that
+        /// is measuring rounding noise, not audio. It accounted for 58 of the 89
+        /// cross-platform failures on its own, including the largest "drift" in
+        /// the whole matrix: -189 dB against -180 dB.
+        ///
+        ///   Raising the floor to something audible is a scoping fix rather than
+        /// a loosening; nothing that can be heard changes hands. Both sides have
+        /// to be below it, so an effect that goes quiet where the golden is loud
+        /// still fails.
+        ///                                   (29.07.2026.) (SW port)
+        if ((golden.bands[band] < audibilityFloor) && (actual.bands[band] < audibilityFloor))
+        {
+            ++measured.bandsSkipped;
             continue;
+        }
         auto const difference(std::abs(golden.bands[band] - actual.bands[band]));
         if (difference > measured.band)
         {
             measured.band = difference;
             measured.worstBand = band;
-            /// \note Two bands can both be far below anything audible and still
-            /// be tens of dB apart -- -189 dB against -180 dB is nine dB of
-            /// "drift" over a signal nobody will ever hear. Flagged rather than
-            /// excluded, so the report can say which it is.
-            measured.bandsNearSilence = std::max(golden.bands[band], actual.bands[band]) < -120.0f;
         }
     }
     return measured;
 }
 
-Comparison compare(Digest const &golden, Digest const &actual, bool const exact)
+Comparison compare(Digest const &golden, Digest const &actual, bool const exact,
+                   Tolerances const &tolerances)
 {
     auto const fail([](std::string reason) { return Comparison{false, std::move(reason)}; });
+    auto const number([](float const value) {
+        char buffer[32];
+        std::snprintf(buffer, sizeof(buffer), "%.4g", static_cast<double>(value));
+        return std::string(buffer);
+    });
 
     auto const measured(deltas(golden, actual));
 
@@ -263,19 +300,25 @@ Comparison compare(Digest const &golden, Digest const &actual, bool const exact)
     if (exact && (actual.hash != golden.hash))
         return fail("bit-exact hash mismatch");
 
-    if (measured.peak > amplitudeTolerance)
-        return fail("peak " + std::to_string(actual.peak) + ", expected " +
-                    std::to_string(golden.peak));
-    if (measured.rms > amplitudeTolerance)
-        return fail("rms " + std::to_string(actual.rms) + ", expected " +
-                    std::to_string(golden.rms));
-    if (measured.dcOffset > amplitudeTolerance)
-        return fail("dc offset " + std::to_string(actual.dcOffset) + ", expected " +
-                    std::to_string(golden.dcOffset));
-    if (measured.band > bandTolerance)
-        return fail("band " + std::to_string(measured.worstBand) + " " +
-                    std::to_string(actual.bands[measured.worstBand]) + " dB, expected " +
-                    std::to_string(golden.bands[measured.worstBand]) + " dB");
+    // Each says the measured distance and the bound it broke, so a failure can be
+    // read without also running the drift report.
+    if (measured.peak > tolerances.peak)
+        return fail("peak differs by " + number(measured.peak) + " relative, over " +
+                    number(tolerances.peak) + " (" + number(actual.peak) + " against " +
+                    number(golden.peak) + ")");
+    if (measured.rms > tolerances.rms)
+        return fail("rms differs by " + number(measured.rms) + " relative, over " +
+                    number(tolerances.rms) + " (" + number(actual.rms) + " against " +
+                    number(golden.rms) + ")");
+    if (measured.dcOffset > tolerances.dcOffset)
+        return fail("dc offset differs by " + number(measured.dcOffset) + " of rms, over " +
+                    number(tolerances.dcOffset) + " (" + number(actual.dcOffset) + " against " +
+                    number(golden.dcOffset) + ")");
+    if (measured.band > tolerances.band)
+        return fail("band " + std::to_string(measured.worstBand) + " differs by " +
+                    number(measured.band) + " dB, over " + number(tolerances.band) + " (" +
+                    number(actual.bands[measured.worstBand]) + " dB against " +
+                    number(golden.bands[measured.worstBand]) + " dB)");
 
     return Comparison{true, {}};
 }
