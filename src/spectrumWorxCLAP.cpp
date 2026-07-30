@@ -571,9 +571,95 @@ clap_process_status SpectrumWorxCLAP::process(clap_process const *const process)
     if (process->out_events)
         flushUIEdits(process->out_events);
 
+    updateLFOTiming(process);
+
     runEngine(process);
 
     return CLAP_PROCESS_CONTINUE;
+}
+
+/// \brief Moves the LFO clock forward by one block.
+///
+/// \note Nothing did. Every LFO reads its phase off Engine::Processor's one
+/// LFO::Timer, and the only code that ever moved that timer was
+/// `SpectrumWorxSharedImpl::process()` -- the 2016 host-facing layer this class
+/// stands in for and does not inherit (see the note on the class). So
+/// `currentTimeInBars()` held 0 for the plugin's lifetime, and every symptom
+/// followed from that one fact: each waveform returned its value at position 0
+/// forever, so enabling an LFO pinned its target to one end of the range instead
+/// of sweeping it; no period boundary was ever crossed, so the per-period
+/// waveforms (RandomHold, RandomSlide, Dirac) never retriggered; and
+/// `hasTempoInformation()` stayed false, which is what greys out the editor's
+/// N/T/D sync buttons, prints the period in milliseconds rather than note
+/// ratios, and defaults every new LFO to Free.
+///
+///   Three cases where 2016 had two, because a CLAP transport can be present and
+/// parked:
+///
+///   - Playing, on a beats timeline: follow the host. An LFO is then phase-locked
+///     to song position and rides a locate or a loop rather than drifting from it.
+///   - Tempo known but stopped -- also a host that reports a tempo and no beats
+///     timeline: keep the host's tempo and meter, and carry the phase forward
+///     from where the timer already stands. An LFO keeps running, at the right
+///     rate, with the transport parked, which is what Six Sines and surge-xt2 do
+///     and what auditioning a patch without pressing play calls for. Continuing
+///     from the timer's own position rather than a counter of our own is what
+///     makes the handover in either direction seamless.
+///   - No transport at all, or a tempo we cannot use: free run at the engine's
+///     assumed 120 BPM 4/4, which is exactly what `updatePosition()` is.
+///
+/// \note Both `updatePosition()` and the three-argument
+/// `updatePositionAndTimingInformation()` call `handleTimingInformationChange()`
+/// themselves. The 2016 callers wrapped them in a second call of their own
+/// (`SpectrumWorxSharedImpl::process()`, `SpectrumWorx::updatePosition()`), which
+/// ran the period resnap twice for one change; not repeated here.
+///                                       (30.07.2026.) (SW port)
+void SpectrumWorxCLAP::updateLFOTiming(clap_process const *const process) noexcept
+{
+    auto const sampleRate(getSampleRate());
+    if (sampleRate <= 0) [[unlikely]]
+        return; // Not activated; nothing sensible to advance by.
+
+    auto const *const transport(process->transport);
+
+    constexpr std::uint32_t tempoAndMeter(CLAP_TRANSPORT_HAS_TEMPO |
+                                          CLAP_TRANSPORT_HAS_TIME_SIGNATURE);
+
+    /// \note tsig_num reaches the engine as the measure numerator, a std::uint8_t
+    /// it divides by -- so a zero or an out-of-range one is not a tempo we can use.
+    bool const usableTempo(transport && ((transport->flags & tempoAndMeter) == tempoAndMeter) &&
+                           (transport->tempo > 0) && (transport->tsig_num >= 1) &&
+                           (transport->tsig_num <= 255));
+    if (!usableTempo)
+    {
+        updatePosition(process->frames_count);
+        return;
+    }
+
+    auto const beatsPerBar(static_cast<double>(transport->tsig_num));
+    auto const barDuration(beatsPerBar * 60 / transport->tempo);
+
+    constexpr std::uint32_t playingOnBeats(CLAP_TRANSPORT_HAS_BEATS_TIMELINE |
+                                           CLAP_TRANSPORT_IS_PLAYING);
+
+    double positionInBars;
+    if ((transport->flags & playingOnBeats) == playingOnBeats)
+    {
+        positionInBars =
+            (static_cast<double>(transport->song_pos_beats) / CLAP_BEATTIME_FACTOR) / beatsPerBar;
+        // A count-in puts the song before its own start; the timer asserts >= 0.
+        if (positionInBars < 0)
+            positionInBars = 0;
+    }
+    else
+    {
+        auto const seconds(process->frames_count / static_cast<double>(sampleRate));
+        positionInBars = lfoTimer().currentTimeInBars() + (seconds / barDuration);
+    }
+
+    updatePositionAndTimingInformation(static_cast<float>(positionInBars),
+                                       static_cast<float>(barDuration),
+                                       static_cast<std::uint8_t>(transport->tsig_num));
 }
 
 void SpectrumWorxCLAP::runEngine(clap_process const *const process) noexcept

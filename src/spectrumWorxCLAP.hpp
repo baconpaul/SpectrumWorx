@@ -330,6 +330,10 @@ class SpectrumWorxCLAP final
     /// there is always a usable scale.
     bool liveRanges(ParameterID, Plugins::ParameterInformation<Protocol> &) const;
 
+    /// Advances the engine's LFO timer for this block: from the host's transport
+    /// while it is playing, from the block length otherwise. See the definition.
+    void updateLFOTiming(clap_process const *) noexcept;
+
     /// Feeds the engine the sidechain port when the host has one connected, and
     /// the main input otherwise -- the engine reads a side channel whenever the
     /// current input mode calls for one and does not check that it is real.

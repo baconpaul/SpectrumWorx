@@ -29,6 +29,7 @@
 #include <cstring>
 #include <numbers>
 #include <functional>
+#include <set>
 #include <vector>
 //------------------------------------------------------------------------------
 namespace
@@ -195,8 +196,13 @@ class ActivePlugin
     clap_plugin const *operator->() const { return pPlugin_; }
 
     /// Runs one block of stereo audio through, in place of a host's callback.
+    ///
+    /// \param transport what the host reports, nullptr being a host that reports
+    /// nothing -- which is the default because most of these cases do not care,
+    /// and because it is the harder half of the LFO timing contract.
     void process(std::vector<float> &leftIn, std::vector<float> &rightIn,
-                 std::vector<float> &leftOut, std::vector<float> &rightOut)
+                 std::vector<float> &leftOut, std::vector<float> &rightOut,
+                 clap_event_transport const *const transport = nullptr)
     {
         float *inputChannels[]{leftIn.data(), rightIn.data()};
         float *outputChannels[]{leftOut.data(), rightOut.data()};
@@ -207,7 +213,7 @@ class ActivePlugin
         clap_process process{};
         process.steady_time = -1;
         process.frames_count = blockSize_;
-        process.transport = nullptr;
+        process.transport = transport;
         process.audio_inputs = &input;
         process.audio_inputs_count = 1;
         process.audio_outputs = &output;
@@ -322,6 +328,87 @@ bool isNormalisedType(clap_id const id)
 {
     auto const type(id >> 24);
     return (type == moduleType) || (type == lfoType);
+}
+
+/// An LFO's own parameters, in the order lfoImpl.hpp declares them.
+enum LFOParameter : unsigned
+{
+    lfoEnabled = 0,
+    lfoPeriodScale = 1,
+    lfoPhase = 2,
+    lfoLowerBound = 3,
+    lfoUpperBound = 4,
+    lfoSyncTypes = 5,
+    lfoWaveform = 6
+};
+
+/// \note A module's LFOs are indexed by *LFO-able* parameter, which is its
+/// parameter index less the one base parameter that has no LFO (Bypass, first).
+/// So LFO 0 drives module parameter 1, which is Gain -- a base parameter, and so
+/// one every effect has whatever is in the slot.
+clap_id lfoParameterID(unsigned const moduleIndex, unsigned const lfoIndex,
+                       LFOParameter const which)
+{
+    return parameterID(lfoType, moduleIndex, (lfoIndex << 8) | which);
+}
+
+/// The module parameter \p lfoIndex drives. \see lfoParameterID
+clap_id modulatedParameterID(unsigned const moduleIndex, unsigned const lfoIndex)
+{
+    return parameterID(moduleType, moduleIndex, (lfoIndex + 1) << 8);
+}
+
+/// \brief Fills slot 0, turns LFO 0 on, and reports how many distinct values its
+/// target takes over \p blocks blocks of audio.
+///
+/// One is the failure: it means the LFO is enabled, is being asked for a value
+/// every block, and is answering with the same one every time.
+std::size_t distinctModulatedValues(ActivePlugin &plugin, clap_plugin_params const &params,
+                                    float const sampleRate, std::uint32_t const blockSize,
+                                    unsigned const blocks,
+                                    clap_event_transport const *const transport)
+{
+    OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0),
+                                        0 /*the first effect in the list*/);
+    params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+
+    OneParameterEvent const enable(lfoParameterID(0, 0, lfoEnabled), 1);
+    params.flush(&*plugin, &*enable, &discardedOutputEvents());
+
+    auto const target(modulatedParameterID(0, 0));
+
+    std::vector<float> leftIn(blockSize), rightIn(blockSize);
+    std::vector<float> leftOut(blockSize), rightOut(blockSize);
+    std::set<double> seen;
+
+    for (unsigned block(0); block < blocks; ++block)
+    {
+        fillWithSine(leftIn, sampleRate, 440.0f, block * blockSize);
+        rightIn = leftIn;
+        plugin.process(leftIn, rightIn, leftOut, rightOut, transport);
+
+        double value{0};
+        REQUIRE(params.get_value(&*plugin, target, &value));
+        seen.insert(value);
+    }
+    return seen.size();
+}
+
+/// A host's transport, at \p tempo in 4/4, parked at \p positionInBeats.
+clap_event_transport transportAt(double const tempo, double const positionInBeats,
+                                 std::uint32_t const extraFlags)
+{
+    clap_event_transport transport{};
+    transport.header.size = sizeof(transport);
+    transport.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+    transport.header.type = CLAP_EVENT_TRANSPORT;
+    transport.flags = CLAP_TRANSPORT_HAS_TEMPO | CLAP_TRANSPORT_HAS_TIME_SIGNATURE |
+                      CLAP_TRANSPORT_HAS_BEATS_TIMELINE | extraFlags;
+    transport.tempo = tempo;
+    transport.tsig_num = 4;
+    transport.tsig_denom = 4;
+    transport.song_pos_beats = static_cast<clap_beattime>(positionInBeats * CLAP_BEATTIME_FACTOR);
+    return transport;
 }
 
 //------------------------------------------------------------------------------
@@ -868,4 +955,94 @@ TEST_CASE("Silence in is silence out", "[clap]")
         CHECK(peak(leftOut) < 1.0e-6f);
         CHECK(peak(rightOut) < 1.0e-6f);
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// LFO timing
+//
+//   All three of these failed before SpectrumWorxCLAP::updateLFOTiming() existed.
+// The engine's LFO clock only ever moved in SpectrumWorxSharedImpl::process(),
+// the 2016 host layer the CLAP does not inherit, so an enabled LFO answered with
+// its value at position 0 for the plugin's lifetime -- which is what "setting up
+// an LFO does not modulate anything" was.
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("An enabled LFO modulates when the host reports no transport", "[clap][lfo]")
+{
+    // The standalone, and any host that does not fill in transport. There is no
+    // song position to follow, so the block length has to move the clock.
+    constexpr float sampleRate{48000};
+    constexpr std::uint32_t blockSize{512};
+    // ~0.85 of a bar at the engine's assumed 120 BPM 4/4, so a default one-bar
+    // sine sweeps most of its range whatever the parameter's resolution.
+    constexpr unsigned int blocks{160};
+
+    Entry const entry;
+    ActivePlugin plugin(sampleRate, blockSize);
+
+    CHECK(distinctModulatedValues(plugin, parameters(*plugin), sampleRate, blockSize, blocks,
+                                  nullptr) > 1);
+}
+
+TEST_CASE("An enabled LFO keeps running while the transport is stopped", "[clap][lfo]")
+{
+    // A parked transport reports the same song position every block, so following
+    // it would freeze every LFO on the rack -- which is not what auditioning a
+    // patch without pressing play should do. Six Sines and surge-xt2 both keep
+    // the LFO moving here, and so does this: the host's tempo and meter are kept,
+    // and the phase is carried forward by the block length.
+    constexpr float sampleRate{48000};
+    constexpr std::uint32_t blockSize{512};
+    constexpr unsigned int blocks{160};
+
+    Entry const entry;
+    ActivePlugin plugin(sampleRate, blockSize);
+
+    auto const stopped(transportAt(120, 8 /*bar 3*/, 0 /*not CLAP_TRANSPORT_IS_PLAYING*/));
+    CHECK(distinctModulatedValues(plugin, parameters(*plugin), sampleRate, blockSize, blocks,
+                                  &stopped) > 1);
+}
+
+TEST_CASE("A playing transport drives the LFO from song position", "[clap][lfo]")
+{
+    // The case the other two stand in for: the host is playing and the LFO is
+    // phase-locked to the song rather than free-running alongside it.
+    constexpr float sampleRate{48000};
+    constexpr std::uint32_t blockSize{512};
+
+    Entry const entry;
+    ActivePlugin plugin(sampleRate, blockSize);
+    auto const &params(parameters(*plugin));
+
+    OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
+    params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+
+    OneParameterEvent const enable(lfoParameterID(0, 0, lfoEnabled), 1);
+    params.flush(&*plugin, &*enable, &discardedOutputEvents());
+
+    auto const target(modulatedParameterID(0, 0));
+
+    std::vector<float> leftIn(blockSize, 0.0f), rightIn(blockSize, 0.0f);
+    std::vector<float> leftOut(blockSize), rightOut(blockSize);
+
+    /// \brief What the LFO reads with the song parked at \p beats.
+    ///
+    /// \note One block per position, and the position is what the host says
+    /// rather than what the last block left behind -- so a repeat has to read the
+    /// same as its first visit, which a free-running clock could not manage.
+    auto const valueAtBeat([&](double const beats) {
+        auto const playing(transportAt(120, beats, CLAP_TRANSPORT_IS_PLAYING));
+        plugin.process(leftIn, rightIn, leftOut, rightOut, &playing);
+        double value{0};
+        REQUIRE(params.get_value(&*plugin, target, &value));
+        return value;
+    });
+
+    // A default LFO is a one-bar sine, so bar starts agree and mid-bar does not.
+    auto const barZero(valueAtBeat(0));
+    auto const midBar(valueAtBeat(2));
+    auto const barOne(valueAtBeat(4));
+
+    CHECK(midBar != barZero);
+    CHECK(barOne == barZero);
 }
