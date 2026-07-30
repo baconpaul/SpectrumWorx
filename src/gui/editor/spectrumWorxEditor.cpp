@@ -19,6 +19,7 @@
 #include "core/modules/moduleDSPAndGUI.hpp"
 #include "core/spectrumWorxCore.hpp"
 #include "gui/editor/editorHost.hpp"
+#include "gui/editor/editorModuleInitialiser.hpp"
 
 #include "le/parameters/lfo.hpp"
 #include "le/parameters/printer.hpp"
@@ -289,13 +290,26 @@ void SpectrumWorxEditor::attachToHostWindow(WindowRef const parentWindow)
 #endif // 32 bit only Carbon support
 #endif // platform
 
+/// \note Walks up to the nearest enclosing editor rather than to the top-level
+/// component. Those were the same thing in 2016: VST 2.4 and AU parented the
+/// editor straight into the host's window, so "the top" *was* the editor.
+/// clap-wrapper's JUCE shim nests it two deep instead --
+/// implDesktop -> implHolder -> editor (clap_juce_shim_impl.cpp) -- so the old
+/// walk landed on implDesktop, and the downcast asserted in a checked build and
+/// silently produced a bad pointer in a release one. Every widget that asks its
+/// editor for the engine setup went through here, so this failed as soon as a
+/// module's widgets were built.
+///                                           (29.07.2026.) (SW port)
 SpectrumWorxEditor &SpectrumWorxEditor::fromChild(juce::Component const &widget)
 {
     LE_ASSERT(widget.getParentComponent());
-    juce::Component *pParent(widget.getParentComponent());
-    while (pParent->getParentComponent())
-        pParent = pParent->getParentComponent();
-    return *LE::Utility::polymorphicDowncast<SpectrumWorxEditor *>(pParent);
+    for (auto *pParent(widget.getParentComponent()); pParent;
+         pParent = pParent->getParentComponent())
+    {
+        if (auto *const pEditor = dynamic_cast<SpectrumWorxEditor *>(pParent))
+            return *pEditor;
+    }
+    LE_UNREACHABLE_CODE();
 }
 
 #ifndef LE_NO_PRESETS
@@ -694,8 +708,12 @@ void SpectrumWorxEditor::moveModules(ModuleUI &targetSlotUI, std::uint8_t number
 std::pair<LE::Utility::IntrusivePtr<SpectrumWorxEditor::Module>, std::int8_t>
 SpectrumWorxEditor::setModuleInSlot(std::uint8_t const slotIndex, std::int8_t const effectIndex)
 {
-    return moduleChainOwner().moduleChain().setParameter(slotIndex, effectIndex,
-                                                         moduleChainOwner().moduleInitialiser());
+    /// \note The editor's own initialiser, not the core's: filling a slot from
+    /// here has to build the module's UI region as well as its buffers, and the
+    /// core half cannot reach the GUI. addUserAddedModule() depends on it having
+    /// happened by the time this returns.
+    EditorModuleInitialiser const initialise{moduleChainOwner().moduleInitialiser(), this};
+    return moduleChainOwner().moduleChain().setParameter(slotIndex, effectIndex, initialise);
 }
 
 void SpectrumWorxEditor::addUserAddedModule(std::uint8_t const effectIndex)
@@ -731,7 +749,14 @@ void SpectrumWorxEditor::addUserAddedModule(std::uint8_t const effectIndex)
         LE_ASSERT(result.first);
         std::uint8_t const changedSlot(nextAvailableModuleSlot_);
         moduleAdded();
-        result.first->gui()->grabKeyboardFocus();
+        /// \note Checked rather than assumed. setModuleInSlot() builds the region
+        /// synchronously and this is the GUI thread, so it is there -- unless
+        /// createGUI() threw, which it swallows in a release build. This used to
+        /// be an unconditional `gui()->`, which on an empty optional is undefined
+        /// behaviour rather than a missing knob.
+        LE_ASSERT(result.first->gui());
+        if (result.first->gui())
+            result.first->gui()->grabKeyboardFocus();
         host().gestureBegin("Add module");
         host().moduleChangedByUser(changedSlot, result.first.get());
         host().gestureEnd();

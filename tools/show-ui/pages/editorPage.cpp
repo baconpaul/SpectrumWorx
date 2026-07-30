@@ -27,6 +27,8 @@
 #include "core/modules/moduleDSPAndGUI.hpp"
 #include "core/spectrumWorxCore.hpp"
 #include "gui/editor/editorHost.hpp"
+#include "core/automatedModuleChain.hpp"
+#include "gui/editor/editorModuleInitialiser.hpp"
 #include "gui/editor/spectrumWorxEditor.hpp"
 #include "gui/theme.hpp"
 
@@ -104,7 +106,7 @@ class HarnessHost final : public GUI::EditorHost
 class EditorPage final : public juce::Component
 {
   public:
-    EditorPage()
+    explicit EditorPage(bool const withModuleInFirstSlot)
     {
         /// \note No setLookAndFeel() here, unlike the other pages: the editor's
         /// own ReferenceCountedGUIInitializationGuard makes Theme the default
@@ -113,6 +115,9 @@ class EditorPage final : public juce::Component
         editor_ = std::make_unique<GUI::SpectrumWorxEditor>(host_);
         addAndMakeVisible(*editor_);
         setSize(editor_->getWidth(), editor_->getHeight());
+
+        if (withModuleInFirstSlot)
+            fillFirstSlot();
     }
 
     /// \note The editor goes before the host it holds a reference to.
@@ -121,13 +126,34 @@ class EditorPage final : public juce::Component
     void resized() override { editor_->setTopLeftPosition(0, 0); }
 
   private:
+    /// \brief Puts an effect in slot 1 the way a *host* does, not the way the
+    /// editor's own menu does.
+    ///
+    /// \note Which is the point: EditorModuleInitialiser is what gives a filled
+    /// slot its UI region, and this is the only way to exercise it without a
+    /// window server and a mouse. The editor's own path (addUserAddedModule) is
+    /// private and needs a real click; this reaches the same initialiser through
+    /// the chain, as host2PluginImpl.inl does for an automated slot change.
+    void fillFirstSlot()
+    {
+        EditorModuleInitialiser const initialise{host_.core().moduleInitialiser(), editor_.get()};
+        auto const result(host_.core().moduleChain().setParameter(0, 0, initialise));
+        LE_ASSERT_MSG(result.first, "The harness could not create a module.");
+        LE_ASSERT_MSG(result.first && result.first->gui(),
+                      "A filled slot has no UI region -- the initialiser did not build one.");
+    }
+
     HarnessHost host_;
     std::unique_ptr<GUI::SpectrumWorxEditor> editor_;
 }; // class EditorPage
 
 SWShowUI::PageRegistration const registration{
     "editor", "the whole editor, over a headless engine",
-    [] { return std::unique_ptr<juce::Component>(std::make_unique<EditorPage>()); }};
+    [] { return std::unique_ptr<juce::Component>(std::make_unique<EditorPage>(false)); }};
+
+SWShowUI::PageRegistration const registrationWithModule{
+    "editor-module", "the editor with an effect in the first slot",
+    [] { return std::unique_ptr<juce::Component>(std::make_unique<EditorPage>(true)); }};
 
 //------------------------------------------------------------------------------
 } // anonymous namespace

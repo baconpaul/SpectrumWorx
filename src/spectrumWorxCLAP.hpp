@@ -25,6 +25,7 @@
 #include "core/modules/moduleDSPAndGUI.hpp"
 #include "core/spectrumWorxCore.hpp"
 #include "gui/editor/editorHost.hpp"
+#include "gui/editor/editorModuleInitialiser.hpp"
 
 #include "le/plugins/clap/tag.hpp"
 
@@ -195,6 +196,23 @@ class SpectrumWorxCLAP final
 
     /// The editor, while one is open, else nullptr.
     GUI::SpectrumWorxEditor *gui() const { return pEditor_; }
+
+    /// \brief Hides SpectrumWorxCore's, deliberately.
+    ///
+    /// \note Filling a slot has to build the module's UI region as well as its
+    /// buffers, and the core's initialiser is only the buffers -- it lives in
+    /// sw-dsp, below the GUI. The callers that matter here reach for the
+    /// initialiser on the *concrete* plugin type -- `pImpl->moduleInitialiser()`
+    /// in host2PluginImpl.inl for a host-driven slot change, and
+    /// `loader.moduleInitialiser()` in presets.hpp for a preset load -- so
+    /// shadowing is enough to reach both without touching the chain.
+    ///
+    ///   The editor fills slots through its own path (setModuleInSlot) and does
+    /// not come through here.
+    EditorModuleInitialiser moduleInitialiser()
+    {
+        return {SpectrumWorxCore::moduleInitialiser(), pEditor_};
+    }
 
     /// \note The VST program model prefixed a modified program's name with '*'.
     /// CLAP has a host call for it instead, and it is the host's business

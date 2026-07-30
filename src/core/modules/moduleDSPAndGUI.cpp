@@ -93,6 +93,13 @@ void Module::createGUI(GUI::SpectrumWorxEditor &editor, std::uint8_t const modul
     }
     catch (...)
     {
+        /// \note Swallowed, because this can run while the host is delivering a
+        /// parameter event and a widget that failed to build is not worth taking
+        /// the host down for. But it leaves the slot without its UI region and
+        /// nothing else says so -- which is invisible in exactly the way that
+        /// wastes an afternoon -- so a checked build stops here.
+        ///                                   (29.07.2026.) (SW port)
+        LE_ASSERT_MSG(false, "Module GUI creation threw; the slot has no UI region.");
     }
 }
 

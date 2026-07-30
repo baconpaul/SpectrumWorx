@@ -45,7 +45,21 @@ template <class Effect> class LE_NOVTABLE ModuleWidgets
   public: // Module GUI interface implementation.
     void create(GUI::ModuleUI &uiBase)
     {
-        LE_ASSERT(!uiBase.module().gui());
+        /// \note There used to be an LE_ASSERT( !uiBase.module().gui() ) here.
+        /// It held while the UI was a Boost.Optional built through a typed
+        /// in-place factory, whose apply() ran this before the optional marked
+        /// itself as initialised. std::optional::emplace() engages first, so by
+        /// the time this runs the optional is always non-empty -- the assertion
+        /// had become unconditionally false and fired on the first module ever
+        /// created. See Module::createGUI's note on the same change; the sibling
+        /// assertion in destroy() below was commented out long before, for what
+        /// looks like the same reason.
+        ///
+        ///   Nothing is lost: what it meant to check -- that this module does not
+        /// already have a finished UI -- is LE_ASSERT( !ui_ ) in
+        /// Module::createGUI, immediately before the emplace, which is the only
+        /// place that can still say it meaningfully.
+        ///                                   (29.07.2026.) (SW port)
         uiBase.setUpForEffect(Effect::title, Effect::description);
         parameterWidgets_.construct(uiBase);
     }
@@ -64,7 +78,6 @@ template <class Effect> class LE_NOVTABLE ModuleWidgets
     ParameterWidgets parameterWidgets_;
 }; // class ModuleWidgets
 
-
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \class Module::Impl<>
@@ -81,7 +94,6 @@ class Module::Impl final : public Engine::ModuleEffectImpl<Effect, Module>,
     {
     }
 }; // class Module::Impl
-
 
 //------------------------------------------------------------------------------
 } // namespace SW

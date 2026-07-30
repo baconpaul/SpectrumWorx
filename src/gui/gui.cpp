@@ -331,6 +331,20 @@ void addToParentAndShow(juce::Component &parent, juce::Component &childToBe)
 void fadeOutComponent(juce::Component &component, float const finalAlpha,
                       unsigned int const duration, bool const useProxyComponent)
 {
+    /// \note There is nothing to animate on a machine with no displays, and
+    /// asking anyway is fatal rather than merely pointless: JUCE's proxy
+    /// component does
+    /// `getDisplays().getDisplayForRect( ... )->scale` (juce_ComponentAnimator.cpp)
+    /// and getDisplayForRect() returns null when the display list is empty. The
+    /// try/catch below cannot help with a null dereference.
+    ///
+    ///   Reachable wherever a plugin is instantiated without a window server --
+    /// offscreen rendering, CI, a scanning host on a headless box -- and it is
+    /// ~ModuleUI that walks into it, so it takes only a loaded effect.
+    ///                                       (29.07.2026.) (SW port)
+    if (juce::Desktop::getInstance().getDisplays().displays.isEmpty())
+        return;
+
     try
     {
         juce::Point<int> const centre(component.getBounds().getCentre());
