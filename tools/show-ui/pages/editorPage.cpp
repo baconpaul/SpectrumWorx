@@ -29,11 +29,14 @@
 #include "gui/editor/editorHost.hpp"
 #include "core/automatedModuleChain.hpp"
 #include "gui/editor/editorModuleInitialiser.hpp"
+#include "le/spectrumworx/effects/configuration/effectNames.hpp"
 #include "gui/editor/spectrumWorxEditor.hpp"
 #include "gui/theme.hpp"
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include <cstdio>
+#include <cstdlib>
 #include <memory>
 //------------------------------------------------------------------------------
 namespace
@@ -134,10 +137,22 @@ class EditorPage final : public juce::Component
     /// window server and a mouse. The editor's own path (addUserAddedModule) is
     /// private and needs a real click; this reaches the same initialiser through
     /// the chain, as host2PluginImpl.inl does for an automated slot change.
+    /// \note SW_SHOW_UI_EFFECT picks which one, so a single page can be swept
+    /// over the whole effect list from a shell loop. Building a module's widgets
+    /// is per-effect work -- every widget type an effect uses is a template
+    /// instantiation of its own -- so "one effect renders" says very little about
+    /// the other fifty-six.
     void fillFirstSlot()
     {
+        std::int8_t effectIndex{0};
+        if (auto const *const requested = std::getenv("SW_SHOW_UI_EFFECT"))
+            effectIndex = static_cast<std::int8_t>(std::atoi(requested));
+
+        std::fprintf(stderr, "sw-show-ui: slot 1 <- effect %d (%s)\n", effectIndex,
+                     Effects::effectName(static_cast<std::uint8_t>(effectIndex)));
+
         EditorModuleInitialiser const initialise{host_.core().moduleInitialiser(), editor_.get()};
-        auto const result(host_.core().moduleChain().setParameter(0, 0, initialise));
+        auto const result(host_.core().moduleChain().setParameter(0, effectIndex, initialise));
         LE_ASSERT_MSG(result.first, "The harness could not create a module.");
         LE_ASSERT_MSG(result.first && result.first->gui(),
                       "A filled slot has no UI region -- the initialiser did not build one.");
