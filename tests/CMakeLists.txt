@@ -49,7 +49,11 @@ target_compile_definitions(sw-tests PRIVATE
         SW_PRESET_SNAPSHOT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/presets/data"
         # \note The shipping banks themselves, not a copy: the corpus test is
         # about *those* files, and a copy is one more thing that can rot.
-        SW_PRESET_DATA_DIR="${CMAKE_SOURCE_DIR}/assets/presets")
+        SW_PRESET_DATA_DIR="${CMAKE_SOURCE_DIR}/assets/presets"
+        # Where a test that has to write a file writes it. The build tree, not
+        # the system temporary directory: it is cleaned with the build, two
+        # configurations cannot collide in it, and a sandboxed CI can reach it.
+        SW_TEST_OUTPUT_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-output")
 
 # So that clap/ can reach goldens/engineHarness.hpp: the CLAP-side tests need an
 # instantiable SpectrumWorxCore, and that is exactly what the golden harness is.

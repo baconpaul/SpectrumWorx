@@ -42,6 +42,11 @@ add_library(sw-gui-widgets STATIC
 
 target_link_libraries(sw-gui-widgets PUBLIC sw-gui-resources sw-dsp)
 
+# Where the user's presets live -- ~/Documents/SpectrumWorx and its platform
+# equivalents, XDG included. PRIVATE: gui.cpp answers with a juce::File, so
+# nothing above it needs to know where the answer came from.
+target_link_libraries(sw-gui-widgets PRIVATE sst-plugininfra)
+
 if (APPLE)
     target_sources(sw-gui-widgets PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/gui/gui.mm)
     target_link_libraries(sw-gui-widgets PRIVATE "-framework Carbon" "-framework Cocoa")

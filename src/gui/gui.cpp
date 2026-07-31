@@ -13,7 +13,10 @@
 #include "le/utility/platformSpecifics.hpp"
 
 #include "le/utility/assert.hpp"
+#include "le/utility/ignoreUnused.hpp"
 #include "le/utility/polymorphicDowncast.hpp"
+
+#include <sst/plugininfra/paths.h>
 #ifdef _WIN32
 #include <algorithm>
 #endif // _WIN32
@@ -228,28 +231,46 @@ static juce::File mruPresetsFolder;
 /// writer was `getBinaryPath`, went with it — nothing ever read it.
 ///                                       (29.07.2026.) (SW port)
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// initializePaths()
+// -----------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
 /// \note What used to live here: the plugin found its skin, its presets and its
 /// documentation by mmapping a `SpectrumWorx.paths` file that the 2016 installer
 /// wrote next to the binary. The skin is compiled into the binary now
-/// (resources.hpp), the installer is gone, and boost::mmap went with stage 2, so
-/// the file, the two mapPathsFile() overloads that read and rewrote it, and the
-/// on-disk resourceBitmap() that used it are all deleted.
+/// (resources.hpp), the factory presets are too (factoryPresets.hpp), and the
+/// installer is gone -- so the file, the two mapPathsFile() overloads that read
+/// and rewrote it, and the on-disk resourceBitmap() that used it are all gone
+/// with it.
 ///
-///   rootPath() and presetsFolder() survive because the editor still wants a
-/// place for the user's guide and the preset browser still wants a folder to
-/// open in. Both now answer from ordinary locations rather than from an
-/// installer artefact. **Stage 8 owns where presets actually live** -- this is a
-/// placeholder that keeps the callers honest, not a decision.
-///                                       (28.07.2026.) (SW port)
+/// \note What is left is the *user's* presets, which are the one thing that
+/// genuinely has to be somewhere a user can find and back up. That is
+/// `~/Documents/SpectrumWorx` and its platform equivalents, from
+/// `sst::plugininfra::paths` -- the same answer Surge gives, arrived at by the
+/// same code, rather than by the `userApplicationDataDirectory` that stood here
+/// as a placeholder. On Linux it honours XDG.
+///
+/// \note The directory is created here rather than at the first save. A browser
+/// that opens on a folder which does not exist shows nothing and offers no way
+/// to make one.
+///                                       (31.07.2026.) (SW port)
 
 bool initializePaths()
 {
-    if (!havePathsBeenInitialised())
-    {
-        pluginRootPath = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-                             .getChildFile("SpectrumWorx");
-        mruPresetsFolder = pluginRootPath.getChildFile("Presets");
-    }
+    if (havePathsBeenInitialised())
+        return true;
+
+    pluginRootPath = juce::File(
+        sst::plugininfra::paths::bestDocumentsFolderPathFor("SpectrumWorx").u8string().c_str());
+    mruPresetsFolder = pluginRootPath.getChildFile("Presets");
+
+    auto const created(mruPresetsFolder.createDirectory());
+    LE_ASSERT_MSG(created.wasOk(), "Cannot create the user preset directory.");
+    LE::Utility::ignoreUnused(created);
+
     return true;
 }
 

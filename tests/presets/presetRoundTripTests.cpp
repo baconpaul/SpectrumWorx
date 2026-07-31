@@ -35,6 +35,7 @@
 #include "le/spectrumworx/effects/configuration/constants.hpp"
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
 #include "le/spectrumworx/engine/moduleParameters.hpp"
+#include "le/spectrumworx/presetFile.hpp"
 #include "le/spectrumworx/presets.hpp"
 
 #include <juce_core/juce_core.h>
@@ -349,4 +350,78 @@ TEST_CASE("A parameter under an enabled LFO takes its value from the LFO", "[pre
         CHECK(module.baseLFO(gain - 1).parameters().get<LFO::LowerBound>().getValue() == 0.125f);
         CHECK(module.baseLFO(gain - 1).parameters().get<LFO::UpperBound>().getValue() == 0.875f);
     });
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Through a file
+// --------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Stage 8's other "done when" is that a user's save and load round-trips.
+/// Everything above round-trips through a buffer; this is the layer under it --
+/// savePreset(juce::File) and readPresetFile() -- and nothing else covers it.
+/// The bug it exists to catch is a truncated or unterminated write, which the
+/// buffer path cannot have.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A preset saved to a file loads back from it", "[preset-roundtrip]")
+{
+    juce::File const directory(juce::String(SW_TEST_OUTPUT_DIR) + "/presets");
+    REQUIRE(directory.createDirectory().wasOk());
+
+    /// \note A name with a space and a parenthesis in it, because those are what
+    /// the shipped banks are full of and what CMakeRC's unescaped command line
+    /// tripped over.
+    auto const file(directory.getChildFile("round trip (1).swp"));
+    file.deleteFile();
+
+    std::string original;
+    {
+        Fixture fixture;
+        auto &engine(fixture.engine());
+        driveGlobals(engine);
+
+        REQUIRE(
+            engine.program().moduleChain().setParameter(0, 3, engine.moduleInitialiser()).second ==
+            3);
+
+        engine.program().moduleChain().forEach<ModuleParameters>(
+            [&](ModuleParameters const &module) {
+                driveModule(const_cast<ModuleParameters &>(module), 3);
+            });
+
+        original = dump(engine).text;
+
+        savePreset(file, juce::File(), juce::String("through a file"), engine.program());
+    }
+
+    REQUIRE(file.existsAsFile());
+    REQUIRE(file.getSize() > 0);
+
+    auto const contents(readPresetFile(file));
+    REQUIRE(contents);
+
+    Fixture reloaded;
+    auto &engine(reloaded.engine());
+
+    SWTest::clearPresetProblems();
+    {
+        ScopedProblemCounter const counting;
+        REQUIRE(LE::SW::loadPreset(contents.get(), true, nullptr, PresetConsumer{engine}));
+    }
+    CHECK(SWTest::presetProblems().missingParameter == 0);
+    CHECK(dump(engine).text == original);
+
+    /// \note And the comment, which is the one thing in a preset that is neither
+    /// a parameter nor an effect and so is in none of the dumps above.
+    juce::String comment;
+    Fixture commentOnly;
+    REQUIRE(LE::SW::loadPreset(readPresetFile(file).get(), true, &comment,
+                               PresetConsumer{commentOnly.engine()}));
+    CHECK(comment == "through a file");
+
+    file.deleteFile();
 }
