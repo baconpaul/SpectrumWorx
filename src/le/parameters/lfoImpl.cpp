@@ -70,10 +70,14 @@ UI_NAME(LFOImpl::Waveform) = "wfrm";
 //    (( dIRAC          , "Dirac down" ))
 //)
 
+/// \note Written out rather than through ENUMERATED_PARAMETER_STRINGS for the
+/// reason above: that macro checks each string against the enumerator it names,
+/// and this parameter has no enumerators to name.
 template <>
-char const *LE_RESTRICT const DiscreteValues<Parameters::LFOImpl::Waveform>::strings[] = {
-    "Sine",    "Triangle", "Sawtooth", "htootwaS", "Square",    "Exponent",
-    "Hrandom", "Grandom",  "Whacko",   "Dirac up", "Dirac down"};
+DiscreteValues<Parameters::LFOImpl::Waveform>::Strings const
+    DiscreteValues<Parameters::LFOImpl::Waveform>::strings{
+        "Sine",    "Triangle", "Sawtooth", "htootwaS", "Square",    "Exponent",
+        "Hrandom", "Grandom",  "Whacko",   "Dirac up", "Dirac down"};
 
 using Enabled = LFOImpl::Enabled;
 using PeriodScale = LFOImpl::PeriodScale;

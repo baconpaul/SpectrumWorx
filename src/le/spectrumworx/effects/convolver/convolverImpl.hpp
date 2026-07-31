@@ -34,8 +34,12 @@ class ConvolverImpl : public EffectImpl<Convolver>
     // ChannelState
     ////////////////////////////////////////////////////////////////////////////
 
-    LE_DYNAMIC_CHANNEL_STATE(
-        ((Engine::HalfFFTBuffer<>)(frozenAmps))((Engine::HalfFFTBuffer<>)(frozenPhases)));
+    struct DynamicChannelState : DynamicChannelState_<DynamicChannelState>
+    {
+        Engine::HalfFFTBuffer<> frozenAmps;
+        Engine::HalfFFTBuffer<> frozenPhases;
+        auto members() { return std::tie(frozenAmps, frozenPhases); }
+    };
 
     struct ChannelState : DynamicChannelState
     {

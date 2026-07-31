@@ -1480,8 +1480,8 @@ void addPowerOfTwoValueStringsToComboBox(unsigned int const firstValue,
     comboBox.setValue(firstValue);
 }
 
-void addEnumeratedParameterValueStringsToComboBox(
-    LE::Utility::Span<char const *LE_RESTRICT const> strings, ComboBox &comboBox)
+void addEnumeratedParameterValueStringsToComboBox(LE::Utility::Span<char const *const> strings,
+                                                  ComboBox &comboBox)
 {
     LE_ASSERT_MSG(comboBox.numberOfItems() == 0, "ComboBox already filled.");
     ComboBox::value_type parameterValue(0);

@@ -42,7 +42,10 @@ char const Phlip::description[] = "Phase flip.";
 
 EFFECT_PARAMETER_NAME(Phlip::Mode, "Target harmonics")
 
-EFFECT_ENUMERATED_PARAMETER_STRINGS(Phlip, Mode, ((All, "All"))((Even, "Even"))((Odd, "Odd")))
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Phlip, Mode,
+    {All, "All"},
+    {Even, "Even"},
+    {Odd, "Odd"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

@@ -74,8 +74,11 @@ struct AnalysisBinStateData
     bool fellBelowThreshold;
 #endif // LE_PV_USE_TSS
 };
-LE_NAMED_DYNAMIC_CHANNEL_STATE(AnalysisChannelStateBase,
-                               ((Engine::HalfFFTBuffer<AnalysisBinStateData>)(binData)));
+struct AnalysisChannelStateBase : DynamicChannelState_<AnalysisChannelStateBase>
+{
+    Engine::HalfFFTBuffer<AnalysisBinStateData> binData;
+    auto members() { return std::tie(binData); }
+};
 } // namespace Detail
 
 struct AnalysisChannelState : Detail::AnalysisChannelStateBase

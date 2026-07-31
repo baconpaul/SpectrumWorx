@@ -27,20 +27,11 @@ namespace Parameters
 {
 //------------------------------------------------------------------------------
 
-namespace Traits
-{
-//------------------------------------------------------------------------------
-
-namespace Tag
-{
-struct MaximumOffset;
-}
-
-template <std::uint16_t value>
-using MaximumOffset = TraitPair<Tag::MaximumOffset, std::integral_constant<std::int16_t, value>>;
-
-//------------------------------------------------------------------------------
-} // namespace Traits
+/// \note MaximumOffset is declared beside the other five traits in
+/// le/parameters/parameter.hpp: a trait is a {tag, value} pair and nothing about
+/// this one is symmetric-specific, and the namespaces that declare parameters
+/// import the six of them together.
+///                                           (31.07.2026.) (SW port)
 
 namespace Detail ///< \internal
 {

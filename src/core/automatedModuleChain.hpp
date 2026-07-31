@@ -38,12 +38,10 @@ namespace SW
 //...mrmlj...defined outside of the AutomatedModuleChain class to enable forward declarations to speed up compilation...clean this up...
 std::int8_t constexpr noModule = -1;
 
-LE_DEFINE_PARAMETER(
-    (ModuleChainParameter)(Parameters::
-                               LinearSignedInteger)(Minimum<noModule>)(Maximum<
-                                                                       Effects::Constants::
-                                                                           numberOfEffects -
-                                                                       1>)(Default<noModule>));
+LE_DEFINE_PARAMETER(ModuleChainParameter, Parameters::LinearSignedInteger,
+                    Parameters::Traits::Minimum<noModule>,
+                    Parameters::Traits::Maximum<Effects::Constants::numberOfEffects - 1>,
+                    Parameters::Traits::Default<noModule>);
 
 ////////////////////////////////////////////////////////////////////////////////
 ///

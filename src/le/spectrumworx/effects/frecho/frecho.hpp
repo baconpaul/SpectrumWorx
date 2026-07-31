@@ -48,10 +48,10 @@ namespace Effects
 struct Frecho
 {
   public:
-    LE_DEFINE_PARAMETERS(
-        ((Distance)(LinearUnsignedInteger)(Minimum<17>)(Maximum<500>)(Default<100>)(Unit<" m">))(
-            (Absorption)(LinearFloat)(Minimum<0>)(Maximum<18>)(Default<6>)(Unit<" dB">))(
-            (EchoPitch)(SymmetricFloat)(MaximumOffset<12>)(Unit<" '/echo">)));
+    LE_DEFINE_PARAMETER(Distance, LinearUnsignedInteger, Minimum<17>, Maximum<500>, Default<100>, Unit<" m">);
+    LE_DEFINE_PARAMETER(Absorption, LinearFloat, Minimum<0>, Maximum<18>, Default<6>, Unit<" dB">);
+    LE_DEFINE_PARAMETER(EchoPitch, SymmetricFloat, MaximumOffset<12>, Unit<" '/echo">);
+    LE_DEFINE_PARAMETERS(Distance, Absorption, EchoPitch);
 
     /// \typedef Distance
     /// \brief Perceived distance of the reflection.

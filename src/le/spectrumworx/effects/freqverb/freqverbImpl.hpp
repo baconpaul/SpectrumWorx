@@ -33,10 +33,13 @@ namespace Effects
 class FreqverbImpl : public EffectImpl<Freqverb>
 {
   public: // LE::Effect required interface.
-    LE_NAMED_DYNAMIC_CHANNEL_STATE(
-        ChannelState,
-        ((Engine::HalfFFTBuffer<>)(feedbackSumReals))((Engine::HalfFFTBuffer<>)(feedbackSumImags))(
-            (PhaseVocoderShared::PitchShifter::ChannelState)(ps)));
+    struct ChannelState : DynamicChannelState_<ChannelState>
+    {
+        Engine::HalfFFTBuffer<>                        feedbackSumReals;
+        Engine::HalfFFTBuffer<>                        feedbackSumImags;
+        PhaseVocoderShared::PitchShifter::ChannelState ps;
+        auto members() { return std::tie(feedbackSumReals, feedbackSumImags, ps); }
+    };
 
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()

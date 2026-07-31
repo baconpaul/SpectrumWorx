@@ -50,11 +50,15 @@ EFFECT_PARAMETER_NAME(Colorifer::BandWidth, "Shape width")
 EFFECT_PARAMETER_NAME(Colorifer::SpectrumPreprocess, "Spectrum preprocess")
 EFFECT_PARAMETER_NAME(Colorifer::ReplacePhase, "Replace phase")
 
-EFFECT_ENUMERATED_PARAMETER_STRINGS(
-    Colorifer, SpectrumPreprocess,
-    ((NotUsed, "None"))((SquareRoot, "Square root"))((Square, "Square"))((Exponential, "Exponent")))
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Colorifer, SpectrumPreprocess,
+    {NotUsed, "None"},
+    {SquareRoot, "Square root"},
+    {Square, "Square"},
+    {Exponential, "Exponent"})
 
-EFFECT_ENUMERATED_PARAMETER_STRINGS(Colorifer, ReplacePhase, ((No, "No"))((Yes, "Yes")))
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Colorifer, ReplacePhase,
+    {No, "No"},
+    {Yes, "Yes"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

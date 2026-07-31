@@ -92,10 +92,19 @@ EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::VibratoDepth, "N/A")  //"Vibrato ext
 EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::VibratoPeriod, "N/A") //"Vibrato rate"            )
 EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::VibratoDelay, "N/A")  //"Vibrato delay"           )
 
-EFFECT_ENUMERATED_PARAMETER_STRINGS(
-    Detail::TuneWorxBase, Key,
-    ((A, "A"))((Ais, "A#"))((B, "B"))((C, "C"))((Cis, "C#"))((D, "D"))((Dis, "D#"))((E, "E"))(
-        (F, "F"))((Fis, "F#"))((G, "G"))((Gis, "G#")))
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Detail::TuneWorxBase, Key,
+    {A, "A"},
+    {Ais, "A#"},
+    {B, "B"},
+    {C, "C"},
+    {Cis, "C#"},
+    {D, "D"},
+    {Dis, "D#"},
+    {E, "E"},
+    {F, "F"},
+    {Fis, "F#"},
+    {G, "G"},
+    {Gis, "G#"})
 
 namespace Detail
 {

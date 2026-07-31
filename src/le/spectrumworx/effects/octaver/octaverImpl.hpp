@@ -36,9 +36,12 @@ class OctaverImpl : public EffectImpl<Octaver>
     // ChannelState
     ////////////////////////////////////////////////////////////////////////////
 
-    LE_NAMED_DYNAMIC_CHANNEL_STATE(ChannelState,
-                                   ((PhaseVocoderShared::PitchShifter::ChannelState)(pv1))(
-                                       (PhaseVocoderShared::PitchShifter::ChannelState)(pv2)));
+    struct ChannelState : DynamicChannelState_<ChannelState>
+    {
+        PhaseVocoderShared::PitchShifter::ChannelState pv1;
+        PhaseVocoderShared::PitchShifter::ChannelState pv2;
+        auto members() { return std::tie(pv1, pv2); }
+    };
 
     void setup(IndexRange const &, Engine::Setup const &);
     void process(ChannelState &, Engine::ChannelData_AmPh2ReIm, Engine::Setup const &) const;

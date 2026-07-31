@@ -51,10 +51,10 @@ struct Inserter
     typedef CommonParameters::Mode Mode;
     /// @}
 
-    LE_DEFINE_PARAMETERS(
-        ((Mode))((Source)(LinearFloat)(Minimum<0>)(Maximum<100>)(Default<0>)(Unit<" bw%">))(
-            (Destination)(LinearFloat)(Minimum<0>)(Maximum<100>)(Default<0>)(Unit<" bw%">))(
-            (InsertSize)(LinearFloat)(Minimum<0>)(Maximum<100>)(Default<5>)(Unit<" bw%">)));
+    LE_DEFINE_PARAMETER(Source, LinearFloat, Minimum<0>, Maximum<100>, Default<0>, Unit<" bw%">);
+    LE_DEFINE_PARAMETER(Destination, LinearFloat, Minimum<0>, Maximum<100>, Default<0>, Unit<" bw%">);
+    LE_DEFINE_PARAMETER(InsertSize, LinearFloat, Minimum<0>, Maximum<100>, Default<5>, Unit<" bw%">);
+    LE_DEFINE_PARAMETERS(Mode, Source, Destination, InsertSize);
 
     /// \typedef Mode
     /// \brief Specifies what is to be inserted.

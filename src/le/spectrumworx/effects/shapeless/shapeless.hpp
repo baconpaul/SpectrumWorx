@@ -41,8 +41,8 @@ namespace Effects
 
 struct Shapeless
 {
-    LE_DEFINE_PARAMETERS(
-        ((Width)(LinearUnsignedInteger)(Minimum<0>)(Maximum<4000>)(Default<200>)(Unit<" Hz">)));
+    LE_DEFINE_PARAMETER(Width, LinearUnsignedInteger, Minimum<0>, Maximum<4000>, Default<200>, Unit<" Hz">);
+    LE_DEFINE_PARAMETERS(Width);
 
     /// \typedef Width
     /// \brief Width of the region to collect the shape from.

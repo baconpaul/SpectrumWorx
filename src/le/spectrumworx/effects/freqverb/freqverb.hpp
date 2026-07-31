@@ -47,12 +47,11 @@ namespace Effects
 
 struct Freqverb
 {
-    LE_DEFINE_PARAMETERS((
-        (Time60dB)(LinearFloat)(Minimum<100>)(Maximum<20000>)(Default<2500>)(ValuesDenominator<
-                                                                             1000>)(Unit<" s">))(
-        (RoomSize)(LinearFloat)(Minimum<-24>)(Maximum<0>)(Default<-3>)(Unit<" dB">))(
-        (ReverbPitch)(SymmetricFloat)(MaximumOffset<48>)(Unit<" '/s">))(
-        (HFAbsorption)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<5>)(Unit<" %">)));
+    LE_DEFINE_PARAMETER(Time60dB, LinearFloat, Minimum<100>, Maximum<20000>, Default<2500>, ValuesDenominator< 1000>, Unit<" s">);
+    LE_DEFINE_PARAMETER(RoomSize, LinearFloat, Minimum<-24>, Maximum<0>, Default<-3>, Unit<" dB">);
+    LE_DEFINE_PARAMETER(ReverbPitch, SymmetricFloat, MaximumOffset<48>, Unit<" '/s">);
+    LE_DEFINE_PARAMETER(HFAbsorption, LinearUnsignedInteger, Minimum<0>, Maximum<100>, Default<5>, Unit<" %">);
+    LE_DEFINE_PARAMETERS(Time60dB, RoomSize, ReverbPitch, HFAbsorption);
 
     /// \typedef Time60dB
     /// \brief Specifies the life time of reverberation (time needed for

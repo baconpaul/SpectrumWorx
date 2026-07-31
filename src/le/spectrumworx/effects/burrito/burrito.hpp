@@ -42,12 +42,12 @@ namespace Effects
 
 struct Burrito
 {
-    LE_ENUMERATED_PARAMETER(Mode, (Replace)(Sum));
+    LE_ENUMERATED_PARAMETER(Mode, Replace, Sum);
 
-    LE_DEFINE_PARAMETERS(((Mode))(
-        (Range)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<50>)(Unit<" bw%">))(
-        (Period)(LinearUnsignedInteger)(Minimum<10>)(Maximum<2000>)(Default<250>)(Unit<" ms">))(
-        (SideGain)(SymmetricInteger)(MaximumOffset<24>)(Unit<" dB">)));
+    LE_DEFINE_PARAMETER(Range, LinearUnsignedInteger, Minimum<0>, Maximum<100>, Default<50>, Unit<" bw%">);
+    LE_DEFINE_PARAMETER(Period, LinearUnsignedInteger, Minimum<10>, Maximum<2000>, Default<250>, Unit<" ms">);
+    LE_DEFINE_PARAMETER(SideGain, SymmetricInteger, MaximumOffset<24>, Unit<" dB">);
+    LE_DEFINE_PARAMETERS(Mode, Range, Period, SideGain);
 
     /// \typedef Mode
     /// \brief Combination mode.

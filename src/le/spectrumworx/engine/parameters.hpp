@@ -34,31 +34,37 @@ using OverlapFactor = Engine::OverlapFactor;
 using WindowFunction = Engine::WindowFunction;
 
 #if LE_SW_ENGINE_INPUT_MODE >= 1
-LE_ENUMERATED_PARAMETER(InputMode, (Stereo)(StereoSideChain)(Mono)(MonoSideChain));
+LE_ENUMERATED_PARAMETER(InputMode, Stereo, StereoSideChain, Mono, MonoSideChain);
 #endif // LE_SW_ENGINE_INPUT_MODE
-//LE_ENUMERATED_PARAMETER( StreamMode, ( Always )( MIDITrigger )( MIDIGate ) ); // ...MIDI not supported yet
+//LE_ENUMERATED_PARAMETER(StreamMode, Always, MIDITrigger, MIDIGate); // ...MIDI not supported yet
 
+/// The parameter list is a comma separated one now, so a conditional member of
+/// it carries its own separator.
 #if LE_SW_ENGINE_WINDOW_PRESUM
-#define LE_SW_WINDOW_SIZEFACTOR_PARAMETER() ((WindowSizeFactor))
+#define LE_SW_WINDOW_SIZEFACTOR_PARAMETER() , WindowSizeFactor
 #else
 #define LE_SW_WINDOW_SIZEFACTOR_PARAMETER()
 #endif // LE_SW_ENGINE_WINDOW_PRESUM
 
 #if LE_SW_ENGINE_INPUT_MODE >= 1
-#define LE_SW_INPUTMODE_PARAMETER() ((InputMode))
+#define LE_SW_INPUTMODE_PARAMETER() , InputMode
 #else // LE_SW_ENGINE_INPUT_MODE
 #define LE_SW_INPUTMODE_PARAMETER()
 #endif // LE_SW_ENGINE_INPUT_MODE
 
-LE_DEFINE_PARAMETERS(((
-    InputGain)(LE::Parameters::
-                   LinearFloat)(Minimum<1>)(Maximum<2000>)(Default<1000>)(ValuesDenominator<1000>))(
-    (OutputGain)(InputGain))(
-    (MixPercentage)(LE::Parameters::LinearFloat)(Minimum<0>)(Maximum<1>)(Default<1>))
+using LE::Parameters::Traits::Default;
+using LE::Parameters::Traits::Maximum;
+using LE::Parameters::Traits::Minimum;
+using LE::Parameters::Traits::ValuesDenominator;
 
-                         ((FFTSize))((OverlapFactor))((WindowFunction))
-                             LE_SW_WINDOW_SIZEFACTOR_PARAMETER() LE_SW_INPUTMODE_PARAMETER()
-                     //( ( StreamMode     ) ) // ...MIDI not supported yet
+LE_DEFINE_PARAMETER(InputGain, LE::Parameters::LinearFloat, Minimum<1>, Maximum<2000>,
+                    Default<1000>, ValuesDenominator<1000>);
+LE_DEFINE_PARAMETER(OutputGain, InputGain);
+LE_DEFINE_PARAMETER(MixPercentage, LE::Parameters::LinearFloat, Minimum<0>, Maximum<1>, Default<1>);
+
+LE_DEFINE_PARAMETERS(InputGain, OutputGain, MixPercentage, FFTSize, OverlapFactor,
+                     WindowFunction LE_SW_WINDOW_SIZEFACTOR_PARAMETER() LE_SW_INPUTMODE_PARAMETER()
+                     //, StreamMode // ...MIDI not supported yet
 );
 
 #undef LE_SW_WINDOW_SIZEFACTOR_PARAMETER

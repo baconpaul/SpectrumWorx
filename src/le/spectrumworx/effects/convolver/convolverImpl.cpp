@@ -47,10 +47,13 @@ EFFECT_PARAMETER_NAME(Convolver::GrabIR, "Grab IR")
 EFFECT_PARAMETER_NAME(Convolver::Phase, "Phase")
 
 EFFECT_ENUMERATED_PARAMETER_STRINGS(Convolver, ConvolutionType,
-                                    ((Triggered, "Triggered"))((Continuous, "Continuous")))
+    {Triggered, "Triggered"},
+    {Continuous, "Continuous"})
 
 EFFECT_ENUMERATED_PARAMETER_STRINGS(Convolver, Phase,
-                                    ((Sum, "Sum"))((Side, "Side"))((Main, "Main")))
+    {Sum, "Sum"},
+    {Side, "Side"},
+    {Main, "Main"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

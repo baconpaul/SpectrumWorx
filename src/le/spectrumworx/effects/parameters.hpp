@@ -66,6 +66,20 @@ using Parameters::SymmetricInteger;
 
 using Parameters::TriggerParameter;
 
+// Implementation note:
+//   And the traits, which LE_DEFINE_PARAMETER used to qualify itself: it walked
+// the trait sequence prefixing every element with LE::Parameters::Traits::, and
+// a variadic macro forwards its arguments rather than visiting them. They are
+// imported rather than named at each of the ~870 declarations that use them.
+//                                            (31.07.2026.) (SW port)
+
+using Parameters::Traits::Default;
+using Parameters::Traits::Maximum;
+using Parameters::Traits::MaximumOffset;
+using Parameters::Traits::Minimum;
+using Parameters::Traits::Unit;
+using Parameters::Traits::ValuesDenominator;
+
 //------------------------------------------------------------------------------
 } // namespace Effects
 //------------------------------------------------------------------------------

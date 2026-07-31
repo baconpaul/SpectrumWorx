@@ -45,10 +45,11 @@ struct Convolver
     // Parameters
     ////////////////////////////////////////////////////////////////////////////
 
-    LE_ENUMERATED_PARAMETER(ConvolutionType, (Triggered)(Continuous));
-    LE_ENUMERATED_PARAMETER(Phase, (Sum)(Side)(Main));
+    LE_ENUMERATED_PARAMETER(ConvolutionType, Triggered, Continuous);
+    LE_ENUMERATED_PARAMETER(Phase, Sum, Side, Main);
 
-    LE_DEFINE_PARAMETERS(((ConvolutionType))((GrabIR)(TriggerParameter))((Phase)));
+    LE_DEFINE_PARAMETER(GrabIR, TriggerParameter);
+    LE_DEFINE_PARAMETERS(ConvolutionType, GrabIR, Phase);
 
     /// \typedef ConvolutionType
     /// \brief Defines the type of convolution.

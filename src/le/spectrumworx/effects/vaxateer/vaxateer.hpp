@@ -44,11 +44,11 @@ namespace Effects
 
 struct Vaxateer
 {
-    LE_ENUMERATED_PARAMETER(RMSTarget, (MainRMS)(SideRMS));
-    LE_ENUMERATED_PARAMETER(Mode, (M1)(M2)(M3)(M4)(M5)(M6)(M7)(M8));
+    LE_ENUMERATED_PARAMETER(RMSTarget, MainRMS, SideRMS);
+    LE_ENUMERATED_PARAMETER(Mode, M1, M2, M3, M4, M5, M6, M7, M8);
 
-    LE_DEFINE_PARAMETERS(
-        ((RMSTarget))((RMSGain)(SymmetricInteger)(MaximumOffset<24>)(Unit<" dB">))((Mode)));
+    LE_DEFINE_PARAMETER(RMSGain, SymmetricInteger, MaximumOffset<24>, Unit<" dB">);
+    LE_DEFINE_PARAMETERS(RMSTarget, RMSGain, Mode);
 
     /// \typedef RMSTarget
     /// \brief Target channel for RMS calculation, can be Main or Side.

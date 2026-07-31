@@ -40,10 +40,14 @@ UI_NAME(SW::Engine::WindowSizeFactor) = "Window size factor";
 //    (( Gaussian      , "Gaussian"        ))
 //)
 
+/// \note Written out rather than through ENUMERATED_PARAMETER_STRINGS for the
+/// reason above: that macro checks each string against the enumerator it names,
+/// and this parameter has no enumerators to name.
 template <>
-char const *LE_RESTRICT const DiscreteValues<SW::Engine::WindowFunction>::strings[] = {
-    "Hann",    "Hamming", "Blackman", "BlackmanHarris", "Gaussian",
-    "FlatTop", "Welch",   "Triangle", "Rectangle"};
+DiscreteValues<SW::Engine::WindowFunction>::Strings const
+    DiscreteValues<SW::Engine::WindowFunction>::strings{"Hann",           "Hamming",  "Blackman",
+                                                        "BlackmanHarris", "Gaussian", "FlatTop",
+                                                        "Welch",          "Triangle", "Rectangle"};
 } // namespace Parameters
 //------------------------------------------------------------------------------
 namespace SW

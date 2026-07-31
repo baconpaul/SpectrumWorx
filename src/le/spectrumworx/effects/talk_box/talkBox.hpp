@@ -47,10 +47,10 @@ struct TalkBox
     typedef Synth::FlangeOffset FlangeOffset;
     /// @}
 
-    LE_DEFINE_PARAMETERS(((ExternalCarrier)(Boolean))(
-        (BaseFrequency)(LinearFloat)(Minimum<40>)(Maximum<400>)(Default<100>))(
-        (CutOff)(LinearUnsignedInteger)(Minimum<0>)(Maximum<12000>)(Default<9000>)(Unit<"Hz">))(
-        (HarmonicSlope))((FlangeIntensity))((FlangeOffset)));
+    LE_DEFINE_PARAMETER(ExternalCarrier, Boolean);
+    LE_DEFINE_PARAMETER(BaseFrequency, LinearFloat, Minimum<40>, Maximum<400>, Default<100>);
+    LE_DEFINE_PARAMETER(CutOff, LinearUnsignedInteger, Minimum<0>, Maximum<12000>, Default<9000>, Unit<"Hz">);
+    LE_DEFINE_PARAMETERS(ExternalCarrier, BaseFrequency, CutOff, HarmonicSlope, FlangeIntensity, FlangeOffset);
 
     /// \typedef BaseFrequency
     /// \brief .

@@ -34,7 +34,11 @@ class SlewLimiterImpl : public EffectImpl<SlewLimiter>
     // ChannelState
     ////////////////////////////////////////////////////////////////////////////
 
-    LE_DYNAMIC_CHANNEL_STATE(((Engine::HalfFFTBuffer<>)(magsPrev)));
+    struct DynamicChannelState : DynamicChannelState_<DynamicChannelState>
+    {
+        Engine::HalfFFTBuffer<> magsPrev;
+        auto members() { return std::tie(magsPrev); }
+    };
 
     struct ChannelState : DynamicChannelState
     {

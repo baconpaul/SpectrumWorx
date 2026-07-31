@@ -48,10 +48,12 @@ EFFECT_PARAMETER_NAME(Swappah::BandLowMid, "Low-Mid border")
 EFFECT_PARAMETER_NAME(Swappah::BandMidHigh, "Mid-High border")
 EFFECT_PARAMETER_NAME(Swappah::BandOrder, "Swap order")
 
-EFFECT_ENUMERATED_PARAMETER_STRINGS(
-    Swappah, BandOrder,
-    ((LowHighMid, "Low-High-Mid"))((MidLowHigh, "Mid-Low-High"))((MidHighLow, "Mid-High-Low"))(
-        (HighLowMid, "High-Low-Mid"))((HighMidLow, "High-Mid-Low")))
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Swappah, BandOrder,
+    {LowHighMid, "Low-High-Mid"},
+    {MidLowHigh, "Mid-Low-High"},
+    {MidHighLow, "Mid-High-Low"},
+    {HighLowMid, "High-Low-Mid"},
+    {HighMidLow, "High-Mid-Low"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

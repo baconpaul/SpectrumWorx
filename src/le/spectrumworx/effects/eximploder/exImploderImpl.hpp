@@ -33,8 +33,12 @@ namespace Detail
 class ExImPloderImpl
 {
   public:
-    LE_DYNAMIC_CHANNEL_STATE(
-        ((Engine::HalfFFTBuffer<float>)(accumMagn))((Engine::HalfFFTBuffer<float>)(accumFreqs)));
+    struct DynamicChannelState : DynamicChannelState_<DynamicChannelState>
+    {
+        Engine::HalfFFTBuffer<float> accumMagn;
+        Engine::HalfFFTBuffer<float> accumFreqs;
+        auto members() { return std::tie(accumMagn, accumFreqs); }
+    };
 
     struct ChannelState : DynamicChannelState
     {

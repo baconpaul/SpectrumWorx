@@ -923,8 +923,11 @@ namespace Detail
 void addPowerOfTwoValueStringsToComboBox(unsigned int firstValue, unsigned int lastValue,
                                          ComboBox &comboBox);
 
-void addEnumeratedParameterValueStringsToComboBox(
-    LE::Utility::Span<char const *LE_RESTRICT const> strings, ComboBox &comboBox);
+/// \note Not LE_RESTRICT const: DiscreteValues::strings is a std::array now, and
+/// a restrict-qualified element type is not something a template argument can
+/// carry.
+void addEnumeratedParameterValueStringsToComboBox(LE::Utility::Span<char const *const> strings,
+                                                  ComboBox &comboBox);
 
 template <class Parameter>
 void fillComboBoxForParameter(ComboBox &comboBox, LE::Parameters::PowerOfTwoParameterTag)

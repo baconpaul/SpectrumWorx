@@ -2318,15 +2318,47 @@ state — and no audio test will catch it.
 `LE_DEFINE_PARAMETERS`'s call syntax identical** so the 57 effect headers do not
 change.
 
-**7.2** The preprocessor sequence syntax `( (Name)(Type)(Minimum<-48>)… )` →
-variadic macros or a designated-initialiser table. This is the part that does
-touch the effect headers.
+**7.2 — done.** The preprocessor sequence syntax `( (Name)(Type)(Minimum<-48>)… )`
+→ variadic macros. This is the part that did touch the effect headers.
 
-**7.3** `Unit<' dB'>` — multi-character literals as non-type template parameters,
-legal but implementation-defined and warning-generating. C++20 class-type NTTPs
-give you `Unit<"dB">`.
+What made it tractable was doing the container first: `LE_DEFINE_PARAMETERS` both
+*declared* each parameter and *collected* them, and only the first of those needs
+a preprocessor at all — a parameter's name has to be pasted into a class
+declaration. Splitting the two left nothing to iterate, which is what a variadic
+macro cannot do:
 
-**7.4** Delete the CPM Boost scaffold; empty the CI allowlist from stage 2.
+| was | is |
+|---|---|
+| `LE_DEFINE_PARAMETERS( ((A)(Type)(Trait)) ((B)) )` | `LE_DEFINE_PARAMETER( A, Type, Trait ); LE_DEFINE_PARAMETERS( A, B )` |
+| `LE_ENUMERATED_PARAMETER( Mode, (Up)(Down) )` | `LE_ENUMERATED_PARAMETER( Mode, Up, Down )` |
+| `LE_DYNAMIC_CHANNEL_STATE( ((Type)(name)) )` | a struct deriving `DynamicChannelState_`, with `members()` |
+| `ENUMERATED_PARAMETER_STRINGS( …, ((Up, "Up")) )` | `ENUMERATED_PARAMETER_STRINGS( …, {Up, "Up"} )` |
+
+Three of those four stopped needing a walk because what the walk produced is a
+pack: `ParameterList<Params...>`, `std::tie` over the named members, and a
+`consteval` function over the value/string pairs that makes the per-value
+`static_assert` one check over a list. The fourth, counting an enumerated
+parameter's values for its base class, is a scoped enum with one extra
+enumerator — a list numbered from zero ends at its own length.
+
+Two things the sequence syntax was hiding, both found by the compiler rather than
+reasoned about:
+
+- `Modify<Parameter>` with no traits is **not** the parameter. It rebuilds a
+  `Parameter<>` from the traits, and what a parameter adds on top of that does not
+  survive: `TriggerParameter::consumeValue()`. That is the case the old macro
+  spelled as a second macro chosen by counting sequence elements, and it is now a
+  partial specialisation that says so.
+- The traits are no longer qualified by the macro — it forwarded its arguments
+  rather than visiting them — so the namespaces that declare parameters import
+  the six of them beside the parameter types they already import.
+
+**7.3 — done.** `Unit<' dB'>` — multi-character literals as non-type template
+parameters, legal but implementation-defined and warning-generating. C++20
+class-type NTTPs give `Unit<"dB">`.
+
+**7.4 — done.** `cmake/temporary-boost.cmake` is deleted, with the two lines that
+included it. Boost is no longer fetched, and nothing that compiles includes it.
 
 **7.5 — Stop force-including `leConfigurationAndODRHeader.h` into other people's
 code. — done.** `dsp.cmake` added it as a `PUBLIC` compile option, so it was
@@ -2402,10 +2434,30 @@ is unconditionally `namespace X {`. The macro wants deleting across those 47
 files, not including — which makes the tail of this stage a mechanical
 substitution rather than an argument.
 
-**Done when:** `rg 'boost/' src` returns nothing; every golden and the parameter
-snapshot are unchanged; the CI gate is an exact-zero check; ~~`dsp.cmake` carries
-no `PUBLIC` force-include and no third-party target is compiled with a header of
-ours it did not ask for~~ — done in 7.5, and `ctest -R odr-header` is the check.
+**Done when:** ~~`rg 'boost/' src` returns nothing~~; ~~every golden and the
+parameter snapshot are unchanged~~; the CI gate is an exact-zero check;
+~~`dsp.cmake` carries no `PUBLIC` force-include and no third-party target is
+compiled with a header of ours it did not ask for~~ — done in 7.5, and
+`ctest -R odr-header` is the check.
+
+**What `rg 'boost/' src` actually returns, and why it is not zero.** The build
+is: nothing that compiles includes a Boost header, and nothing fetches one. The
+strings that remain are all in code this stage does not own, and each is
+reachable only through a macro this build cannot define:
+
+| where | guard | whose |
+|---|---|---|
+| `src/nt2_static_fft/**` | not in any target's sources | the retained NT2 FFT |
+| `le/math/math.hpp` | `#ifdef LE_HAS_NT2` | ditto |
+| `le/math/vector.cpp` | `#ifdef LE_MATH_USE_NT2` | ditto |
+| `le/utility/tchar.hpp`, `leConfigurationAndODRHeader.h` | `#ifdef LE_HAS_NT2` | ditto — restrict-pointer fixes NT2 brings its own Boost for |
+| `spectrumWorx.cpp`, `presets.cpp` | live | `boost::mmap`, the preset reader — **stage 8** |
+| `core/configuration.cmake`, `le/utility/CMakeLists.txt`, `le/build/precompiledHeaders.hpp`, `le/build/juceIncludeWrapper.hpp` | included by nothing but `legacy-build.cmake` | the retained 2016 build |
+
+So the honest form of the check is a grep that excludes NT2 and the 2016 record,
+and it has one hit left: `boost::mmap`, which stage 8.1 replaces along with
+RapidXML. Whoever writes the CI gate should write it that way rather than
+weakening it to a warning.
 
 ---
 

@@ -48,12 +48,11 @@ struct Swappah
     typedef CommonParameters::Mode Mode;
     /// @}
 
-    LE_ENUMERATED_PARAMETER(BandOrder,
-                            (LowHighMid)(MidLowHigh)(MidHighLow)(HighLowMid)(HighMidLow));
+    LE_ENUMERATED_PARAMETER(BandOrder, LowHighMid, MidLowHigh, MidHighLow, HighLowMid, HighMidLow);
 
-    LE_DEFINE_PARAMETERS(((Mode))((BandOrder))(
-        (BandLowMid)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<33>)(Unit<" bw%">))(
-        (BandMidHigh)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<66>)(Unit<" bw%">)));
+    LE_DEFINE_PARAMETER(BandLowMid, LinearUnsignedInteger, Minimum<0>, Maximum<100>, Default<33>, Unit<" bw%">);
+    LE_DEFINE_PARAMETER(BandMidHigh, LinearUnsignedInteger, Minimum<0>, Maximum<100>, Default<66>, Unit<" bw%">);
+    LE_DEFINE_PARAMETERS(Mode, BandOrder, BandLowMid, BandMidHigh);
 
     /// \typedef Mode
     /// \brief Specifies what is to be swapped.

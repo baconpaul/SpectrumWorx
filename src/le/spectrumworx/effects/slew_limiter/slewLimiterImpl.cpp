@@ -54,7 +54,9 @@ EFFECT_PARAMETER_NAME(SlewLimiter::SlewRate, "Slew rate")
 EFFECT_PARAMETER_NAME(SlewLimiter::Direction, "Direction")
 
 EFFECT_ENUMERATED_PARAMETER_STRINGS(SlewLimiter, Direction,
-                                    ((RiseFall, "Rise&Fall"))((Rise, "Rise"))((Fall, "Fall")))
+    {RiseFall, "Rise&Fall"},
+    {Rise, "Rise"},
+    {Fall, "Fall"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

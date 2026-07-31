@@ -46,10 +46,12 @@ namespace BaseParameters
 /// \brief Basic parameters included by all effects
 /// @{
 
-LE_DEFINE_PARAMETERS(((Bypass)(Boolean))((Gain)(SymmetricFloat)(MaximumOffset<20>)(Unit<" dB">))(
-    (Wet)(LinearFloat)(Minimum<0>)(Maximum<100>)(Default<100>)(Unit<" %">))(
-    (StartFrequency)(LinearFloat)(Minimum<0>)(Maximum<1>)(Default<0>))(
-    (StopFrequency)(LinearFloat)(Minimum<0>)(Maximum<1>)(Default<1>)));
+LE_DEFINE_PARAMETER(Bypass, Boolean);
+LE_DEFINE_PARAMETER(Gain, SymmetricFloat, MaximumOffset<20>, Unit<" dB">);
+LE_DEFINE_PARAMETER(Wet, LinearFloat, Minimum<0>, Maximum<100>, Default<100>, Unit<" %">);
+LE_DEFINE_PARAMETER(StartFrequency, LinearFloat, Minimum<0>, Maximum<1>, Default<0>);
+LE_DEFINE_PARAMETER(StopFrequency, LinearFloat, Minimum<0>, Maximum<1>, Default<1>);
+LE_DEFINE_PARAMETERS(Bypass, Gain, Wet, StartFrequency, StopFrequency);
 
 /// \typedef Parameters
 /// \brief Basic parameters shared/included by all effects.

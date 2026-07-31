@@ -50,11 +50,14 @@ EFFECT_PARAMETER_NAME(Shifter::Offset, "Offset")
 EFFECT_PARAMETER_NAME(Shifter::Tail, "Tail")
 
 EFFECT_ENUMERATED_PARAMETER_STRINGS(Shifter, Tail,
-                                    ((Leave, "Leave"))((Clear, "Clear"))((Circular, "Circular")))
+    {Leave, "Leave"},
+    {Clear, "Clear"},
+    {Circular, "Circular"})
 
 EFFECT_ENUMERATED_PARAMETER_STRINGS(Shifter, ShiftTarget,
-                                    ((Magnitudes, "Magnitudes"))((Phases,
-                                                                  "Phases"))((Both, "Mags&Phases")))
+    {Magnitudes, "Magnitudes"},
+    {Phases, "Phases"},
+    {Both, "Mags&Phases"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

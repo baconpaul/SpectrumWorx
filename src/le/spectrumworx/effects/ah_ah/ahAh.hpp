@@ -43,10 +43,10 @@ namespace Effects
 
 struct AhAh
 {
-    LE_DEFINE_PARAMETERS(
-        ((Center)(LinearUnsignedInteger)(Minimum<0>)(Maximum<6000>)(Default<2000>)(Unit<" Hz">))(
-            (Width)(LinearUnsignedInteger)(Minimum<50>)(Maximum<2000>)(Default<1000>)(Unit<" Hz">))(
-            (Strength)(SymmetricFloat)(MaximumOffset<24>)(Unit<" dB">)));
+    LE_DEFINE_PARAMETER(Center, LinearUnsignedInteger, Minimum<0>, Maximum<6000>, Default<2000>, Unit<" Hz">);
+    LE_DEFINE_PARAMETER(Width, LinearUnsignedInteger, Minimum<50>, Maximum<2000>, Default<1000>, Unit<" Hz">);
+    LE_DEFINE_PARAMETER(Strength, SymmetricFloat, MaximumOffset<24>, Unit<" dB">);
+    LE_DEFINE_PARAMETERS(Center, Width, Strength);
 
     /// \typedef Center
     /// \brief Filter center frequency.

@@ -40,8 +40,8 @@ namespace Effects
 
 struct Blender
 {
-    LE_DEFINE_PARAMETERS(
-        ((Amount)(LinearUnsignedInteger)(Minimum<0>)(Maximum<100>)(Default<30>)(Unit<" %">)));
+    LE_DEFINE_PARAMETER(Amount, LinearUnsignedInteger, Minimum<0>, Maximum<100>, Default<30>, Unit<" %">);
+    LE_DEFINE_PARAMETERS(Amount);
 
     /// \typedef Amount
     /// \brief Controls how much of each channel is sent to the output.

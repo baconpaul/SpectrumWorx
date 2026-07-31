@@ -47,7 +47,9 @@ EFFECT_PARAMETER_NAME(Burrito::Range, "Target range")
 EFFECT_PARAMETER_NAME(Burrito::Period, "Range period")
 EFFECT_PARAMETER_NAME(Burrito::SideGain, "Side gain")
 
-EFFECT_ENUMERATED_PARAMETER_STRINGS(Burrito, Mode, ((Replace, "Replace"))((Sum, "Sum")))
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Burrito, Mode,
+    {Replace, "Replace"},
+    {Sum, "Sum"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

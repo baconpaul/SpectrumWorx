@@ -44,10 +44,10 @@ namespace Effects
 struct SlewLimiter
 {
   public:
-    LE_ENUMERATED_PARAMETER(Direction, (RiseFall)(Rise)(Fall));
+    LE_ENUMERATED_PARAMETER(Direction, RiseFall, Rise, Fall);
 
-    LE_DEFINE_PARAMETERS(((Direction))(
-        (SlewRate)(LinearFloat)(Minimum<0>)(Maximum<300>)(Default<50>)(Unit<" dB/s">)));
+    LE_DEFINE_PARAMETER(SlewRate, LinearFloat, Minimum<0>, Maximum<300>, Default<50>, Unit<" dB/s">);
+    LE_DEFINE_PARAMETERS(Direction, SlewRate);
 
     /// \typedef Direction
     /// \brief Determines the slew direction.

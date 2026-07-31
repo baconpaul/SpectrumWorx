@@ -43,8 +43,10 @@ struct Freeze
     // Parameters
     ////////////////////////////////////////////////////////////////////////////
 
-    LE_DEFINE_PARAMETERS(((FreezeTrigger)(TriggerParameter))((MeltTrigger)(TriggerParameter))(
-        (TransitionTime)(LinearUnsignedInteger)(Minimum<0>)(Maximum<10000>)(Default<500>)(Unit<" ms">)));
+    LE_DEFINE_PARAMETER(FreezeTrigger, TriggerParameter);
+    LE_DEFINE_PARAMETER(MeltTrigger, TriggerParameter);
+    LE_DEFINE_PARAMETER(TransitionTime, LinearUnsignedInteger, Minimum<0>, Maximum<10000>, Default<500>, Unit<" ms">);
+    LE_DEFINE_PARAMETERS(FreezeTrigger, MeltTrigger, TransitionTime);
 
     /// \typedef FreezeTrigger
     /// \brief Initiates the freezing process.

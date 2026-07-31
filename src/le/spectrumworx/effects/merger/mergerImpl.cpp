@@ -45,11 +45,13 @@ char const Merger::description[] = "Conditional combinations.";
 EFFECT_PARAMETER_NAME(Merger::Threshold, "Threshold")
 EFFECT_PARAMETER_NAME(Merger::Operation, "Condition")
 
-EFFECT_ENUMERATED_PARAMETER_STRINGS(
-    Merger, Operation,
-    ((MainLargerThanSide, "Main>Side"))((SideLargerThanMain, "Side>Main"))(
-        (MainAboveThreshold, "Main>Thr"))((SideAboveThreshold, "Side>Thr"))(
-        (MainBelowThreshold, "Main<Thr"))((SideBelowThreshold, "Side<Thr")))
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Merger, Operation,
+    {MainLargerThanSide, "Main>Side"},
+    {SideLargerThanMain, "Side>Main"},
+    {MainAboveThreshold, "Main>Thr"},
+    {SideAboveThreshold, "Side>Thr"},
+    {MainBelowThreshold, "Main<Thr"},
+    {SideBelowThreshold, "Side<Thr"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

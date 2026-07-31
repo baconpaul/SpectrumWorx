@@ -13,10 +13,10 @@
 //------------------------------------------------------------------------------
 #include "le/utility/platformSpecifics.hpp"
 
-#include "boost/preprocessor/seq/seq.hpp"
-#include "boost/preprocessor/seq/for_each.hpp"
-
 #include <cstdint>
+#include <tuple>
+#include <type_traits>
+#include <utility>
 #include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -43,50 +43,68 @@ namespace Effects
 {
 //------------------------------------------------------------------------------
 
-#define LE_CS_ADD_INDIVIDUAL_MEMBER(r, dummy, memberSequence)                                      \
-    BOOST_PP_SEQ_HEAD(memberSequence) BOOST_PP_SEQ_TAIL(memberSequence);
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \class DynamicChannelState
+///
+/// \brief A channel state whose members size themselves out of the engine's
+/// storage: derive from it, declare the members, and say what they are.
+///
+///     struct DynamicChannelState : DynamicChannelState_<DynamicChannelState>
+///     {
+///         PhaseVocoderShared::PitchShifter::ChannelState pvState;
+///         History                                        historyBuffer;
+///         auto members() { return std::tie( pvState, historyBuffer ); }
+///     };
+///
+////////////////////////////////////////////////////////////////////////////////
+// Implementation note:
+//   Was LE_DYNAMIC_CHANNEL_STATE( ((Type)(name))((Type)(name)) ), a Boost.PP
+// sequence walked four times: once to declare the members and once each for the
+// three things every one of these does to all of them. Only the first of the
+// four needs a preprocessor -- a member has a name -- and members are just
+// declarations, so writing them is not worse than writing them inside a macro
+// argument. The other three read the members off std::tie, which is the same
+// list said once more and the only thing the class still has to say.
+//                                            (31.07.2026.) (SW port)
+////////////////////////////////////////////////////////////////////////////////
 
-#define LE_CS_ENUMERATE_MEMBERS(members)                                                           \
-    BOOST_PP_SEQ_FOR_EACH(LE_CS_ADD_INDIVIDUAL_MEMBER, 0, members)
+namespace Detail ///< \internal
+{
+template <class Members, std::size_t... indices>
+std::uint32_t requiredStorageOf(Engine::StorageFactors const &factors,
+                                std::index_sequence<indices...>)
+{
+    return (
+        0u + ... +
+        Utility::align(
+            std::remove_cvref_t<std::tuple_element_t<indices, Members>>::requiredStorage(factors)));
+}
+} // namespace Detail
 
-#define LE_CS_ACCUMULATE_INDIVIDUAL_MEMBER(r, dummy, memberSequence)                               \
-    +Utility::align(BOOST_PP_SEQ_HEAD(memberSequence)::requiredStorage(factors))
+template <class Derived> struct DynamicChannelState_
+{
+    static std::uint32_t requiredStorage(Engine::StorageFactors const &factors)
+    {
+        using Members = decltype(std::declval<Derived &>().members());
+        return Detail::requiredStorageOf<Members>(
+            factors, std::make_index_sequence<std::tuple_size_v<Members>>());
+    }
 
-#define LE_CS_ACCUMULATE_MEMBERS(members)                                                          \
-    BOOST_PP_SEQ_FOR_EACH(LE_CS_ACCUMULATE_INDIVIDUAL_MEMBER, 0, members)
+    void reset()
+    {
+        std::apply([](auto &...member) { (member.reset(), ...); }, self().members());
+    }
 
-#define LE_CS_RESIZE_INDIVIDUAL_MEMBER(r, dummy, memberSequence)                                   \
-    BOOST_PP_SEQ_TAIL(memberSequence).resize(factors, storage);
+    void resize(Engine::StorageFactors const &factors, Engine::Storage &storage)
+    {
+        std::apply([&](auto &...member) { (member.resize(factors, storage), ...); },
+                   self().members());
+    }
 
-#define LE_CS_RESIZE_MEMBERS(members)                                                              \
-    BOOST_PP_SEQ_FOR_EACH(LE_CS_RESIZE_INDIVIDUAL_MEMBER, 0, members)
-
-#define LE_CS_RESET_INDIVIDUAL_MEMBER(r, dummy, memberSequence)                                    \
-    BOOST_PP_SEQ_TAIL(memberSequence).reset();
-
-#define LE_CS_RESET_MEMBERS(members)                                                               \
-    BOOST_PP_SEQ_FOR_EACH(LE_CS_RESET_INDIVIDUAL_MEMBER, 0, members)
-
-#define LE_NAMED_DYNAMIC_CHANNEL_STATE(name, members)                                              \
-    struct name                                                                                    \
-    {                                                                                              \
-        static std::uint32_t requiredStorage(Engine::StorageFactors const &factors)                \
-        {                                                                                          \
-            return 0 LE_CS_ACCUMULATE_MEMBERS(members);                                            \
-        }                                                                                          \
-                                                                                                   \
-        void reset() { LE_CS_RESET_MEMBERS(members); }                                             \
-                                                                                                   \
-        void resize(Engine::StorageFactors const &factors, Engine::Storage &storage)               \
-        {                                                                                          \
-            LE_CS_RESIZE_MEMBERS(members);                                                         \
-        }                                                                                          \
-                                                                                                   \
-        LE_CS_ENUMERATE_MEMBERS(members)                                                           \
-    };
-
-#define LE_DYNAMIC_CHANNEL_STATE(members)                                                          \
-    LE_NAMED_DYNAMIC_CHANNEL_STATE(DynamicChannelState, members)
+  private:
+    Derived &self() { return static_cast<Derived &>(*this); }
+}; // struct DynamicChannelState_
 
 ////////////////////////////////////////////////////////////////////////////////
 /// \internal

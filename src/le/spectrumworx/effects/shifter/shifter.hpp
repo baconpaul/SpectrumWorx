@@ -47,11 +47,11 @@ namespace Effects
 
 struct Shifter
 {
-    LE_ENUMERATED_PARAMETER(ShiftTarget, (Magnitudes)(Phases)(Both));
-    LE_ENUMERATED_PARAMETER(Tail, (Leave)(Clear)(Circular));
+    LE_ENUMERATED_PARAMETER(ShiftTarget, Magnitudes, Phases, Both);
+    LE_ENUMERATED_PARAMETER(Tail, Leave, Clear, Circular);
 
-    LE_DEFINE_PARAMETERS(
-        ((ShiftTarget))((Offset)(SymmetricFloat)(MaximumOffset<10>)(Unit<" bw%">))((Tail)));
+    LE_DEFINE_PARAMETER(Offset, SymmetricFloat, MaximumOffset<10>, Unit<" bw%">);
+    LE_DEFINE_PARAMETERS(ShiftTarget, Offset, Tail);
 
     /// \typedef ShiftTarget
     /// \brief Specifies what is to be shifted.

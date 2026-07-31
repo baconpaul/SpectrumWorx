@@ -45,7 +45,9 @@ EFFECT_PARAMETER_NAME(Slicer::TimeOff, "Slice time")
 EFFECT_PARAMETER_NAME(Slicer::Mode, "Slice content")
 
 EFFECT_ENUMERATED_PARAMETER_STRINGS(Slicer, Mode,
-                                    ((Hold, "Sample&Hold"))((Silence, "Silence"))((Side, "Side")))
+    {Hold, "Sample&Hold"},
+    {Silence, "Silence"},
+    {Side, "Side"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

@@ -118,13 +118,19 @@ class LFOImpl : public LFO
     }; // struct PeriodScaleParameterTraits
 
   public:
-    LE_DEFINE_PARAMETERS(((Enabled)(LE::Parameters::Boolean))((PeriodScale))(
-        (Phase)(Parameters::SymmetricFloat)(MaximumOffset<50>)(ValuesDenominator<100>))(
-        (LowerBound)(Parameters::
-                         LinearFloat)(Minimum<minimumValue>)(Maximum<maximumValue>)(Default<
-                                                                                    minimumValue>))(
-        (UpperBound)(LowerBound)(Default<maximumValue>)/*...mrmlj...*/ (
-            ValuesDenominator<1>)(Unit<"">))((SyncTypes))((Waveform)));
+    /// \note The traits are qualified here rather than imported: this is
+    /// namespace LE::Parameters itself, and only the namespaces that declare a
+    /// lot of parameters -- LE::SW::Effects -- import them.
+    ///                                       (31.07.2026.) (SW port)
+    LE_DEFINE_PARAMETER(Enabled, Boolean);
+    LE_DEFINE_PARAMETER(Phase, SymmetricFloat, Traits::MaximumOffset<50>,
+                        Traits::ValuesDenominator<100>);
+    LE_DEFINE_PARAMETER(LowerBound, LinearFloat, Traits::Minimum<minimumValue>,
+                        Traits::Maximum<maximumValue>, Traits::Default<minimumValue>);
+    LE_DEFINE_PARAMETER(UpperBound, LowerBound, Traits::Default<maximumValue>,
+                        //...mrmlj...
+                        Traits::ValuesDenominator<1>, Traits::Unit<"">);
+    LE_DEFINE_PARAMETERS(Enabled, PeriodScale, Phase, LowerBound, UpperBound, SyncTypes, Waveform);
 
     Parameters &parameters() { return parameters_; }
     Parameters const &parameters() const { return const_cast<LFOImpl &>(*this).parameters(); }

@@ -45,7 +45,9 @@ EFFECT_PARAMETER_NAME(Denoiser::Intensity, "Amount")
 EFFECT_PARAMETER_NAME(Denoiser::Mode, "Noise footprint")
 
 EFFECT_ENUMERATED_PARAMETER_STRINGS(Denoiser, Mode,
-                                    ((Main, "Main"))((Side, "Side"))((Sum, "Average")))
+    {Main, "Main"},
+    {Side, "Side"},
+    {Sum, "Average"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

@@ -94,9 +94,22 @@ __pragma(warning(disable : 4480)) /* Nonstandard extension*/
 #define LE_ENUMERATED_PARAMETER_WARNING_END()
 #endif // _MSC_VER
 
-#define LE_ENUMERATED_PARAMETER(parameterName, valueSequence)                                      \
-    class parameterName                                                                            \
-        : public LE::Parameters::EnumeratedParameter<BOOST_PP_SEQ_SIZE(valueSequence)>             \
+// Implementation note:
+//   The value list was a Boost.PP sequence, ( Replace )( Sum ), for two reasons:
+// BOOST_PP_SEQ_ENUM turned it into enumerators and BOOST_PP_SEQ_SIZE counted
+// them, and the count is a template argument of the base class -- so it has to
+// exist before the enum the class declares does.
+//
+//   The scoped enum below is that count, and it is the same list: an extra
+// enumerator past the end of a list numbered from zero *is* the length. It costs
+// a name beside the parameter and no argument-counting macro, whose only other
+// spelling is a ladder of numbered arguments with a ceiling to raise later.
+//                                            (31.07.2026.) (SW port)
+
+#define LE_ENUMERATED_PARAMETER(parameterName, ...)                                                \
+    enum class parameterName##Values_ : std::uint8_t{__VA_ARGS__, numberOfValues_};                \
+    class parameterName : public LE::Parameters::EnumeratedParameter<static_cast<std::uint8_t>(    \
+                              parameterName##Values_::numberOfValues_)>                            \
     {                                                                                              \
       private:                                                                                     \
         using Base = type;                                                                         \
@@ -106,9 +119,9 @@ __pragma(warning(disable : 4480)) /* Nonstandard extension*/
         {                                                                                          \
         }                                                                                          \
         LE_ENUMERATED_PARAMETER_WARNING_BEGIN()                                                    \
-        enum value_type : /*std::*/ uint8_t                                                        \
+        enum value_type : std::uint8_t                                                             \
         {                                                                                          \
-            BOOST_PP_SEQ_ENUM(valueSequence)                                                       \
+            __VA_ARGS__                                                                            \
         };                                                                                         \
         LE_ENUMERATED_PARAMETER_WARNING_END()                                                      \
         operator value_type() const { return static_cast<value_type>(Base::getValue()); }          \

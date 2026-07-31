@@ -30,8 +30,8 @@ namespace Detail
 {
 struct PitchFollowerBase
 {
-    LE_DEFINE_PARAMETERS(
-        ((Speed)(LinearFloat)(Minimum<0>)(Maximum<60>)(Default<1>)(Unit<" '/s">)));
+    LE_DEFINE_PARAMETER(Speed, LinearFloat, Minimum<0>, Maximum<60>, Default<1>, Unit<" '/s">);
+    LE_DEFINE_PARAMETERS(Speed);
 
     /// \typedef Speed
     /// \brief Determines how fast the pitch is followed (in semitones per

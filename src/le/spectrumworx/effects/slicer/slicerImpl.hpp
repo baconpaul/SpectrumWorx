@@ -34,8 +34,12 @@ class SlicerImpl : public EffectImpl<Slicer>
     // ChannelState
     ////////////////////////////////////////////////////////////////////////////
 
-    LE_DYNAMIC_CHANNEL_STATE(
-        ((Engine::HalfFFTBuffer<float>)(mags))((Engine::HalfFFTBuffer<float>)(phas)));
+    struct DynamicChannelState : DynamicChannelState_<DynamicChannelState>
+    {
+        Engine::HalfFFTBuffer<float> mags;
+        Engine::HalfFFTBuffer<float> phas;
+        auto members() { return std::tie(mags, phas); }
+    };
 
     struct ChannelState : DynamicChannelState
     {

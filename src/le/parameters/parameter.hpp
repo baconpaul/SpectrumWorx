@@ -14,10 +14,9 @@
 #include "unitString.hpp"
 
 #include "le/utility/assert.hpp"
-#include "boost/preprocessor/comparison/greater.hpp"
-#include "boost/preprocessor/seq/seq.hpp"
-#include "boost/preprocessor/seq/enum.hpp"
-#include "boost/preprocessor/seq/transform.hpp"
+
+#include <cstdint>
+#include <type_traits>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -119,6 +118,28 @@ DECLARE_PARAMETER_TRAIT(ValuesDenominator, unsigned int); /// \ingroup Parameter
 
 // Helper macro cleanup.
 #undef DECLARE_PARAMETER_TRAIT
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \struct MaximumOffset
+/// \ingroup ParameterProperties
+/// \brief The range of a symmetric parameter, which runs from -offset to
+/// +offset.
+///
+////////////////////////////////////////////////////////////////////////////////
+/// \note Declared here rather than in symmetric/parameter.hpp, where it used to
+/// be: a trait is a {tag, value} pair and there is nothing symmetric-specific
+/// about this one, and the namespaces that declare parameters import the six
+/// traits together.
+///                                           (31.07.2026.) (SW port)
+
+namespace Tag
+{
+struct MaximumOffset;
+}
+
+template <std::uint16_t value>
+using MaximumOffset = TraitPair<Tag::MaximumOffset, std::integral_constant<std::int16_t, value>>;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -238,6 +259,20 @@ template <class OriginalParameter, class... NewTraits> struct Modify
     typedef Parameter<ModifiedTraits> type;
 };
 
+/// \brief Changing nothing is the original parameter, not a Parameter<> rebuilt
+/// from its traits.
+///
+/// \note The difference is what a parameter adds on top of Parameter<>:
+/// TriggerParameter's consumeValue(), which reads the trigger and disarms it, is
+/// not a trait and does not survive the round trip through one. This is the case
+/// LE_DEFINE_PARAMETER used to spell as a separate macro, chosen by counting the
+/// elements of a Boost.PP sequence.
+///                                           (31.07.2026.) (SW port)
+template <class OriginalParameter> struct Modify<OriginalParameter>
+{
+    typedef OriginalParameter type;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// Helper verbosity reducing macros for parameter specifications.
@@ -254,65 +289,36 @@ template <class OriginalParameter, class... NewTraits> struct Modify
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \def LE_ADD_TRAIT_PREFIX
-/// \internal
-///
-////////////////////////////////////////////////////////////////////////////////
-
-#define LE_ADD_TRAIT_PREFIX(r, dummy, trait) LE::Parameters::Traits::trait
-
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \def LE_ENUMERATE_PARAMETER_TRAITS
-/// \internal
-///
-////////////////////////////////////////////////////////////////////////////////
-
-#define LE_ENUMERATE_PARAMETER_TRAITS(traitsSequence)                                              \
-    BOOST_PP_SEQ_ENUM(BOOST_PP_SEQ_TRANSFORM(LE_ADD_TRAIT_PREFIX, 0, traitsSequence))
-
-////////////////////////////////////////////////////////////////////////////////
-///
 /// \def LE_DEFINE_PARAMETER
 /// \brief Creates the struct representing the individual parameter and adds the
 /// forwarding constructor (to minimize the difference between a typedef
 /// parameter specification and a struct that publicly derives from Parameter<>.
 ///
-///   It accepts a Boost PP sequence where the first element is the desired name
-/// for the parameter, the second is the base/existing parameter from which to
-/// create the new parameter (by modifying it) and the following elements are
-/// the desired parameter traits. If the sequence only has two elements the
-/// macro only 'renames' the specified base parameter (i.e. it creates a new
-/// parameter type that is the same/has the same traits as the base one).
+///   LE_DEFINE_PARAMETER( Interval, SymmetricFloat, MaximumOffset<24>, Unit<"'"> )
+/// -- the name to give the parameter, the parameter to build it out of, and the
+/// traits to change. Naming no trait renames: the new parameter has the same
+/// traits as the one it was built from.
 ///
 ////////////////////////////////////////////////////////////////////////////////
+// Implementation note:
+//   Was a Boost.PP sequence, ( Interval )( SymmetricFloat )( MaximumOffset<24> ),
+// walked to prefix every trait with LE::Parameters::Traits:: and counted to tell
+// the rename case from the modify case. Modify already takes a pack and already
+// accepts an empty one -- Boolean::Modify<> is a specialisation that exists --
+// so __VA_ARGS__ goes straight through and the two cases are one.
+//
+//   The traits are no longer qualified here, so they have to be visible where
+// the parameter is declared; the namespaces that declare parameters import them
+// beside the parameter types they already import.
+//                                            (31.07.2026.) (SW port)
+////////////////////////////////////////////////////////////////////////////////
 
-#define LE_DEFINE_PARAMETER_FULL(parameterSequence)                                                \
-    class BOOST_PP_SEQ_HEAD(parameterSequence)                                                     \
-        : public LE::Parameters::Modify<BOOST_PP_SEQ_HEAD(BOOST_PP_SEQ_TAIL(parameterSequence)),   \
-                                        LE_ENUMERATE_PARAMETER_TRAITS(BOOST_PP_SEQ_TAIL(           \
-                                            BOOST_PP_SEQ_TAIL(parameterSequence)))>::type          \
+#define LE_DEFINE_PARAMETER(name, ...)                                                             \
+    class name : public ::LE::Parameters::Modify<__VA_ARGS__>::type                                \
     {                                                                                              \
       public:                                                                                      \
-        BOOST_PP_SEQ_HEAD(parameterSequence)                                                       \
-        (type::value_type const initialValue = type::default_()) { setValue(initialValue); }       \
-    };
-
-#define LE_DEFINE_PARAMETER_RENAME_ONLY(parameterSequence)                                         \
-    class BOOST_PP_SEQ_HEAD(parameterSequence)                                                     \
-        : public BOOST_PP_SEQ_HEAD(BOOST_PP_SEQ_TAIL(parameterSequence))                           \
-    {                                                                                              \
-      public:                                                                                      \
-        BOOST_PP_SEQ_HEAD(parameterSequence)                                                       \
-        (type::value_type const initialValue = type::default_())                                   \
-            : BOOST_PP_SEQ_HEAD(BOOST_PP_SEQ_TAIL(parameterSequence))(initialValue)                \
-        {                                                                                          \
-        }                                                                                          \
-    };
-
-#define LE_DEFINE_PARAMETER(parameterSequence)                                                     \
-    BOOST_PP_IIF(BOOST_PP_GREATER(BOOST_PP_SEQ_SIZE(parameterSequence), 2),                        \
-                 LE_DEFINE_PARAMETER_FULL, LE_DEFINE_PARAMETER_RENAME_ONLY)(parameterSequence)
+        name(type::value_type const initialValue = type::default_()) { setValue(initialValue); }   \
+    }
 
 //------------------------------------------------------------------------------
 } // namespace Parameters

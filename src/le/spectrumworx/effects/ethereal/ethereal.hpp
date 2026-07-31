@@ -49,10 +49,10 @@ struct Ethereal
     typedef CommonParameters::Mode Mode;
     /// @}
 
-    LE_ENUMERATED_PARAMETER(Condition, (DiffHigher)(DiffLower));
+    LE_ENUMERATED_PARAMETER(Condition, DiffHigher, DiffLower);
 
-    LE_DEFINE_PARAMETERS(
-        ((Condition))((Threshold)(SymmetricFloat)(MaximumOffset<30>)(Unit<" dB">))((Mode)));
+    LE_DEFINE_PARAMETER(Threshold, SymmetricFloat, MaximumOffset<30>, Unit<" dB">);
+    LE_DEFINE_PARAMETERS(Condition, Threshold, Mode);
 
     /// \typedef Condition
     /// \brief Condition to meet in order to replace input with side channel.

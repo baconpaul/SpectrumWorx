@@ -44,12 +44,11 @@ namespace Effects
 
 struct Colorifer
 {
-    LE_ENUMERATED_PARAMETER(SpectrumPreprocess, (NotUsed)(SquareRoot)(Square)(Exponential));
-    LE_ENUMERATED_PARAMETER(ReplacePhase, (No)(Yes));
+    LE_ENUMERATED_PARAMETER(SpectrumPreprocess, NotUsed, SquareRoot, Square, Exponential);
+    LE_ENUMERATED_PARAMETER(ReplacePhase, No, Yes);
 
-    LE_DEFINE_PARAMETERS(((SpectrumPreprocess))(
-        (BandWidth)(LinearUnsignedInteger)(Minimum<0>)(Maximum<6000>)(Default<1000>)(Unit<" Hz">))(
-        (ReplacePhase)));
+    LE_DEFINE_PARAMETER(BandWidth, LinearUnsignedInteger, Minimum<0>, Maximum<6000>, Default<1000>, Unit<" Hz">);
+    LE_DEFINE_PARAMETERS(SpectrumPreprocess, BandWidth, ReplacePhase);
 
     /// \typedef SpectrumPreprocess
     /// \brief Specifies if preprocessing is done on the input signal.

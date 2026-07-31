@@ -30,13 +30,10 @@ namespace Detail
 {
 struct ExImPloder ///<
 {
-    LE_DEFINE_PARAMETER(
-        (MagnitudeScale)(LinearUnsignedInteger)(Minimum<1>)(Maximum<200>)(Default<50>)(Unit<" s">));
-    LE_DEFINE_PARAMETER(
-        (Gliss)(LinearSignedInteger)(Minimum<-300>)(Maximum<300>)(Default<-100>)(Unit<" \"/s">));
-    LE_DEFINE_PARAMETER(
-        (Threshold)(LinearSignedInteger)(Minimum<-120>)(Maximum<0>)(Default<-120>)(Unit<" dB">));
-    LE_DEFINE_PARAMETER((Gate)(Threshold));
+    LE_DEFINE_PARAMETER(MagnitudeScale, LinearUnsignedInteger, Minimum<1>, Maximum<200>, Default<50>, Unit<" s">);
+    LE_DEFINE_PARAMETER(Gliss, LinearSignedInteger, Minimum<-300>, Maximum<300>, Default<-100>, Unit<" \"/s">);
+    LE_DEFINE_PARAMETER(Threshold, LinearSignedInteger, Minimum<-120>, Maximum<0>, Default<-120>, Unit<" dB">);
+    LE_DEFINE_PARAMETER(Gate, Threshold);
 
     /// \typedef MagnitudeScale
     /// Used by all ExImploder effects which is only conveniently
@@ -72,11 +69,8 @@ struct PVImploder : Detail::ExImPloder
     typedef Detail::ExImPloder::Threshold Threshold;
     /// @}
 
-    LE_DEFINE_PARAMETERS(((Decay)(Detail::ExImPloder::MagnitudeScale))((Gliss))((Threshold))((Gate))
-                         /// \note We use the same gating logic for both Exploder and Imploder.
-                         ///                               (18.04.2013.) (Domagoj Saric)
-                         //( ( Gate      )( Detail::ExImPloder::Gate )( Default<0> ) )
-    );
+    LE_DEFINE_PARAMETER(Decay, Detail::ExImPloder::MagnitudeScale);
+    LE_DEFINE_PARAMETERS(Decay, Gliss, Threshold, Gate);
 
     /// \typedef Decay
     /// \brief Time needed to decay from 0 to -120 dB.
@@ -131,9 +125,10 @@ struct PVExploder : Detail::ExImPloder
     typedef Detail::ExImPloder::Gate Gate;
     /// @}
 
-    LE_DEFINE_PARAMETERS(((Growth)(Detail::ExImPloder::MagnitudeScale))(
-        (Gliss)(Detail::ExImPloder::Gliss)(Default<100>))(
-        (Threshold)(Detail::ExImPloder::Threshold)(Default<-40>))((Gate)));
+    LE_DEFINE_PARAMETER(Growth, Detail::ExImPloder::MagnitudeScale);
+    LE_DEFINE_PARAMETER(Gliss, Detail::ExImPloder::Gliss, Default<100>);
+    LE_DEFINE_PARAMETER(Threshold, Detail::ExImPloder::Threshold, Default<-40>);
+    LE_DEFINE_PARAMETERS(Growth, Gliss, Threshold, Gate);
 
     /// \typedef Growth
     /// \brief Time needed to grow from 0 to 120 dB.

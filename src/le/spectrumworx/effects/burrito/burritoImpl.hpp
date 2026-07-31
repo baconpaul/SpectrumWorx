@@ -35,7 +35,11 @@ class BurritoImpl : public EffectImpl<Burrito>
     // ChannelState
     ////////////////////////////////////////////////////////////////////////////
 
-    LE_DYNAMIC_CHANNEL_STATE(((Engine::HalfFFTBuffer<bool>)(positions)));
+    struct DynamicChannelState : DynamicChannelState_<DynamicChannelState>
+    {
+        Engine::HalfFFTBuffer<bool> positions;
+        auto members() { return std::tie(positions); }
+    };
 
     using ChannelState = CompoundChannelState<ModuloCounterChannelState, DynamicChannelState>;
 

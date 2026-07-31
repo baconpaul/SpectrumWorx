@@ -25,8 +25,8 @@
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/tchar.hpp"
 
-#include "boost/preprocessor/seq/for_each_i.hpp"
-#include "boost/preprocessor/tuple/elem.hpp"
+#include <array>
+#include <cstdint>
 #include <string_view>
 //------------------------------------------------------------------------------
 namespace LE
@@ -77,8 +77,79 @@ template <class Parameter> constexpr std::string_view name() { return Name<Param
 
 template <class Parameter> struct DiscreteValues
 {
-    static char const *LE_RESTRICT const strings[Parameter::numberOfDiscreteValues];
+    /// \note The element is not itself const -- valueStrings() below fills one
+    /// of these during constant evaluation, and a const element cannot be
+    /// assigned even there. The array object is const, which is what matters.
+    using Strings = std::array<char const *, Parameter::numberOfDiscreteValues>;
+    static Strings const strings;
+
+    /// \note What ParameterInfo carries, beside the nullptr a parameter with no
+    /// value strings gives it.
+    static char const *LE_RESTRICT const *LE_RESTRICT const stringsBegin()
+    {
+        return strings.data();
+    }
 };
+
+namespace Detail ///< \internal
+{
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \struct ValueString
+/// \internal
+/// \brief One enumerated value and the string that names it, as
+/// ENUMERATED_PARAMETER_STRINGS is given them.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+struct ValueString
+{
+    template <class Value>
+    consteval ValueString(Value const value, char const *const string)
+        : value_(static_cast<std::uint8_t>(value)), string_(string)
+    {
+    }
+
+    std::uint8_t value_;
+    char const *string_;
+}; // struct ValueString
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief The strings of \p pairs, having checked that each one is against the
+/// value at its own position.
+///
+////////////////////////////////////////////////////////////////////////////////
+// Implementation note:
+//   Value strings for enumerated parameters are defined in a .cpp file, away
+// from the parameter, so nothing stops the two lists from drifting apart -- and
+// a string against the wrong value is a wrong preset rather than a crash. The
+// check used to be one static_assert per value, emitted by a Boost.PP walk over
+// the pair sequence. It is the same check, said once, over a list the compiler
+// can read: a consteval function that throws is a compile error naming the
+// parameter, which is what the static_assert was for.
+//                                            (31.07.2026.) (SW port)
+////////////////////////////////////////////////////////////////////////////////
+
+template <class Parameter, std::size_t count>
+consteval typename DiscreteValues<Parameter>::Strings
+valueStrings(ValueString const (&pairs)[count])
+{
+    static_assert(count == Parameter::numberOfDiscreteValues,
+                  "Wrong number of enumerated parameter value strings");
+
+    typename DiscreteValues<Parameter>::Strings strings{};
+    for (std::size_t index{0}; index < count; ++index)
+    {
+        if (pairs[index].value_ != index)
+            throw "Incorrect order of enumerated parameter value-string pairs";
+        strings[index] = pairs[index].string_;
+    }
+    return strings;
+}
+
+} // namespace Detail
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -134,28 +205,24 @@ template <class Parameter> struct DisplayValueTransformer
 //                                            (15.07.2011.) (Domagoj Saric)
 ////////////////////////////////////////////////////////////////////////////////
 
-#define ADD_INDIVIDUAL_VALUE_STRING(r, parameter, valueIndex, valueStringPair)                     \
-    BOOST_PP_TUPLE_ELEM(2, 1, valueStringPair),
-
-#define ADD_INDIVIDUAL_VALUE_STRING_ASSERT(r, parameter, valueIndex, valueStringPair)              \
-    static_assert((parameter::BOOST_PP_TUPLE_ELEM(2, 0, valueStringPair) == valueIndex),           \
-                  "Incorrect order of enumerated parameter value-string pairs");
-
-#define ENUMERATED_PARAMETER_STRINGS(parentNameSpaceOrClass, parameter, discreteValueStringPairs)  \
+///   The pairs are written { Value, "string" }, and the value is named
+/// unqualified: the lambda opens a scope the parameter's enumerators are visible
+/// in, which is the job the macro used to do by pasting `parameter::` in front
+/// of each of them.
+#define ENUMERATED_PARAMETER_STRINGS(parentNameSpaceOrClass, parameter, ...)                       \
     template <>                                                                                    \
-    char const *LE_RESTRICT const DiscreteValues<parentNameSpaceOrClass::parameter>::strings       \
-        [parentNameSpaceOrClass::parameter::numberOfDiscreteValues] = {                            \
-            BOOST_PP_SEQ_FOR_EACH_I(ADD_INDIVIDUAL_VALUE_STRING,                                   \
-                                    parentNameSpaceOrClass::parameter, discreteValueStringPairs)}; \
-    BOOST_PP_SEQ_FOR_EACH_I(ADD_INDIVIDUAL_VALUE_STRING_ASSERT, parentNameSpaceOrClass::parameter, \
-                            discreteValueStringPairs)
+    DiscreteValues<parentNameSpaceOrClass::parameter>::Strings const                               \
+        DiscreteValues<parentNameSpaceOrClass::parameter>::strings{[] {                            \
+            using enum parentNameSpaceOrClass::parameter::value_type;                              \
+            return Detail::valueStrings<parentNameSpaceOrClass::parameter>({__VA_ARGS__});         \
+        }()};
 
-#define EFFECT_ENUMERATED_PARAMETER_STRINGS(parentClass, parameter, discreteValueStringPairs)      \
+#define EFFECT_ENUMERATED_PARAMETER_STRINGS(parentClass, parameter, ...)                           \
     }                                                                                              \
     }                                                                                              \
     namespace Parameters                                                                           \
     {                                                                                              \
-    ENUMERATED_PARAMETER_STRINGS(SW::Effects::parentClass, parameter, discreteValueStringPairs)    \
+    ENUMERATED_PARAMETER_STRINGS(SW::Effects::parentClass, parameter, __VA_ARGS__)                 \
     }                                                                                              \
     namespace SW                                                                                   \
     {                                                                                              \

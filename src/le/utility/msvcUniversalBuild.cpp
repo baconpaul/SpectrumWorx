@@ -15,9 +15,6 @@
 #include "platformSpecifics.hpp"
 #include "windowsLite.hpp"
 
-#include <boost/preprocessor/cat.hpp>
-#include <boost/preprocessor/stringize.hpp>
-
 #include <crtdbg.h>
 #include <xmmintrin.h>
 
@@ -32,18 +29,28 @@
 // http://en.wikipedia.org/wiki/Name_mangling#C_name_decoration_in_Microsoft_Windows
 // http://stackoverflow.com/questions/13385935/64bit-name-mangling-for-c
 
+/// \note Was BOOST_PP_CAT and BOOST_PP_STRINGIZE, which are these two pairs:
+/// the indirection is what makes the arguments expand before ## and # see them.
+///                                           (31.07.2026.) (SW port)
+#define LE_CAT_(a, b) a##b
+#define LE_CAT(a, b) LE_CAT_(a, b)
+#define LE_STRINGIZE_(text) #text
+#define LE_STRINGIZE(text) LE_STRINGIZE_(text)
+
 #ifdef _M_X64
 #define LE_ALTERNATE_SYMBOL_ARCH_SELECT(x86symbol, x64symbol) x64symbol
 #define LE_ALTERNATE_CDECL_SYMBOL_PREFIX(symbol) symbol
 #else
 #define LE_ALTERNATE_SYMBOL_ARCH_SELECT(x86symbol, x64symbol) x86symbol
-#define LE_ALTERNATE_CDECL_SYMBOL_PREFIX(symbol) BOOST_PP_CAT(_, symbol)
+#define LE_ALTERNATE_CDECL_SYMBOL_PREFIX(symbol) LE_CAT(_, symbol)
 #endif
 
 #define LE_ALTERNATE_SYMBOL_IMPL(originalSymbol, alternateSymbol)                                  \
-    __pragma(                                                                                      \
-        comment(linker, BOOST_PP_STRINGIZE( BOOST_PP_CAT( BOOST_PP_CAT( /alternatename:, originalSymbol ), BOOST_PP_CAT( =, alternateSymbol ) ) ) ))   \
-            __pragma(comment(linker, BOOST_PP_STRINGIZE( BOOST_PP_CAT( BOOST_PP_CAT( /alternatename:, BOOST_PP_CAT( __imp_, originalSymbol ) ), BOOST_PP_CAT( =, alternateSymbol ) ) ) ))
+    __pragma(comment(linker, LE_STRINGIZE(LE_CAT(LE_CAT(/ alternatename:, originalSymbol),         \
+                                                 LE_CAT(=, alternateSymbol)))))                    \
+        __pragma(comment(                                                                          \
+            linker, LE_STRINGIZE(LE_CAT(LE_CAT(/ alternatename:, LE_CAT(__imp_, originalSymbol)),  \
+                                        LE_CAT(=, alternateSymbol)))))
 
 #define LE_ALTERNATE_SYMBOL(originalx86Symbol, originalx64Symbol, alternateSymbol)                 \
     LE_ALTERNATE_SYMBOL_IMPL(                                                                      \

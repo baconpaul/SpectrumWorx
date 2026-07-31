@@ -51,8 +51,9 @@ EFFECT_PARAMETER_NAME(CentroidExtractor::Bandwidth, "Bandwidth")
 EFFECT_PARAMETER_NAME(CentroidExtractor::Attenuation, "Border slope")
 
 EFFECT_ENUMERATED_PARAMETER_STRINGS(CentroidExtractor, Mode,
-                                    ((Centroid, "Centroid"))((Peak, "Peak"))((Dominant,
-                                                                              "Dominant")))
+    {Centroid, "Centroid"},
+    {Peak, "Peak"},
+    {Dominant, "Dominant"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

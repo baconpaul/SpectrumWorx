@@ -44,9 +44,9 @@ namespace Effects
 
 struct Phlip
 {
-    LE_ENUMERATED_PARAMETER(Mode, (All)(Even)(Odd));
+    LE_ENUMERATED_PARAMETER(Mode, All, Even, Odd);
 
-    LE_DEFINE_PARAMETERS(((Mode)));
+    LE_DEFINE_PARAMETERS(Mode);
 
     /// \typedef Mode
     /// \brief Controls the target harmonics.

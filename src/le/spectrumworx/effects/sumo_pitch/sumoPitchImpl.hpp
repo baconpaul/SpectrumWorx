@@ -35,8 +35,12 @@ class SumoPitchImpl : public EffectImpl<SumoPitch>
     // ChannelState
     ////////////////////////////////////////////////////////////////////////////
 
-    LE_DYNAMIC_CHANNEL_STATE(((PhaseVocoderShared::PitchShifter::ChannelState)(main))(
-        (PhaseVocoderShared::PitchShifter::ChannelState)(side)));
+    struct DynamicChannelState : DynamicChannelState_<DynamicChannelState>
+    {
+        PhaseVocoderShared::PitchShifter::ChannelState main;
+        PhaseVocoderShared::PitchShifter::ChannelState side;
+        auto members() { return std::tie(main, side); }
+    };
 
     struct ChannelState : DynamicChannelState
     {

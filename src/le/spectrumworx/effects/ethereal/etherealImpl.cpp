@@ -43,8 +43,8 @@ EFFECT_PARAMETER_NAME(Ethereal::Threshold, "Threshold")
 EFFECT_PARAMETER_NAME(Ethereal::Condition, "Swap condition")
 
 EFFECT_ENUMERATED_PARAMETER_STRINGS(Ethereal, Condition,
-                                    ((DiffHigher, "Main - Side > Thr."))((DiffLower,
-                                                                          "Main - Side < Thr.")))
+    {DiffHigher, "Main - Side > Thr."},
+    {DiffLower, "Main - Side < Thr."})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

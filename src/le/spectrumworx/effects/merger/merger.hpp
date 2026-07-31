@@ -43,12 +43,10 @@ namespace Effects
 
 struct Merger
 {
-    LE_ENUMERATED_PARAMETER(
-        Operation,
-        (MainLargerThanSide)(SideLargerThanMain)(MainAboveThreshold)(SideAboveThreshold)(MainBelowThreshold)(SideBelowThreshold));
+    LE_ENUMERATED_PARAMETER(Operation, MainLargerThanSide, SideLargerThanMain, MainAboveThreshold, SideAboveThreshold, MainBelowThreshold, SideBelowThreshold);
 
-    LE_DEFINE_PARAMETERS(((Operation))(
-        (Threshold)(LinearFloat)(Minimum<-120>)(Maximum<0>)(Default<-20>)(Unit<" dB">)));
+    LE_DEFINE_PARAMETER(Threshold, LinearFloat, Minimum<-120>, Maximum<0>, Default<-20>, Unit<" dB">);
+    LE_DEFINE_PARAMETERS(Operation, Threshold);
 
     /// \typedef Operation
     /// \brief Defines the operation to be executed.

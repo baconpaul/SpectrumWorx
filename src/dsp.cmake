@@ -145,9 +145,6 @@ target_include_directories(sw-dsp PUBLIC . "${swGeneratedIncludeDir}")
 # PUBLIC or PRIVATE.
 sw_force_include_odr_header(sw-dsp)
 
-# TEMPORARY — Fusion/MPL/Preprocessor for le/parameters only. Goes at stage 7.
-target_link_libraries(sw-dsp PUBLIC sw-boost-scaffold)
-
 # TEMPORARY — the preset parser; tinyxml2 replaces it at stage 8.
 target_link_libraries(sw-dsp PUBLIC rapidxml)
 

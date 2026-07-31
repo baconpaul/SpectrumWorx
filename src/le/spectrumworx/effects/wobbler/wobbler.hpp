@@ -41,10 +41,10 @@ namespace Effects
 
 struct Wobbler
 {
-    LE_DEFINE_PARAMETERS(
-        ((Amplitude)(LinearFloat)(Minimum<0>)(Maximum<+48>)(Default<6>)(Unit<" dB">))(
-            (Period)(LinearUnsignedInteger)(Minimum<10>)(Maximum<1000>)(Default<100>)(Unit<" ms">))(
-            (PreGain)(SymmetricFloat)(MaximumOffset<48>)(Unit<" dB">)));
+    LE_DEFINE_PARAMETER(Amplitude, LinearFloat, Minimum<0>, Maximum<+48>, Default<6>, Unit<" dB">);
+    LE_DEFINE_PARAMETER(Period, LinearUnsignedInteger, Minimum<10>, Maximum<1000>, Default<100>, Unit<" ms">);
+    LE_DEFINE_PARAMETER(PreGain, SymmetricFloat, MaximumOffset<48>, Unit<" dB">);
+    LE_DEFINE_PARAMETERS(Amplitude, Period, PreGain);
 
     /// \typedef Amplitude
     /// \brief Intensity of the wobbling (or how much the sound seems to go up

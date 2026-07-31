@@ -33,10 +33,11 @@ UI_NAME(SW::GlobalParameters::InputMode) = "Input mode";
 //UI_NAME( SW::GlobalParameters::StreamMode    ) = "Sampler streaming mode"; // ...MIDI not supported yet
 
 #if LE_SW_ENGINE_INPUT_MODE >= 1
-ENUMERATED_PARAMETER_STRINGS(
-    SW::GlobalParameters, InputMode,
-    ((Stereo, "2in / 2out (Stereo)"))((StereoSideChain, "4in / 2out (Stereo with side chain)"))(
-        (Mono, "1in / 1out (Mono)"))((MonoSideChain, "2in / 1out (Mono with side chain)")))
+ENUMERATED_PARAMETER_STRINGS(SW::GlobalParameters, InputMode,
+    {Stereo, "2in / 2out (Stereo)"},
+    {StereoSideChain, "4in / 2out (Stereo with side chain)"},
+    {Mono, "1in / 1out (Mono)"},
+    {MonoSideChain, "2in / 1out (Mono with side chain)"})
 #endif // LE_SW_ENGINE_INPUT_MODE >= 1
 } // namespace Parameters
 //------------------------------------------------------------------------------

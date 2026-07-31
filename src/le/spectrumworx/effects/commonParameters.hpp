@@ -46,10 +46,10 @@ namespace CommonParameters /// \brief Common parameters used by various effects
 ///   - Both      : operate on both magnitudes and phases
 ///   - Magnitudes: operate only on magnitudes
 ///   - Phases    : operate only on phases
-LE_ENUMERATED_PARAMETER(Mode, (Both)(Magnitudes)(Phases));
+LE_ENUMERATED_PARAMETER(Mode, Both, Magnitudes, Phases);
 /// \typedef SpringType
 /// \brief Specifies the direction for vibrato-like effects.
-LE_ENUMERATED_PARAMETER(SpringType, (Symmetric)(Up)(Down));
+LE_ENUMERATED_PARAMETER(SpringType, Symmetric, Up, Down);
 
 /// @}
 } // namespace CommonParameters
