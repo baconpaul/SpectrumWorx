@@ -63,11 +63,10 @@ using SWTest::PresetConsumer;
 using SWTest::ScopedProblemCounter;
 
 /// \note Far larger than Preset::InMemoryPresetBuffer's 4096 bytes, and
-/// deliberately. Preset::saveTo() prints without a bound, and the 2016 sources
-/// already record that five TuneWorx modules breach that buffer -- so a test
-/// that used the shipping size would be testing whether it smashed its own
-/// stack. 8.1 gives the printer a length; until then the overflow is real and
-/// this is not the place to discover it.
+/// deliberately: the 2016 sources record that five TuneWorx modules breach that
+/// buffer, and driving every parameter off its default makes a document larger
+/// still. What is under test here is the round-trip, not the shipping buffer
+/// size -- saveTo() refuses to overrun one now, and returns 0 instead.
 constexpr std::size_t generousBuffer{1u << 20};
 
 /// \note A class rather than a function returning one: SWTest::Engine points
@@ -245,8 +244,8 @@ TEST_CASE("A saved preset loads back as itself", "[preset-roundtrip]")
             original = dump(engine).text;
 
             std::vector<char> buffer(generousBuffer, '\0');
-            auto const written(savePreset(buffer.data(), juce::File(), juce::String("round trip"),
-                                          engine.program()));
+            auto const written(
+                savePreset(buffer, juce::File(), juce::String("round trip"), engine.program()));
             REQUIRE(written > 0);
             REQUIRE(written < buffer.size());
             saved.assign(buffer.data(), written - 1 /*the terminator saveTo() appends*/);
@@ -323,8 +322,7 @@ TEST_CASE("A parameter under an enabled LFO takes its value from the LFO", "[pre
         REQUIRE(drivenValue != 0);
 
         std::vector<char> buffer(generousBuffer, '\0');
-        auto const written(
-            savePreset(buffer.data(), juce::File(), juce::String("lfo"), engine.program()));
+        auto const written(savePreset(buffer, juce::File(), juce::String("lfo"), engine.program()));
         REQUIRE(written > 0);
         saved.assign(buffer.data(), written - 1);
     }

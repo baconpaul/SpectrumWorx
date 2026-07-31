@@ -41,12 +41,11 @@ LE_OPTIMIZE_FOR_SIZE_BEGIN()
 //
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \note The buffer is one byte longer than the file and terminated, because
-/// the parse is destructive and RapidXML stops at a NUL it does not itself
-/// write. 193 of the 303 factory presets already end in one -- Preset::saveTo()
-/// appends it and the 2016 writer put it on disk -- and 110 do not. Appending
-/// unconditionally is correct for both: a second NUL after the first is never
-/// reached.
+/// \note The buffer is one byte longer than the file and terminated, because the
+/// parser is handed a C string. 193 of the 303 factory presets already end in a
+/// NUL -- Preset::saveTo() appends one and the 2016 writer put it on disk -- and
+/// 110 do not. Appending unconditionally is correct for both: a second NUL after
+/// the first is never reached.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -110,16 +109,13 @@ void savePreset(juce::File const &file, juce::File const &externalSampleFile,
 {
     LE_ASSERT(file.getParentDirectory().isDirectory());
 
-    /// \todo Preset::saveTo() prints without a bound, so this buffer is a
-    /// promise rather than a limit -- the 2016 sources already record that five
-    /// TuneWorx modules breach it. 8.1 replaces the printer with one that knows
-    /// its own length.
-    ///                                       (31.07.2026.) (SW port)
+    /// \note A preset that does not fit returns 0 and is reported rather than
+    /// written; it used to run off the end of this buffer, which the 2016
+    /// sources already record five TuneWorx modules doing.
     Preset::InMemoryPresetBuffer buffer;
-    auto const presetSize(savePreset(&buffer[0], externalSampleFile, comment, program));
-    LE_ASSERT(presetSize <= buffer.size());
+    auto const presetSize(savePreset(buffer, externalSampleFile, comment, program));
 
-    if (!writePresetFile(file, buffer.data(), presetSize))
+    if (!presetSize || !writePresetFile(file, buffer.data(), presetSize))
         reportPresetProblem(PresetProblem::SaveFailed);
 }
 

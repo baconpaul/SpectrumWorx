@@ -41,7 +41,6 @@ add_library(sw-dsp STATIC
         le/utility/filesystem.cpp
         le/utility/lexicalCast.cpp
         le/utility/trace.cpp
-        le/utility/xml.cpp
 
         # le/spectrumworx -- the preset format, and the one file that opens files
         le/spectrumworx/presetFile.cpp
@@ -150,8 +149,14 @@ target_include_directories(sw-dsp PUBLIC . "${swGeneratedIncludeDir}")
 # PUBLIC or PRIVATE.
 sw_force_include_odr_header(sw-dsp)
 
-# TEMPORARY — the preset parser; tinyxml2 replaces it at stage 8.
-target_link_libraries(sw-dsp PUBLIC rapidxml)
+# The preset parser. PUBLIC because presets.hpp holds a TiXmlDocument by value.
+#
+# \note sst-plugininfra's, not a submodule of our own: it is already configured
+# and built (SST_PLUGININFRA_PROVIDE_TINYXML defaults ON), and a second XML
+# library to pin and vendor-audit is a poor trade for an API preference. It is
+# TinyXML 1, which the plan called tinyxml2 -- the plan was writing from the
+# option's name.
+target_link_libraries(sw-dsp PUBLIC sst-plugininfra::tinyxml)
 
 # LE::Utility::assertionFailed lives in assertionHandler.cpp; without this the
 # asserts degrade to the CRT's and the DAW never sees them.

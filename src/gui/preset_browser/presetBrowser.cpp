@@ -459,11 +459,16 @@ void PresetBrowser::saveDirtyComment()
             if (!pPresetData)
                 return;
             PresetHeader const presetHeader(newComment);
-            Preset preset(pPresetData.get());
+            Preset preset;
+            if (!preset.loadFrom(pPresetData.get()))
+                return;
             preset.setHeader(presetHeader);
-            newPresetDataSize = preset.saveTo(&newPresetData[0]);
+            newPresetDataSize = preset.saveTo(newPresetData);
         }
-        writePresetFile(dirtyPreset, newPresetData.data(), newPresetDataSize);
+        if (newPresetDataSize)
+            writePresetFile(dirtyPreset, newPresetData.data(), newPresetDataSize);
+        else
+            reportPresetProblem(PresetProblem::SaveFailed);
     }
 }
 

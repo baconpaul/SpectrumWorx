@@ -30,7 +30,8 @@
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/tchar.hpp"
 #include "le/utility/trace.hpp"
-#include "le/utility/xml.hpp"
+
+#include <tinyxml/tinyxml.h>
 
 #include <optional>
 
@@ -43,6 +44,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
+#include <string>
 #include <type_traits>
 #include <utility> // rvalues
 //------------------------------------------------------------------------------
@@ -158,49 +161,47 @@ class Preset
     using InMemoryPresetBuffer = std::array<char, 4096>;
 
   public:
-#ifdef LE_EXCEPTION_ON
-    using load_result_t = std::true_type;
-#else
-    typedef bool load_result_t;
-#endif // LE_EXCEPTION_ON
+    Preset() = default;
+    explicit Preset(char const *const pBuffer) { loadFrom(pBuffer); }
 
-    Preset() { setMemoryAllocationTracer(); }
-#ifdef LE_EXCEPTION_ON
-    Preset(char *const pBuffer)
-    {
-        setMemoryAllocationTracer();
-        loadFrom(pBuffer);
-    }
-#endif // LE_EXCEPTION_ON
+    /// \brief Parses \p pBuffer, repairing the 2016 writer's illegal element
+    /// names if it has to. See mangleName().
+    ///
+    /// \note Plain `bool`. It was `std::true_type` whenever exceptions were on
+    /// -- which is always -- so `loadFrom(...) != true` at the one call site was
+    /// a comparison that could not fail, and a malformed preset was reported by
+    /// RapidXML *throwing* instead. TinyXML says so in its return value.
+    ///                                       (31.07.2026.) (SW port)
+    bool loadFrom(char const *pBuffer);
 
-    load_result_t loadFrom(char *pBuffer);
-    unsigned int saveTo(char *pBuffer);
+    /// \brief Prints the preset into \p buffer.
+    /// \return the number of bytes written including the terminator, or 0 if
+    /// the preset does not fit. RapidXML's printer could not tell you: it took
+    /// a bare `char *`, and the 2016 sources already record that five TuneWorx
+    /// modules overrun the 4096 bytes every caller hands it.
+    unsigned int saveTo(std::span<char> buffer) const;
 
     void getHeader(PresetHeader &) const;
     void setHeader(PresetHeader const &);
 
     std::string_view getComment() const;
 
-    Utility::XML::Document &xml() { return preset_; }
-    Utility::XML::Document const &xml() const { return preset_; }
+    TiXmlDocument &xml() { return document_; }
+    TiXmlDocument const &xml() const { return document_; }
 
-    Utility::XML::Element &root();
-    Utility::XML::Element const &root() const;
+    TiXmlElement &root();
+    TiXmlElement const &root() const;
 
-    void reset() { xml().clear(); }
+    void reset() { document_.Clear(); }
 
-    /// \note A preset arrives as a writable, NUL-terminated buffer -- the parse
-    /// is destructive, for entity translation. Where that buffer comes from is
+    /// \note A preset arrives as a NUL-terminated buffer. Where it comes from is
     /// presetFile.hpp's business, not this header's.
     using InMemoryPreset = std::unique_ptr<char[]>;
 
     static void reportPresetLoadingError();
 
   private:
-    void setMemoryAllocationTracer();
-
-  private:
-    Utility::XML::Document preset_;
+    TiXmlDocument document_;
 }; // class Preset
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -215,43 +216,64 @@ class PresetHandler
     PresetHandler(Preset &preset) : preset_(preset) {}
 
   protected:
-    std::string_view mangleSpaces(char const *input) const;
-    std::string_view unmangleSpaces(char const *input) const;
+    ////////////////////////////////////////////////////////////////////////////
+    // Parameter name <-> XML name.
+    //
+    // \note A parameter's or effect's name is used verbatim as an element or
+    // attribute name, and three things they are called are not legal XML names:
+    // a space ("Start frequency"), a leading digit -- TuneWorx's twelve
+    // semitones are called "1" .. "12" -- and the punctuation in
+    // "Center (LFO me!)" and the seven "... (pvd)" effects. The 2016 writer
+    // replaced the space and nothing else, and got away with it because
+    // RapidXML's fastest parse mode never checks a name. TinyXML does, and 25 of
+    // the 303 factory presets do not parse until read through
+    // repairLegacyElementNames().
+    //
+    // \note Not invertible, and it does not need to be: nothing unmangles. A
+    // preset is matched to an effect by mangling the effect's name and comparing,
+    // which is why a mangling that maps "(" and " " to the same character is
+    // still unambiguous.
+    //
+    // \note The 2016 originals returned a view into RapidXML's arena, because
+    // every string an attribute referred to had to outlive the document.
+    // TinyXML copies what it is given, so these own what they return and the
+    // arena, the `allocateString` that fed it and the lifetime rule that came
+    // with them are all gone.
+    //                                        (31.07.2026.) (SW port)
+    ////////////////////////////////////////////////////////////////////////////
 
-    char *allocateString(unsigned int size);
+    static std::string mangleName(std::string_view parameterName);
 
     Preset &preset() { return preset_; }
     Preset const &preset() const { return preset_; }
 
-    Utility::XML::Document &xml() { return preset().xml(); }
-    Utility::XML::Document const &xml() const { return preset().xml(); }
+    TiXmlDocument &xml() { return preset().xml(); }
+    TiXmlDocument const &xml() const { return preset().xml(); }
 
     using LFO = Parameters::LFOImpl;
 
   protected:
     friend class LFODataSaver;
 
-    static std::string_view const &makeStringRef(std::string_view const &source) { return source; }
-    static std::string_view makeStringRef(std::string_view::const_iterator source);
-    template <typename T> std::string_view makeStringRef(T const binarySource)
+    static std::string makeString(std::string_view const source) { return std::string(source); }
+    template <typename T> static std::string makeString(T const binarySource)
     {
-        auto const valueBufferSize(Utility::RequiredStringStorage<T>::value);
-        char *LE_RESTRICT const buffer(allocateString(valueBufferSize));
-        unsigned int const numberOfCharacters(Utility::lexical_cast(
+        std::array<char, Utility::RequiredStringStorage<T>::value> buffer;
+        auto const numberOfCharacters(Utility::lexical_cast(
             std::is_enum<T>::value ? static_cast<std::uint8_t>(binarySource) : binarySource,
-            buffer));
-        LE_ASSUME(numberOfCharacters <= valueBufferSize);
-        return std::string_view(buffer, numberOfCharacters);
+            buffer.data()));
+        LE_ASSUME(numberOfCharacters <= buffer.size());
+        return std::string(buffer.data(), numberOfCharacters);
     }
 
   private:
-    std::string_view fixSpaces(std::string_view input, char searchFor, char replaceWith) const;
+    static std::string fixSpaces(std::string_view input, char searchFor, char replaceWith);
 
   private:
     Preset &preset_;
 }; // class PresetHandler
 
-template <> std::string_view PresetHandler::makeStringRef<bool>(bool);
+template <> std::string PresetHandler::makeString<bool>(bool);
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -287,8 +309,7 @@ class ParametersLoader : private PresetHandler
     template <typename T>
     LE_NOINLINE std::optional<T> getSimpleParameterValue(char const *const parameterName) const
     {
-        auto const pParameterAttribute(getParameterAttribute(parameterName));
-        return getParameterValue<T>(pParameterAttribute, parameterName);
+        return getParameterValue<T>(getParameterAttribute(parameterName), parameterName);
     }
 
     template <typename T>
@@ -300,7 +321,7 @@ class ParametersLoader : private PresetHandler
             if (loadLFO(*pParameterNode, lfo))
                 return std::nullopt;
             else
-                return getParameterValue<T>(pParameterNode, parameterName);
+                return getParameterValue<T>(pParameterNode->GetText(), parameterName);
         }
         else
         {
@@ -340,29 +361,32 @@ class ParametersLoader : private PresetHandler
     }
 
   private:
+    /// \note One overload over a plain C string, where there were two over a
+    /// RapidXML base class: TinyXML's attribute value and element text arrive as
+    /// `char const *` already, and `TiXmlElement::Value()` is the element's
+    /// *name*, so a shared base would have read the wrong thing for one of them.
     template <typename T>
-    std::optional<T> getParameterValue(Utility::XML::Object const *const pXMLElement,
+    std::optional<T> getParameterValue(char const *const text,
                                        char const *const parameterName) const
     {
-        if (pXMLElement)
-        {
-            return Utility::lexical_cast<T>(pXMLElement->value());
-        }
+        if (text)
+            return Utility::lexical_cast<T>(text);
         warnAboutMissingParameter(parameterName);
         return std::nullopt;
     }
 
-    Utility::XML::Attribute const *getParameterAttribute(char const *parameterName) const;
-    Utility::XML::Element const *getParameterNode(char const *parameterName) const;
+    char const *getParameterAttribute(char const *parameterName) const;
+    TiXmlElement const *getParameterNode(char const *parameterName) const;
 
-    bool loadLFO(Utility::XML::Element const &parameterNode, LFO &lfo) const;
+    bool loadLFO(TiXmlElement const &parameterNode, LFO &lfo) const;
 
     static void warnAboutMissingParameter(char const *parameterName);
 
-    std::string_view currentEffectName() const;
-    std::string_view currentMangledEffectName() const;
+    static std::int8_t effectIndexFromMangledName(std::string_view mangledName);
 
-    Utility::XML::Element const &parameters() const
+    char const *currentMangledEffectName() const;
+
+    TiXmlElement const &parameters() const
     {
         LE_ASSUME(pParameters_);
         return *pParameters_;
@@ -371,7 +395,7 @@ class ParametersLoader : private PresetHandler
     bool switchedToModuleParameters() const;
 
   private:
-    Utility::XML::Element const *LE_RESTRICT pParameters_;
+    TiXmlElement const *LE_RESTRICT pParameters_;
 
     mutable bool syncedLFOFound_;
 
@@ -387,34 +411,35 @@ class ParametersLoader : private PresetHandler
 #ifndef LE_SW_SDK_BUILD
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \class PresetWithPreallocatedNodes
+/// \class SavedPreset
+///
+/// \brief A preset being built: the three fixed nodes every one of them has.
+///
+/// \note Was `PresetWithPreallocatedFixedNodes`, which held the header node,
+/// the two section nodes and *five module nodes* as members -- because RapidXML
+/// allocates from an arena and does not own what you append, so pre-allocating
+/// them was how you avoided the allocation. TinyXML owns its children, so a node
+/// held by value cannot be linked into a document at all; the five module nodes
+/// and the `moduleNodesEnd()` walk over them go with the class.
+///                                           (31.07.2026.) (SW port)
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class PresetWithPreallocatedFixedNodes : public Preset
+class SavedPreset : public Preset
 {
-  private:
-    using ModuleNodes = std::array<Utility::XML::Element, Constants::maxNumberOfModules>;
-
   public:
-    PresetWithPreallocatedFixedNodes();
+    SavedPreset();
 
     void setHeader(PresetHeader const &);
 
-    Utility::XML::Element &headerNode() { return headerNode_; }
-    Utility::XML::Element &globalParametersNode() { return globalParametersNode_; }
-    Utility::XML::Element &moduleParametersNode() { return moduleParametersNode_; }
-
-    ModuleNodes &moduleNodes() { return moduleNodes_; }
-    ModuleNodes const &moduleNodes() const { return moduleNodes_; }
+    TiXmlElement &globalParametersNode() { return *pGlobalParametersNode_; }
+    TiXmlElement &moduleParametersNode() { return *pModuleParametersNode_; }
 
   private:
-    Utility::XML::Element headerNode_;
-    Utility::XML::Element globalParametersNode_;
-    Utility::XML::Element moduleParametersNode_;
-
-    ModuleNodes moduleNodes_;
-}; // class PresetWithPreallocatedFixedNodes
+    /// \note Owned by the document, which deletes them.
+    TiXmlElement *pGlobalParametersNode_;
+    TiXmlElement *pModuleParametersNode_;
+}; // class SavedPreset
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -425,7 +450,7 @@ class PresetWithPreallocatedFixedNodes : public Preset
 class ParametersSaver : private PresetHandler
 {
   public:
-    ParametersSaver(PresetWithPreallocatedFixedNodes &);
+    ParametersSaver(SavedPreset &);
 
     void saveEffectModuleChain(AutomatedModuleChain const &);
 
@@ -433,7 +458,7 @@ class ParametersSaver : private PresetHandler
     //void setSampleFileName( juce::String const & sampleFileName );
     void setSampleFileName(std::string_view const &sampleFileName);
 
-    unsigned int saveTo(char *pBuffer);
+    unsigned int saveTo(std::span<char> buffer) const;
 
   public: // For-each functor interface.
     using result_type = void;
@@ -455,46 +480,38 @@ class ParametersSaver : private PresetHandler
     template <typename T>
     void LE_NOINLINE saveParameter(char const *const parameterName, T const parameterValue)
     {
-        saveParameter(parameterName, makeStringRef<T>(parameterValue));
+        saveParameter(parameterName, makeString<T>(parameterValue));
     }
 
     template <typename T>
     void LE_NOINLINE saveParameter(char const *const parameterName, T const parameterValue,
                                    LFO const &parameterLFO)
     {
-        saveParameter(parameterName, makeStringRef<T>(parameterValue), parameterLFO);
+        saveParameter(parameterName, makeString<T>(parameterValue), parameterLFO);
     }
 
   private:
-    void saveParameter(char const *parameterName, std::string_view parameterValue);
-    void saveParameter(char const *parameterName, std::string_view parameterValue,
+    void saveParameter(char const *parameterName, std::string const &parameterValue);
+    void saveParameter(char const *parameterName, std::string const &parameterValue,
                        LFO const &parameterLFO);
 
-    Utility::XML::Element &parameters()
+    TiXmlElement &parameters()
     {
         LE_ASSUME(pParametersNode_);
         return *pParametersNode_;
     }
 
-    PresetWithPreallocatedFixedNodes &preset()
-    {
-        return static_cast<PresetWithPreallocatedFixedNodes &>(PresetHandler::preset());
-    }
-    PresetWithPreallocatedFixedNodes const &preset() const
-    {
-        return const_cast<ParametersSaver &>(*this).preset();
-    }
-
-    Utility::XML::Element const *moduleNodesEnd() const
-    {
-        /// \note Quick-workaround for 'secure STL' array iterators not being
-        /// simple pointers.
-        ///                                   (15.10.2015.) (Domagoj Saric)
-        return &preset().moduleNodes().back() + 1;
-    }
+    SavedPreset &preset() { return static_cast<SavedPreset &>(PresetHandler::preset()); }
+    SavedPreset const &preset() const { return const_cast<ParametersSaver &>(*this).preset(); }
 
   private:
-    Utility::XML::Element *LE_RESTRICT pParametersNode_;
+    /// Where saveParameter() writes: the globals node, then each module's in turn.
+    TiXmlElement *LE_RESTRICT pParametersNode_;
+
+    /// \note Whether saveEffectModuleChain() has run, which the assertions in
+    /// saveTo() used to get from comparing pParametersNode_ against a
+    /// pre-allocated array's bounds.
+    bool moduleChainSaved_{false};
 }; // class ParametersSaver
 #endif // LE_SW_SDK_BUILD
 
@@ -515,12 +532,9 @@ template <class PresetConsumer>
 LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignoreExternalSample,
                         juce::String *LE_RESTRICT const pComment, PresetConsumer const consumer)
 {
-#ifdef LE_EXCEPTION_ON
-    try
     {
-#endif // LE_EXCEPTION_ON
         Preset preset;
-        if (preset.loadFrom(inMemoryPreset) != true)
+        if (!preset.loadFrom(inMemoryPreset))
         {
             Preset::reportPresetLoadingError();
             return false;
@@ -541,17 +555,17 @@ LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignor
         if (!parametersLoader.getSampleFileName().empty())
             reportPresetProblem(PresetProblem::ExternalSampleIgnored);
 #else  // "normal plugin build"
-    if (loader.wantsSampleFile())
-    {
-        // Implementation note:
-        //   The sample file name must be fetched before switching to module
-        // parameters (see the implementation of the
-        // ParametersLoader::getSampleFileName() member function).
-        //                                (15.12.2011.) (Domagoj Saric)
-        /// \todo Clean up this spaghetti.
-        ///                               (15.12.2011.) (Domagoj Saric)
-        loader.setSample(parametersLoader.getSampleFileName());
-    }
+        if (loader.wantsSampleFile())
+        {
+            // Implementation note:
+            //   The sample file name must be fetched before switching to module
+            // parameters (see the implementation of the
+            // ParametersLoader::getSampleFileName() member function).
+            //                                (15.12.2011.) (Domagoj Saric)
+            /// \todo Clean up this spaghetti.
+            ///                               (15.12.2011.) (Domagoj Saric)
+            loader.setSample(parametersLoader.getSampleFileName());
+        }
 #endif // side channel handling
 
         GlobalParameters::Parameters newParameters;
@@ -600,14 +614,7 @@ LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignor
         }
         loader.moduleChainFinished(moduleIndex, parametersLoader.syncedLFOFound());
         return true;
-#ifdef LE_EXCEPTION_ON
     }
-    catch (...)
-    {
-        Preset::reportPresetLoadingError();
-        return false;
-    }
-#endif // LE_EXCEPTION_ON
 
     /// \todo Add MIDI support.
     ///                                       (16.12.2009.) (Domagoj Saric)
@@ -619,7 +626,7 @@ class Program;
 /// \note The `juce::File` overloads of these two -- and the `loadPreset` that
 /// reads a file before parsing it -- are in presetFile.hpp. This translation
 /// unit opens no files, which is what `LE_NO_PRESETS` used to stand in for.
-unsigned int savePreset(char *const data, juce::File const &externalSampleFile,
+unsigned int savePreset(std::span<char> data, juce::File const &externalSampleFile,
                         juce::String const &comment, Program const &);
 #endif // !LE_SW_SDK_BUILD
 
