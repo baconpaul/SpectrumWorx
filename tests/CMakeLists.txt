@@ -18,6 +18,7 @@ add_executable(sw-tests
         math/fftTests.cpp
         math/scalarTests.cpp
         math/vectorTests.cpp
+        parameters/parameterLayoutTests.cpp
         parameters/parameterTableTests.cpp
         utility/buffersTests.cpp
         utility/circularListTests.cpp

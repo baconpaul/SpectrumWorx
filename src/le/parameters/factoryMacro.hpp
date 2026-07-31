@@ -12,18 +12,15 @@
 #define factoryMacro_hpp__8F075C97_FE9A_47F0_A01B_A3632AA17AC9
 //------------------------------------------------------------------------------
 #include "parameter.hpp"
+#include "parameterList.hpp"
 
-#include "boost/preprocessor/cat.hpp"
 #include "boost/preprocessor/comparison/greater.hpp"
 #include "boost/preprocessor/control/iif.hpp"
 #include "boost/preprocessor/seq/seq.hpp"
 #include "boost/preprocessor/seq/for_each.hpp"
-#include "boost/preprocessor/seq/for_each_i.hpp"
 #include "boost/preprocessor/seq/enum.hpp"
 #include "boost/preprocessor/seq/size.hpp"
-
-#include <cstdint>
-#include <type_traits>
+#include "boost/preprocessor/seq/transform.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -64,39 +61,6 @@ namespace Parameters
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \internal
-/// \def LE_ADD_INDIVIDUAL_PARAMETER
-/// \brief Adds a parameter to the Parameters container struct.
-///
-////////////////////////////////////////////////////////////////////////////////
-
-#ifndef LE_PARAMETERS_NO_CLASSIC_ACCESSORS
-#define LE_ADD_INDIVIDUAL_PARAMETER_CLASSIC_WORKER(parameter)                                      \
-    parameter &get##parameter() { return BOOST_PP_CAT(parameter, _); }                             \
-    parameter const &get##parameter() const { return BOOST_PP_CAT(parameter, _); }                 \
-    void set##parameter(parameter::param_type const value) { BOOST_PP_CAT(parameter, _) = value; }
-#else
-#define LE_ADD_INDIVIDUAL_PARAMETER_CLASSIC_WORKER(parameter)
-#endif
-
-#define LE_ADD_INDIVIDUAL_PARAMETER_WORKER(index, parameter)                                       \
-    template <int dummy> struct ParameterAt<index, dummy>                                          \
-    {                                                                                              \
-        using type = parameter;                                                                    \
-    };                                                                                             \
-    template <int dummy>                                                                           \
-    struct IndexOf<parameter, dummy> : std::integral_constant<std::uint8_t, index>                 \
-    {                                                                                              \
-    };                                                                                             \
-    parameter &get(parameter *) { return BOOST_PP_CAT(parameter, _); }                             \
-    LE_ADD_INDIVIDUAL_PARAMETER_CLASSIC_WORKER(parameter)                                          \
-    parameter BOOST_PP_CAT(parameter, _);
-
-#define LE_ADD_INDIVIDUAL_PARAMETER(r, dummy, index, parameterSequence)                            \
-    LE_ADD_INDIVIDUAL_PARAMETER_WORKER(index, BOOST_PP_SEQ_HEAD(parameterSequence))
-
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \internal
 /// \def LE_DEFINE_MY_PARAMETERS
 /// \brief Declares all the parameters from the parameter sequence.
 ///
@@ -108,12 +72,16 @@ namespace Parameters
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \internal
-/// \def LE_ENUMERATE_PARAMETERS
+/// \def LE_ENUMERATE_PARAMETER_NAMES
+/// \brief The parameter sequence as the comma separated list of its names that
+/// ParameterList takes -- the head of each parameter's own sequence.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-#define LE_ENUMERATE_PARAMETERS(parameters)                                                        \
-    BOOST_PP_SEQ_FOR_EACH_I(LE_ADD_INDIVIDUAL_PARAMETER, 0, parameters)
+#define LE_PARAMETER_NAME(s, dummy, parameterSequence) BOOST_PP_SEQ_HEAD(parameterSequence)
+
+#define LE_ENUMERATE_PARAMETER_NAMES(parameters)                                                   \
+    BOOST_PP_SEQ_ENUM(BOOST_PP_SEQ_TRANSFORM(LE_PARAMETER_NAME, 0, parameters))
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -144,26 +112,16 @@ namespace Parameters
 //                                            (28.06.2011.) (Domagoj Saric)
 ////////////////////////////////////////////////////////////////////////////////
 
+// Implementation note:
+//   Parameters remains a class of its own rather than an alias for the
+// ParameterList it is: presets.hpp forward declares GlobalParameters::Parameters,
+// and two effects declaring the same parameters would otherwise share one type.
+//                                            (31.07.2026.) (SW port)
+
 #define LE_DEFINE_PARAMETERS(parameters)                                                           \
     LE_DEFINE_MY_PARAMETERS(parameters)                                                            \
-    struct Parameters                                                                              \
+    struct Parameters : ::LE::Parameters::ParameterList<LE_ENUMERATE_PARAMETER_NAMES(parameters)>  \
     {                                                                                              \
-        static std::uint8_t const static_size = BOOST_PP_SEQ_SIZE(parameters);                     \
-        using size = std::integral_constant<std::uint8_t, static_size>;                            \
-        template <unsigned int, int dummy = 0> struct ParameterAt;                                 \
-        template <class Parameter, int dummy = 0> struct IndexOf : size                            \
-        {                                                                                          \
-        };                                                                                         \
-        template <class Parameter> Parameter &get() { return get(static_cast<Parameter *>(0)); }   \
-        template <class Parameter> Parameter const &get() const                                    \
-        {                                                                                          \
-            return const_cast<Parameters &>(*this).template get<Parameter>();                      \
-        }                                                                                          \
-        template <class Parameter> void set(typename Parameter::param_type const value)            \
-        {                                                                                          \
-            get<Parameter>().setValue(value);                                                      \
-        }                                                                                          \
-        LE_ENUMERATE_PARAMETERS(parameters)                                                        \
     };
 
 //------------------------------------------------------------------------------
