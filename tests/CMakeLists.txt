@@ -20,6 +20,7 @@ add_executable(sw-tests
         math/vectorTests.cpp
         parameters/parameterLayoutTests.cpp
         parameters/parameterTableTests.cpp
+        presets/presetCorpusTests.cpp
         utility/buffersTests.cpp
         utility/circularListTests.cpp
         utility/spanTests.cpp
@@ -42,7 +43,11 @@ target_link_libraries(sw-tests PRIVATE sw-impl sw-gui-resources Catch2::Catch2Wi
 # ~1200 asserts, Release renders the goldens at shipping speed.
 target_compile_definitions(sw-tests PRIVATE
         SW_GOLDEN_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/goldens/data"
-        SW_PARAMETER_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/parameters/data")
+        SW_PARAMETER_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/parameters/data"
+        SW_PRESET_SNAPSHOT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/presets/data"
+        # \note The shipping banks themselves, not a copy: the corpus test is
+        # about *those* files, and a copy is one more thing that can rot.
+        SW_PRESET_DATA_DIR="${CMAKE_SOURCE_DIR}/assets/presets")
 
 # So that clap/ can reach goldens/engineHarness.hpp: the CLAP-side tests need an
 # instantiable SpectrumWorxCore, and that is exactly what the golden harness is.

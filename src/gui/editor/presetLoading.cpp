@@ -115,12 +115,7 @@ struct Loader
         using Timer = SpectrumWorxCore::LFO::Timer;
         if (syncedLFOFound && !Timer::hasTempoInformation() &&
             host.core().lfoTimer().currentTimeInBars())
-        {
-            warningMessageBox(MB_WARNING,
-                              "Loaded preset uses tempo-synced LFOs but the host does not "
-                              "provide tempo information.",
-                              false);
-        }
+            reportPresetProblem(PresetProblem::TempoSyncedLFOWithoutTempo);
     }
 }; // struct Loader
 

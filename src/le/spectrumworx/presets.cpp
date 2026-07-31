@@ -256,10 +256,69 @@ std::string_view Preset::getComment() const
     return Utility::XML::value(*pCommentAttribute);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// Problem reporting
+// -----------------
+//
+////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+LE_COLD void defaultPresetProblemReporter(PresetProblem const problem,
+                                          std::string_view const detail)
+{
+    switch (problem)
+    {
+    case PresetProblem::LoadFailed:
+        GUI::warningMessageBox(MB_ERROR, "Unable to load preset.", false);
+        return;
+    case PresetProblem::SaveFailed:
+        GUI::warningMessageBox(MB_ERROR, "Unable to save preset.", true);
+        return;
+    case PresetProblem::UnknownEffect:
+        GUI::warningMessageBox(MB_ERROR " unknown effect in preset.", detail, false);
+        return;
+    case PresetProblem::EffectNotAvailable:
+        GUI::warningMessageBox(MB_WARNING " effect not available in this edition.", detail, false);
+        return;
+    case PresetProblem::MissingParameter:
+        GUI::warningMessageBox("Missing parameter value in preset", detail, true);
+        return;
+    case PresetProblem::ExternalSampleIgnored:
+        GUI::warningMessageBox(MB_WARNING,
+                               "Loaded preset uses external sample files which are not "
+                               "supported by this edition of SpectrumWorx.",
+                               false);
+        return;
+    case PresetProblem::TempoSyncedLFOWithoutTempo:
+        GUI::warningMessageBox(MB_WARNING,
+                               "Loaded preset uses tempo-synced LFOs but the host does not "
+                               "provide tempo information.",
+                               false);
+        return;
+    }
+}
+
+PresetProblemReporter presetProblemReporter{&defaultPresetProblemReporter};
+} // anonymous namespace
+
+PresetProblemReporter setPresetProblemReporter(PresetProblemReporter const reporter)
+{
+    auto *const previous(presetProblemReporter);
+    presetProblemReporter = reporter ? reporter : &defaultPresetProblemReporter;
+    return previous;
+}
+
+LE_COLD void reportPresetProblem(PresetProblem const problem, std::string_view const detail)
+{
+    presetProblemReporter(problem, detail);
+}
+
 void Preset::reportPresetLoadingError()
 {
     LE_TRACE("Unable to load preset.");
-    GUI::warningMessageBox(MB_ERROR, "Unable to load preset.", false);
+    reportPresetProblem(PresetProblem::LoadFailed);
 }
 
 #ifdef _DEBUG
@@ -412,9 +471,9 @@ LE_COLD ParametersLoader::ModuleChain ParametersLoader::loadModuleChain(ModuleCh
         }
         else
         {
-            GUI::warningMessageBox(foundEffect ? MB_WARNING " effect not available in this edition."
-                                               : MB_ERROR " unknown effect in preset.",
-                                   effectName, false);
+            reportPresetProblem(foundEffect ? PresetProblem::EffectNotAvailable
+                                            : PresetProblem::UnknownEffect,
+                                effectName);
         }
         pParameters_ = static_cast<Utility::XML::Element const *>(pParameters_->next_sibling());
     }
@@ -571,7 +630,7 @@ LE_COLD void ParametersLoader::warnAboutMissingParameter(char const *const pPara
         (parameterName != "Gate"))
     {
         LE_TRACE_LOGONLY("Missing parameter value in preset (%s).", pParameterName);
-        GUI::warningMessageBox("Missing parameter value in preset", parameterName, true);
+        reportPresetProblem(PresetProblem::MissingParameter, parameterName);
     }
 }
 

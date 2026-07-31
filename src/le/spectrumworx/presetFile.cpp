@@ -120,7 +120,7 @@ void savePreset(juce::File const &file, juce::File const &externalSampleFile,
     LE_ASSERT(presetSize <= buffer.size());
 
     if (!writePresetFile(file, buffer.data(), presetSize))
-        GUI::warningMessageBox(MB_ERROR, "Unable to save preset.", true);
+        reportPresetProblem(PresetProblem::SaveFailed);
 }
 
 LE_OPTIMIZE_FOR_SIZE_END()

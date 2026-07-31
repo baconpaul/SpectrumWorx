@@ -78,6 +78,47 @@ struct WindowSizeFactor;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
+/// \enum PresetProblem
+///
+/// \brief Everything that can be wrong with a preset, and where it goes.
+///
+/// \note These were `GUI::warningMessageBox` calls made from inside the engine,
+/// one dialog per problem. Two things wrong with that. It is a layering
+/// inversion -- `sw-dsp` reaching up into the GUI -- and, more concretely, a
+/// 2009-2011 preset does not mention parameters that the 2016 effects grew: the
+/// 303 committed factory presets raise **806** MissingParameter reports between
+/// them, which as dialogs is a wall of them in front of a user who opened a
+/// bank.
+///
+///   So the preset layer says what happened and the caller decides. The default
+/// reporter is still the message box, so a plugin behaves as it did; the corpus
+/// test counts instead, which is how the number above is known.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+enum struct PresetProblem : std::uint8_t
+{
+    LoadFailed,            ///< not a preset, or the parse failed
+    SaveFailed,            ///< the file could not be written
+    UnknownEffect,         ///< names an effect this build does not have
+    EffectNotAvailable,    ///< names an effect this edition excludes
+    MissingParameter,      ///< the effect has a parameter the preset does not mention
+    ExternalSampleIgnored, ///< wants a sample file and this build has no loader
+    TempoSyncedLFOWithoutTempo
+};
+
+/// \param detail the effect or parameter name where there is one, else empty.
+using PresetProblemReporter = void (*)(PresetProblem, std::string_view detail);
+
+/// \brief Installs a reporter, returning the previous one. `[main-thread]`, and
+/// deliberately not a stack: a caller that wants nesting keeps what this
+/// returned and puts it back.
+PresetProblemReporter setPresetProblemReporter(PresetProblemReporter);
+
+void reportPresetProblem(PresetProblem, std::string_view detail = {});
+
+////////////////////////////////////////////////////////////////////////////////
+///
 /// \struct PresetHeader
 ///
 ////////////////////////////////////////////////////////////////////////////////
@@ -498,12 +539,7 @@ LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignor
 
 #if defined(LE_SW_DISABLE_SIDE_CHANNEL)
         if (!parametersLoader.getSampleFileName().empty())
-        {
-            GUI::warningMessageBox(MB_WARNING,
-                                   "Loaded preset uses external sample files which are not "
-                                   "supported by this edition of SpectrumWorx.",
-                                   false);
-        }
+            reportPresetProblem(PresetProblem::ExternalSampleIgnored);
 #else  // "normal plugin build"
     if (loader.wantsSampleFile())
     {
