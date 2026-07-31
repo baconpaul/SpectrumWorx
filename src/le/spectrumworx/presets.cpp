@@ -29,8 +29,6 @@
 #include "le/utility/countof.hpp"
 #include "le/utility/tracePrivate.hpp"
 
-#include "boost/mmap/mappble_objects/file/utility.hpp" // Boost sandbox -- stage 8
-
 #include "le/utility/assert.hpp"
 #include "le/utility/ignoreUnused.hpp"
 #include "le/utility/intrusivePtr.hpp"
@@ -175,32 +173,17 @@ Preset::load_result_t Preset::loadFrom(char *const pBuffer)
 }
 #pragma warning(pop)
 
-Preset::InMemoryPreset Preset::loadIntoMemory(juce::File const &file)
-{
-    using namespace boost;
-    LE_ASSERT(file.exists());
-    mmap::mapped_view<char const> const mappedPreset(
-        mmap::map_read_only_file(file.getFullPathName().getCharPointer()));
-    LE_ASSERT_MSG(mappedPreset, "Failed to map preset file.");
-    if (!mappedPreset)
-        return InMemoryPreset();
-    unsigned int const presetSize(static_cast<unsigned int>(mappedPreset.size()));
-    LE_TRACE_IF(presetSize > InMemoryPresetBuffer().size(), "\tSW: suspiciously large preset.");
-    InMemoryPreset pInMemoryPreset(new (std::nothrow) char[presetSize + 1]);
-    if (pInMemoryPreset.get())
-    {
-        std::memcpy(pInMemoryPreset.get(), &mappedPreset[0], presetSize);
-        pInMemoryPreset.get()[presetSize] = '\0';
-    }
-    return pInMemoryPreset;
-}
-
 #ifndef LE_SW_SDK_BUILD
 unsigned int Preset::saveTo(char *const pBuffer)
 {
 //...mrmlj...an ugly temporary way to verify that the header was set before saving...
+/// \note Braces, not parentheses. `PresetHeader dummyHeader( juce::String() );`
+/// is the most vexing parse -- it declares a function -- so this check has
+/// never once run: the first build to compile this file is the one that
+/// rejected it.
+///                                           (31.07.2026.) (SW port)
 #ifndef NDEBUG
-    PresetHeader dummyHeader(juce::String());
+    PresetHeader dummyHeader{juce::String()};
     getHeader(dummyHeader);
 #endif // NDEBUG
     // Implementation note:
@@ -560,8 +543,7 @@ bool ParametersLoader::loadLFO(Utility::XML::Element const &parameterNode, LFO &
     // LFO::adjustvalueFromPreset<PeriodScale>() function assumes the SyncTypes
     // parameter to already be loaded/set.
     //                                        (18.02.2011.) (Domagoj Saric)
-    LE::Parameters::forEachReversed(lfo.parameters(),
-                            LFODataLoader(parameterNode, lfo));
+    LE::Parameters::forEachReversed(lfo.parameters(), LFODataLoader(parameterNode, lfo));
     syncedLFOFound_ |= lfo.enabled() & (lfo.syncTypes() != LFO::Free);
     return lfo.enabled();
 }
@@ -736,28 +718,6 @@ void ParametersSaver::setSampleFileName(std::string_view const &sampleFileName)
     /// saved more than once.
     ///                                           (03.02.2010.) (Domagoj Saric)
     saveParameter(sampleAttributeName_, sampleFileName);
-}
-
-void savePreset(juce::File const &file, juce::File const &externalSampleFile,
-                juce::String const &comment, Program const &program)
-{
-    LE_ASSERT(file.getParentDirectory().isDirectory());
-    Preset::InMemoryPresetBuffer buffer;
-    auto const presetSize(savePreset(&buffer[0], externalSampleFile, comment, program));
-    LE_ASSERT(presetSize < sizeof(buffer));
-
-    using namespace boost;
-    mmap::basic_mapped_view const presetFile(
-        mmap::map_file(file.getFullPathName().getCharPointer(), presetSize));
-    if (presetFile)
-    {
-        LE_ASSERT(static_cast<unsigned int>(presetFile.size()) == presetSize);
-        std::memcpy(presetFile.begin(), &buffer[0], presetSize);
-    }
-    else
-    {
-        GUI::warningMessageBox(MB_ERROR, "Unable to save preset.", true);
-    }
 }
 
 unsigned int savePreset(char *const data, juce::File const &externalSampleFile,

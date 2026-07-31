@@ -41,6 +41,11 @@ add_library(sw-dsp STATIC
         le/utility/filesystem.cpp
         le/utility/lexicalCast.cpp
         le/utility/trace.cpp
+        le/utility/xml.cpp
+
+        # le/spectrumworx -- the preset format, and the one file that opens files
+        le/spectrumworx/presetFile.cpp
+        le/spectrumworx/presets.cpp
 
         # le/spectrumworx/engine
         le/spectrumworx/engine/automatableParameters.cpp
@@ -177,12 +182,11 @@ target_link_libraries(sw-dsp PUBLIC juce::juce_gui_basics sw-gui-resources)
 # exactly the code that would notice. Not this commit's business.
 target_compile_definitions(sw-dsp PUBLIC JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
 
-# No presets, for now. le/spectrumworx/presets.cpp reads and writes
-# preset files through juce::File and boost::mmap in the same translation unit
-# as the parameter (de)serialisation, so the DSP cannot have the second without
-# the first. Stage 8 splits them; until then ModuleParameters::{load,save}
-# PresetParameters are compiled out and the goldens drive parameters directly.
-target_compile_definitions(sw-dsp PUBLIC LE_NO_PRESETS)
+# \note LE_NO_PRESETS stood here. It compiled out ModuleParameters::{load,save}
+# PresetParameters -- the whole preset serialisation -- because presets.cpp read
+# and wrote preset files through boost::mmap, a library stage 0 deleted, in the
+# same translation unit. Stage 8.0 moved the file half to presetFile.cpp and put
+# juce::File under it, so the engine can have the serialisation without it.
 
 # No external audio file as a side channel, for now. This is the *file* loader,
 # not the host's sidechain port -- that one is live and the CLAP feeds it. The

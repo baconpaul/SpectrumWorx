@@ -16,6 +16,9 @@
 #include "gui/gui.hpp"
 
 #include "le/utility/platformSpecifics.hpp"
+
+#include <functional>
+#include <memory>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -91,6 +94,11 @@ class PresetBrowser final : public BackgroundImage,
 
     void saveCurrentPreset(juce::String const &presetName, juce::File const &targetFile);
 
+    /// \note Retries itself from the dialog's callback rather than from a loop;
+    /// see the definition.
+    void renameTo(juce::File const &sourceFile, juce::File const &targetFile,
+                  juce::String const &newName);
+
     void saveDirtyComment();
     void presetSelectionChanged();
 
@@ -98,7 +106,11 @@ class PresetBrowser final : public BackgroundImage,
 
     void addOneRow(bool const value) { addOneRow_ = value; }
 
-    static bool askForOverwrite();
+    /// \note Was `bool askForOverwrite()`, answered where it was asked. JUCE 8
+    /// builds with JUCE_MODAL_LOOPS_PERMITTED=0 -- and a plugin has no business
+    /// spinning a modal loop inside a host's message thread -- so the answer
+    /// arrives later, on the message thread.
+    static void askForOverwrite(std::function<void(bool)> onAnswer);
 
     bool enablePresetSaving() const;
 
@@ -134,6 +146,10 @@ class PresetBrowser final : public BackgroundImage,
     juce::Array<Item> files_;
 
     juce::String originalComment_;
+
+    /// \note Held rather than stack-local: JUCE 8's FileChooser reports through
+    /// launchAsync() and must outlive the call that starts it.
+    std::unique_ptr<juce::FileChooser> folderChooser_;
 }; // class PresetBrowser
 
 //------------------------------------------------------------------------------

@@ -20,10 +20,12 @@
 #include "core/spectrumWorxCore.hpp"
 #include "gui/editor/editorHost.hpp"
 #include "gui/editor/editorModuleInitialiser.hpp"
+#include "gui/editor/presetLoading.hpp"
 
 #include "le/parameters/lfo.hpp"
 #include "le/parameters/printer.hpp"
 #include "le/parameters/uiElements.hpp"
+#include "le/spectrumworx/presetFile.hpp"
 #include "le/spectrumworx/presets.hpp"
 #include "le/utility/countof.hpp"
 #include "le/utility/objcfwdhelpers.hpp"
@@ -76,9 +78,7 @@ template <> void fillComboBoxForParameter<Engine::OverlapFactor>(ComboBox &combo
         using LE::Parameters::print;
         print<Parameter>(value, const_cast<Engine::Setup const &>(*pEngineSetup),
                          LE::Utility::makeSpan(&buffer[0], buffer.size()));
-        std::strcat(
-            &buffer[0],
-            DisplayValueTransformer<Engine::OverlapFactor>::Suffix::c_str());
+        std::strcat(&buffer[0], DisplayValueTransformer<Engine::OverlapFactor>::Suffix::c_str());
         comboBox.addItem(value, &buffer[0]);
         value *= 2;
     }
@@ -782,21 +782,27 @@ bool SpectrumWorxEditor::loadPreset(juce::File const &presetFile, bool const ign
                                     juce::String &comment, juce::String const &presetName)
 {
     auto const pPresetName(presetName.getCharPointer().getAddress());
-    return editorHost_.loadPreset(presetFile, ignoreExternalSample, &comment, pPresetName);
+    return GUI::loadPreset(editorHost_, *this, presetFile, ignoreExternalSample, &comment,
+                           pPresetName);
 }
 
-void SpectrumWorxEditor::savePreset(juce::File const &presetFile, bool const ignoreExternalSample,
+void SpectrumWorxEditor::savePreset(juce::File const &presetFile,
+                                    [[maybe_unused]] bool const ignoreExternalSample,
                                     juce::String const &comment) const
 {
-    SW::savePreset(presetFile,
-                   ignoreExternalSample ? juce::File() : editorHost_.currentSampleFile(), comment,
-                   program());
+#ifdef LE_SW_DISABLE_SIDE_CHANNEL
+    /// \note Nothing to ignore: with the file loader compiled out there is no
+    /// sample to name in the preset, so the browser's toggle has no subject.
+    /// 5.0 brings the loader back and this asks the host again.
+    juce::File const externalSample;
+#else
+    juce::File const externalSample(ignoreExternalSample ? juce::File()
+                                                         : editorHost_.currentSampleFile());
+#endif // LE_SW_DISABLE_SIDE_CHANNEL
+    SW::savePreset(presetFile, externalSample, comment, program());
 }
 
-char const *SpectrumWorxEditor::currentProgramName() const
-{
-    return editorHost_.currentProgramName();
-}
+char const *SpectrumWorxEditor::currentProgramName() const { return program().name().data(); }
 #endif // !LE_NO_PRESETS
 
 /// \note Not preset machinery despite the name: the flag lives on the engine

@@ -14,6 +14,7 @@
 #include "gui/editor/spectrumWorxEditor.hpp"
 
 #include "le/parameters/uiElements.hpp"
+#include "le/spectrumworx/presetFile.hpp"
 #include "le/spectrumworx/presets.hpp"
 #include "le/utility/countof.hpp"
 #include "le/utility/tchar.hpp"
@@ -259,11 +260,16 @@ void PresetBrowser::paintListBoxItem(int const rowNumber, juce::Graphics &graphi
         //    Theme::singleton().Theme::getDefaultFolderImage(),
         //    2, 2
         //);
-        graphics.drawImageWithin(
-            Theme::singleton().Theme::getDefaultFolderImage(), 2, 2, x - 4, height - 4,
-            juce::RectanglePlacement::xLeft | juce::RectanglePlacement::xRight |
-                juce::RectanglePlacement::onlyReduceInSize,
-            false);
+        /// \note JUCE 8's getDefaultFolderImage() returns a Drawable rather than
+        /// an Image, and may return nothing at all.
+        if (auto const *const pFolderImage = Theme::singleton().Theme::getDefaultFolderImage())
+            pFolderImage->drawWithin(
+                graphics,
+                juce::Rectangle<float>(2.0f, 2.0f, static_cast<float>(x) - 4.0f,
+                                       static_cast<float>(height) - 4.0f),
+                juce::RectanglePlacement::xLeft | juce::RectanglePlacement::xRight |
+                    juce::RectanglePlacement::onlyReduceInSize,
+                1.0f);
     }
 
     graphics.setColour(Theme::singleton().Theme::findColour(
@@ -285,8 +291,23 @@ void PresetBrowser::textEditorTextChanged(juce::TextEditor &editor)
         dirtyCommentPresetIndex_ = listBox_.getLastRowSelected();
 }
 
-#pragma warning(push)
-#pragma warning(disable : 4706) // Assignment within conditional expression.
+////////////////////////////////////////////////////////////////////////////////
+//
+// PresetBrowser::textEditorReturnKeyPressed()
+// -------------------------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note This is the save path the plan calls out: it asked the user two
+/// questions -- "overwrite?" and "retry?" -- and read the answers as return
+/// values, one of them from inside a `while` condition. Neither dialog can
+/// answer in place under JUCE 8, so both are inverted into continuations.
+///
+///   Each one captures a `SafePointer` rather than `this`. The browser is an
+/// owned window and the user can shut it while a dialog is up, which under the
+/// old synchronous code was impossible and is now the normal way to dismiss one.
+///
+////////////////////////////////////////////////////////////////////////////////
 
 void PresetBrowser::textEditorReturnKeyPressed(juce::TextEditor &editor)
 {
@@ -304,37 +325,68 @@ void PresetBrowser::textEditorReturnKeyPressed(juce::TextEditor &editor)
 
     juce::File const targetFile(currentDirectory_.getChildFile(userEntry + presetExtension));
 
+    juce::Component::SafePointer<PresetBrowser> const self(this);
+
     if (newPresetPending_)
     {
-        if (targetFile.exists())
-        {
-            if (!askForOverwrite())
+        auto const save([self, userEntry, targetFile] {
+            if (!self)
+                return;
+            self->newPresetPending_ = false;
+            self->hideFilenameEditBox();
+            self->saveCurrentPreset(userEntry, targetFile);
+        });
+
+        if (!targetFile.exists())
+            return save();
+
+        askForOverwrite([save, targetFile](bool const overwrite) {
+            if (!overwrite)
                 return;
             targetFile.deleteFile();
-        }
-        newPresetPending_ = false;
-        hideFilenameEditBox();
-        saveCurrentPreset(userEntry, targetFile);
+            save();
+        });
+        return;
     }
-    else
-    {
-        juce::File const sourceFile(selectedFile());
-        if (sourceFile != targetFile && (!targetFile.exists() || askForOverwrite()))
-        {
-            bool canceled(false);
-            while (!sourceFile.moveFileTo(targetFile) &&
-                   !(canceled = !GUI::warningOkCancelBox(_T( "Error writing." ), _T( "Retry?" ))))
-            {
-            }
-            if (canceled)
-                return;
-            hideFilenameEditBox();
-            refreshAndSelectPreset(userEntry);
-        }
-    }
+
+    juce::File const sourceFile(selectedFile());
+    if (sourceFile == targetFile)
+        return;
+
+    auto const rename([self, sourceFile, targetFile, userEntry] {
+        if (self)
+            self->renameTo(sourceFile, targetFile, userEntry);
+    });
+
+    if (!targetFile.exists())
+        return rename();
+
+    askForOverwrite([rename](bool const overwrite) {
+        if (overwrite)
+            rename();
+    });
 }
 
-#pragma warning(pop)
+/// \note Was the body of a `while` loop whose condition asked the user whether
+/// to retry. It calls itself from the dialog's callback instead -- one live
+/// attempt at a time, and the stack unwinds between them.
+void PresetBrowser::renameTo(juce::File const &sourceFile, juce::File const &targetFile,
+                             juce::String const &newName)
+{
+    if (sourceFile.moveFileTo(targetFile))
+    {
+        hideFilenameEditBox();
+        refreshAndSelectPreset(newName);
+        return;
+    }
+
+    juce::Component::SafePointer<PresetBrowser> const self(this);
+    GUI::warningOkCancelBox(_T( "Error writing." ), _T( "Retry?" ),
+                            [self, sourceFile, targetFile, newName](bool const retry) {
+                                if (retry && self)
+                                    self->renameTo(sourceFile, targetFile, newName);
+                            });
+}
 
 void PresetBrowser::textEditorEscapeKeyPressed(juce::TextEditor &editor)
 {
@@ -400,24 +452,18 @@ void PresetBrowser::saveDirtyComment()
         juce::String const newComment(comment().getText());
 
         //...assert that the file/preset on disk is the same as the one in selectedPreset...
-        using namespace boost;
         Preset::InMemoryPresetBuffer newPresetData;
         unsigned int newPresetDataSize(0);
         {
-            auto const pPresetData(Preset::loadIntoMemory(dirtyPreset));
-            if (!pPresetData.get())
+            auto const pPresetData(readPresetFile(dirtyPreset));
+            if (!pPresetData)
                 return;
             PresetHeader const presetHeader(newComment);
             Preset preset(pPresetData.get());
             preset.setHeader(presetHeader);
             newPresetDataSize = preset.saveTo(&newPresetData[0]);
         }
-        mmap::basic_mapped_view const mappedPreset(
-            mmap::map_file(dirtyPreset.getFullPathName().getCharPointer(), newPresetDataSize));
-        if (!mappedPreset)
-            return;
-        LE_ASSERT(mappedPreset.size() == newPresetDataSize);
-        std::memcpy(mappedPreset.begin(), &newPresetData[0], newPresetDataSize);
+        writePresetFile(dirtyPreset, newPresetData.data(), newPresetDataSize);
     }
 }
 
@@ -477,13 +523,19 @@ void PresetBrowser::buttonClicked(juce::Button *const pButton)
     else
     {
         LE_ASSERT(pButton == &browseArrow_);
-        juce::FileChooser folderChooser("Please select a folder with SW presets...",
-                                        currentDirectory_);
-        if (folderChooser.browseForDirectory())
-        {
-            LE_ASSERT(folderChooser.getResults().size() == 1);
-            setNewFolder(folderChooser.getResults().getReference(0));
-        }
+        /// \note Asynchronous, and the chooser is a member: JUCE 8 has no
+        /// browseForDirectory(), and launchAsync() reports through a callback
+        /// that the chooser has to still be alive to make.
+        folderChooser_ = std::make_unique<juce::FileChooser>(
+            "Please select a folder with SW presets...", currentDirectory_);
+        folderChooser_->launchAsync(juce::FileBrowserComponent::openMode |
+                                        juce::FileBrowserComponent::canSelectDirectories,
+                                    [self = juce::Component::SafePointer<PresetBrowser>(this)](
+                                        juce::FileChooser const &chooser) {
+                                        auto const chosen(chooser.getResult());
+                                        if (self && (chosen != juce::File()))
+                                            self->setNewFolder(chosen);
+                                    });
     }
 
     // Implementation note:
@@ -541,9 +593,9 @@ void PresetBrowser::hideFilenameEditBox()
     listBox_.updateContent();
 }
 
-bool PresetBrowser::askForOverwrite()
+void PresetBrowser::askForOverwrite(std::function<void(bool)> onAnswer)
 {
-    return GUI::warningOkCancelBox(_T( "File already exists." ), _T( "Overwrite?" ));
+    GUI::warningOkCancelBox(_T( "File already exists." ), _T( "Overwrite?" ), std::move(onAnswer));
 }
 
 void PresetBrowser::setNewFolder(juce::File const &file)

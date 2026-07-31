@@ -66,7 +66,10 @@ add_library(sw-gui STATIC
 
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/editor/auxiliaryComponents.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/editor/moduleMenuHolder.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/gui/editor/presetLoading.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/editor/spectrumWorxEditor.cpp
+
+        ${CMAKE_CURRENT_SOURCE_DIR}/gui/preset_browser/presetBrowser.cpp
 )
 
 sw_force_include_odr_header(sw-gui)

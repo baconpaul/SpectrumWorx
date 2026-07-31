@@ -825,14 +825,24 @@ void SpectrumWorxCLAP::HostProxy::automatedParameterEndEdit(ParameterSelector co
 }
 
 /// \note A whole program is about to be swapped in, so the host should expect
-/// every value to move at once. Nothing to do until presets exist; the rescan
-/// at the end of stateLoad() is the equivalent for the state path.
+/// every value to move at once. Nothing to announce up front -- CLAP has no
+/// "hold on" call, and the rescan at the other end is what a host acts on.
 void SpectrumWorxCLAP::HostProxy::presetChangeBegin() const {}
 
+/// \note INFO as well as VALUES and TEXT. A preset replaces the module chain,
+/// so what the parameters are *called* and which module path they sit under
+/// both move, not only what they read -- which is RESCAN_INFO's own case. The
+/// count does not move (see rebuildParameterIDs), so this is legal while the
+/// plugin is active, unlike RESCAN_ALL.
+///
+/// \note `[main-thread]`: reached from the editor's preset browser, and the
+/// editor runs on the main thread.
 void SpectrumWorxCLAP::HostProxy::presetChangeEnd() const
 {
     if (plugin_._host.canUseParams())
-        plugin_._host.paramsRescan(CLAP_PARAM_RESCAN_VALUES | CLAP_PARAM_RESCAN_TEXT);
+        plugin_._host.paramsRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_VALUES |
+                                   CLAP_PARAM_RESCAN_TEXT);
+    plugin_.markCurrentProgramAsModified();
 }
 
 bool SpectrumWorxCLAP::HostProxy::reportNewLatencyInSamples(unsigned int const latency) const

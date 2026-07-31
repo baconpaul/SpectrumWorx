@@ -87,11 +87,11 @@ class LE_NOVTABLE EditorHost
     virtual void deregisterSampleLoadedListener(SpectrumWorxEditor const &) = 0;
 #endif // !LE_SW_DISABLE_SIDE_CHANNEL
 
-#ifndef LE_NO_PRESETS
-    virtual bool loadPreset(juce::File const &, bool ignoreExternalSample, juce::String *comment,
-                            char const *presetName) = 0;
-    virtual char const *currentProgramName() const = 0;
-#endif // !LE_NO_PRESETS
+    /// \note Presets were two more virtuals here, and are neither. Everything
+    /// loading one needs is reachable through core() and automation(), so it is
+    /// one free function over this interface -- presetLoading.hpp -- rather than
+    /// something each plugin format reimplements. The program's name comes off
+    /// the Program itself.
 
     ////////////////////////////////////////////////////////////////////////////
     // Settings.

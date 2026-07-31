@@ -148,8 +148,10 @@ class Preset
 
     void reset() { xml().clear(); }
 
+    /// \note A preset arrives as a writable, NUL-terminated buffer -- the parse
+    /// is destructive, for entity translation. Where that buffer comes from is
+    /// presetFile.hpp's business, not this header's.
     using InMemoryPreset = std::unique_ptr<char[]>;
-    static InMemoryPreset loadIntoMemory(juce::File const &);
 
     static void reportPresetLoadingError();
 
@@ -576,33 +578,11 @@ LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignor
 } // loadPreset()
 
 #ifndef LE_SW_SDK_BUILD
-template <class PresetConsumer>
-bool LE_COLD loadPreset(juce::File const &presetFile, bool const ignoreExternalSample,
-                        juce::String *const pComment, char_t const *const presetName,
-                        PresetConsumer consumer)
-{
-    auto const pPresetData(Preset::loadIntoMemory(presetFile));
-    if (!pPresetData.get())
-        return false;
-    consumer
-        .notifyHostAboutPresetChangeBegin(); //...mrmlj...assumes host initiated change != loading from file
-    bool const success(loadPreset(pPresetData.get(), ignoreExternalSample, pComment, consumer));
-    if (success)
-    {
-        /// \note Setting the new preset name can be important with VST2.4 hosts
-        /// because of the way preset change notifications are implemented under
-        /// that protocol (hosts usually react to audioMasterUpdateDisplay only
-        /// if a program's name has changed).
-        ///                                   (12.09.2014.) (Domagoj Saric)
-        copyToBuffer(presetName, consumer.program().name());
-    }
-    consumer.notifyHostAboutPresetChangeEnd();
-    return success;
-}
-
 class Program;
-void savePreset(juce::File const &, juce::File const &externalSampleFile,
-                juce::String const &comment, Program const &);
+
+/// \note The `juce::File` overloads of these two -- and the `loadPreset` that
+/// reads a file before parsing it -- are in presetFile.hpp. This translation
+/// unit opens no files, which is what `LE_NO_PRESETS` used to stand in for.
 unsigned int savePreset(char *const data, juce::File const &externalSampleFile,
                         juce::String const &comment, Program const &);
 #endif // !LE_SW_SDK_BUILD
