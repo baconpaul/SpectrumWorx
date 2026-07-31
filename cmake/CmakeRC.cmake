@@ -619,6 +619,13 @@ function(cmrc_add_resources name)
 endfunction()
 
 function(_cmrc_generate_intermediate_cpp lib_ns symbol outfile infile)
+    # \note VERBATIM is a SpectrumWorx addition to this vendored file. Without it
+    # CMake emits the command unescaped, and the Ninja generator hands `/bin/sh`
+    # a resource path containing parentheses -- "syntax error near unexpected
+    # token `('". Forty of the factory presets are named like
+    # "(drums 104bpm) Drum Battle.swp". Spaces survived because the generator
+    # escapes those anyway; parentheses do not.
+    #                                         (31.07.2026.) (SW port)
     add_custom_command(
         # This is the file we will generate
         OUTPUT "${outfile}"
@@ -633,6 +640,7 @@ function(_cmrc_generate_intermediate_cpp lib_ns symbol outfile infile)
                 "-DOUTPUT_FILE=${outfile}"
                 -P "${_CMRC_SCRIPT}"
         COMMENT "Generating intermediate file for ${infile}"
+        VERBATIM
     )
 endfunction()
 

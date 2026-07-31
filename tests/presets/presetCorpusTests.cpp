@@ -46,6 +46,7 @@
 #include "core/modules/moduleDSPAndGUI.hpp"
 #include "core/modules/finalImplementations.hpp"
 
+#include "le/spectrumworx/factoryPresets.hpp"
 #include "le/spectrumworx/presetFile.hpp"
 #include "le/spectrumworx/presets.hpp"
 
@@ -60,6 +61,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <map>
 #include <string>
 #include <string_view>
@@ -244,4 +246,62 @@ TEST_CASE("Every factory preset loads and produces the committed state", "[prese
     }
 
     CHECK(table.size() == expected.size());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// The embedded copy
+// -----------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Stage 8.2 puts the banks in the binary so that a plugin which was
+/// copied rather than installed still has them. What that is worth depends
+/// entirely on the embedded bytes being the committed bytes, and a resource
+/// library built from a glob is exactly the thing that silently ships fourteen
+/// banks out of fifteen. So: byte-for-byte, both directions.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("The embedded factory banks are the committed files", "[preset-corpus]")
+{
+    auto const files(corpus());
+    REQUIRE(files.size() >= 300);
+
+    std::size_t embeddedCount{0};
+    for (auto const &bank : FactoryPresets::banks())
+    {
+        INFO("bank " << bank);
+        CHECK(FactoryPresets::isBank(bank));
+        embeddedCount += FactoryPresets::presets(bank).size();
+    }
+    CHECK(embeddedCount == files.size()); // no bank quietly left out of the glob
+
+    for (auto const &[key, path] : files)
+    {
+        INFO("preset " << key);
+
+        auto const separator(key.find('/'));
+        REQUIRE(separator != std::string::npos);
+        auto const bank(key.substr(0, separator));
+        auto const name(key.substr(separator + 1, key.size() - separator - 1 - 4 /*".swp"*/));
+
+        auto const embedded(FactoryPresets::load(bank, name));
+        REQUIRE(embedded); // a preset on disk that is not in the binary
+
+        std::ifstream file(path, std::ios::binary);
+        std::string const onDisk((std::istreambuf_iterator<char>(file)),
+                                 std::istreambuf_iterator<char>());
+
+        /// \note The embedded copy is terminated by load(); the file may or may
+        /// not be -- 193 of the 303 end in a NUL and 110 do not -- so the
+        /// comparison is over the file's own length.
+        CHECK(std::string_view(embedded.get(), onDisk.size()) == onDisk);
+    }
+
+    /// \note And that a bank which is not there says so, rather than answering
+    /// with an empty list that reads the same as an empty bank.
+    CHECK_FALSE(FactoryPresets::isBank("No Such Bank"));
+    CHECK(FactoryPresets::presets("No Such Bank").empty());
+    CHECK_FALSE(FactoryPresets::load("Echoes", "No Such Preset"));
 }

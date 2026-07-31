@@ -18,7 +18,7 @@
 #include <array>
 #include <cstdio>
 //------------------------------------------------------------------------------
-CMRC_DECLARE(swSkin);
+CMRC_DECLARE(swAssets);
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -32,7 +32,7 @@ namespace GUI
 
 namespace
 {
-cmrc::embedded_filesystem skin() { return cmrc::swSkin::get_filesystem(); }
+cmrc::embedded_filesystem skin() { return cmrc::swAssets::get_filesystem(); }
 
 /// \brief Reads one embedded file, or returns an empty span if it is not there.
 ///
@@ -42,8 +42,8 @@ cmrc::embedded_filesystem skin() { return cmrc::swSkin::get_filesystem(); }
 std::pair<char const *, std::size_t> embeddedFile(juce::String const &name)
 {
     auto const filesystem(skin());
-    // The resource library is rooted at assets/, so that presets and samples
-    // can join it in stage 8 without a second one.
+    // The resource library is rooted at assets/ and holds the factory presets
+    // too (stage 8.2), hence the prefix.
     auto const path(("skin/" + name).toStdString());
     if (!filesystem.exists(path))
         return {nullptr, 0};

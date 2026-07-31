@@ -23,7 +23,7 @@ target_include_directories(sw-gui-resources PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 # other four modules come transitively.
 target_link_libraries(sw-gui-resources
         PUBLIC juce::juce_gui_basics
-        PRIVATE sw::skin
+        PRIVATE sw::assets
 )
 
 target_compile_definitions(sw-gui-resources PRIVATE LE_ENABLE_ASSERT_HANDLER)

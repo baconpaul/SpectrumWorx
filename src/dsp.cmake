@@ -42,7 +42,9 @@ add_library(sw-dsp STATIC
         le/utility/lexicalCast.cpp
         le/utility/trace.cpp
 
-        # le/spectrumworx -- the preset format, and the one file that opens files
+        # le/spectrumworx -- the preset format, the one file that opens files,
+        # and the factory banks that are in the binary rather than either
+        le/spectrumworx/factoryPresets.cpp
         le/spectrumworx/presetFile.cpp
         le/spectrumworx/presets.cpp
 
@@ -169,6 +171,10 @@ target_compile_definitions(sw-dsp PUBLIC LE_ENABLE_ASSERT_HANDLER)
 # widget storage is raw until ModuleWidgets::create(), so a headless test still
 # constructs all 57 modules and processes audio without touching JUCE.
 target_link_libraries(sw-dsp PUBLIC juce::juce_gui_basics sw-gui-resources)
+
+# The factory banks. PRIVATE: factoryPresets.cpp is the only thing that names
+# cmrc, and its header says nothing about where a preset comes from.
+target_link_libraries(sw-dsp PRIVATE sw::assets)
 
 # Linking a JUCE module compiles that module's own sources into the consuming
 # target, so sw-dsp -- not the shim -- is what builds juce_core.cpp. It therefore
