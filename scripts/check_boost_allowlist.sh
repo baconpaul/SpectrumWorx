@@ -11,21 +11,22 @@
 #                                fix-ups it brings its own Boost for. Guarded by
 #                                LE_HAS_NT2 / LE_MATH_USE_NT2, which this build
 #                                does not define        -> stage 4 (tier 3b)
-#   mmap                         the preset reader      -> stage 8.1, with RapidXML
 #
-# Gone since this list was last written: fusion, mpl and preprocessor -- the
-# parameter system -- and intrusive, the module chain's circular_list_algorithms.
+# Gone since this list was last written: mmap, which stage 8.0 took out of the
+# preset reader. Before it: fusion, mpl and preprocessor -- the parameter
+# system -- and intrusive, the module chain's circular_list_algorithms.
 #
-# Not scanned: src/nt2_static_fft, which is vendored NT2; and the two headers of
-# the retained 2016 build that still name Boost, le/build/precompiledHeaders.hpp
-# and le/build/juceIncludeWrapper.hpp, which are reachable only from
-# src/legacy-build.cmake and which nothing includes.
+# Not scanned, all reachable only from src/legacy-build.cmake and named by no
+# live target: src/nt2_static_fft, which is vendored NT2;
+# le/build/precompiledHeaders.hpp and le/build/juceIncludeWrapper.hpp; and
+# spectrumWorx.cpp, the 2016 VST2/AU plugin class the CLAP replaced, retained as
+# the reference 5.0 still needs and holding the last boost::mmap in the tree.
 #
 set -uo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-allowed='^boost/(simd|dispatch|type_traits|mmap)/'
+allowed='^boost/(simd|dispatch|type_traits)/'
 
 offenders="$(
     grep -rEIho '#[[:space:]]*include[[:space:]]*[<"]boost/[^">]+' "${root}/src" \
@@ -33,7 +34,8 @@ offenders="$(
         --include='*.c' --include='*.cpp' --include='*.mm' \
         --include='*.hpp.in' --include='*.cpp.in' \
         --exclude-dir=nt2_static_fft \
-        --exclude=precompiledHeaders.hpp --exclude=juceIncludeWrapper.hpp |
+        --exclude=precompiledHeaders.hpp --exclude=juceIncludeWrapper.hpp \
+        --exclude=spectrumWorx.cpp |
         sed -E 's/.*[<"]//' |
         grep -Ev "${allowed}" |
         sort -u

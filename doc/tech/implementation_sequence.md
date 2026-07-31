@@ -55,19 +55,21 @@ What is left, in the order it is worth doing:
 | 2 | **The audio file loader** — one `doLoad` over `juce::AudioFormatManager`, then drop `LE_SW_DISABLE_SIDE_CHANNEL`. | 5.0 |
 | 3 | **Threading.** The `UIEdits` queue is the first piece; the rest of the main/audio split is not done. | 5.8 |
 | 4 | **`clap-validator` and CI** across the four formats and now three OSes. | 5.9 |
-| 5 | **6.4**, the owned-window collapse, and the preset browser's two async save-path callers. | stage 6 |
-| 6 | **Presets** — the split that `LE_NO_PRESETS` stands in for, which then unblocks a real state format. | stage 8, then 5.6 |
+| 5 | **6.4**, the owned-window collapse — and with it the preset browser's data source, which is the last thing between the embedded factory banks and a user. | stage 6, then 8 |
+| 6 | **A real state format**, now that the preset serialisation it is made of compiles. | 5.6 |
 | 7 | **Property tests for the nine amplifying effects**, which the golden contract deliberately declines to test tightly. | 4.4 |
 
-Done since: **module and LFO parameter ranges are normalised to 0..1**, so a slot's
-effect change no longer moves `min_value`, `max_value` or `is_stepped` — the last
-CLAP-correctness gap (stage 5). And **stage 4**, above — including its golden
-contract, so `sw-tests` is **80/80 green on Linux/arm64**.
+Done since: **stage 8** — the presets compile back in, the parser is TinyXML,
+the 303 factory banks are in the binary and the user's live under
+`~/Documents/SpectrumWorx`. `sw-tests` is **104/104 on macOS**, debug and
+release, and the two new preset snapshots did not move across the parser swap.
+Before it: **module and LFO parameter ranges normalised to 0..1**, the last
+CLAP-correctness gap (stage 5), and **stage 4** with its golden contract.
 
-Two flags are switched on and stand in for unfinished work rather than for
-decisions: **`LE_NO_PRESETS`** (row 6) and **`LE_SW_DISABLE_SIDE_CHANNEL`**
-(row 2). Both are `PUBLIC` on `sw-dsp`; each changes the layout of
-`SpectrumWorxEditor`, so every translation unit has to agree on them.
+**`LE_NO_PRESETS` is gone** (8.0). One flag is still switched on and stands in
+for unfinished work rather than for a decision: **`LE_SW_DISABLE_SIDE_CHANNEL`**
+(row 2). It is `PUBLIC` on `sw-dsp` and changes the layout of
+`SpectrumWorxEditor`, so every translation unit has to agree on it.
 
 ---
 
@@ -157,7 +159,7 @@ src/
     plugins/{plugin.hpp, clap/}
   nt2_static_fft/           retained NT2 static_fft (reference for stage 4)
 assets/
-  CMakeLists.txt            cmrc_add_resource_library(sw-skin) — stage 6.3
+  CMakeLists.txt            cmrc_add_resource_library(sw-assets) — 6.3, 8.2
   skin/                     59 PNGs + 2 fonts, was installer/…/Resources
   presets/                  15 factory banks
   samples/
@@ -203,7 +205,7 @@ Then pin JUCE: `git -C libs/JUCE checkout 8.0.12`.
 | sst-clap-helpers | `gui.mm`, `OwnedWindowBase`, the Win32 hook | `make_clapfirst_plugins` glue + `ClapJuceShim` |
 | sst-basic-blocks + simde | NT2 / Boost.SIMD (10,134 files, 53 MB) | SIMD helpers, SSE-on-NEON |
 | pffft | `nt2/signal/static_fft.hpp` (non-Apple) | Apple keeps Accelerate/vDSP |
-| sst-plugininfra | `.paths` file, `boost::mmap`, RapidXML | paths, tinyxml2, version info |
+| sst-plugininfra | `.paths` file, `boost::mmap`, RapidXML | paths, tinyxml (**1**, not 2), version info |
 | sst-cpputils | `boost::lockfree`, misc | ring buffers |
 | sst-cmake | CPack, WiX, PackageMaker, `buildOptions.cmake` | `include(basic_installer)` |
 | fmt | ad-hoc `sprintf` | |
@@ -475,8 +477,9 @@ as a rename:
 > follow-up commit.
 
 **✅ 0.7 — Preset backward compatibility: keep the format.** Decided. The XML
-schema stays exactly as it is; only the parser changes (RapidXML → tinyxml2,
-8.1). The binding consequence is on stage 7: **the parameter-system refactor may
+schema stays exactly as it is; only the parser changes (RapidXML → TinyXML,
+8.1 — which found that the schema is not well-formed XML, and repairs rather
+than rewrites it). The binding consequence is on stage 7: **the parameter-system refactor may
 not rename, reorder or retype anything a preset file references.** 7.0's
 parameter-table snapshot test is what enforces it.
 
@@ -662,10 +665,11 @@ Per scan §5.1 tier 1 — roughly 300 include sites:
 with the stage that removes it. **CI wiring is deferred with the rest of stage
 1.5**, so the script has to be run by hand for now.
 
-> **Since stage 7:** the allowlist is `simd|dispatch|type_traits` (NT2) and
-> `mmap` (stage 8.1). Fusion, MPL, Preprocessor and Intrusive are gone, and
-> narrowing the allowlist to exclude them is what proves it — the script passing
-> is the check, not a claim beside it.
+> **Since stage 8:** the allowlist is `simd|dispatch|type_traits` — NT2, and
+> nothing else. `mmap` came off it when 8.0 took `boost::mmap` out of the preset
+> reader; Fusion, MPL, Preprocessor and Intrusive came off at stage 7. Narrowing
+> the allowlist is what proves each removal — the script passing is the check,
+> not a claim beside it.
 
 **Done when:** the only Boost includes left under `src/` are Fusion, MPL and
 Preprocessor, and CI fails if that changes. — *Includes: done, with the wider
@@ -838,6 +842,12 @@ generated and so no longer consistent by construction.*
 > un-gating them makes the tree link, but they all share the placeholder
 > `"N/A"`, which is not a usable preset key. Stage 7 owns giving them the real
 > names, which are sitting commented out beside each.
+>
+> — **Both given back in stage 8.** The first by 8.0, which moved the file half
+> out; the second by 8.0b, whose round-trip test showed what the placeholder
+> actually did: saving a TuneWorx preset wrote twenty one elements called
+> `<N/A>`, which is not a legal XML name, so the preset could not be re-read at
+> all.
 
 **✅ 3.5b — Retire the stage 2 shims that first compile validates.** Per §2.1:
 `ignoreUnused` → `[[maybe_unused]]`, `staticLog2` → `std::bit_width`,
@@ -1613,10 +1623,10 @@ Two costs, both accepted:
 read real `(id, value)` pairs and apply slot selectors before anything else on
 load, because a module's parameters do not exist until its effect does. That
 survives a reload, which is what makes the plugin usable. What it is **not** is
-the preset format, or versioned against a changing effect list — the real thing
-goes through the serialisation `LE_NO_PRESETS` still compiles out. Port
-`effGetChunk` / `effSetChunk` (`vst/2.4/plugin.inl:303,355`) properly once stage
-8 has split it out, and version the blob explicitly this time.
+the preset format, or versioned against a changing effect list. Port
+`effGetChunk` / `effSetChunk` (`vst/2.4/plugin.inl:303,355`) properly onto the
+preset serialisation — which compiles now, see below — and version the blob
+explicitly this time.
 
 > **This sub-stage, not stage 4, is the one with a dependency in front of it.**
 > `dsp.cmake:160` defines `LE_NO_PRESETS`, which compiles out
@@ -1634,7 +1644,14 @@ goes through the serialisation `LE_NO_PRESETS` still compiles out. Port
 >
 > **Taken, and then improved on.** 5.1–5.5, 5.7 and the GUI all ran ahead, and
 > the id/value blob above turned out to be enough that the plugin does *not*
-> forget everything on reload. The presets split is still stage 8's.
+> forget everything on reload.
+>
+> **The dependency is now discharged.** 8.0 removed `LE_NO_PRESETS`, so
+> `ModuleParameters::{load,save}PresetParameters` compile, and
+> `savePreset(std::span<char>, …)` / `loadPreset(char const *, …)` are exactly
+> the in-memory pair a state blob wants — a buffer in, a length out, no file.
+> What 5.6 still owes is the version stamp: the preset format carries one in its
+> header (`Version="2.6"`) and this blob carries none.
 
 **5.7 — Audio ports.** ✅ Main stereo in/out plus the sidechain gated by
 `LE_SW_ENGINE_INPUT_MODE`.
@@ -1825,7 +1842,7 @@ bitmap thumb next to a copy of the bitmap itself.
 > `override` on it was commented out in 2016.
 
 **6.3 — Assets.** ✅ *complete*. `assets/skin/*` is a CMakeRC resource library
-(`sw::skin`, rooted at `assets/` so stage 8's presets and samples can join it),
+(`sw::assets`, rooted at `assets/`; the factory presets joined it in 8.2),
 and `src/gui/resources.{hpp,cpp}` is the new accessor. `sw-gui-resources` is the
 first of three GUI layers; the other two are `sw-gui-widgets` and `sw-gui`.
 
@@ -2252,12 +2269,15 @@ have been a cycle.
 The editor registers and deregisters itself through that interface rather than
 being wrapped, because `SpectrumWorxEditor` is `final`.
 
-**Two feature flags are on, and the editor honours them rather than pretending.**
-`LE_NO_PRESETS` disables the preset button and compiles out the preset browser —
-`presetBrowser.cpp` is still in no target — and `LE_SW_DISABLE_SIDE_CHANNEL`
-removes the sample area. Both are `PUBLIC` on `sw-dsp` and next to each other,
-for the same reason: each changes the layout of `SpectrumWorxEditor`, so every
-translation unit that sees the header has to agree on them.
+**One feature flag is on, and the editor honours it rather than pretending.**
+`LE_SW_DISABLE_SIDE_CHANNEL` removes the sample area. It is `PUBLIC` on
+`sw-dsp` because it changes the layout of `SpectrumWorxEditor`, so every
+translation unit that sees the header has to agree on it.
+
+> `LE_NO_PRESETS` stood beside it, disabling the preset button and compiling out
+> the browser, and is gone (8.0). `presetBrowser.cpp` is in a target and the
+> button works; what the browser lists is still a directory rather than the
+> embedded factory banks, which waits on 6.4 — see stage 8.
 
 **Four bugs, none of which could have been found by reading:**
 
@@ -2457,33 +2477,128 @@ reachable only through a macro this build cannot define:
 | `le/math/math.hpp` | `#ifdef LE_HAS_NT2` | ditto |
 | `le/math/vector.cpp` | `#ifdef LE_MATH_USE_NT2` | ditto |
 | `le/utility/tchar.hpp`, `leConfigurationAndODRHeader.h` | `#ifdef LE_HAS_NT2` | ditto — restrict-pointer fixes NT2 brings its own Boost for |
-| `spectrumWorx.cpp`, `presets.cpp` | live | `boost::mmap`, the preset reader — **stage 8** |
+| `spectrumWorx.cpp` | in no target | `boost::mmap`, in the 2016 plugin class the CLAP replaced |
 | `core/configuration.cmake`, `le/utility/CMakeLists.txt`, `le/build/precompiledHeaders.hpp`, `le/build/juceIncludeWrapper.hpp` | included by nothing but `legacy-build.cmake` | the retained 2016 build |
 
 So the honest form of the check is a grep that excludes NT2 and the 2016 record,
-and it has one hit left: `boost::mmap`, which stage 8.1 replaces along with
-RapidXML. Whoever writes the CI gate should write it that way rather than
-weakening it to a warning.
+and stage 8 took its one remaining hit down to zero: `presets.cpp` no longer
+includes `boost/mmap` (8.0), and `spectrumWorx.cpp` — the 2016 plugin class the
+CLAP replaced — is in no target and goes when 5.0 finishes with it as a
+reference. `scripts/check_boost_allowlist.sh` passes. Whoever writes the CI gate
+should write it that way rather than weakening it to a warning.
 
 ---
 
-### Stage 8 — Presets, paths and content
+### Stage 8 — Presets, paths and content ✅ *bar the browser*
 
 **1–2 weeks.**
 
-**8.1** RapidXML → tinyxml2 via `SST_PLUGININFRA_PROVIDE_TINYXML ON`. Per the
-stage 0.7 decision, change the parser, not the schema.
+**✅ 8.0 — the split `LE_NO_PRESETS` stood for.** It was never really about
+splitting: `presets.cpp` read and wrote through `boost::mmap`, a library stage 0
+deleted, in the same translation unit as the parameter (de)serialisation, so the
+engine could have neither and `ModuleParameters::{load,save}PresetParameters`
+were compiled out. The file half is `presetFile.cpp` over `juce::File` now,
+which unlike the in-tree mapping helpers handles a non-ASCII path on Windows,
+and `presets.cpp` opens nothing. The macro is gone.
 
-**8.2** Factory presets (1.2 MB, 15 banks) embedded via CMakeRC rather than
-installed to disk — removing the last runtime dependency on the installer having
-run. Samples (1.4 MB) likewise, or shipped to
-`sst::plugininfra::paths::bestDocumentsFolderPathFor("SpectrumWorx")`.
+> Loading a preset needs somewhere to put it, and everything it needs is
+> reachable through `EditorHost` and the editor — so that is one free function
+> over the interface (`gui/editor/presetLoading.cpp`) rather than a copy per
+> plugin format. Two `EditorHost` virtuals went with it. The CLAP's
+> `presetChangeEnd()` now rescans `INFO` as well as `VALUES|TEXT`: a preset
+> replaces the module chain, so what the parameters are *called* moves too.
+>
+> **The preset browser compiles for the first time**, which makes 6.4's "two
+> async save-path callers" done: "overwrite?" and "retry?" are continuations
+> holding a `SafePointer`, because the user can shut an owned window while a
+> dialog is up. The folder chooser is asynchronous for the same reason.
 
-**8.3** User preset directory via `sst::plugininfra::paths`, not a `.paths` file.
+**✅ 8.0b — the corpus and round-trip tests**, written *before* the parser swap
+because they are what the swap is checked against. All 303 committed presets
+load into a real engine (one engine each — loading merges into the current
+chain), and all 57 effects save and load back with every parameter driven off
+its default. `tests/presets/data/presetCorpus.txt` is one row per preset.
 
-**Done when:** factory banks load in a plugin installed by copying a single
-bundle; user save/load round-trips on all three OSes; an unmodified 2016-era
-preset file still loads.
+> Writing them found that the preset layer raised a `juce::AlertWindow` per
+> problem, from inside `sw-dsp` — 722 of them across the corpus, which is a wall
+> of dialogs for a user opening a bank and 809 leaked `AsyncUpdater`s in a
+> process with no message thread. It reports a `PresetProblem` now and the caller
+> decides; the default reporter is still the message box.
+>
+> And that **TuneWorx could not round-trip at all**: twenty one of its parameters
+> carried the placeholder name `"N/A"`, so saving one wrote twenty one `<N/A>`
+> elements. They have the names that were commented out beside them since 2016 —
+> safe under 0.7, because no preset file can reference `"N/A"`; the 2011 banks
+> predate every one of those parameters.
+>
+> Two things pinned as behaviour rather than worked around: a parameter under an
+> **enabled** LFO does not take its value from the file (the LFO drives it from
+> then on), and the format carries four decimals.
+
+**✅ 8.1 — RapidXML → TinyXML.** Not tinyxml2: `SST_PLUGININFRA_PROVIDE_TINYXML`
+provides TinyXML **1**, and it is already configured and built, so this needs no
+submodule of its own. Both preset snapshots are byte-identical across the change,
+which is what having taken them first is for.
+
+> **The format is not well-formed XML and never was.** A parameter's or effect's
+> name becomes an element name verbatim and the 2016 writer replaced spaces and
+> nothing else, so it emitted `<1>` … `<12>` for TuneWorx's semitones,
+> `<Pitch_Shifter_(pvd)>` and six siblings, and `<Center_(LFO_me!)>`. RapidXML's
+> `parse_fastest` mode never checks a name, which is how it went fifteen years
+> unnoticed — and 25 of the 303 committed presets are affected. The writer
+> mangles properly now; the reader repairs the old spelling on a second pass,
+> taken only after a strict parse has failed. Stage 0.7 said keep the format and
+> change the parser, and this is the smallest thing that honours both.
+>
+> Since the mangling is no longer invertible — `(` and ` ` both become `_` — a
+> preset is matched to an effect by mangling the effect's name and comparing.
+>
+> Falling out of the new parser's own semantics: `saveTo()` takes a `std::span`
+> and returns 0 rather than overrunning (the 2016 sources already record five
+> TuneWorx modules breaching the 4096-byte buffer every caller hands it); a
+> malformed preset is a return value rather than a throw from inside the parser,
+> and `load_result_t` was `std::true_type` whenever exceptions were on — which is
+> always — so `loadFrom(…) != true` was a comparison that could not fail; and the
+> document owns its strings, which retires the arena, `allocateString`, the five
+> pre-allocated module nodes, the "header must outlive `saveTo()`" rule and the
+> NUL written into the parse buffer to terminate an element name.
+
+**✅ 8.2 — Factory presets embedded via CMakeRC.** All 303, in the resource
+library the skin already used — renamed `sw-skin` → `sw-assets`, since it is not
+only the skin any more. `FactoryPresets::{banks,presets,load}` reads them, and a
+test compares every embedded preset against its file byte for byte.
+
+> Two things that test found. "The fifteen factory banks" is **eighteen
+> directories** — three have a sub-folder — so enumerating one level found 193
+> presets of 303. And CMakeRC's generator command is not shell-escaped, so Ninja
+> handed `/bin/sh` an unquoted parenthesis from the forty presets named like
+> `(drums 104bpm) Drum Battle.swp`; `VERBATIM` on the one `add_custom_command`
+> fixes it, and the vendored file says so.
+>
+> **Samples are not embedded.** 1.4 MB for a side-channel loader that
+> `LE_SW_DISABLE_SIDE_CHANNEL` still compiles out — 5.0 owns bringing the loader
+> back, and where its content lives is a decision to make with it rather than
+> before it.
+
+**✅ 8.3 — User preset directory via `sst::plugininfra::paths`.**
+`~/Documents/SpectrumWorx/Presets` and its platform equivalents, XDG included,
+created at startup rather than at the first save. What stood there was
+`userApplicationDataDirectory`, a 6.3 placeholder whose own comment said stage 8
+owned the decision.
+
+**Done when:** ~~an unmodified 2016-era preset file still loads~~ — 303 of them,
+in `ctest`; ~~user save/load round-trips~~ — through a real file, in `ctest`, on
+macOS (the other two OSes are stage 4's CI, not this stage's); **factory banks
+load in a plugin installed by copying a single bundle** — they are *in* the
+bundle and a test loads them from it, but the browser still lists a directory
+rather than them.
+
+**What is left, and why it is not here.** The preset browser's data source is a
+`juce::File` directory. Pointing it at `FactoryPresets` means giving it a notion
+of a read-only bank beside a writable folder, which is a change to a window that
+**6.4 is about to collapse** — so it belongs after 6.4, with the rest of the
+owned-window work, not in front of it. Everything under the browser is ready for
+it.
 
 ---
 
@@ -2560,9 +2675,9 @@ Rows below are in stage-number order, not running order. Running order is
 | 3 | DSP core + goldens ✅ | 3–5 |
 | 4 | Portable SIMD/FFT — *deferred, runs after 6* | 1.5–2.5 |
 | 5 | CLAP host layer — *5.1–5.7 done; 5.0, ranges, 5.8, 5.9 open* | 2.5–4 |
-| 6 | GUI — *widgets, module layer and editor done; 6.4 and the preset browser open* | 4–6 |
+| 6 | GUI — *widgets, module layer, editor and the browser's async save path done; 6.4 open* | 4–6 |
 | 7 | De-Boost the parameter system | 4–6 |
-| 8 | Presets and content | 1–2 |
+| 8 | Presets and content ✅ *bar the browser, which waits on 6.4* | 1–2 |
 | 9 | Ship | 1–2 |
 | | **Serial total** | **20.5–33** |
 | | **Two people, 6 in parallel** | **~16.5–25** |
