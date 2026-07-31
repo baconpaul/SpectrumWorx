@@ -19,8 +19,23 @@
 #include "le/parameters/parametersUtilities.hpp"
 #include "le/parameters/runtimeInformation.hpp"
 
+/// \note Unconditional, and it must be. This header carries the
+/// `DisplayValueTransformer` specialisations for the base parameters, and this
+/// is the only translation unit that instantiates
+/// `ParametersInformation<BaseParameters>` -- so what is visible *here* is what
+/// every caller of parameterInfos() sees. Start frequency and Stop frequency
+/// take their " Hz" from those specialisations and nowhere else.
+///
+///   It stood under `#ifndef LE_NO_PRESETS`, next to presets.hpp and marked
+/// "Bypass@presets", which made the two knobs' unit a function of whether
+/// presets were compiled in: with the macro on they had none. Measured by
+/// compiling this file both ways -- the string " Hz" is in one object and not
+/// the other -- after the stage 7.0 parameter table snapshot noticed the unit
+/// appear when stage 8 switched the macro off.
+///                                           (31.07.2026.) (SW port)
+#include "le/spectrumworx/effects/baseParametersUIElements.hpp"
+
 #ifndef LE_NO_PRESETS
-#include "le/spectrumworx/effects/baseParametersUIElements.hpp" // Bypass@presets
 #include "le/spectrumworx/presets.hpp"
 #include <optional>
 #endif // !LE_NO_PRESETS
