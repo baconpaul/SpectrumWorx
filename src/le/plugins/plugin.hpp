@@ -23,7 +23,6 @@
 #include "le/utility/cstdint.hpp"
 #include "le/utility/platformSpecifics.hpp"
 
-#include "boost/mpl/set_c.hpp"
 #include "le/utility/staticLog2.hpp"
 //------------------------------------------------------------------------------
 namespace LE
@@ -83,10 +82,32 @@ enum PluginCapability
     MidiProgramNames    ///< plug-in supports function #getMidiProgramName ()
 };
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \struct CapabilitySet
+/// \brief The set a plugin implementation declares with
+/// DECLARE_PLUGIN_CAPABILITIES.
+///
+////////////////////////////////////////////////////////////////////////////////
+// Implementation note:
+//   Was boost::mpl::set_c< unsigned int, ... >. Nothing has ever *queried* the
+// set -- queryImplementationCapability() below is the interface that would, and
+// the VST 2.4 layer that would have asked is gone -- so contains() exists to
+// make the declaration mean something rather than to serve a caller.
+//                                            (30.07.2026.) (SW port)
+////////////////////////////////////////////////////////////////////////////////
+
+template <PluginCapability... capabilities> struct CapabilitySet
+{
+    static bool constexpr contains(PluginCapability const capability) noexcept
+    {
+        return ((capability == capabilities) || ...);
+    }
+}; // struct CapabilitySet
+
 /// Helper macro for declaring plugin implementation capabilities.
 #define DECLARE_PLUGIN_CAPABILITIES(...)                                                           \
-    typedef boost::mpl::set_c<unsigned int /*::LE::Plugins::PluginCapability*/, __VA_ARGS__>       \
-        Capabilities
+    using Capabilities = ::LE::Plugins::CapabilitySet<__VA_ARGS__>
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -188,7 +209,7 @@ class Plugin2HostPassiveController
     static char const productString[];
 
   public: // Capabilities.
-    typedef boost::mpl::set_c<PluginCapability> Capabilities;
+    using Capabilities = CapabilitySet<>;
 
   public:
     /// @see AudioEffectX::getParameter()/setParameter().

@@ -20,6 +20,7 @@ add_executable(sw-tests
         math/vectorTests.cpp
         parameters/parameterTableTests.cpp
         utility/buffersTests.cpp
+        utility/circularListTests.cpp
         utility/spanTests.cpp
 )
 

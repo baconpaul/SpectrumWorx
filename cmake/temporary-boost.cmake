@@ -22,7 +22,7 @@
 
 include(${CMAKE_SOURCE_DIR}/libs/sst/sst-basic-blocks/cmake/CPM.cmake)
 
-set(BOOST_INCLUDE_LIBRARIES fusion intrusive mpl preprocessor)
+set(BOOST_INCLUDE_LIBRARIES preprocessor)
 set(BOOST_ENABLE_CMAKE ON)
 set(BOOST_SKIP_INSTALL_RULES ON)
 
@@ -38,8 +38,5 @@ CPMAddPackage(
 # One target to link, so the grep for what still needs Boost is a single name.
 add_library(sw-boost-scaffold INTERFACE)
 target_link_libraries(sw-boost-scaffold INTERFACE
-        Boost::fusion
-        Boost::intrusive
-        Boost::mpl
         Boost::preprocessor
 )

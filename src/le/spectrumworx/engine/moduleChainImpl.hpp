@@ -20,7 +20,7 @@
 #if defined(__clang__) && !defined(LE_EXCEPTION_ON)
 #define throw LE_UNREACHABLE_CODE()
 #endif // LE_EXCEPTION_ON
-#include "boost/intrusive/circular_list_algorithms.hpp"
+#include "le/utility/circularListAlgorithms.hpp"
 #if defined(__clang__) && !defined(LE_EXCEPTION_ON)
 #undef throw
 #endif // LE_EXCEPTION_ON
@@ -75,6 +75,10 @@ struct module_node_traits
 /// boost::intrusive::circular_list_algorithms come in handy).
 /// https://svn.boost.org/trac/boost/ticket/7003
 ///                                       (08.06.2012.) (Domagoj Saric)
+/// \note And so only the algorithms were ever taken -- which is why stage 7
+/// could reimplement them in eighty lines rather than keep a Boost dependency
+/// for them. le/utility/circularListAlgorithms.hpp.
+///                                       (30.07.2026.) (SW port)
 //struct module_node_value_traits
 //{
 //    typedef module_node_traits                     node_traits;
@@ -105,7 +109,7 @@ class ModuleChainBase :
     using size_type = std::uint8_t;
 
     using Node = ModuleNode;
-    using node_algorithms = boost::intrusive::circular_list_algorithms<Detail::module_node_traits>;
+    using node_algorithms = LE::Utility::CircularListAlgorithms<Detail::module_node_traits>;
 
   public: // Iterator
     class chain_const_iterator
