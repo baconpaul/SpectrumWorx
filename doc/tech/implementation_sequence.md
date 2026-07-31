@@ -219,7 +219,8 @@ is one vendored `.cmake` file, no submodule.
 
 **Boost is scaffolding, not a dependency.** It appears in stage 3 via CPM (which
 clap-wrapper already pulls in), scoped to Boost.Fusion / MPL / Preprocessor
-only, and is deleted in stage 7. It never goes under `libs/`.
+only, and is deleted in stage 7. It never goes under `libs/`. — *Done: stage 7.4
+deleted `cmake/temporary-boost.cmake` and the two lines that included it.*
 
 ---
 
@@ -660,6 +661,11 @@ Per scan §5.1 tier 1 — roughly 300 include sites:
 4), `mmap` (stage 6) and `intrusive|type_traits`, each annotated in the script
 with the stage that removes it. **CI wiring is deferred with the rest of stage
 1.5**, so the script has to be run by hand for now.
+
+> **Since stage 7:** the allowlist is `simd|dispatch|type_traits` (NT2) and
+> `mmap` (stage 8.1). Fusion, MPL, Preprocessor and Intrusive are gone, and
+> narrowing the allowlist to exclude them is what proves it — the script passing
+> is the check, not a claim beside it.
 
 **Done when:** the only Boost includes left under `src/` are Fusion, MPL and
 Preprocessor, and CI fails if that changes. — *Includes: done, with the wider
