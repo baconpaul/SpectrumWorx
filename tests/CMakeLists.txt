@@ -21,6 +21,8 @@ add_executable(sw-tests
         parameters/parameterLayoutTests.cpp
         parameters/parameterTableTests.cpp
         presets/presetCorpusTests.cpp
+        presets/presetHarness.cpp
+        presets/presetRoundTripTests.cpp
         utility/buffersTests.cpp
         utility/circularListTests.cpp
         utility/spanTests.cpp

@@ -1,0 +1,215 @@
+////////////////////////////////////////////////////////////////////////////////
+///
+/// presetHarness.cpp
+/// -----------------
+///
+/// Copyright (c) 2026 the SpectrumWorx contributors.
+/// SPDX-License-Identifier: GPL-3.0-or-later
+///
+////////////////////////////////////////////////////////////////////////////////
+//------------------------------------------------------------------------------
+#include "presetHarness.hpp"
+
+#include "core/modules/factory.hpp"
+
+/// \note Not sorted with the block above: finalImplementations names
+/// GUI::ModuleUI, which moduleDSPAndGUI is what defines.
+#include "core/modules/moduleDSPAndGUI.hpp"
+#include "core/modules/finalImplementations.hpp"
+
+#include "le/parameters/lfoImpl.hpp"
+#include "le/parameters/parametersUtilities.hpp"
+#include "le/spectrumworx/effects/configuration/effectNames.hpp"
+#include "le/spectrumworx/engine/moduleParameters.hpp"
+
+#include <array>
+#include <cstdio>
+//------------------------------------------------------------------------------
+namespace SWTest
+{
+//------------------------------------------------------------------------------
+
+using namespace LE;
+using namespace LE::SW;
+
+namespace Effects = LE::SW::Effects;
+
+namespace
+{
+//------------------------------------------------------------------------------
+
+/// \brief Pushes a whole GlobalParameters::Parameters through the engine's own
+/// setter, one parameter at a time.
+///
+/// \note Not the same as assigning the struct: FFT size, overlap factor and
+/// window function each reconfigure the engine, so a preset that changes one has
+/// to go through setGlobalParameter rather than land in the field behind its
+/// back.
+struct GlobalParameterUpdater
+{
+    using result_type = void;
+
+    SpectrumWorxCore &core;
+
+    template <class Parameter> result_type operator()(Parameter const &parameter) const
+    {
+        LE_VERIFY((SpectrumWorxCore::setGlobalParameter<Parameter, SpectrumWorxCore>(
+            core, parameter.getValue())));
+    }
+}; // struct GlobalParameterUpdater
+
+/// \note Every LFO parameter, unconditionally, rather than only the enabled
+/// ones. The saver writes only non-default LFO values (to keep a five-module
+/// preset under the 4096 byte limit) and the loader resets the rest to their
+/// defaults -- so "what a preset does not say" is as much part of the loaded
+/// state as what it does, and a parser that dropped an attribute shows up here
+/// as a default appearing.
+struct LFODumper
+{
+    using result_type = void;
+
+    std::string &out;
+
+    template <class Parameter> result_type operator()(Parameter const &parameter) const
+    {
+        out += ' ';
+        out += LE::Parameters::Name<Parameter>::string_;
+        out += '=';
+        out += number(static_cast<float>(parameter.getValue()));
+    }
+}; // struct LFODumper
+
+struct GlobalDumper
+{
+    using result_type = void;
+
+    std::string &out;
+
+    template <class Parameter> result_type operator()(Parameter const &parameter) const
+    {
+        out += "global ";
+        out += LE::Parameters::Name<Parameter>::string_;
+        out += " = ";
+        out += number(static_cast<float>(parameter.getValue()));
+        out += '\n';
+    }
+}; // struct GlobalDumper
+
+/// \note `SWTest::Engine` is the harness's own, so the engine namespace has to
+/// be spelled in full here.
+using ModuleParameters = LE::SW::Engine::ModuleParameters;
+
+void dumpModule(std::string &out, std::uint8_t const slot, ModuleParameters const &module)
+{
+
+    out += "module " + std::to_string(slot) + " = " +
+           Effects::effectName(module.effectTypeIndex()) + '\n';
+    out += "  bypass = " + std::string(module.bypass() ? "1" : "0") + '\n';
+
+    auto const baseParameters(ModuleParameters::numberOfBaseParameters);
+
+    for (std::uint8_t index(0); index < module.numberOfParameters(); ++index)
+    {
+        bool const isBase(index < baseParameters);
+        auto const value(
+            isBase ? module.getBaseParameter(index)
+                   : module.getEffectParameter(static_cast<std::uint8_t>(index - baseParameters)));
+
+        out += "  ";
+        out += module.parameterInfo(index).name;
+        out += " = " + number(value);
+
+        /// \note Bypass is parameter 0 and is the one base parameter with no
+        /// LFO; the LFO array is indexed from the one after it.
+        if (index >= ModuleParameters::numberOfNonLFOBaseParameters)
+        {
+            out += " |";
+            LE::Parameters::forEach(module
+                                        .lfo(static_cast<std::uint8_t>(
+                                            index - ModuleParameters::numberOfNonLFOBaseParameters))
+                                        .parameters(),
+                                    LFODumper{out});
+        }
+        out += '\n';
+    }
+}
+
+PresetProblems problems;
+
+void countProblem(PresetProblem const problem, std::string_view const /*detail*/)
+{
+    switch (problem)
+    {
+    case PresetProblem::MissingParameter:
+        ++problems.missingParameter;
+        return;
+    case PresetProblem::UnknownEffect:
+    case PresetProblem::EffectNotAvailable:
+        ++problems.unknownEffect;
+        return;
+    default:
+        ++problems.other;
+        return;
+    }
+}
+
+//------------------------------------------------------------------------------
+} // anonymous namespace
+//------------------------------------------------------------------------------
+
+bool PresetLoader::setNewGlobalParameters(
+    LE::SW::GlobalParameters::Parameters const &newParameters) const
+{
+    LE::Parameters::forEach(newParameters, GlobalParameterUpdater{engine});
+    return true;
+}
+
+PresetProblems const &presetProblems() { return problems; }
+void clearPresetProblems() { problems = {}; }
+
+ScopedProblemCounter::ScopedProblemCounter() : previous_(setPresetProblemReporter(&countProblem)) {}
+ScopedProblemCounter::~ScopedProblemCounter() { setPresetProblemReporter(previous_); }
+
+std::string number(float const value)
+{
+    std::array<char, 64> buffer{};
+    std::snprintf(buffer.data(), buffer.size(), "%.6g", static_cast<double>(value));
+    return buffer.data();
+}
+
+Loaded dump(Engine &engine)
+{
+    Loaded loaded;
+
+    LE::Parameters::forEach(engine.program().parameters(), GlobalDumper{loaded.text});
+
+    engine.program().moduleChain().forEach<ModuleParameters>([&](ModuleParameters const &module) {
+        if (loaded.modules == 0)
+            loaded.effects.clear();
+        else
+            loaded.effects += ',';
+        loaded.effects += Effects::effectName(module.effectTypeIndex());
+
+        loaded.parameters += module.numberOfParameters();
+        dumpModule(loaded.text, static_cast<std::uint8_t>(loaded.modules), module);
+        ++loaded.modules;
+    });
+
+    loaded.text += "modules = " + std::to_string(loaded.modules) + '\n';
+    return loaded;
+}
+
+std::uint64_t digest(std::string_view const text)
+{
+    std::uint64_t hash{0xcbf29ce484222325ull};
+    for (auto const character : text)
+    {
+        hash ^= static_cast<unsigned char>(character);
+        hash *= 0x100000001b3ull;
+    }
+    return hash;
+}
+
+//------------------------------------------------------------------------------
+} // namespace SWTest
+//------------------------------------------------------------------------------
