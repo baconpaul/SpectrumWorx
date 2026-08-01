@@ -12,6 +12,7 @@ add_executable(sw-tests
         clap/identityTests.cpp
         clap/parameterModelTests.cpp
         clap/pluginTests.cpp
+        core/processLockTests.cpp
         effects/effectsListTests.cpp
         external_audio/sampleTests.cpp
         goldens/engineHarness.cpp
@@ -45,8 +46,10 @@ target_link_libraries(sw-tests PRIVATE sw-impl sw-gui-resources Catch2::Catch2Wi
 # clapwrapper/{auv2,vst3}.h, for the two sub-factories identityTests.cpp pins.
 # sw-impl links this PRIVATE -- it is a header-only interface target and the
 # entry stubs get it from clap-wrapper's own side -- so it does not arrive here
-# across the link line.
-target_link_libraries(sw-tests PRIVATE clap-wrapper-extensions)
+# across the link line. clap-helpers is the same shape, and is what makes
+# spectrumWorxCLAP.hpp includable: processLockTests.cpp needs the class itself,
+# not the C vtable, to reach the processing lock a host cannot name.
+target_link_libraries(sw-tests PRIVATE clap-helpers clap-wrapper-extensions)
 
 # \note LE_CHECKED_BUILD is deliberately *not* forced here. It decides whether
 # NDEBUG survives, and forcing it on for the test objects only would leave them

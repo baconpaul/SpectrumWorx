@@ -798,12 +798,25 @@ void SpectrumWorxCLAP::runEngine(clap_process const *const process) noexcept
         sideChannels = sampleChannels;
     }
 
-    SpectrumWorxCore::process(input.data32, sideChannels, output.data32, 1.0f,
-                              process->frames_count);
+    /// \note A false return is the engine declining the block: another thread
+    /// holds the processing lock, and waiting for it here is the one thing the
+    /// audio thread may not do. Silence rather than the input, because this
+    /// plugin reports latency -- so the input is not the dry signal, it is the
+    /// dry signal arriving `latencyInSamples_` early, and a host that delay-
+    /// compensates would put it where nothing belongs. A gap is honest; a burst
+    /// of misaligned full-level dry is not.
+    ///
+    ///   §2.1b is what this was: the buffer was left untouched, so the host
+    /// played back whatever the previous plugin in the chain had written into
+    /// it. Every preset load did this.
+    ///                                       (01.08.2026.) (SW port)
+    auto const processed(SpectrumWorxCore::process(input.data32, sideChannels, output.data32, 1.0f,
+                                                   process->frames_count));
 
     // Ports beyond what the engine is configured for are the host's to see as
-    // silence, not as whatever was in the buffer.
-    for (std::uint32_t channel(channels); channel < output.channel_count; ++channel)
+    // silence, not as whatever was in the buffer -- and if nothing ran, that is
+    // every port.
+    for (std::uint32_t channel(processed ? channels : 0); channel < output.channel_count; ++channel)
         std::memset(output.data32[channel], 0, process->frames_count * sizeof(float));
 }
 
@@ -920,20 +933,36 @@ void SpectrumWorxCLAP::HostProxy::automatedParameterChanged(
             CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT | CLAP_PARAM_RESCAN_VALUES);
 
     plugin_.markCurrentProgramAsModified();
-    plugin_._host.paramsRequestFlush();
+    plugin_.requestParameterFlush();
 }
 
 void SpectrumWorxCLAP::HostProxy::automatedParameterBeginEdit(
     ParameterSelector const parameter) const
 {
     plugin_.uiEdits_.push({parameter.value, 0, UIEdits::Kind::GestureBegin});
-    plugin_._host.paramsRequestFlush();
+    plugin_.requestParameterFlush();
 }
 
 void SpectrumWorxCLAP::HostProxy::automatedParameterEndEdit(ParameterSelector const parameter) const
 {
     plugin_.uiEdits_.push({parameter.value, 0, UIEdits::Kind::GestureEnd});
-    plugin_._host.paramsRequestFlush();
+    plugin_.requestParameterFlush();
+}
+
+/// \note The `canUseParams()` guard is not optional and these three had it
+/// missing -- the same bug as markCurrentProgramAsModified()'s thread check, at
+/// three more sites, found by the audit that note recommends rather than by a
+/// test. `clap_host_params` is an *optional* extension; clap-helpers'
+/// `paramsRequestFlush()` is `assert( canUseParams() ); _hostParams->request_flush( … );`.
+/// A host that offers no parameters at all still gets the queued edit; it simply
+/// does not get told to come and collect it, which is all it could do with the
+/// news anyway.
+///                                           (01.08.2026.) (SW port)
+void SpectrumWorxCLAP::requestParameterFlush() const
+{
+    if (!_host.canUseParams())
+        return;
+    const_cast<SpectrumWorxCLAP &>(*this)._host.paramsRequestFlush();
 }
 
 /// \note A whole program is about to be swapped in, so the host should expect
@@ -975,6 +1004,16 @@ bool SpectrumWorxCLAP::HostProxy::reportNewLatencyInSamples(unsigned int const l
 ///
 ///   So the audio thread only records that it wants to; onMainThread() does it.
 /// The same deferral the rescan flags already use, for the same reason.
+///
+/// \note `canUseThreadCheck()` is not decoration either. `clap.thread-check` is
+/// an *optional* extension, and clap-helpers' `HostProxy::isMainThread()` is
+/// `assert( canUseThreadCheck() ); return _hostThreadCheck->is_main_thread( … );`
+/// -- so asking a host that does not offer it is an assertion in a checked build
+/// and a null dereference in a shipping one, on a path every parameter write
+/// reaches. A host that cannot say which thread this is gets the deferral, which
+/// is correct from either: `request_callback` is `[thread-safe]` and
+/// `mark_dirty` then happens where it is allowed to.
+///                                           (01.08.2026.) (SW port)
 void SpectrumWorxCLAP::markCurrentProgramAsModified() const
 {
     if (!_host.canUseState())
@@ -982,7 +1021,7 @@ void SpectrumWorxCLAP::markCurrentProgramAsModified() const
 
     auto &plugin(const_cast<SpectrumWorxCLAP &>(*this));
 
-    if (_host.isMainThread())
+    if (_host.canUseThreadCheck() && _host.isMainThread())
     {
         plugin._host.stateMarkDirty();
         return;

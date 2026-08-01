@@ -42,7 +42,7 @@ inventory that redesign has to satisfy. It is no longer the plan.
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone — macOS arm64. Linux arm64 proven at stage 4. Windows arrives as logs. |
 | Runs | Standalone, with audio, with the real editor, with presets. **Loads in Logic and in Bitwig, and deadlocks in both** in certain situations — see §1 item 3. |
-| Tests | **120/120**: 110 Catch2 + 9 `sw-show-ui --render` + 1 build-property check, in both build trees. Goldens run in Release only. |
+| Tests | **125/125**: 115 Catch2 + 9 `sw-show-ui --render` + 1 build-property check, in both build trees. Goldens run in Release only. |
 | CI | **None.** There is no `.github/`. |
 | Warnings | 254 unique sites in a from-scratch Debug build, 248 of them ours — see §3. |
 | Identity | ✅ `org.surge-synth-team.spectrumworx`, AU `aufx`/`SWrx` by `SSTx` — see §4. |
@@ -68,7 +68,7 @@ the build tidy, and item 3 is no longer a fixup.
 
 | # | What | Stage | Size |
 |---|---|---|---|
-| 0 | **Three bugs found writing this document** | — | hours |
+| 0 | ✅ **Three bugs found writing this document** | — | *done* |
 | 1 | **Load it in a DAW**, and run `clap-validator` / `auval` | 1, 5.9 | 1–2 days |
 | 2 | ✅ **Plugin identity** — Surge Synth Team ids, before any binary exists | new | *done* |
 | 3 | **Threading — a redesign, not the fixup below.** Deadlocks in Logic and Bitwig | 5.8 | its own project |
@@ -80,21 +80,45 @@ the build tidy, and item 3 is no longer a fixup.
 | 9 | **The stage 7 tail** — include-what-you-use, and seven macros no build can define | 7 | 3–4 days |
 | 10 | **Ship** — licence, README, manual, installers, notarisation | 9 | 1–2 weeks |
 
-### 0 — Three bugs, first, because they are one line each
+### 0 — Three bugs, first, because they are one line each ✅ *done, 01.08.2026*
+
+> **Done.** All three, and the fixes are one line each as advertised. What was
+> not one line is the coverage: **five new cases**, `sw-tests` **125/125** in
+> both build trees. Two of the three now fail loudly if the fix is reverted —
+> checked by reverting each and watching them fail, not by inspection.
 
 Found while auditing for this document, not by a test. Details and evidence in
 §2.1.
 
-- **`markCurrentProgramAsModified()` calls `_host.isMainThread()` without
-  `canUseThreadCheck()`** (`spectrumWorxCLAP.cpp:877`). In a host with no
-  `clap.thread-check` that is an `assert` in debug and a **null dereference in
+- **`markCurrentProgramAsModified()` called `_host.isMainThread()` without
+  `canUseThreadCheck()`** (`spectrumWorxCLAP.cpp:998`). In a host with no
+  `clap.thread-check` that was an `assert` in debug and a **null dereference in
   release**, reachable from every parameter write including from `process()`.
-- **A failed `try_lock` returns without writing the output buffer**
-  (`spectrumWorxCore.cpp:95`, `spectrumWorxCLAP.cpp:693`). Whenever the UI
-  thread holds the processing lock — any preset load, any FFT-size change — the
-  host gets whatever was in the buffer, not silence.
-- **The preset browser's Save-As button can never be clicked**
-  (`presetBrowser.cpp:69`).
+  Now guarded: a host that cannot say which thread this is gets the deferral,
+  which is correct from either, because `request_callback` is `[thread-safe]`.
+- **A failed `try_lock` returned without writing the output buffer**
+  (`spectrumWorxCore.cpp:95`, `spectrumWorxCLAP.cpp:819`). `SpectrumWorxCore::process()`
+  **returns `bool` now** — whether `outputs` was written — and
+  `SpectrumWorxCLAP::runEngine()` zeroes every output port when it did not.
+  **Silence and not the input**, because the plugin reports latency: the input
+  is not the dry signal, it is the dry signal arriving `latencyInSamples_`
+  early, and a host that delay-compensates would put it where nothing belongs.
+- **The preset browser's Save-As button could never be clicked**
+  (`presetBrowser.cpp:69`). It is decided in `refresh()` now, which is where the
+  three location setters and `refreshAndSelectPreset()` all pass through; the
+  constructor starts it disabled like the other two.
+
+**What the coverage is, and what it is not.** `tests/core/processLockTests.cpp`
+holds the processing lock on a thread of its own and drives both sides: the
+engine, which must decline and leave the buffer alone, and *the plugin a host
+holds*, which must hand back silence. Reaching the second needed the C++ object
+out of `clap_plugin::plugin_data` — a test knowing more than the C API says,
+because the contention being reproduced comes from a thread the C API has no
+name for. `pluginTests.cpp` gained `StatefulHost`, which offers `clap.state` and
+deliberately no `clap.thread-check`: that combination is what §2.1a needed and
+what no test host had. **Save-As has no test.** It is a `juce::Button` enabled
+state on a component that needs an editor to exist; §2.3's "the GUI tests assert
+exit code only" is the row that owns it.
 
 ### 1 — Load it in a DAW — *begun; it deadlocks*
 
@@ -156,9 +180,10 @@ purpose: it names, with file and line, every path from `process()` and
 Two things from it are worth doing *first regardless* of what replaces the model,
 because they are the instruments the redesign will be read by:
 
-- **The two one-liners in item 0** — the `isMainThread()` null dereference and
-  the `try_lock` that returns without writing the output buffer. Both are
-  outright bugs and neither depends on the design.
+- ✅ **The two one-liners in item 0** — the `isMainThread()` null dereference and
+  the `try_lock` that returns without writing the output buffer. Both were
+  outright bugs and neither depended on the design. *Done 01.08.2026;* the
+  second one leaves a question the redesign inherits, below.
 - **Make `currentThreadOwnsTheProcessLock()` real.** It returns a hardcoded
   `true` on every platform this port builds (`spectrumWorxCore.cpp:385`), so all
   six `LE_ASSERT(currentThreadOwnsTheProcessLock())` sites are vacuous. Until it
@@ -170,9 +195,18 @@ Also worth capturing before the deadlocks are fixed, while they still reproduce:
 A held-lock backtrace pair is worth more than the whole of §2.2 to whoever does
 this, and it stops being collectable the moment the model changes.
 
+**What item 0's second fix leaves here.** The plugin now writes silence rather
+than garbage when it cannot have the lock, which is a correct answer and not a
+good one: *the block is still dropped*. Every preset load and every FFT-size
+change is an audible gap, and how long a gap depends on how long the UI thread
+holds a lock the audio thread is racing. That is not a bug to fix at the call
+site — it is the same arrangement this item exists to replace, and the measure of
+whether the replacement worked is that `runEngine()` stops needing the branch at
+all. Until then it is worth knowing that the gap is now deliberate.
+
 The original list, retained as the inventory rather than the plan:
 
-1. The two one-liners in item 0. *(Promoted above — do these regardless.)*
+1. ✅ The two one-liners in item 0. *(Done 01.08.2026.)*
 2. Make `currentThreadOwnsTheProcessLock()` real. *(Promoted above — the
    redesign needs it to be able to assert anything at all.)*
 3. Route `stateLoad` through the same deferral as everything else — today it
@@ -433,7 +467,11 @@ number in §3 and §4. **The multi-hop call-tree claims in 2.2 were not** — th
 are traced from the sources and each names its steps, but re-read the chain
 before acting on any one of them.
 
-### 2.1 Three bugs to fix before anything else
+### 2.1 Three bugs to fix before anything else ✅ *all three fixed, 01.08.2026*
+
+> Kept in the past tense below because the *reasoning* is what has value now —
+> particularly (a)'s, which is a general statement about optional extensions and
+> not about one call site. What each fix was is in item 0.
 
 **a. A null dereference reachable from every parameter write.**
 `spectrumWorxCLAP.cpp:870-885`:
@@ -453,28 +491,57 @@ void SpectrumWorxCLAP::markCurrentProgramAsModified() const
 A host without `clap.thread-check` gets an assertion in debug and a null
 dereference in release.
 
-Why 108/108 is green anyway, and why that is the interesting part: the test
+Why 108/108 was green anyway, and why that is the interesting part: the test
 host in `tests/clap/pluginTests.cpp:71-73` returns an extension for
 `CLAP_EXT_PARAMS` **and nothing else**, so `canUseState()` is false and the
-function returns one line earlier. A real DAW provides state. *The test host is
-too thin to reach the bug* — see 2.3.
+function returned one line earlier. A real DAW provides state. *The test host was
+too thin to reach the bug* — see 2.3. `StatefulHost` is the one that is not:
+`clap.state` present, `clap.thread-check` deliberately absent.
 
-**b. A failed `try_lock` leaves the host's buffer untouched.**
-`SpectrumWorxCore::process` opens with `if (!processCriticalSection_.try_lock())
+**The general form is worth more than the fix, and it found three more.**
+Anything a plugin reaches through `clap-helpers`' `HostProxy` is two calls —
+`canUseX()` and then `x()` — and the first is not optional. Running that audit
+(`rg -n "_host\.[a-z]" src/spectrumWorxCLAP.cpp`, then reading each against
+`host-proxy.hxx`) turned up **three unguarded `paramsRequestFlush()` calls**, in
+the three `automatedParameter*` members the editor calls on every knob move:
+`assert( canUseParams() )` in debug, a null `_hostParams` dereference in release,
+in a host that offers no parameter extension. Fixed with them, through one
+`requestParameterFlush()` so there is a single place to guard.
+
+Two things that came out of doing it properly rather than by eye:
+`ensureMainThread()` and `ensureNotAudioThread()` already check
+`canUseThreadCheck()` themselves, so they are not instances of this; and
+`requestCallback()` is a member of `clap_host` rather than of an extension, so it
+is always callable — which is exactly what makes the deferral in (a) a safe
+answer for a host that cannot be asked anything else.
+
+The audit is clean as of 01.08.2026. It is worth re-running whenever a new
+`_host.` call appears, which is the sort of thing CI should be doing.
+
+**b. A failed `try_lock` left the host's buffer untouched.**
+`SpectrumWorxCore::process` opened with `if (!processCriticalSection_.try_lock())
 return;` (`spectrumWorxCore.cpp:95`), and `SpectrumWorxCLAP::runEngine` only
-zeroes channels **at or above** the configured count afterwards
-(`spectrumWorxCLAP.cpp:698-699`). So when the lock is held — a preset load, an
-FFT-size change from the settings panel — the plugin returns
-`CLAP_PROCESS_CONTINUE` having written nothing, and the host plays whatever was
-in the buffer. Dropping to silence or passing the input through are both
-defensible; writing nothing is not.
+zeroed channels **at or above** the configured count afterwards. So when the lock
+was held — a preset load, an FFT-size change from the settings panel — the plugin
+returned `CLAP_PROCESS_CONTINUE` having written nothing, and the host played
+whatever was in the buffer. Dropping to silence or passing the input through are
+both defensible; writing nothing is not.
 
-**c. Save-As is dead.** `presetBrowser.cpp:69` calls
+**Silence is what it does now, and the reason is the latency.** Passing the input
+through sounds like the friendlier answer and is not: the plugin reports
+`latencyInSamples_`, so what is in the input buffer is not the dry signal, it is
+the dry signal arriving one FFT early. A host that delay-compensates would place
+it where nothing belongs, at full level. A gap is at least where it says it is.
+
+**c. Save-As was dead.** `presetBrowser.cpp:69` called
 `saveAs_.setEnabled(enablePresetSaving())` during member initialisation, when
-`location_` is still its default `Root`, so it is disabled — and nothing ever
-re-enables it. `presetSelectionChanged` (`:195-198`) and `refreshAndSelectPreset`
+`location_` is still its default `Root`, so it was disabled — and nothing ever
+re-enabled it. `presetSelectionChanged` (`:195-198`) and `refreshAndSelectPreset`
 (`:886-888`) touch `save_`, `delete_` and the comment box, and not `saveAs_`.
-Mine, from stage 8.
+Mine, from stage 8. It is `refresh()`'s now, which is the one place all three
+location setters and `refreshAndSelectPreset()` meet — the button depends on
+*where the browser is*, not on what is selected in it, which is why it never
+belonged with the other two.
 
 ### 2.2 Threading: the audit
 
@@ -531,6 +598,12 @@ Two more worth knowing, both dormant rather than live:
 parameter model and the preset format are covered thoroughly; the host layer and
 the GUI are covered at the edges.
 
+**One hole that was not on this list and is now covered:** what the plugin does
+when it *cannot* process a block. `tests/core/processLockTests.cpp` holds the
+processing lock on a second thread and drives both the engine and the plugin a
+host holds. It is also the first test in the tree that contends the lock at all,
+which makes it the smallest existing instrument for item 3.
+
 **The holes, by value:**
 
 | Hole | State |
@@ -540,7 +613,7 @@ the GUI are covered at the edges.
 | **Malformed / truncated / missing preset** | Nothing. The corpus proves 303 happy paths. The `unknownEffect` and `missing` counters are asserted zero and never driven above zero, so the reporting path is unexercised. `saveTo()`'s refusal to overrun is never triggered because every test hands it a 1 MiB buffer. |
 | **A loaded sample never reaches the DSP in a test** | New with item 7, and the honest half of it. `sampleTests.cpp` proves all seventeen factory samples decode to two equal channels at the requested rate; nothing proves that `runEngine()` then feeds them to the engine in place of the port. The obstacle is reach, not effort: `setNewSample` is an `EditorHost` virtual and `tests/clap/` only drives the C API. §2.8 step 5 is the way in — a golden fixture that loads a sample by name. |
 | **The side-chain port is never fed** | Re-verified 01.08.2026 and it is worse than one line: `ActivePlugin::process` hardcodes `audio_inputs_count = 1` (`pluginTests.cpp:218`), the port test only ever calls `ports->get(…, 0, …)` so the Side Chain port's *info* is unasserted, and `goldens/engineHarness.cpp:181` passes `inputPointers.data()` as **both** main and side. **Seven** side-chain effects are golden-pinned only in the degenerate side == main case. §2.8 has the recipe. |
-| **The test host is too thin** | It offers `clap.params` and nothing else — which is precisely why 2.1a is invisible. Adding `clap.state`, `clap.thread-check`, and a deliberate *without*-thread-check variant is the fix, and it is small. |
+| **The test host is too thin** | *Half closed, 01.08.2026.* `StatefulHost` offers `clap.state` and deliberately no `clap.thread-check`, which is the combination §2.1a needed; `RecordingHost` still offers `clap.params` and nothing else. What is still missing is a host that offers `clap.thread-check` and *answers*, which is the only way to test the main-thread arm of a deferral rather than only the deferred one. |
 | **`lfoImpl.cpp` has no direct test** | Only LFO 0 of module 0 targeting Gain is ever exercised. Waveform shapes, sync types, `PeriodScale` snapping, `LowerBound > UpperBound`, an LFO on an enumerated target, several at once — none. A value-table golden fits the existing pattern. |
 | **Both text conversions are stubs, and they are one job** | `paramsTextToValue` is `return false` (`spectrumWorxCLAP.cpp:469`); `paramsValueToText` **ignores the value it is given** and prints the parameter's current one (`:414-441`). Both are documented at length with a shared `\todo`: give `AutomatedParameterPrinter` an arm that takes a value *and* the live parameter, so an LFO's dynamic range has an owner to validate against. Host-visible in every automation lane tooltip, and unpinned by any test. |
 | **The GUI tests assert exit code only** | `renderPage()` writes a PNG and returns 0. A page that paints solid black passes. Blank/uniform-colour detection is about ten lines and would make the existing nine tests assert something — and it is what would have caught the empty settings panel 6.4 found by looking at a render. |

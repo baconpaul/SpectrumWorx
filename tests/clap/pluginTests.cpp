@@ -124,6 +124,86 @@ class CurrentRecordingHost
     RecordingHost host_;
 }; // class CurrentRecordingHost
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief A host that provides `clap.state` and, deliberately, no
+/// `clap.thread-check`.
+///
+///   RecordingHost above offers `clap.params` and nothing else, which is why
+/// week_two.md §2.1a was invisible: `markCurrentProgramAsModified()` returns at
+/// its `canUseState()` check before it can ask a thread-check that is not there.
+/// Every real DAW provides state. This is the shape that reaches the bug --
+/// state present, thread-check absent -- and CLAP explicitly allows it:
+/// `clap.thread-check` is optional and a plugin may not assume it.
+///
+/// \note The interesting assertion is that nothing crashes. What it also pins
+/// is the *consequence* of not being able to ask: the dirty mark has to go
+/// through on_main_thread(), because "am I already on it" is exactly the
+/// question this host refuses to answer.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+class StatefulHost
+{
+  public:
+    StatefulHost()
+        : state_{[](clap_host const *) { ++instance().dirtyMarks; }},
+          host_{CLAP_VERSION,
+                nullptr,
+                "sw-tests",
+                "SpectrumWorx",
+                "",
+                "0",
+                [](clap_host const *, char const *const id) -> void const * {
+                    return (std::strcmp(id, CLAP_EXT_STATE) == 0) ? &instance().state_ : nullptr;
+                },
+                [](clap_host const *) {},
+                [](clap_host const *) {},
+                [](clap_host const *) { ++instance().mainThreadCallbacks; }}
+    {
+        dirtyMarks = 0;
+        mainThreadCallbacks = 0;
+    }
+
+    StatefulHost(StatefulHost const &) = delete; // the callbacks reach the singleton
+    StatefulHost &operator=(StatefulHost const &) = delete;
+
+    clap_host const &operator*() const { return host_; }
+
+    unsigned dirtyMarks{0};
+    unsigned mainThreadCallbacks{0};
+
+    static StatefulHost &instance()
+    {
+        REQUIRE(pInstance != nullptr);
+        return *pInstance;
+    }
+    static StatefulHost *pInstance;
+
+  private:
+    clap_host_state state_;
+    clap_host host_;
+}; // class StatefulHost
+
+StatefulHost *StatefulHost::pInstance{nullptr};
+
+/// Scopes StatefulHost::instance() to one test. \see CurrentRecordingHost
+class CurrentStatefulHost
+{
+  public:
+    CurrentStatefulHost() { StatefulHost::pInstance = &host_; }
+    ~CurrentStatefulHost() { StatefulHost::pInstance = nullptr; }
+
+    CurrentStatefulHost(CurrentStatefulHost const &) = delete;
+    CurrentStatefulHost &operator=(CurrentStatefulHost const &) = delete;
+
+    StatefulHost &operator*() { return host_; }
+    StatefulHost *operator->() { return &host_; }
+
+  private:
+    StatefulHost host_;
+}; // class CurrentStatefulHost
+
 clap_input_events const &noInputEvents()
 {
     static clap_input_events events{
@@ -779,6 +859,37 @@ TEST_CASE("Filling a slot makes the host re-read the descriptions", "[clap]")
             (std::strcmp(info.name, "N/A") != 0))
             ++named;
     CHECK(named > 0);
+}
+
+TEST_CASE("A host with state and no thread check survives a parameter write", "[clap]")
+{
+    // week_two.md §2.1a. `clap.thread-check` is optional; `clap.state` is what
+    // makes markCurrentProgramAsModified() get as far as asking for it. Before
+    // the fix this asserted in a checked build and dereferenced null in a
+    // shipping one, on the path every automated parameter change takes.
+    Entry const entry;
+    CurrentStatefulHost host;
+    ActivePlugin plugin(48000, 512, **host);
+
+    auto const &params(parameters(*plugin));
+
+    // From the main thread's side: params.flush() outside process().
+    OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
+    params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+
+    // And from the audio thread's: the same write, delivered in process().
+    std::vector<float> leftIn(512, 0.0f), rightIn(512, 0.0f);
+    std::vector<float> leftOut(512), rightOut(512);
+    plugin.process(leftIn, rightIn, leftOut, rightOut);
+
+    // Not marked yet -- it cannot be, since the plugin has no way to establish
+    // that this is the main thread, and mark_dirty is main-thread-only.
+    CHECK(host->dirtyMarks == 0);
+    CHECK(host->mainThreadCallbacks > 0);
+
+    // It is the callback that discharges it, which is what the deferral is for.
+    plugin->on_main_thread(&*plugin);
+    CHECK(host->dirtyMarks == 1);
 }
 
 TEST_CASE("A module parameter's range and step flag survive an effect swap", "[clap]")

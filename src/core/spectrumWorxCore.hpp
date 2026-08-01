@@ -155,7 +155,24 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
     ~SpectrumWorxCore() {}
 #endif // NDEBUG
 
-    void process(float const *const *inputs, float const *const *pSideChannels,
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief One block, if the processing lock is free.
+    ///
+    /// \return whether \p outputs was written. The lock is taken with
+    /// `try_lock`, because waiting for it on the audio thread is the one thing
+    /// this may not do -- so whenever the UI thread holds it (a preset load, an
+    /// FFT-size change) there is no output to give and the caller has to say
+    /// what the host hears instead.
+    ///
+    /// \note It returned `void`, and every caller then left the host's buffer
+    /// exactly as it found it -- so a preset load played back whatever the
+    /// previous plugin in the chain had written there, at full level. See
+    /// week_two.md §2.1b.
+    ///                                       (01.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    bool process(float const *const *inputs, float const *const *pSideChannels,
                  float *const *outputs, float const &outputGainScale, unsigned int samples);
 
     bool updateEngineSetup();

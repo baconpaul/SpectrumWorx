@@ -331,6 +331,8 @@ class SpectrumWorxCLAP final
     /// i.e. if the host's view of the parameter list is now stale.
     bool handleEvent(clap_event_header const *);
     void requestRescan(clap_param_rescan_flags);
+    /// `clap_host_params::request_flush`, if the host has one. \see the note.
+    void requestParameterFlush() const;
     /// Emits param value events for slot selectors the editor moved.
     void flushUIEdits(clap_output_events const *);
 

@@ -65,8 +65,14 @@ PresetBrowser::PresetBrowser()
 
     setSizeFromImage(*this, this->image());
 
+    /// \note All three start disabled and refresh() decides Save-As from there.
+    /// It used to be settled once, here, where location_ is still its default
+    /// Root -- so it was disabled before the browser had ever listed anything
+    /// and nothing re-enabled it. Save-As was unclickable for the life of the
+    /// plugin.
+    ///                                       (01.08.2026.) (SW port)
     save_.setEnabled(false);
-    saveAs_.setEnabled(enablePresetSaving());
+    saveAs_.setEnabled(false);
     delete_.setEnabled(false);
     save_.addListener(this);
     saveAs_.addListener(this);
@@ -791,6 +797,12 @@ void PresetBrowser::refresh()
     }
 
     std::sort(files_.begin(), files_.end());
+
+    /// \note Save-As is the one button that depends on *where* the browser is
+    /// rather than on what is selected in it, so this is where it belongs: the
+    /// three location setters all come through here, and so does
+    /// refreshAndSelectPreset(). save_ and delete_ stay with the selection.
+    saveAs_.setEnabled(enablePresetSaving());
 
     listBox_.updateContent();
 }

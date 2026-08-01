@@ -88,12 +88,12 @@ SpectrumWorxCore::SpectrumWorxCore()
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void SpectrumWorxCore::process /// \throws nothing
+bool SpectrumWorxCore::process /// \throws nothing
     (float const *const *pMainChannels, float const *const *const pSideChannels,
      float *const *const outputs, float const &outputGainScale, unsigned int const samples)
 {
     if (!processCriticalSection_.try_lock())
-        return;
+        return false;
     ProcessLockUnlocker const processingLockUnlocker(*this);
 
 #ifdef _DEBUG
@@ -140,6 +140,8 @@ void SpectrumWorxCore::process /// \throws nothing
         GUI::warningMessageBox(MB_ERROR, message, false);
     }
 #endif // DEBUG
+
+    return true;
 }
 
 void SpectrumWorxCore::suspend() // pause
