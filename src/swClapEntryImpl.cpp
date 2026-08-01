@@ -64,7 +64,7 @@ clap_plugin const *create(clap_plugin_factory const *, clap_host const *const ho
 ////////////////////////////////////////////////////////////////////////////////
 
 constexpr char auManufacturerCode[]{"SSTx"};
-constexpr char auSubtypeCode[]{"SpWx"};
+constexpr char auSubtypeCode[]{"SWrx"};
 
 static_assert(sizeof(auManufacturerCode) == 5, "An AU manufacturer code is four characters.");
 static_assert(sizeof(auSubtypeCode) == 5, "An AU subtype code is four characters.");
