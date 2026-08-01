@@ -3,6 +3,8 @@
 Companion to [`initial_scan.md`](initial_scan.md), which is the analysis. This
 is the plan: a stage-by-stage path from the 2016 tree to a modern three-OS
 plugin, each stage ending in something you can build, test and commit.
+[`week_two.md`](week_two.md) is the re-plan and supersedes this where the two
+disagree; [`tech_debt.md`](tech_debt.md) is what closed stages left behind.
 
 **The decision this document assumes** (scan §1.6): SpectrumWorx becomes a
 **native CLAP**, and [clap-wrapper](https://github.com/free-audio/clap-wrapper)

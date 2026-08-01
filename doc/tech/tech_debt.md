@@ -1,0 +1,236 @@
+# SpectrumWorx — Tech debt
+
+A running list, appended to as work happens. Companion to
+[`implementation_sequence.md`](implementation_sequence.md), which is the plan,
+and [`week_two.md`](week_two.md), which is the re-plan.
+
+**What belongs here and what does not.** Those two documents track *work*: things
+someone will sit down and do, in an order, with a size next to them. This tracks
+what is left behind by work that is otherwise finished — the half-fix, the
+correct-but-unsatisfying answer, the finding that has no owner because it is not
+big enough to be a stage and not small enough to be a `\todo`. A thing that is
+squarely inside a numbered item is that item's; it does not need a bullet here.
+
+The test for a bullet: **if the plan were executed exactly as written, would this
+still be true at the end?** If yes, it belongs here.
+
+Every entry carries the date it was written and, where there is one, the item or
+section it fell out of — because half of these are true only until someone
+touches the file, and a bullet with no provenance is unverifiable a month later.
+New entries go at the top of their area.
+
+---
+
+## Build and platform
+
+- **MP3 decoding is a different decoder on macOS than on Windows and Linux, and
+  which one answers is decided by registration order.** (01.08.2026, item 7)
+  `registerBasicFormats()` gives `CoreAudioFormat` on macOS,
+  `WindowsMediaAudioFormat` on Windows and **nothing** on Linux, so `sw-dsp`
+  defines `JUCE_USE_MP3AUDIOFORMAT=1` — JUCE's own decoder, behind a flag because
+  it carries a patent disclaimer for patents that expired in 2017. Every one of
+  the seventeen factory samples is an MP3, so without it a Linux build ships
+  content it cannot open.
+
+  What that flag actually did is worth reading off
+  `juce_AudioFormatManager.cpp:63-87` rather than off the flag's name.
+  `createReaderFor` walks `knownFormats` **in registration order** and takes the
+  first that accepts the stream, and `MP3AudioFormat` is registered *before*
+  `WindowsMediaAudioFormat` and *after* `CoreAudioFormat`. So:
+
+  | | answers for MP3 |
+  |---|---|
+  | macOS | `CoreAudioFormat` |
+  | Windows | `MP3AudioFormat` — **not** `WindowsMediaAudioFormat`, which the flag displaced |
+  | Linux | `MP3AudioFormat` |
+
+  Two decoders, then, not one and not three — and setting the flag quietly
+  changed Windows from the platform decoder to JUCE's. That is probably the
+  better outcome (it is the same code as Linux, so two platforms agree by
+  construction) but it was not the intent and nothing says so.
+  - The cheap fix is to stop shipping MP3: the samples are 1.4 MB as MP3 and the
+    only reason for the format is that 2016 chose it. FLAC is registered on every
+    platform, ahead of all of these, and would delete this entry.
+  - The `sampleTests.cpp` cases would catch a decoder that fails outright. They
+    would not catch one that is a few samples out of alignment with another
+    platform's — encoder delay is exactly where MP3 decoders disagree — which is
+    what would actually happen.
+
+- **`clang-format` is clean where the port has been and not where it has not.**
+  (01.08.2026) 66 of 465 files deviate; **63 of them are under `src/le/`**, the
+  2016 tree, and the other three are `core/modules/factory.cpp`,
+  `gui/editor/moduleMenuHolder.cpp` and `gui/modules/moduleUI.hpp`. So this is
+  not "the tree is dirty" — it is a boundary between ported and unported code
+  that happens to be visible to a formatter. The three outliers are worth fixing
+  now; reformatting `src/le/` wholesale would put a 60-file diff between every
+  future change and its history, and is a decision rather than a chore.
+
+- **`build-asan/` exists and is configured from an older CMake.** (01.08.2026,
+  from `week_two.md` §1 item 3) It registers three of the nine GUI tests, so a
+  sanitiser run over it is quietly a third of the coverage a normal run has.
+  Item 3 wants ASan; nothing owns the directory being stale, and a stale build
+  directory is exactly the kind of thing that gets trusted.
+
+## Threading
+
+- **A block that cannot have the processing lock is still dropped; it is only
+  the garbage that has gone.** (01.08.2026, item 0) The host now gets silence
+  rather than whatever was in its buffer, which is a correct answer and not a
+  good one. Every preset load and every FFT-size change is an audible gap whose
+  length is decided by how long the UI thread holds a lock the audio thread is
+  racing. Item 3 replaces the arrangement; the measure of success is that
+  `runEngine()` stops needing the branch. Until then the gap is deliberate, and
+  that deserves to be written down somewhere other than a code comment.
+
+- **`currentThreadOwnsTheProcessLock()` returns a hardcoded `true`.**
+  (01.08.2026, from §2.2) All six `LE_ASSERT(currentThreadOwnsTheProcessLock())`
+  sites are therefore vacuous, and have been for the life of the port. The
+  Windows arm is worse than absent: it `reinterpret_cast`s a
+  `std::recursive_mutex` to a `CRITICAL_SECTION`, which the header itself admits
+  is invalid and which was invalid for the MS STL's `std::mutex` before that.
+  Item 3 lists making it real as a prerequisite, so this is *nearly* owned — but
+  the Windows half is Windows bring-up's and belongs to neither.
+
+- **`UIEdits` drops on full, and that is wrong for gestures.** (01.08.2026, from
+  §2.2) The ring is otherwise correct. Dropping a `Kind::Value` is right — the
+  next one supersedes it. Dropping a `GestureBegin` whose `GestureEnd` survives
+  leaves the host holding an unbalanced gesture, which some hosts never recover
+  from. §2.2 calls it "worth a follow-up, not a blocker" and no item took it.
+
+## Host interface
+
+- **The CLAP state does not hold which external audio file is loaded.**
+  (01.08.2026, item 7) A *preset* has since 2011; a session does not. So
+  `setNewSample()` deliberately does not mark the session dirty either — marking
+  it would promise to remember something the format cannot hold. Item 4 owns the
+  state format and will fix this in passing, but the current state is a plugin
+  that silently forgets one of its settings across a session reload, and that is
+  worth knowing before item 4 happens rather than after.
+
+- **`paramsTextToValue` is `return false` and `paramsValueToText` ignores the
+  value it is given.** (01.08.2026, from §2.3) The second prints the parameter's
+  *current* value whatever it was asked about, which is visible in every
+  automation-lane tooltip in every host. Both are documented at length in the
+  source with a shared `\todo`, and both are one job: give
+  `AutomatedParameterPrinter` an arm that takes a value *and* the live parameter.
+  No stage owns it. It is the most user-visible thing on this page.
+
+- **Host automation of the six global parameters does not move the editor's
+  knobs.** (01.08.2026, from §2.2) `updateGlobalParameterWidget<>` and
+  `updateForGlobalParameterChange()` have no callers — their only caller was the
+  deleted 2016 plugin class. A live UX bug with no owner, and one where the
+  naive fix (call them from the parameter path) recreates a documented
+  audio-thread violation.
+
+## DSP and effects
+
+- **A phase-vocoder pitch shift's accuracy depends on the FFT size, and not
+  monotonically.** (01.08.2026, item 8) Measured, with Pitch Magnet asked to
+  move a 220 Hz partial to 880 Hz and the output's dominant frequency read back:
+
+  | FFT size | lands at | error |
+  |---|---|---|
+  | 1024 | 707.9 Hz | **−377 cents** (the target is the *second* loudest thing present) |
+  | 2048 | 880.1 Hz | +0.2 cents |
+  | 4096 | 922.8 Hz | **+82 cents** |
+
+  110 Hz and 330 Hz targets are within 0.2 cents at both 2048 and 4096, so it is
+  the large upward shift that degrades. "More bins are better" is not the shape
+  of this and nobody has looked at why. `exImploderImpl.cpp` carries a 2012
+  `\todo` from Domagoj Saric saying the pitch shift there "is not the correct way
+  to do it (although Dobson does it that way)", which may or may not be the same
+  finding. The property test pins 2048 and says so; that is a test choosing a
+  setting where the measurement is unambiguous, not a fix.
+
+- **Three effect parameters have ranges most of which do nothing useful.**
+  (01.08.2026, item 8) All three were found by writing property tests and all
+  three read as bugs to a user:
+  - **Slew Limiter's rise starts from `FLT_EPSILON`**, which the implementation
+    floors the previous amplitude to so that a bin can leave silence at all.
+    That is 138 dB below unity, so a rise-limited bin has to climb 138 dB before
+    it is audible: **at 3 dB/s that is 46 seconds**, and anything below about
+    28 dB/s — the bottom tenth of the 0–300 dB/s range — takes more than five.
+    That part of the knob is a mute with extra steps.
+  - **The Exploder's "Limit" does not limit.** Reaching it *resets* the
+    accumulator to whatever the input is doing, so the level is a sawtooth
+    rather than a ramp to a ceiling. Defensible as an effect; the parameter is
+    named for the other behaviour.
+  - **The Octaver's cutoff defaults to 350 Hz**, and it is a low pass over the
+    effect's *output*. So an Octaver dropped into a slot removes most of what it
+    just added: the up-octave of anything above F3 (175 Hz) is cut, which is
+    most of what anyone plays. This is the one that most reads as "the effect is
+    broken".
+
+  None of these is a regression — all three are 2016 behaviour, now pinned by
+  tests. Changing any of them changes what a 2011 preset sounds like, which is
+  why none of them is in a plan.
+
+- **The goldens skip in a checked build because `Smoother` asserts.**
+  (01.08.2026, from `goldenTests.cpp:287`) `Math::symmetricMovingAverage` carries
+  a running sum across thousands of bins and over pink noise the accumulated
+  rounding drifts a hair below zero, so `Smoother` hands `amph2DFT()` a negative
+  "amplitude". Benign in the output, real as a numerical weakness. The
+  consequence is structural: **Release is the only configuration that renders
+  DSP**, so a debug-only regression in the engine has nothing to catch it. Item
+  8's property tests are the first DSP assertions a checked build makes, and
+  they cover nine effects of 57.
+
+- **Fourteen side-chain effects are golden-pinned only where side == main.**
+  (01.08.2026, from §2.8) `engineHarness.cpp` passes `inputPointers.data()` as
+  both main and side — the one case in which a side-chain effect cannot be told
+  apart from a bug that ignores the side chain entirely. §2.8 has a five-step
+  recipe and no item owns it. Related and stranger: `convolver.hpp` declares
+  `usesSideChannel = false` while `convolverImpl.hpp` takes
+  `MainSideChannelData_AmPh`, and the reason nobody has noticed is that
+  **`usesSideChannel` has no reader anywhere in `src/` or `tests/`** — 57 files
+  maintaining metadata that nothing consumes.
+
+- **An unconnected side-chain port is fed the main input, not silence.**
+  (01.08.2026, from §2.8) So a Blender with nothing patched blends the signal
+  with itself. Defensible, deliberate, and documented nowhere a user would look.
+
+## Tests
+
+- **The GUI render tests assert an exit code.** (01.08.2026, from §2.3)
+  `renderPage()` writes a PNG and returns 0; a page that paints solid black
+  passes. Blank-and-uniform-colour detection is about ten lines, and it is what
+  would have caught the empty settings panel that 6.4 found by looking at an
+  image. Nine tests currently asserting almost nothing.
+
+- **One effect of 57 and one bank of 18 are ever drawn.** (01.08.2026, from
+  §2.3) `SW_SHOW_UI_EFFECT`, `SW_SHOW_UI_PRESET` and `SW_SHOW_UI_PRESET_SWEEP`
+  exist and are manual-only. A CMake `foreach` over the effect list is four lines
+  for 57× the GUI breadth.
+
+- **`ctest -LE slow` skips nothing.** (01.08.2026, from §2.3) No test in the repo
+  sets `LABELS`; the one labelled case went with `check_gui_flag_parity.py`.
+  Either re-establish the label or stop recommending the flag — several documents
+  do.
+
+- **Nothing has ever loaded a sample and then processed a block.** (01.08.2026,
+  item 7) `sampleTests.cpp` proves all seventeen factory samples decode to two
+  equal channels at the requested rate; nothing proves `runEngine()` then feeds
+  them to the engine in place of the port. The obstacle is reach — `setNewSample`
+  is an `EditorHost` virtual and `tests/clap/` drives the C API — and
+  `processLockTests.cpp` has since shown the way through it (`plugin_data`).
+
+- **A host that provides `clap.thread-check` and answers has never been
+  tested.** (01.08.2026, item 0) `StatefulHost` deliberately omits it, which is
+  what reaches the deferral. The other arm of every `canUseThreadCheck()` branch
+  — the one where the plugin is told it *is* on the main thread and acts
+  immediately — has no coverage at all.
+
+## Licence and shipping
+
+- **`doc/manual/EULA.txt` is a commercial end-user agreement and the repository
+  is GPL-3.0.** (01.08.2026, from item 10) Every file header says
+  `SPDX-License-Identifier: GPL-3.0-or-later`; JUCE 8 is AGPLv3-or-commercial.
+  Item 10 lists it, but it is the only entry there that is a *decision* rather
+  than a task, and decisions do not get cheaper by being scheduled last.
+
+- **The standalone's `CFBundleIdentifier` is clap-wrapper's
+  `SpectrumWorx.standalone`.** (01.08.2026, from §4) Notarisation is the step
+  that cares. The fix belongs upstream — a `BUNDLE_IDENTIFIER` the standalone
+  wrapper honours the way the plugin wrappers already do — so it wants a
+  clap-wrapper PR rather than a local workaround, and an upstream PR is not
+  something a stage can be sized around.

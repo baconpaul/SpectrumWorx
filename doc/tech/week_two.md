@@ -6,6 +6,11 @@ is the **re-plan**: what the nine-stage sequence still owes, what re-reading the
 tree afterwards turned up that the sequence never knew about, and what order to
 do it in now that the thing runs.
 
+There is now a fourth: [`tech_debt.md`](tech_debt.md), which is where things go
+that would still be true after this plan was executed exactly as written — the
+half-fix, the correct-but-unsatisfying answer, the finding with no owner. When an
+item here closes and leaves something behind, the something goes there.
+
 **Week one was 27–31 July 2026** — 84 commits, five days. It closed stages 0, 1
 (bar CI and installers), 2, 3, 4 (on Linux/arm64), 5.1–5.7, most of 6, 7 and 8.
 The plugin builds in four formats, loads, shows its real 2016 editor, passes
@@ -408,6 +413,13 @@ Three things worth knowing that the plan did not:
   Every factory sample is an MP3, so without this a Linux build ships content it
   cannot open — which is exactly the failure §5.4 warned about, arriving from
   the direction it did not expect.
+  - *Corrected 01.08.2026, from reading `juce_AudioFormatManager.cpp:63-87`
+    rather than the flag's name:* `createReaderFor` takes the **first**
+    registered format that accepts the stream, and `MP3AudioFormat` is
+    registered before `WindowsMediaAudioFormat`. So the flag also took MP3 away
+    from WMF on Windows, which now decodes with the same code Linux does.
+    Deferred to [`tech_debt.md`](tech_debt.md); it is arguably an improvement and
+    it was certainly not the intent.
 - **A sample is decoded to the engine's sample rate, and a session can be
   restored before there is one.** `Sample::load` takes zero to mean "the file's
   own", and `activate()` re-reads a sample whose rate disagrees with the host's.
