@@ -103,7 +103,26 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
     std::uint8_t numberOfSideChannels() const { return engineSetup().numberOfSideChannels(); }
     std::uint32_t processBlockSize() const { return buffers().blockSize(); }
 
-    float getSampleRate() const { return engineSetup().sampleRate<float>(); }
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Unchecked, and it matters. `engineSetup()` asserts that the setup
+    /// still agrees with the *spectral* parameters -- `isEngineSetupUpToDate()`
+    /// compares the FFT size, the overlap factor and the window size factor, and
+    /// nothing else. The sample rate is not one of them, so the assertion has
+    /// nothing to say about the value this returns.
+    ///
+    ///   What it did say was "you are on the audio thread while the UI thread is
+    /// halfway through changing the FFT size". True, and not this getter's
+    /// business: SpectrumWorxCLAP::process() calls it through updateLFOTiming()
+    /// on every block, before SpectrumWorxCore::process() takes the processing
+    /// lock, so loading a preset that changes the FFT size fired it every time
+    /// audio was running. **5.8 is what actually fixes the reading of engine
+    /// state off the audio thread**; this stops a getter asserting about a
+    /// staleness that cannot affect it.
+    ///                                       (31.07.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    float getSampleRate() const { return uncheckedEngineSetup().sampleRate<float>(); }
 
     void reset();
     void uninitialise();

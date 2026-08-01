@@ -8,6 +8,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 add_executable(sw-tests
+        clap/engineSetupStalenessTests.cpp
         clap/parameterModelTests.cpp
         clap/pluginTests.cpp
         effects/effectsListTests.cpp

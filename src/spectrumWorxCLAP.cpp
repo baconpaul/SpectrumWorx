@@ -672,7 +672,11 @@ void SpectrumWorxCLAP::runEngine(clap_process const *const process) noexcept
     if (!input.data32 || !output.data32)
         return; // 64 bit hosts get silence rather than a crash until 5.7.
 
-    auto const channels(engineSetup().numberOfChannels());
+    /// \note Unchecked, for the same reason getSampleRate() is: the channel
+    /// count is not one of the fields isEngineSetupUpToDate() compares, and this
+    /// runs on the audio thread before SpectrumWorxCore::process() takes the
+    /// processing lock. See the note on getSampleRate().
+    auto const channels(uncheckedEngineSetup().numberOfChannels());
     if ((input.channel_count < channels) || (output.channel_count < channels))
         return;
 
