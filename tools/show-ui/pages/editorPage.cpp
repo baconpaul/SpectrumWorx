@@ -30,6 +30,7 @@
 #include "core/automatedModuleChain.hpp"
 #include "gui/editor/editorModuleInitialiser.hpp"
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
+#include "le/spectrumworx/factoryPresets.hpp"
 #include "gui/editor/spectrumWorxEditor.hpp"
 #include "gui/theme.hpp"
 
@@ -144,7 +145,18 @@ class EditorPage final : public juce::Component
             /// the eighteen of them from a shell loop -- the same idea as
             /// SW_SHOW_UI_EFFECT above.
             if (auto const *const bank = std::getenv("SW_SHOW_UI_PRESET_BANK"))
+            {
                 editor_->showFactoryBank(bank);
+
+                /// \note SW_SHOW_UI_PRESET then *loads* it, which is what
+                /// selecting a row does and is the half of the browser that
+                /// reaches the engine: new global parameters, a new module
+                /// chain, and a UI region built for each of them.
+                if (auto const *const preset = std::getenv("SW_SHOW_UI_PRESET"))
+                    loadFactoryPreset(bank, preset);
+                else if (std::getenv("SW_SHOW_UI_PRESET_SWEEP"))
+                    sweepFactoryPresets();
+            }
             else
                 editor_->showPresetBrowser(true);
         }
@@ -156,6 +168,33 @@ class EditorPage final : public juce::Component
     void resized() override { editor_->setTopLeftPosition(0, 0); }
 
   private:
+    void loadFactoryPreset(juce::String const &bank, juce::String const &preset)
+    {
+        std::fprintf(stderr, "sw-show-ui: loading %s / %s\n", bank.toRawUTF8(), preset.toRawUTF8());
+
+        auto presetData(FactoryPresets::load(bank.toStdString(), preset.toStdString()));
+        LE_ASSERT_MSG(presetData, "No such factory preset.");
+        if (!presetData)
+            return;
+
+        juce::String comment;
+        LE_VERIFY(editor_->loadPreset(presetData.get(), true, comment, preset));
+    }
+
+    /// \brief Every factory preset, into the same editor, one after another.
+    ///
+    /// \note One editor rather than one each, deliberately: loading a preset
+    /// *merges* into the current module chain -- loadModuleChain() moves a module
+    /// already holding the same effect across rather than building a new one --
+    /// so the second load is a different code path from the first, and it is the
+    /// one a user takes.
+    void sweepFactoryPresets()
+    {
+        for (auto const &bank : FactoryPresets::banks())
+            for (auto const &preset : FactoryPresets::presets(bank))
+                loadFactoryPreset(bank.c_str(), preset.c_str());
+    }
+
     /// \brief Adds an effect exactly as choosing it from the module menu does.
     ///
     /// \note Through the editor's own entry point rather than through the module

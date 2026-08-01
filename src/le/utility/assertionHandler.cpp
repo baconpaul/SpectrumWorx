@@ -41,6 +41,16 @@
 /// took an arm whose declarations it had not seen. Debug-build-only, since a
 /// release build has no assert handler to break from.
 ///                                           (29.07.2026.) (SW port)
+/// \note sst-plugininfra's, not `execinfo.h` directly: it has a Windows arm
+/// over DbgHelp, which `backtrace()` does not exist on at all, and Windows is
+/// the platform whose failures arrive here as a log rather than a debugger
+/// session.
+///                                           (31.07.2026.) (SW port)
+#ifndef __ANDROID__
+#define LE_ASSERT_HAS_BACKTRACE
+#include <sst/plugininfra/misc_platform.h>
+#endif
+
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
@@ -152,6 +162,36 @@ static bool assertMessageBox(char const *const message)
 
 #endif // LE_ASSERT_HAS_MSGBOX
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// printBacktrace()
+// ----------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note An assertion that says what was wrong but not how it was reached costs
+/// a round trip -- more, when the person who can reproduce it and the person
+/// reading the code are not the same. The stack is free to print and is the
+/// first question anyone asks.
+///
+/// \note To stderr, alongside the message, because that is what a DAW's log
+/// window and a test runner both capture. Symbol names come from the dynamic
+/// symbol table, so a bundle built with -fvisibility=hidden shows fewer of them
+/// than a debugger would; the addresses are still there to run through atos or
+/// addr2line.
+///                                           (31.07.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+static void printBacktrace()
+{
+#ifdef LE_ASSERT_HAS_BACKTRACE
+    std::fputc('\n', stderr);
+    std::fputs(sst::plugininfra::misc_platform::stackTraceToString().c_str(), stderr);
+    std::fputc('\n', stderr);
+#endif // LE_ASSERT_HAS_BACKTRACE
+}
+
 void breakIntoDebugger()
 {
 #if defined(__ANDROID__)
@@ -206,6 +246,7 @@ static
 #endif // LE_PUBLIC_BUILD
 
     printDebugMessage(fullMessage);
+    printBacktrace();
 
 #ifdef LE_ASSERT_HAS_MSGBOX
     ignore = assertMessageBox(fullMessage);

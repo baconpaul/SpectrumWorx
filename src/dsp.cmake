@@ -164,6 +164,12 @@ target_link_libraries(sw-dsp PUBLIC sst-plugininfra::tinyxml)
 # asserts degrade to the CRT's and the DAW never sees them.
 target_compile_definitions(sw-dsp PUBLIC LE_ENABLE_ASSERT_HANDLER)
 
+# ...and it prints a stack trace with the message, through sst-plugininfra --
+# which has a Windows arm over DbgHelp, the platform whose failures reach us as
+# a log rather than a debugger session. PUBLIC: sw-gui-resources compiles the
+# same file.
+target_link_libraries(sw-dsp PUBLIC sst-plugininfra)
+
 # The module class is SW::Module now, which embeds a GUI::ModuleUI, so the
 # headers reach JUCE and the skin. PUBLIC: they are in sw-dsp's own headers.
 #

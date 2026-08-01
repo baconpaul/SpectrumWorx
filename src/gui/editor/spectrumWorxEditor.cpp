@@ -1987,8 +1987,6 @@ void SpectrumWorxEditor::Settings::comboBoxValueChanged(ComboBox const &comboBox
 void SpectrumWorxEditor::Settings::updateEnginePage()
 {
     auto const &editor(this->editor());
-    auto const &engineSetup(editor.engineSetup());
-    auto const &parameters(editor.program().parameters());
     // Implementation note:
     //   In rare circumstances this function gets called very often (if engine
     // setup parameters change rapidly, e.g. someone automates them using the
@@ -2002,6 +2000,13 @@ void SpectrumWorxEditor::Settings::updateEnginePage()
     // there will surely be a next message/asynchronous call when it will be up
     // to date).
     //                                        (15.06.2010.) (Domagoj Saric)
+    /// \note And it was not used: the line above this note read
+    /// `editor.engineSetup()`, the checked getter, which is precisely what the
+    /// note says must not be called here. Whether that happened in the port or
+    /// earlier, the comment has been describing a fix that was not present.
+    ///                                       (31.07.2026.) (SW port)
+    auto const &engineSetup(editor.effect().uncheckedEngineSetup());
+    auto const &parameters(editor.program().parameters());
 
     fftSize_->setValue(parameters.get<Engine::FFTSize>());
     overlapFactor_->setValue(parameters.get<Engine::OverlapFactor>());
