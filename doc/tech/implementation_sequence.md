@@ -2676,7 +2676,7 @@ Rows below are in stage-number order, not running order. Running order is
 | 2 | Boost tier-1 sweep ✅ (CI wiring deferred) | 1–2 |
 | 3 | DSP core + goldens ✅ | 3–5 |
 | 4 | Portable SIMD/FFT — *deferred, runs after 6* | 1.5–2.5 |
-| 5 | CLAP host layer — *5.1–5.7 done; 5.0, ranges, 5.8, 5.9 open* | 2.5–4 |
+| 5 | CLAP host layer — *5.1–5.7 done; 5.0, ranges, 5.9 open.* **5.8 is a threading redesign, not a fixup** — it deadlocks in Logic and Bitwig; see `week_two.md` §1.3 | 2.5–4 + 5.8 |
 | 6 | GUI — *widgets, module layer, editor, the browser's async save path and 6.4 done; 6.5–6.7 open* | 4–6 |
 | 7 | De-Boost the parameter system | 4–6 |
 | 8 | Presets and content ✅ *including the browser, once 6.4 landed* | 1–2 |

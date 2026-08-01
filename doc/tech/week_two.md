@@ -26,6 +26,14 @@ reasons this document exists rather than another pass over the old one:
    `FactoryPresets` landed with the presets-button fix. 6.4 is smaller than
    advertised, and §1 says by how much.
 
+**Since then — 01.08.2026 — a third thing, and it outweighs both.** The plugin
+has been loaded in Logic and in Bitwig, and it **deadlocks in both** in certain
+situations. Everything this document says about threading was written from
+reading; it is now written from running, and the conclusion changed: §1 item 3 is
+a **redesign of the threading model**, taken as its own project, not the six-step
+fixup the audit implied. The audit in §2.2 keeps all of its value as the
+inventory that redesign has to satisfy. It is no longer the plan.
+
 ---
 
 ## Where this actually stands
@@ -33,7 +41,7 @@ reasons this document exists rather than another pass over the old one:
 | | |
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone — macOS arm64. Linux arm64 proven at stage 4. Windows arrives as logs. |
-| Runs | Standalone, with audio, with the real editor, with presets. **Never in a DAW.** |
+| Runs | Standalone, with audio, with the real editor, with presets. **Loads in Logic and in Bitwig, and deadlocks in both** in certain situations — see §1 item 3. |
 | Tests | 113 ctest cases: 103 Catch2 + 9 `sw-show-ui --render` + 1 build-property check. Goldens run in Release only. |
 | CI | **None.** There is no `.github/`. |
 | Warnings | 254 unique sites in a from-scratch Debug build, 248 of them ours — see §3. |
@@ -42,22 +50,29 @@ reasons this document exists rather than another pass over the old one:
 **The one feature flag still switched on** is `LE_SW_DISABLE_SIDE_CHANNEL`. It is
 `PUBLIC` on `sw-dsp` and changes the layout of `SpectrumWorxEditor`, so every
 translation unit has to agree on it. It stands for unfinished work (5.0), not
-for a decision.
+for a decision. **It does not disable the side-chain input port** — despite the
+name it is the external audio *file* loader, and the side chain is wired and
+live. §2.8 is the whole story.
 
 ---
 
 ## 1. The ordered attack
 
-Ordering principle: **the plugin has never met a host, and the audit in §2 says
-the host is where it will break.** Everything that makes a DAW session survive
-comes before everything that makes the build tidy.
+Ordering principle, as written on 01.08.2026: *the plugin has never met a host,
+and the audit in §2 says the host is where it will break.*
+
+**It has now met two, and it broke where §2.2 said it would.** SpectrumWorx loads
+in Logic and in Bitwig and **deadlocks in both** in certain situations. That is
+the single most important fact in this document and it re-sorts the list below:
+everything that makes a DAW session survive comes before everything that makes
+the build tidy, and item 3 is no longer a fixup.
 
 | # | What | Stage | Size |
 |---|---|---|---|
 | 0 | **Three bugs found writing this document** | — | hours |
 | 1 | **Load it in a DAW**, and run `clap-validator` / `auval` | 1, 5.9 | 1–2 days |
 | 2 | ✅ **Plugin identity** — Surge Synth Team ids, before any binary exists | new | *done* |
-| 3 | **Threading** — the main/audio split | 5.8 | 1–2 weeks |
+| 3 | **Threading — a redesign, not the fixup below.** Deadlocks in Logic and Bitwig | 5.8 | its own project |
 | 4 | **A real state format**, and the tests it has never had | 5.6 | 3–4 days |
 | 5 | ✅ **The owned-window collapse** | 6.4 | *done* |
 | 6 | **CI**, three OSes × four formats, with the gates that already exist | 1.5, 5.9 | 3–5 days |
@@ -82,17 +97,22 @@ Found while auditing for this document, not by a test. Details and evidence in
 - **The preset browser's Save-As button can never be clicked**
   (`presetBrowser.cpp:69`).
 
-### 1 — Load it in a DAW
+### 1 — Load it in a DAW — *begun; it deadlocks*
 
-Reaper first, then Bitwig, then Logic for the AU. This is stage 1's "done when"
-and half of 5.9's, and it has been the top row of the sequence's own table since
-stage 4. Everything below is speculation until it happens; the four bugs from
-one afternoon of the standalone are the argument.
+**Logic and Bitwig have both loaded it, and it deadlocks in both** in certain
+situations. So this row is no longer "everything below is speculation until it
+happens" — it happened, and it produced the single largest finding in this
+document. See item 3, which it re-scoped from a fixup into a redesign.
 
-Run `clap-cpp-validator validate` (not the Rust one — see stage 1's findings) and
-`auval -v aufx SpWx LiEn` before and after §4 changes the codes.
+What it still owes: Reaper, `clap-cpp-validator validate` (not the Rust one — see
+stage 1's findings) and `auval -v aufx SpWx SSTx`, and the deliberate drive
+through the joins listed below. None of that is worth doing carefully until the
+threading is settled, because a deadlock will mask every other finding — but the
+*situations that deadlock* are worth writing down now, precisely, while they
+still reproduce.
 
-Specifically worth driving, because §2 says these are where the joins are:
+Specifically worth driving, because §2 says these are where the joins are — and
+because the first two are prime suspects for the deadlocks:
 loading a preset **while audio runs** (fixed once, and the fix is one getter);
 changing the FFT size from the host's generic panel while audio runs (§2.2 says
 this takes a blocking mutex on the audio thread); putting an effect in a slot
@@ -111,21 +131,51 @@ plist and a test.
 One thing it leaves for item 1: the CLAP installed in
 `~/Library/Audio/Plug-Ins/CLAP` is still the old build under the old id.
 
-### 3 — Threading (5.8)
+### 3 — Threading (5.8): a redesign, and its own project
 
-The audit is §2.2 and it is worse than the sequence assumed — not because the
-2016 code is careless, but because the CLAP host layer put the host's parameter
-events onto paths the 2016 code only ever ran from the UI. The sequence's own
-description of the starting point is also stale: `GUI::Lock` has no call sites,
-and `BackgroundThread` is in no target.
+**SpectrumWorx deadlocks in Logic and in Bitwig**, in certain situations. That is
+first-hand, from running it, and it settles an argument this document was still
+having with itself: the six-step list below is **too small a goal**. It is a list
+of individual violations to correct, and what the 2016 threading model needs is
+to be replaced rather than patched. That work is deliberately **not** scoped
+here; it gets its own pass.
 
-Suggested order, from §2.2:
+Why the list is the wrong shape for it: every step below makes one call site
+safe. None of them changes the fact that there is a single recursive
+`processCriticalSection_` taken by the audio thread with `try_lock` and by the UI
+thread with a blocking lock, that the same lock is reached from `setParameter`
+via the host's event queue, and that the editor mutates the chain without taking
+it at all. A deadlock is a property of that arrangement, not of any one site in
+it. Fixing six sites inside an arrangement that permits deadlock leaves an
+arrangement that permits deadlock.
 
-1. The two one-liners in item 0.
-2. Make `currentThreadOwnsTheProcessLock()` real — it returns a hardcoded `true`
-   on every platform this port builds (`spectrumWorxCore.cpp:385`), so all six
-   `LE_ASSERT(currentThreadOwnsTheProcessLock())` sites are vacuous. **Do this
-   before the rest**, so the asserts can arbitrate the rest.
+So treat the audit in §2.2 as **the inventory the redesign has to satisfy**, not
+as the plan. It is still the most valuable thing in this document for that
+purpose: it names, with file and line, every path from `process()` and
+`paramsFlush()` into code the 2016 build only ever ran from the UI thread.
+
+Two things from it are worth doing *first regardless* of what replaces the model,
+because they are the instruments the redesign will be read by:
+
+- **The two one-liners in item 0** — the `isMainThread()` null dereference and
+  the `try_lock` that returns without writing the output buffer. Both are
+  outright bugs and neither depends on the design.
+- **Make `currentThreadOwnsTheProcessLock()` real.** It returns a hardcoded
+  `true` on every platform this port builds (`spectrumWorxCore.cpp:385`), so all
+  six `LE_ASSERT(currentThreadOwnsTheProcessLock())` sites are vacuous. Until it
+  is real, the codebase's own account of who holds what is fiction — and a
+  redesign that cannot assert its invariants is a rewrite, not a redesign.
+
+Also worth capturing before the deadlocks are fixed, while they still reproduce:
+**which situations, in which host, and a stack from each side of the deadlock.**
+A held-lock backtrace pair is worth more than the whole of §2.2 to whoever does
+this, and it stops being collectable the moment the model changes.
+
+The original list, retained as the inventory rather than the plan:
+
+1. The two one-liners in item 0. *(Promoted above — do these regardless.)*
+2. Make `currentThreadOwnsTheProcessLock()` real. *(Promoted above — the
+   redesign needs it to be able to assert anything at all.)*
 3. Route `stateLoad` through the same deferral as everything else — today it
    rebuilds the module chain on the main thread with no lock at all, while
    `process()` may be walking it.
@@ -141,7 +191,7 @@ Then the things the sequence already asked for: an SPSC ring for audio→main
 CI under `-fsanitize=realtime`. **Run under `-fsanitize=address` first** — stage
 5's heap corruption was found that way in one run after an afternoon of reading
 had not, and `build-asan/` already exists but is configured from an older CMake
-and registers only three of the eight GUI tests.
+and registers only three of the nine GUI tests.
 
 ### 4 — A real state format (5.6), and its tests
 
@@ -405,7 +455,7 @@ the GUI are covered at the edges.
 | **CLAP state save/load** | Nothing. Zero hits for `CLAP_EXT_STATE` under `tests/`. The largest untested surface in the shipping path. |
 | **Sequential preset loads into one engine** | `presetCorpusTests.cpp:110` deliberately uses one engine per preset to avoid the merge path — so "load preset B on top of preset A", which is what a user does, is untested. |
 | **Malformed / truncated / missing preset** | Nothing. The corpus proves 303 happy paths. The `unknownEffect` and `missing` counters are asserted zero and never driven above zero, so the reporting path is unexercised. `saveTo()`'s refusal to overrun is never triggered because every test hands it a 1 MiB buffer. |
-| **The side-chain port is never fed** | `ActivePlugin::process` hardcodes `audio_inputs_count = 1` (`pluginTests.cpp:216`) even though the test asserts `audioPortsCount(true) == 2`, and `engineHarness.cpp:181` hands main and side the same pointer. Six side-chain effects are golden-pinned only in the degenerate case. |
+| **The side-chain port is never fed** | Re-verified 01.08.2026 and it is worse than one line: `ActivePlugin::process` hardcodes `audio_inputs_count = 1` (`pluginTests.cpp:218`), the port test only ever calls `ports->get(…, 0, …)` so the Side Chain port's *info* is unasserted, and `goldens/engineHarness.cpp:181` passes `inputPointers.data()` as **both** main and side. **Seven** side-chain effects are golden-pinned only in the degenerate side == main case. §2.8 has the recipe. |
 | **The test host is too thin** | It offers `clap.params` and nothing else — which is precisely why 2.1a is invisible. Adding `clap.state`, `clap.thread-check`, and a deliberate *without*-thread-check variant is the fix, and it is small. |
 | **`lfoImpl.cpp` has no direct test** | Only LFO 0 of module 0 targeting Gain is ever exercised. Waveform shapes, sync types, `PeriodScale` snapping, `LowerBound > UpperBound`, an LFO on an enumerated target, several at once — none. A value-table golden fits the existing pattern. |
 | **Both text conversions are stubs, and they are one job** | `paramsTextToValue` is `return false` (`spectrumWorxCLAP.cpp:469`); `paramsValueToText` **ignores the value it is given** and prints the parameter's current one (`:414-441`). Both are documented at length with a shared `\todo`: give `AutomatedParameterPrinter` an arm that takes a value *and* the live parameter, so an LFO's dynamic range has an owner to validate against. Host-visible in every automation lane tooltip, and unpinned by any test. |
@@ -543,10 +593,82 @@ come back for the Windows build, or `sst-plugininfra` already covers them.
   the build does not work", and links to `source/…` paths that stage 0 deleted.
   It is the first thing anyone sees.
 - **`build-asan/` is configured from an older CMake** and registers three of the
-  eight GUI ctest cases, so ASan never runs the editor, the preset browser or the
+  nine GUI ctest cases, so ASan never runs the editor, the preset browser or the
   module pages — the three things most likely to be interesting under it.
 - **The `#pragma message` in `vector.cpp:30`** says "LE.Math.Vector using OS X
   10.4 Accelerate framework". It is 2026.
+
+### 2.8 The side chain: wired, plausible, unverified
+
+Traced end to end on 01.08.2026, because "what is the state of the side chain"
+turned out to have four different answers depending on which file you opened.
+
+**The ports are right.** `audioPortsCount` is 2 in, 1 out
+(`spectrumWorxCLAP.cpp:178`); all three are `CLAP_PORT_STEREO` with a
+`channel_count` of 2. Input 0 is "Main In" with `CLAP_AUDIO_PORT_IS_MAIN`,
+input 1 is "Side Chain" with no flags, output 0 is "Main Out".
+`in_place_pair` is `CLAP_INVALID_ID`
+everywhere, deliberately: with an input gain of exactly one the core hands the
+host's own pointers to the WOLA path, which has not been audited for aliasing.
+
+**The engine agrees and the DSP path is live.** `activate()` hardwires
+`setNumberOfChannels(2, 2)` — two main, two side — so `hasSideChannel()` is true;
+the side channel gets its own OLA FIFO (`sideOLA_`) and its own forward FFT
+through `ChannelData::setNewTimeDomainData`
+(`channelBuffers.cpp:92-100`). **Seven** of the 57 effects take
+`Engine::MainSideChannelData_ReIm` rather than `MainChannelData_ReIm` and so read
+it: `colorifer`, `blender`, `vocoder`, `pitch_follower`, `inserter`,
+`talking_wind`, `burrito`.
+
+**Three things that are easy to get wrong about it:**
+
+- **`LE_SW_DISABLE_SIDE_CHANNEL` is not this.** Despite the name it is the
+  *external audio file* feature — `SampleArea`, the editor's "External audio"
+  box, `registerSampleLoadedListener`. It touches GUI, editor and preset files
+  only; the side-chain port and the DSP that reads it are unaffected by it. It
+  belongs to item 7 (5.0). Nothing about dropping that flag turns the side chain
+  on, because the side chain is already on.
+- **`LE_SW_ENGINE_INPUT_MODE = 0` does not disable it either.** All it removes is
+  the user-facing InputMode parameter (Mono / Mono+SideChain / Stereo /
+  Stereo+SideChain) and the parameter↔channel-config synchronisation. With it off
+  the CLAP's explicit `setNumberOfChannels(2, 2)` stands unopposed, which for a
+  fixed port layout is what you want anyway. This is the one entry in §2.4's
+  table whose absence is currently *harmless*.
+- **An unpatched side chain is the main input, not silence.** `runEngine`
+  (`spectrumWorxCLAP.cpp:691-694`) falls back to `input.data32` when the host has
+  not connected port 1. So a Blender with nothing patched blends the signal with
+  itself. Defensible, but it is a choice and it is undocumented anywhere a user
+  would find it.
+
+**The test pattern that is missing, and it is small.** Nothing has ever put a
+*different* signal on port 1, at either level, so all seven effects are pinned
+only where side == main — the one case in which a side-chain effect cannot be
+distinguished from a bug that ignores the side chain entirely.
+
+1. **`tests/goldens/engineHarness.cpp`** — `render()` builds `inputChannels` and
+   passes `inputPointers.data()` twice (`:181`). Give it a second signal and a
+   second pointer array: `sideChannels`, generated from a *different* `signal`
+   than the main one (the generator already takes one), and pass
+   `sidePointers.data()` as the second argument. The comment at `:166` already
+   claims the side-chain effects "are driven separately"; nothing in `tests/`
+   does, so this makes an existing comment true.
+2. **A golden case per side-chain effect**, with main and side deliberately
+   dissimilar — a sine against noise is enough, and the corpus already has both
+   generators. That is what turns seven degenerate goldens into real ones.
+3. **`tests/clap/pluginTests.cpp`** — `ActivePlugin::process` sets
+   `audio_inputs_count = 1` (`:218`). A second `clap_audio_buffer` with its own
+   two channels, and `audio_inputs_count = 2`, exercises the port-1 branch of
+   `runEngine` for the first time. Keep a variant that still passes 1, because
+   the fallback-to-main path is also untested and is what most hosts will do.
+4. **Assert the Side Chain port's info.** The port test (`:439`) checks
+   `count(true) == 2` and then only calls `ports->get(…, 0, …)`. One more call
+   with index 1, asserting the id, the stereo type and that `IS_MAIN` is clear.
+
+**One loose end.** Every effect declares `static bool const usesSideChannel`, and
+`effects.hpp:61` documents it as part of the effect contract — but a grep of
+`src/` and `tests/` finds **no reader**. Dispatch is by parameter type, not by
+that constant. Either something generated consumes it and the grep is wrong, or
+57 files are maintaining dead metadata; worth five minutes with item 9.
 
 ---
 
@@ -831,7 +953,13 @@ identity being changed is the *publisher's*, not the author's.
 
 ## 5. Where to focus
 
-Beyond the ordered list, five things worth deciding rather than drifting into.
+Beyond the ordered list, six things worth deciding rather than drifting into.
+
+**0. Capture the deadlocks before touching the threading.** They reproduce in
+Logic and in Bitwig today; the moment the model changes they stop being
+collectable, and a stack from each side of a held lock is worth more to the
+redesign than the whole of §2.2. Which host, which situation, both backtraces.
+This is the only item here with an expiry date.
 
 **1. Thicken the test host before doing anything else to the host layer.**
 §2.1a is a null dereference that the whole green suite cannot see, because the
@@ -845,6 +973,11 @@ Uniform-colour detection plus a dimension check is ten lines in `renderPage()`,
 and a `foreach` over the effect list turns one module UI into 57. That combination
 is the cheapest large increase in coverage available anywhere in this tree, and
 the GUI is where week one's bugs actually were.
+
+**2a. Feed the side chain a different signal.** The same argument, for the DSP:
+§2.8 has the four-step recipe, it is well under a day, and it converts seven
+effects' goldens from "cannot distinguish a working side chain from one that is
+ignored" into real pins. Both harnesses currently pass the main input twice.
 
 **3. CLAP preset discovery is a natural fit and nobody has mentioned it.** The
 303 factory banks are already in the binary behind a clean API
