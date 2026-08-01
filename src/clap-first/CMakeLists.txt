@@ -44,3 +44,11 @@ make_clapfirst_plugins(
 # Read back by the installer; clap-wrapper does not set it.
 set_target_properties(${SW_CLAPFIRST_TARGET}_all PROPERTIES
         ARTEFACT_DIRECTORY ${CMAKE_BINARY_DIR}/sw_assets)
+
+# \note The standalone's macOS bundle identifier is *not* ours. clap-wrapper
+# hardcodes it in its own Info.plist.in as "${MACOSX_BUNDLE_BUNDLE_NAME}
+# .standalone" -- so "SpectrumWorx.standalone", a bundle name with a suffix
+# rather than a reverse DNS identifier -- and no CMake property overrides that
+# one key. The only local remedy is to carry a whole copy of their template,
+# which is a fork of a third-party file to change one line. Fix it upstream
+# instead; it matters at notarisation and nowhere before.

@@ -31,7 +31,19 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 project(SpectrumWorx VERSION 3.0.0 LANGUAGES C CXX)
 
 set(PRODUCT_NAME "SpectrumWorx")
-set(SW_CLAP_ID "com.littleendian.spectrumworx")
+
+# The plugin's identity, in one place. These reach the C++ as compile
+# definitions (src/CMakeLists.txt) and the bundle identifiers through
+# make_clapfirst_plugins(), so nothing needs to repeat a string.
+#
+# SW_CLAP_ID is load bearing beyond the CLAP: clap-wrapper derives the VST3
+# class id from it with a SHA-1 (wrapasvst3_entry.cpp), unless the plugin
+# declares a componentId of its own. So changing it after a release would
+# orphan every saved VST3 session -- which is why it was changed now, before
+# anything shipped, rather than later.
+set(SW_CLAP_ID "org.surge-synth-team.spectrumworx")
+set(SW_VENDOR "Surge Synth Team")
+set(SW_VENDOR_URL "https://surge-synth-team.org")
 
 # The JUCE shim compiles .mm. Enable ObjC here, not in a subdirectory — CMake
 # does not populate CMAKE_OBJCXX_COMPILE_OBJECT for subdirectory-scoped

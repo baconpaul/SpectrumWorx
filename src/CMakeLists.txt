@@ -62,5 +62,7 @@ target_link_libraries(sw-impl PUBLIC sst::clap_juce_shim_headers)
 target_compile_definitions(sw-impl PRIVATE
         PRODUCT_NAME="${PRODUCT_NAME}"
         SW_CLAP_ID="${SW_CLAP_ID}"
+        SW_VENDOR="${SW_VENDOR}"
+        SW_VENDOR_URL="${SW_VENDOR_URL}"
         JUCE_STANDALONE_APPLICATION=0
 )

@@ -73,16 +73,22 @@ bool readFully(clap_istream const *const stream, void *const data, std::size_t s
 }
 } // namespace
 
+/// \note Every string here comes from the build (src/CMakeLists.txt), because
+/// the bundle identifiers are made of the same ones and a second copy is how
+/// they drift. SW_CLAP_ID in particular is the plugin's identity in three
+/// places at once: the CLAP id, the `.clap`/`.vst3`/`.component` bundle
+/// identifiers, and -- by way of a SHA-1 in clap-wrapper -- the VST3 class id.
+///                                           (01.08.2026.) (SW port)
 clap_plugin_descriptor const *descriptor()
 {
     static char const *features[]{CLAP_PLUGIN_FEATURE_AUDIO_EFFECT, CLAP_PLUGIN_FEATURE_STEREO,
                                   "spectral", nullptr};
     static clap_plugin_descriptor const description{
         CLAP_VERSION,
-        "com.littleendian.spectrumworx",
-        "SpectrumWorx",
-        "Little Endian Ltd",
-        "https://github.com/baconpaul/SpectrumWorx",
+        SW_CLAP_ID,
+        PRODUCT_NAME,
+        SW_VENDOR,
+        SW_VENDOR_URL,
         "",
         "",
         sst::plugininfra::VersionInformation::project_version_and_hash,

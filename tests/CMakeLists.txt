@@ -9,6 +9,7 @@
 
 add_executable(sw-tests
         clap/engineSetupStalenessTests.cpp
+        clap/identityTests.cpp
         clap/parameterModelTests.cpp
         clap/pluginTests.cpp
         effects/effectsListTests.cpp
@@ -39,6 +40,12 @@ sw_force_include_odr_header(sw-tests)
 # tests drive. No dlopen: the tests link the same static library the .clap
 # bundle does, so what they exercise is what ships.
 target_link_libraries(sw-tests PRIVATE sw-impl sw-gui-resources Catch2::Catch2WithMain)
+
+# clapwrapper/{auv2,vst3}.h, for the two sub-factories identityTests.cpp pins.
+# sw-impl links this PRIVATE -- it is a header-only interface target and the
+# entry stubs get it from clap-wrapper's own side -- so it does not arrive here
+# across the link line.
+target_link_libraries(sw-tests PRIVATE clap-wrapper-extensions)
 
 # \note LE_CHECKED_BUILD is deliberately *not* forced here. It decides whether
 # NDEBUG survives, and forcing it on for the test objects only would leave them
