@@ -141,12 +141,29 @@ struct Consumer
 } // anonymous namespace
 //------------------------------------------------------------------------------
 
+bool loadPreset(EditorHost &host, SpectrumWorxEditor &editor, char *const inMemoryPreset,
+                bool const ignoreExternalSample, juce::String *const comment,
+                char const *const presetName)
+{
+    Consumer const consumer{host, editor};
+
+    consumer.notifyHostAboutPresetChangeBegin();
+    bool const succeeded(SW::loadPreset(inMemoryPreset, ignoreExternalSample, comment, consumer));
+    if (succeeded)
+        copyPresetName(presetName, consumer.program().name());
+    consumer.notifyHostAboutPresetChangeEnd();
+
+    return succeeded;
+}
+
 bool loadPreset(EditorHost &host, SpectrumWorxEditor &editor, juce::File const &presetFile,
                 bool const ignoreExternalSample, juce::String *const comment,
                 char const *const presetName)
 {
-    return SW::loadPreset(presetFile, ignoreExternalSample, comment, presetName,
-                          Consumer{host, editor});
+    auto const presetData(readPresetFile(presetFile));
+    if (!presetData)
+        return false;
+    return loadPreset(host, editor, presetData.get(), ignoreExternalSample, comment, presetName);
 }
 
 //------------------------------------------------------------------------------

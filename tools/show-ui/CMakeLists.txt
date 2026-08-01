@@ -61,11 +61,23 @@ if (SW_BUILD_TESTS)
     # EditorModuleInitialiser, neither of which the empty editor touches.
     # editor-module-cold does it against an engine with no sample rate, which is
     # the order a session restore arrives in and the one that used to assert.
-    foreach (page editor editor-module editor-module-cold environment skin theme)
+    # editor-presets opens the preset browser, which is what the presets button
+    # does and which segfaulted the first time anyone pressed it: nothing
+    # headless covered that button until this page.
+    foreach (page editor editor-module editor-module-cold editor-presets environment skin theme)
         add_test(NAME show-ui-renders-${page}
                 COMMAND sw-show-ui --render ${page}
                 "${CMAKE_CURRENT_BINARY_DIR}/rendered-${page}.png")
     endforeach()
+
+    # \note And one bank listed out of the binary, which is the other half of
+    # what that button does: the root shows "Factory" and "User", and this is
+    # what is behind the first of them.
+    add_test(NAME show-ui-renders-editor-presets-factory-bank
+            COMMAND sw-show-ui --render editor-presets
+            "${CMAKE_CURRENT_BINARY_DIR}/rendered-editor-presets-bank.png")
+    set_tests_properties(show-ui-renders-editor-presets-factory-bank
+            PROPERTIES ENVIRONMENT "SW_SHOW_UI_PRESET_BANK=Echoes")
 endif()
 
 if (APPLE)

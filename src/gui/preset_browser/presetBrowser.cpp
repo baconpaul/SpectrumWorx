@@ -14,6 +14,7 @@
 #include "gui/editor/spectrumWorxEditor.hpp"
 
 #include "le/parameters/uiElements.hpp"
+#include "le/spectrumworx/factoryPresets.hpp"
 #include "le/spectrumworx/presetFile.hpp"
 #include "le/spectrumworx/presets.hpp"
 #include "le/utility/countof.hpp"
@@ -73,7 +74,15 @@ PresetBrowser::PresetBrowser()
 
     browseArrow_.addListener(this);
 
-    setNewFolder(GUI::presetsFolder());
+    /// \note Here rather than at the first save: an empty browser with no way
+    /// to make a folder is not a usable answer to "you have no presets yet".
+    GUI::createUserPresetsFolder();
+
+    /// \note Opens at the root -- "Factory" and "User" -- rather than on the
+    /// user's folder. A new installation's user folder is empty, and a browser
+    /// that opens on nothing while 303 presets sit in the binary is the state
+    /// this was reported in.
+    setRoot();
 
     browseArrow_.setTopLeftPosition(174, 10);
     save_.setTopLeftPosition(17, 33);
@@ -142,15 +151,41 @@ PresetBrowser::~PresetBrowser()
     //this->fadeOutComponent( 600, 0, 0, 0.2f );
     //juce::Point<int> const centre( this->getBounds().getCentre() );
     //juce::Desktop::getInstance().getAnimator().animateComponent( this, juce::Rectangle<int>( centre, centre ), 0, 600, true, 0, 0 );
-    GUI::presetsFolder() = currentDirectory_;
+    /// \note Only a real folder is worth remembering; the factory banks are
+    /// where they always are.
+    if (location_ == Location::User)
+        GUI::presetsFolder() = currentDirectory_;
 }
 
-bool PresetBrowser::enablePresetSaving() const { return true; }
+/// \note A factory bank is compiled into the binary, so there is nothing to save
+/// into, rename or delete there.
+bool PresetBrowser::enablePresetSaving() const { return location_ == Location::User; }
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// PresetBrowser::selectedPresetData()
+// -----------------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The one place the two sources meet. Both hand back the same thing --
+/// a writable, NUL-terminated buffer -- so everything downstream of here is the
+/// same code for a factory preset and for the user's own.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+Preset::InMemoryPreset PresetBrowser::selectedPresetData() const
+{
+    auto const &item(selectedItem());
+    if (inFactory())
+        return FactoryPresets::load(factoryBank_.toStdString(), item.name.toStdString());
+    return readPresetFile(selectedFile());
+}
 
 void PresetBrowser::presetSelectionChanged()
 {
     Item const &item(selectedItem());
-    if (item.isDirectory)
+    if (item.isDirectory())
     {
         save_.setEnabled(false);
         delete_.setEnabled(false);
@@ -162,8 +197,10 @@ void PresetBrowser::presetSelectionChanged()
     save_.setEnabled(enablePresetSaving);
     delete_.setEnabled(enablePresetSaving);
 
-    bool const succeeded(editor().loadPreset(
-        selectedFile(), ignoreExternalSamples_.getToggleState(), originalComment_, item.name));
+    auto const presetData(selectedPresetData());
+    bool const succeeded(presetData && editor().loadPreset(presetData.get(),
+                                                           ignoreExternalSamples_.getToggleState(),
+                                                           originalComment_, item.name));
 
     if (!succeeded)
     {
@@ -186,18 +223,20 @@ unsigned int PresetBrowser::selectedIndex() const
 PresetBrowser::Item const &PresetBrowser::item(unsigned int const index) const
 {
     Item const &item(files_.getReference(index));
-    LE_ASSERT(
-        currentDirectory_.getChildFile(item.name + (item.isDirectory ? _T( "" ) : presetExtension))
-            .exists());
+    LE_ASSERT((location_ != Location::User) || item.isDirectory() ||
+              currentDirectory_.getChildFile(item.name + presetExtension).exists());
     return item;
 }
 
 PresetBrowser::Item const &PresetBrowser::selectedItem() const { return item(selectedIndex()); }
 
+/// \note Only meaningful for a preset on disk; a factory bank has no file. See
+/// selectedPresetData(), which is what the load path uses.
 juce::File PresetBrowser::file(unsigned int const index) const
 {
     Item const &item(this->item(index));
-    LE_ASSERT(!item.isDirectory);
+    LE_ASSERT(!item.isDirectory());
+    LE_ASSERT(location_ == Location::User);
     return currentDirectory_.getChildFile(item.name + presetExtension);
 }
 
@@ -212,10 +251,29 @@ PresetBrowser::Item const *PresetBrowser::findPreset(juce::String const &presetN
 void PresetBrowser::listBoxItemDoubleClicked(int const row, juce::MouseEvent const &)
 {
     Item const &item(this->item(row));
-    if (item.isDirectory)
-        setNewFolder(currentDirectory_.getChildFile(item.name));
-    else
-        showFilenameEditBox(item.name, listBox_.getLastRowSelected());
+    switch (item.kind)
+    {
+    case Item::Kind::Parent:
+        return goToParent();
+
+    case Item::Kind::Section:
+        if (item.name == "Factory")
+            return setFactoryBank({});
+        return setNewFolder(GUI::presetsFolder());
+
+    case Item::Kind::Folder:
+        if (inFactory())
+            return setFactoryBank(factoryBank_.isEmpty() ? item.name
+                                                         : factoryBank_ + "/" + item.name);
+        return setNewFolder(currentDirectory_.getChildFile(item.name));
+
+    case Item::Kind::Preset:
+        /// \note Renaming is the double-click action on a preset, and a factory
+        /// bank is in the binary.
+        if (!inFactory())
+            showFilenameEditBox(item.name, listBox_.getLastRowSelected());
+        return;
+    }
 }
 
 void PresetBrowser::paintListBoxItem(int const rowNumber, juce::Graphics &graphics, int const width,
@@ -245,7 +303,7 @@ void PresetBrowser::paintListBoxItem(int const rowNumber, juce::Graphics &graphi
 
     Item const &item(this->item(rowNumber));
 
-    bool const isDirectory(item.isDirectory);
+    bool const isDirectory(item.isDirectory());
 
     unsigned int const x(isDirectory ? 16 : 4);
 
@@ -443,6 +501,13 @@ void PresetBrowser::saveDirtyComment()
     if (dirtyCommentPresetIndex_ < 0)
         return;
 
+    // A factory preset's comment is in the binary; there is nothing to write to.
+    if (location_ != Location::User)
+    {
+        dirtyCommentPresetIndex_ = -1;
+        return;
+    }
+
     juce::File const dirtyPreset(this->file(dirtyCommentPresetIndex_));
 
     dirtyCommentPresetIndex_ = -1;
@@ -605,13 +670,71 @@ void PresetBrowser::askForOverwrite(std::function<void(bool)> onAnswer)
 
 void PresetBrowser::setNewFolder(juce::File const &file)
 {
-    unsigned int const length(file.getFullPathName().length());
-    bool const goToParent((file.getFullPathName()[length - 1] == '.') &&
-                          (file.getFullPathName()[length - 2] == '.'));
-    currentDirectory_ = goToParent ? file.getParentDirectory().getParentDirectory() : file;
+    location_ = Location::User;
+    factoryBank_.clear();
+    currentDirectory_ = file;
     deselectAllRows();
     refresh();
     background().repaint();
+}
+
+void PresetBrowser::setFactoryBank(juce::String const &bank)
+{
+    location_ = Location::Factory;
+    factoryBank_ = bank;
+    deselectAllRows();
+    refresh();
+    background().repaint();
+}
+
+void PresetBrowser::setRoot()
+{
+    location_ = Location::Root;
+    factoryBank_.clear();
+    deselectAllRows();
+    refresh();
+    background().repaint();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// PresetBrowser::goToParent()
+// ---------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note There was no way up before this. `setNewFolder` had a "does the path
+/// end in `..`" test, but `refresh()` skipped `..` when listing a directory, so
+/// no row ever carried that name and the test never fired -- the only way out of
+/// a folder was the browse arrow and a native file dialog.
+///                                           (31.07.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void PresetBrowser::goToParent()
+{
+    switch (location_)
+    {
+    case Location::Root:
+        return;
+
+    case Location::Factory:
+    {
+        if (factoryBank_.isEmpty())
+            return setRoot();
+        auto const separator(factoryBank_.lastIndexOfChar('/'));
+        return setFactoryBank(separator < 0 ? juce::String()
+                                            : factoryBank_.substring(0, separator));
+    }
+
+    case Location::User:
+        /// \note Up out of the user's own preset folder is the root rather than
+        /// the rest of the filesystem. Somewhere above `~/Documents` there is
+        /// nothing a preset browser should be showing.
+        if (currentDirectory_ == GUI::presetsFolder())
+            return setRoot();
+        return setNewFolder(currentDirectory_.getParentDirectory());
+    }
 }
 
 SpectrumWorxEditor &PresetBrowser::editor()
@@ -639,9 +762,88 @@ void PresetBrowser::selectedRowsChanged(int const lastRowSelected)
 
 int PresetBrowser::getNumRows() noexcept { return files_.size() + addOneRow_; }
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// PresetBrowser::refresh()
+// ------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Three listings, because there are three things to list: two fixed
+/// entries at the root, a bank out of the binary, or a directory. Only the last
+/// is what this browser used to do.
+///
+////////////////////////////////////////////////////////////////////////////////
+
 void PresetBrowser::refresh()
 {
     files_.clearQuick();
+
+    switch (location_)
+    {
+    case Location::Root:
+        refreshRoot();
+        break;
+    case Location::Factory:
+        refreshFactory();
+        break;
+    case Location::User:
+        refreshUserDirectory();
+        break;
+    }
+
+    std::sort(files_.begin(), files_.end());
+
+    listBox_.updateContent();
+}
+
+void PresetBrowser::refreshRoot()
+{
+    files_.add(Item{"Factory", Item::Kind::Section});
+    files_.add(Item{"User", Item::Kind::Section});
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// PresetBrowser::refreshFactory()
+// -------------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note FactoryPresets::banks() is every directory that holds presets, as a
+/// path relative to the root, so the children of the current bank are the ones
+/// that start with it and have no further separator. Three of the fifteen banks
+/// have a sub-folder, which is why this is a filter rather than a lookup.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void PresetBrowser::refreshFactory()
+{
+    files_.add(Item{"..", Item::Kind::Parent});
+
+    juce::String const prefix(factoryBank_.isEmpty() ? juce::String() : factoryBank_ + "/");
+
+    for (auto const &bank : FactoryPresets::banks())
+    {
+        juce::String const path(bank.c_str());
+        if (!path.startsWith(prefix) || (path == factoryBank_))
+            continue;
+
+        auto const remainder(path.substring(prefix.length()));
+        if (remainder.isEmpty() || remainder.containsChar('/'))
+            continue; // a grandchild; it shows up once its parent is opened
+
+        files_.add(Item{remainder, Item::Kind::Folder});
+    }
+
+    if (!factoryBank_.isEmpty())
+        for (auto const &preset : FactoryPresets::presets(factoryBank_.toStdString()))
+            files_.add(Item{preset.c_str(), Item::Kind::Preset});
+}
+
+void PresetBrowser::refreshUserDirectory()
+{
+    files_.add(Item{"..", Item::Kind::Parent});
 
     std::error_code listingError;
     Item item;
@@ -660,15 +862,11 @@ void PresetBrowser::refresh()
 
         if (isDirectory || std::_tcscmp(fileName.c_str() + nameLength, presetExtension) == 0)
         {
-            item.isDirectory = isDirectory;
+            item.kind = isDirectory ? Item::Kind::Folder : Item::Kind::Preset;
             item.name = juce::String(fileName.c_str(), nameLength);
             files_.add(item);
         }
     }
-
-    std::sort(files_.begin(), files_.end());
-
-    listBox_.updateContent();
 }
 
 void PresetBrowser::refreshAndSelectPreset(juce::String const &presetName)
@@ -716,10 +914,12 @@ void PresetBrowser::paint(juce::Graphics &graphics)
 
 bool PresetBrowser::Item::operator==(Item const &other) const { return name == other.name; }
 
+/// \note By kind first, so ".." is always the top row and folders always precede
+/// presets, and by name within a kind.
 bool PresetBrowser::Item::operator<(Item const &other) const
 {
-    if (this->isDirectory != other.isDirectory)
-        return this->isDirectory;
+    if (this->kind != other.kind)
+        return this->kind < other.kind;
     return this->name < other.name;
 }
 

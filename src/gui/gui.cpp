@@ -14,6 +14,7 @@
 
 #include "le/utility/assert.hpp"
 #include "le/utility/ignoreUnused.hpp"
+#include "le/utility/trace.hpp"
 #include "le/utility/polymorphicDowncast.hpp"
 
 #include <sst/plugininfra/paths.h>
@@ -218,9 +219,6 @@ void warningOkCancelBox(TCHAR const *const title, TCHAR const *const question,
     }
 }
 
-static juce::File pluginRootPath;
-static juce::File mruPresetsFolder;
-
 /// \note `maxPathLength`, `path_t` and `getBinaryPath()` stood here and are
 /// deleted. They existed only to locate the `SpectrumWorx.paths` file the note
 /// below describes, and nothing had called them since 6.3 removed the two
@@ -233,8 +231,8 @@ static juce::File mruPresetsFolder;
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-// initializePaths()
-// -----------------
+// Global paths
+// ------------
 //
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -253,39 +251,69 @@ static juce::File mruPresetsFolder;
 /// same code, rather than by the `userApplicationDataDirectory` that stood here
 /// as a placeholder. On Linux it honours XDG.
 ///
-/// \note The directory is created here rather than at the first save. A browser
-/// that opens on a folder which does not exist shows nothing and offers no way
-/// to make one.
+/// \note **Answered on demand, not initialised.** There was an `initializePaths()`
+/// beside these, and a `havePathsBeenInitialised()`, and an assert in each getter
+/// saying "Not initialized." -- and nothing called the initialiser. Its only
+/// caller had been the 2016 VST2/AU plugin class, which the CLAP replaced; the
+/// scaffolding outlived it and went unnoticed for as long as
+/// `presetBrowser.cpp` was in no target. The moment stage 8 put it in one,
+/// pressing the presets button hit that assert.
+///
+///   So there is no initialisation step to forget. A function-local static is
+/// computed on first use and is thread-safe by the language rather than by
+/// convention, and the getters cannot be called too early because there is no
+/// "too early".
 ///                                       (31.07.2026.) (SW port)
-
-bool initializePaths()
-{
-    if (havePathsBeenInitialised())
-        return true;
-
-    pluginRootPath = juce::File(
-        sst::plugininfra::paths::bestDocumentsFolderPathFor("SpectrumWorx").u8string().c_str());
-    mruPresetsFolder = pluginRootPath.getChildFile("Presets");
-
-    auto const created(mruPresetsFolder.createDirectory());
-    LE_ASSERT_MSG(created.wasOk(), "Cannot create the user preset directory.");
-    LE::Utility::ignoreUnused(created);
-
-    return true;
-}
-
-bool havePathsBeenInitialised() { return pluginRootPath != juce::File(); }
 
 juce::File const &rootPath()
 {
-    LE_ASSERT_MSG((pluginRootPath != juce::File()), "Not initialized.");
-    return pluginRootPath;
+    static juce::File const path(
+        sst::plugininfra::paths::bestDocumentsFolderPathFor("SpectrumWorx").u8string().c_str());
+    return path;
 }
 
+/// \note Mutable, and by reference: this is the browser's most-recently-used
+/// folder, which it writes back when it closes. It starts at the user's preset
+/// directory.
 juce::File &presetsFolder()
 {
-    LE_ASSERT_MSG((mruPresetsFolder != juce::File()), "Not initialized.");
-    return mruPresetsFolder;
+    static juce::File folder(rootPath().getChildFile("Presets"));
+    return folder;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// createUserPresetsFolder()
+// -------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Separate from presetsFolder(), and called when the browser opens rather
+/// than from the getter. Asking where the presets go should not create anything
+/// -- a test that wants to check the path should not leave a directory in
+/// someone's Documents -- but a browser that opens on a folder which is not
+/// there shows nothing and offers no way to make one.
+///
+/// \note Traced and reported, not asserted. A plugin does not always get to
+/// write to the user's Documents folder: an AUv2 under macOS app sandboxing may
+/// not, a locked-down or roaming home directory may not, and a CI container
+/// certainly does not. None of those is a programming error, and none of them
+/// should stop the editor opening -- the browser shows an empty folder and
+/// saving is what fails, with a message.
+///                                       (31.07.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+bool createUserPresetsFolder()
+{
+    auto const &folder(presetsFolder());
+    if (folder.isDirectory())
+        return true;
+
+    auto const created(folder.createDirectory());
+    LE_TRACE_IF(!created.wasOk(), "SW: cannot create the user preset directory (%s).",
+                created.getErrorMessage().toRawUTF8());
+    return created.wasOk();
 }
 
 void paintImage(juce::Graphics &graphics, juce::Image const &image)
@@ -416,13 +444,45 @@ bool isParentOf(juce::Component const &parent, juce::Component const *pPossibleC
 HHOOK OwnedWindowBase::wndProcHook(0);
 #endif // _WIN32
 
-void OwnedWindowBase::attach(SpectrumWorxEditor &parent, juce::Component &window)
+////////////////////////////////////////////////////////////////////////////////
+//
+// OwnedWindowBase::attach()
+// -------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note An owned window needs the editor's *native* window to attach itself to,
+/// and the editor does not always have one. `*parent.getPeer()` stood at the top
+/// of this function and dereferenced whatever it got: a null peer went straight
+/// into `makeEditorChild`, which reads through it, and the presets button
+/// segfaulted. `tools/show-ui`'s "editor-presets" page reproduces it -- an
+/// offscreen render has no window at all, so the editor has no peer and never
+/// will.
+///
+///   Without a peer the browser becomes an ordinary child of the editor rather
+/// than a window glued to it. That is not the finished answer; it is what
+/// **stage 6.4** is for, and doing it properly means re-laying-out the editor so
+/// the browser has somewhere to be. It is, however, the honest one: this
+/// function's whole job is to make one native window own another, and where
+/// there is no native window there is nothing for it to do.
+///                                           (31.07.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+bool OwnedWindowBase::attach(SpectrumWorxEditor &parent, juce::Component &window)
 {
     LE_ASSERT(!window.isOpaque());
 
     //...mrmlj...check these links for mac keystroke handling:
     //http://lists.steinberg.net:8100/Lists/vst-plugins/Message/12066.html
-    juce::ComponentPeer &owner(*parent.getPeer());
+    auto *const pOwner(parent.getPeer());
+    if (!pOwner)
+    {
+        LE_TRACE("SW: the editor has no window peer; the owned window becomes a child.");
+        parent.addAndMakeVisible(window);
+        return false;
+    }
+    juce::ComponentPeer &owner(*pOwner);
 #ifdef _WIN32
     // Implementation note:
     //   FL Studio 9 uses a GUI engine that has a 'nonstandard' way of handling/
@@ -516,11 +576,17 @@ void OwnedWindowBase::attach(SpectrumWorxEditor &parent, juce::Component &window
     // http://www.cocoadev.com/index.pl?WindowFollowingWindow
     // http://web.mac.com/mabi99/marcocoa/blog/Entries/2007/5/30_Watching_a_window%E2%80%99s_frame.html
     window.juce::Component::addToDesktop(juce::ComponentPeer::windowIsSemiTransparent);
-    juce::ComponentPeer &ownedWindowPeer(*window.getPeer());
-    makeEditorChild(owner, ownedWindowPeer);
+    /// \note And the other one. addToDesktop() is not required to have produced
+    /// a peer -- it will not have if the component is zero-sized, and a headless
+    /// or offscreen host has other ways of declining.
+    if (auto *const pOwnedWindowPeer = window.getPeer())
+        makeEditorChild(owner, *pOwnedWindowPeer);
+    else
+        LE_TRACE("SW: the owned window did not get a peer; it stays unattached.");
 #endif // __APPLE__
 
     window.juce::Component::setVisible(true);
+    return true;
 }
 
 void OwnedWindowBase::detach([[maybe_unused]] SpectrumWorxEditor &editor,
@@ -537,7 +603,12 @@ void OwnedWindowBase::detach([[maybe_unused]] SpectrumWorxEditor &editor,
         wndProcHook = 0;
     }
 #elif defined(__APPLE__)
-    detachFromEditor(*editor.getPeer(), *ownee.getPeer());
+    /// \note Both peers checked, for the same reason attach() checks them: an
+    /// editor without a native window never made the ownee a native child, so
+    /// there is nothing to undo and nothing to dereference.
+    if (auto *const pEditorPeer = editor.getPeer())
+        if (auto *const pOwneePeer = ownee.getPeer())
+            detachFromEditor(*pEditorPeer, *pOwneePeer);
 #else
     /// \note `detachFromEditor` is defined in gui.mm, so the `#else` this
     /// replaces reached an Objective-C++ function on Linux. There is nothing to
@@ -635,11 +706,11 @@ LRESULT CALLBACK OwnedWindowBase::callWndHookProc(int const nCode, WPARAM const 
                 /// there to move.
                 ///                           (30.07.2026.) (SW port)
 #ifndef LE_NO_PRESETS
-                juce::Component *const pPresetBrowser(editor.presetBrowser_.operator->());
+                juce::Component *const pPresetBrowser(windowOrNull(editor.presetBrowser_));
 #else
                 juce::Component *const pPresetBrowser(nullptr);
 #endif // LE_NO_PRESETS
-                adjustPositions(pPresetBrowser, editor.settings_.operator->(), newEditorLocation.x,
+                adjustPositions(pPresetBrowser, windowOrNull(editor.settings_), newEditorLocation.x,
                                 newEditorLocation.y, wp.flags);
             }
         }
@@ -651,6 +722,33 @@ LRESULT CALLBACK OwnedWindowBase::callWndHookProc(int const nCode, WPARAM const 
 
 namespace
 {
+////////////////////////////////////////////////////////////////////////////////
+//
+// windowOrNull()
+// --------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief The component in \p window, or nullptr when there is not one open.
+///
+/// \note `window.operator->()` stood at all four call sites, and on a
+/// *disengaged* optional that does not return null -- it returns the address of
+/// the uninitialised storage, which is never null. So `adjustOwnedWindow`'s
+/// `if (pWindow)` guard always passed and the very next line made a virtual call
+/// through an uninitialised vtable. Opening the preset browser with the settings
+/// window shut -- which is the ordinary case -- segfaulted every time.
+///
+///   This is the hazard stage 2 recorded when `boost::optional` became
+/// `std::optional` and 6.7 was told to go looking for; here it is.
+///                                           (31.07.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+template <class Window> juce::Component *windowOrNull(std::optional<Window> &window)
+{
+    return window ? &*window : nullptr;
+}
+
 void adjustOwnedWindow(juce::Component *const pWindow, unsigned int &x, unsigned int const y,
                        unsigned int const doHide, unsigned int const doShow)
 {
@@ -710,7 +808,7 @@ void OwnedWindowBase::adjustPositions(SpectrumWorxEditor &parent,
 void OwnedWindowBase::adjustPositionsForPresetBrowser(SpectrumWorxEditor &parent,
                                                       juce::Component *const pCurrentWindowState)
 {
-    adjustPositions(parent, pCurrentWindowState, parent.settings_.operator->());
+    adjustPositions(parent, pCurrentWindowState, windowOrNull(parent.settings_));
 }
 
 void OwnedWindowBase::adjustPositionsForSettings(SpectrumWorxEditor &parent,
@@ -719,7 +817,7 @@ void OwnedWindowBase::adjustPositionsForSettings(SpectrumWorxEditor &parent,
 #ifdef LE_NO_PRESETS
     adjustPositions(parent, nullptr, pCurrentWindowState);
 #else
-    adjustPositions(parent, parent.presetBrowser_.operator->(), pCurrentWindowState);
+    adjustPositions(parent, windowOrNull(parent.presetBrowser_), pCurrentWindowState);
 #endif // LE_NO_PRESETS
 }
 

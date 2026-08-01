@@ -14,6 +14,7 @@ add_executable(sw-tests
         goldens/engineHarness.cpp
         goldens/goldenDigest.cpp
         goldens/goldenTests.cpp
+        gui/pathsTests.cpp
         gui/skinTests.cpp
         math/fftTests.cpp
         math/scalarTests.cpp

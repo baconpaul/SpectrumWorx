@@ -352,18 +352,26 @@ Utility::CriticalSectionLock SpectrumWorxEditor::getProcessingLock() const
     return effect().getProcessingLock();
 }
 
-#ifndef LE_NO_PRESETS
 void SpectrumWorxEditor::togglePresetBrowser(juce::Button const &button)
 {
     auto &editor(SpectrumWorxEditor::fromChild(button));
     LE_ASSERT(editor.getPeer());
-    bool const open(button.getToggleState());
-    if (open)
-        editor.presetBrowser_.emplace();
-    else
-        editor.presetBrowser_ = std::nullopt;
+    editor.showPresetBrowser(button.getToggleState());
 }
-#endif // !LE_NO_PRESETS
+
+void SpectrumWorxEditor::showPresetBrowser(bool const show)
+{
+    if (show)
+        presetBrowser_.emplace();
+    else
+        presetBrowser_ = std::nullopt;
+}
+
+void SpectrumWorxEditor::showFactoryBank(juce::String const &bank)
+{
+    showPresetBrowser(true);
+    presetBrowser_->setFactoryBank(bank);
+}
 
 void SpectrumWorxEditor::setDefaultFocusHandling()
 {
@@ -783,6 +791,14 @@ bool SpectrumWorxEditor::loadPreset(juce::File const &presetFile, bool const ign
 {
     auto const pPresetName(presetName.getCharPointer().getAddress());
     return GUI::loadPreset(editorHost_, *this, presetFile, ignoreExternalSample, &comment,
+                           pPresetName);
+}
+
+bool SpectrumWorxEditor::loadPreset(char *const inMemoryPreset, bool const ignoreExternalSample,
+                                    juce::String &comment, juce::String const &presetName)
+{
+    auto const pPresetName(presetName.getCharPointer().getAddress());
+    return GUI::loadPreset(editorHost_, *this, inMemoryPreset, ignoreExternalSample, &comment,
                            pPresetName);
 }
 

@@ -133,6 +133,9 @@ class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
 #ifndef LE_NO_PRESETS
     bool loadPreset(juce::File const &, bool ignoreExternalSample, juce::String &comment,
                     juce::String const &presetName);
+    /// \note A factory preset has no file; it comes out of the binary.
+    bool loadPreset(char *inMemoryPreset, bool ignoreExternalSample, juce::String &comment,
+                    juce::String const &presetName);
     void savePreset(juce::File const &, bool ignoreExternalSample,
                     juce::String const &comment) const;
     char const *currentProgramName() const;
@@ -279,6 +282,20 @@ class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
     ///                                       (29.07.2026.) (SW port)
     void addUserAddedModule(std::uint8_t effectIndex);
 
+    /// \brief togglePresetBrowser() with the button taken out of it.
+    ///
+    /// \note Public for the same reason as addUserAddedModule() above: the
+    /// presets button is private and its handler recovers the editor *from* the
+    /// button, neither of which a headless render has. `tools/show-ui`'s
+    /// "editor-presets" page is the caller, and it exists because this button
+    /// asserted on its first real press with nothing headless covering it.
+    ///                                       (31.07.2026.) (SW port)
+    void showPresetBrowser(bool show);
+
+    /// \brief Opens the browser on a factory bank, as double-clicking into one
+    /// does. `tools/show-ui` only; see showPresetBrowser().
+    void showFactoryBank(juce::String const &bank);
+
   private:
     void moveModules(ModuleUI &targetSlotUI, std::uint8_t numberOfModules, std::int16_t offset);
     std::pair<LE::Utility::IntrusivePtr<Module>, std ::int8_t>
@@ -294,9 +311,7 @@ class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
 #endif // LE_SW_DISABLE_SIDE_CHANNEL
     void setDefaultFocusHandling();
 
-#ifndef LE_NO_PRESETS
     static void togglePresetBrowser(juce::Button const &);
-#endif // !LE_NO_PRESETS
 
   private:
     enum String

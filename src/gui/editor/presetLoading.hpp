@@ -63,6 +63,14 @@ class SpectrumWorxEditor;
 bool loadPreset(EditorHost &, SpectrumWorxEditor &, juce::File const &presetFile,
                 bool ignoreExternalSample, juce::String *comment, char const *presetName);
 
+/// \brief The same, from a buffer that is already in memory.
+///
+/// \note Which is where a factory preset comes from: the banks are compiled into
+/// the binary (factoryPresets.hpp) and have no file for the overload above to
+/// open. That one reads the file and calls this.
+bool loadPreset(EditorHost &, SpectrumWorxEditor &, char *inMemoryPreset, bool ignoreExternalSample,
+                juce::String *comment, char const *presetName);
+
 //------------------------------------------------------------------------------
 } // namespace GUI
 //------------------------------------------------------------------------------

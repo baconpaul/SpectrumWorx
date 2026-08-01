@@ -15,8 +15,10 @@
 //------------------------------------------------------------------------------
 #include "gui/gui.hpp"
 
+#include "le/spectrumworx/presets.hpp"
 #include "le/utility/platformSpecifics.hpp"
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 //------------------------------------------------------------------------------
@@ -73,19 +75,69 @@ class PresetBrowser final : public BackgroundImage,
     void selectedRowsChanged(int lastRowSelected) override;
 
   private:
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \enum Location
+    ///
+    /// \brief Which of the three things the list is showing.
+    ///
+    /// \note The browser was a directory browser: one `juce::File` and
+    /// `std::filesystem` over it. The factory banks are in the binary now (8.2)
+    /// and have no directory to point it at, so where it is looking became a
+    /// small sum type rather than a path. `Root` is a list of two entries and
+    /// exists so that there is somewhere `..` can go from either tree.
+    ///                                       (31.07.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    enum struct Location : std::uint8_t
+    {
+        Root,    ///< "Factory" and "User"; no storage behind it
+        Factory, ///< an embedded bank, addressed by factoryBank_. Read only.
+        User     ///< a real directory, addressed by currentDirectory_
+    };
+
     struct Item
     {
+        enum struct Kind : std::uint8_t
+        {
+            Parent,  ///< the ".." row
+            Section, ///< "Factory" or "User", only at the Root
+            Folder,  ///< a bank or a sub-directory
+            Preset
+        };
+
         juce::String name;
-        bool isDirectory;
+        Kind kind{Kind::Preset};
+
+        bool isDirectory() const { return kind != Kind::Preset; }
 
         bool operator==(Item const &other) const;
         bool operator<(Item const &other) const;
     };
 
   private:
+  public:
+    /// \note Public for `tools/show-ui`, which opens the browser on a bank to
+    /// render it. See SpectrumWorxEditor::showFactoryBank().
+    void setFactoryBank(juce::String const &bank);
+
+  private:
     void setNewFolder(juce::File const &);
+    void setRoot();
+
+    /// \brief Up one level, wherever "up" is from here.
+    void goToParent();
 
     void refresh();
+    void refreshRoot();
+    void refreshFactory();
+    void refreshUserDirectory();
+
+    /// \brief The selected preset's bytes, from the binary or from a file.
+    Preset::InMemoryPreset selectedPresetData() const;
+
+    bool inFactory() const { return location_ == Location::Factory; }
 
     void refreshAndSelectPreset(juce::String const &presetName);
 
@@ -141,6 +193,12 @@ class PresetBrowser final : public BackgroundImage,
     bool newPresetPending_;
 
     int dirtyCommentPresetIndex_;
+
+    Location location_{Location::Root};
+
+    /// The bank, relative to the preset root, when location_ is Factory. Empty
+    /// means the top of the factory tree.
+    juce::String factoryBank_;
 
     juce::File currentDirectory_;
     juce::Array<Item> files_;

@@ -121,7 +121,10 @@ class EditorPage final : public juce::Component
   public:
     /// \param sampleRate zero for an engine that has not been set up, which is
     /// what a session restored before activate() sees. See HarnessEngine.
-    EditorPage(bool const withModuleInFirstSlot, float const sampleRate) : host_(sampleRate)
+    /// \param openPresetBrowser opens the browser as the presets button does.
+    EditorPage(bool const withModuleInFirstSlot, float const sampleRate,
+               bool const openPresetBrowser = false)
+        : host_(sampleRate)
     {
         /// \note No setLookAndFeel() here, unlike the other pages: the editor's
         /// own ReferenceCountedGUIInitializationGuard makes Theme the default
@@ -133,6 +136,18 @@ class EditorPage final : public juce::Component
 
         if (withModuleInFirstSlot)
             fillFirstSlot();
+
+        if (openPresetBrowser)
+        {
+            /// \note SW_SHOW_UI_PRESET_BANK opens the browser inside a factory
+            /// bank rather than at its root, so a single page can be swept over
+            /// the eighteen of them from a shell loop -- the same idea as
+            /// SW_SHOW_UI_EFFECT above.
+            if (auto const *const bank = std::getenv("SW_SHOW_UI_PRESET_BANK"))
+                editor_->showFactoryBank(bank);
+            else
+                editor_->showPresetBrowser(true);
+        }
     }
 
     /// \note The editor goes before the host it holds a reference to.
@@ -190,6 +205,17 @@ SWShowUI::PageRegistration const registrationWithModule{
 SWShowUI::PageRegistration const registrationBeforeSetup{
     "editor-module-cold", "an effect added before the engine has a sample rate",
     [] { return std::unique_ptr<juce::Component>(std::make_unique<EditorPage>(true, 0)); }};
+
+/// \note The presets button, which had no headless coverage at all until it
+/// asserted on its first real press -- `presetsFolder()` was half of a two-phase
+/// initialisation whose initialiser nothing called. Constructing the browser is
+/// most of what that button does: it reads six skin bitmaps, builds a list box
+/// and a comment editor, asks where the user's presets are and lists them.
+SWShowUI::PageRegistration const registrationWithPresetBrowser{
+    "editor-presets", "the editor with the preset browser open", [] {
+        return std::unique_ptr<juce::Component>(
+            std::make_unique<EditorPage>(true, 48000, true /*preset browser*/));
+    }};
 
 //------------------------------------------------------------------------------
 } // anonymous namespace

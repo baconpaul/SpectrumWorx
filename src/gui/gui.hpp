@@ -121,16 +121,26 @@ float displayScale();
 /// stage 2 removed. They mapped the `SpectrumWorx.paths` file the 2016 installer
 /// wrote, to find the skin and the most-recently-used presets folder; the skin
 /// is compiled in now (resources.hpp), so the only thing left worth keeping is
-/// the MRU folder, and that wants to be an ordinary user-data path rather than a
-/// writable mapping. The rest of this block goes with gui.cpp's implementation
-/// of it.
+/// the MRU folder, and that is an ordinary user-data path.
 ///                                       (28.07.2026.) (SW port)
-bool initializePaths();
-bool havePathsBeenInitialised();
 
+/// \note `initializePaths()`, `havePathsBeenInitialised()` and `resourcesPath()`
+/// stood here. The first two were a two-phase initialisation whose initialiser
+/// nothing called -- see gui.cpp -- and the third was declared and never
+/// defined. These two answer on demand.
+///                                       (31.07.2026.) (SW port)
+
+/// The user's SpectrumWorx folder: `~/Documents/SpectrumWorx` or the platform
+/// equivalent. Nothing is created by asking.
 juce::File const &rootPath();
+
+/// \brief The browser's most-recently-used preset folder, which starts at the
+/// user's preset directory and which the browser writes back when it closes.
 juce::File &presetsFolder();
-juce::File resourcesPath();
+
+/// \brief Creates the user preset directory if it is not there.
+/// \note Not done by presetsFolder(); see the note at the definition.
+bool createUserPresetsFolder();
 
 /// \note makeFSRefFromPath() went with it: FSRef is Carbon, which was never
 /// ported to arm64. Its one caller was external_audio/sampleMac.cpp, which
@@ -244,7 +254,11 @@ class SpectrumWorxEditor;
 class OwnedWindowBase
 {
   protected:
-    static void attach(SpectrumWorxEditor &, juce::Component &);
+    /// \return whether the ownee became a native window owned by the editor's.
+    /// False means it is an ordinary child instead, which is what happens when
+    /// the editor has no native window of its own to be owned by -- see the
+    /// definition.
+    static bool attach(SpectrumWorxEditor &, juce::Component &);
     static void detach(SpectrumWorxEditor &, juce::Component &);
 
     static void adjustPositions(juce::Component *pFirstWindow, juce::Component *pSecondWindow,
@@ -307,14 +321,26 @@ template <class Window> class OwnedWindow : private OwnedWindowBase
         SpectrumWorxEditor &parent(static_cast<Window *>(this)->editor());
         juce::Component &window(static_cast<Window *>(this)->window());
 
-        OwnedWindowBase::attach(parent, window);
-
-        if (isPresetBrowser)
-            adjustPositionsForPresetBrowser(parent, &window);
+        /// \note The position adjustment is for *windows*: it works in the
+        /// editor's screen coordinates and lays the ownee out to the left of it.
+        /// A child's coordinates are its parent's, so running it on one puts the
+        /// child at a negative x -- off the editor entirely. Where a child
+        /// should go instead is the question **stage 6.4** exists to answer; the
+        /// top left corner is a placeholder that at least draws.
+        ///                               (31.07.2026.) (SW port)
+        if (OwnedWindowBase::attach(parent, window))
+        {
+            if (isPresetBrowser)
+                adjustPositionsForPresetBrowser(parent, &window);
+            else
+                adjustPositionsForSettings(parent, &window);
+        }
         else
-            adjustPositionsForSettings(parent, &window);
+        {
+            window.setTopLeftPosition(0, 0);
+        }
 
-        LE_ASSERT(window.isOnDesktop() && window.getPeer());
+        LE_ASSERT(window.isOnDesktop() || window.getParentComponent());
     }
 
     ~OwnedWindow()
