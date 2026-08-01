@@ -52,7 +52,7 @@ What is left, in the order it is worth doing:
 | | | Where |
 |---|---|---|
 | 1 | **Load it in a DAW.** Reaper first. Nothing below is worth much until the thing has been driven by a mouse. | — |
-| 2 | **The audio file loader** — one `doLoad` over `juce::AudioFormatManager`, then drop `LE_SW_DISABLE_SIDE_CHANNEL`. | 5.0 |
+| 2 | ✅ **The audio file loader** — done 01.08.2026: one `doLoad` over `juce::AudioFormatManager`, the two platform decoders deleted, the factory samples embedded and `LE_SW_DISABLE_SIDE_CHANNEL` dropped. Whether loading gets a thread is deferred into row 3 — `week_two.md` §1 item 3a. | 5.0 |
 | 3 | **Threading.** The `UIEdits` queue is the first piece; the rest of the main/audio split is not done. | 5.8 |
 | 4 | **`clap-validator` and CI** across the four formats and now three OSes. | 5.9 |
 | 5 | **6.4**, the owned-window collapse — and with it the preset browser's data source, which is the last thing between the embedded factory banks and a user. | stage 6, then 8 |
@@ -66,10 +66,9 @@ release, and the two new preset snapshots did not move across the parser swap.
 Before it: **module and LFO parameter ranges normalised to 0..1**, the last
 CLAP-correctness gap (stage 5), and **stage 4** with its golden contract.
 
-**`LE_NO_PRESETS` is gone** (8.0). One flag is still switched on and stands in
-for unfinished work rather than for a decision: **`LE_SW_DISABLE_SIDE_CHANNEL`**
-(row 2). It is `PUBLIC` on `sw-dsp` and changes the layout of
-`SpectrumWorxEditor`, so every translation unit has to agree on it.
+**`LE_NO_PRESETS` is gone** (8.0), and so is
+**`LE_SW_DISABLE_SIDE_CHANNEL`** (5.0, 01.08.2026). No feature flag is switched
+on any more.
 
 ---
 
@@ -1446,23 +1445,27 @@ resembles ordinary engineering rather than archaeology. **It runs directly after
 stage 3** — see the note under stage 4 for why nothing in the SIMD work stands
 in front of it.
 
-**5.0 — The audio file loader.** ⏳ *Deferred, and cheaply: the side channel is
-switched off rather than half-built.* `sample.hpp:87` shows the platform seam is
-one static function, `Sample::doLoad`; its only macOS implementation is
-`sampleMac.cpp` over `ExtAudioFile` and the long-removed `FSRef`, which will not
-build against a current SDK.
+**5.0 — The audio file loader.** ✅ *Done, 01.08.2026.* The deferral was cheap
+exactly as this said it would be: `LE_SW_DISABLE_SIDE_CHANNEL` switched the side
+channel's *file* loader off rather than leaving it half-built, and turning it
+back on cost one function plus the flag. `sampleWin.cpp` (DirectShow filter
+graphs) and `sampleMac.cpp` (`ExtAudioFile` over the long-removed `FSRef`) are
+deleted — 1,355 lines — for one `Sample::doLoad` over
+`juce::AudioFormatManager`, and `FSRef` is out of `gui.hpp` with them.
 
-`dsp.cmake` now defines **`LE_SW_DISABLE_SIDE_CHANNEL`**, which compiles out
-`SampleArea` and every `sample_` reference and takes `external_audio/` out of the
-link entirely — the escape the stage 6 notes suggested for the harness, taken for
-the whole build. **This is the file loader, not the host's sidechain port**: that
-one is live and `SpectrumWorxCLAP::runEngine` feeds it.
+Three things the estimate did not have. The 1.4 MB of `assets/samples` is
+**embedded** in `sw-assets` beside the presets, and `Sample::load` resolves a
+name against it when there is nothing on disk — which is the 2016
+`<install>/Samples` fallback, kept working without an installer. The sample area
+opens a **menu** rather than a file dialog, because a file dialog cannot show an
+embedded sample. And **`JUCE_USE_MP3AUDIOFORMAT=1`** is needed for the factory
+samples to decode on Linux, where `registerBasicFormats()` offers no MP3 reader
+at all.
 
-To finish: delete `sampleWin.cpp` (DirectShow filter graphs) and `sampleMac.cpp`,
-write one `doLoad` over `juce::AudioFormatManager` — JUCE is already linked here
-— and drop the flag. Roughly fifty lines, and the editor code inside the guard is
-already ported (the file chooser is `launchAsync`), so flipping it back on is one
-line plus that function. It is also what finally removes `FSRef` from `gui.hpp`.
+Whether the loader gets a thread is deliberately **not** answered here: it is
+deferred into the threading redesign, and `week_two.md` §1 item 3a is the
+handover — what the 2016 `BackgroundThread` did, what a synchronous load costs
+instead, and what the redesign has to build.
 
 **5.1 — A new protocol tag.** ✅ `src/le/plugins/clap/tag.hpp`, mirroring the
 deleted `vst/2.4/tag.hpp`:
@@ -2580,7 +2583,8 @@ test compares every embedded preset against its file byte for byte.
 > **Samples are not embedded.** 1.4 MB for a side-channel loader that
 > `LE_SW_DISABLE_SIDE_CHANNEL` still compiles out — 5.0 owns bringing the loader
 > back, and where its content lives is a decision to make with it rather than
-> before it.
+> before it. *(They are now: 5.0 embedded them in this same `sw-assets` library
+> on 01.08.2026, and the coupling this describes is why.)*
 
 **✅ 8.3 — User preset directory via `sst::plugininfra::paths`.**
 `~/Documents/SpectrumWorx/Presets` and its platform equivalents, XDG included,

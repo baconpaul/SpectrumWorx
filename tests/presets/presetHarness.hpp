@@ -77,6 +77,13 @@ struct PresetLoader
 
     static bool onlySetParameters() { return false; }
 
+    /// \note The external audio file, declined: the harness engine has no
+    /// loader behind it, and what these tests are about is the parameters. A
+    /// preset that names a sample therefore loads without it, which is the same
+    /// answer the browser's "ignore external samples" box gives.
+    static bool wantsSampleFile() { return false; }
+    static void setSample(std::string_view) {}
+
     bool setNewGlobalParameters(LE::SW::GlobalParameters::Parameters const &) const;
 
     static void moduleChainFinished(std::uint8_t /*moduleCount*/, bool /*syncedLFOFound*/) {}

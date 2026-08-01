@@ -3,7 +3,17 @@
 /// \file sample.hpp
 /// ----------------
 ///
+///   The external audio file the side channel can be fed from, instead of the
+/// host's side chain port.
+///
+/// \note There were three files here: this one, a Windows `doLoad` over
+/// DirectShow filter graphs, and a macOS one over `ExtAudioFile` and `FSRef`.
+/// Both were platform decoders written in 2010 because JUCE 2 had none worth
+/// having; JUCE 8 does, so there is one `doLoad` over `juce::AudioFormatManager`
+/// and no platform arm at all.
+///
 /// Copyright (c) 2010 - 2016. Little Endian Ltd.
+/// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later
 ///
 ////////////////////////////////////////////////////////////////////////////////
@@ -11,13 +21,14 @@
 #ifndef sample_hpp__A94590F9_6645_4380_8512_060CF57872FA
 #define sample_hpp__A94590F9_6645_4380_8512_060CF57872FA
 //------------------------------------------------------------------------------
+#include "le/utility/criticalSection.hpp"
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/span.hpp"
 
 #include <juce_core/juce_core.h>
 
 #include <memory>
-#include <mutex>
+#include <vector>
 //------------------------------------------------------------------------------
 
 namespace LE
@@ -32,21 +43,38 @@ namespace LE
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace Utility
-{
-#ifdef _WIN32
-using CriticalSection = std::mutex;
-#else
-class CriticalSection;
-#endif // _WIN32
-} // namespace Utility
-
 class Sample
 {
   public:
     using ChannelData = LE::Utility::Span<float const>;
 
+    /// Always, whatever the file holds: a mono file is duplicated and a wider
+    /// one has its first two channels taken.
+    static constexpr unsigned int numberOfChannels{2};
+
+    ////////////////////////////////////////////////////////////////////////////
+    // The factory samples.
+    //
+    // \note Compiled into the binary (assets/CMakeLists.txt), so they are known
+    // by file name rather than by path -- which is also the only name a preset
+    // can carry that survives being opened on another machine. A juce::File
+    // built from one is deliberately not a path to anything: load() looks on
+    // disk first and falls back to the embedded set by name, which is what the
+    // 2016 build did with <install>/Samples.
+    ////////////////////////////////////////////////////////////////////////////
+
+    static std::vector<juce::File> factorySamples();
+    static bool isFactorySample(juce::File const &);
+
   public:
+    /// \param desiredSampleRate what to resample to, or zero for the file's own
+    ///        -- which is what a caller that does not know the engine's rate yet
+    ///        passes, so that a load is deferred rather than refused.
+    ///
+    /// \return nullptr on success, else a message fit for a dialog.
+    ///
+    /// \note The critical section is held only while the decoded data is swapped
+    /// in, not while it is decoded. See the note in the implementation.
     char const *load(juce::File const &sampleFile, unsigned int desiredSampleRate,
                      Utility::CriticalSection &);
 
@@ -58,10 +86,15 @@ class Sample
     ChannelData channel2() const;
 
     unsigned int &samplePosition();
+    unsigned int samplePosition() const { return samplePosition_; }
     void restart();
 
     juce::File const &sampleFile() const { return sampleFile_; }
     juce::String const &sampleFileName() const { return sampleFile().getFullPathName(); }
+
+    /// The rate the data was resampled to, i.e. the engine's at the time of the
+    /// load. Zero when nothing is loaded.
+    unsigned int sampleRate() const { return sampleRate_; }
 
     static juce::String supportedFormats();
 
@@ -80,17 +113,14 @@ class Sample
         float *pChannel2End;
     };
 
-    class Impl;
-
   private:
-    // To be implemented for each platform separately.
-    static char const *doLoad(juce::String const &sampleFileName, unsigned int desiredSampleRate,
-                              DataHolder &data);
+    static char const *doLoad(juce::File const &, unsigned int desiredSampleRate, DataHolder &);
 
   private:
     DataHolder data_;
 
-    unsigned int samplePosition_;
+    unsigned int samplePosition_{0};
+    unsigned int sampleRate_{0};
 
     juce::File sampleFile_;
 

@@ -190,10 +190,8 @@ class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
   public:
     void updateActiveControlValue();
 
-#ifndef LE_SW_DISABLE_SIDE_CHANNEL
     void updateSampleName();
     void updateSampleNameAsync();
-#endif // LE_SW_DISABLE_SIDE_CHANNEL
 
     void updateForGlobalParameterChange();
 
@@ -308,10 +306,9 @@ class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
     void setActiveControlName(juce::String const &newName);
     void setActiveControlValue(juce::String const &newValue);
 
-#ifndef LE_SW_DISABLE_SIDE_CHANNEL
     void updateSampleName(juce::String const &);
     void setSampleLoadingStatus();
-#endif // LE_SW_DISABLE_SIDE_CHANNEL
+
     void setDefaultFocusHandling();
 
     static void togglePresetBrowser(juce::Button const &);
@@ -379,10 +376,12 @@ class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
     }; // class Gradient
 
   public:
-#ifndef LE_SW_DISABLE_SIDE_CHANNEL
     ////////////////////////////////////////////////////////////////////////////
     /// \internal
     /// \class SampleArea
+    ///
+    /// \brief The "External audio" strip: what the side channel is being fed
+    /// from, and the click that changes it.
     ////////////////////////////////////////////////////////////////////////////
 
     class SampleArea : public WidgetBase
@@ -396,10 +395,15 @@ class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
       private:
         SpectrumWorxEditor &editor();
 
+        void browseForFile();
+
         /// \note Outlives the async file dialog it launches.
         std::unique_ptr<juce::FileChooser> fileChooser_;
+
+        /// \note Likewise the async menu: showCenteredBelow() returns before the
+        /// user has chosen, and the items have to still be there when they do.
+        PopupMenu menu_;
     }; // class SampleArea
-#endif // LE_SW_DISABLE_SIDE_CHANNEL
 
     ////////////////////////////////////////////////////////////////////////////
     /// \internal
@@ -650,12 +654,10 @@ class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
     ModuleMenuButton moduleMenuButton_;
     Gradient gradient_;
 
-#ifndef LE_SW_DISABLE_SIDE_CHANNEL
-  public: //...mrmlj...SpectrumWorx::sampleLoadingLoop()
+    /// \note Was public, for the 2016 loader thread's completion callback to
+    /// reach. There is no loader thread now, so it is nobody's but the editor's
+    /// and its own nested class's.
     SampleArea sampleArea_;
-
-  private:
-#endif // LE_SW_DISABLE_SIDE_CHANNEL
 
     BitmapButton preset_;
     BitmapButton settingsButton_;

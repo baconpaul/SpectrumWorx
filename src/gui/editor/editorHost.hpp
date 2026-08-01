@@ -72,12 +72,16 @@ class LE_NOVTABLE EditorHost
     virtual void editorOpened(SpectrumWorxEditor &) = 0;
     virtual void editorClosed() = 0;
 
-#ifndef LE_SW_DISABLE_SIDE_CHANNEL
     ////////////////////////////////////////////////////////////////////////////
-    // The side channel's sample.
+    // The side channel's sample: the external audio file that feeds it in place
+    // of the host's side chain port.
     //
-    // \note Loading is asynchronous, and the editor shows "Loading..." until it
-    // finishes -- hence the listener registration rather than a plain query.
+    // \note The listener registration is the 2016 shape and the last three are
+    // vestigial while a load is synchronous -- isSampleLoadInProgress() is what
+    // the editor asks before it registers, and today it is always false. Kept
+    // because the threading redesign is what decides whether loading gets a
+    // thread again, and this is the interface it would come back through. See
+    // doc/tech/week_two.md §1 item 3.
     ////////////////////////////////////////////////////////////////////////////
 
     virtual juce::File currentSampleFile() const = 0;
@@ -85,7 +89,6 @@ class LE_NOVTABLE EditorHost
     virtual bool isSampleLoadInProgress() const = 0;
     virtual void registerSampleLoadedListener(SpectrumWorxEditor &) = 0;
     virtual void deregisterSampleLoadedListener(SpectrumWorxEditor const &) = 0;
-#endif // !LE_SW_DISABLE_SIDE_CHANNEL
 
     /// \note Presets were two more virtuals here, and are neither. Everything
     /// loading one needs is reachable through core() and automation(), so it is

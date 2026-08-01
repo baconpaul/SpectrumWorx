@@ -28,6 +28,8 @@
 #include "le/spectrumworx/presetFile.hpp"
 
 #include "le/utility/assert.hpp"
+
+#include <string_view>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -74,6 +76,8 @@ struct Loader
 {
     EditorHost &host;
     SpectrumWorxEditor &editor;
+    /// The preset browser's "ignore external samples" box.
+    bool ignoreSampleFile;
 
     /// The chain reaches for this typedef; see presets.hpp's loadPreset().
     using Module = SpectrumWorxCore::Module;
@@ -97,6 +101,36 @@ struct Loader
     }
 
     static bool onlySetParameters() { return false; }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // The external audio file the preset names, if it names one.
+    ////////////////////////////////////////////////////////////////////////////
+
+    bool wantsSampleFile() const { return !ignoreSampleFile && !onlySetParameters(); }
+
+    void setSample(std::string_view const sampleFileName) const
+    {
+        if (sampleFileName.empty())
+            return;
+
+        // Implementation note:
+        //   Workaround for relative sample paths and Windows paths on OS X.
+        //                                    (17.11.2011.) (Domagoj Saric)
+        /// \note And the reason a factory sample is stored by bare name: that
+        /// is the one spelling no separator can spoil, and Sample::load()
+        /// resolves it against the embedded set when there is nothing on disk.
+        auto const path(
+            juce::String::fromUTF8(sampleFileName.data(), static_cast<int>(sampleFileName.size()))
+#ifdef _WIN32
+                .replaceCharacter('/', '\\')
+#else
+                .replaceCharacter('\\', '/')
+#endif // _WIN32
+        );
+
+        host.setNewSample(juce::File::createFileWithoutCheckingPath(path));
+        editor.updateSampleNameAsync();
+    }
 
     bool setNewGlobalParameters(GlobalParameters::Parameters const &newParameters) const
     {
@@ -126,10 +160,10 @@ struct Consumer
 
     using Module = Loader::Module;
 
-    /// \note `ignoreExternalSample` has no subject while the side channel's file
-    /// loader is compiled out -- presets.hpp does not ask a consumer about the
-    /// sample at all in that configuration. 5.0 brings both back.
-    Loader presetLoader(bool /*ignoreExternalSample*/) const { return {host, editor}; }
+    Loader presetLoader(bool const ignoreExternalSample) const
+    {
+        return {host, editor, ignoreExternalSample};
+    }
 
     Program &program() const { return host.core().program(); }
 

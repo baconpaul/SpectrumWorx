@@ -42,6 +42,10 @@ add_library(sw-dsp STATIC
         le/utility/lexicalCast.cpp
         le/utility/trace.cpp
 
+        # The external audio file the side channel can be fed from, and the
+        # factory samples that are in the binary beside the banks.
+        external_audio/sample.cpp
+
         # le/spectrumworx -- the preset format, the one file that opens files,
         # and the factory banks that are in the binary rather than either
         le/spectrumworx/factoryPresets.cpp
@@ -178,9 +182,23 @@ target_link_libraries(sw-dsp PUBLIC sst-plugininfra)
 # constructs all 57 modules and processes audio without touching JUCE.
 target_link_libraries(sw-dsp PUBLIC juce::juce_gui_basics sw-gui-resources)
 
-# The factory banks. PRIVATE: factoryPresets.cpp is the only thing that names
-# cmrc, and its header says nothing about where a preset comes from.
+# The factory banks and the factory samples. PRIVATE: factoryPresets.cpp and
+# external_audio/sample.cpp are the only things that name cmrc, and neither
+# header says anything about where its bytes come from.
 target_link_libraries(sw-dsp PRIVATE sw::assets)
+
+# The audio file decoder, replacing the DirectShow and ExtAudioFile ones. PUBLIC
+# because it compiles juce_audio_basics and juce_audio_formats into whatever
+# links sw-dsp, and the plugin's own translation units have to agree with it.
+target_link_libraries(sw-dsp PUBLIC juce::juce_audio_formats)
+
+# The factory samples are MP3, and off Apple and Windows nothing else decodes
+# one: registerBasicFormats() gets CoreAudioFormat on macOS and
+# WindowsMediaAudioFormat on Windows, and on Linux it would get neither. JUCE's
+# own decoder is behind this flag because it carries a patent disclaimer -- the
+# MP3 patents expired in 2017, and the licence JUCE's decoder ships under is the
+# one this whole tree is already built with.
+target_compile_definitions(sw-dsp PUBLIC JUCE_USE_MP3AUDIOFORMAT=1)
 
 # Linking a JUCE module compiles that module's own sources into the consuming
 # target, so sw-dsp -- not the shim -- is what builds juce_core.cpp. It therefore
@@ -205,16 +223,13 @@ target_compile_definitions(sw-dsp PUBLIC JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
 # same translation unit. Stage 8.0 moved the file half to presetFile.cpp and put
 # juce::File under it, so the engine can have the serialisation without it.
 
-# No external audio file as a side channel, for now. This is the *file* loader,
-# not the host's sidechain port -- that one is live and the CLAP feeds it. The
-# only macOS Sample::doLoad is external_audio/sampleMac.cpp over ExtAudioFile
-# and FSRef, neither of which builds against a current SDK. Stage 5.0 rewrites
-# it over juce::AudioFormatManager, ~50 lines, and this goes.
-#
-# PUBLIC, and next to LE_NO_PRESETS, for the same reason: both change the layout
-# of SpectrumWorxEditor, so every translation unit that sees the header has to
-# agree on them.
-target_compile_definitions(sw-dsp PUBLIC LE_SW_DISABLE_SIDE_CHANNEL)
+# \note LE_SW_DISABLE_SIDE_CHANNEL stood here, and it was the *file* loader
+# rather than the host's sidechain port -- that one has been live since the CLAP
+# was written. It compiled out external_audio/, the editor's "External audio"
+# box and the preset format's Sample attribute, because the only macOS
+# Sample::doLoad was over ExtAudioFile and FSRef and did not build against a
+# current SDK. Stage 5.0 replaced both platform decoders with one over
+# juce::AudioFormatManager, so the flag has nothing left to stand for.
 
 if (APPLE)
     # le/math/vector.cpp and le/math/dft/fft.cpp are vDSP/vForce on Apple.

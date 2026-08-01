@@ -42,17 +42,16 @@ inventory that redesign has to satisfy. It is no longer the plan.
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone — macOS arm64. Linux arm64 proven at stage 4. Windows arrives as logs. |
 | Runs | Standalone, with audio, with the real editor, with presets. **Loads in Logic and in Bitwig, and deadlocks in both** in certain situations — see §1 item 3. |
-| Tests | 113 ctest cases: 103 Catch2 + 9 `sw-show-ui --render` + 1 build-property check. Goldens run in Release only. |
+| Tests | **120/120**: 110 Catch2 + 9 `sw-show-ui --render` + 1 build-property check, in both build trees. Goldens run in Release only. |
 | CI | **None.** There is no `.github/`. |
 | Warnings | 254 unique sites in a from-scratch Debug build, 248 of them ours — see §3. |
-| Identity | ✅ `org.surge-synth-team.spectrumworx`, AU `aufx`/`SpWx` by `SSTx` — see §4. |
+| Identity | ✅ `org.surge-synth-team.spectrumworx`, AU `aufx`/`SWrx` by `SSTx` — see §4. |
 
-**The one feature flag still switched on** is `LE_SW_DISABLE_SIDE_CHANNEL`. It is
-`PUBLIC` on `sw-dsp` and changes the layout of `SpectrumWorxEditor`, so every
-translation unit has to agree on it. It stands for unfinished work (5.0), not
-for a decision. **It does not disable the side-chain input port** — despite the
-name it is the external audio *file* loader, and the side chain is wired and
-live. §2.8 is the whole story.
+**There is no longer a feature flag switched on.** `LE_SW_DISABLE_SIDE_CHANNEL`
+was the last, it was the external audio *file* loader rather than the
+side-chain port despite the name, and item 7 dropped it on 01.08.2026 along with
+the two platform decoders it stood for. §2.8 is still the story of the port,
+which was never what it disabled.
 
 ---
 
@@ -76,7 +75,7 @@ the build tidy, and item 3 is no longer a fixup.
 | 4 | **A real state format**, and the tests it has never had | 5.6 | 3–4 days |
 | 5 | ✅ **The owned-window collapse** | 6.4 | *done* |
 | 6 | **CI**, three OSes × four formats, with the gates that already exist | 1.5, 5.9 | 3–5 days |
-| 7 | **The audio file loader**, and dropping the last flag | 5.0 | 2–3 days |
+| 7 | ✅ **The audio file loader**, and dropping the last flag | 5.0 | *done* |
 | 8 | **Property tests for the nine amplifying effects** | 4.4 | 2 days |
 | 9 | **The stage 7 tail** — include-what-you-use, and seven macros no build can define | 7 | 3–4 days |
 | 10 | **Ship** — licence, README, manual, installers, notarisation | 9 | 1–2 weeks |
@@ -193,10 +192,61 @@ CI under `-fsanitize=realtime`. **Run under `-fsanitize=address` first** — sta
 had not, and `build-asan/` already exists but is configured from an older CMake
 and registers only three of the nine GUI tests.
 
+#### 3a — The sample loader, deferred here by 5.0
+
+Item 7 landed the audio file loader on 01.08.2026 and deliberately **did not**
+decide how it is scheduled. That decision is this item's, so here is the whole
+of what it inherits.
+
+**What 2016 did.** `SpectrumWorx::setNewSample` (`spectrumWorx.cpp:769-819`,
+still in the tree, still in no target) wrote the request into
+`pendingSampleToLoad_` and started `sampleLoadingThread_` — a `BackgroundThread`
+over raw `pthread_create`, with a `pthread_cancel` in its destructor. The thread
+ran `sampleLoadingLoop()`, which re-read `pendingSampleToLoad_` in a `while` so
+that a second request arriving mid-load was picked up rather than dropped, then
+posted back to the editor. `isSampleLoadInProgress()` was
+`sampleLoadingThread_.isRunning()`, and the editor asked it, showed
+"Loading...", and registered itself as the one listener to be told when the
+load finished. That listener is `pListenerToNotifyWhenSampleLoaded_`, a bare
+pointer written from both threads.
+
+**What is there now.** `SpectrumWorxCLAP::setNewSample` decodes on the calling
+thread — the message thread at all three call sites — and takes the process lock
+only to swap the decoded buffers in. `isSampleLoadInProgress()` returns `false`,
+so the editor's "Loading..." branch is unreachable and the listener
+registrations are empty bodies. Three consequences, and they are the honest
+account of the trade:
+
+- **The message thread stalls for the length of the decode.** A factory sample
+  is single-digit milliseconds; a long file the user picks is not.
+- **The audio thread now `try_lock`s the process lock in `runEngine()`** and
+  holds it across `SpectrumWorxCore::process()`, because the sample's buffers
+  are swapped under it. On a failed lock the block plays the host's side chain
+  port instead of the sample. That is one more entry for the §2.2 inventory,
+  and the only one this port added rather than inherited.
+- **A second request cannot arrive mid-load**, so the `while` loop that existed
+  for that case has no subject.
+
+**How to proceed.** Not by restoring the thread. The loader wants exactly what
+everything else in this item wants and does not have: a main-thread work queue
+with a completion the editor can be told about, and a way to hand the audio
+thread a new buffer without a lock — publish a new `Sample` and let the audio
+thread swap an atomic pointer, retiring the old one on the main thread. Both are
+the redesign's own machinery, and building either of them *for the loader alone*
+would be building it twice. `EditorHost`'s five sample virtuals are kept whole
+and unshortened for precisely this: `isSampleLoadInProgress()` and the listener
+pair are the interface a deferred load comes back through.
+
 ### 4 — A real state format (5.6), and its tests
 
 `stateSave`/`stateLoad` write `(id, value)` pairs and carry **no version stamp**,
-while the preset format has carried `Version="2.6"` since 2011. 8.0 discharged
+while the preset format has carried `Version="2.6"` since 2011.
+
+**One thing arrived here from item 7:** the state does not hold which external
+audio file is loaded, so a session that restores does not restore the sample —
+where a *preset* does, and has since 2011. `SpectrumWorxCLAP::setNewSample`
+therefore does not mark the session dirty either, and says why. The preset
+format's `Sample` attribute is the shape to copy. 8.0 discharged
 the dependency that was in front of this: `savePreset(std::span<char>, …)` /
 `loadPreset(char const *, …)` are exactly the in-memory pair a state blob wants.
 
@@ -283,17 +333,50 @@ one of them. The goldens `SKIP` under `!NDEBUG` (documented at
 DSP, and Debug is the only one that runs the ~1200 asserts. Neither alone is
 "108/108".
 
-### 7 — The audio file loader (5.0)
+### 7 — The audio file loader (5.0) ✅ *done, 01.08.2026*
 
-One `doLoad` over `juce::AudioFormatManager`, delete `sampleWin.cpp` (DirectShow
-filter graphs) and `sampleMac.cpp` (`FSRef`), drop `LE_SW_DISABLE_SIDE_CHANNEL`.
-Roughly fifty lines; the editor code inside the guard is already ported.
+> **Done.** One `Sample::doLoad` over `juce::AudioFormatManager`;
+> `sampleWin.cpp` (DirectShow filter graphs) and `sampleMac.cpp` (`FSRef` and
+> `ExtAudioFile`) are gone, **1,355 lines out**, and with them the last
+> per-platform arm in `src/` that was not a JUCE one.
+> **`LE_SW_DISABLE_SIDE_CHANNEL` is dropped**: the tree now has no feature flag
+> switched on at all. `sw-tests` is **120/120** in both build trees, the six new
+> cases being `tests/external_audio/sampleTests.cpp`.
 
-Two decisions travel with it, and neither should be made before it: where the
-1.4 MB of `assets/samples` lives (embedded like the presets, or installed
-beside them), and whether the loader gets a thread of its own — the 2016 answer
-was a raw-`pthread` `BackgroundThread` that is now in no target, so this is
-design rather than port.
+**Both decisions it was told to carry were made, and the third was not.**
+
+- **The samples are embedded**, beside the presets and the skin, in the same
+  `sw-assets` CMakeRC library — 1.4 MB against a ~20 MB binary. The argument is
+  not the size: it is that the 2016 loader's fallback for a preset naming a
+  sample it cannot find was `<install>/Samples/<name>`, and there is no
+  installer and no path file any more. Embedding is what keeps that fallback
+  meaning something, and it is what `FactoryPresets` already does for the banks.
+- **`Sample::load` resolves disk first, then the embedded set by file name**, so
+  a factory sample is identified by a bare name with no directory. That is also
+  the one spelling a preset can carry across machines — which matters because
+  none of the 303 factory presets names a sample, but a user's will.
+- **The loader did not get a thread**, and that is deferred into item 3 rather
+  than answered here. §3a above is the whole account: what 2016 did, what is
+  there instead, and what the redesign has to build for it.
+
+Three things worth knowing that the plan did not:
+
+- **A file dialog cannot show an embedded sample.** So the sample area opens a
+  menu — "Load audio file...", "No external audio", then the seventeen factory
+  samples — with the 2016 file chooser one entry inside it. Right-click still
+  clears, as it always did.
+- **MP3 is a per-platform question and Linux is the platform that answers no.**
+  `registerBasicFormats()` gets `CoreAudioFormat` on macOS and
+  `WindowsMediaAudioFormat` on Windows, and neither on Linux, so
+  `JUCE_USE_MP3AUDIOFORMAT=1` is set on `sw-dsp`. It is behind a flag because
+  JUCE's decoder carries a patent disclaimer; those patents expired in 2017.
+  Every factory sample is an MP3, so without this a Linux build ships content it
+  cannot open — which is exactly the failure §5.4 warned about, arriving from
+  the direction it did not expect.
+- **A sample is decoded to the engine's sample rate, and a session can be
+  restored before there is one.** `Sample::load` takes zero to mean "the file's
+  own", and `activate()` re-reads a sample whose rate disagrees with the host's.
+  The 2016 build did neither and played at the wrong pitch for the session.
 
 ### 8 — Property tests for the nine amplifying effects (4.4)
 
@@ -455,6 +538,7 @@ the GUI are covered at the edges.
 | **CLAP state save/load** | Nothing. Zero hits for `CLAP_EXT_STATE` under `tests/`. The largest untested surface in the shipping path. |
 | **Sequential preset loads into one engine** | `presetCorpusTests.cpp:110` deliberately uses one engine per preset to avoid the merge path — so "load preset B on top of preset A", which is what a user does, is untested. |
 | **Malformed / truncated / missing preset** | Nothing. The corpus proves 303 happy paths. The `unknownEffect` and `missing` counters are asserted zero and never driven above zero, so the reporting path is unexercised. `saveTo()`'s refusal to overrun is never triggered because every test hands it a 1 MiB buffer. |
+| **A loaded sample never reaches the DSP in a test** | New with item 7, and the honest half of it. `sampleTests.cpp` proves all seventeen factory samples decode to two equal channels at the requested rate; nothing proves that `runEngine()` then feeds them to the engine in place of the port. The obstacle is reach, not effort: `setNewSample` is an `EditorHost` virtual and `tests/clap/` only drives the C API. §2.8 step 5 is the way in — a golden fixture that loads a sample by name. |
 | **The side-chain port is never fed** | Re-verified 01.08.2026 and it is worse than one line: `ActivePlugin::process` hardcodes `audio_inputs_count = 1` (`pluginTests.cpp:218`), the port test only ever calls `ports->get(…, 0, …)` so the Side Chain port's *info* is unasserted, and `goldens/engineHarness.cpp:181` passes `inputPointers.data()` as **both** main and side. **Seven** side-chain effects are golden-pinned only in the degenerate side == main case. §2.8 has the recipe. |
 | **The test host is too thin** | It offers `clap.params` and nothing else — which is precisely why 2.1a is invisible. Adding `clap.state`, `clap.thread-check`, and a deliberate *without*-thread-check variant is the fix, and it is small. |
 | **`lfoImpl.cpp` has no direct test** | Only LFO 0 of module 0 targeting Gain is ever exercised. Waveform shapes, sync types, `PeriodScale` snapping, `LowerBound > UpperBound`, an LFO on an enumerated target, several at once — none. A value-table golden fits the existing pattern. |
@@ -503,11 +587,15 @@ banner `legacy-build.cmake` has.
 
 ### 2.5 Dead weight
 
-37 `.cpp`/`.mm` files, **8,717 lines**, are in the tree and in no target.
-`tests/` and `tools/` have none — every orphan is under `src/`. Worth removing
-not for tidiness but because each one makes the next audit harder: the threading
-audit spent real effort proving that `BackgroundThread` and `GUI::Lock` do not
-matter.
+37 `.cpp`/`.mm` files, **8,717 lines**, were in the tree and in no target when
+this was counted. `tests/` and `tools/` have none — every orphan is under
+`src/`. Worth removing not for tidiness but because each one makes the next
+audit harder: the threading audit spent real effort proving that
+`BackgroundThread` and `GUI::Lock` do not matter.
+
+**Two of them are gone with item 7**: `external_audio/sample{Win,Mac}.cpp`,
+1,355 lines, deleted rather than adopted — so 35 files and ~7,360 lines. A third,
+`external_audio/sample.cpp`, stopped being an orphan and is in `sw-dsp`.
 
 **Free deletions, no decision needed** (~1,500 lines):
 `core/modules/{moduleGUI.cpp,moduleGUI.hpp,moduleDSP.hpp}` (superseded by
@@ -533,7 +621,10 @@ come back for the Windows build, or `sst-plugininfra` already covers them.
 - **`src/spectrumWorx.{cpp,hpp}`** (1,899 lines) — the 2016 plugin class the CLAP
   replaced, the last `boost/mmap` reference, and the home of `BackgroundThread`
   and its `pthread_cancel`. Stage 0 kept it as a reference for stage 5; stage 5
-  is done, and 5.0 is the last thing that needs to read it.
+  is done and so is 5.0, which was named as the last thing that needed to read
+  it. **It is not, quite:** §3a quotes `sampleLoadingLoop()` from it as what the
+  threading redesign has to replace, so it is item 3's reference now — and item 3
+  is the one that should delete it.
 - **`effects/_unfinished/`** — 16 effects, 3,778 lines. `initial_scan.md:768`
   says read before deleting. A branch or an `attic/` gets it out of
   `git ls-files 'src/**'` without losing it.
@@ -566,10 +657,10 @@ come back for the Windows build, or `sst-plugininfra` already covers them.
 - **Hand-written weak `strnlen`/`wcsnlen`** — `gui.cpp:1657-1680`, "OSX 10.6 does
   not provide std::strnlen", with the `!__LP64__` guard **commented out**. So
   they are compiled into every macOS build today, in 2026.
-- **`FSRef` and DirectShow** — `sampleMac.cpp` and `sampleWin.cpp`, 1,355 lines
-  between them. `sampleMac.cpp` already calls `makeFSRefFromPath()`, which no
-  longer exists; it only "works" because the file is in no target. Both go with
-  5.0.
+- ✅ **`FSRef` and DirectShow** — `sampleMac.cpp` and `sampleWin.cpp`, 1,355
+  lines between them. `sampleMac.cpp` called `makeFSRefFromPath()`, which no
+  longer existed; it only "worked" because the file was in no target. *Both gone
+  with 5.0, for one `juce::AudioFormatManager` implementation.*
 
 ### 2.7 Small things that have drifted
 
@@ -614,20 +705,35 @@ host's own pointers to the WOLA path, which has not been audited for aliasing.
 **The engine agrees and the DSP path is live.** `activate()` hardwires
 `setNumberOfChannels(2, 2)` — two main, two side — so `hasSideChannel()` is true;
 the side channel gets its own OLA FIFO (`sideOLA_`) and its own forward FFT
-through `ChannelData::setNewTimeDomainData`
-(`channelBuffers.cpp:92-100`). **Seven** of the 57 effects take
-`Engine::MainSideChannelData_ReIm` rather than `MainChannelData_ReIm` and so read
-it: `colorifer`, `blender`, `vocoder`, `pitch_follower`, `inserter`,
-`talking_wind`, `burrito`.
+through `ChannelData::setNewTimeDomainData` (`channelBuffers.cpp:92-100`).
+
+**Not seven effects — fourteen.** This said seven, naming `colorifer`,
+`blender`, `vocoder`, `pitch_follower`, `inserter`, `talking_wind` and
+`burrito`; that is a subset, and one of them (`vocoder`) is not even in
+`effectsList.hpp`. Grepping **both** spellings — `MainSideChannelData_ReIm`,
+which only `blender` uses, and `MainSideChannelData_AmPh`, which everything else
+does — finds sixteen implementations, of which `vocoder` and `synth` are the
+unshipped ones. The fourteen that ship: `blender`, `burrito`, `colorifer`,
+`convolver`, `denoiser`, `ethereal`, `inserter`, `merger`, `pitch_follower`,
+`shapeless`, `slicer`, `sumo_pitch`, `talking_wind`, `vaxateer`. **So the
+untested surface below is twice the size it claimed**, and the recipe is
+unchanged.
+
+*Found while doing item 7, from the other end:* `convolver.hpp:69` declares
+`static bool const usesSideChannel = false` and `convolverImpl.hpp:60` takes
+`MainSideChannelData_AmPh`. Both cannot be true, and the reason nothing has ever
+noticed is the loose end at the foot of this section — that constant has no
+reader anywhere in `src/` or `tests/`.
 
 **Three things that are easy to get wrong about it:**
 
-- **`LE_SW_DISABLE_SIDE_CHANNEL` is not this.** Despite the name it is the
-  *external audio file* feature — `SampleArea`, the editor's "External audio"
-  box, `registerSampleLoadedListener`. It touches GUI, editor and preset files
-  only; the side-chain port and the DSP that reads it are unaffected by it. It
-  belongs to item 7 (5.0). Nothing about dropping that flag turns the side chain
-  on, because the side chain is already on.
+- **`LE_SW_DISABLE_SIDE_CHANNEL` was not this**, and it is gone as of item 7.
+  Despite the name it was the *external audio file* feature — `SampleArea`, the
+  editor's "External audio" box, `registerSampleLoadedListener` — and it touched
+  GUI, editor and preset files only. Dropping it did not turn the side chain on,
+  because the side chain was already on. What it *did* change here: an external
+  file, when one is loaded, now takes precedence over the port in `runEngine()`,
+  which is the 2016 order and is what the editor's box implies.
 - **`LE_SW_ENGINE_INPUT_MODE = 0` does not disable it either.** All it removes is
   the user-facing InputMode parameter (Mono / Mono+SideChain / Stereo /
   Stereo+SideChain) and the parameter↔channel-config synchronisation. With it off
@@ -663,6 +769,13 @@ distinguished from a bug that ignores the side chain entirely.
 4. **Assert the Side Chain port's info.** The port test (`:439`) checks
    `count(true) == 2` and then only calls `ports->get(…, 0, …)`. One more call
    with index 1, asserting the id, the stereo type and that `IS_MAIN` is clear.
+5. **New with item 7: the harness can feed a *file* now, not just a signal.**
+   `implementation_sequence.md` records 25 golden fixtures that hash identically
+   on every platform because they render pure silence — `Convolver`, `Frecho`,
+   `Frevcho` at default parameters — and blames the flag that compiled the
+   loader out. The loader is back and the factory samples are in the binary, so
+   a fixture can now load one by name and those 25 can pin something. Nothing in
+   `tests/` does it yet, and `sampleTests.cpp` only proves the decode.
 
 **One loose end.** Every effect declares `static bool const usesSideChannel`, and
 `effects.hpp:61` documents it as part of the effect contract — but a grep of
@@ -855,7 +968,7 @@ AUv2 manufacturer, and an explicit VST3 factory extension rather than a hash.
 | `.clap` / `.vst3` / `.component` id | `com.littleendian.spectrumworx.<format>` | `org.surge-synth-team.spectrumworx.<format>` |
 | Standalone bundle id | `SpectrumWorx.standalone` | unchanged — **still clap-wrapper's, see below** |
 | AU type | `aufx`, derived from the CLAP features | unchanged |
-| AU subtype | `SpWx` | unchanged — and free: scxt uses `ScXT`, surge-xt2 `sxt2` |
+| AU subtype | `SpWx` | **`SWrx`**, changed by hand in `efd7037` after this section was written; `identityTests.cpp` pins it as of 01.08.2026. scxt uses `ScXT` and surge-xt2 `sxt2`, so it is free either way — until something ships under one |
 | AU manufacturer | `LiEn` / `Little Endian Ltd` | `SSTx` / `Surge Synth Team` |
 | VST3 factory | not declared | declared, at both factory versions |
 | VST3 class id | `sha1_guid_from_name(clap_id)` | the same hash, of the **new** id — see below |
@@ -988,10 +1101,12 @@ step. surge-xt2 has the hook stubbed out
 place where being a 2011 plugin with a big preset library is an *advantage*, and
 it is a day's work on top of what 8.2 built.
 
-**4. Decide the sample question with 5.0, not before it.** 1.4 MB of
-`assets/samples` is currently neither embedded nor installed, and the loader that
-reads it is compiled out. Those two facts are one decision, and splitting them is
-how a build ends up shipping content nothing can open.
+**4. Decide the sample question with 5.0, not before it.** ✅ *Done, and it was
+the right coupling.* The samples are embedded and the loader reads them from
+there; the two facts were one decision, as this said. The way a build very
+nearly did ship content nothing could open was not the one predicted, though: it
+was MP3 on Linux, where `registerBasicFormats()` offers no decoder at all
+without `JUCE_USE_MP3AUDIOFORMAT`. Item 7 has it.
 
 **5. Settle the licence early, because it is a decision and not a task.**
 `doc/manual/EULA.txt` contradicts `LICENSE`; JUCE 8 is AGPLv3-or-commercial; 452

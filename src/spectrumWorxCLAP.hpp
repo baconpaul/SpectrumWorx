@@ -24,6 +24,7 @@
 #include "core/host_interop/plugin2HostImpl.hpp"
 #include "core/modules/moduleDSPAndGUI.hpp"
 #include "core/spectrumWorxCore.hpp"
+#include "external_audio/sample.hpp"
 #include "gui/editor/editorHost.hpp"
 #include "gui/editor/editorModuleInitialiser.hpp"
 
@@ -247,6 +248,25 @@ class SpectrumWorxCLAP final
     void editorOpened(GUI::SpectrumWorxEditor &) override;
     void editorClosed() override;
 
+    ////////////////////////////////////////////////////////////////////////////
+    // The external audio file the side channel can be fed from.
+    //
+    // \note Loading is synchronous, on the calling thread, which is the message
+    // thread at all three call sites (the editor's menu, a preset that names a
+    // sample, and activate() re-reading one at a new sample rate). The 2016
+    // build gave it a raw-pthread BackgroundThread; that thread is in no target
+    // and giving it a new one is the threading redesign's decision, not this
+    // file's. doc/tech/week_two.md §1 item 3 has the whole account.
+    ////////////////////////////////////////////////////////////////////////////
+
+    juce::File currentSampleFile() const override { return sample_.sampleFile(); }
+    void setNewSample(juce::File const &) override;
+    /// \note Always false while the load above is synchronous: by the time
+    /// anything can ask, it has finished. See the note on the interface.
+    bool isSampleLoadInProgress() const override { return false; }
+    void registerSampleLoadedListener(GUI::SpectrumWorxEditor &) override {}
+    void deregisterSampleLoadedListener(GUI::SpectrumWorxEditor const &) override {}
+
     /// \note Audio Units negotiate their channel layout with the host, and
     /// clap-wrapper does present this plugin as one. It is not reachable from
     /// here, though, and the CLAP itself declares its ports outright -- so the
@@ -364,6 +384,13 @@ class SpectrumWorxCLAP final
     /// What the editor moved, waiting for a process() or flush() to carry it to
     /// the host.
     UIEdits uiEdits_;
+
+    /// \note Written by setNewSample() on the message thread, read by
+    /// runEngine() on the audio thread, and the process lock is what stands
+    /// between them -- taken outright by the writer and with try_lock by the
+    /// reader, which falls back to the host's port for that block rather than
+    /// wait. See the note in runEngine().
+    Sample sample_;
 
     /// \note Owned by the shim, which destroys it before this. Cleared in the
     /// editor's own destructor path so a queued notification cannot reach a

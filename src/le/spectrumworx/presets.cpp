@@ -423,12 +423,6 @@ LE_COLD void defaultPresetProblemReporter(PresetProblem const problem,
     case PresetProblem::MissingParameter:
         GUI::warningMessageBox("Missing parameter value in preset", detail, true);
         return;
-    case PresetProblem::ExternalSampleIgnored:
-        GUI::warningMessageBox(MB_WARNING,
-                               "Loaded preset uses external sample files which are not "
-                               "supported by this edition of SpectrumWorx.",
-                               false);
-        return;
     case PresetProblem::TempoSyncedLFOWithoutTempo:
         GUI::warningMessageBox(MB_WARNING,
                                "Loaded preset uses tempo-synced LFOs but the host does not "

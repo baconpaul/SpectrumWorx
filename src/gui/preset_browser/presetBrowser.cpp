@@ -139,11 +139,6 @@ PresetBrowser::PresetBrowser()
     /// desktop window owned by the editor's. The editor parents and positions it
     /// now -- see SpectrumWorxEditor::openOverlay().
     ///                                       (01.08.2026.) (SW port)
-
-#ifdef LE_SW_DISABLE_SIDE_CHANNEL
-    ignoreExternalSamples_.setValue(true);
-    ignoreExternalSamples_.setEnabled(false);
-#endif // LE_SW_DISABLE_SIDE_CHANNEL
 }
 
 #pragma warning(pop)

@@ -10,9 +10,7 @@
 //------------------------------------------------------------------------------
 #include "spectrumWorxEditor.hpp"
 
-#ifndef LE_SW_DISABLE_SIDE_CHANNEL
 #include "external_audio/sample.hpp"
-#endif // !LE_SW_DISABLE_SIDE_CHANNEL
 
 #include "core/automatedModuleChain.hpp"
 #include "core/host_interop/plugin2Host.hpp"
@@ -139,14 +137,12 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost)
     updateMainKnobs();
     LE_ASSERT(!settings_);
 
-#ifndef LE_SW_DISABLE_SIDE_CHANNEL
     // Implementation note:
     //   A sample may have already been loaded, either at startup using the last
     // session "preset" or through the GUI that was then destroyed and is now
     // being recreated.
     //                                        (10.06.2010.) (Domagoj Saric)
     updateSampleNameAsync();
-#endif // LE_SW_DISABLE_SIDE_CHANNEL
 
     /// \note The focus grab that was here moved to parentHierarchyChanged().
     /// A component can only take focus once it is on screen, and in 2016 the
@@ -166,9 +162,7 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost)
     gradient_.setSize(ModuleUI::width, ModuleUI::height);
     moduleMenuButton_.moveToSlot(0);
 
-#ifndef LE_SW_DISABLE_SIDE_CHANNEL
     sampleArea_.setBounds(75, 307, 115, 20);
-#endif // LE_SW_DISABLE_SIDE_CHANNEL
 
     preset_.setTopLeftPosition(74, 338);
     settingsButton_.setTopLeftPosition(134, 338);
@@ -200,9 +194,7 @@ SpectrumWorxEditor::~SpectrumWorxEditor()
     // First: nothing may reach a dying editor.
     editorHost_.editorClosed();
 
-#ifndef LE_SW_DISABLE_SIDE_CHANNEL
     editorHost_.deregisterSampleLoadedListener(*this);
-#endif // LE_SW_DISABLE_SIDE_CHANNEL
 
     while (static_cast<bool const volatile &>(holdLFODisplay_))
     {
@@ -639,7 +631,6 @@ void SpectrumWorxEditor::updateActiveControlValue()
     }
 }
 
-#ifndef LE_SW_DISABLE_SIDE_CHANNEL
 void SpectrumWorxEditor::updateSampleName(juce::String const &newSampleName)
 {
     using namespace Constants::Layout;
@@ -651,18 +642,24 @@ void SpectrumWorxEditor::updateSampleName()
     updateSampleName(editorHost_.currentSampleFile().getFileNameWithoutExtension());
 }
 
+/// \note "Async" is 2016's, and the branch it names is currently unreachable:
+/// loading happens on this thread inside setNewSample(), so the host is never
+/// mid-load when it is asked. Kept whole rather than collapsed to
+/// updateSampleName(), because whether the loader gets a thread again is the
+/// threading redesign's decision and this is the shape it would come back in.
+///                                           (01.08.2026.) (SW port)
 void SpectrumWorxEditor::updateSampleNameAsync()
 {
     if (editorHost_.isSampleLoadInProgress())
     {
         editorHost_.registerSampleLoadedListener(*this);
         setSampleLoadingStatus();
-        LE_ASSERT(
-            editorHost_
-                .isSampleLoadInProgress()); //...mrmlj...handle this threading issue properly....
     }
     else
+    {
+        sampleArea_.setVisible();
         updateSampleName();
+    }
 }
 
 void SpectrumWorxEditor::setSampleLoadingStatus()
@@ -676,7 +673,6 @@ void SpectrumWorxEditor::newSampleFileSelected(juce::File const &file)
     editorHost_.setNewSample(file);
     updateSampleNameAsync();
 }
-#endif // LE_SW_DISABLE_SIDE_CHANNEL
 
 void SpectrumWorxEditor::removeModule(ModuleUI &moduleUI)
 {
@@ -811,19 +807,11 @@ bool SpectrumWorxEditor::loadPreset(char *const inMemoryPreset, bool const ignor
                            pPresetName);
 }
 
-void SpectrumWorxEditor::savePreset(juce::File const &presetFile,
-                                    [[maybe_unused]] bool const ignoreExternalSample,
+void SpectrumWorxEditor::savePreset(juce::File const &presetFile, bool const ignoreExternalSample,
                                     juce::String const &comment) const
 {
-#ifdef LE_SW_DISABLE_SIDE_CHANNEL
-    /// \note Nothing to ignore: with the file loader compiled out there is no
-    /// sample to name in the preset, so the browser's toggle has no subject.
-    /// 5.0 brings the loader back and this asks the host again.
-    juce::File const externalSample;
-#else
     juce::File const externalSample(ignoreExternalSample ? juce::File()
                                                          : editorHost_.currentSampleFile());
-#endif // LE_SW_DISABLE_SIDE_CHANNEL
     SW::savePreset(presetFile, externalSample, comment, program());
 }
 
@@ -1799,12 +1787,26 @@ SpectrumWorxEditor::LFODisplay const &SpectrumWorxEditor::LFODisplay::Period::pa
     return Utility::ParentFromMember<LFODisplay, Period, &LFODisplay::period_>()(*this);
 }
 
-#ifndef LE_SW_DISABLE_SIDE_CHANNEL
 SpectrumWorxEditor::SampleArea::SampleArea()
 {
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
     addToParentAndShow(editor(), *this);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// SpectrumWorxEditor::SampleArea::mouseUp()
+// -----------------------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note A menu rather than 2016's straight-to-the-file-dialog, because the
+/// factory samples are in the binary now and a file dialog cannot show them.
+/// The dialog is still one entry away, and the right button still clears, as it
+/// always did.
+///                                           (01.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
 
 void SpectrumWorxEditor::SampleArea::mouseUp(juce::MouseEvent const &event)
 {
@@ -1813,26 +1815,71 @@ void SpectrumWorxEditor::SampleArea::mouseUp(juce::MouseEvent const &event)
     if (mouseButtons.isRightButtonDown())
     {
         editor.newSampleFileSelected(juce::File());
+        return;
     }
-    else if (mouseButtons.isLeftButtonDown())
+    if (!mouseButtons.isLeftButtonDown() || PopupMenu::menuActive())
+        return;
+
+    auto const factorySamples(Sample::factorySamples());
+
+    enum : PopupMenu::ItemID
     {
-        /// \note Held rather than stack-allocated: launchAsync() returns
-        /// immediately and the chooser must outlive the dialog.
-        fileChooser_ = std::make_unique<juce::FileChooser>(
-            "Choose external audio file",
-            //juce::File::getSpecialLocation( juce::File::userMusicDirectory ), //...mrmlj... for testing...
-            //juce::File(),
-            editor.editorHost().currentSampleFile(), Sample::supportedFormats(), true);
-        juce::Component::SafePointer<SpectrumWorxEditor> pEditor(&editor);
-        fileChooser_->launchAsync(
-            juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-            [pEditor](juce::FileChooser const &chooser) {
-                if (!pEditor || chooser.getResults().isEmpty())
-                    return;
-                LE_ASSERT(chooser.getResults().size() == 1);
-                pEditor->newSampleFileSelected(chooser.getResults().getReference(0));
-            });
-    }
+        browse = 0,
+        clear,
+        firstFactorySample
+    };
+
+    menu_.clear();
+    menu_.addItem(browse, "Load audio file...");
+    menu_.addItem(clear, "No external audio",
+                  /*icon*/ juce::Image(),
+                  /*enabled*/ editor.editorHost().currentSampleFile() != juce::File());
+    menu_.addSectionHeader("Factory samples");
+    for (std::size_t sample(0); sample < factorySamples.size(); ++sample)
+        menu_.addItem(static_cast<PopupMenu::ItemID>(firstFactorySample + sample),
+                      factorySamples[sample].getFileNameWithoutExtension().toRawUTF8());
+
+    juce::Component::SafePointer<SpectrumWorxEditor> pEditor(&editor);
+    menu_.showCenteredBelow(*this, [this, pEditor, factorySamples](PopupMenu::OptionalID chosen) {
+        if (!pEditor || !chosen)
+            return;
+        switch (*chosen)
+        {
+        case browse:
+            return browseForFile();
+        case clear:
+            return pEditor->newSampleFileSelected(juce::File());
+        default:
+            return pEditor->newSampleFileSelected(factorySamples[*chosen - firstFactorySample]);
+        }
+    });
+}
+
+void SpectrumWorxEditor::SampleArea::browseForFile()
+{
+    SpectrumWorxEditor &editor(this->editor());
+
+    /// \note Only a real file is a place to start from: a factory sample is a
+    /// bare name and no directory, and JUCE would resolve it against whatever
+    /// the host's working directory happens to be.
+    auto const currentFile(editor.editorHost().currentSampleFile());
+    auto const startingFile(currentFile.existsAsFile()
+                                ? currentFile
+                                : juce::File::getSpecialLocation(juce::File::userMusicDirectory));
+
+    /// \note Held rather than stack-allocated: launchAsync() returns
+    /// immediately and the chooser must outlive the dialog.
+    fileChooser_ = std::make_unique<juce::FileChooser>("Choose external audio file", startingFile,
+                                                       Sample::supportedFormats(), true);
+    juce::Component::SafePointer<SpectrumWorxEditor> pEditor(&editor);
+    fileChooser_->launchAsync(
+        juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+        [pEditor](juce::FileChooser const &chooser) {
+            if (!pEditor || chooser.getResults().isEmpty())
+                return;
+            LE_ASSERT(chooser.getResults().size() == 1);
+            pEditor->newSampleFileSelected(chooser.getResults().getReference(0));
+        });
 }
 
 SpectrumWorxEditor &SpectrumWorxEditor::SampleArea::editor()
@@ -1840,7 +1887,6 @@ SpectrumWorxEditor &SpectrumWorxEditor::SampleArea::editor()
     return Utility::ParentFromMember<SpectrumWorxEditor, SampleArea,
                                      &SpectrumWorxEditor::sampleArea_>()(*this);
 }
-#endif // LE_SW_DISABLE_SIDE_CHANNEL
 
 ////////////////////////////////////////////////////////////////////////////////
 //

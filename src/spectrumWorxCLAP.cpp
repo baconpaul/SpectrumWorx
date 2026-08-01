@@ -27,11 +27,16 @@
 #include "core/host_interop/host2PluginImpl.inl"
 #include "core/host_interop/plugin2HostImpl.inl"
 
+#include "gui/gui.hpp" // warningMessageBox()
+
+#include "le/math/vector.hpp" // Math::copy(), for the sample's wrap
+
 #include <sst/plugininfra/cpufeatures.h>
 #include <sst/plugininfra/version_information.h>
 
 #include <algorithm>
 #include <cstring>
+#include <mutex>
 //------------------------------------------------------------------------------
 namespace LE::SW
 {
@@ -70,6 +75,52 @@ bool readFully(clap_istream const *const stream, void *const data, std::size_t s
         size -= static_cast<std::size_t>(read);
     }
     return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// sampleChunk()
+// -------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief One block of a looped sample channel, advancing \p position past it.
+///
+/// \return the sample's own data where a whole block is contiguously available,
+/// which is every block but the one that wraps; \p workBuffer, filled, where it
+/// is not. So the common case costs nothing and only the wrap copies.
+///
+/// \note LE::SW::getChannelDataChunk in the 2016 plugin class, moved here with
+/// its shape intact -- it is the whole of what feeding the engine from a file
+/// amounts to.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+float const *LE_RESTRICT sampleChunk(Sample::ChannelData const &channelData,
+                                     std::uint32_t &position, std::uint32_t chunkSize,
+                                     float *LE_RESTRICT const workBuffer)
+{
+    auto const dataSize(static_cast<std::uint32_t>(channelData.size()));
+    LE_ASSERT(position <= dataSize);
+    if (dataSize > (position + chunkSize))
+    {
+        auto const *const pChunk(&channelData[position]);
+        position += chunkSize;
+        return pChunk;
+    }
+
+    auto *workBufferPosition(workBuffer);
+    while (chunkSize)
+    {
+        if (position == dataSize)
+            position = 0;
+        auto const amountToCopy(std::min<std::uint32_t>(dataSize - position, chunkSize));
+        Math::copy(&channelData[position], workBufferPosition, amountToCopy);
+        workBufferPosition += amountToCopy;
+        position += amountToCopy;
+        chunkSize -= amountToCopy;
+    }
+    return workBuffer;
 }
 } // namespace
 
@@ -140,6 +191,14 @@ bool SpectrumWorxCLAP::activate(double const sampleRate, std::uint32_t,
     resume();
     engineRunning_ = true;
     latencyInSamples_ = engineSetup().latencyInSamples();
+
+    /// \note A sample is decoded to the engine's rate, and a session can be
+    /// restored -- sample and all -- before the host has said what that rate is.
+    /// Re-read it here when they disagree; the 2016 build did not, and played
+    /// the sample at the wrong pitch for the rest of the session.
+    ///                                       (01.08.2026.) (SW port)
+    if (sample_ && (sample_.sampleRate() != static_cast<unsigned int>(sampleRate)))
+        setNewSample(sample_.sampleFile());
 
     /// \note An editor that opened before this point built its module knobs
     /// against an engine with no sample rate, so the ranges that quantise to a
@@ -686,15 +745,58 @@ void SpectrumWorxCLAP::runEngine(clap_process const *const process) noexcept
     if ((input.channel_count < channels) || (output.channel_count < channels))
         return;
 
+    if (!engineRunning_)
+        return;
+
     // The engine reads a side channel whenever the input mode calls for one, and
     // does not check that the host actually connected the port.
-    auto const *const sideChannels(
+    float const *const *sideChannels(
         ((process->audio_inputs_count > 1) && process->audio_inputs[1].data32)
             ? process->audio_inputs[1].data32
             : input.data32);
 
-    if (!engineRunning_)
-        return;
+    ////////////////////////////////////////////////////////////////////////////
+    // An external audio file, when one is loaded, in place of the port.
+    //
+    // \note The lock, and why it is a try_lock and why it is held past the call
+    // below. The message thread swaps the decoded data under this one, so the
+    // pointers below have to be read and used with it held -- and it is the
+    // same recursive lock SpectrumWorxCore::process() takes, so holding it here
+    // is what stops that call from dropping the block. If another thread has it
+    // (a load, a preset, an FFT-size change) this block plays the host's side
+    // chain instead of the sample, which is a block of the wrong source rather
+    // than a block of silence or a wait on the audio thread.
+    //
+    //   2016 got the same effect from taking its try_lock at the top of its own
+    // process() and reading the sample inside it. Every part of this belongs to
+    // the threading redesign; it is written this way because that is what is
+    // there now.
+    //                                        (01.08.2026.) (SW port)
+    ////////////////////////////////////////////////////////////////////////////
+
+    /// \note A Sample is always stereo, so a wider engine configuration -- which
+    /// nothing produces today; activate() asks for 2 x 2 -- keeps the port.
+    float const *sampleChannels[Sample::numberOfChannels];
+    std::unique_lock<Utility::CriticalSection> const sampleLock(processCriticalSection_,
+                                                                std::try_to_lock);
+    if (sampleLock.owns_lock() && sample_ && (channels <= std::size(sampleChannels)) &&
+        (buffers().numberOfSideChannels() >= channels) &&
+        (process->frames_count <= buffers().blockSize()))
+    {
+        auto const startingPosition(sample_.samplePosition());
+        std::uint32_t position(startingPosition);
+        for (std::uint8_t channel(0); channel < channels; ++channel)
+        {
+            // Every channel reads the same span, so each starts where the last
+            // one did and the advance is taken once.
+            position = startingPosition;
+            sampleChannels[channel] =
+                sampleChunk(sample_.channel(channel), position, process->frames_count,
+                            buffers().sideChannel(channel).begin());
+        }
+        sample_.samplePosition() = position;
+        sideChannels = sampleChannels;
+    }
 
     SpectrumWorxCore::process(input.data32, sideChannels, output.data32, 1.0f,
                               process->frames_count);
@@ -997,6 +1099,57 @@ std::unique_ptr<juce::Component> SpectrumWorxCLAP::createEditor()
 
 void SpectrumWorxCLAP::editorOpened(GUI::SpectrumWorxEditor &editor) { pEditor_ = &editor; }
 void SpectrumWorxCLAP::editorClosed() { pEditor_ = nullptr; }
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// SpectrumWorxCLAP::setNewSample()
+// --------------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note `[main-thread]`, and synchronous: it decodes the whole file here and
+/// takes the process lock only to swap the result in. An MP3 of the size the
+/// factory samples are is single-digit milliseconds; a long file the user picks
+/// is not, and stalling the message thread is the cost of not having a loader
+/// thread. That is a deliberate deferral -- see the note on the declaration and
+/// doc/tech/week_two.md §1 item 3 -- and not something to fix here, because the
+/// answer is a queue this plugin does not have yet.
+///
+///   Two things the 2016 worker did that are gone with the buffers they served:
+/// InputBuffers::forceSideChannel() and a resize() around the load. activate()
+/// asks for two main and two side channels outright, so the side buffers this
+/// writes into are already there whether a sample is loaded or not.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxCLAP::setNewSample(juce::File const &newSampleFile)
+{
+    if (newSampleFile == juce::File())
+    {
+        Utility::CriticalSectionLock const processingLock(getProcessingLock());
+        sample_.clear();
+        clearSideChannelData();
+        return;
+    }
+
+    /// \note This plugin's own rate rather than the engine's, and zero is a
+    /// legal answer: a host can restore a session -- sample and all -- before it
+    /// has ever activated, and Sample::load() reads a file at its own rate when
+    /// it is given no other. activate() then re-reads it. Refusing would be the
+    /// alternative, and it would silently lose the sample.
+    auto const *const pErrorMessage(sample_.load(
+        newSampleFile, static_cast<unsigned int>(sampleRate_), processCriticalSection_));
+    if (pErrorMessage)
+        GUI::warningMessageBox("SpectrumWorx: error loading selected sample file.", pErrorMessage,
+                               false);
+
+    /// \note Deliberately no markCurrentProgramAsModified(). Which sample is
+    /// loaded is not in what stateSave() writes -- that is `(id, value)` pairs
+    /// and nothing else -- so telling the host the session is dirty would
+    /// promise to remember something the state format cannot hold. Item 4 owns
+    /// putting it there, and marking dirty belongs with it. It is also the one
+    /// call reachable from here that walks into §2.1a's null dereference.
+}
 
 bool SpectrumWorxCLAP::registerOrUnregisterTimer(clap_id &id, int const milliseconds,
                                                  bool const registering)

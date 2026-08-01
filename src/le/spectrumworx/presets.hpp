@@ -101,12 +101,11 @@ struct WindowSizeFactor;
 
 enum struct PresetProblem : std::uint8_t
 {
-    LoadFailed,            ///< not a preset, or the parse failed
-    SaveFailed,            ///< the file could not be written
-    UnknownEffect,         ///< names an effect this build does not have
-    EffectNotAvailable,    ///< names an effect this edition excludes
-    MissingParameter,      ///< the effect has a parameter the preset does not mention
-    ExternalSampleIgnored, ///< wants a sample file and this build has no loader
+    LoadFailed,         ///< not a preset, or the parse failed
+    SaveFailed,         ///< the file could not be written
+    UnknownEffect,      ///< names an effect this build does not have
+    EffectNotAvailable, ///< names an effect this edition excludes
+    MissingParameter,   ///< the effect has a parameter the preset does not mention
     TempoSyncedLFOWithoutTempo
 };
 
@@ -551,10 +550,6 @@ LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignor
 
         auto loader(consumer.presetLoader(ignoreExternalSample));
 
-#if defined(LE_SW_DISABLE_SIDE_CHANNEL)
-        if (!parametersLoader.getSampleFileName().empty())
-            reportPresetProblem(PresetProblem::ExternalSampleIgnored);
-#else  // "normal plugin build"
         if (loader.wantsSampleFile())
         {
             // Implementation note:
@@ -566,7 +561,6 @@ LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignor
             ///                               (15.12.2011.) (Domagoj Saric)
             loader.setSample(parametersLoader.getSampleFileName());
         }
-#endif // side channel handling
 
         GlobalParameters::Parameters newParameters;
         LE::Parameters::forEach(newParameters, parametersLoader);

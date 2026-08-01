@@ -101,15 +101,14 @@ if( APPLE )
 endif()
 source_group( "GUI" FILES ${SOURCES_GUI} )
 
+# \note sampleWin.cpp (DirectShow filter graphs) and sampleMac.cpp (ExtAudioFile
+# over an FSRef) were listed here, per platform. Stage 5.0 deleted both for one
+# juce::AudioFormatManager implementation in sample.cpp, so the per-platform arm
+# is gone with them; sample.cpp is in sw-dsp (src/dsp.cmake).
 set( SOURCES_ExternalAudio
     ${CMAKE_SOURCE_DIR}/external_audio/sample.cpp
     ${CMAKE_SOURCE_DIR}/external_audio/sample.hpp
 )
-if ( MSVC )
-    list( APPEND SOURCES_ExternalAudio ${CMAKE_SOURCE_DIR}/external_audio/sampleWin.cpp )
-elseif( APPLE )
-    list( APPEND SOURCES_ExternalAudio ${CMAKE_SOURCE_DIR}/external_audio/sampleMac.cpp )
-endif()
 source_group( "ExternalAudio" FILES ${SOURCES_ExternalAudio} )
 
 if ( MSVC )

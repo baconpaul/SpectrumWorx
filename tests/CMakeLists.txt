@@ -13,6 +13,7 @@ add_executable(sw-tests
         clap/parameterModelTests.cpp
         clap/pluginTests.cpp
         effects/effectsListTests.cpp
+        external_audio/sampleTests.cpp
         goldens/engineHarness.cpp
         goldens/goldenDigest.cpp
         goldens/goldenTests.cpp

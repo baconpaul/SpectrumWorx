@@ -10,8 +10,9 @@
 # JUCE_MODULES_ONLY and none of the juce_add_* helpers exist under it.
 #
 # \note One library rooted at assets/, not one per kind: what the consumers want
-# is a path ("skin/01.png", "presets/Echoes/LE Boiler.swp"), and the skin and the
-# presets are wanted by the same binary in every configuration that has either.
+# is a path ("skin/01.png", "presets/Echoes/LE Boiler.swp", "samples/Carrier.mp3"),
+# and the skin and the presets are wanted by the same binary in every
+# configuration that has either.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -29,6 +30,20 @@ file(GLOB_RECURSE SW_PRESET_FILES CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/presets/*.swp"
 )
 
+# The factory samples for the external-audio side channel: 1.4 MB of MP3, in the
+# binary rather than installed beside it. In 2016 the installer wrote them to
+# <install>/Samples and the loader looked there by file name when a preset named
+# one it could not find; embedding keeps that fallback working with no installer
+# and no path file, exactly as it does for the presets.
+#
+# The size is the whole of the argument against, and 1.4 MB against a ~20 MB
+# binary is not an argument. Revisit if the library grows, at which point the
+# answer is a downloadable expansion, not a loose directory nothing can find.
+file(GLOB SW_SAMPLE_FILES CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/*.mp3"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/*.wav"
+)
+
 list(LENGTH SW_SKIN_FILES SW_SKIN_FILE_COUNT)
 if (SW_SKIN_FILE_COUNT EQUAL 0)
     message(FATAL_ERROR "assets/skin is empty -- did the submodule/checkout complete?")
@@ -39,8 +54,13 @@ if (SW_PRESET_FILE_COUNT EQUAL 0)
     message(FATAL_ERROR "assets/presets is empty -- did the submodule/checkout complete?")
 endif()
 
+list(LENGTH SW_SAMPLE_FILES SW_SAMPLE_FILE_COUNT)
+if (SW_SAMPLE_FILE_COUNT EQUAL 0)
+    message(FATAL_ERROR "assets/samples is empty -- did the submodule/checkout complete?")
+endif()
+
 message(STATUS "SpectrumWorx assets: ${SW_SKIN_FILE_COUNT} skin files, "
-        "${SW_PRESET_FILE_COUNT} factory presets")
+        "${SW_PRESET_FILE_COUNT} factory presets, ${SW_SAMPLE_FILE_COUNT} factory samples")
 
 cmrc_add_resource_library(sw-assets
         ALIAS sw::assets
@@ -48,6 +68,7 @@ cmrc_add_resource_library(sw-assets
         WHENCE "${CMAKE_CURRENT_SOURCE_DIR}"
         ${SW_SKIN_FILES}
         ${SW_PRESET_FILES}
+        ${SW_SAMPLE_FILES}
 )
 
 # cmrc_add_resource_library makes a static library of generated .cpp files; they

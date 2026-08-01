@@ -46,7 +46,11 @@ constexpr char vendor[]{"Surge Synth Team"};
 constexpr char vendorURL[]{"https://surge-synth-team.org"};
 
 constexpr char auManufacturerCode[]{"SSTx"};
-constexpr char auSubtypeCode[]{"SpWx"};
+/// \note `SpWx` was SpectrumWorx's from 2010 and this pinned it; the shipping
+/// code is `SWrx` (swClapEntryImpl.cpp) and has been since `efd7037`. Nothing
+/// has been released under either, so the subtype is still free to change --
+/// but once one is, changing it orphans every AU instance in a saved session.
+constexpr char auSubtypeCode[]{"SWrx"};
 
 /// \brief The least a host can be: no extensions, no-op requests.
 clap_host const &minimalHost()
