@@ -25,7 +25,6 @@
 #include "le/utility/criticalSection.hpp"
 #include "le/utility/cstdint.hpp"
 #include "le/utility/platformSpecifics.hpp"
-#include "le/utility/objcfwdhelpers.hpp"
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "le/utility/intrusivePtr.hpp"
@@ -35,15 +34,10 @@
 #include <utility>
 #include <optional>
 //------------------------------------------------------------------------------
-//...mrmlj...should be deduced based on protocol through metaprogramming...
-#if defined(__APPLE__)
-struct OpaqueWindowPtr;
-typedef struct OpaqueWindowPtr *WindowPtr;
-typedef WindowPtr WindowRef;
-#elif defined(_WIN32)
-struct HWND__;
-typedef struct HWND__ *HWND;
-#endif
+/// \note A global-namespace forward declaration of Carbon's `WindowRef` and of
+/// Win32's `HWND` stood here, for the three `attachToHostWindow` overloads
+/// stage 6.4 deleted. Nothing else in the tree named either.
+///                                           (01.08.2026.) (SW port)
 namespace boost
 {
 template <class T> class intrusive_ptr;
@@ -101,24 +95,6 @@ class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
   public:
     explicit SpectrumWorxEditor(EditorHost &);
     ~SpectrumWorxEditor();
-
-#if defined(_WIN32)
-    void attachToHostWindow(HWND parentWindow);
-#elif defined(__APPLE__)
-    void attachToHostWindow(ObjC::NSView *parentWindow);
-/// \note Carbon, and 32 bit only. The guard used to read !__x86_64__, which is
-/// true on arm64 -- so this compiled on Apple Silicon and then failed to link
-/// against gui.mm, which has always guarded the same code with !JUCE_64BIT.
-///                                           (29.07.2026.) (SW port)
-#if !JUCE_64BIT
-    void attachToHostWindow(WindowRef parentWindow);
-    //...mrmlj...seems to be needed after all...reinvestigate...
-  private:
-    ObjC::NSWindow *pCocoaHostWindow_;
-
-  public:
-#endif // !JUCE_64BIT
-#endif // platform
 
   public:
     static SpectrumWorxEditor &fromChild(juce::Component const &);
@@ -253,10 +229,32 @@ class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
   public: //...mrmlj...needed at end of preset loading...
     void setLastModulePosition(std::uint8_t slotIndex);
 
+    /// \brief Where the preset browser and the settings panel go.
+    ///
+    /// \note Both are 191 x 363 and there is exactly one place in a 563 x 376
+    /// editor that will take one: over the module strips, right edge flush with
+    /// theirs. The left column is 213 px wide and every pixel of it is spoken
+    /// for -- the in/out/mix knobs, the module-info and LFO column, and the two
+    /// buttons that open these panels, which an overlay must not cover or there
+    /// is no way to shut it again. So the panels share one rectangle and only
+    /// one of them is ever open. Stage 6.4; the alternative was to grow the
+    /// editor while a panel is up, which needs a host that honours a resize
+    /// request and 6.6 ships non-resizable.
+    ///                                       (01.08.2026.) (SW port)
+    /// \note overlayX is the module strips' right edge less overlayWidth, and
+    /// the .cpp static_asserts it against ModuleUI's own constants rather than
+    /// this header taking a dependency on moduleUI.hpp for three numbers.
+    static unsigned short const overlayWidth = 191;
+    static unsigned short const overlayHeight = 363;
+    static unsigned short const overlayX = 362;
+    static unsigned short const overlayY = (estimatedHeight - overlayHeight) / 2;
+
   private:
     void newSampleFileSelected(juce::File const &);
 
-    void showSettings(unsigned int pageIndexToActivate);
+    /// \brief Parents \p panel to the editor at the overlay rectangle, on top.
+    void openOverlay(juce::Component &panel);
+
     void updateSettings();
 
     void updateMainKnobs();
@@ -295,6 +293,11 @@ class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
     /// \brief Opens the browser on a factory bank, as double-clicking into one
     /// does. `tools/show-ui` only; see showPresetBrowser().
     void showFactoryBank(juce::String const &bank);
+
+    /// \brief Opens the settings panel on \p pageIndexToActivate, as the
+    /// settings button does. Public for the same reason showPresetBrowser() is:
+    /// the button is private and its handler recovers the editor from it.
+    void showSettings(unsigned int pageIndexToActivate);
 
   private:
     void moveModules(ModuleUI &targetSlotUI, std::uint8_t numberOfModules, std::int16_t offset);
@@ -525,8 +528,7 @@ class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
 
     class Settings : public juce::TabbedComponent,
                      private juce::Slider::Listener,
-                     private juce::Button::Listener,
-                     public OwnedWindow<Settings>
+                     private juce::Button::Listener
     {
       public:
         Settings();
@@ -537,10 +539,6 @@ class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
         static void comboBoxValueChanged(ComboBox const &);
 
         SpectrumWorxEditor &editor();
-        juce::Component &window()
-        {
-            return *this;
-        } //...mrmlj...required because of the focus chemistry in PresetBrowser (which disables proper implicit cast to juce::Component)...
 
       private:
         void refillFrameSize(Engine::Setup const &);
@@ -630,6 +628,15 @@ class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
         static std::uint8_t const yStep = 45;
     }; // class Settings
 
+    /// Tab indices into Settings, in addTab() order.
+    enum SettingsPage : unsigned int
+    {
+        enginePageIndex = 0,
+        interfacePageIndex,
+        aboutPageIndex,
+        numberOfSettingsPages
+    };
+
   private:
     /// \note First member, and a reference: everything below is built in the
     /// constructor body and reaches through it.
@@ -654,7 +661,6 @@ class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
     BitmapButton settingsButton_;
 
     // Optional/auxiliary components
-    friend class OwnedWindowBase;
     friend class SharedModuleControls;
     std::optional<SharedModuleControls> sharedModuleControls_;
     std::optional<LFODisplay> lfoDisplay_;

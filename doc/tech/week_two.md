@@ -34,7 +34,7 @@ reasons this document exists rather than another pass over the old one:
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone — macOS arm64. Linux arm64 proven at stage 4. Windows arrives as logs. |
 | Runs | Standalone, with audio, with the real editor, with presets. **Never in a DAW.** |
-| Tests | 112 ctest cases: 103 Catch2 + 8 `sw-show-ui --render` + 1 build-property check. Goldens run in Release only. |
+| Tests | 113 ctest cases: 103 Catch2 + 9 `sw-show-ui --render` + 1 build-property check. Goldens run in Release only. |
 | CI | **None.** There is no `.github/`. |
 | Warnings | 254 unique sites in a from-scratch Debug build, 248 of them ours — see §3. |
 | Identity | ✅ `org.surge-synth-team.spectrumworx`, AU `aufx`/`SpWx` by `SSTx` — see §4. |
@@ -59,7 +59,7 @@ comes before everything that makes the build tidy.
 | 2 | ✅ **Plugin identity** — Surge Synth Team ids, before any binary exists | new | *done* |
 | 3 | **Threading** — the main/audio split | 5.8 | 1–2 weeks |
 | 4 | **A real state format**, and the tests it has never had | 5.6 | 3–4 days |
-| 5 | **The owned-window collapse** | 6.4 | 4–6 days |
+| 5 | ✅ **The owned-window collapse** | 6.4 | *done* |
 | 6 | **CI**, three OSes × four formats, with the gates that already exist | 1.5, 5.9 | 3–5 days |
 | 7 | **The audio file loader**, and dropping the last flag | 5.0 | 2–3 days |
 | 8 | **Property tests for the nine amplifying effects** | 4.4 | 2 days |
@@ -158,35 +158,63 @@ larger than the stream (it sizes a `std::vector` from it before any bound
 check), an id no build knows. A `clap_ostream`/`clap_istream` over a
 `std::vector<char>` is about thirty lines and the rest are mutations of it.
 
-### 5 — The owned-window collapse (6.4)
+### 5 — The owned-window collapse (6.4) ✅ *done, 01.08.2026*
 
-**Smaller than the sequence says, and the part that shrank is the part it worried
-about.** The preset browser's data source is done: `Location{Root,Factory,User}`,
-`Item{Parent,Section,Folder,Preset}`, three refreshers, and `selectedPresetData()`
-joining `FactoryPresets::load()` and `readPresetFile()` into one
-`InMemoryPreset`. What is left of it is a day of tidying — see §2.5.
+> **Done.** Both panels are ordinary child components of the editor, sharing one
+> 191 × 363 rectangle at (362, 6) — over the module strips, right edge flush with
+> theirs. `OwnedWindowBase`/`OwnedWindow<>`, the Win32 `SetWindowsHookEx`, the
+> Carbon `HIView` path and `-framework Carbon` are gone: **923 lines out of
+> `src/`, 169 in**. `otool -L` shows no Carbon in the CLAP or in `sw-show-ui`.
+> `sw-tests` is **113/113 in both build trees**, the extra case being a new
+> `editor-settings` render — the settings panel had never been drawn by anything
+> headless, because until now it was a separate desktop window.
 
-What remains is genuinely a redesign, and it has one hard question in it:
+**Smaller than the sequence said, and the part that shrank was the part it
+worried about.** The preset browser's data source was already done:
+`Location{Root,Factory,User}`, `Item{Parent,Section,Folder,Preset}`, three
+refreshers, and `selectedPresetData()` joining `FactoryPresets::load()` and
+`readPresetFile()` into one `InMemoryPreset`.
 
-- **Deleting the machinery is a day.** `OwnedWindowBase` + `OwnedWindow<>` is
-  ~497 lines across `gui.hpp:243-359` and `gui.cpp:443-822`, with exactly two
-  instantiations. `gui.mm` goes from 367 lines to about 30 — only
-  `initialiseMac()` survives — and `-framework Carbon`, which is **linked into
-  every macOS build today** (`src/gui.cmake:52-53`), goes with it. So does the
-  process-wide `SetWindowsHookEx` in `gui.cpp:567`. See §2.6.
-- **The hard question: there is no free 191 px column.** The editor is 563 × 376
-  and fixed; the preset browser is 191 × 363 and the settings panel 191 × 376.
-  A left-hand overlay covers its own toggle button and the in/out/mix knobs; a
-  right-hand one covers three of the five module strips. `CallOutBox` solves
-  dismissal and z-order but adds chrome the skin does not have. **That is a UX
-  decision, not a port**, and it should be made explicitly before the deletion
-  starts.
-- Three smaller decisions ride along: `Gradient` sets `setAlwaysOnTop(true)` and
-  never clears it (`spectrumWorxEditor.cpp:436`), so a panel added after a drag
-  paints underneath; `Theme::Settings::globalOpacity` is labelled "Side window &
-  menu opacity" and stops meaning that; and the settings panel has a 13 px gap
-  (376 − 16 of tab bar vs a 347 px page bitmap) that is invisible over the
-  desktop and will not be over the editor.
+**The hard question was: there is no free 191 px column.** The editor is 563 × 376
+and fixed. The left column is 213 px wide and every pixel is spoken for — the
+in/out/mix knobs, the module-info and LFO column, and, fatally, the two buttons
+that open these panels: an overlay that covers its own toggle cannot be shut
+again. Three answers were weighed:
+
+| | Verdict |
+|---|---|
+| **Right-hand overlay** | **Chosen.** Costs the sight of module slots 3–5 while a panel is open — and `globalOpacity` already lets them show through, since `BackgroundImage::paint` applies it and its only subclasses are these two panels. |
+| Grow the editor while open | Closest to 2016 and covers nothing, but needs a host that honours `clap_host_gui::request_resize`, and 6.6 ships non-resizable. Cannot be trusted until item 1. |
+| `juce::CallOutBox` | Does not fit: 363 px of panel plus ~20 of arrow and border into a 376 px editor. In-editor it clips; on the desktop it is the thing being deleted. |
+
+The panels are therefore **mutually exclusive** — opening either shuts the other
+and un-toggles its button. `openOverlay()` is the single place both callers pass
+through and it asserts the invariant, and the `editor-settings` render page opens
+the browser *first* so that the ctest case actually exercises the swap.
+
+The three smaller decisions that rode along, and one more the overlay exposed:
+
+- `Gradient` set `setAlwaysOnTop(true)` and never cleared it, so a panel opened
+  after any module drag painted underneath. Cleared in `moduleDragEnd`.
+- The settings panel's 13 px gap (376 of editor height vs 16 of tab bar + a
+  347 px page bitmap) is closed: it is sized to what it draws, which is also
+  what the preset browser measures.
+- `Theme::Settings::globalOpacity` is now labelled "Panel & menu opacity". It
+  drives exactly what it always did; over the editor rather than the desktop it
+  is *more* use than it was, not less.
+- **New: clicking the SpectrumWorx logo opened the settings panel with no page
+  at all.** `mouseDown` asked for tab 3 of three, and JUCE clamps an out-of-range
+  index to −1. Invisible as a transparent desktop window; an empty panel over the
+  editor. It means the About tab, which is index 2, and the indices are an enum
+  now with the tab count asserted against it.
+
+Two things deliberately **not** done. `fft.cpp:35`'s `CarbonDummyPointName`
+stays — `<Accelerate/Accelerate.h>` still drags in `MacTypes.h`'s `Point`
+(verified by compiling one, not by reading), so that workaround is load bearing
+whatever the frameworks say. And the JUCE focus assertion the render pages print
+is **not** this work's: it comes from `fillFirstSlot()` — `editor` alone renders
+silently, `editor-module` asserts with no panel in sight. An offscreen editor can
+never be `isShowing()`, so every `grabKeyboardFocus()` in the harness trips it.
 
 ### 6 — CI
 
@@ -381,7 +409,7 @@ the GUI are covered at the edges.
 | **The test host is too thin** | It offers `clap.params` and nothing else — which is precisely why 2.1a is invisible. Adding `clap.state`, `clap.thread-check`, and a deliberate *without*-thread-check variant is the fix, and it is small. |
 | **`lfoImpl.cpp` has no direct test** | Only LFO 0 of module 0 targeting Gain is ever exercised. Waveform shapes, sync types, `PeriodScale` snapping, `LowerBound > UpperBound`, an LFO on an enumerated target, several at once — none. A value-table golden fits the existing pattern. |
 | **Both text conversions are stubs, and they are one job** | `paramsTextToValue` is `return false` (`spectrumWorxCLAP.cpp:469`); `paramsValueToText` **ignores the value it is given** and prints the parameter's current one (`:414-441`). Both are documented at length with a shared `\todo`: give `AutomatedParameterPrinter` an arm that takes a value *and* the live parameter, so an LFO's dynamic range has an owner to validate against. Host-visible in every automation lane tooltip, and unpinned by any test. |
-| **The GUI tests assert exit code only** | `renderPage()` writes a PNG and returns 0. A page that paints solid black passes. Blank/uniform-colour detection is about ten lines and would make the existing eight tests assert something. |
+| **The GUI tests assert exit code only** | `renderPage()` writes a PNG and returns 0. A page that paints solid black passes. Blank/uniform-colour detection is about ten lines and would make the existing nine tests assert something — and it is what would have caught the empty settings panel 6.4 found by looking at a render. |
 | **1 of 57 effects, 1 of 18 banks** | `SW_SHOW_UI_EFFECT`, `SW_SHOW_UI_PRESET` and `SW_SHOW_UI_PRESET_SWEEP` exist and are manual-only. A CMake `foreach` over the effect list is four lines for 57× the GUI breadth. |
 | **`ctest -LE slow` skips nothing** | No test in the repo sets `LABELS`; the one labelled case went with `check_gui_flag_parity.py`. Either re-establish the label or stop recommending the flag. |
 
@@ -439,8 +467,8 @@ a PCH), `le/utility/{conditionVariable.hpp,pimpl.hpp,pimplPrivate.hpp,
 entryPoint.hpp,filesystemImpl.inl}`, `le/plugins/{entryPoint.hpp,plugin.hpp}`
 (0.3 kept `le/plugins/` "until `le/plugins/clap/` works" — the VST2/AU/FMOD/Unity
 backends are already gone, and these two are what is left), `GUI::Lock`,
-`gui.mm`'s `hideCursor`/`showCursor`, and eight symbols that are declared and
-never defined — including **three public members of `SpectrumWorxCLAP`**
+~~`gui.mm`'s `hideCursor`/`showCursor`~~ (gone with 6.4), and eight symbols that
+are declared and never defined — including **three public members of `SpectrumWorxCLAP`**
 (`cycleModuleFromUI`, `requestRescanFromUI`, `effectIn`, `spectrumWorxCLAP.hpp:227-233`).
 The sequence says stage 6 deleted those three with `stubEditor.cpp`; it deleted
 their definitions and callers and left the declarations.
@@ -470,20 +498,21 @@ come back for the Windows build, or `sst-plugininfra` already covers them.
 
 ### 2.6 Live platform code that should not be
 
-- **Carbon is not just present, it is linked.** `src/gui.cmake:52-53` compiles
-  `gui/gui.mm` into `sw-gui-widgets` **and links `-framework Carbon`**, on the
-  only platform this has run on. `gui.mm:25` includes `Carbon/Carbon.h`
-  unconditionally, and ~155 of its 367 lines are `#if !JUCE_64BIT` — unreachable
-  on any 64-bit build. `SpectrumWorxEditor::attachToHostWindow` has three
-  overloads and **no callers at all** now the shim parents the editor. Even
-  `fft.cpp:35` carries a `CarbonDummyPointName` enum working around Carbon's
-  `Point` typedef. This goes with 6.4 and it is the cheap half of it.
-- **A process-wide `SetWindowsHookEx(WH_CALLWNDPROC, …)`** — `gui.cpp:567`, with
+- ✅ **Carbon is not just present, it is linked.** `src/gui.cmake:52-53` compiled
+  `gui/gui.mm` into `sw-gui-widgets` **and linked `-framework Carbon`**, on the
+  only platform this has run on. `gui.mm:25` included `Carbon/Carbon.h`
+  unconditionally, and ~155 of its 367 lines were `#if !JUCE_64BIT` — unreachable
+  on any 64-bit build. `SpectrumWorxEditor::attachToHostWindow` had three
+  overloads and **no callers at all** now the shim parents the editor.
+  *All gone with 6.4; `otool -L` confirms.* The one survivor is `fft.cpp:35`'s
+  `CarbonDummyPointName`, and it has to be: `<Accelerate/Accelerate.h>` still
+  pulls in `MacTypes.h`'s `Point` regardless of what is linked.
+- ✅ **A process-wide `SetWindowsHookEx(WH_CALLWNDPROC, …)`** — `gui.cpp:567`, with
   `LE_ASSERT(wndProcHook); //...mrmlj...better error handling desired...` on the
   next line. A message hook installed process-wide by a plugin is the kind of
-  thing that gets a plugin blacklisted by a host. It is `OwnedWindowBase`'s, so
-  6.4 removes it — which is an argument for 6.4 landing before the Windows build
-  gets driven in anger.
+  thing that gets a plugin blacklisted by a host. It was `OwnedWindowBase`'s, and
+  went with it — **before** the Windows build gets driven in anger, which was the
+  argument for doing 6.4 when it was done.
 - **Hand-written weak `strnlen`/`wcsnlen`** — `gui.cpp:1657-1680`, "OSX 10.6 does
   not provide std::strnlen", with the `!__LP64__` guard **commented out**. So
   they are compiled into every macOS build today, in 2026.

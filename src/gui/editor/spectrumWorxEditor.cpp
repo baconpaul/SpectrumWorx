@@ -28,7 +28,6 @@
 #include "le/spectrumworx/presetFile.hpp"
 #include "le/spectrumworx/presets.hpp"
 #include "le/utility/countof.hpp"
-#include "le/utility/objcfwdhelpers.hpp"
 #include "le/utility/parentFromMember.hpp"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -83,15 +82,6 @@ template <> void fillComboBoxForParameter<Engine::OverlapFactor>(ComboBox &combo
         value *= 2;
     }
 }
-
-#ifdef __APPLE__
-// gui.mmm forward declarations.
-extern void attachComponentToHostWindow(juce::Component &, ObjC::NSView *);
-extern void detachComponentFromHostWindow(juce::Component &, ObjC::NSWindow *);
-#if !JUCE_64BIT
-extern ObjC::NSWindow *attachComponentToHostWindow(juce::Component &, WindowRef);
-#endif // !JUCE_64BIT
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -245,50 +235,14 @@ SpectrumWorxEditor::~SpectrumWorxEditor()
 #ifndef LE_NO_PRESETS
     presetBrowser_ = std::nullopt;
 #endif // !LE_NO_PRESETS
-
-#if defined(__APPLE__) && !JUCE_64BIT
-    if (pCocoaHostWindow_)
-    {
-        //...mrmlj...manual detachment seems to be needed after all...otherwise
-        // (background/hidden) ghost window(s) are left hanging sometimes...
-        // ...this has to be called _after_ all owned windows are closed...
-        // ...reinvestigate...
-        detachComponentFromHostWindow(*this, pCocoaHostWindow_);
-    }
-#endif // Apple & Carbon
 }
 
-#if defined(_WIN32)
-
-void SpectrumWorxEditor::attachToHostWindow(HWND const parentWindowHandle)
-{
-    //...mrmlj...taken from the JUCE VST wrapper
-    juce::Component::addToDesktop(0);
-    HWND const thisHWND(reinterpret_cast<HWND>(this->getWindowHandle()));
-    LE_VERIFY(::SetParent(thisHWND, parentWindowHandle));
-
-    DWORD val(::GetWindowLong(thisHWND, GWL_STYLE));
-    val = (val & ~WS_POPUP) | WS_CHILD;
-    ::SetWindowLong(thisHWND, GWL_STYLE, val);
-}
-
-#elif defined(__APPLE__)
-
-void SpectrumWorxEditor::attachToHostWindow(ObjC::NSView *const pParentWindow)
-{
-#if !JUCE_64BIT
-    pCocoaHostWindow_ = nullptr;
-#endif
-    attachComponentToHostWindow(*this, pParentWindow);
-}
-
-#if !JUCE_64BIT
-void SpectrumWorxEditor::attachToHostWindow(WindowRef const parentWindow)
-{
-    pCocoaHostWindow_ = attachComponentToHostWindow(*this, parentWindow);
-}
-#endif // 32 bit only Carbon support
-#endif // platform
+/// \note `attachToHostWindow` had three overloads here -- a Win32 SetParent, a
+/// Cocoa NSView one and a 32 bit Carbon HIView one -- and no callers on any
+/// platform: the CLAP shim parents the editor. Deleted with the rest of the
+/// owned-window machinery in stage 6.4, and they took `-framework Carbon` with
+/// them.
+///                                           (01.08.2026.) (SW port)
 
 /// \note Walks up to the nearest enclosing editor rather than to the top-level
 /// component. Those were the same thing in 2016: VST 2.4 and AU parented the
@@ -359,12 +313,62 @@ void SpectrumWorxEditor::togglePresetBrowser(juce::Button const &button)
     editor.showPresetBrowser(button.getToggleState());
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// SpectrumWorxEditor::openOverlay()
+// ---------------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The whole of what stage 6.4 replaced ~500 lines of OwnedWindowBase
+/// with. The panel is an ordinary child; the only thing that needed saying is
+/// where it goes and that it goes on top -- gradient_ raises itself to always-
+/// on-top for a module drag, and a stale one would otherwise paint through this.
+///                                           (01.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxEditor::openOverlay(juce::Component &panel)
+{
+    static_assert(overlayX == ModuleUI::horizontalOffset +
+                                  SW::Constants::maxNumberOfModules *
+                                      (ModuleUI::width + ModuleUI::distance) -
+                                  overlayWidth,
+                  "the overlay's right edge is the module strips' right edge");
+
+    LE_ASSERT(panel.getWidth() == overlayWidth);
+    LE_ASSERT(panel.getHeight() == overlayHeight);
+
+    /// \note The whole of the "one rectangle, one panel" rule, in the one place
+    /// both callers pass through. Both toggle buttons feed this, and a host or a
+    /// harness can reach showSettings()/showPresetBrowser() without touching
+    /// either button, so the invariant belongs here rather than in the handlers.
+#ifndef LE_NO_PRESETS
+    LE_ASSERT_MSG(!(settings_.has_value() && presetBrowser_.has_value()),
+                  "the settings panel and the preset browser share one rectangle");
+#endif // !LE_NO_PRESETS
+    LE_ASSERT(!panel.getParentComponent());
+
+    panel.setTopLeftPosition(overlayX, overlayY);
+    addAndMakeVisible(panel);
+    panel.toFront(false);
+}
+
+/// \note The two panels share one rectangle, so opening either shuts the other
+/// and un-toggles its button.
 void SpectrumWorxEditor::showPresetBrowser(bool const show)
 {
     if (show)
+    {
+        settings_ = std::nullopt;
+        settingsButton_.setToggleState(false, juce::dontSendNotification);
         presetBrowser_.emplace();
+        openOverlay(*presetBrowser_);
+    }
     else
+    {
         presetBrowser_ = std::nullopt;
+    }
 }
 
 void SpectrumWorxEditor::showFactoryBank(juce::String const &bank)
@@ -447,6 +451,11 @@ void SpectrumWorxEditor::moduleDragEnd(ModuleUI &moduleUI, juce::MouseEvent cons
     bool const dragAborted(!gradient_.isVisible() ||
                            !gradient_.getBounds().contains(mousePosition));
     gradient_.setInvisible();
+    /// \note moduleDrag() raises this to always-on-top and nothing lowered it,
+    /// so a panel opened after any drag painted underneath it. Only matters now
+    /// the panels are children rather than desktop windows.
+    ///                                       (01.08.2026.) (SW port)
+    gradient_.setAlwaysOnTop(false);
     if (dragAborted)
         return;
 
@@ -1035,14 +1044,27 @@ void SpectrumWorxEditor::mouseDown(juce::MouseEvent const &event)
     juce::Rectangle<int> const logoArea(12, 290, 51, 63);
     if (logoArea.contains(event.x, event.y))
     {
-        showSettings(3);
+        /// \note Was 3, and there are three tabs. JUCE clamps an out of range
+        /// index to -1, so clicking the logo raised the panel with *no* page
+        /// selected -- an empty transparent window over the desktop, which is
+        /// why nobody saw it, and an empty panel over the editor now. The About
+        /// page this means is index 2.
+        ///                                   (01.08.2026.) (SW port)
+        showSettings(aboutPageIndex);
     }
 }
 
 void SpectrumWorxEditor::showSettings(unsigned int const pageIndexToActivate)
 {
     if (!settings_.has_value())
+    {
+#ifndef LE_NO_PRESETS
+        presetBrowser_ = std::nullopt;
+        preset_.setToggleState(false, juce::dontSendNotification);
+#endif // !LE_NO_PRESETS
         settings_.emplace();
+        openOverlay(*settings_);
+    }
     settings_->setCurrentTabIndex(pageIndexToActivate, false);
     settingsButton_.setToggleState(true, juce::dontSendNotification);
 }
@@ -1855,7 +1877,15 @@ SpectrumWorxEditor::Settings::Settings() /// \throws std::bad_alloc Out of memor
       inputMode_(enginePage_, xMargin, yMargin + yStep * 3, (GlobalParameters::InputMode *)(0))
 #endif // LE_SW_ENGINE_WINDOW_PRESUM
 {
-    this->setSize(resourceBitmap<SettingsEngineBg>().getWidth(), editor().getHeight());
+    /// \note The height was editor().getHeight() -- 376 -- while what this
+    /// paints is a 16 px tab bar over a 347 px page bitmap: 363. The 13 px
+    /// difference was empty and invisible while this was a transparent desktop
+    /// window, and would not be as an overlay over the editor. So it is the sum
+    /// of what it draws, which is also what the preset browser measures.
+    ///                                       (01.08.2026.) (SW port)
+    this->setSize(resourceBitmap<SettingsEngineBg>().getWidth(),
+                  resourceBitmap<SettingsEngineOn>().getHeight() +
+                      resourceBitmap<SettingsEngineBg>().getHeight());
 
 #if LE_SW_ENGINE_INPUT_MODE >= 2 && defined(__APPLE__)
     inputMode_->setEnabled(!editor().effect().completelyDisableIOChanges());
@@ -1883,7 +1913,11 @@ SpectrumWorxEditor::Settings::Settings() /// \throws std::bad_alloc Out of memor
     addTab(dummyName, juce::Colours::transparentBlack, &interfacePage_, false);
     addTab(dummyName, juce::Colours::transparentBlack, &aboutPage_, false);
 
-    OwnedWindow<Settings>::attach();
+    LE_ASSERT(getNumTabs() == numberOfSettingsPages);
+
+    /// \note `OwnedWindow<Settings>::attach()` stood here; the editor parents
+    /// and positions this now -- see SpectrumWorxEditor::openOverlay().
+    ///                                       (01.08.2026.) (SW port)
 }
 
 SpectrumWorxEditor::Settings::~Settings()
@@ -2102,7 +2136,13 @@ void SpectrumWorxEditor::Settings::EnginePage::paint(juce::Graphics &g)
 
 SpectrumWorxEditor::Settings::InterfacePage::InterfacePage()
     : BackgroundImage(resourceBitmap<SettingsIntrfcBg>()),
-      opacityTitle_("Side window & menu opacity", xMargin + 7, yMargin + 3 * yStep + 15,
+      /// \note "Side window & menu opacity" until 6.4, when the side windows
+      /// stopped being windows. It still drives exactly the same thing --
+      /// BackgroundImage::paint, whose only subclasses are this panel's three
+      /// pages and the preset browser -- and over the editor rather than over
+      /// the desktop it is more use than it was, not less.
+      ///                                   (01.08.2026.) (SW port)
+      opacityTitle_("Panel & menu opacity", xMargin + 7, yMargin + 3 * yStep + 15,
                     opacityWidth + 40, 16, juce::Justification::left),
       globalOpacity_(juce::String()),
       moduleUIMouseOverReaction_(*this, xMargin, yMargin + 0 * yStep, "Mouse over reaction"),

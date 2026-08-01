@@ -135,7 +135,10 @@ PresetBrowser::PresetBrowser()
     addToParentAndShow(*this, comment());
     addToParentAndShow(*this, listBox_);
 
-    OwnedWindow<PresetBrowser>::attach();
+    /// \note `OwnedWindow<PresetBrowser>::attach()` stood here and made this a
+    /// desktop window owned by the editor's. The editor parents and positions it
+    /// now -- see SpectrumWorxEditor::openOverlay().
+    ///                                       (01.08.2026.) (SW port)
 
 #ifdef LE_SW_DISABLE_SIDE_CHANNEL
     ignoreExternalSamples_.setValue(true);

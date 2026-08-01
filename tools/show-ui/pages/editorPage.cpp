@@ -123,8 +123,9 @@ class EditorPage final : public juce::Component
     /// \param sampleRate zero for an engine that has not been set up, which is
     /// what a session restored before activate() sees. See HarnessEngine.
     /// \param openPresetBrowser opens the browser as the presets button does.
+    /// \param settingsPage a tab index to open the settings panel on, or -1.
     EditorPage(bool const withModuleInFirstSlot, float const sampleRate,
-               bool const openPresetBrowser = false)
+               bool const openPresetBrowser = false, int const settingsPage = -1)
         : host_(sampleRate)
     {
         /// \note No setLookAndFeel() here, unlike the other pages: the editor's
@@ -159,6 +160,19 @@ class EditorPage final : public juce::Component
             }
             else
                 editor_->showPresetBrowser(true);
+        }
+
+        if (settingsPage >= 0)
+        {
+            /// \note Through the browser first, deliberately. The two panels
+            /// share one rectangle and openOverlay() asserts that only one of
+            /// them is ever up; going straight to the settings would never
+            /// exercise that, and swapping between them is what a user does.
+            /// What this page renders is therefore also the evidence that the
+            /// browser went away.
+            ///                               (01.08.2026.) (SW port)
+            editor_->showPresetBrowser(true);
+            editor_->showSettings(static_cast<unsigned int>(settingsPage));
         }
     }
 
@@ -254,6 +268,22 @@ SWShowUI::PageRegistration const registrationWithPresetBrowser{
     "editor-presets", "the editor with the preset browser open", [] {
         return std::unique_ptr<juce::Component>(
             std::make_unique<EditorPage>(true, 48000, true /*preset browser*/));
+    }};
+
+/// \note The settings panel had no headless coverage at all -- it was a separate
+/// desktop window until 6.4 and nothing offscreen could ever see it. It shares
+/// the preset browser's rectangle now, so this page is also what says the two of
+/// them land in the same place. Its three tabs are one bitmap page each; the
+/// interface tab is the interesting one, being the only page with live widgets
+/// on it. `SW_SHOW_UI_SETTINGS_PAGE` picks a tab, as the other env switches here
+/// pick an effect or a bank.
+SWShowUI::PageRegistration const registrationWithSettings{
+    "editor-settings", "the editor with the settings panel open", [] {
+        int page{0};
+        if (auto const *const requested = std::getenv("SW_SHOW_UI_SETTINGS_PAGE"))
+            page = std::atoi(requested);
+        return std::unique_ptr<juce::Component>(
+            std::make_unique<EditorPage>(true, 48000, false, page));
     }};
 
 //------------------------------------------------------------------------------

@@ -41,14 +41,11 @@ class SpectrumWorxEditor;
 class PresetBrowser final : public BackgroundImage,
                             private juce::ListBoxModel,
                             private juce::Button::Listener,
-                            private juce::TextEditor::Listener,
-                            public OwnedWindow<PresetBrowser>
+                            private juce::TextEditor::Listener
 {
   public:
     PresetBrowser();
     ~PresetBrowser();
-
-    juce::Component &window() { return *this; }
 
     SpectrumWorxEditor &editor();
     SpectrumWorxEditor const &editor() const;

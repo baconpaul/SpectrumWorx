@@ -240,123 +240,14 @@ template <class BaseComponent = juce::Component> class LE_NOVTABLE WidgetBase : 
     using BaseComponent::setVisible;
 }; // class WidgetBase
 
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \class OwnedWindowBase
-/// \internal
-/// \brief OwnedWindow core/non-templated implementation.
-///
-////////////////////////////////////////////////////////////////////////////////
-
-class PresetBrowser;
-class SpectrumWorxEditor;
-
-class OwnedWindowBase
-{
-  protected:
-    /// \return whether the ownee became a native window owned by the editor's.
-    /// False means it is an ordinary child instead, which is what happens when
-    /// the editor has no native window of its own to be owned by -- see the
-    /// definition.
-    static bool attach(SpectrumWorxEditor &, juce::Component &);
-    static void detach(SpectrumWorxEditor &, juce::Component &);
-
-    static void adjustPositions(juce::Component *pFirstWindow, juce::Component *pSecondWindow,
-                                unsigned int editorX, unsigned int editorY, unsigned int flags);
-    static void adjustPositions(SpectrumWorxEditor &parent, juce::Component *pFirstWindow,
-                                juce::Component *pSecondWindow);
-
-    static void adjustPositionsForPresetBrowser(SpectrumWorxEditor &parent,
-                                                juce::Component *pCurrentWindowState);
-    static void adjustPositionsForSettings(SpectrumWorxEditor &parent,
-                                           juce::Component *pCurrentWindowState);
-
-  private:
-#ifdef _WIN32
-    static LRESULT __stdcall callWndHookProc(int, WPARAM, LPARAM);
-
-    static HHOOK wndProcHook;
-#endif // _WIN32
-}; // class OwnedWindowBase
-
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \class OwnedWindow
-///
-/// \brief A base class for windows/widgets/components that need "owned window"
-/// behaviour with automatic main (editor) window position tracking/following.
-///
-////////////////////////////////////////////////////////////////////////////////
-
-#pragma warning(push)
-#pragma warning(disable : 4127) // Conditional expression is constant.
-
-template <class Window> class OwnedWindow : private OwnedWindowBase
-{
-  private:
-    static bool const isPresetBrowser = std::is_same<Window, PresetBrowser>::value;
-    static bool const isSettingsWindow = !isPresetBrowser;
-
-  public:
-    // Implementation note:
-    //   Unfortunately we cannot make the attachment automatic in the
-    // constructor because, under OSX, attachment causes the 'paint' method to
-    // be immediately invoked which can cause undefined behaviour/crashes
-    // because the wrapping object's constructor still has not finished (and
-    // thus the 'paint' method gets called on an incomplete object). Because of
-    // this, the only reliable usage (for now) is for the wrapping class
-    // (Window) to call the attach() function manually at the end of its
-    // constructor.
-    //                                        (07.10.2010.) (Domagoj Saric)
-    /// \todo Think of a smarter solution or assert that attach() gets called
-    /// exactly once.
-    ///                                       (07.10.2010.) (Domagoj Saric)
-    void attach()
-    {
-#ifdef _MSC_VER
-        static_assert(std::is_same<Window, SpectrumWorxEditor::Settings>::value == isSettingsWindow,
-                      "");
-#endif // _MSC_VER
-
-        SpectrumWorxEditor &parent(static_cast<Window *>(this)->editor());
-        juce::Component &window(static_cast<Window *>(this)->window());
-
-        /// \note The position adjustment is for *windows*: it works in the
-        /// editor's screen coordinates and lays the ownee out to the left of it.
-        /// A child's coordinates are its parent's, so running it on one puts the
-        /// child at a negative x -- off the editor entirely. Where a child
-        /// should go instead is the question **stage 6.4** exists to answer; the
-        /// top left corner is a placeholder that at least draws.
-        ///                               (31.07.2026.) (SW port)
-        if (OwnedWindowBase::attach(parent, window))
-        {
-            if (isPresetBrowser)
-                adjustPositionsForPresetBrowser(parent, &window);
-            else
-                adjustPositionsForSettings(parent, &window);
-        }
-        else
-        {
-            window.setTopLeftPosition(0, 0);
-        }
-
-        LE_ASSERT(window.isOnDesktop() || window.getParentComponent());
-    }
-
-    ~OwnedWindow()
-    {
-#ifdef _MSC_VER
-#endif // _MSC_VER
-        SpectrumWorxEditor &parent(static_cast<Window *>(this)->editor());
-        juce::Component &window(static_cast<Window *>(this)->window());
-        OwnedWindowBase::detach(parent, window);
-        if (isPresetBrowser)
-            adjustPositionsForPresetBrowser(parent, 0);
-        else
-            adjustPositionsForSettings(parent, 0);
-    }
-}; // class OwnedWindow
-#pragma warning(pop)
+/// \note `OwnedWindowBase` / `OwnedWindow<>` stood here: ~500 lines that made
+/// the preset browser and the settings panel separate top-level desktop windows
+/// owned by the editor's native one, kept in position by a process-wide
+/// `SetWindowsHookEx` on Windows and `[NSWindow addChildWindow:]` on macOS.
+/// **Stage 6.4** deleted them. Both panels are ordinary child components of the
+/// editor now, sharing one overlay rectangle over the module strips --
+/// `SpectrumWorxEditor::openOverlay()` is where that lives.
+///                                           (01.08.2026.) (SW port)
 
 void warningMessageBox(std::string_view title, std::string_view message, bool canBlock);
 

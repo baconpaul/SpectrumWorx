@@ -49,8 +49,11 @@ target_link_libraries(sw-gui-widgets PUBLIC sw-gui-resources sw-dsp)
 target_link_libraries(sw-gui-widgets PRIVATE sst-plugininfra)
 
 if (APPLE)
+    # gui.mm is Cocoa only now. "-framework Carbon" stood beside Cocoa here and
+    # was linked into every macOS build for the owned windows' HIView path,
+    # which stage 6.4 deleted.
     target_sources(sw-gui-widgets PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/gui/gui.mm)
-    target_link_libraries(sw-gui-widgets PRIVATE "-framework Carbon" "-framework Cocoa")
+    target_link_libraries(sw-gui-widgets PRIVATE "-framework Cocoa")
 endif()
 
 # After the .mm above, so that it gets the header too.

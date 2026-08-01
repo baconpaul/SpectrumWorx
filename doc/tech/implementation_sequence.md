@@ -2052,7 +2052,8 @@ sufficient — `juce_graphics`, `juce_data_structures`, `juce_events` and
 | 6.2 `Theme` | ✅ `LookAndFeel_V2`, in `src/gui/theme.{hpp,cpp}`, rendered by `sw-show-ui theme` |
 | 6.3 assets | ✅ |
 | 6.1 — the widget set | ☐ blocked on the two rewrites below |
-| 6.4 – 6.7 | ☐ |
+| 6.4 | ✅ 01.08.2026 — both panels are child components sharing one 191 × 363 overlay at (362, 6); `OwnedWindow*`, the Win32 hook, the Carbon path and `-framework Carbon` deleted, 923 lines out of `src/`. See `week_two.md` §1.5 |
+| 6.5 – 6.7 | ☐ |
 
 **These two are not ports.** Everything swept so far was a substitution: the
 JUCE 8 spelling of a thing that still exists. What is left is two pieces of
@@ -2306,10 +2307,11 @@ engine (a `SpectrumWorxCore` plus a `Plugin2HostInteropControler` whose
 notifications go nowhere), rendered offscreen. `--render` needs no window server,
 so it is a ctest, and it caught both.
 
-**Still outstanding in stage 6:** 6.4, the owned-window collapse; the preset
-browser's two `warningOkCancelBox` save-path callers, which still need the async
-inversion before that file can compile; and the editor has never been driven by a
-mouse.
+**Still outstanding in stage 6:** the preset browser's two `warningOkCancelBox`
+save-path callers, which still need the async inversion before that file can
+compile. 6.4, the owned-window collapse, landed on 01.08.2026, and the editor
+has since been driven by a mouse — which is where week two's first four bugs
+came from.
 
 > **Re-run the release goldens before pushing any of this.** Stage 6 has no
 > business changing DSP output, which is exactly why an unexplained golden
@@ -2675,9 +2677,9 @@ Rows below are in stage-number order, not running order. Running order is
 | 3 | DSP core + goldens ✅ | 3–5 |
 | 4 | Portable SIMD/FFT — *deferred, runs after 6* | 1.5–2.5 |
 | 5 | CLAP host layer — *5.1–5.7 done; 5.0, ranges, 5.8, 5.9 open* | 2.5–4 |
-| 6 | GUI — *widgets, module layer, editor and the browser's async save path done; 6.4 open* | 4–6 |
+| 6 | GUI — *widgets, module layer, editor, the browser's async save path and 6.4 done; 6.5–6.7 open* | 4–6 |
 | 7 | De-Boost the parameter system | 4–6 |
-| 8 | Presets and content ✅ *bar the browser, which waits on 6.4* | 1–2 |
+| 8 | Presets and content ✅ *including the browser, once 6.4 landed* | 1–2 |
 | 9 | Ship | 1–2 |
 | | **Serial total** | **20.5–33** |
 | | **Two people, 6 in parallel** | **~16.5–25** |
