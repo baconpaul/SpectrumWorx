@@ -169,6 +169,13 @@ void writeFixtures(std::vector<SWTest::Fixture> const &fixtures)
 /// bypassed slot is transparent — rather than a fixture with a wide bound. That
 /// is what actually tests them; this declines to. See stage 4.4.
 ///                                       (29.07.2026.) (SW port)
+///
+/// \note **Written, 01.08.2026: `tests/effects/amplifyingEffectsTests.cpp`.**
+/// Nineteen cases, and they run in both build types where this file renders in
+/// Release only. So the wide bound below is no longer the whole of what holds
+/// these nine to anything; it is the same-platform regression net, and what the
+/// effects *do* is asserted there.
+///                                       (01.08.2026.) (SW port)
 bool amplifiesRounding(std::string const &key)
 {
     // Keys carry the effect name with spaces turned into underscores, as

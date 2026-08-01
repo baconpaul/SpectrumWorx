@@ -42,7 +42,7 @@ inventory that redesign has to satisfy. It is no longer the plan.
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone — macOS arm64. Linux arm64 proven at stage 4. Windows arrives as logs. |
 | Runs | Standalone, with audio, with the real editor, with presets. **Loads in Logic and in Bitwig, and deadlocks in both** in certain situations — see §1 item 3. |
-| Tests | **125/125**: 115 Catch2 + 9 `sw-show-ui --render` + 1 build-property check, in both build trees. Goldens run in Release only. |
+| Tests | **144/144**: 134 Catch2 + 9 `sw-show-ui --render` + 1 build-property check, in both build trees. Goldens run in Release only. |
 | CI | **None.** There is no `.github/`. |
 | Warnings | 254 unique sites in a from-scratch Debug build, 248 of them ours — see §3. |
 | Identity | ✅ `org.surge-synth-team.spectrumworx`, AU `aufx`/`SWrx` by `SSTx` — see §4. |
@@ -76,16 +76,16 @@ the build tidy, and item 3 is no longer a fixup.
 | 5 | ✅ **The owned-window collapse** | 6.4 | *done* |
 | 6 | **CI**, three OSes × four formats, with the gates that already exist | 1.5, 5.9 | 3–5 days |
 | 7 | ✅ **The audio file loader**, and dropping the last flag | 5.0 | *done* |
-| 8 | **Property tests for the nine amplifying effects** | 4.4 | 2 days |
+| 8 | ✅ **Property tests for the nine amplifying effects** | 4.4 | *done* |
 | 9 | **The stage 7 tail** — include-what-you-use, and seven macros no build can define | 7 | 3–4 days |
 | 10 | **Ship** — licence, README, manual, installers, notarisation | 9 | 1–2 weeks |
 
 ### 0 — Three bugs, first, because they are one line each ✅ *done, 01.08.2026*
 
 > **Done.** All three, and the fixes are one line each as advertised. What was
-> not one line is the coverage: **five new cases**, `sw-tests` **125/125** in
-> both build trees. Two of the three now fail loudly if the fix is reverted —
-> checked by reverting each and watching them fail, not by inspection.
+> not one line is the coverage: **five new cases**. Two of the three now fail
+> loudly if the fix is reverted — checked by reverting each and watching them
+> fail, not by inspection.
 
 Found while auditing for this document, not by a test. Details and evidence in
 §2.1.
@@ -355,7 +355,7 @@ never be `isShowing()`, so every `grabKeyboardFocus()` in the harness trips it.
 Nothing exists. The gates, however, mostly do — they are just not wired:
 `scripts/check_boost_allowlist.sh` (run by hand), `tests/checkODRHeaderScope.cmake`
 (a ctest already), `clang-format` (see §2.5 — the tree is **not** clean any
-more), and 108 ctest cases that need **both** build types to mean 108.
+more), and 144 ctest cases that need **both** build types to mean 144.
 
 Model it on OB-Xf's `build-plugin.yml` with `sst-githubactions/prepare-for-juce`.
 Matrix: macos-universal, windows-msvc-x64, windows-arm64, linux-x64, linux-arm64.
@@ -365,7 +365,8 @@ The one thing to get right on day one: **run `ctest` in Debug and Release**, not
 one of them. The goldens `SKIP` under `!NDEBUG` (documented at
 `goldenTests.cpp:287-298`), so Release is the only configuration that renders
 DSP, and Debug is the only one that runs the ~1200 asserts. Neither alone is
-"108/108".
+"144/144". Item 8's property tests narrow that gap without closing it — they run
+in both, and they are the only DSP assertions a checked build makes.
 
 ### 7 — The audio file loader (5.0) ✅ *done, 01.08.2026*
 
@@ -374,8 +375,8 @@ DSP, and Debug is the only one that runs the ~1200 asserts. Neither alone is
 > `ExtAudioFile`) are gone, **1,355 lines out**, and with them the last
 > per-platform arm in `src/` that was not a JUCE one.
 > **`LE_SW_DISABLE_SIDE_CHANNEL` is dropped**: the tree now has no feature flag
-> switched on at all. `sw-tests` is **120/120** in both build trees, the six new
-> cases being `tests/external_audio/sampleTests.cpp`.
+> switched on at all. `sw-tests` was **120/120** in both build trees at the time,
+> the seven new cases being `tests/external_audio/sampleTests.cpp`.
 
 **Both decisions it was told to carry were made, and the third was not.**
 
@@ -412,7 +413,11 @@ Three things worth knowing that the plan did not:
   own", and `activate()` re-reads a sample whose rate disagrees with the host's.
   The 2016 build did neither and played at the wrong pitch for the session.
 
-### 8 — Property tests for the nine amplifying effects (4.4)
+### 8 — Property tests for the nine amplifying effects (4.4) ✅ *done, 01.08.2026*
+
+> **Done.** `tests/effects/amplifyingEffectsTests.cpp`, **19 cases**, and they
+> run in **both build types** where the goldens render in Release only.
+> `sw-tests` is **144/144** in both build trees.
 
 The golden contract deliberately holds `Pitch_Spring`, `Pitch_Magnet`, `Octaver`,
 `PVD_start`, `PVD_stop`, `Imploder`, `Exploder`, `Slew_Limiter` and
@@ -420,7 +425,52 @@ The golden contract deliberately holds `Pitch_Spring`, `Pitch_Magnet`, `Octaver`
 percent-level output difference in each. Loosely is not the same as untested:
 they want properties (monotonicity, energy bounds, stability under a repeated
 transient) rather than a hash. The list is a measurement, not a property, and a
-third platform may add a tenth — which is another reason this follows CI.
+third platform may add a tenth.
+
+**What is asserted.** Three things of all nine — a bypassed slot is *bit*-identical
+to an empty chain, the output is finite and bounded, and two renders of the same
+input agree — then one property per effect, stated as what the effect is named
+for:
+
+| | |
+|---|---|
+| Pitch Spring, and `(pvd)` | Depth 0 does not move the pitch; Depth 600 ¢ sweeps most of 600 ¢, and *Up* never goes below the input pitch while *Down* never goes above. Both spellings, because the oscillator is shared and only the shifter under it differs — which is the one thing the goldens cannot say. |
+| Pitch Magnet | Strength 0 does not move the pitch; otherwise the output **lands on the target frequency** — 880, 330 and 110 Hz from a 220 Hz input, all within 20 ¢. |
+| Octaver | Both octaves off is transparent; *1 up* puts >10× the dry energy at 2f₀ and *1 down* at f₀/2, with the original still underneath; the octave's level is monotone in its gain over −24…+12 dB; the cutoff really is a low pass on the output. |
+| PVD start / PVD stop | **The pair is transparent** — analysis then synthesis returns what it was given, within 5 %. Plus the control that makes that mean something: PVD start *alone* differs from dry by >20 %, so the round trip is not two no-ops. |
+| Imploder | A note that stops leaves a tail >10× the dry one, monotone in Decay; and no frequency is ever louder than it has been, while sounding or after. |
+| Exploder | A quiet steady note climbs monotonically, >3× over its own start and >8× over dry inside one second; faster Growth gets further; it does not run away. |
+| Slew Limiter | At 300 dB/s it limits nothing; rise-limited, the attack arrives sooner the higher the rate, ordered across 60/150/300 dB/s; fall-limited, the release outlasts the dry one and outlasts it longer the lower the rate. |
+
+**Four of the nineteen were wrong the first time, and measuring is what fixed
+them** — the harness-over-reading rule earning its keep again. Each one was a
+claim that sounded right and was not:
+
+- **A pitch shift's accuracy is FFT-size dependent, and not monotonically.** At
+  1024 bins a 220 Hz partial shifted to 880 lands 377 ¢ flat, smeared across
+  three bins with the target the second loudest thing present. At 2048 it lands
+  within **0.2 ¢**. At 4096 it is 82 ¢ sharp again. That is worth knowing and
+  nothing in the tree said it; the test uses 2048 and `tech_debt.md` has the
+  finding.
+- **The Imploder's energy bound is a property of the spectrum, not of the
+  samples.** Its sample peak measures 1.6× the dry peak — four overlapping
+  windows holding one magnitude add in phase where the input's did not — while
+  every bin in that render obeys the rule exactly.
+- **The Exploder's "Limit" is not a ceiling it approaches.** Reaching it *resets*
+  the accumulator to the current input, so the level is a sawtooth and "later is
+  louder than earlier" sampled at two arbitrary points is a coin toss. The
+  property is about the growth phase.
+- **The Slew Limiter's rise starts from `FLT_EPSILON`**, which the implementation
+  floors the previous amplitude to so a bin can leave silence at all. That is
+  138 dB down, so 3 dB/s needs **46 seconds** to open and reads as a mute in any
+  test short enough to run.
+
+**Two things this does not cover.** The nine are the ones whose *goldens* are
+loose, which is not the same as the nine that most want properties: `lfoImpl.cpp`
+(§2.3) still has none, and the side-chain effects are pinned only in the
+degenerate side == main case (§2.8). And a property test says nothing about
+cross-platform agreement — it says the same thing on every platform, which is the
+point, but the goldens remain the only thing comparing one to another.
 
 ### 9 — The stage 7 tail, and the macros that make live code lie
 

@@ -57,7 +57,7 @@ What is left, in the order it is worth doing:
 | 4 | **`clap-validator` and CI** across the four formats and now three OSes. | 5.9 |
 | 5 | **6.4**, the owned-window collapse — and with it the preset browser's data source, which is the last thing between the embedded factory banks and a user. | stage 6, then 8 |
 | 6 | **A real state format**, now that the preset serialisation it is made of compiles. | 5.6 |
-| 7 | **Property tests for the nine amplifying effects**, which the golden contract deliberately declines to test tightly. | 4.4 |
+| 7 | ✅ **Property tests for the nine amplifying effects** — done 01.08.2026: `tests/effects/amplifyingEffectsTests.cpp`, 19 cases, and unlike the goldens they run in a checked build too. What each effect is named for is what is asserted: a magnet lands on its target, PVD start and PVD stop are inverses, an octaver puts energy an octave away. | 4.4 |
 
 Done since: **stage 8** — the presets compile back in, the parser is TinyXML,
 the 303 factory banks are in the binary and the user's live under
@@ -1175,6 +1175,15 @@ file, which is macOS today — so a Linux-only regression in one of them would g
 unnoticed. Closing that needs either per-platform fixture files or the property
 tests in row 7 of "what is left", and the property tests are the answer that
 actually tests them.
+
+> **Row 7 is done, 01.08.2026, and it closes most of this.** The properties hold
+> on any platform by construction — "the magnet lands on its target" does not
+> care which FFT computed the spectrum — so a Linux-only regression in any of the
+> nine now fails a test rather than passing an 8 dB bound. What is still open is
+> narrower than it was: the goldens remain the only thing that *compares* two
+> platforms, and a drift too small to break a property is still only visible to
+> them. See `week_two.md` item 8, which also records the four properties that had
+> to be measured rather than reasoned out.
 
 **Done when:** `sw-tests` green on macOS (arm64 + x86_64), Windows (x64 +
 arm64), Linux (x64 + arm64); NT2 is gone with no golden outside an agreed and

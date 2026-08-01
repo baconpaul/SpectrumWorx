@@ -21,11 +21,13 @@
 #include "core/spectrumWorxCore.hpp"
 
 #include "le/spectrumworx/effects/configuration/constants.hpp"
+#include "le/spectrumworx/engine/moduleParameters.hpp"
 #include "le/spectrumworx/engine/parameters.hpp"
 #include "le/utility/buffers.hpp"
 
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <numbers>
 #include <span>
 #include <vector>
@@ -140,6 +142,47 @@ struct RenderSetup
 ///        chain (which the goldens use to pin the engine's own WOLA path).
 std::vector<float> render(RenderSetup const &, std::int8_t effectIndex, Signal,
                           std::uint32_t frames);
+
+//------------------------------------------------------------------------------
+// Chains
+//------------------------------------------------------------------------------
+
+/// \brief One slot of a chain to render: which effect, and what to set on it.
+///
+/// \note `configure` runs after the module is in the chain and before the first
+/// block, which is all a test needs: ModuleDSP::preProcess() calls the effect's
+/// setup() every block, so a parameter written here is in force from the first
+/// one. Indices are into the effect's own LE_DEFINE_PARAMETERS order and values
+/// are in the parameter's own units -- Hz, dB, cents, or an enumerator.
+///
+/// \note The base parameters (Bypass, Gain, Wet, StartFrequency, StopFrequency)
+/// are reachable the same way through setBaseParameter(), and are what the
+/// transparency properties are written against.
+struct Slot
+{
+    std::int8_t effectIndex{-1};
+    std::function<void(LE::SW::Engine::ModuleParameters &)> configure{};
+};
+
+/// \brief Runs a whole chain, one effect per slot, and returns the interleaved
+/// output.
+///
+/// The single-effect render() above is this with one default-configured slot;
+/// what this adds is the two things a property needs and a golden does not --
+/// several effects at once (PVD start, something, PVD stop) and a parameter set
+/// to something other than its default.
+std::vector<float> renderChain(RenderSetup const &, std::span<Slot const>, Signal,
+                               std::uint32_t frames);
+
+/// \brief The same, over a signal the caller generated.
+///
+/// The four Signal generators are what the goldens need: broadband, dense,
+/// deliberately awkward. A property about *pitch* wants the opposite -- one
+/// partial, so that "the dominant frequency moved" has an unambiguous subject --
+/// and a property about an envelope wants a note that starts and stops. Both are
+/// three lines at the call site and neither belongs in the golden enum.
+std::vector<float> renderChain(RenderSetup const &, std::span<Slot const>,
+                               std::span<float const> monoInput);
 
 //------------------------------------------------------------------------------
 } // namespace SWTest

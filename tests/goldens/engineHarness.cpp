@@ -128,7 +128,24 @@ void generate(Signal const signal, std::span<float> const mono, float const samp
 std::vector<float> render(RenderSetup const &setup, std::int8_t const effectIndex,
                           Signal const signal, std::uint32_t const frames)
 {
+    Slot const slots[]{{effectIndex, {}}};
+    return renderChain(setup, slots, signal, frames);
+}
+
+std::vector<float> renderChain(RenderSetup const &setup, std::span<Slot const> const slots,
+                               Signal const signal, std::uint32_t const frames)
+{
+    std::vector<float> input(frames);
+    generate(signal, input, static_cast<float>(setup.sampleRate));
+    return renderChain(setup, slots, input);
+}
+
+std::vector<float> renderChain(RenderSetup const &setup, std::span<Slot const> const slots,
+                               std::span<float const> const monoInput)
+{
     using namespace LE::SW;
+
+    auto const frames(static_cast<std::uint32_t>(monoInput.size()));
 
     Engine engine;
 
@@ -142,12 +159,17 @@ std::vector<float> render(RenderSetup const &setup, std::int8_t const effectInde
     LE_ASSERT_MSG(initialised, "Test engine failed to initialise.");
     LE::Utility::ignoreUnused(initialised);
 
-    if (effectIndex >= 0)
+    LE_ASSERT_MSG(slots.size() <= Constants::maxNumberOfModules, "More slots than the chain has.");
+    for (std::uint8_t slot(0); slot < slots.size(); ++slot)
     {
+        if (slots[slot].effectIndex < 0)
+            continue;
         auto const inserted(engine.program().moduleChain().setParameter(
-            0, effectIndex, engine.moduleInitialiser()));
-        LE_ASSERT_MSG(inserted.second == effectIndex, "Test engine failed to insert the effect.");
-        LE::Utility::ignoreUnused(inserted);
+            slot, slots[slot].effectIndex, engine.moduleInitialiser()));
+        LE_ASSERT_MSG(inserted.second == slots[slot].effectIndex,
+                      "Test engine failed to insert the effect.");
+        if (inserted.first && slots[slot].configure)
+            slots[slot].configure(*inserted.first);
     }
 
     engine.resume();
@@ -159,12 +181,11 @@ std::vector<float> render(RenderSetup const &setup, std::int8_t const effectInde
     LE::Math::rngSeed(0xA5A5C3C3u);
 
     auto const channels(setup.numberOfChannels);
-    std::vector<float> input(frames);
-    generate(signal, input, static_cast<float>(setup.sampleRate));
 
     // Every channel gets the same signal; the effects that care about stereo
     // are the side-chain ones, and those are driven separately.
-    std::vector<std::vector<float>> inputChannels(channels, input);
+    std::vector<std::vector<float>> inputChannels(
+        channels, std::vector<float>(monoInput.begin(), monoInput.end()));
     std::vector<std::vector<float>> outputChannels(channels, std::vector<float>(frames, 0.0f));
 
     std::vector<float const *> inputPointers(channels);
