@@ -467,6 +467,31 @@ float liveModuleParameter(clap_plugin const &plugin, std::uint8_t const moduleIn
     return pModule->getBaseParameter(parameterIndex);
 }
 
+/// \brief The plugin as the editor sees it -- the queue and the mailbox.
+///
+/// \note A public base of SpectrumWorxCLAP, which is how the editor reaches them
+/// without sw-gui naming the plugin. A test stands in for the editor here.
+LE::SW::GUI::EditorHost &editorHostOf(clap_plugin const &plugin)
+{
+    auto *const pHelper(static_cast<LE::SW::PluginHelper *>(plugin.plugin_data));
+    REQUIRE(pHelper != nullptr);
+    return *static_cast<LE::SW::SpectrumWorxCLAP *>(pHelper);
+}
+
+/// \brief A module parameter's static description, for a value inside its range.
+LE::Parameters::RuntimeInformation const &moduleParameterInfo(clap_plugin const &plugin,
+                                                              std::uint8_t const moduleIndex,
+                                                              std::uint8_t const parameterIndex)
+{
+    auto *const pHelper(static_cast<LE::SW::PluginHelper *>(plugin.plugin_data));
+    REQUIRE(pHelper != nullptr);
+    auto &implementation(*static_cast<LE::SW::SpectrumWorxCLAP *>(pHelper));
+    auto const pModule(
+        implementation.program().moduleChain().moduleAs<LE::SW::Module>(moduleIndex));
+    REQUIRE(pModule);
+    return pModule->parameterInfo(parameterIndex);
+}
+
 /// \brief Fills slot 0, turns LFO 0 on, and reports how many distinct values its
 /// target takes over \p blocks blocks of audio.
 ///
@@ -1155,6 +1180,48 @@ TEST_CASE("An enabled LFO modulates when the host reports no transport", "[clap]
 
     CHECK(distinctModulatedValues(plugin, parameters(*plugin), sampleRate, blockSize, blocks,
                                   nullptr) > 1);
+}
+
+TEST_CASE("An edit made in the interface reaches the engine through the queue", "[clap][protocol]")
+{
+    // What the editor does when a knob moves: push a command and ask the host to
+    // collect. It used to write the engine on the message thread, in the middle of
+    // whatever process() was doing with it.
+    constexpr float sampleRate{48000};
+    constexpr std::uint32_t blockSize{512};
+    constexpr std::uint8_t gainIndex{1};
+
+    Entry const entry;
+    ActivePlugin plugin(sampleRate, blockSize);
+    auto const &params(parameters(*plugin));
+
+    OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
+    params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+
+    auto const &info(moduleParameterInfo(*plugin, 0, gainIndex));
+    auto const before(liveModuleParameter(*plugin, 0, gainIndex));
+    auto const wanted(info.minimum + ((info.maximum - info.minimum) * 0.25f));
+    REQUIRE(wanted != before);
+
+    editorHostOf(*plugin).toEngine().push(
+        LE::SW::Threading::setBaseParameter(modulatedParameterID(0, 0), wanted));
+
+    // Nothing yet: the engine belongs to the audio thread, and no block or flush
+    // has run. That is the point -- a queue that applied itself on push would be
+    // the direct write with extra steps.
+    CHECK(liveModuleParameter(*plugin, 0, gainIndex) == before);
+
+    // ...and a flush is what applies it. A host reaches this through
+    // clap_host_params::request_flush, which the editor asks for after every edit.
+    params.flush(&*plugin, &noInputEvents(), &discardedOutputEvents());
+    CHECK_THAT(liveModuleParameter(*plugin, 0, gainIndex),
+               Catch::Matchers::WithinAbs(wanted, 1e-3));
+
+    // And the host sees the same thing, because it is the unmodulated value.
+    double hostValue{0};
+    REQUIRE(params.get_value(&*plugin, modulatedParameterID(0, 0), &hostValue));
+    CHECK_THAT(hostValue, Catch::Matchers::WithinAbs(
+                              (wanted - info.minimum) / (info.maximum - info.minimum), 1e-3));
 }
 
 TEST_CASE("An LFO sweeps the DSP and not what the host reads", "[clap][lfo]")

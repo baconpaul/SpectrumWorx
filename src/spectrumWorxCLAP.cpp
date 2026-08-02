@@ -627,6 +627,8 @@ void SpectrumWorxCLAP::requestRescan(clap_param_rescan_flags const flags)
 void SpectrumWorxCLAP::paramsFlush(clap_input_events const *const in,
                                    clap_output_events const *const out) noexcept
 {
+    drainCommands();
+
     auto const size(in->size(in));
     bool effectChanged(false);
     for (std::uint32_t event(0); event < size; ++event)
@@ -904,10 +906,14 @@ void SpectrumWorxCLAP::onMainThread() noexcept
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+/// \note Called from `process()` and from `paramsFlush()`, which is the same
+/// arrangement `flushUIEdits` already has and is safe for the same reason: CLAP
+/// forbids a host from running the two concurrently, so there is still exactly one
+/// consumer. It matters that flush drains too -- a host with the transport parked
+/// may not be calling `process()`, and `requestParameterFlush()` after an edit is
+/// what then gets the edit applied.
 void SpectrumWorxCLAP::drainCommands()
 {
-    LE_ASSERT(Threading::isAudioThread());
-
     Threading::ToEngine command;
     while (toEngine_.pop(command))
     {
@@ -916,10 +922,25 @@ void SpectrumWorxCLAP::drainCommands()
         case Threading::ToEngine::Kind::None:
             break;
 
-        case Threading::ToEngine::Kind::SetBaseParameter: // stage 4
-        case Threading::ToEngine::Kind::SetSlot:          // stage 6
-        case Threading::ToEngine::Kind::SwapProgram:      // stage 6
-        case Threading::ToEngine::Kind::SwapSample:       // stage 6
+        case Threading::ToEngine::Kind::SetBaseParameter:
+        {
+            /// \note The same entry point a host's parameter event reaches, and
+            /// with the value in the same units: `handleEvent` converts off the
+            /// CLAP edge first and then calls this. So an edit made in the
+            /// interface and one made in the host's panel are the same operation
+            /// arriving by two routes, applied on one thread, in a defined order.
+            ParameterID const parameterID{
+                Plugins::ParameterID{command.setBaseParameter.parameterID}};
+            setParameter(parameterID, command.setBaseParameter.value);
+            if (parameterID.type() == ParameterID::ModuleChainParameter)
+                requestRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT |
+                              CLAP_PARAM_RESCAN_VALUES);
+            break;
+        }
+
+        case Threading::ToEngine::Kind::SetSlot:     // stage 6
+        case Threading::ToEngine::Kind::SwapProgram: // stage 6
+        case Threading::ToEngine::Kind::SwapSample:  // stage 6
             LE_ASSERT_MSG(false, "Command sent before its handler exists.");
             break;
         }

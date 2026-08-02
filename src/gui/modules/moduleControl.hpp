@@ -120,7 +120,18 @@ class LE_NOVTABLE ModuleControlBase
     // the existing virtual functions of the Knob widget class (in order to
     // reuse them more easily).
     //                                        (07.07.2011.) (Domagoj Saric)
-    juce::String getValueText() const { return getValueString(nullptr); }
+    ///
+    /// \note `getValueString( nullptr )`, which formatted the *engine's* value.
+    /// The interface's edits are queued now, so the engine may not have applied
+    /// the last one yet and the readout would lag a drag by a block -- or for
+    /// ever, with a host that is not processing. The widget's own value is what is
+    /// on screen and is what the caption should say.
+    ///                                       (02.08.2026.) (SW port)
+    juce::String getValueText() const
+    {
+        auto const value(getValue());
+        return getValueString(&value);
+    }
     juce::String getTextFromValue(float const value) const { return getValueString(&value); }
 
     juce::String getValueString(float const *LE_RESTRICT pValue) const;

@@ -169,21 +169,50 @@ class SpectrumWorxEditor final : private SkinLifetime,
     void mainKnobDragStarted(std::uint8_t parameterIndex) const;
     void mainKnobDragStopped(std::uint8_t parameterIndex) const;
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note This called `SpectrumWorxCore::setGlobalParameter` -- which for the
+    /// FFT size and the overlap factor takes the processing lock, *blocking*, on
+    /// the message thread and then reallocates the entire spectral working set
+    /// under it. That is the single worst path in the old model and the one most
+    /// likely to be half of the deadlock. It queues now, and the engine applies it
+    /// where every other parameter change is applied.
+    ///
+    /// \note The old form returned whether the engine accepted the value, and one
+    /// caller used it. Nothing can answer that synchronously any more; the answer
+    /// comes back as a `ToUI::BaseParameterChanged` when the engine has one, which
+    /// is stage 5. Until then the interface believes itself, which is what it did
+    /// for every value the engine did accept.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
     template <class Parameter>
     bool globalParameterChanged(typename Parameter::value_type const value,
                                 bool const asDiscreteGesture)
     {
-        if (!setGlobalParameter<Parameter>(value))
-            return false;
+        queueGlobalParameter(
+            LE::Parameters::IndexOf<GlobalParameters::Parameters, Parameter>::value,
+            Math::convert<float>(value));
         this->globalParameterChanged<Parameter>(host(), Parameter(value), asDiscreteGesture);
         return true;
     }
 
     template <class Parameter> bool setGlobalParameter(typename Parameter::value_type const value)
     {
-        return this->setGlobalParameter<Parameter>(moduleChainOwner(), value);
+        queueGlobalParameter(
+            LE::Parameters::IndexOf<GlobalParameters::Parameters, Parameter>::value,
+            Math::convert<float>(value));
+        return true;
     }
 
+  private:
+    /// \brief One global parameter, by its index in GlobalParameters::Parameters,
+    /// in its own units. Non-template so that the header does not need the
+    /// protocol.
+    void queueGlobalParameter(std::uint8_t index, float value) const;
+
+  public:
   private:
     template <class Parameter> void updateGlobalParameterWidget();
 
@@ -233,7 +262,7 @@ class SpectrumWorxEditor final : private SkinLifetime,
         return sharedModuleControlsActive() && sharedModuleControls_->hasFocus();
     }
 
-    void updateModuleParameterAndNotifyHost(ModuleUI &, std::uint_fast8_t moduleParameterIndex,
+    void updateModuleParameterAndNotifyHost(ModuleUI &, std::uint8_t moduleParameterIndex,
                                             float parameterValue) const;
 
     void createChainGUIs(AutomatedModuleChain &);
@@ -494,20 +523,42 @@ class SpectrumWorxEditor final : private SkinLifetime,
         void updateLFOAndHostFromPeriodControl();
 
         void automatedParameterChanged(std::uint8_t lfoParameterIndex, float parameterValue) const;
+
+        /// \brief One LFO parameter, queued rather than written.
+        ///
+        /// \note `lfo().parameters().set<LFOParameter>()` stood in the middle of
+        /// this: the message thread writing an LFO the audio thread reads every
+        /// block, unsynchronised, and `week_two.md` §2.2's "a widget write every
+        /// block" is the same object seen from the other side.
+        ///
+        /// \note The parameters past `lfoExportedParameters` -- Waveform and
+        /// SyncTypes -- have no ParameterID and so no route through the queue.
+        /// They still go straight into the LFO, which is the one write this stage
+        /// leaves behind; stage 5 takes it with the rest of the LFO's state.
+        ///                                   (02.08.2026.) (SW port)
         template <class LFOParameter, typename T>
         void updateParameterAndNotifyHost(T const widgetValue)
         {
             using namespace LE::Parameters;
             using value_type = typename LFOParameter::value_type;
             auto const parameterValue(Math::convert<value_type>(widgetValue));
-            lfo().parameters().set<LFOParameter>(parameterValue);
             auto const parameterIndex(IndexOf<LFO::Parameters, LFOParameter>::value);
+            auto const internalValue(Math::convert<float>(parameterValue));
+
             //...mrmlj...fmod/separated DSP-GUI...
             if (parameterIndex >= ParameterCounts::lfoExportedParameters)
+            {
+                lfo().parameters().set<LFOParameter>(parameterValue);
                 return;
-            auto const internalValue(Math::convert<float>(parameterValue));
+            }
+
+            queueLFOParameter(parameterIndex, internalValue);
             automatedParameterChanged(parameterIndex, internalValue);
         }
+
+        /// \brief The queued half of the above, non-template so that this header
+        /// does not need the protocol.
+        void queueLFOParameter(std::uint8_t lfoParameterIndex, float value) const;
 
         void verifyGUIAndLFOConsistency() const;
 

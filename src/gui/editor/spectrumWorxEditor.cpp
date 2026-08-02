@@ -1152,15 +1152,51 @@ void SpectrumWorxEditor::updateLFO(ModuleUI const &moduleUI, std::uint8_t const 
     holdLFODisplay_ = false;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note This called `Module::setParameterValueFromUI()` -- the engine, written
+/// from the message thread while `process()` was reading it -- and used the
+/// snapped value it returned. It queues now.
+///
+///   Nothing is lost by not waiting for the answer. Snapping is a pure function of
+/// the parameter's *static* description, and the widget already carries that: a
+/// knob's range and interval are set from the same `ParameterInfo`
+/// (`ModuleKnob::setupForParameter`), a combo box's value is an index, a button's
+/// is a bool. So the value arriving here is the snapped one, which is what the old
+/// assertion in `Module::setEffectParameter` says too.
+///
+/// \see doc/tech/correct_the_threading.md §3.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxEditor::queueGlobalParameter(std::uint8_t const index, float const value) const
+{
+    ParameterID parameterID;
+    parameterID.value.type = ParameterID::GlobalParameter;
+    parameterID.value._.global = {ParameterID::Zero, ParameterID::Zero, index};
+
+    editorHost().toEngine().push(Threading::setBaseParameter(parameterID.binaryValue, value));
+}
+
 void SpectrumWorxEditor::updateModuleParameterAndNotifyHost(ModuleUI &moduleUI,
                                                             std::uint8_t const moduleParameterIndex,
-                                                            float parameterValue) const
+                                                            float const parameterValue) const
 {
     auto &module(moduleUI.module());
     std::uint8_t const moduleIndex(moduleChain().getIndexForModule(module));
-    auto const snappedParameterValue(
-        module.setParameterValueFromUI(moduleParameterIndex, parameterValue));
-    parameterValue = snappedParameterValue;
+
+    ParameterID parameterID;
+    parameterID.value.type = ParameterID::ModuleParameter;
+    parameterID.value._.module = {ParameterID::Zero, moduleParameterIndex, moduleIndex};
+
+    editorHost().toEngine().push(
+        Threading::setBaseParameter(parameterID.binaryValue, parameterValue));
+
+    /// \note Straight to the host rather than waiting for the engine to confirm.
+    /// `automatedParameterChanged` queues too -- into the ring the host collects
+    /// on its next `process()` or `flush()` -- so both ends of the edit are on
+    /// their way in one place, and it is `requestParameterFlush()` inside that
+    /// call which gets the command drained when the transport is parked.
     host().automatedParameterChanged(module, moduleIndex, moduleParameterIndex, parameterValue);
 }
 
@@ -1728,6 +1764,21 @@ void SpectrumWorxEditor::LFODisplay::automatedParameterChanged(std::uint8_t cons
         const_cast<SpectrumWorxEditor &>(editor()).moduleChainOwner());
 #endif // LE_SW_FMOD
     editor().host().automatedParameterChanged(lfoParameterID, parameterValue);
+}
+
+void SpectrumWorxEditor::LFODisplay::queueLFOParameter(std::uint8_t const lfoParameterIndex,
+                                                       float const value) const
+{
+    auto const moduleParameterIndex(control().moduleParameterIndex());
+    if (moduleParameterIndex >= (SW::Constants::maxNumberOfParametersPerModule - 1))
+        return;
+
+    ParameterID parameterID;
+    parameterID.value.type = ParameterID::LFOParameter;
+    parameterID.value._.lfo = {lfoParameterIndex, moduleParameterIndex, moduleIndex()};
+
+    editor().editorHost().toEngine().push(
+        Threading::setBaseParameter(parameterID.binaryValue, value));
 }
 
 void SpectrumWorxEditor::LFODisplay::verifyGUIAndLFOConsistency() const

@@ -167,6 +167,48 @@ struct ToUI
 using ToEngineQueue = SPSCQueue<ToEngine, 1024>;
 using ToUIQueue = SPSCQueue<ToUI, 1024>;
 
+////////////////////////////////////////////////////////////////////////////////
+// Makers.
+//
+// \note Because a union member cannot be initialised positionally without saying
+// which one, and `message.setSlot = {3, 17}` at a call site says nothing about
+// what kind of message it is. These do.
+////////////////////////////////////////////////////////////////////////////////
+
+/// \param parameterID packed, i.e. `SW::ParameterID::binaryValue`.
+/// \param value in the parameter's own units, not normalised.
+inline ToEngine setBaseParameter(std::uint32_t const parameterID, float const value)
+{
+    ToEngine message{};
+    message.kind = ToEngine::Kind::SetBaseParameter;
+    message.setBaseParameter = {parameterID, value};
+    return message;
+}
+
+inline ToEngine setSlot(std::uint8_t const slot, std::int8_t const effectIndex)
+{
+    ToEngine message{};
+    message.kind = ToEngine::Kind::SetSlot;
+    message.setSlot = {slot, effectIndex};
+    return message;
+}
+
+inline ToUI baseParameterChanged(std::uint32_t const parameterID, float const value)
+{
+    ToUI message{};
+    message.kind = ToUI::Kind::BaseParameterChanged;
+    message.baseParameterChanged = {parameterID, value};
+    return message;
+}
+
+inline ToUI retire(ToUI::Retired const what, void *const pObject)
+{
+    ToUI message{};
+    message.kind = ToUI::Kind::Retire;
+    message.retire = {what, pObject};
+    return message;
+}
+
 //------------------------------------------------------------------------------
 } // namespace Threading
 //------------------------------------------------------------------------------

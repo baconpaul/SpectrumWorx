@@ -307,11 +307,7 @@ below for what it found.
 
 **3 — The base value in the engine.** ✅ *done, 02.08.2026;* see §6.3.
 
-**4 — UI → engine: every edit is a command.** `updateModuleParameterAndNotifyHost`
-(`spectrumWorxEditor.cpp:1156-1166`) stops calling `setParameterValueFromUI` and pushes a
-command. Snapping stays synchronous in the UI, because it is a pure function of the static
-`ParameterInfo` and `normalisedToParameterValue`/`parameterToNormalisedValue` are already
-static (`moduleParameters.hpp:136-139`).
+**4 — UI → engine: every edit is a command.** ✅ *done, 02.08.2026;* see §6.4.
 
 **5 — Engine → UI: `Module` loses its `ModuleUI`.** `Module::set{Base,Effect}Parameter` push
 ToUI events; `set*ParameterFromLFO` writes the mailbox. Then the members go — `ui_`,
@@ -515,6 +511,51 @@ being explicit about: they asserted "an enabled LFO modulates something" by watc
 `get_value`, which is exactly what must now stay still. They read the live engine parameter
 through `plugin_data` instead, and a new case pins both halves at once — the DSP's value
 takes many values over a run, the host's takes one.
+
+### 6.4 — What stage 4 did
+
+**One command covers all four kinds of parameter**, because `SetBaseParameter` carries a
+packed `ParameterID` and a value in the parameter's own units — which is exactly what
+`Host2PluginInteropImpl::setParameter` already takes, `handleEvent` having converted off the
+CLAP edge before calling it. So an edit made in the interface and one made in the host's
+panel became the same operation arriving by two routes, applied on one thread in a defined
+order. The three editor sites that wrote the engine directly now push:
+
+| | wrote | now |
+|---|---|---|
+| a module knob, button or combo box | `Module::setParameterValueFromUI` | `SetBaseParameter` |
+| an LFO control | `lfo().parameters().set<…>()` | `SetBaseParameter` |
+| a global — including **FFT size and overlap factor** | `SpectrumWorxCore::setGlobalParameter` | `SetBaseParameter` |
+
+That last row is the important one. `setGlobalParameter(FFTSize&, …)` took the processing
+lock **blocking, on the message thread**, and reallocated the entire spectral working set
+under it — the single worst path in the old model and the most likely half of the deadlock.
+
+**Two things follow from the write no longer being synchronous.**
+
+`drainCommands()` is called from `paramsFlush()` as well as `process()`. A host with the
+transport parked may not be calling `process()` at all, and `requestParameterFlush()` — which
+the editor already asks for after every edit — is what then gets the command applied. Two
+callers is safe for the same reason `flushUIEdits` already had two: CLAP forbids a host from
+running flush and process concurrently, so there is still one consumer.
+
+`ModuleControlBase::getValueText()` formats the **widget's** value rather than the engine's.
+It called `getValueString(nullptr)`, which reads the module — so with the write queued the
+caption under a knob would lag the drag by a block, or for ever with a host that is not
+processing. What is on screen is what the caption should say.
+
+**Nothing is lost by not waiting for the snapped value.** Snapping is a pure function of the
+parameter's static description, and the widget already carries it: a knob's range and
+interval come from the same `ParameterInfo`, a combo box's value is an index, a button's is a
+bool. The assertion in `Module::setEffectParameter` says the same thing.
+
+**One write is deliberately left.** The LFO's Waveform and SyncTypes are past
+`lfoExportedParameters`, so they have no `ParameterID` and no route through the queue; they
+still go straight into the LFO. Stage 5 takes them with the rest of the LFO's state.
+
+**Test.** `[clap][protocol]`: push a command, check the engine has *not* changed — a queue
+that applied itself on push would be the direct write with extra steps — then flush and check
+it has, and that the host reads the same value.
 
 ---
 
