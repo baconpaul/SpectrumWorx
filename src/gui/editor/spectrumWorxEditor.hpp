@@ -870,9 +870,6 @@ class SpectrumWorxEditor final : private SkinLifetime,
     /// \note Deliberately not indexed by slot; see createModuleRegion().
     std::array<std::unique_ptr<ModuleUI>, SW::Constants::maxNumberOfModules> moduleRegions_;
 
-    mutable bool holdSharedModuleControls_;
-    mutable bool holdLFODisplay_;
-
     std::array<juce::String, numberOfStrings> strings_;
 
 }; // class SpectrumWorxEditor

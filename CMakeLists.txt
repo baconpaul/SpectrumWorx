@@ -101,8 +101,15 @@ include(sw-odr-header)
 include(sw-sanitizers)
 
 option(SW_COPY_AFTER_BUILD "Install the built plugins into the user plugin folders" OFF)
-option(SW_BUILD_TESTS "Build sw-tests" ON)
+option(SW_BUILD_TESTS "Build the test binaries" ON)
 option(SW_BUILD_TOOLS "Build the developer tools (sw-show-ui)" ON)
+
+# \note The bundles, not the plugin: sw-impl is the plugin and is always built.
+# What this switches off is clap-wrapper's per-format wrapping, which fetches the
+# VST3 and AudioUnit SDKs over the network at *configure* time. A sanitizer build
+# wants the test binaries and nothing else, and a machine with no network cannot
+# configure one otherwise. See doc/tech/correct_the_threading.md §6.8.
+option(SW_BUILD_PLUGIN_BUNDLES "Build the .clap/.vst3/.component bundles" ON)
 
 if (SW_BUILD_TESTS)
     enable_testing()
@@ -119,7 +126,10 @@ set(JUCE_PATH "${CMAKE_SOURCE_DIR}/libs/JUCE")
 add_subdirectory(libs)
 add_subdirectory(assets)
 add_subdirectory(src)
-add_subdirectory(src/clap-first)
+
+if (SW_BUILD_PLUGIN_BUNDLES)
+    add_subdirectory(src/clap-first)
+endif()
 
 if (SW_BUILD_TOOLS)
     add_subdirectory(tools)

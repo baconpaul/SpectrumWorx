@@ -452,10 +452,21 @@ void SharedModuleControls::FrequencyRange::verifyThumbAndParameterIndicies() con
 #endif // NDEBUG
 }
 
+/// \note `!isThisTheGUIThread() ||` stood in front of this, and it is what the
+/// old model looked like written down as a condition: "somebody other than the
+/// interface is writing this widget, so the write is one of ours". That somebody
+/// was the audio thread, driving a two-thumbed range slider from inside
+/// `preProcess()`. Nothing but the interface writes a widget now, so the term is
+/// dead -- and it was never a check, it was a description.
+///
+///   What is left is the honest half: a preset load pushes values into the
+/// controls, and that is when a write without a mouse behind it is expected.
+///                                           (02.08.2026.) (SW port)
 bool SharedModuleControls::FrequencyRange::canUseWriteAccessIndex() const
 {
+    LE_ASSERT(isThisTheGUIThread());
     //...mrmlj...see the comment for parameterIndexForInternalWriteAccess_...
-    return (!isThisTheGUIThread() || editor().presetLoadingInProgress()) &&
+    return editor().presetLoadingInProgress() &&
            (parameterIndexForInternalWriteAccess_ != Constants::invalidIndex);
 }
 

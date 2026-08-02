@@ -334,10 +334,6 @@ class ModuleUI final : public WidgetBase<>, private juce::Button::Listener
     SpectrumWorxEditor const &editor() const;
     SharedModuleControls &sharedControls();
 
-    //...mrmlj...quick-fix...
-    void holdSharedControls(bool doHold) const;
-    bool sharedControlsLocked() const;
-
     typedef SW::Module Module;
 
     /// \note Was `Module::fromGUI( *this )` -- pointer arithmetic from the

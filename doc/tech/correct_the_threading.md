@@ -316,14 +316,7 @@ see §6.5.
 
 **7 — `sw-dsp` links no JUCE; the test binary splits.** ✅ *done, 02.08.2026;* see §6.7.
 
-**8 — Prove it, and delete the corpses.** Editor open, every knob on all five slots dragged,
-**zero rtsan reports**. tsan over the two-instance test.
-`SharedModuleControls::FrequencyRange::canUseWriteAccessIndex()`'s `!isThisTheGUIThread()`
-hack (`auxiliaryComponents.cpp:451-456`) and `~SpectrumWorxEditor`'s two `volatile bool`
-spin-waits (`spectrumWorxEditor.cpp:199-204`) go, because nothing but the GUI thread writes
-a widget any more. Delete `src/spectrumWorx.{cpp,hpp}` — 1,899 lines, which `week_two.md`
-§2.5 says this item owns — along with `GUI::Lock` and `BackgroundThread`. Drive Logic and
-Bitwig through the situations that deadlocked, plus `clap-validator`.
+**8 — Prove it, and delete the corpses.** ✅ *done, 02.08.2026, except the DAWs;* see §6.8.
 
 ### 6.0 — What stage 0 built, and what it found
 
@@ -760,11 +753,66 @@ the host-facing parameter enumeration, which is `plugin2Host.cpp` in `sw-impl`.
 **What is still on `sw-dsp`'s link line:** `sst-cpputils`, `sst-plugininfra`, `tinyxml`,
 `sw::assets`, and Accelerate or pffft. No JUCE, and nothing that pulls it.
 
+### 6.8 — What stage 8 proved, and what it deleted
+
+**Goal 4, measured.** Two new cases carry it, and both are ordinary functional tests that
+*become* the acceptance test when the tree is built with a sanitizer:
+
+- *"A full rack with LFOs running and an editor open processes cleanly"* — five slots, five
+  effects, an LFO on each, an editor attached, and a knob moved on a different slot every
+  block for 64 blocks.
+- *"Two instances process while their editors come and go"* — two plugins, **two real audio
+  threads**, and a message thread opening and closing both windows and moving knobs
+  underneath them. Every case before it called `process()` on the thread that also drives
+  the editor, so the two never actually overlapped; this is the arrangement symptom 2 is
+  about.
+
+**RealtimeSanitizer: clean.** `sw-plugin-tests` and `sw-dsp-tests` both run with zero
+reports under `-fsanitize=realtime` (Homebrew clang 22.1.6; Apple's ships no rtsan runtime).
+**Verified by reversion**, because a clean sanitizer run and an inactive one look identical:
+a `std::malloc` planted in `runEngine()` is reported with a stack, naming the file and line.
+A `delete new int` was *not* — the optimiser removes that pair — which is worth knowing
+before trusting a null result from this instrument.
+
+**ThreadSanitizer: clean**, once the harness stopped racing itself. The first run reported a
+dozen races, every one of them in `Catch::RunContext::handleExpr`: `REQUIRE` from a worker
+thread writes Catch2's shared assertion counter. So `ActivePlugin` grew a non-asserting
+`processStatus()`, the workers record and the main thread asserts, and what is left is
+nothing.
+
+**What went.**
+
+- `src/spectrumWorx.{cpp,hpp}` — 1,899 lines of the 2016 VST2/AU host class, in no target
+  since the port began and the last thing in the tree that took a processing lock.
+- `le/utility/criticalSection.hpp` and `conditionVariable.hpp`, which nothing else used.
+- `~SpectrumWorxEditor`'s two `volatile bool` spin-waits, and the two flags behind them.
+  Their producers carried "This gets called from a non GUI thread" and by this point neither
+  did. A `volatile` read is not a synchronisation primitive in any case: what made those
+  loops work is that they always exited immediately.
+- `canUseWriteAccessIndex()`'s `!isThisTheGUIThread() ||`, which is the old model written
+  down as a condition — "somebody other than the interface is writing this widget, so the
+  write is one of ours". That somebody was the audio thread.
+- `PopupMenu::menuActive_` as a process-wide `static bool`. It is a member now, which is
+  both per instance and what all three readers meant: each asks about a menu it owns.
+  `juce::PopupMenu::dismissAllActiveMenus()` in the editor's destructor is the other half —
+  the user's own suggestion, and the lifetime problem the flag was not solving.
+- `assertionHandler.cpp`'s JUCE arm (§6.7).
+
+**One new build option**, `SW_BUILD_PLUGIN_BUNDLES`. clap-wrapper fetches the VST3 and
+AudioUnit SDKs over the network at *configure* time, so a sanitizer tree — which wants the
+test binaries and nothing else — could not be configured without it.
+
+**What is not done: the DAWs.** Logic and Bitwig through the two situations that deadlocked,
+and `clap-validator`. Those need a machine with the hosts on it, and no headless case
+substitutes for either. `request_restart` in particular has been driven by nothing but the
+test hosts; §10's fallback stands until a real one answers it.
+
 ---
 
-## 6.9 — Where the cross-thread state is, as of stage 6
+## 6.9 — Where the cross-thread state is, at the end
 
-The inventory this redesign is measured by. **Stages 0–6 are done; 7 and 8 are not.**
+The inventory this redesign is measured by. **Stages 0–8 are done**, bar the DAW drive
+(§6.8).
 
 | What | Shared how | State |
 |---|---|---|
@@ -779,27 +827,23 @@ The inventory this redesign is measured by. **Stages 0–6 are done; 7 and 8 are
 | The `Sample` | `ToEngine::SwapSample` + `ToUI::Retire`; the main thread keeps the file name and the decoded rate | ✅ |
 | The module rack | recomputed from the chain on `ToUI::ChainChanged`; nothing walks it incrementally | ✅ |
 | **`LFOImpl::Timer`'s tempo** | three process-wide statics, now `std::atomic` — no longer a race, still shared between instances | §8 |
-| `PopupMenu::menuActive_` | process-wide `bool` | left deliberately, §6.1 — but see below |
+| `PopupMenu::menuActive_` | a member, per menu and therefore per editor | ✅ (stage 8) |
 | `Theme::settings()` | process-wide, and arguably correct: these are application preferences | not addressed |
 
-**There is no lock.** `Utility::CriticalSection` still exists as a header, and nothing in any
-target uses it — `ConditionVariable` is included by nothing and `spectrumWorx.cpp` is in no
-target. All three go at stage 8.
-
-**One better idea than `menuActive_`**, from reviewing this: the flag exists so that a
-dying editor does not leave a menu pointing at it. `juce::PopupMenu::dismissAllActiveMenus()`
-in `~SpectrumWorxEditor` says the same thing without a process-wide `bool`. Stage 8.
+**There is no lock.** `Utility::CriticalSection`, `ConditionVariable` and the 2016 host class
+that was the last thing to take one are all deleted (§6.8).
 
 ---
 
 ## 7. What is still missing
 
-**Stage 8**, which is the proof: rtsan with the editor open and every knob dragged, tsan on
-two instances, and the DAWs.
+**The DAWs.** Logic and Bitwig through the two situations that deadlocked, plus
+`clap-validator`. The sanitizers are clean (§6.8) and no headless case substitutes for a
+real host.
 
 **`request_restart` has not been driven by a real host.** The test hosts in `tests/clap/`
 implement it as a no-op observer, which is enough to say the plugin asks and not enough to
-say a DAW answers. Until stage 8's Logic and Bitwig pass, a host that ignores the request
+say a DAW answers. Until Logic and Bitwig say so, a host that ignores the request
 leaves the FFT size parameter reading one thing and the engine running another — visible,
 harmless, and not what anyone asked for. §10 names the fallback.
 

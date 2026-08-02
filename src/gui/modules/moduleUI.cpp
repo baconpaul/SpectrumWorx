@@ -592,11 +592,9 @@ void ModuleUI::setBaseParameter(std::uint8_t const sharedParameterIndex, float c
     }
     else
     {
-        holdSharedControls(true);
         if (selected())
             setParameterControl(sharedControls().controlForParameter(sharedParameterIndex),
                                 parameterValue, source);
-        holdSharedControls(false);
     }
 }
 
@@ -680,19 +678,6 @@ SharedModuleControls &ModuleUI::sharedControls()
 {
     LE_ASSERT_MSG(selected(), "Inactive modules do not have an active shared controls UI.");
     return editor().sharedModuleControls();
-}
-
-void ModuleUI::holdSharedControls(bool const doHold) const
-{
-    LE_ASSERT(editor().holdSharedModuleControls_ != doHold);
-    //...mmrlj...LE_ASSERT( selected() == editor().sharedModuleControlsActive() );
-    editor().holdSharedModuleControls_ = doHold;
-}
-
-bool ModuleUI::sharedControlsLocked() const
-{
-    LE_ASSERT_MSG(selected(), "Inactive modules do not have an active shared controls UI.");
-    return editor().holdSharedModuleControls_;
 }
 
 ModuleControlBase &ModuleUI::effectSpecificParameterControl(std::uint8_t const parameterIndex)

@@ -33,8 +33,6 @@ set( Headers
     buffers.hpp
     clear.hpp
     countof.hpp
-    conditionVariable.hpp
-    criticalSection.hpp
     entryPoint.hpp
     filesystem.hpp
     filesystemImpl.hpp

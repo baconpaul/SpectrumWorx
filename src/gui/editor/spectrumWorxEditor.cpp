@@ -120,9 +120,7 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost)
 
       // buttons...
       preset_(*this, resourceBitmap<PresetOn>(), resourceBitmap<PresetOff>()),
-      settingsButton_(*this, resourceBitmap<SettingsOn>(), resourceBitmap<SettingsOff>()),
-
-      holdSharedModuleControls_(false), holdLFODisplay_(false)
+      settingsButton_(*this, resourceBitmap<SettingsOn>(), resourceBitmap<SettingsOff>())
 {
     using LE::Parameters::IndexOf;
     using namespace GlobalParameters;
@@ -200,14 +198,30 @@ SpectrumWorxEditor::~SpectrumWorxEditor()
     stopTimer();
     editorHost_.editorClosed();
 
+    /// \note And nothing may be *pointing* at one either. A menu is asynchronous
+    /// -- JUCE 8 defaults JUCE_MODAL_LOOPS_PERMITTED to 0 -- so a host closing
+    /// the window with one down leaves a callback holding a `SafePointer` to a
+    /// component that is going. The SafePointers are what make that survivable;
+    /// this is what makes it not happen.
+    ///                                       (02.08.2026.) (SW port)
+    juce::PopupMenu::dismissAllActiveMenus();
+
     editorHost_.deregisterSampleLoadedListener(*this);
 
-    while (static_cast<bool const volatile &>(holdLFODisplay_))
-    {
-    }
-    while (static_cast<bool const volatile &>(holdSharedModuleControls_))
-    {
-    }
+    /// \note Two spin-waits stood here, on plain `bool`s read through a
+    /// `volatile` cast: "wait until whatever non-GUI thread is inside the LFO
+    /// display or the shared controls has left". Both producers carried the
+    /// comment "This gets called from a non GUI thread", and by the time this
+    /// port began neither did -- the editor's `updateForNewTimingInfo()` had no
+    /// live caller at all, and `updateLFO()` is reached from
+    /// `parameterChangedElsewhere()`, which is the main thread draining a
+    /// message. Stage 5 removed the last route by which the audio thread could
+    /// have reached either.
+    ///
+    ///   A `volatile` read is not a synchronisation primitive in any case, so
+    /// this was never the guarantee it looked like; what made it work was that
+    /// the loops always exited immediately.
+    ///                                       (02.08.2026.) (SW port)
 
     /// \note
     ///   Take the focus beforehand to workaround JUCE's problematic focus
@@ -935,12 +949,7 @@ void SpectrumWorxEditor::moduleDeactivated()
         GUI::postMessageToComponent(*this, [](GUI::SpectrumWorxEditor &editor) {
             auto &sharedModuleControls(editor.sharedModuleControls_);
             if (sharedModuleControls && !sharedModuleControls->isEnabled())
-            {
-                if (static_cast<bool const volatile &>(editor.holdSharedModuleControls_))
-                    return false;
-                else
-                    sharedModuleControls = std::nullopt;
-            }
+                sharedModuleControls = std::nullopt;
             return true;
         });
     }
@@ -1011,10 +1020,7 @@ void SpectrumWorxEditor::retireLFODisplay()
         auto &lfoDisplay(editor.lfoDisplay_);
         if (lfoDisplay && !lfoDisplay->isEnabled())
         {
-            if (static_cast<bool const volatile &>(editor.holdLFODisplay_))
-                return false;
-            else
-                lfoDisplay = std::nullopt;
+            lfoDisplay = std::nullopt;
             LE_ASSERT(editor.getWantsKeyboardFocus());
             LE_ASSERT(editor.getMouseClickGrabsKeyboardFocus());
         }
@@ -1206,10 +1212,8 @@ template <> void SpectrumWorxEditor::updateGlobalParameterWidget<MixPercentage>(
 void SpectrumWorxEditor::updateForEngineSetupChanges()
 {
     Engine::Setup const &engineSetup(this->engineSetup());
-    holdSharedModuleControls_ = true;
     if (sharedModuleControlsActive())
         sharedModuleControls().updateForEngineSetupChanges(engineSetup);
-    holdSharedModuleControls_ = false;
     moduleChain().forEach<Module>([&](Module &module) {
 #ifndef LE_SW_FMOD
         //...mrmlj...when switching programs...
@@ -1221,26 +1225,28 @@ void SpectrumWorxEditor::updateForEngineSetupChanges()
     });
 }
 
+/// \note Nothing calls this. Its one caller was `SpectrumWorx::updatePosition()`
+/// in the 2016 host class, which is in no target; the CLAP's equivalent is
+/// `updateLFOTiming()`, on the audio thread, and reaching a widget from there is
+/// what this whole redesign is about. Kept rather than deleted because the
+/// *behaviour* is missing rather than obsolete -- an LFO panel open while the
+/// host's tempo changes shows the old period -- and this is where the answer
+/// goes when it arrives as a message. Recorded in tech_debt.md.
+///                                           (02.08.2026.) (SW port)
 void SpectrumWorxEditor::updateForNewTimingInfo()
 {
-    // This gets called from a non GUI thread.
-    LE_ASSERT(!holdLFODisplay_);
-    holdLFODisplay_ = true;
+    LE_ASSERT(isThisTheGUIThread());
     if (lfoDisplay_ && lfoDisplay_->isEnabled())
         lfoDisplay_->updateForNewTimingInfo();
-    holdLFODisplay_ = false;
 }
 
 void SpectrumWorxEditor::updateLFO(ModuleUI const &moduleUI, std::uint8_t const parameterIndex,
                                    std::uint8_t const lfoParameterIndex,
                                    Plugins::AutomatedParameterValue const value)
 {
-    // This gets called from a non GUI thread.
-    LE_ASSERT(!holdLFODisplay_);
-    holdLFODisplay_ = true;
+    LE_ASSERT(isThisTheGUIThread());
     if (lfoDisplay_ && lfoDisplay_->isEnabled())
         lfoDisplay_->updateForChangedParameters(moduleUI, parameterIndex, lfoParameterIndex, value);
-    holdLFODisplay_ = false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2173,7 +2179,7 @@ void SpectrumWorxEditor::SampleArea::mouseUp(juce::MouseEvent const &event)
         editor.newSampleFileSelected(juce::File());
         return;
     }
-    if (!mouseButtons.isLeftButtonDown() || PopupMenu::menuActive())
+    if (!mouseButtons.isLeftButtonDown() || menu_.menuActive())
         return;
 
     auto const factorySamples(Sample::factorySamples());

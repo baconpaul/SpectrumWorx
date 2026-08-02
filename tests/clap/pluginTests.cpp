@@ -24,6 +24,7 @@
 /// "does an enabled LFO modulate anything" has to look at the engine, and reaches
 /// it through `clap_plugin::plugin_data` as processLockTests.cpp does.
 #include "core/modules/moduleDSPAndGUI.hpp"
+#include "gui/editor/spectrumWorxEditor.hpp"
 #include "spectrumWorxCLAP.hpp"
 
 #include <clap/clap.h>
@@ -292,6 +293,21 @@ class ActivePlugin
                  std::vector<float> &leftOut, std::vector<float> &rightOut,
                  clap_event_transport const *const transport = nullptr)
     {
+        REQUIRE(processStatus(leftIn, rightIn, leftOut, rightOut, transport) != CLAP_PROCESS_ERROR);
+    }
+
+    /// \brief The same, without asserting.
+    ///
+    /// \note For the cases that call this from a thread of their own. Catch2's
+    /// assertion machinery is not thread safe -- `RunContext::handleExpr` writes
+    /// a shared counter -- so a `REQUIRE` on a worker thread is a data race in
+    /// the *harness*, and tsan says so at length while saying nothing about the
+    /// plugin.
+    ///                                       (02.08.2026.) (SW port)
+    clap_process_status processStatus(std::vector<float> &leftIn, std::vector<float> &rightIn,
+                                      std::vector<float> &leftOut, std::vector<float> &rightOut,
+                                      clap_event_transport const *const transport = nullptr)
+    {
         float *inputChannels[]{leftIn.data(), rightIn.data()};
         float *outputChannels[]{leftOut.data(), rightOut.data()};
 
@@ -309,7 +325,7 @@ class ActivePlugin
         process.in_events = &noInputEvents();
         process.out_events = &discardedOutputEvents();
 
-        REQUIRE(pPlugin_->process(pPlugin_, &process) != CLAP_PROCESS_ERROR);
+        return pPlugin_->process(pPlugin_, &process);
     }
 
     static char const *descriptorID()
@@ -1365,4 +1381,177 @@ TEST_CASE("A playing transport drives the LFO from song position", "[clap][lfo]"
 
     CHECK(midBar != barZero);
     CHECK(barOne == barZero);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The acceptance test for doc/tech/correct_the_threading.md, and it looks
+/// like an ordinary functional case on purpose. Goal 4 is "with the UI open you
+/// can change params and not trigger rtsan at all"; what says so is *this run*,
+/// built with `-fsanitize=realtime`, where every allocation, lock and syscall
+/// inside `process()` is a failure with a stack. In an ordinary build it still
+/// earns its place -- it is the only case that drives a full rack with every
+/// LFO running and an editor attached.
+///
+///   Everything it does is what a user does: fill the five slots, open the
+/// window, turn on an LFO per slot, and move knobs while audio runs. The edits go
+/// through the queue, which is the route a knob drag takes.
+///
+/// \note The slots are filled through the *host's* parameter route, which is the
+/// one remaining path that allocates inside the callback -- the granted
+/// concession, recorded in tech_debt.md. So they are filled before the measured
+/// blocks, not during them, and a `SW_SANITIZER=realtime` run that reports
+/// `ModuleFactory::create` here would be reporting a known one.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A full rack with LFOs running and an editor open processes cleanly", "[clap][realtime]")
+{
+    constexpr float sampleRate{48000};
+    constexpr std::uint32_t blockSize{512};
+    constexpr unsigned int blocks{64};
+    constexpr std::uint8_t slots{LE::SW::Constants::maxNumberOfModules};
+
+    Entry const entry;
+    ActivePlugin plugin(sampleRate, blockSize);
+    auto const &params(parameters(*plugin));
+
+    // Five slots, five different effects, and one LFO each.
+    for (std::uint8_t slot(0); slot < slots; ++slot)
+    {
+        OneParameterEvent const fill(parameterID(moduleChainType, slot), slot / 64.0);
+        params.flush(&*plugin, &*fill, &discardedOutputEvents());
+
+        OneParameterEvent const enable(lfoParameterID(slot, 0, lfoEnabled), 1);
+        params.flush(&*plugin, &*enable, &discardedOutputEvents());
+    }
+
+    /// \note The editor, built the way the shim builds it. Its presence is the
+    /// point: `pEditor_` gates the ToUI pushes, and the mailbox has a reader.
+    juce::ScopedJuceInitialiser_GUI const juceIsUp;
+    auto editor(std::make_unique<LE::SW::GUI::SpectrumWorxEditor>(editorHostOf(*plugin)));
+
+    std::vector<float> leftIn(blockSize), rightIn(blockSize);
+    std::vector<float> leftOut(blockSize), rightOut(blockSize);
+
+    auto const playing(transportAt(120, 0, CLAP_TRANSPORT_IS_PLAYING));
+
+    for (unsigned block(0); block < blocks; ++block)
+    {
+        // A knob moved, on a different slot each block, the way the editor sends
+        // one: a base value, in the parameter's own units, through the queue.
+        auto const slot(static_cast<std::uint8_t>(block % slots));
+        constexpr std::uint8_t wetIndex{2};
+        auto const &info(moduleParameterInfo(*plugin, slot, wetIndex));
+        auto const fraction((block % 8) / 8.0f);
+        editorHostOf(*plugin).toEngine().push(LE::SW::Threading::setBaseParameter(
+            parameterID(moduleType, slot, wetIndex << 8),
+            info.minimum + fraction * (info.maximum - info.minimum)));
+
+        fillWithSine(leftIn, sampleRate, 440.0f, block * blockSize);
+        rightIn = leftIn;
+        plugin.process(leftIn, rightIn, leftOut, rightOut, &playing);
+
+        REQUIRE(std::isfinite(peak(leftOut)));
+        REQUIRE(std::isfinite(peak(rightOut)));
+    }
+
+    // The rack is what was asked for, and the sweeps reached the interface.
+    CHECK(editor->moduleChain().size() == slots);
+
+    editor.reset();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Two instances, two real audio threads, one message thread -- which is
+/// the arrangement symptom 2 of doc/tech/correct_the_threading.md is about, and
+/// the only one every case above deliberately avoids: they call `process()` on
+/// the thread that also drives the editor, so the two never actually overlap.
+///
+///   `REQUIRE` allocates, so the worker threads record rather than assert; the
+/// process loop is what is being measured and it must be what a host runs. Under
+/// `SW_SANITIZER=thread` this is the acceptance test for goal 1, and under
+/// `realtime` it is a second run of the callback with a window opening and
+/// closing underneath it.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("Two instances process while their editors come and go", "[clap][threading]")
+{
+    constexpr float sampleRate{48000};
+    constexpr std::uint32_t blockSize{256};
+    constexpr unsigned int blocks{400};
+
+    Entry const entry;
+    juce::ScopedJuceInitialiser_GUI const juceIsUp;
+
+    ActivePlugin first(sampleRate, blockSize);
+    ActivePlugin second(sampleRate, blockSize);
+
+    // A module apiece, so there is a chain to walk and an LFO to publish.
+    for (auto *pPlugin : {&first, &second})
+    {
+        auto const &params(parameters(**pPlugin));
+        OneParameterEvent const fill(parameterID(moduleChainType, 0), 0);
+        params.flush(&**pPlugin, &*fill, &discardedOutputEvents());
+        OneParameterEvent const enable(lfoParameterID(0, 0, lfoEnabled), 1);
+        params.flush(&**pPlugin, &*enable, &discardedOutputEvents());
+    }
+
+    std::atomic<bool> stop{false};
+    std::atomic<unsigned int> blocksRun{0};
+    std::atomic<bool> sawNonFinite{false};
+
+    auto const audioThread([&](ActivePlugin &plugin) {
+        std::vector<float> leftIn(blockSize), rightIn(blockSize);
+        std::vector<float> leftOut(blockSize), rightOut(blockSize);
+        auto const playing(transportAt(120, 0, CLAP_TRANSPORT_IS_PLAYING));
+
+        for (unsigned block(0); !stop.load(std::memory_order_acquire); ++block)
+        {
+            fillWithSine(leftIn, sampleRate, 440.0f, block * blockSize);
+            rightIn = leftIn;
+            if (plugin.processStatus(leftIn, rightIn, leftOut, rightOut, &playing) ==
+                CLAP_PROCESS_ERROR)
+                sawNonFinite.store(true, std::memory_order_release);
+            if (!std::isfinite(peak(leftOut)))
+                sawNonFinite.store(true, std::memory_order_release);
+            blocksRun.fetch_add(1, std::memory_order_acq_rel);
+        }
+    });
+
+    std::thread firstAudio(audioThread, std::ref(first));
+    std::thread secondAudio(audioThread, std::ref(second));
+
+    /// \note What the message thread does meanwhile: opens and closes windows and
+    /// moves knobs. Closing one used to tear down the MessageManager the other
+    /// was running on (§1B), and a knob used to write engine state directly.
+    for (unsigned round(0); round < 8; ++round)
+    {
+        auto firstEditor(std::make_unique<LE::SW::GUI::SpectrumWorxEditor>(editorHostOf(*first)));
+        auto secondEditor(std::make_unique<LE::SW::GUI::SpectrumWorxEditor>(editorHostOf(*second)));
+
+        constexpr std::uint8_t wetIndex{2};
+        auto const &info(moduleParameterInfo(*first, 0, wetIndex));
+        auto const wanted(info.minimum + ((round % 4) / 4.0f) * (info.maximum - info.minimum));
+        editorHostOf(*first).toEngine().push(
+            LE::SW::Threading::setBaseParameter(parameterID(moduleType, 0, wetIndex << 8), wanted));
+        editorHostOf(*second).toEngine().push(
+            LE::SW::Threading::setBaseParameter(parameterID(moduleType, 0, wetIndex << 8), wanted));
+
+        firstEditor.reset();
+        secondEditor.reset();
+    }
+
+    // Enough blocks that the two really did overlap the eight window cycles.
+    while (blocksRun.load(std::memory_order_acquire) < blocks)
+    {
+    }
+    stop.store(true, std::memory_order_release);
+    firstAudio.join();
+    secondAudio.join();
+
+    CHECK(!sawNonFinite.load());
+    CHECK(juce::MessageManager::getInstanceWithoutCreating() != nullptr);
 }

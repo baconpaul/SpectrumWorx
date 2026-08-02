@@ -552,8 +552,21 @@ class PopupMenu
     void showCenteredAtRight(juce::Component const &, OnChosen) const;
     void showCenteredBelow(juce::Component const &, OnChosen) const;
 
-    /// True from the moment a menu is shown until its callback has run.
-    static bool menuActive() { return menuActive_; };
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief True from the moment *this* menu is shown until its callback has
+    /// run.
+    ///
+    /// \note It was a process-wide `static bool`, so one editor's open menu
+    /// silenced the equivalent button in every other instance in the host. All
+    /// three readers ask about a menu they own -- a combo box's own, the LFO
+    /// type's, the sample area's -- so per menu is both correct and what they
+    /// meant. `mutable` because showing a menu changes nothing about what the
+    /// menu *is*, which is why showAt() is const.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    bool menuActive() const { return menuActive_; }
 
   protected:
     struct Item
@@ -590,7 +603,7 @@ class PopupMenu
     unsigned short menuHeight_;
     unsigned short menuWidth_;
 
-    static bool menuActive_;
+    mutable bool menuActive_{false};
 }; // class PopupMenu
 
 ////////////////////////////////////////////////////////////////////////////////

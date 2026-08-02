@@ -160,21 +160,67 @@ class OneEvent
 
 TEST_CASE("An audio callback scope is bounded, and is per thread", "[core][threading]")
 {
+    /// \note Observed inside the scope, asserted outside it. `ScopedAudioCallback`
+    /// opens a RealtimeSanitizer realtime region, and Catch2's `CHECK` allocates
+    /// -- so under `-fsanitize=realtime` a case that asserted in here would abort
+    /// on its own expression macro. Which is rtsan being right: this is a scope in
+    /// which allocating is forbidden, and a test is not exempt.
+    ///                                       (02.08.2026.) (SW port)
+    bool insideScope{false};
+    bool insideNested{false};
+    bool afterNested{false};
+    bool onAnotherThreadInside{true};
+
     CHECK(!Threading::isAudioThread());
     {
         Threading::ScopedAudioCallback const audioCallback;
-        CHECK(Threading::isAudioThread());
-
-        // A host with a worker pool calls one plugin from several threads; the
-        // answer has to be about this call, not about the process.
-        onAnotherThread([] { CHECK(!Threading::isAudioThread()); });
+        insideScope = Threading::isAudioThread();
 
         {
             Threading::ScopedAudioCallback const nested;
-            CHECK(Threading::isAudioThread());
+            insideNested = Threading::isAudioThread();
         }
-        CHECK(Threading::isAudioThread());
+        afterNested = Threading::isAudioThread();
     }
+    CHECK(!Threading::isAudioThread());
+
+    CHECK(insideScope);
+    CHECK(insideNested);
+    CHECK(afterNested);
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note A host with a worker pool calls one plugin from several threads, so
+    /// the answer has to be about this *call* rather than about the process.
+    ///
+    ///   The observer is started before the scope opens, not inside it: creating
+    /// a thread is itself something a callback may not do, and the whole point of
+    /// this file is that the scope means it. The handshake is two relaxed atomics
+    /// and a bare spin -- `std::this_thread::yield()` is a syscall.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    std::atomic<bool> scopeIsOpen{false};
+    std::atomic<bool> hasObserved{false};
+
+    std::thread observer([&] {
+        while (!scopeIsOpen.load(std::memory_order_acquire))
+        {
+        }
+        onAnotherThreadInside = Threading::isAudioThread();
+        hasObserved.store(true, std::memory_order_release);
+    });
+
+    {
+        Threading::ScopedAudioCallback const audioCallback;
+        scopeIsOpen.store(true, std::memory_order_release);
+        while (!hasObserved.load(std::memory_order_acquire))
+        {
+        }
+    }
+    observer.join();
+
+    CHECK(!onAnotherThreadInside);
     CHECK(!Threading::isAudioThread());
 }
 

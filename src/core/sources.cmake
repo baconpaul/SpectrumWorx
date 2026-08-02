@@ -96,7 +96,6 @@ set(SOURCES_Externals__Utility
     ${leExternals}/utility/buffers.hpp
     ${leExternals}/utility/clear.hpp
     ${leExternals}/utility/countof.hpp
-    ${leExternals}/utility/criticalSection.hpp
     ${leExternals}/utility/lexicalCast.cpp
     ${leExternals}/utility/lexicalCast.hpp
     ${leExternals}/utility/filesystem.cpp

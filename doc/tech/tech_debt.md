@@ -95,6 +95,15 @@ New entries go at the top of their area.
   to the main thread and back before the slot changes, which is a latency a
   generic panel would notice.
 
+- **The LFO panel does not follow the host's tempo.**
+  (02.08.2026, from `correct_the_threading.md` §6.8)
+  `SpectrumWorxEditor::updateForNewTimingInfo()` is correct and unreachable: its
+  one caller was `SpectrumWorx::updatePosition()` in the 2016 host class, which
+  stage 8 deleted. The CLAP's equivalent is `updateLFOTiming()`, on the audio
+  thread, and reaching a widget from there is what this whole redesign forbids —
+  so the answer is a `ToUI` message, and the function is where it lands. Visible
+  as an LFO panel showing the old period after a tempo change.
+
 - **`LFOImpl::Timer`'s tempo is one value for every instance in the process.**
   (02.08.2026, from §8) `std::atomic` since stage 6, so it is no longer a data
   race — but two tracks at two tempi still see one tempo. Making it per-instance

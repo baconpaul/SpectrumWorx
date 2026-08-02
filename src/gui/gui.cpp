@@ -546,7 +546,6 @@ juce::Colour const &BitmapButton::normalOverlay() { return juce::Colours::transp
 // all items etc...) or to workaround bugs (e.g. the menu displaying in wrong
 // places when in lower and/or right half of the screen)...
 //                                            (17.03.2010.) (Domagoj Saric)
-bool PopupMenu::menuActive_(false);
 
 PopupMenu::PopupMenu() : menuHeight_(0), menuWidth_(0) {}
 
@@ -640,11 +639,16 @@ void PopupMenu::showAt(unsigned int const x, unsigned int const y, unsigned int 
                        unsigned int const height, OnChosen onChosen) const
 {
     menuActive_ = true;
+    /// \note `this` in the callback, where the flag used to be a static. A menu
+    /// can outlive what opened it -- the host can close the editor while it is
+    /// down -- but not the menu object itself: every caller owns its menu as a
+    /// member and the editor dismisses whatever is open before it goes. See
+    /// ~SpectrumWorxEditor().
     build(tickedIndex_)
         .showMenuAsync(juce::PopupMenu::Options()
                            .withTargetScreenArea(juce::Rectangle<int>(x, y, width, height))
                            .withMinimumWidth(width),
-                       [onChosen = std::move(onChosen)](int const chosenID) {
+                       [this, onChosen = std::move(onChosen)](int const chosenID) {
                            menuActive_ = false;
                            if (onChosen)
                                onChosen(chosenID ? OptionalID(fromJuceID(chosenID)) : std::nullopt);
