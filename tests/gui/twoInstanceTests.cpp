@@ -205,6 +205,117 @@ TEST_CASE("Selection and the active control belong to an editor, not to the proc
     b.closeEditor();
 }
 
+TEST_CASE("Adding and removing modules keeps the rack and the chain in step", "[gui][modules]")
+{
+    // Ejecting a module had no headless coverage of any kind, and the first thing
+    // it did after the strips became the editor's was assert "Invalid downcast":
+    // nothing dropped a strip when its module left the chain, so the strip kept
+    // the removed module alive and on screen, and the next removal walked off the
+    // end of the chain and onto its sentinel node. Both faults are pinned here --
+    // the walk, and the rack agreeing with the chain afterwards.
+    HostSideJuce const juceIsUp;
+
+    Instance instance;
+    instance.openEditor();
+    auto &editor(instance.editor());
+    auto &chain(instance.core().program().moduleChain());
+
+    /// \note In the plugin this arrives as a posted message, because removal is
+    /// reached from inside the strip's own button callback and the strip cannot
+    /// be destroyed under it. A test has no message loop to pump -- the shim
+    /// builds JUCE with modal loops disabled -- and what is worth pinning is the
+    /// resync's effect rather than JUCE's delivery of it.
+    auto const settle([&] { editor.dropOrphanedRegions(); });
+
+    for (std::uint8_t effect(0); effect < 3; ++effect)
+        editor.addUserAddedModule(static_cast<std::int8_t>(effect));
+    settle();
+
+    REQUIRE(chain.size() == 3);
+    REQUIRE(editor.regionInSlot(0) != nullptr);
+    REQUIRE(editor.regionInSlot(1) != nullptr);
+    REQUIRE(editor.regionInSlot(2) != nullptr);
+
+    // The middle one, so the walk below has something to shuffle.
+    editor.removeModule(*editor.regionInSlot(1));
+    settle();
+
+    CHECK(chain.size() == 2);
+
+    // The rack matches the chain: two strips, in slots 0 and 1, and the one that
+    // was in slot 2 has moved down rather than been left where it was.
+    REQUIRE(editor.regionInSlot(0) != nullptr);
+    REQUIRE(editor.regionInSlot(1) != nullptr);
+    CHECK(editor.regionInSlot(0)->getX() == GUI::ModuleUI::horizontalOffset);
+    CHECK(editor.regionInSlot(1)->getX() ==
+          GUI::ModuleUI::horizontalOffset + GUI::ModuleUI::width + GUI::ModuleUI::distance);
+
+    // ...and the strips that are left are the modules that are left.
+    CHECK(&editor.regionInSlot(0)->module() == chain.moduleAs<SW::Module>(0).get());
+    CHECK(&editor.regionInSlot(1)->module() == chain.moduleAs<SW::Module>(1).get());
+
+    // Emptying the rack from the front, one at a time, is the case that overran.
+    editor.removeModule(*editor.regionInSlot(0));
+    settle();
+    CHECK(chain.size() == 1);
+    editor.removeModule(*editor.regionInSlot(0));
+    settle();
+    CHECK(chain.size() == 0);
+    CHECK(editor.regionInSlot(0) == nullptr);
+
+    instance.closeEditor();
+}
+
+TEST_CASE("A strip whose module has already gone does not walk off the chain", "[gui][modules]")
+{
+    // The reported assertion, reproduced. Removing a module leaves its strip on
+    // screen until the posted resync runs -- it is still a child of the editor
+    // and still clickable -- and that strip's module is no longer in the chain.
+    // Ejecting it walks the intrusive list from an unlinked node, which used to
+    // step onto the chain's sentinel root and downcast it to a Module:
+    //
+    //   LE SDK assertion failure, ERROR: Invalid downcast.
+    //     dynamic_cast<Target>(pSource) == pSource
+    //     Target = LE::SW::Module *, Source = LE::SW::Engine::ModuleNode
+    //
+    // Remove the isEnd() guard from moveModules() and this comes back.
+    HostSideJuce const juceIsUp;
+
+    Instance instance;
+    instance.openEditor();
+    auto &editor(instance.editor());
+    auto &chain(instance.core().program().moduleChain());
+
+    for (std::uint8_t effect(0); effect < 3; ++effect)
+        editor.addUserAddedModule(static_cast<std::int8_t>(effect));
+    REQUIRE(chain.size() == 3);
+
+    /// \note The *last* strip specifically. Its slot index is the highest, so
+    /// after the removal `nextAvailableModuleSlot_` drops below it -- and
+    /// `lastModuleIndex - firstModuleIndex` is then -1 in a `std::uint8_t`, which
+    /// is 255 walks along a chain of two.
+    auto *const pStrip(editor.regionInSlot(2));
+    REQUIRE(pStrip != nullptr);
+
+    // No resync in between: this is the window the plugin is in between the
+    // removal and the posted refresh, and the strip is still on screen.
+    editor.removeModule(*pStrip);
+    REQUIRE(chain.size() == 2);
+
+    // The same strip again, whose module is no longer in the chain. This is the
+    // click that asserted.
+    editor.removeModule(*pStrip);
+
+    // It declined, rather than walking: the chain is untouched, and the rack can
+    // be brought back into agreement with it.
+    CHECK(chain.size() == 2);
+    editor.dropOrphanedRegions();
+    for (std::uint8_t slot(0); slot < chain.size(); ++slot)
+        CHECK(editor.regionInSlot(slot) != nullptr);
+
+    instance.closeEditor();
+}
+
 TEST_CASE("A preset load counts its problems instead of raising dialogs",
           "[gui][two-instances][presets]")
 {

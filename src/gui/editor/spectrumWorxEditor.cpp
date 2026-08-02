@@ -691,12 +691,45 @@ void SpectrumWorxEditor::removeModule(ModuleUI &moduleUI)
     Host2PluginInteropControler::AutomationBlocker const automationBlocker(
         /*host*/ moduleChainOwner /*mrmlj*/ ());
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note A strip whose module has already left the chain is still on screen
+    /// and still clickable until the posted resync runs -- which is a window this
+    /// editor did not used to have, because a module owned its own strip and
+    /// destroying the module destroyed it.
+    ///
+    ///   Clicking one was the reported "Invalid downcast": `slot` comes from the
+    /// stale strip's *position*, so ejecting the last one and then its ghost gives
+    /// slot 2 against a `nextAvailableModuleSlot_` of 2. `lastModuleIndex -
+    /// firstModuleIndex` is then -1 in a `std::uint8_t` parameter, so the walk
+    /// below ran 255 times, off the end of the chain and onto its sentinel node.
+    ///
+    ///   Asking the chain is the answer, rather than defending the arithmetic:
+    /// a strip whose module is not in the chain has nothing to remove.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    bool stillChained(false);
+    moduleChain().forEach<Module>(
+        [&](Module const &module) { stillChained |= (&module == &moduleUI.module()); });
+    if (!stillChained)
+    {
+        refreshModuleRegionsAsync();
+        return;
+    }
+
     LE_ASSUME(nextAvailableModuleSlot_ != 0);
     auto const slotWidth(ModuleUI::width + ModuleUI::distance);
     auto const offset(-signed(slotWidth));
     auto const slot((moduleUI.getX() - ModuleUI::horizontalOffset) / slotWidth);
     auto const firstModuleIndex(slot);
     auto const lastModuleIndex(nextAvailableModuleSlot_ - 1);
+    LE_ASSERT_MSG(firstModuleIndex <= lastModuleIndex, "A strip is outside the filled rack.");
+    if (firstModuleIndex > lastModuleIndex)
+    {
+        refreshModuleRegionsAsync();
+        return;
+    }
     moveModules(moduleUI, lastModuleIndex - firstModuleIndex, offset);
     moduleRemoved();
     LE_VERIFY(setModuleInSlot(slot, AutomatedModuleChain::noModule).first == nullptr);
@@ -714,10 +747,25 @@ void SpectrumWorxEditor::moveModules(ModuleUI &targetSlotUI, std::uint8_t number
     ModuleNode::NodePtr ModuleNode::*const pNextPtr((offset < 0) ? &ModuleNode::next_
                                                                  : &ModuleNode::previous_);
     //...mrmlj...internal module chain knowledge...
+    ///
+    /// \note The walk stops at the chain's own end marker as well as at the
+    /// count. It only had the count, taken from `nextAvailableModuleSlot_` and a
+    /// strip's X position -- so any disagreement between the rack and the chain
+    /// stepped onto the sentinel root node and downcast it to a Module, which
+    /// asserts "Invalid downcast" and in a release build is a bad pointer. A
+    /// count is a claim about the chain; the chain itself is the fact.
+    ///                                       (02.08.2026.) (SW port)
+    auto &chain(moduleChain());
     auto *LE_RESTRICT pMovedModule(&targetSlotUI.module());
     while (numberOfModules--)
     {
-        pMovedModule = &Engine::actualModule<Module>(*(Engine::node(*pMovedModule).*pNextPtr));
+        auto *const pNextNode((Engine::node(*pMovedModule).*pNextPtr).get());
+        if (!pNextNode || chain.isEnd(pNextNode))
+        {
+            LE_ASSERT_MSG(false, "The module rack and the module chain disagree on length.");
+            return;
+        }
+        pMovedModule = &Engine::actualModule<Module>(*pNextNode);
         LE_ASSUME(pMovedModule); //...msvc...
         auto *const pRegion(regionFor(*pMovedModule));
         LE_ASSERT(pRegion);
@@ -1270,6 +1318,40 @@ void SpectrumWorxEditor::dropOrphanedRegions()
         if (!stillChained)
             pRegion.reset();
     }
+
+    /// \note And put what is left where the chain says it goes, so the rack is a
+    /// function of the chain rather than of a running total -- which is what
+    /// `nextAvailableModuleSlot_` and the per-strip X arithmetic amount to, and
+    /// what they disagreeing produced: a walk off the end of the chain and onto
+    /// its sentinel node.
+    std::uint8_t slot(0);
+    chain.forEach<Module>([&](Module &module) {
+        if (auto *const pRegion = regionFor(module))
+            pRegion->moveToSlot(slot);
+        ++slot;
+    });
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Resyncs the rack with the chain on the next turn of the message loop.
+///
+/// \note Asynchronous, and it has to be: the path that removes a module is
+/// `ModuleUI::buttonClicked` -> `removeModule`, so dropping the strip
+/// synchronously would destroy the component whose button callback is on the
+/// stack. The 2016 code met the same thing from the other side and left an
+/// "...investigate why this doesn't work when placed inside the ModuleUI
+/// destructor..." beside it.
+///                                           (02.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxEditor::refreshModuleRegionsAsync()
+{
+    postMessageToComponent(*this, [](SpectrumWorxEditor &editor) {
+        editor.dropOrphanedRegions();
+        return true;
+    });
 }
 
 void SpectrumWorxEditor::parameterChangedElsewhere(ParameterID const parameterID, float const value)

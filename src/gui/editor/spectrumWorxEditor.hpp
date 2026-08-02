@@ -307,11 +307,28 @@ class SpectrumWorxEditor final : private SkinLifetime,
     ModuleUI *regionFor(Module const &);
     ModuleUI *regionInSlot(std::uint8_t slotIndex);
 
-    /// \brief Drops any strip whose module has left the chain.
+    /// \brief Drops any strip whose module has left the chain, and puts the rest
+    /// where the chain says they go.
     void dropOrphanedRegions();
 
-    void moduleRemoved() { setLastModulePosition(nextAvailableModuleSlot_ - 1); }
-    void moduleAdded() { setLastModulePosition(nextAvailableModuleSlot_ + 1); }
+    /// \brief The same, on the next turn of the message loop. See the definition
+    /// for why it cannot be immediate.
+    void refreshModuleRegionsAsync();
+
+    /// \note Both resync the rack afterwards, because both are reached from the
+    /// host's side as well as from this editor's -- `updateGUIForChangedModule`
+    /// in host2PluginImpl.inl calls them when a *host* fills or empties a slot,
+    /// and nothing else would then take the strip down.
+    void moduleRemoved()
+    {
+        setLastModulePosition(nextAvailableModuleSlot_ - 1);
+        refreshModuleRegionsAsync();
+    }
+    void moduleAdded()
+    {
+        setLastModulePosition(nextAvailableModuleSlot_ + 1);
+        refreshModuleRegionsAsync();
+    }
 
   public: //...mrmlj...needed at end of preset loading...
     void setLastModulePosition(std::uint8_t slotIndex);
@@ -437,12 +454,20 @@ class SpectrumWorxEditor final : private SkinLifetime,
     void updateString(String, unsigned int stringVerticalOffset, unsigned int stringHeight,
                       juce::String const &);
 
+  public:
+    /// \brief What the eject button calls. Public for the same reason
+    /// addUserAddedModule() is: removing a module is five steps -- shuffle the
+    /// strips left, decrement the slot marker, empty the slot, tell the host, drop
+    /// the strip -- and only the middle one is reachable through the chain.
+    /// Everything that has gone wrong here has gone wrong in the other four, and
+    /// the assertion this note was written for came from the first.
+    ///                                       (02.08.2026.) (SW port)
+    void removeModule(ModuleUI &);
+
   private:
     friend class ModuleUI;
     void moduleDrag(ModuleUI &, juce::MouseEvent const &);
     void moduleDragEnd(ModuleUI &, juce::MouseEvent const &);
-
-    void removeModule(ModuleUI &);
 
     SharedModuleControls &sharedModuleControls() { return *sharedModuleControls_; }
 
