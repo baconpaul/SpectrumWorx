@@ -110,7 +110,17 @@ template <class ModuleInterface> struct ModuleConstructor
                       "Internal inconsistency");
         auto const pModule(new (storage) ModuleImplementation(ArmonizerIndex()));
         LE_ASSUME(pModule);
-        pModule->baseParameters().template set<Effects::BaseParameters::Wet>(50.0f);
+        /// \note Through setBaseParameter() rather than into the parameter
+        /// directly, so that the unmodulated value moves with it. Writing the
+        /// storage behind the setter's back would leave this module claiming a
+        /// Wet of 100 to the host and to a preset while sounding like 50.
+        ///                                   (02.08.2026.) (SW port)
+        /// \note Qualified: ModuleInterface may override this privately to push
+        /// the value into a widget, and there is no widget at factory time.
+        pModule->Engine::ModuleParameters::setBaseParameter(
+            LE::Parameters::IndexOf<Effects::BaseParameters::Parameters,
+                                    Effects::BaseParameters::Wet>::value,
+            50.0f);
         return pModule;
     }
 
@@ -168,8 +178,7 @@ LE::Utility::IntrusivePtr<ModuleInterface> ModuleFactory::create(std::int8_t con
     }
 
     using SizeGetter = ModuleSizeGetter<ModuleInterface>;
-    auto const storageSize(
-        Utility::switchOn<Effects::ValidIndices>(effectIndex, SizeGetter()));
+    auto const storageSize(Utility::switchOn<Effects::ValidIndices>(effectIndex, SizeGetter()));
     void *const pStorage(std::malloc(storageSize));
 
     if (!pStorage) [[unlikely]]
@@ -177,8 +186,8 @@ LE::Utility::IntrusivePtr<ModuleInterface> ModuleFactory::create(std::int8_t con
 
     using Constructor = ModuleConstructor<ModuleInterface>;
     Constructor &moduleConstructor(*static_cast<Constructor *>(pStorage));
-    return Utility::switchOn<Effects::ValidIndices>(
-        effectIndex, std::forward<Constructor>(moduleConstructor));
+    return Utility::switchOn<Effects::ValidIndices>(effectIndex,
+                                                    std::forward<Constructor>(moduleConstructor));
 }
 
 ////////////////////////////////////////////////////////////////////////////////

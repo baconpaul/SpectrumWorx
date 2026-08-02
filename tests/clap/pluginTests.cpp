@@ -18,6 +18,14 @@
 
 #include "core/host_interop/parameters.hpp" // the fixed parameter count
 
+/// \note For the live parameter, which is not the one a host reads. Since the
+/// base/modulated split, `clap_plugin_params::get_value` answers the value a user
+/// set and an LFO's sweep is deliberately invisible there -- so a test asking
+/// "does an enabled LFO modulate anything" has to look at the engine, and reaches
+/// it through `clap_plugin::plugin_data` as processLockTests.cpp does.
+#include "core/modules/moduleDSPAndGUI.hpp"
+#include "spectrumWorxCLAP.hpp"
+
 #include <clap/clap.h>
 
 #include <catch2/catch_test_macros.hpp>
@@ -438,6 +446,27 @@ clap_id modulatedParameterID(unsigned const moduleIndex, unsigned const lfoIndex
     return parameterID(moduleType, moduleIndex, (lfoIndex + 1) << 8);
 }
 
+/// \brief The value the DSP is actually using for module \p moduleIndex's
+/// parameter \p parameterIndex, right now.
+///
+/// \note Not `clap_plugin_params::get_value`, which since the base/modulated
+/// split answers the value a *user* set: an LFO modulates the live parameter and
+/// leaves that one alone, on purpose, so a host's automation lane does not jitter
+/// and a saved preset does not freeze the sweep. Reaching the engine needs the C++
+/// object out of `plugin_data`, which is the same trick processLockTests.cpp uses
+/// and for the same reason -- what is being observed has no name in the C API.
+float liveModuleParameter(clap_plugin const &plugin, std::uint8_t const moduleIndex,
+                          std::uint8_t const parameterIndex)
+{
+    auto *const pHelper(static_cast<LE::SW::PluginHelper *>(plugin.plugin_data));
+    REQUIRE(pHelper != nullptr);
+    auto &implementation(*static_cast<LE::SW::SpectrumWorxCLAP *>(pHelper));
+    auto const pModule(
+        implementation.program().moduleChain().moduleAs<LE::SW::Module>(moduleIndex));
+    REQUIRE(pModule);
+    return pModule->getBaseParameter(parameterIndex);
+}
+
 /// \brief Fills slot 0, turns LFO 0 on, and reports how many distinct values its
 /// target takes over \p blocks blocks of audio.
 ///
@@ -450,6 +479,39 @@ std::size_t distinctModulatedValues(ActivePlugin &plugin, clap_plugin_params con
 {
     OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0),
                                         0 /*the first effect in the list*/);
+    params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+
+    OneParameterEvent const enable(lfoParameterID(0, 0, lfoEnabled), 1);
+    params.flush(&*plugin, &*enable, &discardedOutputEvents());
+
+    /// \note LFO 0 drives module parameter 1, which is Gain -- the first base
+    /// parameter after Bypass, and one every effect has whatever is in the slot.
+    constexpr std::uint8_t gainIndex{1};
+
+    std::vector<float> leftIn(blockSize), rightIn(blockSize);
+    std::vector<float> leftOut(blockSize), rightOut(blockSize);
+    std::set<float> seen;
+
+    for (unsigned block(0); block < blocks; ++block)
+    {
+        fillWithSine(leftIn, sampleRate, 440.0f, block * blockSize);
+        rightIn = leftIn;
+        plugin.process(leftIn, rightIn, leftOut, rightOut, transport);
+        seen.insert(liveModuleParameter(*plugin, 0, gainIndex));
+    }
+    return seen.size();
+}
+
+/// \brief The same run, counting what the *host* would have seen.
+///
+/// One is the pass here: an LFO is a modulation and a host's value is not
+/// supposed to move because of one.
+std::size_t distinctHostVisibleValues(ActivePlugin &plugin, clap_plugin_params const &params,
+                                      float const sampleRate, std::uint32_t const blockSize,
+                                      unsigned const blocks,
+                                      clap_event_transport const *const transport)
+{
+    OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
     params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
 
     OneParameterEvent const enable(lfoParameterID(0, 0, lfoEnabled), 1);
@@ -1095,6 +1157,30 @@ TEST_CASE("An enabled LFO modulates when the host reports no transport", "[clap]
                                   nullptr) > 1);
 }
 
+TEST_CASE("An LFO sweeps the DSP and not what the host reads", "[clap][lfo]")
+{
+    // The base/modulated split, stated where a host would notice it. Before it,
+    // the LFO wrote through the same setter a user does: get_value() polled the
+    // sweep, so a generic panel's slider jittered on its own and saving a preset
+    // froze the LFO's instantaneous output as the parameter's value.
+    constexpr float sampleRate{48000};
+    constexpr std::uint32_t blockSize{512};
+    constexpr unsigned int blocks{160};
+
+    Entry const entry;
+
+    {
+        ActivePlugin plugin(sampleRate, blockSize);
+        CHECK(distinctModulatedValues(plugin, parameters(*plugin), sampleRate, blockSize, blocks,
+                                      nullptr) > 1);
+    }
+    {
+        ActivePlugin plugin(sampleRate, blockSize);
+        CHECK(distinctHostVisibleValues(plugin, parameters(*plugin), sampleRate, blockSize, blocks,
+                                        nullptr) == 1);
+    }
+}
+
 TEST_CASE("An enabled LFO keeps running while the transport is stopped", "[clap][lfo]")
 {
     // A parked transport reports the same song position every block, so following
@@ -1131,8 +1217,6 @@ TEST_CASE("A playing transport drives the LFO from song position", "[clap][lfo]"
     OneParameterEvent const enable(lfoParameterID(0, 0, lfoEnabled), 1);
     params.flush(&*plugin, &*enable, &discardedOutputEvents());
 
-    auto const target(modulatedParameterID(0, 0));
-
     std::vector<float> leftIn(blockSize, 0.0f), rightIn(blockSize, 0.0f);
     std::vector<float> leftOut(blockSize), rightOut(blockSize);
 
@@ -1141,12 +1225,13 @@ TEST_CASE("A playing transport drives the LFO from song position", "[clap][lfo]"
     /// \note One block per position, and the position is what the host says
     /// rather than what the last block left behind -- so a repeat has to read the
     /// same as its first visit, which a free-running clock could not manage.
+    ///
+    /// \note The live parameter, not `get_value`: an LFO modulates and the value
+    /// a host reads is deliberately not modulated. See liveModuleParameter().
     auto const valueAtBeat([&](double const beats) {
         auto const playing(transportAt(120, beats, CLAP_TRANSPORT_IS_PLAYING));
         plugin.process(leftIn, rightIn, leftOut, rightOut, &playing);
-        double value{0};
-        REQUIRE(params.get_value(&*plugin, target, &value));
-        return value;
+        return liveModuleParameter(*plugin, 0, 1 /*Gain*/);
     });
 
     // A default LFO is a one-bar sine, so bar starts agree and mid-bar does not.

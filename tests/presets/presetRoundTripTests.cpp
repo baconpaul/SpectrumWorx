@@ -337,6 +337,57 @@ TEST_CASE("A saved preset loads back as itself", "[preset-roundtrip]")
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
+TEST_CASE("Saving while an LFO is running stores the setting, not the sweep",
+          "[preset-roundtrip][lfo]")
+{
+    // The concrete cost of there having been no unmodulated value:
+    // savePresetParameters() wrote getBaseParameter(), which the LFO overwrote
+    // every block, so a preset saved with an LFO running froze that LFO's
+    // instantaneous output as the parameter's value -- and loading it back read
+    // that as the user's setting. Revert the unmodulated write in
+    // ModuleParameters::setBaseParameter and this goes red.
+    constexpr std::uint8_t gain{1}; // the first base parameter with an LFO
+    constexpr std::uint32_t blockSize{512};
+    constexpr std::uint8_t channels{2};
+
+    Fixture fixture;
+    auto &engine(fixture.engine());
+
+    REQUIRE(engine.program().moduleChain().setParameter(0, 0, engine.moduleInitialiser()).second ==
+            0);
+
+    float setValue{0};
+    engine.program().moduleChain().forEach<ModuleParameters>(
+        [&](ModuleParameters const &constModule) {
+            auto &module(const_cast<ModuleParameters &>(constModule));
+            setValue = module.setBaseParameter(gain, offDefault(module.parameterInfo(gain)));
+            driveLFO(module.baseLFO(gain - 1), 0, true /*enabled*/);
+        });
+    REQUIRE(setValue != 0);
+
+    // Enough blocks for the LFO clock to move well off position zero.
+    std::vector<std::vector<float>> input(channels, std::vector<float>(blockSize, 0.0f));
+    std::vector<std::vector<float>> output(channels, std::vector<float>(blockSize, 0.0f));
+    std::vector<float const *> inputPointers{input[0].data(), input[1].data()};
+    std::vector<float *> outputPointers{output[0].data(), output[1].data()};
+    for (unsigned block(0); block < 64; ++block)
+        REQUIRE(engine.process(inputPointers.data(), inputPointers.data(), outputPointers.data(),
+                               1.0f, blockSize));
+
+    // The LFO really did move the live parameter -- otherwise the case below
+    // would pass for the wrong reason.
+    float liveValue{0};
+    engine.program().moduleChain().forEach<ModuleParameters>(
+        [&](ModuleParameters const &module) { liveValue = module.getBaseParameter(gain); });
+    REQUIRE(liveValue != setValue);
+
+    auto const saved(savePreset(juce::File(), juce::String("lfo running"), engine.program()));
+    REQUIRE_FALSE(saved.empty());
+
+    INFO("saved preset:\n" << saved);
+    CHECK(savedParameterValue(saved, "Gain") == Catch::Approx(setValue));
+}
+
 TEST_CASE("A parameter under an enabled LFO takes its value from the LFO", "[preset-roundtrip]")
 {
     /// Gain is base parameter 1, the first with an LFO of its own.

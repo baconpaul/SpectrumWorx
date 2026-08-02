@@ -28,7 +28,12 @@ Plugins::AutomatedParameterValue
 AutomatedModuleImpl<Impl>::getSharedAutomatedParameter(std::uint8_t const parameterIndex,
                                                        bool const normalised) const
 {
-    float const parameterValue(impl().getBaseParameter(parameterIndex));
+    /// \note The unmodulated value. This is what `clap_plugin_params::get_value`
+    /// answers, and a host must not see an LFO sweeping there: the sweep is a
+    /// modulation, and CLAP models modulation separately from value. It read the
+    /// live parameter, so a host's generic panel polled the sweep.
+    ///                                       (02.08.2026.) (SW port)
+    float const parameterValue(impl().unmodulatedBaseParameter(parameterIndex));
     return Automation::sharedInternal2AutomatedValue(parameterIndex, parameterValue, normalised);
 }
 
@@ -39,7 +44,8 @@ Plugins::AutomatedParameterValue AutomatedModuleImpl<Impl>::getEffectSpecificAut
 #ifdef LE_SW_FMOD //...mrmlj...FMOD has "full range" but completely static parameters...
     const_cast<bool &>(normalised) = true;
 #endif // LE_SW_FMOD
-    float const parameterValue(impl().getEffectParameter(effectSpecificParameterIndex));
+    /// \note The unmodulated value; see getSharedAutomatedParameter() above.
+    float const parameterValue(impl().unmodulatedEffectParameter(effectSpecificParameterIndex));
     return Automation::effectInternal2AutomatedValue(effectSpecificParameterIndex, parameterValue,
                                                      normalised, impl());
 }

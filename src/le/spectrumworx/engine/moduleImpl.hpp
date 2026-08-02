@@ -459,7 +459,7 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
         : Base(std::forward<T>(args)...,
                Engine::Detail::MakeEffectMetaData<Effect, EffectTypeIndex>::data,
 #ifndef LE_NO_LFOs
-               &lfos_[0],
+               &lfos_[0], &unmodulatedValues_[0],
 #endif // !LE_NO_LFOs
                Engine::Detail::EffectParameterOffsets<Effect>::parameterOffsets,
                static_cast<std::uint16_t>(
@@ -470,6 +470,12 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
           setupCalled_(false)
 #endif // NDEBUG
     {
+#ifndef LE_NO_LFOs
+        /// \note Here and not in ModuleParameters' constructor: this is the first
+        /// point at which `effect_` exists and its parameters hold their
+        /// defaults, which is what an unmodulated value starts as.
+        this->captureUnmodulatedValues();
+#endif // !LE_NO_LFOs
     }
 #ifdef __clang__
 #pragma clang diagnostic pop
@@ -544,6 +550,12 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
         std::array<ModuleParameters::LFOPlaceholder,
                    ModuleParameters::numberOfLFOBaseParameters + Effect::Parameters::static_size>;
     LFOStorage lfos_;
+
+    /// \note One per LFO-able parameter, sized and indexed exactly as lfos_ is:
+    /// the value each of those parameters has when its LFO is off. See
+    /// ModuleParameters::unmodulatedBaseParameter().
+    std::array<float, ModuleParameters::numberOfLFOBaseParameters + Effect::Parameters::static_size>
+        unmodulatedValues_;
 #endif // !LE_NO_LFOs
 
 #ifndef NDEBUG

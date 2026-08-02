@@ -105,6 +105,52 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
     LE_AUX_VIRTUAL_SET float setEffectParameter(std::uint8_t effectParameterIndex, float value);
 #undef LE_AUX_VIRTUAL_GET
 #undef LE_AUX_VIRTUAL_SET
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The value a parameter has when its LFO is off, remembered while it
+    /// is on.
+    ///
+    ///   Written by a user edit, by host automation and by a preset load; never
+    /// by the LFO, which writes the live parameter and nothing else. This is what
+    /// `clap_plugin_params` reports and what a preset stores, so an LFO sweeping
+    /// no longer moves either.
+    ///
+    /// \note Called *unmodulated* rather than *base* in the code, because "base
+    /// parameters" already means the five shared ones -- Bypass, Gain, Wet and
+    /// the two frequencies. doc/tech/correct_the_threading.md §4 calls the same
+    /// thing the base value, in the CLAP sense.
+    ///
+    /// \note There was no such value at all: `setEffectParameterFromLFOAux` wrote
+    /// the LFO's output into the parameter itself, so an LFO *overwrote* rather
+    /// than modulated. That is why `paramsValue` polled the sweep, why saving a
+    /// preset with an LFO running froze that LFO's instantaneous output into the
+    /// file, and why the interface disables a knob whose LFO is on -- there was
+    /// nothing to drag to.
+    ///
+    /// \note Indexed as `lfo()` is: `numberOfLFOBaseParameters` entries for the
+    /// LFO-able shared parameters (Bypass excluded, hence the -1), then one per
+    /// effect parameter.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    float unmodulatedBaseParameter(std::uint8_t baseParameterIndex) const;
+    float unmodulatedEffectParameter(std::uint8_t effectParameterIndex) const;
+
+  protected:
+    /// \brief Copies every live value into its unmodulated slot.
+    ///
+    /// \note Called once, from the most derived constructor, which is the first
+    /// point at which the effect's own parameters hold their defaults. Before
+    /// that there is nothing to copy.
+    void captureUnmodulatedValues();
+
+    /// \brief The live parameter only, leaving the unmodulated value alone.
+    /// What the LFO writes through; nothing else should.
+    float setBaseParameterLive(std::uint8_t baseParameterIndex, float value);
+    float setEffectParameterLive(std::uint8_t effectParameterIndex, float value);
+
   public: // LFO section
     /// \note Until FMOD timing info functionality settles in, all LFO stuff
     /// will be crammed here.
@@ -201,7 +247,10 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
         EffectMetaData const &metadata
 #ifndef LE_NO_LFOs
         ,
-        LFOPlaceholder *pLFOStorage
+        LFOPlaceholder *pLFOStorage,
+        /// \note From the same place and sized the same way as the LFO storage:
+        /// the most derived class holds an array whose length the effect decides.
+        float *pUnmodulatedValues
 #endif
     );
 
@@ -220,6 +269,10 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
 
     //...mrmlj...make ModuleDSP::preProcess() call SW::Module::set*ParameterFromLFO()...
     //...mrmlj...and make ModuleChainImpl::preProcessAll() non template...
+    ///
+    /// \note These write the *live* parameter and leave the unmodulated value
+    /// alone, which is the whole of the base/modulated split -- see
+    /// unmodulatedBaseParameter() above.
     parameter_value_t setBaseParameterFromLFOAux(std::uint8_t parameterIndex, LFO::value_type);
     parameter_value_t setEffectParameterFromLFOAux(std::uint8_t parameterIndex, LFO::value_type);
 
@@ -256,6 +309,9 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
     BaseParameters baseParameters_;
 #ifndef LE_NO_LFOs
     LFO *LE_RESTRICT const pLFOs_;
+    /// One per LFO-able parameter, indexed as pLFOs_ is. See
+    /// unmodulatedBaseParameter().
+    float *LE_RESTRICT const pUnmodulatedValues_;
 #endif
 }; // class ModuleParameters
 

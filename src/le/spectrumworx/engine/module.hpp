@@ -104,14 +104,14 @@ class LE_NOVTABLE ModuleDSP :
   protected:
     ModuleDSP(ModuleParameters::EffectMetaData const &metaData,
 #ifndef LE_NO_LFOs
-              LFOPlaceholder *const pLFOs,
+              LFOPlaceholder *const pLFOs, float *const pUnmodulatedValues,
 #endif // !LE_NO_LFOs
               std::uint8_t const *const pParameterOffsets, std::uint16_t const parametersBaseOffset)
         :
 #ifdef LE_NO_LFOs
           ModuleParameters(metaData),
 #else
-          ModuleParameters(metaData, pLFOs),
+          ModuleParameters(metaData, pLFOs, pUnmodulatedValues),
 #endif
           parametersBaseOffset_(parametersBaseOffset), pParameterOffsets_(pParameterOffsets)
     {

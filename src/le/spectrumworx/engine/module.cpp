@@ -241,6 +241,19 @@ float ModuleParameters::getEffectParameter(std::uint8_t const parameterIndex) co
 
 float ModuleParameters::setEffectParameter(std::uint8_t const parameterIndex, float const value)
 {
+    auto const setValue(setEffectParameterLive(parameterIndex, value));
+#ifndef LE_NO_LFOs
+    /// \note What the *user, the host or a preset* asked for, so it is the
+    /// unmodulated value as well as the live one. The LFO comes through
+    /// setEffectParameterFromLFOAux(), which calls the Live form directly and
+    /// leaves this alone. See ModuleParameters::unmodulatedBaseParameter().
+    pUnmodulatedValues_[numberOfLFOBaseParameters + parameterIndex] = setValue;
+#endif // LE_NO_LFOs
+    return setValue;
+}
+
+float ModuleParameters::setEffectParameterLive(std::uint8_t const parameterIndex, float const value)
+{
     auto const &info(effectSpecificParameterInfo(parameterIndex));
     return static_cast<ModuleDSP &>(*this).setEffectParameter(parameterIndex, value, info);
 }

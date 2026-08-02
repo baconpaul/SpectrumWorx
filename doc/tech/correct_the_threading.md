@@ -305,9 +305,7 @@ below for what it found.
 
 **2 — The protocol, empty.** ✅ *done, 02.08.2026;* see §6.2.
 
-**3 — The base value in the engine.** §4. `paramsValue`, `savePresetParameters` and
-`stateSave` read the base; the LFO writes only live storage. The preset-save bug closes
-here, with a test that reddens if the base write is removed.
+**3 — The base value in the engine.** ✅ *done, 02.08.2026;* see §6.3.
 
 **4 — UI → engine: every edit is a command.** `updateModuleParameterAndNotifyHost`
 (`spectrumWorxEditor.cpp:1156-1166`) stops calling `setParameterValueFromUI` and pushes a
@@ -477,6 +475,46 @@ stage that sends a message before writing its handler says so rather than droppi
 end of the storage, and two cases that actually run two threads: 100k messages through an
 eight-slot ring arriving once and in order, and a mailbox swept while a writer runs flat out
 ending on the last value written.
+
+### 6.3 — What stage 3 did
+
+`Engine::ModuleParameters` keeps one float per LFO-able parameter, sized and indexed exactly
+as the LFO storage is and provisioned the same way — an array in `ModuleEffectImpl<Effect>`,
+whose length the effect decides, handed down to the base.
+
+It is called **unmodulated** in the code and *base* in this document, because "base
+parameters" already means the five shared ones. `setBaseParameter`/`setEffectParameter` —
+what a user, the host and a preset go through — write both it and the live value;
+`set*ParameterFromLFOAux` calls a new `set*ParameterLive` and writes only the live one.
+
+Three things move as a result:
+
+| | before | after |
+|---|---|---|
+| `clap_plugin_params::get_value` | the sweep, polled | the value the user set |
+| `savePresetParameters` | the LFO's instantaneous output | the value the user set |
+| GUI pushes per LFO tick | **two**, one of them tagged `AutomationOrPreset` | one |
+
+That last one was a real defect and fell out of the change: `setEffectParameterFromLFOAux`
+called the *virtual* setter, so `Module::setEffectParameter` pushed the value into the widget
+with the wrong source, and then `Module::setEffectParameterFromLFO` pushed it again with
+`LFOValue`. Calling the non-virtual live setter leaves exactly one push.
+
+**The Armonizer's quick-patch had to change with it.** `ModuleFactory` set that effect's Wet
+to 50 % by writing the parameter directly, behind the setter — which would now leave the
+module claiming 100 to a host and to a preset while sounding like 50. It goes through
+`setBaseParameter` now.
+
+**Tests.** A new `[preset-roundtrip]` case sets Gain, enables its LFO, runs 64 blocks,
+checks the live value really has moved, and then requires the *saved* value to be the one
+that was set. Verified by reversion: with the unmodulated write removed it fails, and it was
+run and watched to fail rather than reasoned about.
+
+Three existing `[clap][lfo]` cases had to change their observation point, and that is worth
+being explicit about: they asserted "an enabled LFO modulates something" by watching
+`get_value`, which is exactly what must now stay still. They read the live engine parameter
+through `plugin_data` instead, and a new case pins both halves at once — the DSP's value
+takes many values over a run, the host's takes one.
 
 ---
 

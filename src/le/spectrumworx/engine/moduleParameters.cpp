@@ -58,7 +58,7 @@ LE_COLD ModuleParameters::ModuleParameters(
     EffectMetaData const &metadata
 #ifndef LE_NO_LFOs
     ,
-    LFOPlaceholder *const pLFOStorage
+    LFOPlaceholder *const pLFOStorage, float *const pUnmodulatedValues
 #endif // LE_NO_LFOs
     )
     : //moduleSlotIndex_( moduleSlotIndex ),
@@ -67,13 +67,19 @@ LE_COLD ModuleParameters::ModuleParameters(
           {}
 #else
       ,
-      pLFOs_(reinterpret_cast<LFO *>(pLFOStorage))
+      pLFOs_(reinterpret_cast<LFO *>(pLFOStorage)), pUnmodulatedValues_(pUnmodulatedValues)
 {
     LE_DISABLE_LOOP_UNROLLING()
     for (auto &lfoPlaceholder : lfos())
     {
         new (&lfoPlaceholder) LFO;
     }
+
+    /// \note Zeroed rather than left as whatever the storage held. The real
+    /// values arrive from captureUnmodulatedValues(), which the most derived
+    /// constructor calls once the effect's own parameters exist -- but a module
+    /// asked for one in between must not read uninitialised memory.
+    std::fill_n(pUnmodulatedValues_, numberOfLFOControledParameters(), 0.0f);
 }
 #endif // LE_NO_LFOs
 
@@ -118,12 +124,53 @@ struct ValueSetter
     float const value_;
 }; // struct ValueSetter
 } // anonymous namespace
-LE_COLD float ModuleParameters::setBaseParameter(std::uint8_t const baseParameterIndex,
-                                                 float const parameterValue)
+LE_COLD float ModuleParameters::setBaseParameterLive(std::uint8_t const baseParameterIndex,
+                                                     float const parameterValue)
 {
     return LE::Parameters::invokeFunctorOnIndexedParameter(baseParameters(), baseParameterIndex,
                                                            ValueSetter(parameterValue));
 }
+
+LE_COLD float ModuleParameters::setBaseParameter(std::uint8_t const baseParameterIndex,
+                                                 float const parameterValue)
+{
+    auto const setValue(setBaseParameterLive(baseParameterIndex, parameterValue));
+#ifndef LE_NO_LFOs
+    /// \note What the *user, the host or a preset* asked for, so it is the
+    /// unmodulated value as well as the live one. The LFO comes through
+    /// setBaseParameterFromLFOAux() instead, which writes only the live one.
+    /// Bypass has no LFO and therefore no unmodulated slot.
+    if (baseParameterIndex >= numberOfNonLFOBaseParameters)
+        pUnmodulatedValues_[baseParameterIndex - numberOfNonLFOBaseParameters] = setValue;
+#endif // LE_NO_LFOs
+    return setValue;
+}
+
+#ifndef LE_NO_LFOs
+LE_COLD float
+ModuleParameters::unmodulatedBaseParameter(std::uint8_t const baseParameterIndex) const
+{
+    if (baseParameterIndex < numberOfNonLFOBaseParameters)
+        return getBaseParameter(baseParameterIndex); // Bypass: never modulated
+    return pUnmodulatedValues_[baseParameterIndex - numberOfNonLFOBaseParameters];
+}
+
+LE_COLD float
+ModuleParameters::unmodulatedEffectParameter(std::uint8_t const effectParameterIndex) const
+{
+    return pUnmodulatedValues_[numberOfLFOBaseParameters + effectParameterIndex];
+}
+
+LE_COLD void ModuleParameters::captureUnmodulatedValues()
+{
+    for (std::uint8_t index(numberOfNonLFOBaseParameters); index < numberOfBaseParameters; ++index)
+        pUnmodulatedValues_[index - numberOfNonLFOBaseParameters] = getBaseParameter(index);
+
+    auto const effectParameters(numberOfEffectSpecificParameters());
+    for (std::uint8_t index(0); index < effectParameters; ++index)
+        pUnmodulatedValues_[numberOfLFOBaseParameters + index] = getEffectParameter(index);
+}
+#endif // LE_NO_LFOs
 
 /// \note The shared base parameters' static descriptions. One definition, in
 /// the one translation unit that can see the template that builds them; every
@@ -256,7 +303,11 @@ LE_COLD parameter_value_t ModuleParameters::setBaseParameterFromLFOAux(
                   "LFO::value_type not normalised.");
     auto const parameterValue(
         normalisedToParameterValue(lfoValue, parameterInfos()[parameterIndex]));
-    return setBaseParameter(parameterIndex, parameterValue);
+    /// \note Live, not `setBaseParameter`. An LFO modulates; it does not decide
+    /// what the parameter *is*. Before the split it wrote through the same setter
+    /// a user does, so `paramsValue` polled the sweep and saving a preset froze
+    /// the LFO's instantaneous output into the file.
+    return setBaseParameterLive(parameterIndex, parameterValue);
 }
 
 LE_COLD parameter_value_t ModuleParameters::setEffectParameterFromLFOAux(
@@ -266,7 +317,8 @@ LE_COLD parameter_value_t ModuleParameters::setEffectParameterFromLFOAux(
                   "LFO::value_type not normalised.");
     auto const &info(effectSpecificParameterInfo(parameterIndex));
     auto const parameterValue(normalisedToParameterValue(lfoValue, info));
-    return setEffectParameter(parameterIndex, parameterValue);
+    /// \note Live; see setBaseParameterFromLFOAux() above.
+    return setEffectParameterLive(parameterIndex, parameterValue);
 }
 
 LE_COLD LFO::value_type
@@ -343,9 +395,16 @@ LE_COLD void ModuleParameters::savePresetParameters(ParametersSaver const &param
     saver.saveParameter<bool>(LE::Parameters::streamingName<Effects::BaseParameters::Bypass>(),
                               bypass());
 
+    /// \note The *unmodulated* value throughout. This wrote `getBaseParameter`
+    /// and `getEffectParameter` -- the live ones -- so saving a preset or a
+    /// session while an LFO was running stored that LFO's instantaneous output as
+    /// the parameter's value, and loading the file back read it as the setting.
+    /// The load side has always read the value as an unmodulated one; see
+    /// getParameterValueWithoutLFO() above.
+    ///                                       (02.08.2026.) (SW port)
     for (std::uint8_t i(1); i < numberOfBaseParameters; ++i)
     {
-        saver.saveParameter<float>(parameterInfos()[i].streamingName, getBaseParameter(i),
+        saver.saveParameter<float>(parameterInfos()[i].streamingName, unmodulatedBaseParameter(i),
                                    baseLFO(i - 1));
     }
 
@@ -353,7 +412,7 @@ LE_COLD void ModuleParameters::savePresetParameters(ParametersSaver const &param
     for (std::uint8_t i(0); i < effectSpecificParameters; ++i)
     {
         saver.saveParameter<float>(effectSpecificParameterInfo(i).streamingName,
-                                   getEffectParameter(i), effectLFO(i));
+                                   unmodulatedEffectParameter(i), effectLFO(i));
         //...mrmlj...
         //ParameterInfo const &       info  ( effectSpecificParameterInfo( i ) );
         //LFO           const &       lfo   ( effectLFO                  ( i ) );
