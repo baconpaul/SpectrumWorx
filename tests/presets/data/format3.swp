@@ -1,0 +1,34 @@
+<SpectrumWorxPreset Format="3" Version="3.0" LastModified="02.08.2026 12:00" Comment="A hand-written 3.0 fixture. Do not regenerate.">
+	<Global>
+		<p n="In" v="0.5" />
+		<p n="Out" v="1.25" />
+		<p n="Mix" v="0.75" />
+		<p n="FFT size" v="2048" />
+		<p n="Overlap factor" v="4" />
+		<p n="Window type" v="1" />
+	</Global>
+	<Modules>
+		<Module effect="Pitch Shifter">
+			<p n="Bypass" v="0" />
+			<p n="Gain" v="-6.5" sync="0" />
+			<p n="Wet" v="80" sync="0" />
+			<p n="Start frequency" v="0.125" sync="0" />
+			<p n="Stop frequency" v="0.875" sync="0" />
+			<p n="Semitones" v="7" sync="0" />
+			<p n="Cents" v="0" sync="0" />
+		</Module>
+		<Module effect="Ah-ah">
+			<p n="Bypass" v="1" />
+			<p n="Gain" v="0" sync="0" />
+			<p n="Wet" v="100" sync="0" />
+			<p n="Start frequency" v="0" sync="0" />
+			<p n="Stop frequency" v="1" sync="0" />
+			<p n="Center (LFO me!)" v="3000" on="1" T="500" ph="0.25" lbnd="0.1" ubnd="0.9" sync="0" wfrm="0" />
+			<p n="Width" v="750" sync="0" />
+			<p n="Strength" v="9999" sync="0" />
+		</Module>
+	</Modules>
+	<dawExtraState>
+		<somethingAPresetReaderMustIgnore value="1" />
+	</dawExtraState>
+</SpectrumWorxPreset>

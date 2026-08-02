@@ -113,7 +113,9 @@ std::vector<std::pair<std::string, std::filesystem::path>> corpus()
 /// new one -- so a reused engine would make every row depend on the row before
 /// it, and a snapshot in which row 200 changes when row 199 does is not a
 /// snapshot of row 200.
-Loaded load(std::filesystem::path const &file, bool &succeeded)
+/// \brief Loads \p data into a fresh engine and dumps it, optionally handing
+/// back what this build would write that engine out as.
+Loaded loadBuffer(std::vector<char> data, bool &succeeded, std::string *const pRewritten = nullptr)
 {
     SWTest::Engine engine;
     engine.setNumberOfChannels(2, 2);
@@ -123,14 +125,10 @@ Loaded load(std::filesystem::path const &file, bool &succeeded)
 
     succeeded = false;
 
-    auto const presetData(readPresetFile(juce::File(file.string())));
-    if (!presetData)
-        return {};
-
     SWTest::clearPresetProblems();
     {
         ScopedProblemCounter const counting;
-        if (!LE::SW::loadPreset(presetData.get(), true /*ignore external samples*/, nullptr,
+        if (!LE::SW::loadPreset(data.data(), true /*ignore external samples*/, nullptr,
                                 PresetConsumer{engine}))
             return {};
     }
@@ -140,10 +138,35 @@ Loaded load(std::filesystem::path const &file, bool &succeeded)
     /// that silently dropped an effect rather than a preset that is wrong.
     CHECK(SWTest::presetProblems().unknownEffect == 0);
 
+    if (pRewritten)
+        *pRewritten = savePreset(juce::File(), juce::String(), engine.program());
+
     succeeded = true;
     auto loaded(dump(engine));
     loaded.missing = SWTest::presetProblems().missingParameter;
     return loaded;
+}
+
+std::vector<char> readPreset(std::filesystem::path const &file)
+{
+    auto const presetData(readPresetFile(juce::File(file.string())));
+    if (!presetData)
+        return {};
+    std::string_view const text(presetData.get());
+    std::vector<char> buffer(text.begin(), text.end());
+    buffer.push_back('\0'); // the parse is destructive and wants a terminator
+    return buffer;
+}
+
+Loaded load(std::filesystem::path const &file, bool &succeeded, std::string *const pRewritten)
+{
+    auto data(readPreset(file));
+    if (data.empty())
+    {
+        succeeded = false;
+        return {};
+    }
+    return loadBuffer(std::move(data), succeeded, pRewritten);
 }
 
 using Table = std::map<std::string, std::string>;
@@ -204,7 +227,7 @@ TEST_CASE("Every factory preset loads and produces the committed state", "[prese
         INFO("preset " << key);
 
         bool succeeded{false};
-        auto const loaded(load(path, succeeded));
+        auto const loaded(load(path, succeeded, nullptr));
         REQUIRE(succeeded); // stage 8: an unmodified 2016-era preset file still loads
 
         if (dumpFilter && (key.find(dumpFilter) != std::string::npos))
@@ -246,6 +269,84 @@ TEST_CASE("Every factory preset loads and produces the committed state", "[prese
     }
 
     CHECK(table.size() == expected.size());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// The translation
+// ---------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+///   Every factory preset, read through the 2.x reader, written out by the 3.0
+/// writer, and read back through the 3.0 reader. What comes out the far end must
+/// be the row the snapshot above committed.
+///
+///   This is the claim the format change rests on: that 3.0 carries everything
+/// 2.x carried. It is a different question from "does the new writer round-trip"
+/// -- presetRoundTripTests answers that, from parameters this build chose -- and
+/// a stronger one, because the input is fifteen years of files nobody can
+/// rewrite, holding shapes the round-trip fixtures do not think to produce:
+/// parameters absent because the effect grew them later, LFOs from before sync
+/// types existed, values written by a printer that is gone.
+///
+///   It shares the committed table rather than one of its own, and that is the
+/// point: two paths into the same 303 digests, so a translation that quietly
+/// dropped an attribute cannot agree with the direct read.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("Every factory preset survives translation into the 3.0 format", "[preset-corpus]")
+{
+    auto const files(corpus());
+    REQUIRE(files.size() >= 300);
+
+    auto const expected(readTable());
+    REQUIRE_FALSE(expected.empty());
+
+    for (auto const &[key, path] : files)
+    {
+        INFO("preset " << key);
+
+        bool succeeded{false};
+        std::string rewritten;
+        auto const legacy(load(path, succeeded, &rewritten));
+        REQUIRE(succeeded);
+        REQUIRE_FALSE(rewritten.empty());
+
+        /// \note Both facts about the file this build would now write: that it
+        /// says which grammar it is in, and that it needs no repair pass to
+        /// parse. 25 of these 303 do need one on the way *in*; none may need one
+        /// on the way out.
+        INFO("rewritten as:\n" << rewritten);
+        CHECK(rewritten.find("Format=\"3\"") != std::string::npos);
+        CHECK(rewritten.find("<p n=") != std::string::npos);
+
+        std::vector<char> parseBuffer(rewritten.begin(), rewritten.end());
+        parseBuffer.push_back('\0');
+
+        bool translated{false};
+        auto const reloaded(loadBuffer(std::move(parseBuffer), translated));
+        REQUIRE(translated);
+
+        /// \note The parameters a 2011 file never mentioned are still not
+        /// mentioned after a translation -- the writer writes what the *engine*
+        /// holds, so they come back as defaults and are no longer missing. That
+        /// is the one column that legitimately differs, and comparing the rest
+        /// against the committed row is what says nothing else did.
+        std::array<char, 32> digestText{};
+        std::snprintf(digestText.data(), digestText.size(), "%016llx",
+                      static_cast<unsigned long long>(digest(reloaded.text)));
+
+        auto const found(expected.find(key));
+        REQUIRE(found != expected.end());
+
+        auto const row(std::to_string(reloaded.modules) + " | " + reloaded.effects + " | " +
+                       std::to_string(reloaded.parameters) + " | " +
+                       std::to_string(legacy.missing) + " | " + digestText.data());
+        CHECK(found->second == row);
+        CHECK(reloaded.missing == 0); // a file this build wrote cannot be missing a parameter
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

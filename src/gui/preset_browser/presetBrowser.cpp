@@ -521,8 +521,12 @@ void PresetBrowser::saveDirtyComment()
         juce::String const newComment(comment().getText());
 
         //...assert that the file/preset on disk is the same as the one in selectedPreset...
-        Preset::InMemoryPresetBuffer newPresetData;
-        unsigned int newPresetDataSize(0);
+        /// \note A read-modify-write of the header alone: the document that goes
+        /// back is the one that came off disk, so a 2.x preset stays 2.x and
+        /// only its Comment moves. Editing a comment is not a reason to rewrite
+        /// somebody's file into a grammar the plugin they had it from cannot
+        /// read.
+        std::string newPresetData;
         {
             auto const pPresetData(readPresetFile(dirtyPreset));
             if (!pPresetData)
@@ -532,12 +536,10 @@ void PresetBrowser::saveDirtyComment()
             if (!preset.loadFrom(pPresetData.get()))
                 return;
             preset.setHeader(presetHeader);
-            newPresetDataSize = preset.saveTo(newPresetData);
+            newPresetData = preset.saveTo();
         }
-        if (newPresetDataSize)
-            writePresetFile(dirtyPreset, newPresetData.data(), newPresetDataSize);
-        else
-            reportPresetProblem(PresetProblem::SaveFailed);
+        writePresetFile(dirtyPreset, newPresetData.c_str(),
+                        static_cast<unsigned int>(newPresetData.size() + 1));
     }
 }
 

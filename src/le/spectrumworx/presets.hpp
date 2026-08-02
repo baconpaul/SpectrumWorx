@@ -33,6 +33,7 @@
 
 #include <tinyxml/tinyxml.h>
 
+#include <functional>
 #include <optional>
 
 #include "le/parameters/parametersUtilities.hpp"
@@ -105,6 +106,7 @@ enum struct PresetProblem : std::uint8_t
 {
     LoadFailed,         ///< not a preset, or the parse failed
     SaveFailed,         ///< the file could not be written
+    FutureFormat,       ///< written by a newer SpectrumWorx than this one
     UnknownEffect,      ///< names an effect this build does not have
     EffectNotAvailable, ///< names an effect this edition excludes
     MissingParameter,   ///< the effect has a parameter the preset does not mention
@@ -159,7 +161,30 @@ class Preset
     Preset(Preset const &) = delete; // makes non-copyable
     Preset &operator=(Preset const &) = delete;
 
-    using InMemoryPresetBuffer = std::array<char, 4096>;
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The grammar the file is written in, and the one this build writes.
+    ///
+    /// \note A separate attribute from `Version`, which is and always was the
+    /// *product* version (`SW_VERSION_MAJOR.MINOR`). The corpus carries 2.6, 2.7,
+    /// 2.8, 2.9 and 2.93 in that field, and it tracked the format only because
+    /// the two moved together in 2011. They do not any more: this tree is
+    /// 3.0.0, so it was already writing `Version="3.0"` onto 2.6-shaped files
+    /// while `isPre27Preset()` read that number as a format version.
+    ///
+    /// \note Absent means **0**, which is every file written before 08.2026 and
+    /// is what selects the legacy reader. Greater than
+    /// `currentFormatVersion` is refused by `loadPreset()` with
+    /// `PresetProblem::FutureFormat`, so "saved by a newer SpectrumWorx" is not
+    /// reported as a corrupt file.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    static constexpr unsigned int currentFormatVersion{3};
+    static char const formatAttributeName[];
+
+    unsigned int formatVersion() const;
 
   public:
     Preset() = default;
@@ -175,12 +200,17 @@ class Preset
     ///                                       (31.07.2026.) (SW port)
     bool loadFrom(char const *pBuffer);
 
-    /// \brief Prints the preset into \p buffer.
-    /// \return the number of bytes written including the terminator, or 0 if
-    /// the preset does not fit. RapidXML's printer could not tell you: it took
-    /// a bare `char *`, and the 2016 sources already record that five TuneWorx
-    /// modules overrun the 4096 bytes every caller hands it.
-    unsigned int saveTo(std::span<char> buffer) const;
+    /// \brief Prints the preset.
+    ///
+    /// \note A `std::string`, where this took a `std::span<char>` and answered 0
+    /// when the preset did not fit. Every caller passed the same
+    /// `std::array<char, 4096>`, and the 2016 sources already record that five
+    /// TuneWorx modules overrun it -- so the size limit was real, reachable, and
+    /// bought nothing: TiXmlPrinter builds the whole document in a string of its
+    /// own before any of it is copied out. Session state, which has no size to
+    /// be limited to, is what made keeping it indefensible.
+    ///                                       (02.08.2026.) (SW port)
+    std::string saveTo() const;
 
     void getHeader(PresetHeader &) const;
     void setHeader(PresetHeader const &);
@@ -200,6 +230,40 @@ class Preset
     using InMemoryPreset = std::unique_ptr<char[]>;
 
     static void reportPresetLoadingError();
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \name DAW extra state
+    ///
+    /// \brief The block that makes one serialisation serve both a preset file
+    /// and the session state a host hands back.
+    ///
+    ///   A preset says what the plugin sounds like. A session says that, plus
+    /// where the user had got to -- which preset folder was open, what the
+    /// editor was showing, settings that are not parameters and never will be.
+    /// Writing both into every file would mean loading a preset silently resets
+    /// the session; writing neither means a session cannot remember anything
+    /// that is not a parameter, which is where this plugin has been.
+    ///
+    ///   So the block is optional on write (savePreset's `withDawExtraState`)
+    /// and optional on read: `dawExtraStateFrom` is called only if the element
+    /// is *present*, so a `.swp` loaded into a live session leaves that session
+    /// alone. The shape is
+    /// `sst::plugininfra::patch_support::PatchBase::dawExtraState{To,From}`,
+    /// which is what the other Surge Synth Team plugins do.
+    ///
+    /// \note The element is written even when the hook writes nothing into it.
+    /// An empty `<dawExtraState/>` is a claim a test can make -- that state and
+    /// preset really are different documents -- and a payload that is still
+    /// empty is not a reason to be unable to say so.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    /// @{
+    static char const dawExtraStateNodeName[];
+
+    std::function<void(TiXmlElement &)> dawExtraStateTo{nullptr};
+    std::function<void(TiXmlElement const &)> dawExtraStateFrom{nullptr};
+    /// @}
 
   private:
     TiXmlDocument document_;
@@ -276,6 +340,15 @@ class PresetHandler
 
 template <> std::string PresetHandler::makeString<bool>(bool);
 
+/// \note Nine significant figures, which is the shortest that round-trips every
+/// `float`, where the generic path gives four *decimals* (lexicalCast.cpp:63).
+/// Four decimals is plenty for 6000 Hz and coarse for a normalised 0..1
+/// frequency, where it is about fourteen bits: "Start frequency" saved and
+/// reloaded did not come back the same number. Reading is unaffected -- strtof
+/// takes whatever it is given -- so no committed preset moves.
+///                                           (02.08.2026.) (SW port)
+template <> std::string PresetHandler::makeString<float>(float);
+
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \class ParametersLoader
@@ -322,7 +395,7 @@ class ParametersLoader : private PresetHandler
             if (loadLFO(*pParameterNode, lfo))
                 return std::nullopt;
             else
-                return getParameterValue<T>(pParameterNode->GetText(), parameterName);
+                return getParameterValue<T>(parameterValueText(*pParameterNode), parameterName);
         }
         else
         {
@@ -376,8 +449,41 @@ class ParametersLoader : private PresetHandler
         return std::nullopt;
     }
 
+    ////////////////////////////////////////////////////////////////////////////
+    // The two grammars.
+    //
+    // \note Four private members are everything that differs between a 2.x file
+    // and a 3.0 one: where a parameter's value lives, where its LFO attributes
+    // live, how the module elements are walked, and how one of them names its
+    // effect. So this branches on a flag rather than growing a second class --
+    // and the legacy arm is the code that was here, moved and not rewritten,
+    // because the 303 committed presets are the only sample of that grammar
+    // anyone will ever have.
+    ////////////////////////////////////////////////////////////////////////////
+
+    enum struct Grammar : std::uint8_t
+    {
+        /// Element name *is* the mangled parameter name; the value is an
+        /// attribute on the parent for a plain parameter and the element's own
+        /// text for an LFO-able one; a module element is named after the mangled
+        /// effect name.
+        Legacy,
+        /// `<p n="…" v="…">` throughout, with the LFO attributes on the same
+        /// element, and `<Module effect="…">`.
+        V3
+    };
+
+    /// \brief The value text for \p parameterName, or null if it is absent.
     char const *getParameterAttribute(char const *parameterName) const;
+
+    /// \brief The element carrying \p parameterName's value and LFO settings, or
+    /// null. In 3.0 this and getParameterAttribute() answer about the same
+    /// element; in 2.x they are two different shapes and either may be the one
+    /// present, which is what getLFOParameterValue()'s fallback is for.
     TiXmlElement const *getParameterNode(char const *parameterName) const;
+
+    /// \brief Where the value sits on a node getParameterNode() returned.
+    char const *parameterValueText(TiXmlElement const &parameterNode) const;
 
     bool loadLFO(TiXmlElement const &parameterNode, LFO &lfo) const;
 
@@ -385,7 +491,9 @@ class ParametersLoader : private PresetHandler
 
     static std::int8_t effectIndexFromMangledName(std::string_view mangledName);
 
-    char const *currentMangledEffectName() const;
+    /// \brief The effect the module element now under the cursor names, and the
+    /// spelling to report if this build does not have it.
+    std::pair<std::int8_t, char const *> currentEffect() const;
 
     TiXmlElement const &parameters() const
     {
@@ -397,6 +505,8 @@ class ParametersLoader : private PresetHandler
 
   private:
     TiXmlElement const *LE_RESTRICT pParameters_;
+
+    Grammar grammar_;
 
     mutable bool syncedLFOFound_;
 
@@ -459,7 +569,7 @@ class ParametersSaver : private PresetHandler
     //void setSampleFileName( juce::String const & sampleFileName );
     void setSampleFileName(std::string_view const &sampleFileName);
 
-    unsigned int saveTo(std::span<char> buffer) const;
+    std::string saveTo() const;
 
   public: // For-each functor interface.
     using result_type = void;
@@ -492,9 +602,16 @@ class ParametersSaver : private PresetHandler
     }
 
   private:
+    /// \note Both write the same shape -- `<p n="…" v="…">` -- and differ only in
+    /// whether the LFO's settings join it as further attributes. In 2.x they
+    /// wrote two different things, an attribute on the parent and an element
+    /// with the value as its text, which is why the reader still has to look for
+    /// both.
     void saveParameter(char const *parameterName, std::string const &parameterValue);
     void saveParameter(char const *parameterName, std::string const &parameterValue,
                        LFO const &parameterLFO);
+
+    TiXmlElement &newParameterNode(char const *parameterName, std::string const &parameterValue);
 
     TiXmlElement &parameters()
     {
@@ -538,6 +655,16 @@ LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignor
         if (!preset.loadFrom(inMemoryPreset))
         {
             Preset::reportPresetLoadingError();
+            return false;
+        }
+
+        /// \note Refused rather than read as far as it happens to make sense. A
+        /// grammar this build does not know is not a corrupt file and should not
+        /// be reported as one, and a partial read of one would be worse than
+        /// either -- it would silently drop whatever the new version added.
+        if (preset.formatVersion() > Preset::currentFormatVersion)
+        {
+            reportPresetProblem(PresetProblem::FutureFormat);
             return false;
         }
 
@@ -622,8 +749,14 @@ class Program;
 /// \note The `juce::File` overloads of these two -- and the `loadPreset` that
 /// reads a file before parsing it -- are in presetFile.hpp. This translation
 /// unit opens no files, which is what `LE_NO_PRESETS` used to stand in for.
-unsigned int savePreset(std::span<char> data, juce::File const &externalSampleFile,
-                        juce::String const &comment, Program const &);
+///
+/// \param withDawExtraState whether to write a `<dawExtraState>` block. False
+/// for a `.swp`, true for the session state a host holds: a preset carries what
+/// the plugin *sounds like* and a session carries that plus where the user had
+/// got to, and the two must not be the same file or opening a preset would
+/// silently reset the session. See Preset::dawExtraStateTo.
+std::string savePreset(juce::File const &externalSampleFile, juce::String const &comment,
+                       Program const &, bool withDawExtraState = false);
 #endif // !LE_SW_SDK_BUILD
 
 LE_OPTIMIZE_FOR_SIZE_END()

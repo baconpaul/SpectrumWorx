@@ -114,13 +114,30 @@ void PresetHeader::setCurrentTime()
 namespace
 {
 char const headerNodeName_[] = "SpectrumWorxPreset";
-char const parametersNodeName_[] = "Parameters";
 char const globalParametersNodeName_[] = "Global";
 char const moduleParametersNodeName_[] = "Modules";
-char const moduleNodeName_[] = "Module";
-char const moduleIDAttributeName_[] = "ID";
 char const sampleAttributeName_[] = "Sample";
+
+/// \name The 3.0 grammar's own names.
+/// \note Short on purpose: `<p>` and its two attributes are repeated once per
+/// parameter, up to 55 times per preset, and this is a format read by machines
+/// and skimmed by people rather than the other way round.
+/// @{
+char const moduleNodeName_[] = "Module";
+char const moduleEffectAttributeName_[] = "effect";
+char const parameterNodeName_[] = "p";
+char const parameterNameAttributeName_[] = "n";
+char const parameterValueAttributeName_[] = "v";
+/// @}
+
+/// \note `parametersNodeName_ = "Parameters"` and `moduleIDAttributeName_ =
+/// "ID"` stood here, declared and referenced by nothing -- leftovers of a shape
+/// the format never took. `Module` was one of them and now means something.
+///                                           (02.08.2026.) (SW port)
 } // namespace
+
+char const Preset::formatAttributeName[] = "Format";
+char const Preset::dawExtraStateNodeName[] = "dawExtraState";
 
 char const PresetHeader::AttributeNames::version[] = "Version";
 char const PresetHeader::AttributeNames::timeStamp[] = "LastModified";
@@ -308,7 +325,7 @@ bool Preset::loadFrom(char const *const pBuffer)
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-unsigned int Preset::saveTo(std::span<char> const buffer) const
+std::string Preset::saveTo() const
 {
     //...mrmlj...an ugly temporary way to verify that the header was set before saving...
     /// \note Braces, not parentheses. `PresetHeader dummyHeader( juce::String() );`
@@ -325,18 +342,25 @@ unsigned int Preset::saveTo(std::span<char> const buffer) const
     printer.SetIndent("\t");
     document_.Accept(&printer);
 
-    auto const size(printer.Size() + 1 /*terminator*/);
-    if (size > buffer.size())
-    {
-        LE_TRACE("SW: preset of %u bytes does not fit a %u byte buffer.",
-                 static_cast<unsigned int>(size), static_cast<unsigned int>(buffer.size()));
-        return 0;
-    }
-
-    *std::copy_n(printer.CStr(), printer.Size(), buffer.data()) = '\0';
-    return static_cast<unsigned int>(size);
+    /// \note No terminator in the string. The 2016 writer put one on disk and
+    /// 193 of the 303 committed files end in a NUL byte, so `writePresetFile()`
+    /// still appends one -- but a `std::string` that carries its own NUL in
+    /// `size()` is a trap for every caller that is not writing a file, and the
+    /// state stream is now one of those.
+    return printer.CStr();
 }
 #endif // LE_SW_SDK_BUILD
+
+unsigned int Preset::formatVersion() const
+{
+    auto const *const pFormat(root().Attribute(formatAttributeName));
+    if (!pFormat)
+        return 0;
+    int format{0};
+    if (root().QueryIntAttribute(formatAttributeName, &format) != TIXML_SUCCESS)
+        return 0;
+    return static_cast<unsigned int>(std::max(format, 0));
+}
 
 TiXmlElement &Preset::root()
 {
@@ -414,6 +438,10 @@ LE_COLD void defaultPresetProblemReporter(PresetProblem const problem,
     case PresetProblem::SaveFailed:
         GUI::warningMessageBox(MB_ERROR, "Unable to save preset.", true);
         return;
+    case PresetProblem::FutureFormat:
+        GUI::warningMessageBox(MB_ERROR,
+                               "This preset was saved by a newer version of SpectrumWorx.", false);
+        return;
     case PresetProblem::UnknownEffect:
         GUI::warningMessageBox(MB_ERROR " unknown effect in preset.", detail, false);
         return;
@@ -469,15 +497,40 @@ template <> std::string PresetHandler::makeString<bool>(bool const binarySource)
     return binarySource ? "1" : "0";
 }
 
+/// \note %.9g rather than std::to_chars' shortest round-trip: nine significant
+/// figures round-trips every float too, it is two lines instead of a
+/// <charconv> availability question across three toolchains, and
+/// parameterTableTests.cpp already prints its defaults exactly this way for
+/// exactly this reason.
+template <> std::string PresetHandler::makeString<float>(float const binarySource)
+{
+    std::array<char, 32> buffer{};
+    std::snprintf(buffer.data(), buffer.size(), "%.9g", static_cast<double>(binarySource));
+    return buffer.data();
+}
+
 /// \note A preset with no `<Global>` node used to throw from this constructor,
 /// which `loadPreset`'s catch-all turned into "unable to load". It reports the
 /// same thing without the throw: `pParameters_` is null and every getter misses,
 /// which the missing-parameter path already handles.
 ParametersLoader::ParametersLoader(Preset const &preset)
-    : PresetHandler(const_cast<Preset &>(preset)), syncedLFOFound_(false)
+    : PresetHandler(const_cast<Preset &>(preset)),
+      grammar_(preset.formatVersion() >= 3 ? Grammar::V3 : Grammar::Legacy), syncedLFOFound_(false)
 {
     pParameters_ = preset.root().FirstChildElement(globalParametersNodeName_);
     LE_ASSERT_MSG(pParameters_, "Preset node not found");
+
+    if (preset.dawExtraStateFrom)
+    {
+        /// \note Only when the element is there. A `.swp` has none, and calling
+        /// the hook with nothing to read would hand the caller a
+        /// default-constructed session state -- which is how loading a preset
+        /// would come to reset where the browser was pointing.
+        auto const *const pDawExtraState(
+            preset.root().FirstChildElement(Preset::dawExtraStateNodeName));
+        if (pDawExtraState)
+            preset.dawExtraStateFrom(*pDawExtraState);
+    }
 }
 
 #ifdef LE_SW_SDK_BUILD //...mrmlj...
@@ -503,7 +556,13 @@ LE_COLD ParametersLoader::ModuleChain ParametersLoader::loadModuleChain(ModuleCh
         if (!pModuleParameters)
             return ModuleChain();
 #endif
-        pParameters_ = pModuleParameters->FirstChildElement();
+        /// \note Unfiltered for 2.x, because there the element's *name* is the
+        /// effect and no two are alike; filtered for 3.0, so that anything a
+        /// later version puts beside a `<Module>` is skipped rather than read as
+        /// a module with an effect this build does not have.
+        pParameters_ = (grammar_ == Grammar::V3)
+                           ? pModuleParameters->FirstChildElement(moduleNodeName_)
+                           : pModuleParameters->FirstChildElement();
     }
 
     ModuleChain newChain;
@@ -512,8 +571,7 @@ LE_COLD ParametersLoader::ModuleChain ParametersLoader::loadModuleChain(ModuleCh
     while (pParameters_)
     {
         using namespace Effects;
-        auto const effectName(currentMangledEffectName());
-        auto const effectIndex(effectIndexFromMangledName(effectName));
+        auto const [effectIndex, effectName](currentEffect());
         bool const foundEffect(effectIndex != noModule);
         bool const effectEnabled(foundEffect && includedEffects[effectIndex]);
 #ifdef LE_SW_FULL
@@ -550,7 +608,8 @@ LE_COLD ParametersLoader::ModuleChain ParametersLoader::loadModuleChain(ModuleCh
                                             : PresetProblem::UnknownEffect,
                                 effectName);
         }
-        pParameters_ = pParameters_->NextSiblingElement();
+        pParameters_ = (grammar_ == Grammar::V3) ? pParameters_->NextSiblingElement(moduleNodeName_)
+                                                 : pParameters_->NextSiblingElement();
     }
 
 #ifndef LE_SW_SDK_BUILD
@@ -613,10 +672,25 @@ std::int8_t ParametersLoader::effectIndexFromMangledName(std::string_view const 
 /// \note The 2016 version wrote a NUL over the byte after the element's name --
 /// into the parse buffer, because RapidXML's names are not terminated and the
 /// mangling wanted a C string. TinyXML's are.
-char const *ParametersLoader::currentMangledEffectName() const
+///
+/// \note 3.0 spells the effect out in an attribute, so it needs neither the
+/// mangling nor the 57-way search: the name in the file is the streaming name
+/// exactly, and `effectIndexFromStreamingName()` is one comparison per effect
+/// against a string it does not have to transform first.
+std::pair<std::int8_t, char const *> ParametersLoader::currentEffect() const
 {
     LE_ASSERT_MSG(switchedToModuleParameters(), "Not yet switched to module parameters.");
-    return parameters().Value();
+
+    if (grammar_ == Grammar::V3)
+    {
+        auto const *const pEffect(parameters().Attribute(moduleEffectAttributeName_));
+        if (!pEffect)
+            return {-1, ""};
+        return {Effects::effectIndexFromStreamingName(pEffect), pEffect};
+    }
+
+    auto const *const pMangledName(parameters().Value());
+    return {effectIndexFromMangledName(pMangledName), pMangledName};
 }
 
 // sampleAttributeName_ contains no spaces
@@ -700,11 +774,36 @@ bool ParametersLoader::loadLFO(TiXmlElement const &parameterNode, LFO &lfo) cons
     return lfo.enabled();
 }
 
+namespace
+{
+/// \brief The `<p n="…">` under \p parent, or null.
+///
+/// \note A linear walk, because a module has at most ten parameters and the
+/// globals six or eight. The 2.x reader's own lookups are a TinyXML attribute
+/// scan and a child-element scan, which are the same shape.
+TiXmlElement const *findParameterNode(TiXmlElement const &parent, char const *const parameterName)
+{
+    for (auto const *pNode(parent.FirstChildElement(parameterNodeName_)); pNode;
+         pNode = pNode->NextSiblingElement(parameterNodeName_))
+    {
+        auto const *const pName(pNode->Attribute(parameterNameAttributeName_));
+        if (pName && (std::strcmp(pName, parameterName) == 0))
+            return pNode;
+    }
+    return nullptr;
+}
+} // anonymous namespace
+
 LE_NOINLINE char const *
 ParametersLoader::getParameterAttribute(char const *const parameterName) const
 {
     if (!pParameters_)
         return nullptr;
+    if (grammar_ == Grammar::V3)
+    {
+        auto const *const pNode(findParameterNode(parameters(), parameterName));
+        return pNode ? pNode->Attribute(parameterValueAttributeName_) : nullptr;
+    }
     return parameters().Attribute(mangleName(parameterName).c_str());
 }
 
@@ -713,7 +812,18 @@ ParametersLoader::getParameterNode(char const *const parameterName) const
 {
     if (!pParameters_)
         return nullptr;
+    if (grammar_ == Grammar::V3)
+        return findParameterNode(parameters(), parameterName);
     return parameters().FirstChildElement(mangleName(parameterName).c_str());
+}
+
+char const *ParametersLoader::parameterValueText(TiXmlElement const &parameterNode) const
+{
+    /// \note `GetText()` on a 3.0 node would answer null -- `<p/>` has no text
+    /// child -- which getParameterValue() reports as a missing parameter. Every
+    /// LFO-able parameter in the file, silently defaulted.
+    return (grammar_ == Grammar::V3) ? parameterNode.Attribute(parameterValueAttributeName_)
+                                     : parameterNode.GetText();
 }
 
 LE_COLD void ParametersLoader::warnAboutMissingParameter(char const *const pParameterName)
@@ -737,6 +847,13 @@ SavedPreset::SavedPreset()
     auto *const pHeaderNode(new TiXmlElement(headerNodeName_));
     xml().LinkEndChild(pHeaderNode);
 
+    /// \note On the document rather than in setHeader(), because it is a
+    /// property of the shape being built and not of the header data being put
+    /// into it -- setHeader() is also what saveDirtyComment() calls on a
+    /// *reparsed* file, and stamping 3 onto a 2.6 document there would claim a
+    /// grammar the rest of that file is not written in.
+    pHeaderNode->SetAttribute(formatAttributeName, int(currentFormatVersion));
+
     pGlobalParametersNode_ = new TiXmlElement(globalParametersNodeName_);
     pModuleParametersNode_ = new TiXmlElement(moduleParametersNodeName_);
     pHeaderNode->LinkEndChild(pGlobalParametersNode_);
@@ -750,30 +867,46 @@ ParametersSaver::ParametersSaver(SavedPreset &preset)
 {
 }
 
-unsigned int ParametersSaver::saveTo(std::span<char> const buffer) const
+std::string ParametersSaver::saveTo() const
 {
     LE_ASSERT_MSG(moduleChainSaved_, "Module chain parameters not yet saved/parsed.");
-    return preset().saveTo(buffer);
+    return preset().saveTo();
 }
 
+/// \note `<Module effect="Ah-ah">`, where 2.x wrote `<Ah-ah>`. The name is no
+/// longer mangled because it is no longer an element name: an attribute value
+/// takes any character, which is what the whole of `mangleName()` and the
+/// read-side repair beside it exist to work around. 3.0 cannot emit a document
+/// that needs repairing.
 void ParametersSaver::saveEffectModuleChain(AutomatedModuleChain const &moduleChain)
 {
     LE_ASSERT_MSG(!moduleChainSaved_, "Already switched to modules."); //...mrmlj...
     moduleChainSaved_ = true;
 
     moduleChain.forEach<PresetModule>([&](PresetModule const &module) {
-        auto *const pModuleNode(new TiXmlElement(
-            mangleName(Effects::effectStreamingName(module.effectTypeIndex())).c_str()));
+        auto *const pModuleNode(new TiXmlElement(moduleNodeName_));
+        pModuleNode->SetAttribute(moduleEffectAttributeName_,
+                                  Effects::effectStreamingName(module.effectTypeIndex()));
         preset().moduleParametersNode().LinkEndChild(pModuleNode);
         pParametersNode_ = pModuleNode;
         module.savePresetParameters(*this);
     });
 }
 
+TiXmlElement &ParametersSaver::newParameterNode(char const *const parameterName,
+                                                std::string const &parameterValue)
+{
+    auto *const pParameterNode(new TiXmlElement(parameterNodeName_));
+    pParameterNode->SetAttribute(parameterNameAttributeName_, parameterName);
+    pParameterNode->SetAttribute(parameterValueAttributeName_, parameterValue);
+    parameters().LinkEndChild(pParameterNode);
+    return *pParameterNode;
+}
+
 void ParametersSaver::saveParameter(char const *const parameterName,
                                     std::string const &parameterValue)
 {
-    parameters().SetAttribute(mangleName(parameterName), parameterValue);
+    newParameterNode(parameterName, parameterValue);
 }
 
 // ...mrmlj...cannot put LFODataSaver into the anonymous namespace because it is
@@ -825,19 +958,23 @@ class LFODataSaver
 };
 //} // anonymous namespace
 
-/// \note An LFO-able parameter is an element with the value as its text and the
-/// LFO's settings as its attributes, rather than a plain attribute -- which is
-/// why the loader has to look for both.
+/// \note The same `<p n v>` as a parameter with no LFO, with the LFO's settings
+/// alongside as further attributes -- `on`, `T`, `ph`, `lbnd`, `ubnd`, `sync`,
+/// `wfrm`, unchanged and in the same place they occupied in 2.x. That is what
+/// keeps LFODataSaver and LFODataLoader out of this change entirely: the
+/// reversed-order load, the SyncTypes-before-PeriodScale ordering and
+/// adjustValueForPreset() are the subtlest part of the format and they see the
+/// same element they always did.
+///
+///   In 2.x the two overloads wrote two different things -- an attribute on the
+/// parent, or an element with the value as its text -- and the loader still has
+/// to look for both, because that is what the 303 committed files contain.
 void ParametersSaver::saveParameter(char const *const parameterName,
                                     std::string const &parameterValue, LFO const &parameterLFO)
 {
-    auto *const pParameterNode(new TiXmlElement(mangleName(parameterName).c_str()));
-    pParameterNode->LinkEndChild(new TiXmlText(parameterValue));
-
+    auto &parameterNode(newParameterNode(parameterName, parameterValue));
     LE::Parameters::forEach(parameterLFO.parameters(),
-                            LFODataSaver(*this, *pParameterNode, parameterLFO));
-
-    parameters().LinkEndChild(pParameterNode);
+                            LFODataSaver(*this, parameterNode, parameterLFO));
 }
 
 /*
@@ -860,8 +997,8 @@ void ParametersSaver::setSampleFileName(std::string_view const &sampleFileName)
     saveParameter(sampleAttributeName_, std::string(sampleFileName));
 }
 
-unsigned int savePreset(std::span<char> const data, juce::File const &externalSampleFile,
-                        juce::String const &comment, Program const &program)
+std::string savePreset(juce::File const &externalSampleFile, juce::String const &comment,
+                       Program const &program, bool const withDawExtraState)
 {
     PresetHeader const presetHeader(comment);
     SavedPreset preset;
@@ -906,7 +1043,18 @@ unsigned int savePreset(std::span<char> const data, juce::File const &externalSa
 
     parametersSaver.saveEffectModuleChain(program.moduleChain());
 
-    return preset.saveTo(data);
+    /// \note Last, so that the block a host reads back sits after the audio
+    /// state it belongs to rather than in front of it, and written even when the
+    /// hook puts nothing in it -- see the note on Preset::dawExtraStateTo.
+    if (withDawExtraState)
+    {
+        auto *const pDawExtraState(new TiXmlElement(Preset::dawExtraStateNodeName));
+        preset.root().LinkEndChild(pDawExtraState);
+        if (preset.dawExtraStateTo)
+            preset.dawExtraStateTo(*pDawExtraState);
+    }
+
+    return parametersSaver.saveTo();
 }
 
 #endif // LE_SW_SDK_BUILD

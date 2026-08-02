@@ -40,6 +40,7 @@
 
 #include <juce_core/juce_core.h>
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
@@ -63,12 +64,54 @@ using SWTest::dump;
 using SWTest::PresetConsumer;
 using SWTest::ScopedProblemCounter;
 
-/// \note Far larger than Preset::InMemoryPresetBuffer's 4096 bytes, and
-/// deliberately: the 2016 sources record that five TuneWorx modules breach that
-/// buffer, and driving every parameter off its default makes a document larger
-/// still. What is under test here is the round-trip, not the shipping buffer
-/// size -- saveTo() refuses to overrun one now, and returns 0 instead.
-constexpr std::size_t generousBuffer{1u << 20};
+/// \note `generousBuffer`, a 1 MiB `std::vector<char>` every save was handed,
+/// stood here. It was needed because `savePreset` wrote into a caller's span and
+/// the shipping caller's was 4096 bytes -- which five TuneWorx modules breach,
+/// as the 2016 sources record. `savePreset` returns a `std::string` now, so
+/// there is no size to be generous about and no path left where a preset is too
+/// large to save.
+///                                           (02.08.2026.) (SW port)
+
+/// \brief The first `<p n="…">` anywhere under \p element, or null.
+TiXmlElement const *findParameter(TiXmlElement const &element, std::string_view const parameterName)
+{
+    for (auto const *pChild(element.FirstChildElement()); pChild;
+         pChild = pChild->NextSiblingElement())
+    {
+        auto const *const pName(pChild->Attribute("n"));
+        if (pName && (std::string_view(pChild->Value()) == "p") &&
+            (std::string_view(pName) == parameterName))
+            return pChild;
+        if (auto const *const pFound = findParameter(*pChild, parameterName))
+            return pFound;
+    }
+    return nullptr;
+}
+
+/// \brief The value 3.0 recorded for \p parameterName, read back out of the
+/// document rather than matched as text.
+///
+/// \note Depth-first from the root and the first match wins, which is what these
+/// single-module fixtures want. The globals come first in the document and share
+/// no name with a module parameter -- In, Out, Mix, FFT size, Overlap factor,
+/// Window type against Gain, Wet and the rest -- so there is nothing here to
+/// disambiguate yet. A two-module preset would need the module element named.
+float savedParameterValue(std::string const &saved, char const *const parameterName)
+{
+    TiXmlDocument document;
+    document.Parse(saved.c_str());
+    REQUIRE_FALSE(document.Error());
+
+    auto const *const pRoot(document.RootElement());
+    REQUIRE(pRoot != nullptr);
+
+    auto const *const pParameter(findParameter(*pRoot, parameterName));
+    REQUIRE(pParameter != nullptr);
+
+    double value{0};
+    REQUIRE(pParameter->QueryDoubleAttribute("v", &value) == TIXML_SUCCESS);
+    return static_cast<float>(value);
+}
 
 /// \note A class rather than a function returning one: SWTest::Engine points
 /// SpectrumWorxCore at a Program it holds by value, so it can be neither copied
@@ -244,12 +287,8 @@ TEST_CASE("A saved preset loads back as itself", "[preset-roundtrip]")
 
             original = dump(engine).text;
 
-            std::vector<char> buffer(generousBuffer, '\0');
-            auto const written(
-                savePreset(buffer, juce::File(), juce::String("round trip"), engine.program()));
-            REQUIRE(written > 0);
-            REQUIRE(written < buffer.size());
-            saved.assign(buffer.data(), written - 1 /*the terminator saveTo() appends*/);
+            saved = savePreset(juce::File(), juce::String("round trip"), engine.program());
+            REQUIRE_FALSE(saved.empty());
         }
 
         INFO("saved preset:\n" << saved);
@@ -322,15 +361,20 @@ TEST_CASE("A parameter under an enabled LFO takes its value from the LFO", "[pre
 
         REQUIRE(drivenValue != 0);
 
-        std::vector<char> buffer(generousBuffer, '\0');
-        auto const written(savePreset(buffer, juce::File(), juce::String("lfo"), engine.program()));
-        REQUIRE(written > 0);
-        saved.assign(buffer.data(), written - 1);
+        saved = savePreset(juce::File(), juce::String("lfo"), engine.program());
+        REQUIRE_FALSE(saved.empty());
     }
 
     /// The value is in the file -- it is what is not applied.
+    ///
+    /// \note Read out of the document rather than searched for as a substring.
+    /// It was `saved.find( SWTest::number( drivenValue ) )`, which asked the file
+    /// to spell the number the way the *dump* spells it -- six significant
+    /// figures -- and 3.0 writes nine, so `-5.16` became `-5.15999985` and the
+    /// search stopped finding anything. Comparing the parsed value asks the
+    /// question the test means and survives the next change of precision too.
     INFO("saved preset:\n" << saved);
-    CHECK(saved.find(SWTest::number(drivenValue)) != std::string::npos);
+    CHECK(savedParameterValue(saved, "Gain") == Catch::Approx(drivenValue));
 
     Fixture reloaded;
     auto &engine(reloaded.engine());
@@ -424,4 +468,90 @@ TEST_CASE("A preset saved to a file loads back from it", "[preset-roundtrip]")
     CHECK(comment == "through a file");
 
     file.deleteFile();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// The committed 3.0 fixture
+// -------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+///   Everything above writes a preset and reads it back, so the writer and the
+/// reader agree by construction -- including if they are both wrong in the same
+/// direction. A change that renamed `<p>` to `<param>` on both sides would pass
+/// every one of them and orphan every file already saved.
+///
+///   So: a file, hand written, never regenerated, read by a test that does not
+/// run the writer at all. If this fails, the grammar moved.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("The committed 3.0 fixture loads without the writer's help", "[preset-roundtrip]")
+{
+    juce::File const fixtureFile(juce::String(SW_PRESET_SNAPSHOT_DIR) + "/format3.swp");
+    REQUIRE(fixtureFile.existsAsFile());
+
+    auto const contents(readPresetFile(fixtureFile));
+    REQUIRE(contents);
+
+    Fixture fixture;
+    auto &engine(fixture.engine());
+
+    juce::String comment;
+    SWTest::clearPresetProblems();
+    {
+        ScopedProblemCounter const counting;
+        REQUIRE(LE::SW::loadPreset(contents.get(), true, &comment, PresetConsumer{engine}));
+    }
+    CHECK(SWTest::presetProblems().total() == 0);
+    CHECK(comment.startsWith("A hand-written 3.0 fixture"));
+
+    /// \note The globals, read off the `<Global>` block. `MixPercentage` runs
+    /// 0..1, not 0..100 -- the name and the "%" unit are both about how it is
+    /// *displayed*. Worth stating because the fixture was written with 75 in it
+    /// first and this test is how that was found out.
+    auto const &globals(engine.program().parameters());
+    CHECK(globals.get<GlobalParameters::InputGain>().getValue() == Catch::Approx(0.5f));
+    CHECK(globals.get<GlobalParameters::OutputGain>().getValue() == Catch::Approx(1.25f));
+    CHECK(globals.get<GlobalParameters::MixPercentage>().getValue() == Catch::Approx(0.75f));
+
+    /// Two modules, in document order, named by their streaming names.
+    std::vector<std::string> effects;
+    std::vector<float> gains;
+    float strength{0};
+    bool lfoEnabled{false};
+    engine.program().moduleChain().forEach<ModuleParameters>([&](ModuleParameters const &module) {
+        effects.emplace_back(Effects::effectStreamingName(module.effectTypeIndex()));
+        gains.push_back(module.getBaseParameter(1 /*Gain*/));
+        if (module.numberOfParameters() > 7)
+        {
+            lfoEnabled |= module.lfo(5 - ModuleParameters::numberOfNonLFOBaseParameters).enabled();
+            strength = module.getEffectParameter(2 /*Strength*/);
+        }
+    });
+
+    REQUIRE(effects.size() == 2);
+    CHECK(effects[0] == "Pitch Shifter");
+    CHECK(effects[1] == "Ah-ah");
+    CHECK(gains[0] == Catch::Approx(-6.5f));
+
+    /// \note Ah-ah's Strength is 9999 in the fixture and its range is +/-24 dB,
+    /// so what comes back is the default. A value outside a parameter's range is
+    /// dropped silently -- not clamped, not reported, and not counted as a
+    /// missing parameter, because the file did name it. Pinned here because
+    /// nothing else drives that branch and because "silently" is the part worth
+    /// knowing.
+    CHECK(strength == Catch::Approx(0.0f));
+
+    /// \note The second module's Center carries a full LFO attribute set, in the
+    /// same seven attributes 2.x used and on the `<p>` element rather than
+    /// beside it. That the LFO comes back enabled is what says the writer's
+    /// change of element did not quietly cost the reader its settings.
+    CHECK(lfoEnabled);
+
+    /// \note And `<dawExtraState>` is in the fixture with an element inside it
+    /// that means nothing here. A preset reader installs no hook, so it must
+    /// walk straight past -- neither reading it nor treating it as a module.
+    CHECK(effects.size() == 2);
 }

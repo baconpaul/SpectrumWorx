@@ -58,9 +58,12 @@ Preset::InMemoryPreset readPresetFile(juce::File const &file)
         return {};
     }
 
+    /// \note 4096 was `InMemoryPresetBuffer`'s size and therefore the largest
+    /// preset that could be *written*; it is kept here, as a bare number and
+    /// only as a trace, because "larger than anything the 2016 build could have
+    /// produced" is still the interesting thing to say about a file.
     auto const presetSize(static_cast<unsigned int>(fileData.getSize()));
-    LE_TRACE_IF(presetSize > Preset::InMemoryPresetBuffer().size(),
-                "\tSW: suspiciously large preset.");
+    LE_TRACE_IF(presetSize > 4096, "\tSW: suspiciously large preset.");
 
     Preset::InMemoryPreset pInMemoryPreset(new (std::nothrow) char[presetSize + 1]);
     if (pInMemoryPreset)
@@ -109,13 +112,17 @@ void savePreset(juce::File const &file, juce::File const &externalSampleFile,
 {
     LE_ASSERT(file.getParentDirectory().isDirectory());
 
-    /// \note A preset that does not fit returns 0 and is reported rather than
-    /// written; it used to run off the end of this buffer, which the 2016
-    /// sources already record five TuneWorx modules doing.
-    Preset::InMemoryPresetBuffer buffer;
-    auto const presetSize(savePreset(buffer, externalSampleFile, comment, program));
+    /// \note No size limit any more, and so no "does not fit" to report. The
+    /// 4096-byte `InMemoryPresetBuffer` that used to stand here was breached by
+    /// five TuneWorx modules -- the 2016 sources say so -- and the writer builds
+    /// the whole document in a string of its own regardless, so the buffer never
+    /// bounded anything except what could be saved.
+    ///
+    /// \note The terminator is written to the file, because the 2016 writer put
+    /// one there and 193 of the 303 committed presets end in a NUL byte.
+    auto const preset(savePreset(externalSampleFile, comment, program));
 
-    if (!presetSize || !writePresetFile(file, buffer.data(), presetSize))
+    if (!writePresetFile(file, preset.c_str(), static_cast<unsigned int>(preset.size() + 1)))
         reportPresetProblem(PresetProblem::SaveFailed);
 }
 

@@ -6,9 +6,10 @@ is keyed, and what may and may not be renamed. Companion to
 [`week_two.md`](week_two.md) (the re-plan, item 4) and
 [`tech_debt.md`](tech_debt.md).
 
-Written 01.08.2026, as the work happened. Sections marked **⏳ planned** describe
-what has been decided and not yet built; everything else is in the tree and has
-tests naming it.
+Written 01–02.08.2026, as the work happened. Everything described here is in the
+tree and has tests naming it, with one exception, called out where it appears:
+`stateSave`/`stateLoad` do not use any of it yet — they still write the private
+binary blob item 4 exists to replace.
 
 ---
 
@@ -118,7 +119,8 @@ spirit for two of the four tuples; this finishes it.
 |---|---|---|
 | `tests/parameters/data/streamingNames.txt` | every string that reaches a file — 57 effects, their parameters, the globals, the LFO | a key changes. **Always a break.** |
 | `tests/parameters/data/parameterTable.txt` | display names, types, ranges, defaults, units, and the host-visible id space | a label changes, or a range does |
-| `tests/presets/data/presetCorpus.txt` | what all 303 factory presets load into | a preset loads differently |
+| `tests/presets/data/presetCorpus.txt` | what all 303 factory presets load into, by two routes: read directly, and read → rewritten as 3.0 → read again | a preset loads differently, or the translation into 3.0 loses something |
+| `tests/presets/data/format3.swp` | the 3.0 grammar itself — hand written, read by a test that never runs the writer | the grammar moves. A rename applied to writer *and* reader passes every round-trip test and orphans every file already saved; this is what does not pass. |
 
 `streamingNameTests.cpp` also asserts the mechanism itself rather than only its
 output: no streaming name is null or empty (the default is a null sentinel
@@ -141,10 +143,11 @@ process-global tempo state in `LFO::Timer`. See `tech_debt.md`, "Tests".
 
 ---
 
-## 4. The format ⏳ planned
+## 4. The format
 
-The keys are now stable, which is the precondition for the rest of item 4. What
-follows is decided and not yet built.
+Built 02.08.2026, on top of §1 — stable keys were the precondition. What is not
+yet built is what *uses* it: `stateSave`/`stateLoad` still write the private
+binary blob, and §4.4's payload is empty by design.
 
 ### 4.1 Version, and why not `Version`
 
@@ -163,20 +166,27 @@ SpectrumWorx" reads as itself.
 ### 4.2 The 3.0 grammar
 
 ```xml
-<SpectrumWorxPreset Format="3" Version="3.0.0" LastModified="…" Comment="" Name="Noosa">
-	<Global Sample="Carrier.mp3">
-		<p n="In" v="1"/>
-		<p n="FFT size" v="4096"/>
+<SpectrumWorxPreset Format="3" Version="3.0" LastModified="02.08.2026 12:00" Comment="">
+	<Global>
+		<p n="In" v="1" />
+		<p n="FFT size" v="4096" />
+		<p n="Sample" v="Carrier.mp3" />
 	</Global>
 	<Modules>
 		<Module effect="Ah-ah">
-			<p n="Bypass" v="0"/>
-			<p n="Center (LFO me!)" v="2000" T="685.6681" sync="0"/>
+			<p n="Bypass" v="0" />
+			<p n="Center (LFO me!)" v="2000" on="1" T="500" ph="0.25" sync="0" wfrm="0" />
 		</Module>
 	</Modules>
-	<dawExtraState/>
+	<dawExtraState />
 </SpectrumWorxPreset>
 ```
+
+The external sample is a `<p>` like everything else rather than an attribute on
+`<Global>`, which is where 2.x kept it and where the first sketch of this put it.
+It is not a parameter, but it is a global scalar keyed by name, and giving it the
+same shape means the reader needs no special case for it: `getSampleFileName()`
+goes through the same lookup as `In` and `FFT size`.
 
 Against 2.x:
 
@@ -205,6 +215,28 @@ strategy rather than growing a second class.
 
 The 303 factory presets **stay 2.x**. They are the only corpus of that grammar
 and the only thing keeping its reader honest.
+
+One thing the split touches that is not a grammar: `savePreset` and
+`Preset::saveTo` return a `std::string`. They wrote into a caller's
+`std::span<char>` and every shipping caller passed the same
+`std::array<char, 4096>` — which five TuneWorx modules breach, as the 2016
+sources record, so a preset that large simply could not be saved. The writer
+builds the whole document in a string of its own regardless, so the buffer
+bounded nothing except what was possible. Session state, which has no size to be
+limited to, is what made keeping it indefensible.
+
+Editing a preset's comment is deliberately *not* a rewrite: `saveDirtyComment()`
+reparses the file, moves the `Comment` attribute and prints back the document it
+read, so a 2.x preset stays 2.x. Changing a comment is not a reason to rewrite
+somebody's file into a grammar the plugin they had it from cannot open.
+
+### 4.4b Precision
+
+3.0 prints floats at nine significant figures — the shortest that round-trips
+every `float` — where 2.x wrote four *decimals* (`lexicalCast.cpp:63`). Four is
+ample for 6000 Hz and coarse for a normalised 0..1 frequency, where it is about
+fourteen bits. Reading is unaffected, since `strtof` takes whatever it is given,
+so no committed preset moves.
 
 ### 4.4 `dawExtraState`
 
