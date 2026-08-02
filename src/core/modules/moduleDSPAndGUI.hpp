@@ -14,11 +14,8 @@
 //------------------------------------------------------------------------------
 #include "automatedModuleImpl.hpp"
 
-#include "gui/modules/moduleUI.hpp"
-
 #include "le/spectrumworx/engine/module.hpp"
 #include "le/utility/cstdint.hpp"
-#include <optional>
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -27,42 +24,35 @@ namespace SW
 {
 //------------------------------------------------------------------------------
 
-namespace GUI
-{
-class SpectrumWorxEditor;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \class Module
 ///
+/// \note It held its own editor region -- a `std::optional<GUI::ModuleUI>`
+/// member, plus a `ParameterWidgetsVTable` base carrying a pair of function
+/// pointers to build and destroy that effect's widgets. So the engine's module
+/// class was a `juce::Component` container, `sw-dsp` linked `juce_gui_basics`,
+/// and every module the factory `malloc`ed carried the widget storage for its
+/// effect inline.
+///
+///   The region belongs to the editor now and holds a counted reference *to* the
+/// module -- the other way round -- so nothing here knows the interface exists.
+/// See gui/modules/moduleUI.hpp and doc/tech/correct_the_threading.md.
+///                                           (02.08.2026.) (SW port)
+///
 ////////////////////////////////////////////////////////////////////////////////
 
-class LE_NOVTABLE Module : public Engine::ModuleDSP,
-                           public AutomatedModuleImpl<Module>,
-                           private GUI::ParameterWidgetsVTable<Module>
+class LE_NOVTABLE Module : public Engine::ModuleDSP, public AutomatedModuleImpl<Module>
 {
-  public: // GUI
-    void createGUI(GUI::SpectrumWorxEditor &, std::uint8_t moduleIndex);
-    bool destroyGUI();
-
   public:
-    using OptionalUI = std::optional<GUI::ModuleUI>;
-
-    OptionalUI &gui() { return ui_; }
-    OptionalUI const &gui() const { return ui_; }
-
     float setParameterValueFromUI(std::uint8_t parameterIndex, float value);
-
-    static Module &fromGUI(GUI::ModuleUI &);
 
   public:
     template <class Effect> class Impl;
 
   protected:
     template <class Effect, typename... T>
-    Module(Impl<Effect> *const pImpl, T &&...args)
-        : ModuleDSP(std::forward<T>(args)...), GUI::ParameterWidgetsVTable<Module>(*pImpl)
+    Module(Impl<Effect> *, T &&...args) : ModuleDSP(std::forward<T>(args)...)
     {
     }
 
@@ -85,9 +75,6 @@ class LE_NOVTABLE Module : public Engine::ModuleDSP,
     /// engine two ABIs.
     ///                                       (02.08.2026.) (SW port)
     friend class AutomatedModuleImpl<Module>;
-
-  private:
-    OptionalUI ui_;
 }; // class Module
 
 //------------------------------------------------------------------------------

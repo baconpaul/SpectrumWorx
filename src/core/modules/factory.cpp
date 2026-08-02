@@ -16,6 +16,7 @@
 #include "core/modules/finalImplementations.hpp"
 
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
+#include "le/spectrumworx/presets.hpp" // reportPresetProblem()
 #include "le/spectrumworx/effects/configuration/indexToEffectImplMapping.hpp"
 #include "le/spectrumworx/effects/configuration/includedEffects.hpp"
 #include "le/spectrumworx/engine/moduleParameters.hpp"
@@ -39,22 +40,11 @@ namespace SW
 {
 //------------------------------------------------------------------------------
 
-namespace GUI
-{
-// Implementation note:
-//   The (PVD)PitchMagnet::Target parameter is so far the only parameter
-// that is not handled correctly by the simple ModuleKnob::QuantizationFor
-// logic (which detects quantized parameters simply by their units). It is a
-// Hertz parameter but its precision is not bound by the DFT engine
-// parameters ando so it does not need to be quantized accordingly.
-//                                        (13.12.2011.) (Domagoj Saric)
-/// \todo Think of a cleaner solution.
-///                                       (13.12.2011.) (Domagoj Saric)
-template <> struct ModuleKnob::QuantizationFor<Effects::Detail::PitchMagnetBase::Target>
-{
-    static ModuleKnob::Quantization const value = ModuleKnob::Fixed;
-};
-} // namespace GUI
+/// \note A `ModuleKnob::QuantizationFor` specialisation for
+/// `PitchMagnetBase::Target` stood here -- a statement about a *widget*, in the
+/// module factory, which is why this translation unit needed the widget headers.
+/// It is beside the widgets now, in gui/modules/moduleWidgets.cpp.
+///                                           (02.08.2026.) (SW port)
 
 namespace
 {
@@ -172,8 +162,14 @@ LE::Utility::IntrusivePtr<ModuleInterface> ModuleFactory::create(std::int8_t con
 #endif // LE_SW_FULL
     if (!moduleEnabled)
     {
-        GUI::warningMessageBox(MB_WARNING " effect not available in this edition.",
-                               Effects::effectName(effectIndex), false);
+        /// \note Was `GUI::warningMessageBox`, from a path a host's parameter
+        /// event reaches -- week_two.md §2.4 flags it as "a live branch that
+        /// raises a juce::AlertWindow from a path the audio thread can reach",
+        /// held off only by `includedEffects` being a constexpr table of all
+        /// `true`. It reports through the same counted reporter a preset uses,
+        /// which is in this layer and raises nothing.
+        ///                                   (02.08.2026.) (SW port)
+        reportPresetProblem(PresetProblem::EffectNotAvailable, Effects::effectName(effectIndex));
         return nullptr;
     }
 

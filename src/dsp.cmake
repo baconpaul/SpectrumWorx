@@ -184,13 +184,19 @@ target_link_libraries(sw-dsp PUBLIC sst-cpputils)
 # same file.
 target_link_libraries(sw-dsp PUBLIC sst-plugininfra)
 
-# The module class is SW::Module now, which embeds a GUI::ModuleUI, so the
-# headers reach JUCE and the skin. PUBLIC: they are in sw-dsp's own headers.
+# \note `target_link_libraries(sw-dsp PUBLIC juce::juce_gui_basics sw-gui-resources)`
+# stood here, because SW::Module embedded a GUI::ModuleUI and Module::Impl<Effect>
+# inherited that effect's widget storage -- so the engine's headers named JUCE
+# components and the factory had to know how big a rack of knobs is.
 #
-# \note The optional<ModuleUI> stays empty until createGUI(), and the per-effect
-# widget storage is raw until ModuleWidgets::create(), so a headless test still
-# constructs all 57 modules and processes audio without touching JUCE.
-target_link_libraries(sw-dsp PUBLIC juce::juce_gui_basics sw-gui-resources)
+#   Neither is true now: a module's strip belongs to the editor and holds a
+# counted reference to the module rather than the other way round, and which
+# effect's widgets to build is an index looked up in sw-gui. See
+# doc/tech/correct_the_threading.md.
+#
+#   juce_audio_formats is still below, for external_audio/sample.cpp, and
+# presets.{hpp,cpp} still carry a juce::String and a juce::File. Stage 7 is what
+# takes those, and with them the last of JUCE off this target.
 
 # The factory banks and the factory samples. PRIVATE: factoryPresets.cpp and
 # external_audio/sample.cpp are the only things that name cmrc, and neither

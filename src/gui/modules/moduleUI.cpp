@@ -318,13 +318,16 @@ void DiscreteParameter::focusChanged() { repaint(); }
 #pragma warning(push)
 #pragma warning(disable : 4355) // 'this' used in base member initializer list.
 
-ModuleUI::ModuleUI(SpectrumWorxEditor &editor)
-    : editor_(editor), bypass_(*this, resourceBitmap<ModuleMuted>(), resourceBitmap<ModuleOn>()),
+ModuleUI::ModuleUI(SpectrumWorxEditor &editor, LE::Utility::IntrusivePtr<SW::Module> pModule,
+                   std::uint8_t const slotIndex)
+    : editor_(editor), pModule_(std::move(pModule)),
+      bypass_(*this, resourceBitmap<ModuleMuted>(), resourceBitmap<ModuleOn>()),
       eject_(*this, resourceBitmap<Eject>(), resourceBitmap<Eject>(),
              juce::Colours::darkgrey.withAlpha(0.4f))
 {
     LE_ASSERT(isThisTheGUIThread() ||
               juce::MessageManager::getInstance()->currentThreadHasLockedMessageManager());
+    LE_ASSERT(pModule_);
 
     LE_ASSERT(resourceBitmap<ModuleBgSelected>().getWidth() ==
               resourceBitmap<ModuleBg>().getWidth());
@@ -359,7 +362,42 @@ ModuleUI::ModuleUI(SpectrumWorxEditor &editor)
     //);
 
     LE_ASSERT_MSG(unsigned(this->getNumChildComponents()) == baseWidgets,
+                  "Unexpected number of child widgets before the effect's own controls.");
+
+    ////////////////////////////////////////////////////////////////////////////
+    // The effect's own controls, and everything Module::createGUI() used to do
+    // after building them.
+    ////////////////////////////////////////////////////////////////////////////
+
+    /// \note Parented before the effect's controls are built, and invisible until
+    /// the caller shows it. Several of them walk `getParentComponent()` up to the
+    /// editor as they are constructed -- `SpectrumWorxEditor::fromChild()` -- and
+    /// a strip that is not in the hierarchy yet has nothing to walk. The old
+    /// createGUI() did the same thing with an `editor.addChildComponent()` under
+    /// `#ifndef NDEBUG`, for the same reason and only in a checked build.
+    ///                                       (02.08.2026.) (SW port)
+    editor_.addChildComponent(this);
+
+    pWidgets_ = createModuleWidgets(module().effectTypeIndex(), *this);
+    LE_ASSERT_MSG(pWidgets_ != nullptr, "No widgets for this effect index.");
+
+    LE_ASSERT_MSG(getNumChildComponents() ==
+                      (baseWidgets + module().numberOfEffectSpecificParameters()),
                   "Unexpected number of child widgets at end of ModuleUI constructor.");
+
+    updateForEngineSetupChanges(editor_.engineSetup());
+
+    /// \note A strip is never selected at the moment it is built, so its shared
+    /// parameter controls are not showing and do not need updating.
+    ///                                       (07.02.2014.) (Domagoj Saric)
+    LE_ASSERT(!selected());
+    setBypass(module().bypass());
+
+    auto const effectParameters(module().numberOfEffectSpecificParameters());
+    for (std::uint8_t parameter(0); parameter < effectParameters; ++parameter)
+        setEffectParameter(parameter, module().getEffectParameter(parameter), AutomationOrPreset);
+
+    moveToSlot(slotIndex);
 }
 
 #pragma warning(pop)
@@ -655,7 +693,11 @@ ModuleUI::effectSpecificParameterControl(std::uint8_t const parameterIndex) cons
     return const_cast<ModuleUI &>(*this).effectSpecificParameterControl(parameterIndex);
 }
 
-ModuleUI::Module &ModuleUI::module() { return Module::fromGUI(*this); }
+ModuleUI::Module &ModuleUI::module()
+{
+    LE_ASSUME(pModule_.get() != nullptr);
+    return *pModule_;
+}
 ModuleUI::Module const &ModuleUI::module() const { return const_cast<ModuleUI &>(*this).module(); }
 
 Utility::CriticalSectionLock ModuleUI::getProcessingLock() const

@@ -15,6 +15,9 @@
 //------------------------------------------------------------------------------
 #include "gui/gui.hpp"
 #include "gui/modules/moduleControl.hpp"
+#include "gui/modules/moduleWidgets.hpp"
+
+#include "le/utility/intrusivePtr.hpp"
 
 #include "le/math/conversion.hpp"
 #include "le/parameters/linear/parameter.hpp"
@@ -344,8 +347,14 @@ class ModuleUI final : public WidgetBase<>, private juce::Button::Listener
 
     typedef SW::Module Module;
 
+    /// \note Was `Module::fromGUI( *this )` -- pointer arithmetic from the
+    /// region back to the module that held it as a member. The region holds the
+    /// module now, the other way round.
     Module &module();
     Module const &module() const;
+
+    /// \brief Which slot this strip is drawn in, as last set by moveToSlot().
+    std::uint8_t slot() const { return slot_; }
 
     /// \note Was `static ModuleUI *selectedModule()` over a file-scope pointer,
     /// with a 2011 note arguing that a static was safe "even if there are multiple
@@ -358,16 +367,26 @@ class ModuleUI final : public WidgetBase<>, private juce::Button::Listener
     bool selected() const;
 
   public:
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief One module's strip: its controls, and where they are on screen.
+    ///
+    /// \note The module is held by *reference count*. A region has to outlive the
+    /// chain dropping the module -- a host can empty a slot from its own panel
+    /// while the window is open -- and the alternative was what used to be here:
+    /// the module owned the region as a member, so the module could not be
+    /// destroyed until the message thread had run `destroyGUI()`, which is why
+    /// `intrusive_ptr_release_deleter` posted a message from whichever thread
+    /// dropped the last reference. That thread can be the audio one.
+    ///
     /// \note The editor is held rather than recovered from the component
-    /// hierarchy. `editor()` used to walk `getParentComponent()`, which meant it
-    /// could only be asked once the region had been parented -- and
-    /// `Module::createGUI` pushes every parameter value into the widgets *before*
-    /// `addToParentAndShow`. That worked only because everything reached from
-    /// there went through process-wide statics instead of through the editor.
-    /// Those statics are the editor's members now, so the reference has to be
-    /// there from the first line of the constructor.
+    /// hierarchy: the constructor writes every parameter into the widgets before
+    /// the region is parented.
     ///                                       (02.08.2026.) (SW port)
-    explicit ModuleUI(SpectrumWorxEditor &);
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    ModuleUI(SpectrumWorxEditor &, LE::Utility::IntrusivePtr<SW::Module>, std::uint8_t slotIndex);
     ~ModuleUI();
 
     void setUpForEffect(char const *effectName, char const *effectDescription);
@@ -404,10 +423,20 @@ class ModuleUI final : public WidgetBase<>, private juce::Button::Listener
     /// constructor body and reach through it.
     SpectrumWorxEditor &editor_;
 
+    /// The module this strip is for, kept alive for as long as the strip is.
+    LE::Utility::IntrusivePtr<SW::Module> pModule_;
+
     BitmapButton bypass_;
     BitmapButton eject_;
 
+    /// \note After the two buttons: the effect's own controls are children added
+    /// in order, and `effectSpecificParameterControl()` indexes past `baseWidgets`
+    /// of them. Destroyed before them, which is what the declaration order gives.
+    std::unique_ptr<ModuleWidgets> pWidgets_;
+
     juce::String description_;
+
+    std::uint8_t slot_{0};
 
   public:
     static std::uint8_t const horizontalOffset = 213;
@@ -652,46 +681,15 @@ template <> class ParameterWidgets<Effects::Detail::EmptyParameters>
     static void destroy() {}
 }; // class ParameterWidgets<EmptyParameters>
 
-template <class Interface> struct ParameterWidgetsVTable
-{
-    template <class Implementation>
-    ParameterWidgetsVTable(Implementation const &)
-        :
-#ifndef _MSC_VER //...mrmlj...msvc(12) compilation error bug...
-          doCreateGUI([](ModuleUI &uiBase) {
-              LE::Utility::polymorphicDowncast<Implementation *>(&uiBase.module())->create(uiBase);
-          }),
-          doDestroyGUI([](ModuleUI::Module &base) {
-              LE::Utility::polymorphicDowncast<Implementation *>(&base)->destroy();
-          })
-#else
-          doCreateGUI(&createGUI<Implementation>), doDestroyGUI(&destroyGUI<Implementation>)
-#endif // _MSC_VER
-    {
-    }
-
-    /// \note Both of these once carried a calling convention -- __fastcall for
-    /// GNU, whatever LE_MSVC_SPECIFIC held for MSVC -- and both were emptied out,
-    /// the GNU one to a comment and the MSVC one to `LE_MSVC_SPECIFIC()` with no
-    /// argument at all. That is a function-like macro invoked with nothing, which
-    /// MSVC warns about (C4003) once per declaration and every other compiler
-    /// expands to the same nothing. Said plainly instead.
-    ///                                       (30.07.2026.) (SW port)
-    void (*const doCreateGUI)(ModuleUI &);
-    void (*const doDestroyGUI)(ModuleUI::Module &) /*noexcept*/;
-
-#ifdef _MSC_VER
-  private:
-    template <class Implementation> static void createGUI(ModuleUI &uiBase)
-    {
-        LE::Utility::polymorphicDowncast<Implementation *>(&uiBase.module())->create(uiBase);
-    }
-    template <class Implementation> static void destroyGUI(ModuleUI::Module &base)
-    {
-        LE::Utility::polymorphicDowncast<Implementation *>(&base)->destroy();
-    }
-#endif
-}; // struct ParameterWidgetsVTable
+/// \note `template <class Interface> struct ParameterWidgetsVTable` stood here:
+/// a pair of function pointers, planted in every module at construction, that
+/// built and destroyed that effect's widgets. It existed because the *module*
+/// owned the widgets, so the only place that knew which effect's storage it was
+/// holding was the module itself.
+///
+///   The region owns them now and picks the instantiation by effect index --
+/// moduleWidgets.hpp -- so there is nothing left to plant.
+///                                           (02.08.2026.) (SW port)
 
 //------------------------------------------------------------------------------
 } // namespace GUI

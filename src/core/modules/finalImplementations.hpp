@@ -20,6 +20,7 @@
 #include "le/parameters/parametersUtilities.hpp"
 #include "le/parameters/parametersUtilities.hpp"
 #include "le/spectrumworx/effects/effects.hpp"
+#include "core/modules/moduleDSPAndGUI.hpp"
 #include "le/spectrumworx/engine/moduleImpl.hpp"
 #include "le/spectrumworx/engine/moduleParameters.hpp"
 #include "le/utility/cstdint.hpp"
@@ -34,49 +35,13 @@ namespace SW
 {
 //------------------------------------------------------------------------------
 
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \class ModuleWidgets
-///
-////////////////////////////////////////////////////////////////////////////////
-
-template <class Effect> class LE_NOVTABLE ModuleWidgets
-{
-  public: // Module GUI interface implementation.
-    void create(GUI::ModuleUI &uiBase)
-    {
-        /// \note There used to be an LE_ASSERT( !uiBase.module().gui() ) here.
-        /// It held while the UI was a Boost.Optional built through a typed
-        /// in-place factory, whose apply() ran this before the optional marked
-        /// itself as initialised. std::optional::emplace() engages first, so by
-        /// the time this runs the optional is always non-empty -- the assertion
-        /// had become unconditionally false and fired on the first module ever
-        /// created. See Module::createGUI's note on the same change; the sibling
-        /// assertion in destroy() below was commented out long before, for what
-        /// looks like the same reason.
-        ///
-        ///   Nothing is lost: what it meant to check -- that this module does not
-        /// already have a finished UI -- is LE_ASSERT( !ui_ ) in
-        /// Module::createGUI, immediately before the emplace, which is the only
-        /// place that can still say it meaningfully.
-        ///                                   (29.07.2026.) (SW port)
-        uiBase.setUpForEffect(Effect::title, Effect::description);
-        parameterWidgets_.construct(uiBase);
-    }
-
-    void destroy()
-    {
-        //LE_ASSERT( !uiBase.module().gui() );
-        parameterWidgets_.destroy();
-    }
-
-  private:
-    using Parameters = typename Effect::Parameters;
-    using ParameterWidgets = GUI::ParameterWidgets<Parameters>;
-
-  private:
-    ParameterWidgets parameterWidgets_;
-}; // class ModuleWidgets
+/// \note `template <class Effect> class ModuleWidgets` stood here, and
+/// `Module::Impl<Effect>` inherited it -- so every module the factory allocated
+/// carried the JUCE widget storage for its effect inline, and `sw-dsp` needed
+/// `juce_gui_basics` to know how big that was. It is
+/// `GUI::WidgetsFor<Effect>` in gui/modules/moduleWidgets.cpp now, owned by the
+/// region that draws it and chosen by effect index rather than by type.
+///                                           (02.08.2026.) (SW port)
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -84,9 +49,7 @@ template <class Effect> class LE_NOVTABLE ModuleWidgets
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-template <class Effect>
-class Module::Impl final : public Engine::ModuleEffectImpl<Effect, Module>,
-                           public ModuleWidgets<Effect>
+template <class Effect> class Module::Impl final : public Engine::ModuleEffectImpl<Effect, Module>
 {
   public:
     template <typename EffectTypeIndex>

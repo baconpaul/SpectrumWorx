@@ -719,8 +719,10 @@ void SpectrumWorxEditor::moveModules(ModuleUI &targetSlotUI, std::uint8_t number
     {
         pMovedModule = &Engine::actualModule<Module>(*(Engine::node(*pMovedModule).*pNextPtr));
         LE_ASSUME(pMovedModule); //...msvc...
-        auto &gui(*pMovedModule->gui());
-        gui.setTopLeftPosition(gui.getX() + offset, ModuleUI::verticalOffset);
+        auto *const pRegion(regionFor(*pMovedModule));
+        LE_ASSERT(pRegion);
+        if (pRegion)
+            pRegion->setTopLeftPosition(pRegion->getX() + offset, ModuleUI::verticalOffset);
     }
 }
 
@@ -782,9 +784,10 @@ void SpectrumWorxEditor::addUserAddedModule(std::uint8_t const effectIndex)
         /// createGUI() threw, which it swallows in a release build. This used to
         /// be an unconditional `gui()->`, which on an empty optional is undefined
         /// behaviour rather than a missing knob.
-        LE_ASSERT(result.first->gui());
-        if (result.first->gui())
-            result.first->gui()->grabKeyboardFocus();
+        auto *const pRegion(regionFor(*result.first));
+        LE_ASSERT(pRegion);
+        if (pRegion)
+            pRegion->grabKeyboardFocus();
         host().gestureBegin("Add module");
         host().moduleChangedByUser(changedSlot, result.first.get());
         host().gestureEnd();
@@ -1022,13 +1025,19 @@ void SpectrumWorxEditor::createChainGUIs(AutomatedModuleChain &chain)
 {
     // http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2012/n3424.pdf
     std::uint8_t moduleIndex(0);
-    chain.forEach<Module>([&](Module &module) mutable { module.createGUI(*this, moduleIndex++); });
+    chain.forEach<Module>([&](Module &module) mutable {
+        createModuleRegion(LE::Utility::IntrusivePtr<Module>(&module), moduleIndex++);
+    });
     setLastModulePosition(moduleIndex);
 }
 
-void SpectrumWorxEditor::destroyChainGUIs(AutomatedModuleChain &chain)
+void SpectrumWorxEditor::destroyChainGUIs(AutomatedModuleChain &)
 {
-    chain.forEach<Module>([](Module &module) { module.destroyGUI(); });
+    /// \note Everything, whatever the chain holds. This walked the chain and
+    /// asked each module to destroy the strip it owned; the strips are here now,
+    /// and dropping one drops its reference to its module.
+    for (auto &pRegion : moduleRegions_)
+        pRegion.reset();
     setLastModulePosition(0);
 }
 
@@ -1129,10 +1138,11 @@ void SpectrumWorxEditor::updateForEngineSetupChanges()
     moduleChain().forEach<Module>([&](Module &module) {
 #ifndef LE_SW_FMOD
         //...mrmlj...when switching programs...
-        LE_ASSERT(module.gui());
-        if (module.gui())
+        auto *const pRegion(regionFor(module));
+        LE_ASSERT(pRegion);
+        if (pRegion)
 #endif // LE_SW_FMOD
-            module.gui()->updateForEngineSetupChanges(engineSetup);
+            pRegion->updateForEngineSetupChanges(engineSetup);
     });
 }
 
@@ -1181,20 +1191,86 @@ void SpectrumWorxEditor::updateLFO(ModuleUI const &moduleUI, std::uint8_t const 
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace
+////////////////////////////////////////////////////////////////////////////////
+// The module strips
+////////////////////////////////////////////////////////////////////////////////
+
+ModuleUI *SpectrumWorxEditor::regionFor(Module const &module)
 {
-/// \brief The module region for \p slot, or null if that slot has none.
-///
-/// \note Through the chain and `Module::gui()`, which is the bridge until the
-/// widgets stop living inside the module. See doc/tech/correct_the_threading.md.
-ModuleUI *regionForSlot(AutomatedModuleChain &chain, std::uint8_t const slot)
-{
-    auto const pModule(chain.moduleAs<SW::Module>(slot));
-    if (!pModule || !pModule->gui())
-        return nullptr;
-    return &*pModule->gui();
+    for (auto &pRegion : moduleRegions_)
+        if (pRegion && (&pRegion->module() == &module))
+            return pRegion.get();
+    return nullptr;
 }
-} // anonymous namespace
+
+ModuleUI *SpectrumWorxEditor::regionInSlot(std::uint8_t const slotIndex)
+{
+    auto const pModule(moduleChain().moduleAs<Module>(slotIndex));
+    return pModule ? regionFor(*pModule) : nullptr;
+}
+
+void SpectrumWorxEditor::createModuleRegion(LE::Utility::IntrusivePtr<Module> const &pModule,
+                                            std::uint8_t const slotIndex)
+{
+    LE_ASSERT(isThisTheGUIThread());
+    LE_ASSERT(pModule);
+
+    /// \note A module that already has a strip keeps it and moves; only a newly
+    /// created one needs building. Both cases matter: a slot can be refilled with
+    /// the same effect, and strips shift left when one ahead of them is removed.
+    if (auto *const pExisting = regionFor(*pModule))
+    {
+        pExisting->moveToSlot(slotIndex);
+        return;
+    }
+
+    /// \note Any strip whose module has already left the chain goes first, so a
+    /// rack that is full of stale strips still has a slot to build into.
+    dropOrphanedRegions();
+
+    for (auto &pRegion : moduleRegions_)
+    {
+        if (pRegion)
+            continue;
+
+        try
+        {
+            pRegion = std::make_unique<ModuleUI>(*this, pModule, slotIndex);
+        }
+        catch (...)
+        {
+            /// \note Swallowed, because this can run while a preset is being
+            /// applied and a strip that failed to build is not worth taking the
+            /// host down for. A checked build stops here, because a slot with no
+            /// strip is invisible in exactly the way that wastes an afternoon.
+            ///                               (29.07.2026.) (SW port)
+            LE_ASSERT_MSG(false, "Module region construction threw; the slot has no strip.");
+            return;
+        }
+        addToParentAndShow(*this, *pRegion);
+        return;
+    }
+
+    LE_ASSERT_MSG(false, "No free module region; the rack and the chain disagree.");
+}
+
+void SpectrumWorxEditor::dropOrphanedRegions()
+{
+    LE_ASSERT(isThisTheGUIThread());
+
+    auto &chain(moduleChain());
+    for (auto &pRegion : moduleRegions_)
+    {
+        if (!pRegion)
+            continue;
+
+        bool stillChained(false);
+        chain.forEach<Module>(
+            [&](Module const &module) { stillChained |= (&module == &pRegion->module()); });
+        if (!stillChained)
+            pRegion.reset();
+    }
+}
 
 void SpectrumWorxEditor::parameterChangedElsewhere(ParameterID const parameterID, float const value)
 {
@@ -1203,14 +1279,13 @@ void SpectrumWorxEditor::parameterChangedElsewhere(ParameterID const parameterID
     switch (parameterID.type())
     {
     case ParameterID::ModuleParameter:
-        if (auto *const pRegion =
-                regionForSlot(moduleChain(), parameterID.value._.module.moduleIndex))
+        if (auto *const pRegion = regionInSlot(parameterID.value._.module.moduleIndex))
             pRegion->setParameter(parameterID.value._.module.moduleParameterIndex, value,
                                   ModuleUI::AutomationOrPreset);
         return;
 
     case ParameterID::LFOParameter:
-        if (auto *const pRegion = regionForSlot(moduleChain(), parameterID.value._.lfo.moduleIndex))
+        if (auto *const pRegion = regionInSlot(parameterID.value._.lfo.moduleIndex))
             updateLFO(*pRegion, parameterID.value._.lfo.moduleParameterIndex,
                       parameterID.value._.lfo.lfoParameterIndex, value);
         return;
@@ -1238,12 +1313,11 @@ void SpectrumWorxEditor::timerCallback()
 {
     LE_ASSERT(isThisTheGUIThread());
 
-    auto &chain(moduleChain());
     editorHost().modulatedValues().forEachChanged([&](std::size_t const index, float const value) {
         ParameterID const parameterID{Plugins::ParameterIndex{static_cast<std::uint16_t>(index)}};
         if (parameterID.type() != ParameterID::ModuleParameter)
             return;
-        if (auto *const pRegion = regionForSlot(chain, parameterID.value._.module.moduleIndex))
+        if (auto *const pRegion = regionInSlot(parameterID.value._.module.moduleIndex))
             pRegion->setParameter(parameterID.value._.module.moduleParameterIndex, value,
                                   ModuleUI::LFOValue);
     });

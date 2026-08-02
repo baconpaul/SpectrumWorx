@@ -32,110 +32,19 @@ namespace SW
 //   This is required to prevent Clang from inlining the base destructor into
 // each ModuleDSP<> destructor.
 //                                            (13.12.2011.) (Domagoj Saric)
-LE_NOINLINE LE_COLD Module::~Module() { LE_ASSUME(!ui_.has_value()); }
+LE_NOINLINE LE_COLD Module::~Module() {}
 
-void Module::createGUI(GUI::SpectrumWorxEditor &editor, std::uint8_t const moduleIndex)
-{
-    /// \note This used to be a Boost.Optional typed in-place factory, whose
-    /// apply() ran the widget construction below before the optional marked
-    /// itself as initialised. std::optional::emplace() engages first, so a
-    /// re-entrant gui() during doCreateGUI() now sees a half built ModuleUI
-    /// where it used to see an empty optional.
-    ///                                       (28.07.2026.) (SW port)
-    auto const constructModuleUI([&](GUI::ModuleUI &moduleUI) {
-        moduleUI.module().doCreateGUI(moduleUI);
-        LE_ASSERT_MSG(
-            moduleUI.getNumChildComponents() ==
-                (GUI::ModuleUI::baseWidgets + moduleUI.module().numberOfEffectSpecificParameters()),
-            "Unexpected number of child widgets at end of ModuleUI constructor.");
-        moduleUI.updateForEngineSetupChanges(editor.engineSetup());
-    });
-
-    if (!GUI::isThisTheGUIThread())
-    {
-        LE::Utility::IntrusivePtr<Module> pModule(this);
-        GUI::postMessage([=, &editor]() { pModule->createGUI(editor, moduleIndex); });
-        return;
-    }
-
-    try
-    {
-        LE_ASSERT(GUI::isThisTheGUIThread() ||
-                  juce::MessageManager::getInstance()->currentThreadHasLockedMessageManager());
-        LE_ASSERT(!ui_);
-        constructModuleUI(ui_.emplace(editor));
-        LE_ASSERT(gui());
-
-#ifndef NDEBUG
-        /// \note Certain debug-only sanity checks may require early access to
-        /// the editor (e.g. for access to the Engine::Setup instance).
-        ///                                   (28.03.2014.) (Domagoj Saric)
-        editor.addChildComponent(&*gui());
-#endif // nDEBUG
-
-        /// \note It is assumed that right upon (GUI) creation a module is not
-        /// selected and that therefor its shared parameters UI is not active
-        /// and does not need to be updated.
-        ///                                   (07.02.2014.) (Domagoj Saric)
-        LE_ASSERT(!gui()->selected());
-        gui()->setBypass(bypass());
-
-        using GUI::ModuleControlBase;
-        std::uint8_t const numberOfEffectParameters(numberOfEffectSpecificParameters());
-        for (std::uint8_t effectParameterIndex(0); effectParameterIndex < numberOfEffectParameters;
-             ++effectParameterIndex)
-            gui()->setEffectParameter(effectParameterIndex,
-                                      getEffectParameter(effectParameterIndex),
-                                      GUI::ModuleUI::AutomationOrPreset);
-
-        gui()->moveToSlot(moduleIndex);
-        GUI::addToParentAndShow(editor, *gui());
-    }
-    catch (...)
-    {
-        /// \note Swallowed, because this can run while the host is delivering a
-        /// parameter event and a widget that failed to build is not worth taking
-        /// the host down for. But it leaves the slot without its UI region and
-        /// nothing else says so -- which is invisible in exactly the way that
-        /// wastes an afternoon -- so a checked build stops here.
-        ///                                   (29.07.2026.) (SW port)
-        LE_ASSERT_MSG(false, "Module GUI creation threw; the slot has no UI region.");
-    }
-}
-
-bool Module::destroyGUI()
-{
-    // Implementation note:
-    //   The current module has to be removed from the processing chain before
-    // its GUI is destroyed or added after its GUI is created to prevent the
-    // processing thread from accessing the, possibly partially
-    // destroyed/created, GUI in the ModuleDSP<>::doPreProcess() member
-    // function.
-    //                                        (18.11.2011.) (Domagoj Saric)
-    if (GUI::isThisTheGUIThread() /*&& referenceCount_ == 1*/)
-    {
-        LE_ASSERT(juce::MessageManager::getInstance()->currentThreadHasLockedMessageManager());
-        LE_ASSERT(
-            gui()); //...might not be true if not part of the "active chain"...checked outside for now...
-        /// \note Make sure the module is not 'used' from the processing thread
-        /// (possibly updating its GUI from active LFOs).
-        ///                                       (18.03.2014.) (Domagoj Saric)
-        auto const processingLock(gui()->getProcessingLock());
-        gui() = std::nullopt;
-        doDestroyGUI(*this);
-        return true;
-    }
-    else if (gui())
-    {
-        GUI::postMessage(*this, [](GUI::ModuleUI &gui) {
-            LE_VERIFY(gui.module()./*...mrmlj...*/ destroyGUI());
-            return true;
-        });
-        return false;
-    }
-    // Not created or already destroyed
-    return true;
-}
+/// \note `createGUI()` and `destroyGUI()` stood here, ~100 lines of building a
+/// module's editor region into a member of the module and taking it down again.
+/// Both had to cope with being called from the wrong thread -- `createGUI` posted
+/// itself to the message thread when it was not on it, and `destroyGUI` took the
+/// *processing lock* on the message thread so that the audio thread could not be
+/// halfway through the module while its widgets were freed.
+///
+///   Neither is needed. The editor owns the region and builds it in the region's
+/// own constructor, on the thread that owns widgets, and the region holds a
+/// counted reference to the module so the module cannot go while it is drawn.
+///                                           (02.08.2026.) (SW port)
 
 float Module::setParameterValueFromUI(std::uint8_t const parameterIndex, float const value)
 {
@@ -146,25 +55,24 @@ float Module::setParameterValueFromUI(std::uint8_t const parameterIndex, float c
                : ModuleDSP::setEffectParameter(effectSpecificParameterIndex(parameterIndex), value);
 }
 
-Module &Module::fromGUI(GUI::ModuleUI &gui)
-{
-    return Utility::ParentFromOptionalMember<Module, GUI::ModuleUI, &Module::ui_, false>()(gui);
-}
-
 namespace Engine
 {
+/// \note This used to ask the module whether it still had an editor region, and
+/// destroy it first -- which, when the reference that reached zero was the *audio
+/// thread's*, meant `destroyGUI()` allocating a message and posting it to the
+/// message queue from inside the audio callback. The chain deliberately holds a
+/// reference per node while it walks it (moduleChainImpl.hpp), so that is not a
+/// hypothetical: removing a module mid-block is exactly when it happened.
+///
+///   A region holds a counted reference of its own now, so a module with one
+/// drawn simply does not reach zero, and by the time it does there is nothing to
+/// take down.
+///                                           (02.08.2026.) (SW port)
 void LE_NOINLINE intrusive_ptr_release_deleter(ModuleNode const *LE_RESTRICT const pModuleNode)
 {
     auto const &module(actualModule<Module>(*pModuleNode));
-    if (!module.gui() || const_cast<Module &>(module).destroyGUI())
-    {
-        LE_ASSUME(module.referenceCount_ == 0);
-        ModuleFactory::destroy(module);
-    }
-    else
-    {
-        LE_ASSUME(module.referenceCount_ == 1);
-    }
+    LE_ASSUME(module.referenceCount_ == 0);
+    ModuleFactory::destroy(module);
 }
 } // namespace Engine
 

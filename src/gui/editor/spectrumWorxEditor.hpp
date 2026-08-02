@@ -281,6 +281,35 @@ class SpectrumWorxEditor final : private SkinLifetime,
     void createChainGUIs(AutomatedModuleChain &);
     void destroyChainGUIs(AutomatedModuleChain &);
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The module strips, which this editor owns.
+    ///
+    ///   A module used to own its own strip -- a `std::optional<GUI::ModuleUI>`
+    /// member -- which is why the engine's module class was a JUCE component
+    /// container and why destroying a module had to be able to happen on the
+    /// message thread. The ownership is the other way round now: a strip holds a
+    /// counted reference to its module, so the module cannot be destroyed while
+    /// it is on screen, and no thread but this one ever touches a widget.
+    ///
+    /// \note Found by module rather than by slot. There are at most five, the
+    /// search is a pointer comparison, and the alternative -- an array indexed by
+    /// slot -- has to be reordered every time a module is dragged or removed,
+    /// which is exactly the bookkeeping that used to go wrong.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    /// \brief Builds \p module's strip at \p slotIndex, or moves the one it
+    /// already has. Called by EditorModuleInitialiser as a slot is filled.
+    void createModuleRegion(LE::Utility::IntrusivePtr<Module> const &, std::uint8_t slotIndex);
+
+    ModuleUI *regionFor(Module const &);
+    ModuleUI *regionInSlot(std::uint8_t slotIndex);
+
+    /// \brief Drops any strip whose module has left the chain.
+    void dropOrphanedRegions();
+
     void moduleRemoved() { setLastModulePosition(nextAvailableModuleSlot_ - 1); }
     void moduleAdded() { setLastModulePosition(nextAvailableModuleSlot_ + 1); }
 
@@ -778,6 +807,9 @@ class SpectrumWorxEditor final : private SkinLifetime,
     std::optional<PresetBrowser> presetBrowser_;
 #endif // !LE_NO_PRESETS
     std::optional<Settings> settings_;
+
+    /// \note Deliberately not indexed by slot; see createModuleRegion().
+    std::array<std::unique_ptr<ModuleUI>, SW::Constants::maxNumberOfModules> moduleRegions_;
 
     mutable bool holdSharedModuleControls_;
     mutable bool holdLFODisplay_;

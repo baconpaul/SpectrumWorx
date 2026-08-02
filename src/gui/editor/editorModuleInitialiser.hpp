@@ -13,8 +13,10 @@
 //------------------------------------------------------------------------------
 #include "core/modules/moduleDSPAndGUI.hpp"
 #include "core/spectrumWorxCore.hpp"
+#include "gui/editor/spectrumWorxEditor.hpp"
 
 #include "le/utility/cstdint.hpp"
+#include "le/utility/intrusivePtr.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -64,15 +66,10 @@ struct EditorModuleInitialiser
         if (!pEditor)
             return true;
 
-        /// \note A module that already has a region keeps it and moves; only a
-        /// newly created one needs building. Both cases matter: a slot can be
-        /// refilled with the same effect, and modules shift left when one ahead
-        /// of them is removed.
-        if (module.gui())
-            module.gui()->moveToSlot(moduleIndex);
-        else
-            module.createGUI(*pEditor, moduleIndex);
-
+        /// \note The editor decides whether that means building a strip or moving
+        /// one it already has; see SpectrumWorxEditor::createModuleRegion(). This
+        /// used to reach into the module for the strip it owned.
+        pEditor->createModuleRegion(LE::Utility::IntrusivePtr<Module>(&module), moduleIndex);
         return true;
     }
 

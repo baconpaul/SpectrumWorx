@@ -72,6 +72,7 @@ add_library(sw-gui STATIC
         ${CMAKE_CURRENT_SOURCE_DIR}/core/modules/moduleDSPAndGUI.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/modules/moduleControl.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/modules/moduleUI.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/gui/modules/moduleWidgets.cpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/editor/auxiliaryComponents.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/editor/moduleMenuHolder.cpp
