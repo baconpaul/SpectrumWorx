@@ -315,6 +315,16 @@ class SpectrumWorxEditor final : private SkinLifetime,
     /// for why it cannot be immediate.
     void refreshModuleRegionsAsync();
 
+    /// \brief Lets go of a strip's controls before it is destroyed, so that
+    /// JUCE's focus handling cannot re-enter through a control that is going.
+    void detachFrom(ModuleUI &);
+
+  private:
+    /// \brief Disables the LFO display and posts its destruction. Shared by
+    /// moduleControlDectivated() and detachFrom().
+    void retireLFODisplay();
+
+  public:
     /// \note Both resync the rack afterwards, because both are reached from the
     /// host's side as well as from this editor's -- `updateGUIForChangedModule`
     /// in host2PluginImpl.inl calls them when a *host* fills or empties a slot,

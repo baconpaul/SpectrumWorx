@@ -263,6 +263,14 @@ TEST_CASE("Adding and removing modules keeps the rack and the chain in step", "[
     CHECK(chain.size() == 0);
     CHECK(editor.regionInSlot(0) == nullptr);
 
+    /// \note No control of a dropped strip is left as the active one. Destroying
+    /// a strip makes JUCE move the focus and deliver the loss to whichever
+    /// control had it, which re-enters the editor -- see
+    /// SpectrumWorxEditor::detachFrom(). Offscreen JUCE refuses keyboard focus
+    /// (`juce_Component.cpp:2752`), so this checks the state that re-entrancy
+    /// needs rather than the re-entrancy itself.
+    CHECK(editor.activeControl() == nullptr);
+
     instance.closeEditor();
 }
 

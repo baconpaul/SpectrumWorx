@@ -998,32 +998,73 @@ void SpectrumWorxEditor::moduleControlDectivated(ModuleControlBase const &contro
     setActiveControlName(selectedModule() ? selectedModule()->description() : juce::String());
     setActiveControlValue(juce::String());
 
-    if (lfoDisplay_)
-    {
-        /// \note See the note in the moduleDeactivated() member function.
-        ///                                   (17.01.2012.) (Domagoj Saric)
-        setDefaultFocusHandling();
-        lfoDisplay_->setEnabled(false);
-        /// \note We defer LFODisplay destruction so that we can avoid the
-        /// destruction+recreation in case the user is actually only switching
-        /// between controls.
-        ///                                   (02.09.2013.) (Domagoj Saric)
-        postMessageToComponent(*this, [](GUI::SpectrumWorxEditor &editor) {
-            auto &lfoDisplay(editor.lfoDisplay_);
-            if (lfoDisplay && !lfoDisplay->isEnabled())
-            {
-                if (static_cast<bool const volatile &>(editor.holdLFODisplay_))
-                    return false;
-                else
-                    lfoDisplay = std::nullopt;
-                LE_ASSERT(editor.getWantsKeyboardFocus());
-                LE_ASSERT(editor.getMouseClickGrabsKeyboardFocus());
-            }
-            return true;
-        });
-    }
+    retireLFODisplay();
 
     host().automatedParameterEndEdit(moduleControlID(control));
+}
+
+void SpectrumWorxEditor::retireLFODisplay()
+{
+    if (!lfoDisplay_)
+        return;
+
+    /// \note See the note in the moduleDeactivated() member function.
+    ///                                       (17.01.2012.) (Domagoj Saric)
+    setDefaultFocusHandling();
+    lfoDisplay_->setEnabled(false);
+    /// \note We defer LFODisplay destruction so that we can avoid the
+    /// destruction+recreation in case the user is actually only switching
+    /// between controls.
+    ///                                       (02.09.2013.) (Domagoj Saric)
+    postMessageToComponent(*this, [](GUI::SpectrumWorxEditor &editor) {
+        auto &lfoDisplay(editor.lfoDisplay_);
+        if (lfoDisplay && !lfoDisplay->isEnabled())
+        {
+            if (static_cast<bool const volatile &>(editor.holdLFODisplay_))
+                return false;
+            else
+                lfoDisplay = std::nullopt;
+            LE_ASSERT(editor.getWantsKeyboardFocus());
+            LE_ASSERT(editor.getMouseClickGrabsKeyboardFocus());
+        }
+        return true;
+    });
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Lets go of \p region's controls before it is destroyed.
+///
+///   Destroying a strip makes JUCE move the keyboard focus, which reaches
+/// `ModuleControlImpl::focusLost` -> `reportInactiveControl()` on whichever
+/// control had it -- and that calls `moduleControlDectivated()`, which asserts
+/// that the LFO display for that control is still there.
+///
+/// \note This is the general form of a workaround the 2016 code carried in
+/// `ModuleUI::buttonClicked`, deactivating the active control by hand before
+/// removing the module, with an "...investigate why this doesn't work when
+/// placed inside the ModuleUI destructor..." beside it. It worked because the
+/// whole eject happened inside one message callback, so the *deferred* LFO
+/// display destruction could not run in between. Dropping a strip is its own
+/// posted message now, so it can and does.
+///
+/// \note Deliberately **not** `moduleControlDectivated()`: that ends the host's
+/// automation gesture, and `moduleControlID()` walks the chain for the control's
+/// module -- which by the time a strip is dropped has left it. The gesture is
+/// ended on the path that removes the module, where the module is still there.
+///                                           (02.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxEditor::detachFrom(ModuleUI &region)
+{
+    LE_ASSERT(isThisTheGUIThread());
+
+    if (!pActiveControl_ || (&pActiveControl_->moduleUI() != &region))
+        return;
+
+    retireLFODisplay();
+    pActiveControl_ = nullptr;
 }
 
 void SpectrumWorxEditor::mainKnobDragStarted(std::uint8_t const index) const
@@ -1085,7 +1126,12 @@ void SpectrumWorxEditor::destroyChainGUIs(AutomatedModuleChain &)
     /// asked each module to destroy the strip it owned; the strips are here now,
     /// and dropping one drops its reference to its module.
     for (auto &pRegion : moduleRegions_)
+    {
+        if (!pRegion)
+            continue;
+        detachFrom(*pRegion);
         pRegion.reset();
+    }
     setLastModulePosition(0);
 }
 
@@ -1315,8 +1361,14 @@ void SpectrumWorxEditor::dropOrphanedRegions()
         bool stillChained(false);
         chain.forEach<Module>(
             [&](Module const &module) { stillChained |= (&module == &pRegion->module()); });
-        if (!stillChained)
-            pRegion.reset();
+        if (stillChained)
+            continue;
+
+        /// \note Before the reset, never after: destroying a strip moves the
+        /// keyboard focus, and JUCE delivers that to whichever control had it.
+        /// See detachFrom().
+        detachFrom(*pRegion);
+        pRegion.reset();
     }
 
     /// \note And put what is left where the chain says it goes, so the rack is a

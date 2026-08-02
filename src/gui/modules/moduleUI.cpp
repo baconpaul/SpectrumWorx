@@ -642,6 +642,15 @@ void ModuleUI::buttonClicked(juce::Button *LE_RESTRICT const pButton)
     {
         LE_ASSERT(pButton == &eject_);
         //...mrmlj...investigate why this doesn't work when placed inside the ModuleUI destructor...
+        /// \note Answered, and it is still true: JUCE moves the focus when a
+        /// strip is destroyed and delivers the loss to whichever control had it,
+        /// which re-enters the editor through a control that is going. What has
+        /// changed is that the strip is no longer destroyed inside this call, so
+        /// this deactivation is now only half the job -- see
+        /// SpectrumWorxEditor::detachFrom(), which does the other half where the
+        /// strip actually dies. This one stays because the module is still in the
+        /// chain here, which is what ending the host's gesture needs.
+        ///                                   (02.08.2026.) (SW port)
         auto *const pActiveControl(editor().activeControl());
         if (pActiveControl && (this == &pActiveControl->moduleUI()))
             editor().moduleControlDectivated(*pActiveControl);
