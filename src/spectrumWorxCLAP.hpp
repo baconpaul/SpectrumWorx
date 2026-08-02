@@ -49,6 +49,8 @@ class ModuleUI;
 class SpectrumWorxEditor;
 } // namespace GUI
 
+struct DawExtraState;
+
 clap_plugin_descriptor const *descriptor();
 clap_plugin const *createPlugin(clap_host const *);
 
@@ -306,10 +308,16 @@ class SpectrumWorxCLAP final
     bool paramsTextToValue(clap_id, char const *display, double *) noexcept override;
     void paramsFlush(clap_input_events const *, clap_output_events const *) noexcept override;
 
-    // clap_plugin_state
+    // clap_plugin_state. The preset serialisation plus a <dawExtraState> block;
+    // see the note above the definitions and doc/tech/streaming_format.md.
     bool implementsState() const noexcept override { return true; }
     bool stateSave(clap_ostream const *) noexcept override;
     bool stateLoad(clap_istream const *) noexcept override;
+
+    /// \brief The session's non-parameter state, as a pair of hooks over the
+    /// `<dawExtraState>` block. Empty for now, and the note on the definition
+    /// says what goes in it first.
+    DawExtraState sessionState() const;
 
     // clap_plugin_latency. Cached at activate(): engineSetup() asserts that the
     // setup is current, and the host may ask at any time.

@@ -7,9 +7,7 @@ is keyed, and what may and may not be renamed. Companion to
 [`tech_debt.md`](tech_debt.md).
 
 Written 01–02.08.2026, as the work happened. Everything described here is in the
-tree and has tests naming it, with one exception, called out where it appears:
-`stateSave`/`stateLoad` do not use any of it yet — they still write the private
-binary blob item 4 exists to replace.
+tree and has tests naming it.
 
 ---
 
@@ -121,6 +119,7 @@ spirit for two of the four tuples; this finishes it.
 | `tests/parameters/data/parameterTable.txt` | display names, types, ranges, defaults, units, and the host-visible id space | a label changes, or a range does |
 | `tests/presets/data/presetCorpus.txt` | what all 303 factory presets load into, by two routes: read directly, and read → rewritten as 3.0 → read again | a preset loads differently, or the translation into 3.0 loses something |
 | `tests/presets/data/format3.swp` | the 3.0 grammar itself — hand written, read by a test that never runs the writer | the grammar moves. A rename applied to writer *and* reader passes every round-trip test and orphans every file already saved; this is what does not pass. |
+| `tests/clap/stateTests.cpp` | `clap_plugin_state`: the round trip through a second instance, the bytes, the sample, and what a host may do to a stream | state stops being a preset, or stops surviving a truncated / mis-sized / hostile one |
 
 `streamingNameTests.cpp` also asserts the mechanism itself rather than only its
 output: no streaming name is null or empty (the default is a null sentinel
@@ -145,9 +144,8 @@ process-global tempo state in `LFO::Timer`. See `tech_debt.md`, "Tests".
 
 ## 4. The format
 
-Built 02.08.2026, on top of §1 — stable keys were the precondition. What is not
-yet built is what *uses* it: `stateSave`/`stateLoad` still write the private
-binary blob, and §4.4's payload is empty by design.
+Built 02.08.2026, on top of §1 — stable keys were the precondition. §4.4's
+payload is empty by design; everything else is load-bearing.
 
 ### 4.1 Version, and why not `Version`
 
@@ -268,7 +266,46 @@ for free, and `setNewSample()` can finally mark the session dirty.
 
 ---
 
-## 5. Adding or changing a parameter
+---
+
+## 5. What the host holds
+
+`stateSave` writes `savePreset(currentSampleFile(), {}, program_, &sessionState())`
+and puts the bytes on the stream, terminator included. `stateLoad` reads the
+stream to its end, NUL-terminates it and hands it to
+`GUI::loadPreset(*this, pEditor_, …)`. That is the whole of it, which is the
+point.
+
+What it replaced: `SWX1` followed by 286 `(uint32 id, double value)` pairs, keyed
+on `SW::ParameterID` — which means "slot 3's 4th parameter" and never "Convolver's
+Wet". It survived a reload and nothing more. It could not be versioned against a
+changing effect list, and it could not carry anything that is not a parameter,
+which is why a session forgot which audio file was loaded. It is **dropped, not
+kept as a fallback**: nothing has shipped, so the only sessions holding one are
+development sessions in this tree.
+
+Three things fall out of state being a preset:
+
+- **The sample travels.** `<p n="Sample">` has been in the format since 2011, so
+  `setNewSample()` can call `markCurrentProgramAsModified()` — it deliberately
+  did not, because marking a session dirty would have promised to remember
+  something the old format could not hold.
+- **The chain rebuild is no longer unlocked.** `loadPreset` takes
+  `loader.processingLock()` around the swap; the old `stateLoad` took nothing
+  while `process()` might be walking the chain (`week_two.md` §2.2). This does
+  not close item 3 — it stops one race the audit named.
+- **All four formats move together**, because clap-wrapper's VST3, AUv2 and
+  standalone all carry the CLAP blob.
+
+`GUI::loadPreset` takes the editor as a **pointer**, and that is what makes one
+code path serve both. A host restores state before it has ever shown an editor,
+and with the window shut for the rest of the session; the editor's part is
+building each module's UI region and moving the slot marker, both of which are
+simply skipped when there is nowhere to draw.
+
+---
+
+## 6. Adding or changing a parameter
 
 - **Adding one.** Nothing to do. Its display name becomes its streaming name;
   regenerate `streamingNames.txt` and `parameterTable.txt` and read the diff —

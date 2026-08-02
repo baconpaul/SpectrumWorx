@@ -12,6 +12,7 @@ add_executable(sw-tests
         clap/identityTests.cpp
         clap/parameterModelTests.cpp
         clap/pluginTests.cpp
+        clap/stateTests.cpp
         core/processLockTests.cpp
         effects/amplifyingEffectsTests.cpp
         effects/effectsListTests.cpp

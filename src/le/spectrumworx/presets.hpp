@@ -151,6 +151,46 @@ struct PresetHeader
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
+/// \struct DawExtraState
+///
+/// \brief The block that makes one serialisation serve both a preset file and
+/// the session state a host hands back.
+///
+///   A preset says what the plugin sounds like. A session says that, plus where
+/// the user had got to -- which preset folder was open, what the editor was
+/// showing, settings that are not parameters and never will be. Writing both
+/// into every file would mean loading a preset silently resets the session;
+/// writing neither means a session cannot remember anything that is not a
+/// parameter, which is where this plugin has been.
+///
+///   So it is optional at both ends. `savePreset` writes the block only when
+/// handed one of these, and `loadPreset` calls `from` only if the element is
+/// actually *present* -- so a `.swp` loaded into a live session leaves that
+/// session's own state alone. The shape is
+/// `sst::plugininfra::patch_support::PatchBase::dawExtraState{To,From}`, which
+/// is what the other Surge Synth Team plugins do.
+///
+/// \note The element is written even when `to` puts nothing in it. An empty
+/// `<dawExtraState/>` is a claim a test can make -- that a session and a preset
+/// really are different documents -- and a payload that is still empty is not a
+/// reason to be unable to make it.
+///
+/// \note Passed to the two free functions rather than held on `Preset`, because
+/// the caller does not own the `Preset`: `savePreset` builds a `SavedPreset` and
+/// `loadPreset` builds a `Preset`, both internally, and neither is ever in a
+/// caller's hands to hang a hook on.
+///                                           (02.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+struct DawExtraState
+{
+    std::function<void(TiXmlElement &)> to{nullptr};
+    std::function<void(TiXmlElement const &)> from{nullptr};
+}; // struct DawExtraState
+
+////////////////////////////////////////////////////////////////////////////////
+///
 /// \class Preset
 ///
 ////////////////////////////////////////////////////////////////////////////////
@@ -231,39 +271,7 @@ class Preset
 
     static void reportPresetLoadingError();
 
-    ////////////////////////////////////////////////////////////////////////////
-    ///
-    /// \name DAW extra state
-    ///
-    /// \brief The block that makes one serialisation serve both a preset file
-    /// and the session state a host hands back.
-    ///
-    ///   A preset says what the plugin sounds like. A session says that, plus
-    /// where the user had got to -- which preset folder was open, what the
-    /// editor was showing, settings that are not parameters and never will be.
-    /// Writing both into every file would mean loading a preset silently resets
-    /// the session; writing neither means a session cannot remember anything
-    /// that is not a parameter, which is where this plugin has been.
-    ///
-    ///   So the block is optional on write (savePreset's `withDawExtraState`)
-    /// and optional on read: `dawExtraStateFrom` is called only if the element
-    /// is *present*, so a `.swp` loaded into a live session leaves that session
-    /// alone. The shape is
-    /// `sst::plugininfra::patch_support::PatchBase::dawExtraState{To,From}`,
-    /// which is what the other Surge Synth Team plugins do.
-    ///
-    /// \note The element is written even when the hook writes nothing into it.
-    /// An empty `<dawExtraState/>` is a claim a test can make -- that state and
-    /// preset really are different documents -- and a payload that is still
-    /// empty is not a reason to be unable to say so.
-    ///                                       (02.08.2026.) (SW port)
-    ///
-    /// @{
     static char const dawExtraStateNodeName[];
-
-    std::function<void(TiXmlElement &)> dawExtraStateTo{nullptr};
-    std::function<void(TiXmlElement const &)> dawExtraStateFrom{nullptr};
-    /// @}
 
   private:
     TiXmlDocument document_;
@@ -648,7 +656,8 @@ using char_t = juce::String::CharPointerType::CharType;
 
 template <class PresetConsumer>
 LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignoreExternalSample,
-                        juce::String *LE_RESTRICT const pComment, PresetConsumer const consumer)
+                        juce::String *LE_RESTRICT const pComment, PresetConsumer const consumer,
+                        DawExtraState const *const pDawExtraState = nullptr)
 {
     {
         Preset preset;
@@ -673,6 +682,17 @@ LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignor
             auto const comment(preset.getComment());
             *pComment =
                 juce::String::fromUTF8(comment.begin(), static_cast<unsigned int>(comment.size()));
+        }
+
+        /// \note Only if the element is there. A `.swp` has none, and calling
+        /// the hook with nothing to read would hand the caller a
+        /// default-constructed session state -- which is how loading a preset
+        /// would come to reset where the browser was pointing.
+        if (pDawExtraState && pDawExtraState->from)
+        {
+            auto const *const pNode(preset.root().FirstChildElement(Preset::dawExtraStateNodeName));
+            if (pNode)
+                pDawExtraState->from(*pNode);
         }
 
         ParametersLoader parametersLoader(preset);
@@ -750,13 +770,11 @@ class Program;
 /// reads a file before parsing it -- are in presetFile.hpp. This translation
 /// unit opens no files, which is what `LE_NO_PRESETS` used to stand in for.
 ///
-/// \param withDawExtraState whether to write a `<dawExtraState>` block. False
-/// for a `.swp`, true for the session state a host holds: a preset carries what
-/// the plugin *sounds like* and a session carries that plus where the user had
-/// got to, and the two must not be the same file or opening a preset would
-/// silently reset the session. See Preset::dawExtraStateTo.
+/// \param pDawExtraState null for a `.swp`, which carries only what the plugin
+/// sounds like; non-null for the session state a host holds, which carries that
+/// plus where the user had got to. See DawExtraState.
 std::string savePreset(juce::File const &externalSampleFile, juce::String const &comment,
-                       Program const &, bool withDawExtraState = false);
+                       Program const &, DawExtraState const *pDawExtraState = nullptr);
 #endif // !LE_SW_SDK_BUILD
 
 LE_OPTIMIZE_FOR_SIZE_END()

@@ -289,24 +289,38 @@ std::optional<std::string> repairLegacyElementNames(char const *const pBuffer)
 
 bool Preset::loadFrom(char const *const pBuffer)
 {
+    /// \brief Parsed, and a preset.
+    ///
+    /// \note The second half is not pedantry. `root()` asserts its node exists
+    /// and then dereferences it, so a well-formed document that is not a preset
+    /// -- somebody else's XML, or a state blob from a plugin that used to have
+    /// this plugin's id -- was a null dereference on the first thing to ask.
+    /// Refusing it here covers every caller at once, and "not a preset" is
+    /// exactly what LoadFailed already means.
+    ///                                       (02.08.2026.) (SW port)
+    auto const parsedAsPreset([this] {
+        return !document_.Error() && (document_.FirstChildElement(headerNodeName_) != nullptr);
+    });
+
     document_.Clear();
     document_.Parse(pBuffer);
-    if (!document_.Error())
+    if (parsedAsPreset())
         return true;
 
     if (auto const repaired(repairLegacyElementNames(pBuffer)); repaired)
     {
         document_.Clear();
         document_.Parse(repaired->c_str());
-        if (!document_.Error())
+        if (parsedAsPreset())
         {
             LE_TRACE_LOGONLY("SW: preset uses 2016 numeric element names; repaired on read.");
             return true;
         }
     }
 
-    LE_TRACE("SW preset parsing failed (%s @ row %d).", document_.ErrorDesc(),
-             document_.ErrorRow());
+    LE_TRACE_IF(!document_.Error(), "SW: document parsed but has no <%s> root.", headerNodeName_);
+    LE_TRACE_IF(document_.Error(), "SW preset parsing failed (%s @ row %d).", document_.ErrorDesc(),
+                document_.ErrorRow());
     return false;
 }
 
@@ -519,18 +533,6 @@ ParametersLoader::ParametersLoader(Preset const &preset)
 {
     pParameters_ = preset.root().FirstChildElement(globalParametersNodeName_);
     LE_ASSERT_MSG(pParameters_, "Preset node not found");
-
-    if (preset.dawExtraStateFrom)
-    {
-        /// \note Only when the element is there. A `.swp` has none, and calling
-        /// the hook with nothing to read would hand the caller a
-        /// default-constructed session state -- which is how loading a preset
-        /// would come to reset where the browser was pointing.
-        auto const *const pDawExtraState(
-            preset.root().FirstChildElement(Preset::dawExtraStateNodeName));
-        if (pDawExtraState)
-            preset.dawExtraStateFrom(*pDawExtraState);
-    }
 }
 
 #ifdef LE_SW_SDK_BUILD //...mrmlj...
@@ -998,7 +1000,7 @@ void ParametersSaver::setSampleFileName(std::string_view const &sampleFileName)
 }
 
 std::string savePreset(juce::File const &externalSampleFile, juce::String const &comment,
-                       Program const &program, bool const withDawExtraState)
+                       Program const &program, DawExtraState const *const pDawExtraState)
 {
     PresetHeader const presetHeader(comment);
     SavedPreset preset;
@@ -1045,13 +1047,13 @@ std::string savePreset(juce::File const &externalSampleFile, juce::String const 
 
     /// \note Last, so that the block a host reads back sits after the audio
     /// state it belongs to rather than in front of it, and written even when the
-    /// hook puts nothing in it -- see the note on Preset::dawExtraStateTo.
-    if (withDawExtraState)
+    /// hook puts nothing in it -- see the note on DawExtraState.
+    if (pDawExtraState)
     {
-        auto *const pDawExtraState(new TiXmlElement(Preset::dawExtraStateNodeName));
-        preset.root().LinkEndChild(pDawExtraState);
-        if (preset.dawExtraStateTo)
-            preset.dawExtraStateTo(*pDawExtraState);
+        auto *const pNode(new TiXmlElement(Preset::dawExtraStateNodeName));
+        preset.root().LinkEndChild(pNode);
+        if (pDawExtraState->to)
+            pDawExtraState->to(*pNode);
     }
 
     return parametersSaver.saveTo();

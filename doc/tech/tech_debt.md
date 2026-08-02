@@ -100,13 +100,22 @@ New entries go at the top of their area.
 
 ## Host interface
 
-- **The CLAP state does not hold which external audio file is loaded.**
-  (01.08.2026, item 7) A *preset* has since 2011; a session does not. So
-  `setNewSample()` deliberately does not mark the session dirty either — marking
-  it would promise to remember something the format cannot hold. Item 4 owns the
-  state format and will fix this in passing, but the current state is a plugin
-  that silently forgets one of its settings across a session reload, and that is
-  worth knowing before item 4 happens rather than after.
+- **Restoring a session puts up one modal dialog per parameter the file does not
+  mention.** (02.08.2026, item 4) The default `PresetProblemReporter` is
+  `GUI::warningMessageBox`, and `MissingParameter` is raised once per parameter
+  an effect grew after the file was written — 806 times across the 303 factory
+  banks. That was already true of opening a preset; it is now also true of a host
+  restoring a project, which happens without anyone asking for it and possibly
+  before there is a window to put a dialog in front of. The machinery to fix it
+  exists and is used by the tests: `setPresetProblemReporter` takes a function
+  pointer, and `SWTest::ScopedProblemCounter` counts instead of alerting. What is
+  missing is the shipping plugin's own choice of reporter — a status line, a
+  once-per-load summary, anything that is not a dialog per parameter.
+
+- ~~**The CLAP state does not hold which external audio file is loaded.**~~
+  *Fixed 02.08.2026, item 4.* State is the preset serialisation now, and
+  `<p n="Sample">` has been in that since 2011, so `setNewSample()` marks the
+  session dirty and a reopened project has its sample.
 
 - **`paramsTextToValue` is `return false` and `paramsValueToText` ignores the
   value it is given.** (01.08.2026, from §2.3) The second prints the parameter's
@@ -249,9 +258,11 @@ New entries go at the top of their area.
 - **Nothing has ever loaded a sample and then processed a block.** (01.08.2026,
   item 7) `sampleTests.cpp` proves all seventeen factory samples decode to two
   equal channels at the requested rate; nothing proves `runEngine()` then feeds
-  them to the engine in place of the port. The obstacle is reach — `setNewSample`
-  is an `EditorHost` virtual and `tests/clap/` drives the C API — and
-  `processLockTests.cpp` has since shown the way through it (`plugin_data`).
+  them to the engine in place of the port. The obstacle *was* reach —
+  `setNewSample` is an `EditorHost` virtual and `tests/clap/` drives the C API —
+  and that is now gone: `stateTests.cpp` loads a sample into a plugin the factory
+  created, through `plugin_data` and the `EditorHost` interface. What is left is
+  only the block itself, which is the smaller half.
 
 - **A host that provides `clap.thread-check` and answers has never been
   tested.** (01.08.2026, item 0) `StatefulHost` deliberately omits it, which is

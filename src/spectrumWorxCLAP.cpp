@@ -29,6 +29,12 @@
 
 #include "gui/gui.hpp" // warningMessageBox()
 
+// The state format: GUI::loadPreset() takes the editor as a pointer precisely so
+// that this can call it with none, and savePreset() is the writer at the far end
+// of it. See doc/tech/streaming_format.md.
+#include "gui/editor/presetLoading.hpp"
+#include "le/spectrumworx/presets.hpp"
+
 #include "le/math/vector.hpp" // Math::copy(), for the sample's wrap
 
 #include <sst/plugininfra/cpufeatures.h>
@@ -47,7 +53,13 @@ constexpr clap_id mainInputPort{0};
 constexpr clap_id sideChainInputPort{1};
 constexpr clap_id mainOutputPort{2};
 
-constexpr char stateMagic[4]{'S', 'W', 'X', '1'};
+/// \note `stateMagic`, the four bytes `SWX1`, stood here in front of a
+/// `(uint32 id, double value)` array. Dropped with the blob it introduced rather
+/// than kept as a fallback: nothing has shipped, so the only sessions holding
+/// one are development sessions in this tree, and a permanent second reader for
+/// a format no user has is dead weight from the day it is written. A stream that
+/// does not begin with `<` fails the parse, which is how one is refused.
+///                                           (02.08.2026.) (SW port)
 
 bool writeFully(clap_ostream const *const stream, void const *const data, std::size_t size)
 {
@@ -63,18 +75,43 @@ bool writeFully(clap_ostream const *const stream, void const *const data, std::s
     return true;
 }
 
-bool readFully(clap_istream const *const stream, void *const data, std::size_t size)
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Reads \p stream to its end into a NUL-terminated, writable buffer.
+///
+/// \note The whole stream before any of it is parsed, because the document is
+/// not self-delimiting: a host may hand back any number of bytes and the reader
+/// has to see all of them. `readFully` into a fixed size, which is what the
+/// binary blob used, cannot express that.
+///
+/// \note A `read` of 0 is the end and a negative is an error, and the two are
+/// not the same answer -- a truncated read that reported failure would be
+/// indistinguishable from an empty state. The buffer grows geometrically; the
+/// shape is `sst::plugininfra::patch_support::inStreamToPatch`, which does the
+/// same job for the other Surge Synth Team plugins.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+std::optional<std::vector<char>> readWholeStream(clap_istream const *const stream)
 {
-    auto *cursor(static_cast<char *>(data));
-    while (size > 0)
+    constexpr std::size_t chunk{1u << 12};
+
+    std::vector<char> buffer;
+    std::size_t used(0);
+    for (;;)
     {
-        auto const read(stream->read(stream, cursor, size));
-        if (read <= 0)
-            return false;
-        cursor += read;
-        size -= static_cast<std::size_t>(read);
+        buffer.resize(used + chunk);
+        auto const read(stream->read(stream, buffer.data() + used, chunk));
+        if (read < 0)
+            return std::nullopt;
+        if (read == 0)
+            break;
+        used += static_cast<std::size_t>(read);
     }
-    return true;
+
+    buffer.resize(used + 1);
+    buffer[used] = '\0'; // the parse is destructive and wants a terminator
+    return buffer;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1035,93 +1072,102 @@ void SpectrumWorxCLAP::markCurrentProgramAsModified() const
 // State
 ////////////////////////////////////////////////////////////////////////////////
 
-/// \note Not the preset format, and not stage 5.6. This writes the current
-/// parameter list as (id, value) pairs, which is enough to survive a session
-/// and a reload. What it is not is *durable*: nothing here is versioned against
-/// a changing effect list, and the real thing goes through the preset
-/// serialisation that LE_NO_PRESETS still compiles out of the engine. Stage 8
-/// splits that out; until then this beats forgetting everything.
-///                                       (29.07.2026.) (SW port)
+////////////////////////////////////////////////////////////////////////////////
+///
+///   The preset serialisation, plus a `<dawExtraState>` block. Not a format of
+/// its own, which is what this was until 02.08.2026: `SWX1` followed by 286
+/// `(uint32 id, double value)` pairs, keyed on `SW::ParameterID` -- which means
+/// "slot 3's 4th parameter" and not "Convolver's Wet". That survived a reload
+/// and nothing else. It could not be versioned against a changing effect list,
+/// and it could not hold anything that is not a parameter, which is why the
+/// sample a session had loaded did not come back.
+///
+///   What a preset already solved and this now inherits: keys that are names,
+/// so an effect list that moves does not silently re-point them; a `Format`
+/// stamp; a reader for every file the plugin has ever written; and `Sample`,
+/// which has been in the format since 2011.
+///
+/// \note Natural units, not CLAPEdge's 0..1 -- as before, and now because the
+/// preset format says so rather than because this code chose it. The edge exists
+/// because a *host* may not see a range move; a file has no such problem, and
+/// storing natural units means the state does not encode the edge policy and so
+/// survives a change to it.
+///
+////////////////////////////////////////////////////////////////////////////////
 
-/// \note Values here are the engine's own, not CLAPEdge's 0..1 -- deliberately.
-/// The edge exists because a *host* may not see a range move; a file has no such
-/// problem, and storing natural units means the state does not encode the edge
-/// policy and so survives a change to it. Save and load use the same pair of
-/// accessors, so the two stay consistent by construction.
 bool SpectrumWorxCLAP::stateSave(clap_ostream const *const stream) noexcept
 {
-    rebuildParameterIDs();
+    /// \note `withDawExtraState`, which a `.swp` does not get. The block is
+    /// empty today -- see installDawExtraStateHooks() -- and written anyway, so
+    /// that "a session is a preset plus somewhere to put the rest" is a property
+    /// of the bytes rather than a plan.
+    auto const dawExtraState(sessionState());
+    auto const state(savePreset(currentSampleFile(), juce::String(), program_, &dawExtraState));
 
-    auto const count(static_cast<std::uint32_t>(parameterIDs_.size()));
-    if (!writeFully(stream, stateMagic, sizeof(stateMagic)))
-        return false;
-    if (!writeFully(stream, &count, sizeof(count)))
-        return false;
-
-    for (auto const id : parameterIDs_)
-    {
-        auto const value(static_cast<double>(getParameter(ParameterID{id})));
-        if (!writeFully(stream, &id.value, sizeof(id.value)))
-            return false;
-        if (!writeFully(stream, &value, sizeof(value)))
-            return false;
-    }
-    return true;
+    /// \note The terminator goes into the stream, because loadFrom() parses a
+    /// C string and a host is free to hand back exactly what it was given with
+    /// nothing after it.
+    return writeFully(stream, state.c_str(), state.size() + 1);
 }
 
 bool SpectrumWorxCLAP::stateLoad(clap_istream const *const stream) noexcept
 {
-    char magic[sizeof(stateMagic)]{};
-    if (!readFully(stream, magic, sizeof(magic)))
-        return false;
-    if (std::memcmp(magic, stateMagic, sizeof(magic)) != 0)
+    auto state(readWholeStream(stream));
+    if (!state)
         return false;
 
-    std::uint32_t count{0};
-    if (!readFully(stream, &count, sizeof(count)))
+    /// \note `pEditor_`, which is null unless a window happens to be open. A
+    /// host restores state before it ever shows an editor, and with the window
+    /// shut for the rest of the session; the same call serves both because the
+    /// consumer takes the editor as a pointer.
+    ///
+    /// \note And `ignoreExternalSample` false: the browser's toggle is a
+    /// question about somebody else's preset, and this is the session's own
+    /// state, where the sample is exactly the thing that has been getting lost.
+    auto const dawExtraState(sessionState());
+    if (!GUI::loadPreset(*this, pEditor_, state->data(), false /*ignoreExternalSample*/, nullptr,
+                         nullptr, &dawExtraState))
         return false;
-
-    std::vector<std::pair<Plugins::ParameterID::value_type, double>> saved(count);
-    for (auto &entry : saved)
-    {
-        if (!readFully(stream, &entry.first, sizeof(entry.first)))
-            return false;
-        if (!readFully(stream, &entry.second, sizeof(entry.second)))
-            return false;
-    }
-
-    /// \note Slot selectors first, and in a second pass everything else: a
-    /// module's parameters do not exist until its effect does, so applying them
-    /// in file order would drop every one that belongs to a slot the load has
-    /// not filled yet.
-    for (auto const &[id, value] : saved)
-    {
-        ParameterID const parameterID{Plugins::ParameterID{id}};
-        if (parameterID.type() == ParameterID::ModuleChainParameter)
-            setParameter(parameterID, static_cast<Plugins::AutomatedParameterValue>(value));
-    }
-    /// \note And skipping, in that second pass, whatever no effect owns -- the
-    /// saved file holds all 286 IDs, most of them belonging to slots that are
-    /// empty in the state being restored. Writing one of those is the same
-    /// out-of-range write handleEvent() guards against; see the note there.
-    for (auto const &[id, value] : saved)
-    {
-        ParameterID const parameterID{Plugins::ParameterID{id}};
-        if (parameterID.type() == ParameterID::ModuleChainParameter)
-            continue;
-
-        Plugins::ParameterInformation<Protocol> ranges;
-        if (!liveRanges(parameterID, ranges))
-            continue;
-
-        setParameter(parameterID, static_cast<Plugins::AutomatedParameterValue>(value));
-    }
 
     // Already on the main thread here.
     if (_host.canUseParams())
         _host.paramsRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT |
                            CLAP_PARAM_RESCAN_VALUES);
     return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// SpectrumWorxCLAP::sessionState()
+/// --------------------------------
+///
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Where session state that is not a parameter goes.
+///
+///   Empty, and deliberately so. The mechanism is what item 4 owed; the payload
+/// is a list that will grow one bullet at a time, and guessing at it now would
+/// be inventing a schema for settings nobody has asked to persist yet.
+///
+///   The first three candidates, all `[main-thread]` and none of them
+/// parameters:
+///
+///   - `loadLastSession_`, whose own note on the declaration says the session
+///     state a host hands back is a better home for it than the settings file
+///     this plugin does not have;
+///   - the preset browser's location and selection -- week_two.md §2.7's "the
+///     browser does not remember where it was", for the session case;
+///   - the interface settings (opacity, mouse-over reaction, LFO update
+///     behaviour, hide-cursor-on-knob-drag), which the CLAP build persists
+///     nowhere at all. Those are arguably user preferences rather than session
+///     state, and sst-plugininfra's userdefaults.h is the other candidate home;
+///     the two are not exclusive and surge uses both.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+DawExtraState SpectrumWorxCLAP::sessionState() const
+{
+    return {[](TiXmlElement &) {}, [](TiXmlElement const &) {}};
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1182,12 +1228,13 @@ void SpectrumWorxCLAP::setNewSample(juce::File const &newSampleFile)
         GUI::warningMessageBox("SpectrumWorx: error loading selected sample file.", pErrorMessage,
                                false);
 
-    /// \note Deliberately no markCurrentProgramAsModified(). Which sample is
-    /// loaded is not in what stateSave() writes -- that is `(id, value)` pairs
-    /// and nothing else -- so telling the host the session is dirty would
-    /// promise to remember something the state format cannot hold. Item 4 owns
-    /// putting it there, and marking dirty belongs with it. It is also the one
-    /// call reachable from here that walks into §2.1a's null dereference.
+    /// \note And now it *is* dirty. This said "deliberately no
+    /// markCurrentProgramAsModified()" until 02.08.2026, because the state was
+    /// `(id, value)` pairs and could not hold a file name, so telling a host the
+    /// session had changed would have promised to remember something the format
+    /// could not. State is the preset serialisation now and `<p n="Sample">` has
+    /// been in that since 2011, so the promise is one this can keep.
+    markCurrentProgramAsModified();
 }
 
 bool SpectrumWorxCLAP::registerOrUnregisterTimer(clap_id &id, int const milliseconds,

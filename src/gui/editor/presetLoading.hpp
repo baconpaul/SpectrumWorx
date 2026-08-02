@@ -35,6 +35,10 @@ namespace LE
 namespace SW
 {
 //------------------------------------------------------------------------------
+
+struct DawExtraState;
+
+//------------------------------------------------------------------------------
 namespace GUI
 {
 //------------------------------------------------------------------------------
@@ -51,6 +55,14 @@ class SpectrumWorxEditor;
 ///
 /// \brief Reads \p presetFile and makes it the host's current program.
 ///
+/// \param pEditor  the open editor, or **null**. A preset the user picked from
+/// the browser has one; the session state a host restores usually does not, and
+/// a plugin whose window has never been opened must load it just the same. The
+/// editor's part is building each module's UI region as its slot is filled and
+/// moving the slot marker afterwards -- both of which are simply skipped, which
+/// is what `EditorModuleInitialiser` already documents its own null pointer as
+/// meaning. Everything below that line is the engine's and happens either way.
+///                                           (02.08.2026.) (SW port)
 /// \param comment  the preset's comment, if it has one and the caller wants it.
 /// \param presetName goes into Program::name(), truncated to fit.
 ///
@@ -60,16 +72,21 @@ class SpectrumWorxEditor;
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-bool loadPreset(EditorHost &, SpectrumWorxEditor &, juce::File const &presetFile,
-                bool ignoreExternalSample, juce::String *comment, char const *presetName);
+/// \param pDawExtraState null for a preset the user opened; the session's own,
+/// for state a host restored. See SW::DawExtraState.
+bool loadPreset(EditorHost &, SpectrumWorxEditor *pEditor, juce::File const &presetFile,
+                bool ignoreExternalSample, juce::String *comment, char const *presetName,
+                DawExtraState const *pDawExtraState = nullptr);
 
 /// \brief The same, from a buffer that is already in memory.
 ///
 /// \note Which is where a factory preset comes from: the banks are compiled into
 /// the binary (factoryPresets.hpp) and have no file for the overload above to
-/// open. That one reads the file and calls this.
-bool loadPreset(EditorHost &, SpectrumWorxEditor &, char *inMemoryPreset, bool ignoreExternalSample,
-                juce::String *comment, char const *presetName);
+/// open. That one reads the file and calls this. It is also where session state
+/// comes from -- a `clap_istream` is not a file either.
+bool loadPreset(EditorHost &, SpectrumWorxEditor *pEditor, char *inMemoryPreset,
+                bool ignoreExternalSample, juce::String *comment, char const *presetName,
+                DawExtraState const *pDawExtraState = nullptr);
 
 //------------------------------------------------------------------------------
 } // namespace GUI

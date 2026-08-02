@@ -75,7 +75,8 @@ struct GlobalParameterUpdater
 struct Loader
 {
     EditorHost &host;
-    SpectrumWorxEditor &editor;
+    /// Null when no window is open, which is the normal case for session state.
+    SpectrumWorxEditor *pEditor;
     /// The preset browser's "ignore external samples" box.
     bool ignoreSampleFile;
 
@@ -94,10 +95,11 @@ struct Loader
 
     /// \note The editor-aware initialiser, so that a preset which fills slots
     /// builds their UI regions as it goes rather than leaving five modules with
-    /// nowhere to draw.
+    /// nowhere to draw. With no editor it is the DSP half alone, which is all
+    /// there is to do.
     EditorModuleInitialiser moduleInitialiser() const
     {
-        return {host.core().moduleInitialiser(), &editor};
+        return {host.core().moduleInitialiser(), pEditor};
     }
 
     static bool onlySetParameters() { return false; }
@@ -129,7 +131,8 @@ struct Loader
         );
 
         host.setNewSample(juce::File::createFileWithoutCheckingPath(path));
-        editor.updateSampleNameAsync();
+        if (pEditor)
+            pEditor->updateSampleNameAsync();
     }
 
     bool setNewGlobalParameters(GlobalParameters::Parameters const &newParameters) const
@@ -140,7 +143,8 @@ struct Loader
 
     void moduleChainFinished(std::uint8_t const moduleCount, bool const syncedLFOFound) const
     {
-        editor.setLastModulePosition(moduleCount);
+        if (pEditor)
+            pEditor->setLastModulePosition(moduleCount);
 
         /// \note Some hosts (Renoise 2.8) provide tempo information lazily,
         /// after the first process() call, so the transport position is checked
@@ -156,13 +160,13 @@ struct Loader
 struct Consumer
 {
     EditorHost &host;
-    SpectrumWorxEditor &editor;
+    SpectrumWorxEditor *pEditor;
 
     using Module = Loader::Module;
 
     Loader presetLoader(bool const ignoreExternalSample) const
     {
-        return {host, editor, ignoreExternalSample};
+        return {host, pEditor, ignoreExternalSample};
     }
 
     Program &program() const { return host.core().program(); }
@@ -175,14 +179,15 @@ struct Consumer
 } // anonymous namespace
 //------------------------------------------------------------------------------
 
-bool loadPreset(EditorHost &host, SpectrumWorxEditor &editor, char *const inMemoryPreset,
+bool loadPreset(EditorHost &host, SpectrumWorxEditor *const pEditor, char *const inMemoryPreset,
                 bool const ignoreExternalSample, juce::String *const comment,
-                char const *const presetName)
+                char const *const presetName, DawExtraState const *const pDawExtraState)
 {
-    Consumer const consumer{host, editor};
+    Consumer const consumer{host, pEditor};
 
     consumer.notifyHostAboutPresetChangeBegin();
-    bool const succeeded(SW::loadPreset(inMemoryPreset, ignoreExternalSample, comment, consumer));
+    bool const succeeded(
+        SW::loadPreset(inMemoryPreset, ignoreExternalSample, comment, consumer, pDawExtraState));
     if (succeeded)
         copyPresetName(presetName, consumer.program().name());
     consumer.notifyHostAboutPresetChangeEnd();
@@ -190,14 +195,15 @@ bool loadPreset(EditorHost &host, SpectrumWorxEditor &editor, char *const inMemo
     return succeeded;
 }
 
-bool loadPreset(EditorHost &host, SpectrumWorxEditor &editor, juce::File const &presetFile,
+bool loadPreset(EditorHost &host, SpectrumWorxEditor *const pEditor, juce::File const &presetFile,
                 bool const ignoreExternalSample, juce::String *const comment,
-                char const *const presetName)
+                char const *const presetName, DawExtraState const *const pDawExtraState)
 {
     auto const presetData(readPresetFile(presetFile));
     if (!presetData)
         return false;
-    return loadPreset(host, editor, presetData.get(), ignoreExternalSample, comment, presetName);
+    return loadPreset(host, pEditor, presetData.get(), ignoreExternalSample, comment, presetName,
+                      pDawExtraState);
 }
 
 //------------------------------------------------------------------------------

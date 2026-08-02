@@ -795,7 +795,7 @@ bool SpectrumWorxEditor::loadPreset(juce::File const &presetFile, bool const ign
                                     juce::String &comment, juce::String const &presetName)
 {
     auto const pPresetName(presetName.getCharPointer().getAddress());
-    return GUI::loadPreset(editorHost_, *this, presetFile, ignoreExternalSample, &comment,
+    return GUI::loadPreset(editorHost_, this, presetFile, ignoreExternalSample, &comment,
                            pPresetName);
 }
 
@@ -803,7 +803,7 @@ bool SpectrumWorxEditor::loadPreset(char *const inMemoryPreset, bool const ignor
                                     juce::String &comment, juce::String const &presetName)
 {
     auto const pPresetName(presetName.getCharPointer().getAddress());
-    return GUI::loadPreset(editorHost_, *this, inMemoryPreset, ignoreExternalSample, &comment,
+    return GUI::loadPreset(editorHost_, this, inMemoryPreset, ignoreExternalSample, &comment,
                            pPresetName);
 }
 
