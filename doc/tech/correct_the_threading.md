@@ -600,17 +600,94 @@ compile lines, not against the CMake. Stage 7 takes the last three.
 the *chain* is still mutated from the message thread — `setModuleInSlot`, `removeModule`,
 `moduleDragEnd`. That is what stage 6 is for; nothing in this stage made it better or worse.
 
+### 6.5a — What stage 5 broke, and what that says
+
+Ejecting a module asserted `Invalid downcast` in `moveModules`, found by hand in the
+standalone. Worth recording because the cause is a *consequence of the design change*, not a
+slip:
+
+Giving the strips to the editor created a window the old arrangement did not have. A module
+used to own its strip, so removing the module destroyed the strip in the same breath. Now
+the strip holds a counted reference to the module, so removing the module leaves the strip
+on screen — still a child of the editor, still clickable — until something takes it down.
+Clicking eject on that ghost computes its slot from its *position*: eject the last strip and
+then its ghost and you get slot 2 against a `nextAvailableModuleSlot_` of 2, so
+`lastModuleIndex - firstModuleIndex` is −1 in a `std::uint8_t` parameter and the walk runs
+255 times, off the end of the chain and onto its sentinel node.
+
+Three things came out of it, and only the first is the fix:
+
+- **The rack is resynced from the chain** after any removal — asynchronously, because the
+  request arrives from inside the strip's own button callback and the strip cannot be
+  destroyed under it. `dropOrphanedRegions()` also repositions the survivors, so the rack is
+  a *function of the chain* rather than of a running total.
+- **A strip whose module has left the chain declines** rather than defending the arithmetic.
+- `moveModules` stops at the chain's end marker as well as at the count.
+
+**And the reason it reached a user rather than a test: ejecting had no headless coverage of
+any kind.** `tools/show-ui` fills slots and never empties one. There are now two cases in
+`tests/gui/twoInstanceTests.cpp`, and the second reproduces the exact condition — verified
+by removing all three guards and watching it fail, not by inspection.
+
+---
+
+## 6.9 — Where the cross-thread state is, as of stage 5
+
+The inventory this redesign is measured by. **Stages 0–5 are done; 6, 7 and 8 are not**, so
+this is a mid-point picture, and the "stage 6" rows are exactly what that stage is for.
+
+| What | Shared how | State |
+|---|---|---|
+| Parameter edits, interface → engine | `ToEngineQueue`, drained at the top of `process()` and in `paramsFlush()` | ✅ |
+| Base-value changes, engine → interface | `ToUIQueue`, drained in `onMainThread()` | ✅ |
+| Modulated values, for painting | `ValueMailbox`, written per block, swept at 30 Hz | ✅ |
+| Plugin → host notifications | `UIEdits` ring | ✅ (was already right) |
+| Which thread is which | `Threading::{isMainThread,isAudioThread}` | ✅ |
+| Who holds the processing lock | `Utility::CriticalSection`, owner token | ✅ |
+| **The module chain** | **`processCriticalSection_`** — and `setModuleInSlot`, `removeModule`, `moduleDragEnd` take **nothing at all** | stage 6 |
+| **`Engine::Setup` and the spectral storage** | same lock, taken **blocking on the message thread**, whole working set reallocated under it | stage 6 |
+| **The `Sample`** | same lock; `try_lock` on the audio side, which is why a failed lock plays the host's port instead | stage 6 |
+| **`LFOImpl::Timer`'s tempo** | three process-wide statics, shared by every instance | stage 6 (deferred from 1, §6.1) |
+| `PopupMenu::menuActive_` | process-wide `bool` | left deliberately, §6.1 — but see below |
+| `Theme::settings()` | process-wide, and arguably correct: these are application preferences | not addressed |
+
+So the lock is load-bearing for exactly three things, all structural, all stage 6 — which is
+the stage that deletes it. Nothing in `process()` blocks on it today; the one remaining
+`try_lock` is the sample swap.
+
+**One better idea than `menuActive_`**, from reviewing this: the flag exists so that a
+dying editor does not leave a menu pointing at it. `juce::PopupMenu::dismissAllActiveMenus()`
+in `~SpectrumWorxEditor` says the same thing without a process-wide `bool`. Stage 8.
+
 ---
 
 ## 7. What is still missing
 
+**Stages 6, 7 and 8.** Stage 6 is the headline — it is what makes `process()` lock free —
+and it is deliberately not half done: removing the lock before chain mutation, preset load,
+state load, the sample swap and the spectral setup have all moved off the message thread
+would be a regression wearing the shape of progress. §6.9 is the list it has to clear.
+
+Two things learned since it was planned, which stage 6 has to take account of:
+
+- **`engineSetup()` asserts that the setup agrees with the parameters**, and that assertion
+  is reached from all over `process()`. So the `request_restart` route (§5) cannot simply
+  set the parameter and wait: either the parameter waits too — and the host reads a stale
+  FFT size until the restart — or the staleness has to become legal while a restart is
+  pending. The second is the honest one, and it is a change to `isEngineSetupUpToDate()`'s
+  contract rather than to a call site.
+- **A slot change is currently synchronous and the editor depends on it.**
+  `addUserAddedModule` takes focus on the strip that `setModuleInSlot` built. Under
+  `ToEngine::SetSlot` that becomes "build the strip when `ToUI::SlotChanged` comes back",
+  which is a change to the editor's flow in several places — and §6.5a is what that kind of
+  change costs when it is not covered.
+
 **A backtrace pair from the two-instance deadlock**, one from each side, while it still
 reproduces. §1A names a plausible cycle — the message thread holding the message-manager
 lock and blocking on the processing lock in `destroyGUI()`, against the audio thread holding
-the processing lock and calling `repaint()` into AppKit — but that is derived from reading,
-not observed. §1B is a second, independent mechanism and it may be the whole story on its
-own. The two are not exclusive, and stage 1 addresses only the second. It stops being
-collectable the moment the model changes.
+the processing lock and calling `repaint()` into AppKit. Both halves of that cycle are now
+gone (§6.5), so if the deadlock survives, the cause is elsewhere and the backtraces are the
+only way to find it.
 
 ---
 
