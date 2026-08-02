@@ -96,6 +96,10 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 # subdirectories -- inherit sw_force_include_odr_header() too.
 include(sw-odr-header)
 
+# Before add_subdirectory(libs), and before any target exists: a sanitizer has to
+# be on every translation unit and on the link line, dependencies included.
+include(sw-sanitizers)
+
 option(SW_COPY_AFTER_BUILD "Install the built plugins into the user plugin folders" OFF)
 option(SW_BUILD_TESTS "Build sw-tests" ON)
 option(SW_BUILD_TOOLS "Build the developer tools (sw-show-ui)" ON)

@@ -131,6 +131,10 @@ add_library(sw-dsp STATIC
         core/spectrumWorxCore.cpp
         core/modules/automatedModule.cpp
         core/modules/factory.cpp
+
+        # Which thread is this, and may it do that. See
+        # doc/tech/correct_the_threading.md.
+        core/threading/threadCheck.cpp
 )
 
 # configure_file into the build tree, never back into src/ — that is what the
@@ -167,6 +171,12 @@ target_link_libraries(sw-dsp PUBLIC sst-plugininfra::tinyxml)
 # LE::Utility::assertionFailed lives in assertionHandler.cpp; without this the
 # asserts degrade to the CRT's and the DAW never sees them.
 target_compile_definitions(sw-dsp PUBLIC LE_ENABLE_ASSERT_HANDLER)
+
+# rtsan_support.h, for the RealtimeSanitizer region ScopedAudioCallback opens, and
+# for the RTSAN_DISABLE guards the conceded audio-thread allocations will carry.
+# PUBLIC: sw-impl marks those sites and the header is where the macro comes from.
+# It is header only and compiles to nothing without -fsanitize=realtime.
+target_link_libraries(sw-dsp PUBLIC sst-cpputils)
 
 # ...and it prints a stack trace with the message, through sst-plugininfra --
 # which has a Windows arm over DbgHelp, the platform whose failures reach us as

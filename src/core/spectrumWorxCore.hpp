@@ -314,6 +314,27 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
 
     bool currentThreadOwnsTheProcessLock() const;
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Whether the calling thread may mutate engine state right now.
+    ///
+    /// \note What the six `LE_ASSERT( currentThreadOwnsTheProcessLock() )` sites
+    /// meant, now that the answer is no longer a hardcoded `true` and they can be
+    /// wrong. Holding the lock is *one* way to be sure nothing else is inside
+    /// `process()`; the other is that `process()` cannot be running at all, which
+    /// is what `suspend()` records and what `clap_plugin::activate` guarantees
+    /// before `start_processing`. `activate()` reconfigures the channel count and
+    /// the block size on that basis and takes nothing, correctly -- so asserting
+    /// the lock alone made a legitimate path fire the moment the check became
+    /// real.
+    ///
+    /// \note Both terms disappear at stage 6, when the audio thread owns the
+    /// engine outright and mutating it from anywhere else is the thing that is
+    /// wrong. See doc/tech/correct_the_threading.md.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    bool currentThreadMayMutateEngineState() const;
+
     void moveModule(std::uint8_t sourceIndex, std::uint8_t targetIndex);
 
     InputBuffers &buffers() { return buffers_; }

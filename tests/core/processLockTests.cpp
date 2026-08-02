@@ -188,6 +188,37 @@ LE::SW::SpectrumWorxCore const &engineOf(clap_plugin const &plugin)
 }
 } // anonymous namespace
 
+TEST_CASE("The process lock knows which thread holds it", "[core][lock]")
+{
+    // It did not. `currentThreadOwnsTheProcessLock()` returned a hardcoded `true`
+    // off Windows and `reinterpret_cast` the mutex to a CRITICAL_SECTION on it, so
+    // all six `LE_ASSERT( currentThreadOwnsTheProcessLock() )` sites in the engine
+    // asserted nothing on any platform this port has built for. The last CHECK
+    // below is the one that fails against that implementation.
+    RunningEngine engine;
+
+    CHECK(!engine->currentThreadOwnsTheProcessLock());
+    {
+        auto const lock(engine->getProcessingLock());
+        CHECK(engine->currentThreadOwnsTheProcessLock());
+
+        // Recursive, and the ownership has to survive the inner release -- which
+        // is the property SpectrumWorxCLAP::runEngine() relies on.
+        {
+            auto const nested(engine->getProcessingLock());
+            CHECK(engine->currentThreadOwnsTheProcessLock());
+        }
+        CHECK(engine->currentThreadOwnsTheProcessLock());
+    }
+    CHECK(!engine->currentThreadOwnsTheProcessLock());
+
+    {
+        LockHeldElsewhere const contention(*engine);
+        CHECK(!engine->currentThreadOwnsTheProcessLock());
+    }
+    CHECK(!engine->currentThreadOwnsTheProcessLock());
+}
+
 TEST_CASE("A block the engine processes says so, and is written", "[core][lock]")
 {
     RunningEngine engine;

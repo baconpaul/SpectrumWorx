@@ -49,6 +49,12 @@ class Engine : public LE::SW::SpectrumWorxCore
     /// per-format wrapper.
     using Core::process;
 
+    /// Likewise protected, and likewise something only a test asks directly.
+    /// Six assertions in the engine depend on it being the truth rather than the
+    /// hardcoded `true` it used to be; processLockTests.cpp is where that is
+    /// pinned. See doc/tech/correct_the_threading.md.
+    using Core::currentThreadOwnsTheProcessLock;
+
     Program &program() { return program_; }
 
     template <class Parameter> bool set(typename Parameter::param_type const value)

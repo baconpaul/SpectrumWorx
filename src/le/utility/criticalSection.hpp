@@ -39,11 +39,25 @@
 ///     raw `pthread_mutex_t`) is included by nothing. `lock`/`unlock`/`try_lock`
 ///     are the whole of the used interface, and `std::recursive_mutex` has them.
 ///
-/// `SpectrumWorxCore::currentThreadOwnsTheProcessLock` reinterpret_casts this to
-/// a `CRITICAL_SECTION` under `_WIN32`. That was already invalid for the MS STL's
-/// `std::mutex` and stays invalid here; it is Windows bring-up's to fix, and it
-/// is a debug helper that already returns a hardcoded `true` off Windows.
-///                                           (29.07.2026.) (SW port)
+/// \note It was a bare `using CriticalSection = std::recursive_mutex;`, and
+/// `SpectrumWorxCore::currentThreadOwnsTheProcessLock` recovered the owner by
+/// `reinterpret_cast`ing it to a `CRITICAL_SECTION` under `_WIN32` and returning a
+/// hardcoded `true` everywhere else. The cast was invalid for the MS STL's
+/// `std::mutex` before it and stayed invalid here, and the other arm meant all six
+/// `LE_ASSERT( currentThreadOwnsTheProcessLock() )` sites asserted nothing at all
+/// on every platform this port has built for.
+///
+///   So the mutex keeps its own ownership, which is the only portable way to have
+/// the answer: a token unique to the calling thread, published under the mutex and
+/// readable by anyone. It costs one relaxed-ordered pointer store per lock and one
+/// per final unlock, and it is what lets the threading redesign assert its
+/// invariants while the lock still exists -- see doc/tech/correct_the_threading.md,
+/// which deletes the lock outright at stage 6.
+///                                           (02.08.2026.) (SW port)
+#include "le/utility/assert.hpp"
+#include "le/utility/threadIdentity.hpp"
+
+#include <atomic>
 #include <mutex>
 //------------------------------------------------------------------------------
 namespace LE
@@ -53,7 +67,70 @@ namespace Utility
 {
 //------------------------------------------------------------------------------
 
-using CriticalSection = std::recursive_mutex;
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \class CriticalSection
+///
+/// \brief A recursive mutex that knows whether the calling thread holds it.
+///
+/// \note Satisfies Lockable, so `std::unique_lock<CriticalSection>` and the
+/// `std::try_to_lock` overload keep working -- spectrumWorxCLAP.cpp uses both.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+class CriticalSection
+{
+  public:
+    CriticalSection() = default;
+    CriticalSection(CriticalSection const &) = delete; // makes non-copyable
+    CriticalSection &operator=(CriticalSection const &) = delete;
+
+    void lock()
+    {
+        mutex_.lock();
+        takeOwnership();
+    }
+
+    bool try_lock()
+    {
+        if (!mutex_.try_lock())
+            return false;
+        takeOwnership();
+        return true;
+    }
+
+    void unlock()
+    {
+        LE_ASSERT_MSG(currentThreadOwns(),
+                      "Unlocking a critical section this thread does not own.");
+        if (--depth_ == 0)
+            owner_.store(nullptr, std::memory_order_release);
+        mutex_.unlock();
+    }
+
+    /// \brief Whether the calling thread holds this lock, at any depth.
+    bool currentThreadOwns() const
+    {
+        return owner_.load(std::memory_order_acquire) == currentThreadToken();
+    }
+
+  private:
+    /// \note Written only by the owning thread, and only while it holds the
+    /// mutex; read by any thread. That is what makes the plain `depth_` below
+    /// safe without atomicity of its own.
+    void takeOwnership()
+    {
+        owner_.store(currentThreadToken(), std::memory_order_release);
+        ++depth_;
+    }
+
+    static_assert(std::atomic<void const *>::is_always_lock_free,
+                  "The process lock's owner is read from the audio thread.");
+
+    std::recursive_mutex mutex_;
+    std::atomic<void const *> owner_{nullptr};
+    unsigned int depth_{0};
+}; // class CriticalSection
 
 class CriticalSectionLock
 {

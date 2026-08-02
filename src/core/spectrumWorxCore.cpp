@@ -25,9 +25,10 @@
 
 #include "le/utility/assert.hpp"
 
-#if defined(_WIN32) && !defined(_XBOX)
-#include <windows.h> // CRITICAL_SECTION
-#endif
+/// \note `#include <windows.h> // CRITICAL_SECTION` stood here, for the cast
+/// currentThreadOwnsTheProcessLock() used to make. The mutex answers for itself
+/// now, so the one thing in this file that needed the platform header is gone.
+///                                           (02.08.2026.) (SW port)
 
 #include <cstdlib>
 #include <ctime>
@@ -301,7 +302,7 @@ SpectrumWorxCore::setNumberOfChannels(std::uint8_t const numberOfInputChannels,
 bool SpectrumWorxCore::setNumberOfChannelsImpl(std::uint8_t const numberOfMainChannels,
                                                std::uint8_t const numberOfSideChannels)
 {
-    LE_ASSERT(currentThreadOwnsTheProcessLock());
+    LE_ASSERT(currentThreadMayMutateEngineState());
 
     if (!buffers().resize(buffers().blockSize(), numberOfMainChannels, numberOfSideChannels))
         return false;
@@ -375,25 +376,37 @@ void SpectrumWorxCore::setReportedNumberOfChannels(std::uint8_t const numberOfMa
     Engine::Processor::setNumberOfChannels(numberOfMainChannels, numberOfSideChannels);
 }
 
+/// \note It was a `reinterpret_cast` of the mutex to a `CRITICAL_SECTION` under
+/// `_WIN32` -- invalid for the MS STL's `std::mutex` when it was written and
+/// invalid for the `std::recursive_mutex` that replaced it -- and a hardcoded
+/// `true` on every other platform. So the six sites that assert this asserted
+/// nothing at all on the only platforms this port has built for, and the code
+/// base's own account of who holds what was fiction.
+///
+///   `Utility::CriticalSection` keeps its owner now, so this is the answer rather
+/// than a guess, on every platform and in one line. doc/tech/correct_the_threading.md
+/// deletes the lock at stage 6; until then this is what the stages in between are
+/// checked against.
+///                                           (02.08.2026.) (SW port)
 bool SpectrumWorxCore::currentThreadOwnsTheProcessLock() const
 {
-#if defined(_WIN32) && !defined(_XBOX)
-    CRITICAL_SECTION const &guard(
-        reinterpret_cast<CRITICAL_SECTION const &>(processCriticalSection_));
-    //...mrmlj...FMOD...LE_ASSERT( guard.OwningThread || suspended_ );
-    return !guard.OwningThread ||
-           (guard.OwningThread == reinterpret_cast<HANDLE>(::GetCurrentThreadId()));
+    return processCriticalSection_.currentThreadOwns();
+}
+
+bool SpectrumWorxCore::currentThreadMayMutateEngineState() const
+{
+#ifndef NDEBUG
+    return currentThreadOwnsTheProcessLock() || suspended_;
 #else
-    //...mrmlj...LE_ASSERT( !"Implement!" );
-    return true;
-#endif // _WIN32
+    return currentThreadOwnsTheProcessLock();
+#endif // NDEBUG
 }
 
 bool SpectrumWorxCore::setBlockSize(unsigned int const newBlockSize)
 {
     if (newBlockSize == buffers().blockSize())
         return true;
-    LE_ASSERT(currentThreadOwnsTheProcessLock());
+    LE_ASSERT(currentThreadMayMutateEngineState());
     return buffers().resize(newBlockSize, engineSetup().numberOfChannels(),
                             engineSetup().numberOfSideChannels());
 }
@@ -424,7 +437,7 @@ Engine::Setup const &SpectrumWorxCore::uncheckedEngineSetup() const
 
 bool SpectrumWorxCore::resize(Engine::StorageFactors const &newfactors)
 {
-    LE_ASSERT(currentThreadOwnsTheProcessLock());
+    LE_ASSERT(currentThreadMayMutateEngineState());
     return Engine::Processor::resize(
         currentStorageFactors_, newfactors,
         static_cast<Engine::Setup::Window>(parameters().get<WindowFunction>().getValue()),
@@ -438,7 +451,7 @@ bool SpectrumWorxCore::updateEngineSetup()
     //...mrmlj...rethink this...LE_ASSERT( !isEngineSetupUpToDate() );
     Setup const &setup(uncheckedEngineSetup());
 
-    LE_ASSERT(currentThreadOwnsTheProcessLock());
+    LE_ASSERT(currentThreadMayMutateEngineState());
 
     Parameters &parameters(this->parameters());
 
@@ -570,7 +583,7 @@ void SpectrumWorxCore::uninitialise()
 
 void SpectrumWorxCore::clearSideChannelData()
 {
-    LE_ASSERT(currentThreadOwnsTheProcessLock());
+    LE_ASSERT(currentThreadMayMutateEngineState());
     Engine::Processor::clearSideChannelData();
 }
 
@@ -587,7 +600,7 @@ void SpectrumWorxCore::resetChannelBuffers()
 #ifdef LE_SW_FMOD
     auto const lock(getProcessingLock());
 #endif // LE_SW_FMOD
-    LE_ASSERT(currentThreadOwnsTheProcessLock());
+    LE_ASSERT(currentThreadMayMutateEngineState());
     Engine::Processor::resetChannelBuffers();
 }
 

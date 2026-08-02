@@ -297,14 +297,8 @@ restart with it and installs its chain in `activate()`.
 Each leaves a working plugin and a green `sw-tests` in both build trees. One commit per
 stage, on a branch.
 
-**0 — Instruments and evidence.** No behaviour change. This document. Make
-`currentThreadOwnsTheProcessLock()` real — owner id plus depth — so that the six
-`LE_ASSERT(currentThreadOwnsTheProcessLock())` sites start meaning something *while the
-lock still exists*; a redesign that cannot assert its invariants is a rewrite.
-A `Threading::assert{Audio,Main}Thread()` facility seeded at `activate()`/`process()`.
-`build-rtsan/` and `build-tsan/` wired in CMake, and `SST_CPPUTILS_NONBLOCKING` on
-`process()` — `sst-cpputils` already ships `rtsan_support.h`. Capture the two-instance
-deadlock backtrace while it still reproduces (§7).
+**0 — Instruments and evidence.** ✅ *done, 02.08.2026.* No behaviour change; see §6.0
+below for what it found.
 
 **1 — One owner for JUCE; per-instance statics; the reporter stops being a dialog.**
 Fixes the leak and the two-instance deadlock, and depends on nothing below it.
@@ -363,6 +357,55 @@ spin-waits (`spectrumWorxEditor.cpp:199-204`) go, because nothing but the GUI th
 a widget any more. Delete `src/spectrumWorx.{cpp,hpp}` — 1,899 lines, which `week_two.md`
 §2.5 says this item owns — along with `GUI::Lock` and `BackgroundThread`. Drive Logic and
 Bitwig through the situations that deadlocked, plus `clap-validator`.
+
+### 6.0 — What stage 0 built, and what it found
+
+**The lock knows its owner.** `Utility::CriticalSection` is a class rather than a
+`using` for `std::recursive_mutex`, and it publishes a per-thread token under the mutex.
+`currentThreadOwnsTheProcessLock()` is one line and true on every platform.
+
+**Which found a live falsehood in the first run.** `setNumberOfChannelsImpl` asserts the
+lock, and `clap_plugin::activate` reaches it *without* the lock — correctly, the audio
+thread not having started. The same is true of `setBlockSize`. So the six sites did not
+mean "hold the lock"; they meant **nothing else may be inside `process()` right now**,
+which holding the lock is only one way to achieve. They assert
+`currentThreadMayMutateEngineState()` now — the lock *or* `suspended_`, which the
+constructor sets and `resume()` clears. Both terms go at stage 6.
+
+That is the whole argument for doing this stage first: the assertion had been vacuous for
+the life of the port, and the first thing it did on becoming real was contradict the
+codebase's own account of its invariant.
+
+**Thread identity.** `core/threading/threadCheck.hpp`. `markMainThread()` at
+`clap_plugin::init`, which is `[main-thread]` by contract and the only answer available
+when the host offers no `clap.thread-check`. `isAudioThread()` is deliberately *"is this
+call underneath `process()`"* rather than *"is this thread the audio thread"* — a host
+with a worker pool delivers successive blocks of one plugin on different threads, so
+there is no such thread to name.
+
+**Sanitizers.** `cmake/sw-sanitizers.cmake`, one `SW_SANITIZER` cache variable rather
+than a pair of blessed build directories, applied before `add_subdirectory(libs)` so that
+it reaches the dependencies too. It link-tests the flag and refuses with a diagnostic
+naming the compiler, because `-fsanitize=realtime` *compiles* on Apple clang 21 and fails
+to link. Measured: Homebrew clang 22.1.6 links it, so the acceptance test is
+
+```
+cmake -B build-rtsan -D SW_SANITIZER=realtime \
+      -D CMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++
+```
+
+`Threading::ScopedAudioCallback` at the top of `process()` opens the realtime region.
+It is the runtime entry point and not `[[clang::nonblocking]]`: the attribute would also
+run a static analysis this tree cannot answer until stage 6.
+
+**Tests.** `tests/core/threadCheckTests.cpp`, plus one case in `processLockTests.cpp`
+whose last `CHECK` — the lock held on another thread, so this one does not own it — is
+what fails against the hardcoded `true`. The wiring is checked through the host API
+rather than by reading the source: a host offering `clap.state` and no
+`clap.thread-check` makes `markCurrentProgramAsModified()` defer, so a parameter event
+delivered to `process()` arrives at `request_callback` from inside the audio callback,
+and `mark_dirty` arrives only later at `on_main_thread`. Take the guard out of
+`process()` and the case goes red.
 
 ---
 

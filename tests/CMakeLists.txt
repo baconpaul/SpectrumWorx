@@ -14,6 +14,7 @@ add_executable(sw-tests
         clap/pluginTests.cpp
         clap/stateTests.cpp
         core/processLockTests.cpp
+        core/threadCheckTests.cpp
         effects/amplifyingEffectsTests.cpp
         effects/effectsListTests.cpp
         external_audio/sampleTests.cpp

@@ -27,6 +27,8 @@
 #include "core/host_interop/host2PluginImpl.inl"
 #include "core/host_interop/plugin2HostImpl.inl"
 
+#include "core/threading/threadCheck.hpp"
+
 #include "gui/gui.hpp" // warningMessageBox()
 
 // The state format: GUI::loadPreset() takes the editor as a pointer precisely so
@@ -203,6 +205,12 @@ SpectrumWorxCLAP::~SpectrumWorxCLAP() = default;
 
 bool SpectrumWorxCLAP::init() noexcept
 {
+    /// \note `clap_plugin::init` is `[main-thread]` by contract, so the thread
+    /// running it is the answer for the life of the plugin -- and it is the only
+    /// answer available, `clap.thread-check` being an optional extension a host
+    /// need not offer. See core/threading/threadCheck.hpp.
+    Threading::markMainThread();
+
     // The host may ask for the parameter list before activate(), and does.
     rebuildParameterIDs();
     return true;
@@ -654,6 +662,12 @@ clap_process_status SpectrumWorxCLAP::process(clap_process const *const process)
     ///   off this same entry point.
     ///                                   (29.07.2026.) (SW port)
     sst::plugininfra::cpufeatures::FPUStateGuard const denormalGuard;
+
+    /// \note Makes `Threading::isAudioThread()` true for everything below, and
+    /// opens a RealtimeSanitizer realtime region so that an allocation, a lock or
+    /// a syscall reached from anywhere under here is reported with a stack. Both
+    /// compile away without `-fsanitize=realtime`. See cmake/sw-sanitizers.cmake.
+    Threading::ScopedAudioCallback const audioCallback;
 
     bool effectChanged(false);
     if (auto const *const in = process->in_events)
