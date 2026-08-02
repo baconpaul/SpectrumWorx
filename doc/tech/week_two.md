@@ -161,6 +161,14 @@ One thing it leaves for item 1: the CLAP installed in
 
 ### 3 — Threading (5.8): a redesign, and its own project
 
+> **The design is written and this row is now a pointer to it:**
+> [`correct_the_threading.md`](correct_the_threading.md), 02.08.2026. It takes §2.2
+> below as its inventory, as this row asked, and adds four causes the audit did not
+> have — two owners of JUCE's lifetime, four process-wide UI statics that two
+> instances share, an allocation and a JUCE message post reachable from the audio
+> thread through a module's *destructor*, and the absence of any base parameter value
+> distinct from the LFO's output. Everything below is retained as the evidence.
+
 **SpectrumWorx deadlocks in Logic and in Bitwig**, in certain situations. That is
 first-hand, from running it, and it settles an argument this document was still
 having with itself: the six-step list below is **too small a goal**. It is a list
