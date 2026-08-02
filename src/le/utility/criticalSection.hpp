@@ -50,9 +50,15 @@
 ///   So the mutex keeps its own ownership, which is the only portable way to have
 /// the answer: a token unique to the calling thread, published under the mutex and
 /// readable by anyone. It costs one relaxed-ordered pointer store per lock and one
-/// per final unlock, and it is what lets the threading redesign assert its
-/// invariants while the lock still exists -- see doc/tech/correct_the_threading.md,
-/// which deletes the lock outright at stage 6.
+/// per final unlock, and it is what let the threading redesign assert its
+/// invariants while the lock still existed.
+///
+/// \note **Nothing in the plugin uses this any more.** Stage 6 deleted the
+/// processing lock rather than narrowing it -- see
+/// doc/tech/correct_the_threading.md -- and it was the only owner of a
+/// CriticalSection. What is left is this header, `ConditionVariable` (which
+/// nothing includes) and `spectrumWorx.cpp` (the 2016 host class, in no target).
+/// All three go together at stage 8.
 ///                                           (02.08.2026.) (SW port)
 #include "le/utility/assert.hpp"
 #include "le/utility/threadIdentity.hpp"

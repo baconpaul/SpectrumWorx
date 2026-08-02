@@ -1,0 +1,290 @@
+////////////////////////////////////////////////////////////////////////////////
+///
+/// engineOwnershipTests.cpp
+/// ------------------------
+///
+///   Who owns the engine, and what follows from it.
+///
+///   This was processLockTests.cpp, and everything it pinned was a property of a
+/// lock that no longer exists: that `SpectrumWorxCore::process()` took it with
+/// `try_lock`, that it returned false when it could not have it, and that the
+/// CLAP wrote silence when that happened. The lock is gone (stage 6), so those
+/// are not weaker properties now -- they are the wrong questions. The right ones
+/// are here.
+///
+///   The invariant that replaced the lock: **the audio thread owns the engine
+/// while one exists, and the main thread owns it while one does not**. Nothing
+/// waits, nothing is dropped, and the two never touch the same thing at once.
+/// `SpectrumWorxCore::currentThreadMayMutateEngineState()` is that sentence, and
+/// six assertions in the engine are written against it.
+///
+/// See doc/tech/correct_the_threading.md §2 and §5.
+///
+/// Copyright (c) 2026 the SpectrumWorx contributors.
+/// SPDX-License-Identifier: GPL-3.0-or-later
+///
+////////////////////////////////////////////////////////////////////////////////
+//------------------------------------------------------------------------------
+#include "goldens/engineHarness.hpp"
+
+#include "core/automatedModuleChain.hpp"
+#include "core/modules/moduleDSPAndGUI.hpp"
+#include "core/threading/publish.hpp"
+#include "core/threading/threadCheck.hpp"
+
+#include "le/spectrumworx/engine/parameters.hpp"
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <algorithm>
+#include <vector>
+//------------------------------------------------------------------------------
+namespace
+{
+constexpr std::uint32_t blockSize{256};
+constexpr std::uint8_t channels{2};
+constexpr float sampleRate{48000};
+
+/// An engine taken as far as a host takes it before the first block.
+class RunningEngine
+{
+  public:
+    RunningEngine()
+    {
+        engine_.setNumberOfChannels(channels, channels);
+        engine_.setSampleRate(sampleRate);
+        engine_.setBlockSize(blockSize);
+        REQUIRE(engine_.initialise());
+        engine_.resume();
+    }
+
+    ~RunningEngine() { engine_.suspend(); }
+
+    RunningEngine(RunningEngine const &) = delete; // makes non-copyable
+    RunningEngine &operator=(RunningEngine const &) = delete;
+
+    SWTest::Engine &operator*() { return engine_; }
+    SWTest::Engine *operator->() { return &engine_; }
+
+  private:
+    SWTest::Engine engine_;
+}; // class RunningEngine
+
+/// One block of whatever \p input holds, into \p output, through the engine.
+///
+/// \note Under a ScopedAudioCallback, which is what a host's process() opens and
+/// what makes `Threading::isAudioThread()` true -- so the engine's own
+/// assertions see what they would see in a DAW rather than what a test happens
+/// to be doing.
+void runOneBlock(SWTest::Engine &engine, std::vector<std::vector<float>> &input,
+                 std::vector<std::vector<float>> &output)
+{
+    std::vector<float const *> inputPointers(channels);
+    std::vector<float *> outputPointers(channels);
+    for (std::uint8_t channel(0); channel < channels; ++channel)
+    {
+        inputPointers[channel] = input[channel].data();
+        outputPointers[channel] = output[channel].data();
+    }
+
+    LE::SW::Threading::ScopedAudioCallback const audioCallback;
+    engine.process(inputPointers.data(), inputPointers.data(), outputPointers.data(), 1.0f,
+                   blockSize);
+}
+
+/// A buffer pattern no engine output can be mistaken for.
+constexpr float sentinel{-12345.0f};
+
+bool isUntouched(std::vector<std::vector<float>> const &output)
+{
+    return std::all_of(output.begin(), output.end(), [](std::vector<float> const &channel) {
+        return std::all_of(channel.begin(), channel.end(),
+                           [](float const sample) { return sample == sentinel; });
+    });
+}
+
+std::vector<std::vector<float>> makeInput()
+{
+    std::vector<std::vector<float>> input(channels, std::vector<float>(blockSize));
+    SWTest::generate(SWTest::Signal::Sweep, input[0], sampleRate);
+    input[1] = input[0];
+    return input;
+}
+} // anonymous namespace
+
+TEST_CASE("Who may mutate the engine follows from whether anything is processing",
+          "[core][ownership]")
+{
+    SWTest::Engine engine;
+
+    // Nothing is running, so this thread owns it outright -- which is how a
+    // preset load, a slot change and activate() itself are legal at all.
+    CHECK(!engine.engineIsRunning());
+    CHECK(engine.currentThreadMayMutateEngineState());
+
+    engine.setNumberOfChannels(channels, channels);
+    engine.setSampleRate(sampleRate);
+    engine.setBlockSize(blockSize);
+    REQUIRE(engine.initialise());
+    engine.resume();
+
+    // Now something is, and this thread is not it.
+    CHECK(engine.engineIsRunning());
+    CHECK(!engine.currentThreadMayMutateEngineState());
+
+    // Unless it is: inside a process callback, the audio thread is the owner.
+    {
+        LE::SW::Threading::ScopedAudioCallback const audioCallback;
+        CHECK(engine.currentThreadMayMutateEngineState());
+    }
+    CHECK(!engine.currentThreadMayMutateEngineState());
+
+    engine.suspend();
+    CHECK(engine.currentThreadMayMutateEngineState());
+}
+
+TEST_CASE("Every block is processed and written", "[core][ownership]")
+{
+    // The property the lock cost us. `process()` returned false whenever another
+    // thread held the processing lock, and every caller then had to decide what
+    // the host heard instead -- silence, in the end, because the alternative was
+    // the previous plugin's output at full level (week_two.md §2.1b). There is
+    // no such case now: nothing else can be inside the engine while this runs.
+    RunningEngine engine;
+
+    auto input(makeInput());
+    std::vector<std::vector<float>> output(channels, std::vector<float>(blockSize, sentinel));
+
+    runOneBlock(*engine, input, output);
+
+    // Silence would be a legitimate first block -- the engine has latency -- but
+    // the sentinel would not, and that is the whole question here.
+    CHECK(!isUntouched(output));
+}
+
+TEST_CASE("A spectral change while running waits, and lands when it stops", "[core][ownership]")
+{
+    // The FFT size was the worst path in the old model: it took the processing
+    // lock, blocking, on the message thread, and reallocated the entire spectral
+    // working set under it while audio ran. It is a deferral now -- the
+    // parameter moves, the setup does not, and the plugin asks the host to
+    // restart. See SpectrumWorxCLAP::deactivate().
+    using namespace LE::SW::GlobalParameters;
+
+    RunningEngine engine;
+
+    auto const originalFFTSize(engine->uncheckedEngineSetup().fftSize<unsigned int>());
+    REQUIRE(originalFFTSize != 1024);
+    CHECK(!engine->spectralSetupPending());
+
+    CHECK(engine->set<FFTSize>(1024));
+
+    // The parameter is what the user asked for...
+    CHECK(engine->parameters().get<FFTSize>() == 1024);
+    // ...and the engine is still running what it was running.
+    CHECK(engine->uncheckedEngineSetup().fftSize<unsigned int>() == originalFFTSize);
+    CHECK(engine->spectralSetupPending());
+
+    // And blocks keep coming through, at the old size, rather than being
+    // dropped for as long as the message thread holds a lock.
+    auto input(makeInput());
+    std::vector<std::vector<float>> output(channels, std::vector<float>(blockSize, sentinel));
+    runOneBlock(*engine, input, output);
+    CHECK(!isUntouched(output));
+
+    // The restart. This is what clap_plugin::deactivate does.
+    engine->suspend();
+    CHECK(engine->applyPendingSpectralSetup());
+
+    CHECK(!engine->spectralSetupPending());
+    CHECK(engine->engineSetup().fftSize<unsigned int>() == 1024);
+}
+
+TEST_CASE("A spectral change with nothing running is applied at once", "[core][ownership]")
+{
+    // The other half, and the reason there is no queue in it: with no audio
+    // thread the main thread owns the engine and simply does the work. Which is
+    // what every headless test, and a host setting parameters before activate(),
+    // relies on.
+    using namespace LE::SW::GlobalParameters;
+
+    SWTest::Engine engine;
+    engine.setNumberOfChannels(channels, channels);
+    engine.setSampleRate(sampleRate);
+    engine.setBlockSize(blockSize);
+    REQUIRE(engine.initialise());
+
+    CHECK(engine.set<FFTSize>(1024));
+    CHECK(!engine.spectralSetupPending());
+    CHECK(engine.engineSetup().fftSize<unsigned int>() == 1024);
+}
+
+TEST_CASE("A published chain comes back holding what it displaced", "[core][ownership]")
+{
+    // Publish and retire, in the one line that matters: the caller hands over a
+    // chain it built and gets the same object back full of the old modules, to
+    // destroy wherever it likes. Nothing is freed where the swap happened.
+    using LE::SW::AutomatedModuleChain;
+    using LE::SW::Threading::createModuleForSlot;
+    using LE::SW::Threading::publishChain;
+
+    SWTest::Engine engine;
+    engine.setNumberOfChannels(channels, channels);
+    engine.setSampleRate(sampleRate);
+    engine.setBlockSize(blockSize);
+    REQUIRE(engine.initialise());
+
+    LE::SW::Threading::ToEngineQueue toEngine;
+
+    // One module, installed the ordinary way.
+    LE::SW::Threading::publishSlot(engine, toEngine, 0, 0, createModuleForSlot(engine, 0, 0));
+    REQUIRE(engine.moduleChain().size() == 1);
+    auto const *const pFirst(engine.moduleChain().moduleAs<LE::SW::Module>(0).get());
+    REQUIRE(pFirst != nullptr);
+
+    // A whole chain over the top of it.
+    AutomatedModuleChain replacement;
+    auto *const pSecond(createModuleForSlot(engine, 1, 0));
+    REQUIRE(pSecond != nullptr);
+    replacement.push_back(LE::SW::Engine::node(*pSecond));
+    intrusive_ptr_release(&LE::SW::Engine::node(*pSecond)); // the chain owns it now
+
+    publishChain(engine, toEngine, replacement);
+
+    CHECK(engine.moduleChain().size() == 1);
+    CHECK(engine.moduleChain().moduleAs<LE::SW::Module>(0).get() == pSecond);
+
+    // And the caller's chain is holding the module that came out, still alive
+    // and still this thread's to destroy.
+    REQUIRE(replacement.size() == 1);
+    CHECK(&LE::SW::Engine::actualModule<LE::SW::Module>(*replacement.module(0)) == pFirst);
+}
+
+TEST_CASE("A slot change while running is a command rather than a mutation", "[core][ownership]")
+{
+    // With audio running the same call queues instead, and nothing happens to
+    // the chain until something drains it -- which is what makes the chain the
+    // audio thread's alone.
+    using LE::SW::Threading::createModuleForSlot;
+
+    RunningEngine engine;
+    LE::SW::Threading::ToEngineQueue toEngine;
+
+    auto *const pModule(createModuleForSlot(*engine, 0, 0));
+    REQUIRE(pModule != nullptr);
+    LE::SW::Threading::publishSlot(*engine, toEngine, 0, 0, pModule);
+
+    CHECK(engine->moduleChain().size() == 0);
+
+    // The drain, as process() does it.
+    LE::SW::Threading::ToEngine command{};
+    REQUIRE(toEngine.pop(command));
+    CHECK(command.kind == LE::SW::Threading::ToEngine::Kind::SetSlot);
+    {
+        LE::SW::Threading::ScopedAudioCallback const audioCallback;
+        CHECK(engine->installModuleInSlot(command.setSlot.slot,
+                                          static_cast<LE::SW::Module *>(command.setSlot.pModule)) ==
+              nullptr);
+    }
+    CHECK(engine->moduleChain().size() == 1);
+}

@@ -371,8 +371,8 @@ TEST_CASE("Saving while an LFO is running stores the setting, not the sweep",
     std::vector<float const *> inputPointers{input[0].data(), input[1].data()};
     std::vector<float *> outputPointers{output[0].data(), output[1].data()};
     for (unsigned block(0); block < 64; ++block)
-        REQUIRE(engine.process(inputPointers.data(), inputPointers.data(), outputPointers.data(),
-                               1.0f, blockSize));
+        engine.process(inputPointers.data(), inputPointers.data(), outputPointers.data(), 1.0f,
+                       blockSize);
 
     // The LFO really did move the live parameter -- otherwise the case below
     // would pass for the wrong reason.

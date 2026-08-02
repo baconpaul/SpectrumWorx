@@ -665,9 +665,22 @@ LFOImpl::linearisePeriodScale(Plugins::AutomatedParameterValue const nonlinearNo
 // host uses more than one tempo value at any given time is correct.
 //                                            (07.01.2011.) (Domagoj Saric)
 // Assume 120 BPM 4/4
-LFOImpl::value_type LFOImpl::Timer::barDuration_(60.0f / 120 * 4);
-std::uint8_t LFOImpl::Timer::measureNumerator_(4);
-bool LFOImpl::Timer::hasTempoInformation_(false);
+std::atomic<LFOImpl::value_type> LFOImpl::Timer::barDuration_(60.0f / 120 * 4);
+std::atomic<std::uint8_t> LFOImpl::Timer::measureNumerator_(4);
+std::atomic<bool> LFOImpl::Timer::hasTempoInformation_(false);
+
+namespace
+{
+/// \note Relaxed throughout; see the note on the declarations.
+template <typename T> T relaxed(std::atomic<T> const &value)
+{
+    return value.load(std::memory_order_relaxed);
+}
+template <typename T> void relaxed(std::atomic<T> &value, T const newValue)
+{
+    value.store(newValue, std::memory_order_relaxed);
+}
+} // anonymous namespace
 
 LFOImpl::Timer::Timer() { reset(); }
 
@@ -694,18 +707,18 @@ LFOImpl::Timer::TimingInformationChange LFOImpl::Timer::updatePositionAndTimingI
     // duration changes).
     //                                        (02.02.2011.) (Domagoj Saric)
     TimingInformationChange const changeInfo = {
-        barDuration_ / barDuration,           // barDurationChangeRatio_
-        measureNumerator_ != measureNumerator // measureNumeratorChanged_
+        relaxed(barDuration_) / barDuration,           // barDurationChangeRatio_
+        relaxed(measureNumerator_) != measureNumerator // measureNumeratorChanged_
     };
 
-    hasTempoInformation_ = true;
+    relaxed(hasTempoInformation_, true);
 
-    barDuration_ = barDuration;
-    measureNumerator_ = measureNumerator;
+    relaxed(barDuration_, barDuration);
+    relaxed(measureNumerator_, measureNumerator);
 
     LE_ASSERT(std::isfinite(currentTimeInBars_));
     LE_ASSERT(std::isfinite(previousTimeInBars_));
-    LE_ASSERT(std::isfinite(barDuration_));
+    LE_ASSERT(std::isfinite(relaxed(barDuration_)));
 
     return changeInfo;
 }
@@ -716,7 +729,7 @@ LFOImpl::Timer::updatePositionAndTimingInformation(unsigned int const deltaNumbe
 {
     // Position
     float const timeToAdvanceInSeconds(Math::convert<float>(deltaNumberOfSamples) / sampleRate);
-    float const timeToAdvanceInBars(timeToAdvanceInSeconds / barDuration_);
+    float const timeToAdvanceInBars(timeToAdvanceInSeconds / relaxed(barDuration_));
 
     LE_ASSERT((currentTimeInBars_ >= previousTimeInBars_) || (currentTimeInBars_ == 0));
     previousTimeInBars_ = currentTimeInBars_;
@@ -728,14 +741,14 @@ LFOImpl::Timer::updatePositionAndTimingInformation(unsigned int const deltaNumbe
     float const barDuration(60.0f / 120 * measureNumerator);
 
     TimingInformationChange const changeInfo = {
-        barDuration_ / barDuration,           // barDurationChangeRatio_
-        measureNumerator_ != measureNumerator // measureNumeratorChanged_
+        relaxed(barDuration_) / barDuration,           // barDurationChangeRatio_
+        relaxed(measureNumerator_) != measureNumerator // measureNumeratorChanged_
     };
 
-    hasTempoInformation_ = false;
+    relaxed(hasTempoInformation_, false);
 
-    barDuration_ = barDuration;
-    measureNumerator_ = measureNumerator;
+    relaxed(barDuration_, barDuration);
+    relaxed(measureNumerator_, measureNumerator);
 
     return changeInfo;
 }
@@ -748,15 +761,18 @@ void LFOImpl::Timer::setPosition(unsigned int const numberOfSamples, float const
 
 void LFOImpl::Timer::setPosition(float const timeInSeconds)
 {
-#ifndef LE_SW_SDK_BUILD
-    // Assume 120 BPM 4/4
-    LE_ASSUME(hasTempoInformation_ == false);
-    LE_ASSUME(barDuration_ == 4);
-    LE_ASSUME(measureNumerator_ == 60.0f / 120 * 4);
-#endif // LE_SW_SDK_BUILD
+    /// \note Three `LE_ASSUME`s stood here -- "assume 120 BPM 4/4" -- and two of
+    /// them compared the wrong pair: `barDuration_ == 4` and `measureNumerator_
+    /// == 60.0f / 120 * 4`, i.e. each against the other's value. An `LE_ASSUME`
+    /// is a promise to the optimiser rather than a check, so a false one is
+    /// undefined behaviour and nothing would have said so. Deleted rather than
+    /// corrected: nothing calls this (`Engine::Processor::setPosition` is the
+    /// only caller and has none of its own), so a promise about it cannot be
+    /// tested and is not worth keeping.
+    ///                                       (02.08.2026.) (SW port)
 
     // Position
-    float const timeInBars(timeInSeconds / barDuration_);
+    float const timeInBars(timeInSeconds / relaxed(barDuration_));
 
     LE_ASSERT((currentTimeInBars_ > previousTimeInBars_) || (currentTimeInBars_ == 0));
     previousTimeInBars_ = currentTimeInBars_;
@@ -778,9 +794,9 @@ void LFOImpl::Timer::reset()
     /// LFOImpl::Timer::reset()) and process() (which again fetches valid tempo
     /// information).
     ///                                       (28.05.2012.) (Domagoj Saric)
-    //hasTempoInformation_ = false;
-    barDuration_ = 60.0f / 120 * 4;
-    measureNumerator_ = 4;
+    //relaxed( hasTempoInformation_, false );
+    relaxed(barDuration_, 60.0f / 120 * 4);
+    relaxed(measureNumerator_, std::uint8_t(4));
 }
 
 LFOImpl::value_type LFOImpl::Timer::measureNumeratorFloat()

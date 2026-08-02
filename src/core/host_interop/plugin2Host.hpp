@@ -100,6 +100,8 @@ class LE_NOVTABLE Plugin2HostInteropControler
     void modulesChanged(AutomatedModuleChain const &, std::uint8_t firstModuleIndex,
                         std::uint8_t lastModuleIndex) const;
     void moduleChangedByUser(std::uint8_t chainParameterIndex, Module const *) const;
+    /// \see the definition for why the effect index alone is the useful form.
+    void moduleChangedByUser(std::uint8_t chainParameterIndex, std::int8_t effectIndex) const;
 
     static bool canParameterBeAutomated(Plugins::ParameterIndex, void const * /*pContext*/)
     {

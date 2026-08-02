@@ -551,9 +551,24 @@ LE::Utility::IntrusivePtr<PresetModule> createModule(std::uint8_t effectIndex);
 #define MB_WARNING "SW SDK warning:"
 #define MB_ERROR "SW SDK error:"
 #endif // LE_SW_SDK_BUILD
-LE_COLD ParametersLoader::ModuleChain ParametersLoader::loadModuleChain(ModuleChain &currentChain)
+/// \note It took the live chain and stole any module whose effect matched,
+/// leaving the rest to be created -- an allocation saved, at the price of the
+/// only mutation of the live chain a preset load performed, from the message
+/// thread, under the processing lock. The chain belongs to the audio thread now,
+/// so the reuse cannot survive and the lock has nothing left to hold: every
+/// module in the new chain is built here, the finished chain is published, and
+/// what it displaces comes back to be destroyed. See
+/// doc/tech/correct_the_threading.md §5.
+///
+///   It also fixes a smaller thing on the way. A reused module kept its channel
+/// state -- its analysis history, its LFO phase -- so loading a preset over one
+/// that happened to use the same effect started it mid-flight, and loading the
+/// same preset twice in a row did not give the same result as loading it once.
+///                                           (02.08.2026.) (SW port)
+LE_COLD void ParametersLoader::loadModuleChain(ModuleChain &newChain)
 {
     LE_ASSERT_MSG(!switchedToModuleParameters(), "Already switched to module parameters.");
+    LE_ASSERT(newChain.empty());
 
     {
         auto const *const pModuleParameters(
@@ -564,7 +579,7 @@ LE_COLD ParametersLoader::ModuleChain ParametersLoader::loadModuleChain(ModuleCh
 #else
         LE_ASSERT_MSG(pModuleParameters, "Module parameters node not found");
         if (!pModuleParameters)
-            return ModuleChain();
+            return;
 #endif
         /// \note Unfiltered for 2.x, because there the element's *name* is the
         /// effect and no two are alike; filtered for 3.0, so that anything a
@@ -575,7 +590,6 @@ LE_COLD ParametersLoader::ModuleChain ParametersLoader::loadModuleChain(ModuleCh
                            : pModuleParameters->FirstChildElement();
     }
 
-    ModuleChain newChain;
     std::int8_t const noModule(-1);
     std::uint8_t moduleIndex(0);
     while (pParameters_)
@@ -591,22 +605,15 @@ LE_COLD ParametersLoader::ModuleChain ParametersLoader::loadModuleChain(ModuleCh
         {
             LE_ASSUME(effectIndex >= 0);
             using namespace Engine;
-            auto pPreexistingModule(std::find_if(
-                currentChain.begin(), currentChain.end(), [=](ModuleNode const &module) {
-                    return actualModule<PresetModule>(module).effectTypeIndex() == effectIndex;
-                }));
-            bool const preexistingModule(!currentChain.isEnd(pPreexistingModule));
-            auto pModule(preexistingModule ? &actualModule<PresetModule>(*pPreexistingModule)
+            auto pModule(
 #ifdef LE_SW_SDK_BUILD
-                                           : Engine::createModule(effectIndex)
+                Engine::createModule(effectIndex)
 #else
-                                           : ModuleFactory::create<PresetModule>(effectIndex)
+                ModuleFactory::create<PresetModule>(effectIndex)
 #endif // LE_SW_SDK_BUILD
             );
             if (pModule)
             {
-                if (preexistingModule)
-                    currentChain.remove(*pModule);
                 newChain.push_back(*pModule);
                 pModule->loadPresetParameters(*this);
                 ++moduleIndex;
@@ -626,7 +633,6 @@ LE_COLD ParametersLoader::ModuleChain ParametersLoader::loadModuleChain(ModuleCh
     LE_ASSERT_MSG(moduleIndex <= SW::Constants::maxNumberOfModules,
                   "Preset loaded too many modules?");
 #endif // LE_SW_SDK_BUILD
-    return newChain;
 }
 
 bool ParametersLoader::switchedToModuleParameters() const

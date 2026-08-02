@@ -312,15 +312,7 @@ below for what it found.
 **5 — Engine → UI: `Module` loses its `ModuleUI`.** ✅ *done, 02.08.2026, in two commits;*
 see §6.5.
 
-**6 — Publish and retire; the lock is deleted.** §5, applied to slot edits, preset load,
-state load, sample loads and the spectral setup. Also **`LFOImpl::Timer`'s three tempo
-statics**, deferred here from stage 1 (see §6.1): the transport becomes a per-instance value
-the audio thread publishes, and `clampFreePeriod`, `snapSyncedPeriod`, `defaultSyncType` and
-`adjustValue{For,From}Preset` take it rather than reading a global.
-**`processCriticalSection_` is deleted**,
-`SpectrumWorxCore::process` returns `void` again, and `runEngine`'s silence branch goes with
-it — which is `week_two.md`'s own stated measure of whether this worked, and closes the
-first threading entry in `tech_debt.md`.
+**6 — Publish and retire; the lock is deleted.** ✅ *done, 02.08.2026;* see §6.6.
 
 **7 — `sw-dsp` links no JUCE; the test binary splits.** `presets.{hpp,cpp}` drop
 `juce::String`/`juce::File` for `std::string` (8 sites); `presetFile.cpp` and
@@ -629,12 +621,105 @@ any kind.** `tools/show-ui` fills slots and never empties one. There are now two
 `tests/gui/twoInstanceTests.cpp`, and the second reproduces the exact condition — verified
 by removing all three guards and watching it fail, not by inspection.
 
+### 6.6 — What stage 6 did
+
+The headline: **there is no lock.** `processCriticalSection_`, `getProcessingLock()`,
+`ProcessLockUnlocker` and `currentThreadOwnsTheProcessLock()` are gone, `SpectrumWorxCore::process`
+returns `void`, and nothing in the audio callback waits for anything.
+
+**The invariant that replaced it.** `currentThreadMayMutateEngineState()` is now
+`!engineIsRunning() || Threading::isAudioThread()`, which is §2's rule in one line: while
+the plugin is activated the audio thread owns the engine, and while it is not the main
+thread does. `engineIsRunning()` is `suspend()`/`resume()`, promoted out of `#ifndef NDEBUG`
+because it is load-bearing now — every publish helper branches on it. The six assertions
+that used to say "I hold the lock" say this instead.
+
+**Publish and retire, in four messages.** `ToEngine` gained `SetSlot`, `MoveModule`,
+`SwapChain` and `SwapSample`; `ToUI` gained `ChainChanged` and `Retire`. The engine side is
+two functions, both pure pointer surgery and both legal inside `process()`:
+`installModuleInSlot()` (takes a reference out before relinking, because unlinking would
+otherwise call the deleter on the audio thread) and `swapModuleChain()`, over a new
+`ModuleChainBase::swap()` — three splices of a circular list, no destruction. Whatever comes
+out goes back through `Retire` and is destroyed on the main thread.
+
+**`Threading::publish{Slot,ModuleMove,Chain}()` is where the branch lives**, so that no
+caller has to know which side of `activate()` it is on: with nothing processing they apply
+the change directly, and with audio running they queue it. That is what keeps every headless
+test working without a message pump and what makes the preset loader one code path.
+
+**The granted concession was not needed after all**, except in one place. The plan allowed
+`ModuleFactory::create` inside the callback under `SST_CPPUTILS_RTSAN_DISABLE`. It turned
+out the preset loader already built its modules on the main thread, and a slot change is the
+same operation with one module instead of five — so `Threading::createModuleForSlot()` builds
+it there and the audio thread only links it. The exception is a **host** writing a slot
+selector: that arrives as a parameter event inside `process()`, and deferring it would mean a
+round trip to the main thread and back, so it still allocates. Recorded in `tech_debt.md`.
+
+**The spectral setup goes through the host.** `setGlobalParameter` for FFT size, overlap
+factor *and window function* now records `spectralSetupPending_` instead of reallocating;
+`drainCommands()` and `presetChangeEnd()` ask for `clap_host::request_restart()`, and
+`deactivate()` applies it — where there is definitionally no audio thread, and which is the
+only point at which `clap_plugin_latency` permits the latency to change. The window function
+joined the other two because `calculateWindowAndWOLAGain()` rewrites the analysis and
+synthesis windows the WOLA path is reading; it allocated nothing, so it looked harmless.
+`engineSetup()`'s assertion tolerates the gap while a restart is pending — the change §7
+predicted, and it is to that assertion's contract rather than to any call site.
+
+**The sample is a pointer now.** `SpectrumWorxCLAP` holds `Sample *pSample_`, swapped by
+command, plus its own `sampleFile_`/`decodedSampleRate_` so that `currentSampleFile()` and
+`activate()`'s re-read answer without touching the audio thread's copy. `Sample::load()` no
+longer takes a critical section: it decodes into an object nobody else can see. The
+`try_lock` in `runEngine()` went with it, and with it the case where a block played the
+host's side chain port because the message thread happened to be busy.
+
+**The preset loader stopped stealing modules.** `loadModuleChain()` reused any module in the
+live chain whose effect matched — which was the *only* mutation of the live chain a preset
+load performed, and it cannot survive. Every module in the new chain is built fresh. That
+also fixes a smaller thing: a reused module kept its channel state, so loading a preset over
+one using the same effect started it mid-flight, and loading the same preset twice did not
+give the same result as loading it once. The corpus digests did not move.
+
+**The rack became a function of the chain.** `createChainGUIs`, `dropOrphanedRegions` and
+`moveModules` collapsed into one `resyncModuleRack()`: drop strips whose module has gone,
+build strips for modules that have none, put every one of them where the chain says. It is
+a recomputation rather than a diff, because between a click and the engine applying it the
+rack is what the user asked for and the chain is what is playing. `ToUI::ChainChanged`
+drives it, coalesced. `EditorModuleInitialiser` is deleted, and with it the last route by
+which filling a slot built a JUCE component — including `Detail::updateGUIForChangedModule`,
+which did it *from `process()`* when a host wrote a slot selector.
+
+**Three things this found on the way**, none of them the point:
+
+- **`ModuleUI::moveToSlot()` never recorded the slot.** `slot_` sat at the zero it was
+  constructed with for as long as every caller recovered the slot from `getX()` instead.
+  Nothing noticed because `slot()` had no reader but an assertion.
+- **`AutomatedModuleChain::module()` hides the base overload** and answers with an
+  `IntrusivePtr` that is merely null past the end — which `isEnd()` then reads as a node that
+  is not the root, i.e. as a *full* slot. `installModuleInSlot()` qualifies the call.
+- **Two `LE_ASSUME`s in `LFOImpl::Timer::setPosition()` compared the wrong pair** —
+  `barDuration_ == 4` and `measureNumerator_ == 60.0f / 120 * 4`, each against the other's
+  value. An `LE_ASSUME` is a promise rather than a check, so a false one is undefined
+  behaviour and nothing would have said so. Deleted: nothing calls that function.
+
+**What the LFO timer got instead of per-instance state.** Its three tempo statics are
+`std::atomic` with relaxed ordering, so two instances no longer race on them — but they are
+still shared, which is still wrong for two tracks at two tempi. Making them per-instance
+means threading a timer through `snapPeriodScale()`, `clampFreePeriod()` and the two
+period-scale bounds, all static and all called from the parameter layer and the editor. That
+is the LFO parameter interface's redesign, not this one's; see §8.
+
+`processLockTests.cpp` is `engineOwnershipTests.cpp` now. Everything it pinned was a property
+of the lock — that `process()` took it with `try_lock`, that it returned false, that the CLAP
+wrote silence — and those are not weaker questions now, they are the wrong ones. What is
+pinned instead: who may mutate the engine and when, that every block is written, that a
+spectral change waits and then lands, and that a published chain comes back holding what it
+displaced.
+
 ---
 
-## 6.9 — Where the cross-thread state is, as of stage 5
+## 6.9 — Where the cross-thread state is, as of stage 6
 
-The inventory this redesign is measured by. **Stages 0–5 are done; 6, 7 and 8 are not**, so
-this is a mid-point picture, and the "stage 6" rows are exactly what that stage is for.
+The inventory this redesign is measured by. **Stages 0–6 are done; 7 and 8 are not.**
 
 | What | Shared how | State |
 |---|---|---|
@@ -643,17 +728,18 @@ this is a mid-point picture, and the "stage 6" rows are exactly what that stage 
 | Modulated values, for painting | `ValueMailbox`, written per block, swept at 30 Hz | ✅ |
 | Plugin → host notifications | `UIEdits` ring | ✅ (was already right) |
 | Which thread is which | `Threading::{isMainThread,isAudioThread}` | ✅ |
-| Who holds the processing lock | `Utility::CriticalSection`, owner token | ✅ |
-| **The module chain** | **`processCriticalSection_`** — and `setModuleInSlot`, `removeModule`, `moduleDragEnd` take **nothing at all** | stage 6 |
-| **`Engine::Setup` and the spectral storage** | same lock, taken **blocking on the message thread**, whole working set reallocated under it | stage 6 |
-| **The `Sample`** | same lock; `try_lock` on the audio side, which is why a failed lock plays the host's port instead | stage 6 |
-| **`LFOImpl::Timer`'s tempo** | three process-wide statics, shared by every instance | stage 6 (deferred from 1, §6.1) |
+| Who owns the engine | `engineIsRunning()`: the audio thread while activated, the main thread otherwise | ✅ |
+| The module chain | `ToEngine::{SetSlot,MoveModule,SwapChain}` + `ToUI::Retire`; built on the main thread, linked on the audio thread | ✅ |
+| `Engine::Setup` and the spectral storage | `spectralSetupPending_` + `clap_host::request_restart()`, applied in `deactivate()` | ✅ |
+| The `Sample` | `ToEngine::SwapSample` + `ToUI::Retire`; the main thread keeps the file name and the decoded rate | ✅ |
+| The module rack | recomputed from the chain on `ToUI::ChainChanged`; nothing walks it incrementally | ✅ |
+| **`LFOImpl::Timer`'s tempo** | three process-wide statics, now `std::atomic` — no longer a race, still shared between instances | §8 |
 | `PopupMenu::menuActive_` | process-wide `bool` | left deliberately, §6.1 — but see below |
 | `Theme::settings()` | process-wide, and arguably correct: these are application preferences | not addressed |
 
-So the lock is load-bearing for exactly three things, all structural, all stage 6 — which is
-the stage that deletes it. Nothing in `process()` blocks on it today; the one remaining
-`try_lock` is the sample swap.
+**There is no lock.** `Utility::CriticalSection` still exists as a header, and nothing in any
+target uses it — `ConditionVariable` is included by nothing and `spectrumWorx.cpp` is in no
+target. All three go at stage 8.
 
 **One better idea than `menuActive_`**, from reviewing this: the flag exists so that a
 dying editor does not leave a menu pointing at it. `juce::PopupMenu::dismissAllActiveMenus()`
@@ -663,31 +749,23 @@ in `~SpectrumWorxEditor` says the same thing without a process-wide `bool`. Stag
 
 ## 7. What is still missing
 
-**Stages 6, 7 and 8.** Stage 6 is the headline — it is what makes `process()` lock free —
-and it is deliberately not half done: removing the lock before chain mutation, preset load,
-state load, the sample swap and the spectral setup have all moved off the message thread
-would be a regression wearing the shape of progress. §6.9 is the list it has to clear.
+**Stages 7 and 8.** Stage 7 is a layering job — `sw-dsp` still links `juce_core`,
+`juce_audio_basics` and `juce_audio_formats`, and goal 3 is that it links none of them.
+Stage 8 is the proof: rtsan with the editor open and every knob dragged, tsan on two
+instances, and the DAWs.
 
-Two things learned since it was planned, which stage 6 has to take account of:
-
-- **`engineSetup()` asserts that the setup agrees with the parameters**, and that assertion
-  is reached from all over `process()`. So the `request_restart` route (§5) cannot simply
-  set the parameter and wait: either the parameter waits too — and the host reads a stale
-  FFT size until the restart — or the staleness has to become legal while a restart is
-  pending. The second is the honest one, and it is a change to `isEngineSetupUpToDate()`'s
-  contract rather than to a call site.
-- **A slot change is currently synchronous and the editor depends on it.**
-  `addUserAddedModule` takes focus on the strip that `setModuleInSlot` built. Under
-  `ToEngine::SetSlot` that becomes "build the strip when `ToUI::SlotChanged` comes back",
-  which is a change to the editor's flow in several places — and §6.5a is what that kind of
-  change costs when it is not covered.
+**`request_restart` has not been driven by a real host.** The test hosts in `tests/clap/`
+implement it as a no-op observer, which is enough to say the plugin asks and not enough to
+say a DAW answers. Until stage 8's Logic and Bitwig pass, a host that ignores the request
+leaves the FFT size parameter reading one thing and the engine running another — visible,
+harmless, and not what anyone asked for. §10 names the fallback.
 
 **A backtrace pair from the two-instance deadlock**, one from each side, while it still
 reproduces. §1A names a plausible cycle — the message thread holding the message-manager
 lock and blocking on the processing lock in `destroyGUI()`, against the audio thread holding
-the processing lock and calling `repaint()` into AppKit. Both halves of that cycle are now
-gone (§6.5), so if the deadlock survives, the cause is elsewhere and the backtraces are the
-only way to find it.
+the processing lock and calling `repaint()` into AppKit. Every part of that cycle is now
+gone — the lock itself included — so if the deadlock survives, the cause is elsewhere and
+the backtraces are the only way to find it.
 
 ---
 
@@ -695,10 +773,15 @@ only way to find it.
 
 These go to `tech_debt.md` as this project's own leavings.
 
-- **Creating an effect allocates on the audio thread.** A granted concession. The command
-  handler calls `ModuleFactory::create` inline under `SST_CPPUTILS_RTSAN_DISABLE`. Doing it
-  properly needs a main-thread-readable snapshot of the storage factors, which is the one
-  piece of machinery this design does not otherwise require.
+- **A host writing a slot selector allocates on the audio thread.** What is left of the
+  granted concession, and only this: the interface builds its modules on the main thread and
+  hands the engine a pointer, but a host's parameter event arrives inside `process()` and
+  deferring it would mean a round trip to the main thread and back before the slot changed.
+- **The LFO's tempo is shared between instances.** Atomic, so no longer a race, but two
+  tracks at two tempi still see one tempo. Per-instance means threading a timer through
+  `snapPeriodScale()`, `clampFreePeriod()` and the two period-scale bounds — all static, all
+  called from the parameter layer and the editor. That is the LFO parameter interface's
+  redesign rather than this one's.
 - **Dragging the base with the LFO active.** The data is plumbed in stage 3 — the model
   carries both values — but the four sites that disable the knob stay, and drawing the sweep
   around a live knob is a skin decision.

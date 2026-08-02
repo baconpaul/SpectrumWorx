@@ -428,7 +428,11 @@ class ParametersLoader : private PresetHandler
     typedef AutomatedModuleChain ModuleChain;
 #endif // LE_SW_SDK_BUILD
 
-    ModuleChain loadModuleChain(ModuleChain &currentChain);
+    /// \note Fills \p newChain rather than returning one, so that the call stays
+    /// dependent on a template parameter and clang does not need the chain to be
+    /// complete where the template is *defined*. Same reason as the note at the
+    /// call site.
+    void loadModuleChain(ModuleChain &newChain);
 
     std::string_view getSampleFileName();
 
@@ -761,19 +765,14 @@ LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignor
 
         GlobalParameters::Parameters newParameters;
         LE::Parameters::forEach(newParameters, parametersLoader);
-        auto &currentChain(loader.targetChain());
         //...mrmlj...clang's early template instantiation...AutomatedModuleChain newChain;
-        typename std::remove_reference<decltype(currentChain)>::type newChain;
-        {
-            auto const lock(loader.processingLock()); //...mrmlj...
-            newChain = parametersLoader.loadModuleChain(currentChain);
-            LE::Utility::ignoreUnused(lock);
-        }
+        typename std::remove_reference<decltype(loader.targetChain())>::type newChain;
+        parametersLoader.loadModuleChain(newChain);
 #ifndef LE_SW_SDK_BUILD
         if (loader.onlySetParameters())
         {
             loader.targetGlobalParameters() = newParameters;
-            currentChain = std::move(newChain);
+            loader.targetChain() = std::move(newChain);
             return true;
         }
 #endif // LE_SW_SDK_BUILD
@@ -796,13 +795,15 @@ LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignor
             if (!initialiseModule(Engine::actualModule<Module>(module), moduleIndex++))
                 newChain.remove(module);
         });
-        {
-            auto const lock(loader.processingLock()); //...mrmlj...
-            currentChain = std::move(newChain);
-            LE_ASSERT(newChain.size() == 0);
-            LE_ASSERT(currentChain.size() == moduleIndex);
-            LE::Utility::ignoreUnused(lock);
-        }
+
+        /// \note And this is the handover. Everything above happened on the
+        /// calling thread against a chain nothing else can see; this is the one
+        /// step that touches the engine, and whether it happens here or at the
+        /// top of the next block is the publisher's business rather than this
+        /// function's. `newChain` comes back holding whatever it displaced, and
+        /// its destructor is what finally lets those modules go.
+        ///                                   (02.08.2026.) (SW port)
+        loader.publishChain(newChain);
         loader.moduleChainFinished(moduleIndex, parametersLoader.syncedLFOFound());
         return true;
     }

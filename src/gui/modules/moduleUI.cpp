@@ -441,6 +441,14 @@ void ModuleUI::setUpForEffect(char const *const effectName, char const *const ef
 
 void ModuleUI::moveToSlot(std::uint8_t const slotIndex)
 {
+    /// \note The assignment is new, and its absence was invisible for as long as
+    /// every caller recovered the slot from `getX()` instead -- `slot_` sat at
+    /// the zero it was constructed with while `slot()` was only ever read by an
+    /// assertion. It is the answer now: the rack is what the user asked for and
+    /// the chain is what is playing, so a strip has to know its own place
+    /// without asking the chain.
+    ///                                       (02.08.2026.) (SW port)
+    slot_ = slotIndex;
     std::uint16_t const myHorizontalOffset(horizontalOffset + slotIndex * (width + distance));
     setTopLeftPosition(myHorizontalOffset, verticalOffset);
 }
@@ -708,11 +716,6 @@ ModuleUI::Module &ModuleUI::module()
     return *pModule_;
 }
 ModuleUI::Module const &ModuleUI::module() const { return const_cast<ModuleUI &>(*this).module(); }
-
-Utility::CriticalSectionLock ModuleUI::getProcessingLock() const
-{
-    return editor().getProcessingLock();
-}
 
 //------------------------------------------------------------------------------
 namespace Detail

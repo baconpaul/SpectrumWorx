@@ -283,6 +283,21 @@ class ModuleChainBase :
 
     void clear();
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Exchanges the contents of two chains, without destroying anything.
+    ///
+    /// \note What publish-and-retire is made of. `operator=( && )` clears first,
+    /// so it *destroys* the modules it displaces -- which on the audio thread is
+    /// a `free()` inside the callback. This is three splices of a circular list
+    /// and no ownership change at all: the caller hands over a chain holding the
+    /// new modules and gets the same object back holding the old ones, to
+    /// destroy wherever it likes.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    void swap(ModuleChainBase &);
+
     static iterator iterator_to(Node &);
     static const_iterator iterator_to(Node const &);
 

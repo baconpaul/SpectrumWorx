@@ -74,23 +74,34 @@ New entries go at the top of their area.
 
 ## Threading
 
-- **A block that cannot have the processing lock is still dropped; it is only
-  the garbage that has gone.** (01.08.2026, item 0) The host now gets silence
-  rather than whatever was in its buffer, which is a correct answer and not a
-  good one. Every preset load and every FFT-size change is an audible gap whose
-  length is decided by how long the UI thread holds a lock the audio thread is
-  racing. Item 3 replaces the arrangement; the measure of success is that
-  `runEngine()` stops needing the branch. Until then the gap is deliberate, and
-  that deserves to be written down somewhere other than a code comment.
+- ~~**A block that cannot have the processing lock is still dropped.**~~ *Closed
+  02.08.2026 by `correct_the_threading.md` stage 6.* There is no lock, so there
+  is no block to drop: `SpectrumWorxCore::process()` returns `void` again and
+  `runEngine()`'s silence branch is gone, which is the measure of success
+  `week_two.md` item 3 set for itself.
 
-- **`currentThreadOwnsTheProcessLock()` returns a hardcoded `true`.**
-  (01.08.2026, from §2.2) All six `LE_ASSERT(currentThreadOwnsTheProcessLock())`
-  sites are therefore vacuous, and have been for the life of the port. The
-  Windows arm is worse than absent: it `reinterpret_cast`s a
-  `std::recursive_mutex` to a `CRITICAL_SECTION`, which the header itself admits
-  is invalid and which was invalid for the MS STL's `std::mutex` before that.
-  Item 3 lists making it real as a prerequisite, so this is *nearly* owned — but
-  the Windows half is Windows bring-up's and belongs to neither.
+- ~~**`currentThreadOwnsTheProcessLock()` returns a hardcoded `true`.**~~ *Closed
+  02.08.2026.* Stage 0 made it real; stage 6 deleted the lock it was about. The
+  six assertion sites now read `currentThreadMayMutateEngineState()`, which is
+  "the audio thread owns the engine while one exists, and the main thread owns it
+  while one does not". The invalid `reinterpret_cast` to a `CRITICAL_SECTION`
+  went with it, so the Windows half is closed too.
+
+- **A host writing a slot selector allocates on the audio thread.** (02.08.2026,
+  from `correct_the_threading.md` §8) What is left of the concession stage 6 was
+  granted. Every other route — the interface, a preset, a session — builds its
+  modules on the main thread and hands the engine a pointer to link. A host's
+  parameter event arrives inside `process()`, and deferring it means a round trip
+  to the main thread and back before the slot changes, which is a latency a
+  generic panel would notice.
+
+- **`LFOImpl::Timer`'s tempo is one value for every instance in the process.**
+  (02.08.2026, from §8) `std::atomic` since stage 6, so it is no longer a data
+  race — but two tracks at two tempi still see one tempo. Making it per-instance
+  means threading a timer through `snapPeriodScale()`, `clampFreePeriod()` and
+  the two period-scale bounds, all of them static and all called from the
+  parameter layer and the editor; that is the LFO parameter interface's redesign
+  rather than the threading model's.
 
 - **`UIEdits` drops on full, and that is wrong for gestures.** (01.08.2026, from
   §2.2) The ring is otherwise correct. Dropping a `Kind::Value` is right — the

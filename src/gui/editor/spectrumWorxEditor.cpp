@@ -16,8 +16,8 @@
 #include "core/host_interop/plugin2Host.hpp"
 #include "core/modules/moduleDSPAndGUI.hpp"
 #include "core/spectrumWorxCore.hpp"
+#include "core/threading/publish.hpp"
 #include "gui/editor/editorHost.hpp"
-#include "gui/editor/editorModuleInitialiser.hpp"
 #include "gui/editor/presetLoading.hpp"
 
 #include "le/parameters/lfo.hpp"
@@ -176,7 +176,7 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost)
     preset_.setEnabled(false);
 #endif // LE_NO_PRESETS
 
-    createChainGUIs(moduleChain());
+    resyncModuleRack();
 
     setOpaque(true);
     setVisible();
@@ -221,7 +221,7 @@ SpectrumWorxEditor::~SpectrumWorxEditor()
     // Only meaningful while on screen, and JUCE asserts otherwise.
     if (isShowing() || isOnDesktop())
         grabKeyboardFocus();
-    destroyChainGUIs(moduleChain());
+    destroyChainGUIs();
 
     /// \note
     ///   Required now that std::optional does not mark itself as
@@ -298,11 +298,6 @@ SpectrumWorxEditor::Host const &SpectrumWorxEditor::host() const
 
 Program &SpectrumWorxEditor::program() { return effect().program(); }
 Program const &SpectrumWorxEditor::program() const { return effect().program(); }
-
-Utility::CriticalSectionLock SpectrumWorxEditor::getProcessingLock() const
-{
-    return effect().getProcessingLock();
-}
 
 void SpectrumWorxEditor::togglePresetBrowser(juce::Button const &button)
 {
@@ -476,22 +471,42 @@ void SpectrumWorxEditor::moduleDragEnd(ModuleUI &moduleUI, juce::MouseEvent cons
     int const gradientToTargetOffset((ModuleUI::width + ModuleUI::distance) / 2);
     targetX -= moveLeft ? -gradientToTargetOffset : +gradientToTargetOffset;
     LE_ASSERT((signed(targetX - sourceX) % signed(slotWidth)) == 0);
-    moduleUI.setTopLeftPosition(targetX, ModuleUI::verticalOffset);
-
-    int const offset(moveLeft ? +static_cast<int>(slotWidth) : -static_cast<int>(slotWidth));
 
     std::uint8_t const sourceIndex((sourceX - ModuleUI::horizontalOffset) / slotWidth);
     std::uint8_t const targetIndex((targetX - ModuleUI::horizontalOffset) / slotWidth);
-    //...mrmlj...
-    //if ( sourceIndex > targetIndex )
-    //    std::swap( sourceIndex, targetIndex );
+    if (sourceIndex == targetIndex)
+        return;
 
-    moveModules(moduleUI, Math::abs(targetIndex - sourceIndex), offset);
-    auto &moduleChain(this->moduleChain());
-    moduleChain.moveModule(sourceIndex, targetIndex);
+    /// \note The rack is told first and the engine second, which is the order
+    /// every edit takes now: the strips move here so the drag ends where the
+    /// user let go, and resyncModuleRack() puts them where the chain says once
+    /// the engine has caught up. They agree either way -- this is the same
+    /// permutation, applied to the same two orderings.
+    ///                                       (02.08.2026.) (SW port)
+    std::int8_t const from(static_cast<std::int8_t>(sourceIndex));
+    std::int8_t const to(static_cast<std::int8_t>(targetIndex));
+    std::int8_t const step(from < to ? -1 : +1);
+    for (auto &pRegion : moduleRegions_)
+    {
+        if (!pRegion)
+            continue;
+        auto const slot(static_cast<std::int8_t>(pRegion->slot()));
+        if (slot == from)
+            pRegion->moveToSlot(static_cast<std::uint8_t>(to));
+        else if ((slot >= std::min(from, to)) && (slot <= std::max(from, to)))
+            pRegion->moveToSlot(static_cast<std::uint8_t>(slot + step));
+    }
+
+    Threading::publishModuleMove(moduleChainOwner(), editorHost().toEngine(), sourceIndex,
+                                 targetIndex);
+
     host().gestureBegin("Drag module");
-    host().modulesChanged(moduleChain, sourceIndex, targetIndex);
+    for (std::uint8_t slot(std::min(sourceIndex, targetIndex));
+         slot <= std::max(sourceIndex, targetIndex); ++slot)
+        host().moduleChangedByUser(slot, effectInRackSlot(slot));
     host().gestureEnd();
+
+    refreshModuleRackAsync();
 }
 
 void SpectrumWorxEditor::setLastModulePosition(std::uint_fast8_t const slotIndex)
@@ -680,10 +695,30 @@ void SpectrumWorxEditor::newSampleFileSelected(juce::File const &file)
     updateSampleNameAsync();
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief What the rack says is in \p slotIndex, which is not the same question
+/// as what the chain says.
+///
+/// \note And it is deliberately the rack. A slot change is a request now, so
+/// between the click and the engine applying it the two disagree -- and every
+/// caller here is describing what the *user* did, which is a statement about
+/// what they were looking at.
+///                                           (02.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+std::int8_t SpectrumWorxEditor::effectInRackSlot(std::uint8_t const slotIndex) const
+{
+    for (auto const &pRegion : moduleRegions_)
+        if (pRegion && (pRegion->slot() == slotIndex))
+            return pRegion->module().effectTypeIndex();
+    return AutomatedModuleChain::noModule;
+}
+
 void SpectrumWorxEditor::removeModule(ModuleUI &moduleUI)
 {
-    static_assert(ModuleUI::width % 2 == 0, "Only even width modules supported.");
-    static_assert(ModuleUI::distance % 2 == 0, "Only even width modules supported.");
+    LE_ASSERT(isThisTheGUIThread());
 
     /// \note See the note for the equivalent statement in the moduleDragEnd()
     /// member function.
@@ -694,95 +729,58 @@ void SpectrumWorxEditor::removeModule(ModuleUI &moduleUI)
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \note A strip whose module has already left the chain is still on screen
-    /// and still clickable until the posted resync runs -- which is a window this
-    /// editor did not used to have, because a module owned its own strip and
-    /// destroying the module destroyed it.
+    /// and still clickable until the resync runs -- a window this editor did not
+    /// used to have, because a module owned its own strip and destroying the
+    /// module destroyed it.
     ///
-    ///   Clicking one was the reported "Invalid downcast": `slot` comes from the
-    /// stale strip's *position*, so ejecting the last one and then its ghost gives
-    /// slot 2 against a `nextAvailableModuleSlot_` of 2. `lastModuleIndex -
-    /// firstModuleIndex` is then -1 in a `std::uint8_t` parameter, so the walk
-    /// below ran 255 times, off the end of the chain and onto its sentinel node.
-    ///
-    ///   Asking the chain is the answer, rather than defending the arithmetic:
-    /// a strip whose module is not in the chain has nothing to remove.
+    ///   Clicking one was the reported "Invalid downcast": the slot came from the
+    /// stale strip's *position*, so ejecting the last one and then its ghost gave
+    /// slot 2 against a `nextAvailableModuleSlot_` of 2, and the walk that
+    /// followed ran 255 times off the end of the chain and onto its sentinel node.
+    /// That walk is gone -- the rack is a function of the chain now, computed in
+    /// one place -- and this is what is left of the guard.
     ///                                       (02.08.2026.) (SW port)
     ///
     ////////////////////////////////////////////////////////////////////////////
-    bool stillChained(false);
-    moduleChain().forEach<Module>(
-        [&](Module const &module) { stillChained |= (&module == &moduleUI.module()); });
-    if (!stillChained)
+    ///   Not an assertion: clicking a strip that is on its way out is something
+    /// a user does, not a fault. It only used to be impossible.
+    auto const slot(moduleUI.slot());
+    if (slot >= nextAvailableModuleSlot_)
     {
-        refreshModuleRegionsAsync();
+        refreshModuleRackAsync();
         return;
     }
 
-    LE_ASSUME(nextAvailableModuleSlot_ != 0);
-    auto const slotWidth(ModuleUI::width + ModuleUI::distance);
-    auto const offset(-signed(slotWidth));
-    auto const slot((moduleUI.getX() - ModuleUI::horizontalOffset) / slotWidth);
-    auto const firstModuleIndex(slot);
-    auto const lastModuleIndex(nextAvailableModuleSlot_ - 1);
-    LE_ASSERT_MSG(firstModuleIndex <= lastModuleIndex, "A strip is outside the filled rack.");
-    if (firstModuleIndex > lastModuleIndex)
-    {
-        refreshModuleRegionsAsync();
-        return;
-    }
-    moveModules(moduleUI, lastModuleIndex - firstModuleIndex, offset);
-    moduleRemoved();
-    LE_VERIFY(setModuleInSlot(slot, AutomatedModuleChain::noModule).first == nullptr);
+    setModuleInSlot(slot, AutomatedModuleChain::noModule);
+
+    /// \note What the host is told, and it is told what was *asked for* rather
+    /// than what the chain currently holds -- which may still be the old chain
+    /// for another block. Removing a module shifts every later one down a slot,
+    /// so every selector from here to the end moves.
     host().gestureBegin("Remove module");
-    host().modulesChanged(moduleChain(), firstModuleIndex, lastModuleIndex);
+    for (std::uint8_t moved(slot); moved < nextAvailableModuleSlot_; ++moved)
+        host().moduleChangedByUser(moved, effectInRackSlot(moved + 1));
     host().gestureEnd();
+
+    moduleRemoved();
+    refreshModuleRackAsync();
 }
 
-void SpectrumWorxEditor::moveModules(ModuleUI &targetSlotUI, std::uint8_t numberOfModules,
-                                     std::int16_t const offset)
+bool SpectrumWorxEditor::setModuleInSlot(std::uint8_t const slotIndex,
+                                         std::int8_t const effectIndex)
 {
-    //...mrmlj...
-    typedef Engine::ModuleNode ModuleNode;
-    typedef std::remove_reference<decltype(targetSlotUI.module())>::type Module;
-    ModuleNode::NodePtr ModuleNode::*const pNextPtr((offset < 0) ? &ModuleNode::next_
-                                                                 : &ModuleNode::previous_);
-    //...mrmlj...internal module chain knowledge...
-    ///
-    /// \note The walk stops at the chain's own end marker as well as at the
-    /// count. It only had the count, taken from `nextAvailableModuleSlot_` and a
-    /// strip's X position -- so any disagreement between the rack and the chain
-    /// stepped onto the sentinel root node and downcast it to a Module, which
-    /// asserts "Invalid downcast" and in a release build is a bad pointer. A
-    /// count is a claim about the chain; the chain itself is the fact.
-    ///                                       (02.08.2026.) (SW port)
-    auto &chain(moduleChain());
-    auto *LE_RESTRICT pMovedModule(&targetSlotUI.module());
-    while (numberOfModules--)
-    {
-        auto *const pNextNode((Engine::node(*pMovedModule).*pNextPtr).get());
-        if (!pNextNode || chain.isEnd(pNextNode))
-        {
-            LE_ASSERT_MSG(false, "The module rack and the module chain disagree on length.");
-            return;
-        }
-        pMovedModule = &Engine::actualModule<Module>(*pNextNode);
-        LE_ASSUME(pMovedModule); //...msvc...
-        auto *const pRegion(regionFor(*pMovedModule));
-        LE_ASSERT(pRegion);
-        if (pRegion)
-            pRegion->setTopLeftPosition(pRegion->getX() + offset, ModuleUI::verticalOffset);
-    }
-}
+    LE_ASSERT(isThisTheGUIThread());
+    auto &core(moduleChainOwner());
 
-std::pair<LE::Utility::IntrusivePtr<SpectrumWorxEditor::Module>, std::int8_t>
-SpectrumWorxEditor::setModuleInSlot(std::uint8_t const slotIndex, std::int8_t const effectIndex)
-{
-    /// \note The editor's own initialiser, not the core's: filling a slot from
-    /// here has to build the module's UI region as well as its buffers, and the
-    /// core half cannot reach the GUI. addUserAddedModule() depends on it having
-    /// happened by the time this returns.
-    EditorModuleInitialiser const initialise{moduleChainOwner().moduleInitialiser(), this};
-    return moduleChainOwner().moduleChain().setParameter(slotIndex, effectIndex, initialise);
+    /// \note Building it is still synchronous and still this thread's, so an
+    /// effect this build does not have is still a failure the caller can be told
+    /// about here. Only the *installing* is deferred.
+    auto *const pModule(Threading::createModuleForSlot(core, effectIndex, slotIndex));
+    if ((effectIndex != AutomatedModuleChain::noModule) && !pModule)
+        return false;
+
+    Threading::publishSlot(core, editorHost().toEngine(), slotIndex, effectIndex, pModule);
+    return true;
 }
 
 void SpectrumWorxEditor::addUserAddedModule(std::uint8_t const effectIndex)
@@ -792,6 +790,12 @@ void SpectrumWorxEditor::addUserAddedModule(std::uint8_t const effectIndex)
     // the module creation to be done synchronously, in order for the focus
     // grabbing to be safe.
     //                                        (06.07.2011.) (Domagoj Saric)
+    /// \note It no longer is, and cannot be: filling a slot is a request the
+    /// engine answers when it next runs. So the focus is asked for by slot and
+    /// taken by resyncModuleRack() when the strip exists -- which is the same
+    /// moment, when nothing is processing, and one block later when something
+    /// is.
+    ///                                       (02.08.2026.) (SW port)
     LE_ASSERT(isThisTheGUIThread());
     // Implementation note:
     //   We want any user-added module (using the add module menu) to
@@ -820,31 +824,18 @@ void SpectrumWorxEditor::addUserAddedModule(std::uint8_t const effectIndex)
     this->grabKeyboardFocus();
 #endif // _WIN32
 
-    auto const result(setModuleInSlot(nextAvailableModuleSlot_, effectIndex));
-    std::int8_t const actualEffectIndex(result.second);
-    if (actualEffectIndex == effectIndex) //...mrmlj...
-    {
-        LE_ASSERT(result.first);
-        std::uint8_t const changedSlot(nextAvailableModuleSlot_);
-        moduleAdded();
-        /// \note Checked rather than assumed. setModuleInSlot() builds the region
-        /// synchronously and this is the GUI thread, so it is there -- unless
-        /// createGUI() threw, which it swallows in a release build. This used to
-        /// be an unconditional `gui()->`, which on an empty optional is undefined
-        /// behaviour rather than a missing knob.
-        auto *const pRegion(regionFor(*result.first));
-        LE_ASSERT(pRegion);
-        if (pRegion)
-            pRegion->grabKeyboardFocus();
-        host().gestureBegin("Add module");
-        host().moduleChangedByUser(changedSlot, result.first.get());
-        host().gestureEnd();
-    }
-    else
-    { // failed module creation
-        LE_ASSERT(result.first == nullptr);
-        LE_ASSERT(result.second == noModule);
-    }
+    std::uint8_t const changedSlot(nextAvailableModuleSlot_);
+    if (!setModuleInSlot(changedSlot, static_cast<std::int8_t>(effectIndex)))
+        return; // The effect is not in this build; nothing was asked of the engine.
+
+    slotAwaitingFocus_ = changedSlot;
+    moduleAdded();
+
+    host().gestureBegin("Add module");
+    host().moduleChangedByUser(changedSlot, static_cast<std::int8_t>(effectIndex));
+    host().gestureEnd();
+
+    refreshModuleRackAsync();
 }
 
 #ifndef LE_NO_PRESETS
@@ -1110,17 +1101,7 @@ void EditorKnob::valueChanged() noexcept
     }
 }
 
-void SpectrumWorxEditor::createChainGUIs(AutomatedModuleChain &chain)
-{
-    // http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2012/n3424.pdf
-    std::uint8_t moduleIndex(0);
-    chain.forEach<Module>([&](Module &module) mutable {
-        createModuleRegion(LE::Utility::IntrusivePtr<Module>(&module), moduleIndex++);
-    });
-    setLastModulePosition(moduleIndex);
-}
-
-void SpectrumWorxEditor::destroyChainGUIs(AutomatedModuleChain &)
+void SpectrumWorxEditor::destroyChainGUIs()
 {
     /// \note Everything, whatever the chain holds. This walked the chain and
     /// asked each module to destroy the strip it owned; the strips are here now,
@@ -1303,6 +1284,17 @@ ModuleUI *SpectrumWorxEditor::regionInSlot(std::uint8_t const slotIndex)
     return pModule ? regionFor(*pModule) : nullptr;
 }
 
+/// \note Which strip is *drawn* in that slot, where regionInSlot() asks the
+/// chain. The two differ for as long as a slot change is in flight; see
+/// effectInRackSlot().
+ModuleUI *SpectrumWorxEditor::regionInRackSlot(std::uint8_t const slotIndex)
+{
+    for (auto &pRegion : moduleRegions_)
+        if (pRegion && (pRegion->slot() == slotIndex))
+            return pRegion.get();
+    return nullptr;
+}
+
 void SpectrumWorxEditor::createModuleRegion(LE::Utility::IntrusivePtr<Module> const &pModule,
                                             std::uint8_t const slotIndex)
 {
@@ -1317,10 +1309,6 @@ void SpectrumWorxEditor::createModuleRegion(LE::Utility::IntrusivePtr<Module> co
         pExisting->moveToSlot(slotIndex);
         return;
     }
-
-    /// \note Any strip whose module has already left the chain goes first, so a
-    /// rack that is full of stale strips still has a slot to build into.
-    dropOrphanedRegions();
 
     for (auto &pRegion : moduleRegions_)
     {
@@ -1348,11 +1336,32 @@ void SpectrumWorxEditor::createModuleRegion(LE::Utility::IntrusivePtr<Module> co
     LE_ASSERT_MSG(false, "No free module region; the rack and the chain disagree.");
 }
 
-void SpectrumWorxEditor::dropOrphanedRegions()
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Makes the rack a function of the chain, and nothing else.
+///
+/// \note The one place the two are reconciled, and the reason there is only one.
+/// The rack used to be maintained incrementally -- a strip built here, a strip
+/// dropped there, every other strip shifted by a slot width at each call site --
+/// against a running total in `nextAvailableModuleSlot_`. Any disagreement
+/// between that total and the chain was then a walk off the end of it (§6.5a).
+///
+///   It also has to be a recomputation rather than an update, because a slot
+/// change is a request now: between the click and the engine applying it the
+/// rack is what the user asked for and the chain is what is playing, and this is
+/// what closes the gap when the answer arrives. `ToUI::ChainChanged` is one
+/// caller; the editor's own edits, which want the strip moved before the engine
+/// has caught up, are the others.
+///                                           (02.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxEditor::resyncModuleRack()
 {
     LE_ASSERT(isThisTheGUIThread());
 
     auto &chain(moduleChain());
+
     for (auto &pRegion : moduleRegions_)
     {
         if (!pRegion)
@@ -1371,22 +1380,29 @@ void SpectrumWorxEditor::dropOrphanedRegions()
         pRegion.reset();
     }
 
-    /// \note And put what is left where the chain says it goes, so the rack is a
-    /// function of the chain rather than of a running total -- which is what
-    /// `nextAvailableModuleSlot_` and the per-strip X arithmetic amount to, and
-    /// what they disagreeing produced: a walk off the end of the chain and onto
-    /// its sentinel node.
     std::uint8_t slot(0);
     chain.forEach<Module>([&](Module &module) {
-        if (auto *const pRegion = regionFor(module))
-            pRegion->moveToSlot(slot);
+        /// \note Builds one when the module has none, which is how a chain the
+        /// engine installed -- a preset, a session, a host-driven slot change --
+        /// comes to have strips at all.
+        createModuleRegion(LE::Utility::IntrusivePtr<Module>(&module), slot);
         ++slot;
     });
+    setLastModulePosition(slot);
+
+    if (slotAwaitingFocus_ != noSlotAwaitingFocus)
+    {
+        if (auto *const pRegion = regionInRackSlot(slotAwaitingFocus_))
+        {
+            slotAwaitingFocus_ = noSlotAwaitingFocus;
+            pRegion->grabKeyboardFocus();
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \brief Resyncs the rack with the chain on the next turn of the message loop.
+/// \brief The same, on the next turn of the message loop.
 ///
 /// \note Asynchronous, and it has to be: the path that removes a module is
 /// `ModuleUI::buttonClicked` -> `removeModule`, so dropping the strip
@@ -1398,10 +1414,10 @@ void SpectrumWorxEditor::dropOrphanedRegions()
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-void SpectrumWorxEditor::refreshModuleRegionsAsync()
+void SpectrumWorxEditor::refreshModuleRackAsync()
 {
     postMessageToComponent(*this, [](SpectrumWorxEditor &editor) {
-        editor.dropOrphanedRegions();
+        editor.resyncModuleRack();
         return true;
     });
 }

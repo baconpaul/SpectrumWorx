@@ -115,27 +115,20 @@ bool Sample::isFactorySample(juce::File const &file)
 
 juce::String Sample::supportedFormats() { return formats().getWildcardForAllFormats(); }
 
-char const *Sample::load(juce::File const &sampleFile, unsigned int const desiredSampleRate,
-                         Utility::CriticalSection &criticalSection)
+/// \note "Think of a cleaner solution where the Sample class knows nothing about
+/// critical sections and threading issues" stood here, dated 22.09.2010. This is
+/// it: the class knows nothing about them because there is nothing to know --
+/// what it loads into is private to the loader until it is published.
+///                                           (02.08.2026.) (SW port)
+char const *Sample::load(juce::File const &sampleFile, unsigned int const desiredSampleRate)
 {
     DataHolder newData;
     char const *const pErrorString(doLoad(sampleFile, desiredSampleRate, newData));
     if (!pErrorString)
     {
-        Utility::CriticalSectionLock const lock(criticalSection);
         this->sampleFile_ = sampleFile;
         this->sampleRate_ = desiredSampleRate;
         this->data_.takeDataFrom(newData);
-        // Implementation note:
-        //   The sample position has to be cleared while we still hold the lock
-        // otherwise race conditions (and thus crashes) occur.
-        //                                    (18.06.2010.) (Domagoj Saric)
-        /// \todo Think of a cleaner solution where the Sample class knows
-        /// nothing about critical sections and threading issues. This is the
-        /// same lock the audio thread try_locks around reading the data, and
-        /// both belong to the threading redesign rather than here.
-        ///                                   (22.09.2010.) (Domagoj Saric)
-        ///                                   (01.08.2026.) (SW port)
         samplePosition_ = 0;
 
         // Assert something was actually read.

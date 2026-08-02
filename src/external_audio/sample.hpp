@@ -21,8 +21,6 @@
 #ifndef sample_hpp__A94590F9_6645_4380_8512_060CF57872FA
 #define sample_hpp__A94590F9_6645_4380_8512_060CF57872FA
 //------------------------------------------------------------------------------
-#include "le/utility/criticalSection.hpp"
-#include "le/utility/platformSpecifics.hpp"
 #include "le/utility/span.hpp"
 
 #include <juce_core/juce_core.h>
@@ -73,10 +71,13 @@ class Sample
     ///
     /// \return nullptr on success, else a message fit for a dialog.
     ///
-    /// \note The critical section is held only while the decoded data is swapped
-    /// in, not while it is decoded. See the note in the implementation.
-    char const *load(juce::File const &sampleFile, unsigned int desiredSampleRate,
-                     Utility::CriticalSection &);
+    /// \note It took a critical section, held while the decoded data was swapped
+    /// into a Sample the audio thread might be reading. Nothing reads a Sample
+    /// while it is being loaded any more: the caller decodes into one of its own
+    /// and publishes it, and the one it displaces is destroyed on the main
+    /// thread. See doc/tech/correct_the_threading.md §5.
+    ///                                       (02.08.2026.) (SW port)
+    char const *load(juce::File const &sampleFile, unsigned int desiredSampleRate);
 
     void clear();
 

@@ -28,7 +28,6 @@
 #include "core/threading/valueMailbox.hpp"
 #include "external_audio/sample.hpp"
 #include "gui/editor/editorHost.hpp"
-#include "gui/editor/editorModuleInitialiser.hpp"
 
 #include "le/plugins/clap/tag.hpp"
 
@@ -189,22 +188,14 @@ class SpectrumWorxCLAP final
     /// The editor, while one is open, else nullptr.
     GUI::SpectrumWorxEditor *gui() const { return pEditor_; }
 
-    /// \brief Hides SpectrumWorxCore's, deliberately.
-    ///
-    /// \note Filling a slot has to build the module's UI region as well as its
-    /// buffers, and the core's initialiser is only the buffers -- it lives in
-    /// sw-dsp, below the GUI. The callers that matter here reach for the
-    /// initialiser on the *concrete* plugin type -- `pImpl->moduleInitialiser()`
-    /// in host2PluginImpl.inl for a host-driven slot change, and
-    /// `loader.moduleInitialiser()` in presets.hpp for a preset load -- so
-    /// shadowing is enough to reach both without touching the chain.
-    ///
-    ///   The editor fills slots through its own path (setModuleInSlot) and does
-    /// not come through here.
-    EditorModuleInitialiser moduleInitialiser()
-    {
-        return {SpectrumWorxCore::moduleInitialiser(), pEditor_};
-    }
+    /// \note An `EditorModuleInitialiser` shadowed `SpectrumWorxCore`'s here, so
+    /// that filling a slot built the module's strip as well as its buffers. It
+    /// cannot: the two callers that reached it -- a host parameter event in
+    /// `process()` and a preset load -- are on the audio thread and the main
+    /// thread respectively, and building a JUCE component on the first is the
+    /// whole of symptom 3. The strip follows the chain now (`ToUI::ChainChanged`),
+    /// so the initialiser is the DSP half again and there is nothing to shadow.
+    ///                                       (02.08.2026.) (SW port)
 
     /// \note The VST program model prefixed a modified program's name with '*'.
     /// CLAP has a host call for it instead, and it is the host's business
@@ -250,7 +241,7 @@ class SpectrumWorxCLAP final
     // file's. doc/tech/week_two.md §1 item 3 has the whole account.
     ////////////////////////////////////////////////////////////////////////////
 
-    juce::File currentSampleFile() const override { return sample_.sampleFile(); }
+    juce::File currentSampleFile() const override { return sampleFile_; }
     void setNewSample(juce::File const &) override;
     /// \note Always false while the load above is synchronous: by the time
     /// anything can ask, it has finished. See the note on the interface.
@@ -335,6 +326,18 @@ class SpectrumWorxCLAP final
     /// \brief Applies everything the audio thread has reported, on the main
     /// thread. `[main-thread]`
     void drainEngineEvents();
+
+    /// \brief Hands \p pObject back for the main thread to destroy.
+    /// `[audio-thread]` \see the definition.
+    void retire(Threading::ToUI::Retired, void *pObject);
+
+    /// \brief Says the chain changed shape, and asks the host to re-read the
+    /// parameters that describe it. `[audio-thread]`
+    void chainChanged();
+
+    /// \brief Installs \p pNewSample (owned, null clears) as the side channel's
+    /// source. `[main-thread]` \see the definition.
+    void publishSample(Sample *pNewSample);
 
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -436,12 +439,29 @@ class SpectrumWorxCLAP final
     Threading::ToUIQueue toUI_;
     Threading::ValueMailbox values_;
 
-    /// \note Written by setNewSample() on the message thread, read by
-    /// runEngine() on the audio thread, and the process lock is what stands
-    /// between them -- taken outright by the writer and with try_lock by the
-    /// reader, which falls back to the host's port for that block rather than
-    /// wait. See the note in runEngine().
-    Sample sample_;
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The external audio file feeding the side channel.
+    ///
+    /// \note Two halves, and the split is the point. `pSample_` belongs to
+    /// whichever thread owns the engine and is only ever *swapped*: the message
+    /// thread decodes a new one, publishes the pointer, and the old one comes
+    /// back through `ToUI::Retire` to be freed off the callback. `sampleFile_`
+    /// and `sampleRate_` are the main thread's own record of what it published,
+    /// so that `currentSampleFile()` and `activate()`'s re-read at a new rate
+    /// answer without touching the audio thread's copy.
+    ///
+    ///   One `Sample` stood here, written by `setNewSample()` under the
+    /// processing lock and read by `runEngine()` under a `try_lock` -- which is
+    /// why a load, a preset or an FFT-size change made a block play the host's
+    /// side chain port instead of the sample.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    Sample *pSample_{nullptr};
+    juce::File sampleFile_;
+    unsigned int decodedSampleRate_{0};
 
     /// \note Owned by the shim, which destroys it before this. Cleared in the
     /// editor's own destructor path so a queued notification cannot reach a
@@ -452,6 +472,15 @@ class SpectrumWorxCLAP final
     std::uint32_t latencyInSamples_{0};
     bool engineRunning_{false};
     bool loadLastSession_{false};
+
+    /// \note One outstanding `request_restart` at a time. A preset that moves
+    /// the FFT size and the overlap factor is two parameter changes and one
+    /// restart, and a host that has not got round to it yet does not need to be
+    /// asked again. Cleared in deactivate(), which is where the restart lands.
+    bool restartRequested_{false};
+
+    /// \brief A `ToUI::ChainChanged` waiting to be acted on. \see drainEngineEvents().
+    bool chainChangedPending_{false};
 }; // class SpectrumWorxCLAP
 
 //------------------------------------------------------------------------------

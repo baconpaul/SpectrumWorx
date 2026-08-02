@@ -64,12 +64,30 @@ using LFO = Parameters::LFOImpl;
 void Plugin2HostInteropControler::moduleChangedByUser(std::uint8_t const chainParameterIndex,
                                                       Module const *LE_RESTRICT const pModule) const
 {
+    moduleChangedByUser(chainParameterIndex,
+                        pModule ? std::int8_t(pModule->effectTypeIndex()) : std::int8_t(noModule));
+
+    if (parameterListChanged())
+        return;
+
+    moduleChanged(chainParameterIndex, pModule);
+}
+
+/// \note By effect index, because the editor's callers no longer have a module
+/// to point at: filling a slot is a request the engine answers later, and what
+/// the host is being told is what the *user* did. Reading it back off the chain
+/// would be reading state another thread owns, to say something that was already
+/// known.
+///                                           (02.08.2026.) (SW port)
+void Plugin2HostInteropControler::moduleChangedByUser(std::uint8_t const chainParameterIndex,
+                                                      std::int8_t const effectIndex) const
+{
     LE_ASSERT(GUI::isThisTheGUIThread());
 
     ParameterID parameterID;
     parameterID.value.type = ParameterID::ModuleChainParameter;
     parameterID.value._.moduleChain.moduleIndex = chainParameterIndex;
-    ModuleChainParameter const parameter(pModule ? pModule->effectTypeIndex() : noModule);
+    ModuleChainParameter const parameter(effectIndex);
     ParameterValueForAutomation const automationValue = {
         Plugins::FullRangeAutomatedParameter ::convertParameterToAutomationValue(parameter),
         Plugins::NormalisedAutomatedParameter::convertParameterToAutomationValue(parameter)};
@@ -86,12 +104,10 @@ void Plugin2HostInteropControler::moduleChangedByUser(std::uint8_t const chainPa
     /// kept the names they were first read with, which for an empty slot is
     /// "N/A".
     ///                                       (29.07.2026.) (SW port)
+    ///
+    /// \note And only this: pushing the *rest* of that slot's parameters needs a
+    /// module to read them off, so it stays in the overload that has one.
     automatedParameterChanged(parameterID, automationValue);
-
-    if (parameterListChanged())
-        return;
-
-    moduleChanged(chainParameterIndex, pModule);
 }
 
 void Plugin2HostInteropControler::automatedParameterChanged(Module const &module,

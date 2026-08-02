@@ -20,6 +20,7 @@
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
 
+#include <atomic>
 #include <cstdint>
 //------------------------------------------------------------------------------
 namespace LE
@@ -194,18 +195,44 @@ class LFOImpl : public LFO
 
         void reset();
 
-        static bool hasTempoInformation() { return hasTempoInformation_; }
-        static value_type const &basePeriod() { return barDuration_; }
-        static std::uint8_t measureNumerator() { return measureNumerator_; }
+        ////////////////////////////////////////////////////////////////////////
+        ///
+        /// \brief The host's tempo, as every LFO in the process sees it.
+        ///
+        /// \note Still process-wide, and still wrong for two instances in two
+        /// tracks at two tempi -- but no longer a data race. Each instance's
+        /// audio thread writes these once a block and the message thread reads
+        /// them to lay out the LFO panel, which as plain scalars is undefined
+        /// behaviour rather than merely a stale answer. Relaxed atomics, because
+        /// nothing else is published through them: what a reader needs is a
+        /// tempo, not a happens-before edge.
+        ///
+        ///   Making them per-instance is the real fix and is not this redesign's:
+        /// they are read by `snapPeriodScale()`, `clampFreePeriod()` and the two
+        /// period-scale bounds, all *static* and all called from the parameter
+        /// layer and the editor, so a per-instance timer means threading one
+        /// through the LFO parameter interface. Recorded in tech_debt.md.
+        ///                                   (02.08.2026.) (SW port)
+        ///
+        ////////////////////////////////////////////////////////////////////////
+        static bool hasTempoInformation()
+        {
+            return hasTempoInformation_.load(std::memory_order_relaxed);
+        }
+        static value_type basePeriod() { return barDuration_.load(std::memory_order_relaxed); }
+        static std::uint8_t measureNumerator()
+        {
+            return measureNumerator_.load(std::memory_order_relaxed);
+        }
         static value_type measureNumeratorFloat();
 
       private:
         value_type currentTimeInBars_;
         value_type previousTimeInBars_;
 
-        static value_type barDuration_;
-        static std::uint8_t measureNumerator_;
-        static bool hasTempoInformation_;
+        static std::atomic<value_type> barDuration_;
+        static std::atomic<std::uint8_t> measureNumerator_;
+        static std::atomic<bool> hasTempoInformation_;
     }; // class Timer
 #endif // LE_NO_LFOs
   public:

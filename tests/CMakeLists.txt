@@ -13,7 +13,7 @@ add_executable(sw-tests
         clap/parameterModelTests.cpp
         clap/pluginTests.cpp
         clap/stateTests.cpp
-        core/processLockTests.cpp
+        core/engineOwnershipTests.cpp
         core/protocolTests.cpp
         core/threadCheckTests.cpp
         effects/amplifyingEffectsTests.cpp
@@ -53,8 +53,8 @@ target_link_libraries(sw-tests PRIVATE sw-impl sw-gui-resources Catch2::Catch2Wi
 # sw-impl links this PRIVATE -- it is a header-only interface target and the
 # entry stubs get it from clap-wrapper's own side -- so it does not arrive here
 # across the link line. clap-helpers is the same shape, and is what makes
-# spectrumWorxCLAP.hpp includable: processLockTests.cpp needs the class itself,
-# not the C vtable, to reach the processing lock a host cannot name.
+# spectrumWorxCLAP.hpp includable: several cases need the class itself rather
+# than the C vtable, to reach what a host cannot name.
 target_link_libraries(sw-tests PRIVATE clap-helpers clap-wrapper-extensions)
 
 # \note LE_CHECKED_BUILD is deliberately *not* forced here. It decides whether

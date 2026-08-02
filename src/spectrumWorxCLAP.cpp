@@ -201,7 +201,14 @@ SpectrumWorxCLAP::SpectrumWorxCLAP(clap_host const *const host) : PluginHelper(d
     clapJuceShim_->setResizable(false);
 }
 
-SpectrumWorxCLAP::~SpectrumWorxCLAP() = default;
+SpectrumWorxCLAP::~SpectrumWorxCLAP()
+{
+    /// \note Anything the audio thread handed back and nobody collected. There
+    /// is no audio thread by now -- a host destroys a deactivated plugin -- so
+    /// this is the last chance to free it.
+    drainEngineEvents();
+    delete pSample_;
+}
 
 bool SpectrumWorxCLAP::init() noexcept
 {
@@ -219,6 +226,11 @@ bool SpectrumWorxCLAP::init() noexcept
 bool SpectrumWorxCLAP::activate(double const sampleRate, std::uint32_t,
                                 std::uint32_t const maxFrames) noexcept
 {
+    /// \note Whatever the audio thread handed back and nobody has collected yet.
+    /// A host that restarts the plugin need not call `on_main_thread` in between,
+    /// and every one of these is a live allocation.
+    drainEngineEvents();
+
     sampleRate_ = sampleRate;
 
     // Stereo in, stereo out. Anything else waits for 5.7 and the input-mode
@@ -233,17 +245,20 @@ bool SpectrumWorxCLAP::activate(double const sampleRate, std::uint32_t,
     if (!initialise())
         return false;
 
-    resume();
-    engineRunning_ = true;
-    latencyInSamples_ = engineSetup().latencyInSamples();
-
     /// \note A sample is decoded to the engine's rate, and a session can be
     /// restored -- sample and all -- before the host has said what that rate is.
     /// Re-read it here when they disagree; the 2016 build did not, and played
     /// the sample at the wrong pitch for the rest of the session.
+    ///
+    /// \note Before resume(), so that the swap is the direct one rather than a
+    /// command waiting for a block that has not been asked for yet.
     ///                                       (01.08.2026.) (SW port)
-    if (sample_ && (sample_.sampleRate() != static_cast<unsigned int>(sampleRate)))
-        setNewSample(sample_.sampleFile());
+    if ((decodedSampleRate_ != 0) && (decodedSampleRate_ != static_cast<unsigned int>(sampleRate)))
+        setNewSample(sampleFile_);
+
+    resume();
+    engineRunning_ = true;
+    latencyInSamples_ = engineSetup().latencyInSamples();
 
     /// \note An editor that opened before this point built its module knobs
     /// against an engine with no sample rate, so the ranges that quantise to a
@@ -259,6 +274,20 @@ bool SpectrumWorxCLAP::activate(double const sampleRate, std::uint32_t,
     return true;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Where a pending spectral setup lands, and the only place it may. FFT
+/// size, overlap factor and window function reallocate the whole spectral
+/// working set and resize every module; with the plugin deactivated there is no
+/// audio thread to race and no lock needed to say so. `request_restart` is what
+/// brings us here -- see drainCommands() and §5.
+///
+///   It is also the one point at which `clap_plugin_latency` allows the latency
+/// to change, and the FFT size *is* the latency.
+///                                           (02.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
 void SpectrumWorxCLAP::deactivate() noexcept
 {
     if (engineRunning_)
@@ -266,6 +295,24 @@ void SpectrumWorxCLAP::deactivate() noexcept
         suspend();
         engineRunning_ = false;
     }
+
+    drainEngineEvents();
+
+    restartRequested_ = false;
+    if (spectralSetupPending())
+    {
+        applyPendingSpectralSetup();
+        auto const newLatency(engineSetup().latencyInSamples());
+        if (newLatency != latencyInSamples_)
+        {
+            latencyInSamples_ = newLatency;
+            if (_host.canUseLatency())
+                _host.latencyChanged();
+        }
+        if (pEditor_)
+            pEditor_->updateForEngineSetupChanges();
+    }
+
     sampleRate_ = 0;
 }
 
@@ -646,7 +693,7 @@ void SpectrumWorxCLAP::paramsFlush(clap_input_events const *const in,
         effectChanged |= handleEvent(in->get(in, event));
 
     if (effectChanged)
-        requestRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT | CLAP_PARAM_RESCAN_VALUES);
+        chainChanged();
 
     flushUIEdits(out);
 }
@@ -701,7 +748,7 @@ clap_process_status SpectrumWorxCLAP::process(clap_process const *const process)
     /// would be illegal here, an active plugin having to go through
     /// clap_host->restart() first. See rebuildParameterIDs().
     if (effectChanged)
-        requestRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT | CLAP_PARAM_RESCAN_VALUES);
+        chainChanged();
 
     if (process->out_events)
         flushUIEdits(process->out_events);
@@ -832,32 +879,23 @@ void SpectrumWorxCLAP::runEngine(clap_process const *const process) noexcept
     ////////////////////////////////////////////////////////////////////////////
     // An external audio file, when one is loaded, in place of the port.
     //
-    // \note The lock, and why it is a try_lock and why it is held past the call
-    // below. The message thread swaps the decoded data under this one, so the
-    // pointers below have to be read and used with it held -- and it is the
-    // same recursive lock SpectrumWorxCore::process() takes, so holding it here
-    // is what stops that call from dropping the block. If another thread has it
-    // (a load, a preset, an FFT-size change) this block plays the host's side
-    // chain instead of the sample, which is a block of the wrong source rather
-    // than a block of silence or a wait on the audio thread.
-    //
-    //   2016 got the same effect from taking its try_lock at the top of its own
-    // process() and reading the sample inside it. Every part of this belongs to
-    // the threading redesign; it is written this way because that is what is
-    // there now.
-    //                                        (01.08.2026.) (SW port)
+    // \note A `try_lock` on the processing lock stood around this, because the
+    // message thread swapped the decoded data under the reader. Nothing swaps
+    // anything under this thread now -- `pSample_` is only ever exchanged by
+    // `drainCommands()`, which is this thread, at the top of this callback -- so
+    // there is no lock, and no block is played from the wrong source because
+    // another thread happened to be busy.
+    //                                        (02.08.2026.) (SW port)
     ////////////////////////////////////////////////////////////////////////////
 
     /// \note A Sample is always stereo, so a wider engine configuration -- which
     /// nothing produces today; activate() asks for 2 x 2 -- keeps the port.
     float const *sampleChannels[Sample::numberOfChannels];
-    std::unique_lock<Utility::CriticalSection> const sampleLock(processCriticalSection_,
-                                                                std::try_to_lock);
-    if (sampleLock.owns_lock() && sample_ && (channels <= std::size(sampleChannels)) &&
+    if (pSample_ && *pSample_ && (channels <= std::size(sampleChannels)) &&
         (buffers().numberOfSideChannels() >= channels) &&
         (process->frames_count <= buffers().blockSize()))
     {
-        auto const startingPosition(sample_.samplePosition());
+        auto const startingPosition(pSample_->samplePosition());
         std::uint32_t position(startingPosition);
         for (std::uint8_t channel(0); channel < channels; ++channel)
         {
@@ -865,32 +903,19 @@ void SpectrumWorxCLAP::runEngine(clap_process const *const process) noexcept
             // one did and the advance is taken once.
             position = startingPosition;
             sampleChannels[channel] =
-                sampleChunk(sample_.channel(channel), position, process->frames_count,
+                sampleChunk(pSample_->channel(channel), position, process->frames_count,
                             buffers().sideChannel(channel).begin());
         }
-        sample_.samplePosition() = position;
+        pSample_->samplePosition() = position;
         sideChannels = sampleChannels;
     }
 
-    /// \note A false return is the engine declining the block: another thread
-    /// holds the processing lock, and waiting for it here is the one thing the
-    /// audio thread may not do. Silence rather than the input, because this
-    /// plugin reports latency -- so the input is not the dry signal, it is the
-    /// dry signal arriving `latencyInSamples_` early, and a host that delay-
-    /// compensates would put it where nothing belongs. A gap is honest; a burst
-    /// of misaligned full-level dry is not.
-    ///
-    ///   §2.1b is what this was: the buffer was left untouched, so the host
-    /// played back whatever the previous plugin in the chain had written into
-    /// it. Every preset load did this.
-    ///                                       (01.08.2026.) (SW port)
-    auto const processed(SpectrumWorxCore::process(input.data32, sideChannels, output.data32, 1.0f,
-                                                   process->frames_count));
+    SpectrumWorxCore::process(input.data32, sideChannels, output.data32, 1.0f,
+                              process->frames_count);
 
     // Ports beyond what the engine is configured for are the host's to see as
-    // silence, not as whatever was in the buffer -- and if nothing ran, that is
-    // every port.
-    for (std::uint32_t channel(processed ? channels : 0); channel < output.channel_count; ++channel)
+    // silence, not as whatever was in the buffer.
+    for (std::uint32_t channel(channels); channel < output.channel_count; ++channel)
         std::memset(output.data32[channel], 0, process->frames_count * sizeof(float));
 }
 
@@ -953,13 +978,72 @@ void SpectrumWorxCLAP::drainCommands()
             break;
         }
 
-        case Threading::ToEngine::Kind::SetSlot:     // stage 6
-        case Threading::ToEngine::Kind::SwapProgram: // stage 6
-        case Threading::ToEngine::Kind::SwapSample:  // stage 6
-            LE_ASSERT_MSG(false, "Command sent before its handler exists.");
+        case Threading::ToEngine::Kind::SetSlot:
+        {
+            auto *const pOutgoing(installModuleInSlot(
+                command.setSlot.slot, static_cast<Module *>(command.setSlot.pModule)));
+            if (pOutgoing)
+                retire(Threading::ToUI::Retired::Module, pOutgoing);
+            chainChanged();
             break;
         }
+
+        case Threading::ToEngine::Kind::MoveModule:
+            moveModule(command.moveModule.from, command.moveModule.to);
+            chainChanged();
+            break;
+
+        case Threading::ToEngine::Kind::SwapChain:
+        {
+            auto *const pIncoming(static_cast<AutomatedModuleChain *>(command.swapChain.pChain));
+            swapModuleChain(*pIncoming);
+            /// \note The same object back, now holding what used to be live.
+            retire(Threading::ToUI::Retired::Chain, pIncoming);
+            chainChanged();
+            break;
+        }
+
+        case Threading::ToEngine::Kind::SwapSample:
+        {
+            auto *const pOutgoing(
+                std::exchange(pSample_, static_cast<Sample *>(command.swapSample.pSample)));
+            clearSideChannelData();
+            if (pOutgoing)
+                retire(Threading::ToUI::Retired::Sample, pOutgoing);
+            break;
+        }
+        }
     }
+
+    /// \note After the batch rather than per command: a preset that moves the
+    /// FFT size and the overlap factor together is one restart, not two. And
+    /// `clap_host::request_restart` is `[thread-safe]`, which is what makes this
+    /// legal from here at all.
+    if (spectralSetupPending() && !restartRequested_)
+    {
+        restartRequested_ = true;
+        _host.requestRestart();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// What the audio thread hands back. `[audio-thread]`
+////////////////////////////////////////////////////////////////////////////////
+
+/// \note A full retire ring is a leak, and there is nothing sensible to do about
+/// it here -- freeing on this thread is the one thing the ring exists to prevent.
+/// 1024 deep against one entry per structural change, so it is a checked-build
+/// assertion rather than a policy.
+void SpectrumWorxCLAP::retire(Threading::ToUI::Retired const what, void *const pObject)
+{
+    LE_ASSERT_MSG(toUI_.push(Threading::retire(what, pObject)),
+                  "The retire queue is full; something will be leaked.");
+}
+
+void SpectrumWorxCLAP::chainChanged()
+{
+    toUI_.push(Threading::chainChanged());
+    requestRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT | CLAP_PARAM_RESCAN_VALUES);
 }
 
 void SpectrumWorxCLAP::publishModulatedValues()
@@ -1016,13 +1100,42 @@ void SpectrumWorxCLAP::drainEngineEvents()
                     event.baseParameterChanged.value);
             break;
 
-        case Threading::ToUI::Kind::SlotChanged:  // stage 6
-        case Threading::ToUI::Kind::Retire:       // stage 6
-        case Threading::ToUI::Kind::SetupChanged: // stage 6
-            LE_ASSERT_MSG(false, "Event sent before its handler exists.");
+        case Threading::ToUI::Kind::ChainChanged:
+            /// \note Coalesced: a preset that swaps the chain and then fills a
+            /// slot is one resync, and the resync is a recomputation rather than
+            /// a diff, so running it twice would only cost.
+            chainChangedPending_ = true;
+            break;
+
+        ////////////////////////////////////////////////////////////////////////
+        ///
+        /// \note The other end of §5, and the only place any of this is
+        /// destroyed. A `Module` is one *reference* rather than an object -- the
+        /// interface may still hold a strip pointing at it, and dropping that
+        /// strip is what finally frees it.
+        ///
+        ////////////////////////////////////////////////////////////////////////
+        case Threading::ToUI::Kind::Retire:
+            switch (event.retire.what)
+            {
+            case Threading::ToUI::Retired::None:
+                break;
+            case Threading::ToUI::Retired::Module:
+                intrusive_ptr_release(&Engine::node(*static_cast<Module *>(event.retire.pObject)));
+                break;
+            case Threading::ToUI::Retired::Chain:
+                delete static_cast<AutomatedModuleChain *>(event.retire.pObject);
+                break;
+            case Threading::ToUI::Retired::Sample:
+                delete static_cast<Sample *>(event.retire.pObject);
+                break;
+            }
             break;
         }
     }
+
+    if (std::exchange(chainChangedPending_, false) && pEditor_)
+        pEditor_->resyncModuleRack();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1155,9 +1268,24 @@ void SpectrumWorxCLAP::HostProxy::presetChangeBegin() const {}
 /// editor runs on the main thread.
 void SpectrumWorxCLAP::HostProxy::presetChangeEnd() const
 {
+    auto &plugin(const_cast<SpectrumWorxCLAP &>(plugin_));
+
     if (plugin_._host.canUseParams())
-        plugin_._host.paramsRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_VALUES |
-                                   CLAP_PARAM_RESCAN_TEXT);
+        plugin._host.paramsRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_VALUES |
+                                  CLAP_PARAM_RESCAN_TEXT);
+
+    /// \note A preset that changes the FFT size sets the parameter on this
+    /// thread and leaves the setup where it is; this is what then asks the host
+    /// for the restart that applies it. `drainCommands()` does the same for the
+    /// route through the queue -- both, because a preset load does not go
+    /// through the queue and a knob does.
+    ///                                       (02.08.2026.) (SW port)
+    if (plugin.spectralSetupPending() && !plugin.restartRequested_)
+    {
+        plugin.restartRequested_ = true;
+        plugin._host.requestRestart();
+    }
+
     plugin_.markCurrentProgramAsModified();
 }
 
@@ -1347,11 +1475,11 @@ void SpectrumWorxCLAP::editorClosed() { pEditor_ = nullptr; }
 
 void SpectrumWorxCLAP::setNewSample(juce::File const &newSampleFile)
 {
+    LE_ASSERT(Threading::isMainThread() || !Threading::isAudioThread());
+
     if (newSampleFile == juce::File())
     {
-        Utility::CriticalSectionLock const processingLock(getProcessingLock());
-        sample_.clear();
-        clearSideChannelData();
+        publishSample(nullptr);
         return;
     }
 
@@ -1360,11 +1488,18 @@ void SpectrumWorxCLAP::setNewSample(juce::File const &newSampleFile)
     /// has ever activated, and Sample::load() reads a file at its own rate when
     /// it is given no other. activate() then re-reads it. Refusing would be the
     /// alternative, and it would silently lose the sample.
-    auto const *const pErrorMessage(sample_.load(
-        newSampleFile, static_cast<unsigned int>(sampleRate_), processCriticalSection_));
+    auto const rate(static_cast<unsigned int>(sampleRate_));
+    auto *const pNewSample(new Sample);
+    auto const *const pErrorMessage(pNewSample->load(newSampleFile, rate));
     if (pErrorMessage)
+    {
+        delete pNewSample;
         GUI::warningMessageBox("SpectrumWorx: error loading selected sample file.", pErrorMessage,
                                false);
+        return;
+    }
+
+    publishSample(pNewSample);
 
     /// \note And now it *is* dirty. This said "deliberately no
     /// markCurrentProgramAsModified()" until 02.08.2026, because the state was
@@ -1373,6 +1508,37 @@ void SpectrumWorxCLAP::setNewSample(juce::File const &newSampleFile)
     /// could not. State is the preset serialisation now and `<p n="Sample">` has
     /// been in that since 2011, so the promise is one this can keep.
     markCurrentProgramAsModified();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Hands \p pNewSample (owned, null clears) to whoever owns the engine.
+///
+/// \note The sample's half of §5, and the same shape as the chain's: swap a
+/// pointer where the engine is, destroy the old one where destroying is allowed.
+/// The main thread keeps its own record of the file and the rate it decoded at,
+/// because those are questions the interface asks with audio running.
+///                                           (02.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxCLAP::publishSample(Sample *const pNewSample)
+{
+    sampleFile_ = pNewSample ? pNewSample->sampleFile() : juce::File();
+    decodedSampleRate_ = pNewSample ? pNewSample->sampleRate() : 0;
+
+    if (!engineIsRunning())
+    {
+        delete std::exchange(pSample_, pNewSample);
+        clearSideChannelData();
+        return;
+    }
+
+    if (toEngine_.push(Threading::swapSample(pNewSample)))
+        return;
+
+    LE_ASSERT_MSG(false, "The command queue is full; a sample load was dropped.");
+    delete pNewSample;
 }
 
 bool SpectrumWorxCLAP::registerOrUnregisterTimer(clap_id &id, int const milliseconds,

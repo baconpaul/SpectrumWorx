@@ -225,7 +225,7 @@ TEST_CASE("Adding and removing modules keeps the rack and the chain in step", "[
     /// be destroyed under it. A test has no message loop to pump -- the shim
     /// builds JUCE with modal loops disabled -- and what is worth pinning is the
     /// resync's effect rather than JUCE's delivery of it.
-    auto const settle([&] { editor.dropOrphanedRegions(); });
+    auto const settle([&] { editor.resyncModuleRack(); });
 
     for (std::uint8_t effect(0); effect < 3; ++effect)
         editor.addUserAddedModule(static_cast<std::int8_t>(effect));
@@ -298,12 +298,23 @@ TEST_CASE("A strip whose module has already gone does not walk off the chain", "
         editor.addUserAddedModule(static_cast<std::int8_t>(effect));
     REQUIRE(chain.size() == 3);
 
+    /// \note A strip appears when the rack is resynced, not when the module is
+    /// created: the two are one step apart now, because with audio running the
+    /// engine answers a slot change a block later. See
+    /// SpectrumWorxEditor::resyncModuleRack().
+    editor.resyncModuleRack();
+
     /// \note The *last* strip specifically. Its slot index is the highest, so
     /// after the removal `nextAvailableModuleSlot_` drops below it -- and
     /// `lastModuleIndex - firstModuleIndex` is then -1 in a `std::uint8_t`, which
     /// is 255 walks along a chain of two.
     auto *const pStrip(editor.regionInSlot(2));
     REQUIRE(pStrip != nullptr);
+    /// \note A strip knows which slot it is drawn in, because that is what the
+    /// removal below is judged against; nothing recovers it from `getX()` any
+    /// more. `ModuleUI::moveToSlot()` did not in fact record it until this case
+    /// asked, and `slot()` had no other reader to notice.
+    CHECK(int(pStrip->slot()) == 2);
 
     // No resync in between: this is the window the plugin is in between the
     // removal and the posted refresh, and the strip is still on screen.
@@ -317,7 +328,7 @@ TEST_CASE("A strip whose module has already gone does not walk off the chain", "
     // It declined, rather than walking: the chain is untouched, and the rack can
     // be brought back into agreement with it.
     CHECK(chain.size() == 2);
-    editor.dropOrphanedRegions();
+    editor.resyncModuleRack();
     for (std::uint8_t slot(0); slot < chain.size(); ++slot)
         CHECK(editor.regionInSlot(slot) != nullptr);
 

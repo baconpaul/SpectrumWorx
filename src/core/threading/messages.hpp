@@ -52,13 +52,18 @@ struct ToEngine
         /// the sender -- snapping is a pure function of the static ParameterInfo,
         /// so the interface can do it without waiting for an answer.
         SetBaseParameter,
-        /// Which effect a slot holds. The audio thread builds it, which allocates;
-        /// a granted concession, recorded in tech_debt.md.
+        /// Which effect a slot holds. The module travels *with* the message,
+        /// already built and sized by the main thread; the audio thread only
+        /// relinks. See the note on `setSlot` below.
         SetSlot,
-        /// A whole Program, built on the main thread. The audio thread swaps it in
-        /// and hands the old one back as ToUI::Retire -- it is never destroyed
-        /// under the callback.
-        SwapProgram,
+        /// Two modules trading places, by slot index. Pure relinking, so nothing
+        /// travels and nothing comes back.
+        MoveModule,
+        /// A whole module chain, built on the main thread. The audio thread
+        /// exchanges it with the live one and hands the same object back as
+        /// ToUI::Retire, now holding what used to be live -- so nothing is ever
+        /// destroyed under the callback.
+        SwapChain,
         /// Likewise a decoded Sample.
         SwapSample
     };
@@ -73,19 +78,30 @@ struct ToEngine
             float value;
         } setBaseParameter;
 
+        /// \note `pModule` carries one reference, transferred. Null means empty
+        /// the slot, which is also what `effectIndex == -1` says -- the index is
+        /// there so the event coming back can name it without dereferencing
+        /// anything.
         struct
         {
+            void *pModule;
             std::uint8_t slot;
-            std::int8_t effectIndex; ///< -1 empties the slot
+            std::int8_t effectIndex;
         } setSlot;
+
+        struct
+        {
+            std::uint8_t from;
+            std::uint8_t to;
+        } moveModule;
 
         /// \note `void *` rather than the real type: this header is the protocol
         /// and has no business including the engine. The two sites that put a
         /// pointer in and take it out are one file apart and both static_cast.
         struct
         {
-            void *pProgram;
-        } swapProgram;
+            void *pChain;
+        } swapChain;
 
         struct
         {
@@ -113,22 +129,26 @@ struct ToUI
         /// A base value the engine settled on, after snapping or after a host
         /// automation event. Latchable: the model takes it and the host is told.
         BaseParameterChanged,
-        /// A slot's effect changed, so that slot's parameters are now different
-        /// ones with different names. The interface rebuilds its strip.
-        SlotChanged,
+        /// The chain changed shape -- a slot filled or emptied, two modules
+        /// swapped, a whole chain installed. The interface makes its rack a
+        /// function of the chain again; see SpectrumWorxEditor::resyncModuleRack().
+        ChainChanged,
         /// Something the audio thread unlinked and the main thread must delete.
         /// Dropping one of these is a leak, which is why this is a ring and not a
         /// mailbox.
-        Retire,
-        /// The spectral setup changed, so every Hz-quantised range moved.
-        SetupChanged
+        Retire
     };
 
     /// What a Retire is carrying, since the main thread has to know what to call.
+    ///
+    /// \note `Module` is a reference to release, not an object to `delete`: the
+    /// chain's modules are intrusively counted and the interface may still hold
+    /// one of its own.
     enum struct Retired : std::uint8_t
     {
         None,
-        Program,
+        Module,
+        Chain,
         Sample
     };
 
@@ -141,12 +161,6 @@ struct ToUI
             std::uint32_t parameterID;
             float value;
         } baseParameterChanged;
-
-        struct
-        {
-            std::uint8_t slot;
-            std::int8_t effectIndex;
-        } slotChanged;
 
         struct
         {
@@ -185,11 +199,38 @@ inline ToEngine setBaseParameter(std::uint32_t const parameterID, float const va
     return message;
 }
 
-inline ToEngine setSlot(std::uint8_t const slot, std::int8_t const effectIndex)
+/// \param pModule an `SW::Module *`, one reference, transferred; null empties.
+inline ToEngine setSlot(std::uint8_t const slot, std::int8_t const effectIndex, void *const pModule)
 {
     ToEngine message{};
     message.kind = ToEngine::Kind::SetSlot;
-    message.setSlot = {slot, effectIndex};
+    message.setSlot = {pModule, slot, effectIndex};
+    return message;
+}
+
+inline ToEngine moveModule(std::uint8_t const from, std::uint8_t const to)
+{
+    ToEngine message{};
+    message.kind = ToEngine::Kind::MoveModule;
+    message.moveModule = {from, to};
+    return message;
+}
+
+/// \param pChain an `SW::AutomatedModuleChain *`, owned by the message.
+inline ToEngine swapChain(void *const pChain)
+{
+    ToEngine message{};
+    message.kind = ToEngine::Kind::SwapChain;
+    message.swapChain = {pChain};
+    return message;
+}
+
+/// \param pSample an `LE::Sample *`, owned by the message.
+inline ToEngine swapSample(void *const pSample)
+{
+    ToEngine message{};
+    message.kind = ToEngine::Kind::SwapSample;
+    message.swapSample = {pSample};
     return message;
 }
 
@@ -198,6 +239,13 @@ inline ToUI baseParameterChanged(std::uint32_t const parameterID, float const va
     ToUI message{};
     message.kind = ToUI::Kind::BaseParameterChanged;
     message.baseParameterChanged = {parameterID, value};
+    return message;
+}
+
+inline ToUI chainChanged()
+{
+    ToUI message{};
+    message.kind = ToUI::Kind::ChainChanged;
     return message;
 }
 

@@ -128,29 +128,25 @@ TEST_CASE("The messages the protocol carries fit through it", "[core][protocol]"
 {
     // Trivially copyable is a static_assert on the queue; that the union members
     // survive the round trip is this.
+    int module{0};
     Threading::ToEngineQueue toEngine;
-    Threading::ToEngine sent{};
-    sent.kind = Threading::ToEngine::Kind::SetSlot;
-    sent.setSlot = {3, 17};
-    REQUIRE(toEngine.push(sent));
+    REQUIRE(toEngine.push(Threading::setSlot(3, 17, &module)));
 
     Threading::ToEngine received{};
     REQUIRE(toEngine.pop(received));
     CHECK(received.kind == Threading::ToEngine::Kind::SetSlot);
     CHECK(received.setSlot.slot == 3);
     CHECK(received.setSlot.effectIndex == 17);
+    CHECK(received.setSlot.pModule == &module);
 
     Threading::ToUIQueue toUI;
     int retirable{0};
-    Threading::ToUI event{};
-    event.kind = Threading::ToUI::Kind::Retire;
-    event.retire = {Threading::ToUI::Retired::Program, &retirable};
-    REQUIRE(toUI.push(event));
+    REQUIRE(toUI.push(Threading::retire(Threading::ToUI::Retired::Chain, &retirable)));
 
     Threading::ToUI back{};
     REQUIRE(toUI.pop(back));
     CHECK(back.kind == Threading::ToUI::Kind::Retire);
-    CHECK(back.retire.what == Threading::ToUI::Retired::Program);
+    CHECK(back.retire.what == Threading::ToUI::Retired::Chain);
     CHECK(back.retire.pObject == &retirable);
 }
 

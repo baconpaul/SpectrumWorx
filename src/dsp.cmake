@@ -132,9 +132,10 @@ add_library(sw-dsp STATIC
         core/modules/automatedModule.cpp
         core/modules/factory.cpp
 
-        # Which thread is this, and may it do that. See
-        # doc/tech/correct_the_threading.md.
+        # Which thread is this, may it do that, and how a change made on one
+        # reaches the other. See doc/tech/correct_the_threading.md.
         core/threading/threadCheck.cpp
+        core/threading/publish.cpp
 )
 
 # configure_file into the build tree, never back into src/ — that is what the

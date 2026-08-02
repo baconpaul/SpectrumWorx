@@ -50,10 +50,11 @@ class Engine : public LE::SW::SpectrumWorxCore
     using Core::process;
 
     /// Likewise protected, and likewise something only a test asks directly.
-    /// Six assertions in the engine depend on it being the truth rather than the
-    /// hardcoded `true` it used to be; processLockTests.cpp is where that is
-    /// pinned. See doc/tech/correct_the_threading.md.
-    using Core::currentThreadOwnsTheProcessLock;
+    /// Six assertions in the engine depend on it; engineOwnershipTests.cpp is
+    /// where that is pinned. See doc/tech/correct_the_threading.md.
+    using Core::applyPendingSpectralSetup;
+    using Core::currentThreadMayMutateEngineState;
+    using Core::spectralSetupPending;
 
     Program &program() { return program_; }
 

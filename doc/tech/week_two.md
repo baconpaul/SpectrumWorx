@@ -648,6 +648,14 @@ deferral pattern 5.8 wants, applied to two flags rather than to engine state.
 | **The editor mutates the chain unlocked** | `setModuleInSlot`, `moduleDragEnd`, `removeModule` — none takes `getProcessingLock()`, which exists and is never called | `spectrumWorxEditor.cpp:717`, `:483`, `:672` |
 | **The guard is a no-op** | `currentThreadOwnsTheProcessLock()` returns a hardcoded `true` outside `_WIN32`; the Windows arm `reinterpret_cast`s a `std::recursive_mutex` to a `CRITICAL_SECTION`, which the header admits is invalid | `spectrumWorxCore.cpp:376-388` |
 
+> **All seven rows are closed as of 02.08.2026**, by `correct_the_threading.md`
+> stages 3–6 — which is what this audit was written to size. The line references
+> above are to the code as it stood at the audit and no longer resolve;
+> `editorModuleInitialiser.hpp` and the processing lock do not exist. The one
+> survivor is the *first half* of row one: a host writing a slot selector still
+> allocates inside `process()`, deliberately, and is recorded in `tech_debt.md`.
+> The JUCE construction beside it is gone.
+
 Two more worth knowing, both dormant rather than live:
 
 - `~SpectrumWorxEditor` spin-waits on two plain `bool`s read through a

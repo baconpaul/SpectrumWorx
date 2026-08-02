@@ -11,6 +11,7 @@
 #include "spectrumWorxCore.hpp"
 
 #include "modules/moduleDSPAndGUI.hpp"
+#include "threading/threadCheck.hpp"
 
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
@@ -75,11 +76,9 @@ SpectrumWorxCore::SpectrumWorxCore()
 
     Utility::clear(currentStorageFactors_);
 
-    setReportedNumberOfChannels(maxNumberOfOutputs, maxNumberOfInputs - maxNumberOfOutputs);
-
-#ifndef NDEBUG
     suspended_ = true;
-#endif // NDEBUG
+
+    setReportedNumberOfChannels(maxNumberOfOutputs, maxNumberOfInputs - maxNumberOfOutputs);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -89,14 +88,10 @@ SpectrumWorxCore::SpectrumWorxCore()
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-bool SpectrumWorxCore::process /// \throws nothing
+void SpectrumWorxCore::process /// \throws nothing
     (float const *const *pMainChannels, float const *const *const pSideChannels,
      float *const *const outputs, float const &outputGainScale, unsigned int const samples)
 {
-    if (!processCriticalSection_.try_lock())
-        return false;
-    ProcessLockUnlocker const processingLockUnlocker(*this);
-
 #ifdef _DEBUG
     // Implementation note:
     //   To aid in algorithm debugging we locally enable FPU exceptions.
@@ -141,8 +136,6 @@ bool SpectrumWorxCore::process /// \throws nothing
         GUI::warningMessageBox(MB_ERROR, message, false);
     }
 #endif // DEBUG
-
-    return true;
 }
 
 void SpectrumWorxCore::suspend() // pause
@@ -150,9 +143,7 @@ void SpectrumWorxCore::suspend() // pause
     //...mrmlj...could be called on startup when the flag is already set by the
     //constructor...
     //LE_ASSERT( !suspended_ );
-#ifndef NDEBUG
     suspended_ = true;
-#endif // NDEBUG
 }
 
 void SpectrumWorxCore::resume()
@@ -160,10 +151,10 @@ void SpectrumWorxCore::resume()
 #ifndef __APPLE__ //...mrmlj...isHost( "Vst2Au2" )
     LE_ASSERT(suspended_);
 #endif // __APPLE__
+    /// \note Before the flag, not after: reset() mutates the engine, and
+    /// currentThreadMayMutateEngineState() is what says whether this thread may.
     reset();
-#ifndef NDEBUG
     suspended_ = false;
-#endif // NDEBUG
 }
 
 void SpectrumWorxCore::reset()
@@ -376,30 +367,18 @@ void SpectrumWorxCore::setReportedNumberOfChannels(std::uint8_t const numberOfMa
     Engine::Processor::setNumberOfChannels(numberOfMainChannels, numberOfSideChannels);
 }
 
-/// \note It was a `reinterpret_cast` of the mutex to a `CRITICAL_SECTION` under
-/// `_WIN32` -- invalid for the MS STL's `std::mutex` when it was written and
-/// invalid for the `std::recursive_mutex` that replaced it -- and a hardcoded
-/// `true` on every other platform. So the six sites that assert this asserted
-/// nothing at all on the only platforms this port has built for, and the code
-/// base's own account of who holds what was fiction.
-///
-///   `Utility::CriticalSection` keeps its owner now, so this is the answer rather
-/// than a guess, on every platform and in one line. doc/tech/correct_the_threading.md
-/// deletes the lock at stage 6; until then this is what the stages in between are
-/// checked against.
+/// \note Three answers over three stages, and this is the last of them. It was a
+/// `reinterpret_cast` of the mutex to a `CRITICAL_SECTION` under `_WIN32` --
+/// invalid for the MS STL's `std::mutex` when it was written and invalid for the
+/// `std::recursive_mutex` that replaced it -- and a hardcoded `true` everywhere
+/// else, so the six sites that assert this asserted nothing at all on any
+/// platform this port has built for. Stage 0 made the mutex answer for itself.
+/// Stage 6 deleted the mutex, and what is left is the invariant the mutex was
+/// standing in for.
 ///                                           (02.08.2026.) (SW port)
-bool SpectrumWorxCore::currentThreadOwnsTheProcessLock() const
-{
-    return processCriticalSection_.currentThreadOwns();
-}
-
 bool SpectrumWorxCore::currentThreadMayMutateEngineState() const
 {
-#ifndef NDEBUG
-    return currentThreadOwnsTheProcessLock() || suspended_;
-#else
-    return currentThreadOwnsTheProcessLock();
-#endif // NDEBUG
+    return !engineIsRunning() || Threading::isAudioThread();
 }
 
 bool SpectrumWorxCore::setBlockSize(unsigned int const newBlockSize)
@@ -426,7 +405,14 @@ bool SpectrumWorxCore::isEngineSetupUpToDate() const
 
 Engine::Setup const &SpectrumWorxCore::engineSetup() const
 {
-    LE_ASSERT(isEngineSetupUpToDate() || !currentStorageFactors().complete());
+    /// \note The third term is new and is the price of the restart route: while
+    /// a restart is pending the FFT size parameter reads what the user asked for
+    /// and the setup still reads what the engine is running, and they are
+    /// *supposed* to disagree. Making that legal is a change to this assertion's
+    /// contract rather than to any of the call sites that reach it.
+    ///                                       (02.08.2026.) (SW port)
+    LE_ASSERT(isEngineSetupUpToDate() || spectralSetupPending_ ||
+              !currentStorageFactors().complete());
     return uncheckedEngineSetup();
 }
 
@@ -455,7 +441,12 @@ bool SpectrumWorxCore::updateEngineSetup()
 
     Parameters &parameters(this->parameters());
 
-    LE_ASSERT(unsigned(setup.windowFunction()) == parameters.get<WindowFunction>());
+    /// \note An assertion that the setup's window function still agrees with the
+    /// parameter stood here. It cannot: a window change is one of the three that
+    /// now waits for a restart, and applying it is this function's own job --
+    /// resize() passes the parameter down and calls changeWindowFunction() when
+    /// nothing else moved.
+    ///                                       (02.08.2026.) (SW port)
 
 #if defined(_DEBUG) && LE_SW_ENGINE_INPUT_MODE >= 1
     {
@@ -597,9 +588,6 @@ bool SpectrumWorxCore::haveSideChannel() const { return engineSetup().hasSideCha
 
 void SpectrumWorxCore::resetChannelBuffers()
 {
-#ifdef LE_SW_FMOD
-    auto const lock(getProcessingLock());
-#endif // LE_SW_FMOD
     LE_ASSERT(currentThreadMayMutateEngineState());
     Engine::Processor::resetChannelBuffers();
 }
@@ -622,12 +610,80 @@ SpectrumWorxCore const &SpectrumWorxCore::fromEngineSetup(Engine::Setup const &e
 
 void SpectrumWorxCore::moveModule(std::uint8_t const sourceIndex, std::uint8_t const targetIndex)
 {
+    LE_ASSERT(currentThreadMayMutateEngineState());
     moduleChain().moveModule(sourceIndex, targetIndex);
 }
 
-Utility::CriticalSectionLock SpectrumWorxCore::getProcessingLock() const
+////////////////////////////////////////////////////////////////////////////////
+// Publish and retire
+////////////////////////////////////////////////////////////////////////////////
+
+SW::Module *SpectrumWorxCore::installModuleInSlot(std::uint8_t const slot,
+                                                  SW::Module *const pModule)
 {
-    return Utility::CriticalSectionLock(processCriticalSection_);
+    LE_ASSERT(currentThreadMayMutateEngineState());
+
+    auto &chain(moduleChain());
+    /// \note The *base* overload, explicitly. `AutomatedModuleChain::module()`
+    /// hides it and answers with an `IntrusivePtr` that is simply null past the
+    /// end -- which `isEnd()` then reads as a node that is not the root, i.e. as
+    /// a full slot.
+    auto const pSlotNode(chain.Engine::ModuleChainImpl::module(slot));
+    auto const slotFull(!chain.isEnd(pSlotNode));
+
+    /// \note Taken *before* the relink and handed straight back out: unlinking
+    /// drops the chain's reference, and with the interface holding none -- a
+    /// module the host swapped out with the window shut -- that reference is the
+    /// last one, so the unlink itself would call the deleter. Which is a free(),
+    /// inside process().
+    SW::Module *const pOutgoing(slotFull ? &Engine::actualModule<SW::Module>(*pSlotNode) : nullptr);
+    if (pOutgoing)
+        intrusive_ptr_add_ref(&Engine::node(*pOutgoing));
+
+    if (pModule)
+        chain.insertAtAndReplace(pSlotNode, Engine::node(*pModule));
+    else if (slotFull)
+        chain.remove(*pSlotNode);
+
+    /// \note And the reference the caller transferred in is the chain's now, so
+    /// the one the factory handed over is released here rather than leaked.
+    if (pModule)
+        intrusive_ptr_release(&Engine::node(*pModule));
+
+    return pOutgoing;
+}
+
+void SpectrumWorxCore::swapModuleChain(AutomatedModuleChain &chain)
+{
+    LE_ASSERT(currentThreadMayMutateEngineState());
+    moduleChain().swap(chain);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// The spectral setup
+////////////////////////////////////////////////////////////////////////////////
+
+bool SpectrumWorxCore::applyPendingSpectralSetup()
+{
+    LE_ASSERT_MSG(!engineIsRunning(), "The spectral setup may only be applied with audio stopped.");
+    if (!spectralSetupPending_)
+        return true;
+    spectralSetupPending_ = false;
+    return updateEngineSetup();
+}
+
+/// \brief Applies the spectral setup now, or records that it has to wait.
+///
+/// \note The one decision the three spectral setters share. `updateEngineSetup()`
+/// reallocates the shared storage and resizes every module in the chain, so it
+/// may not run while a block might be in flight -- and there is no lock left to
+/// make it wait. Nothing is processing exactly when `engineIsRunning()` is false,
+/// which is when the main thread owns the engine and may simply do it.
+///                                           (02.08.2026.) (SW port)
+bool SpectrumWorxCore::deferOrApplySpectralSetup()
+{
+    spectralSetupPending_ = true;
+    return engineIsRunning() ? true : applyPendingSpectralSetup();
 }
 
 #if LE_SW_ENGINE_INPUT_MODE >= 2
@@ -662,25 +718,29 @@ SpectrumWorxCore::ioChannels(InputMode::value_type const ioMode)
 
 bool SpectrumWorxCore::setGlobalParameter(FFTSize &parameter, FFTSize::param_type const newValue)
 {
-    Utility::CriticalSectionLock const processLock(this->getProcessingLock());
     parameter.setValue(newValue);
-    return updateEngineSetup();
+    return deferOrApplySpectralSetup();
 }
 
 bool SpectrumWorxCore::setGlobalParameter(OverlapFactor &parameter,
                                           OverlapFactor::param_type const newValue)
 {
-    Utility::CriticalSectionLock const processLock(this->getProcessingLock());
     parameter.setValue(newValue);
-    return updateEngineSetup();
+    return deferOrApplySpectralSetup();
 }
 
+/// \note Through the same deferral as the other two, where it used to recompute
+/// the window tables on the spot. It allocates nothing, so it looked harmless --
+/// but it rewrites the analysis and synthesis windows the WOLA path is reading,
+/// so a block spanning the write got half of each. `updateEngineSetup()` applies
+/// it: `resize()` takes the window function as an argument and calls
+/// `changeWindowFunction()` itself when nothing else moved.
+///                                           (02.08.2026.) (SW port)
 bool SpectrumWorxCore::setGlobalParameter(WindowFunction &parameter,
                                           WindowFunction::param_type const newValue)
 {
     parameter.setValue(newValue);
-    updateForWindowChange(newValue);
-    return true;
+    return deferOrApplySpectralSetup();
 }
 
 #if LE_SW_ENGINE_INPUT_MODE >= 2

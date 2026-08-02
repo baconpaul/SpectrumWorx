@@ -143,6 +143,18 @@ LE_COLD void ModuleChainBase::clear()
     resetRoot();
 }
 
+void ModuleChainBase::swap(ModuleChainBase &other)
+{
+    /// \note A scratch chain on the stack, which allocates nothing: the
+    /// constructor links the root node to itself and the destructor clears an
+    /// already empty list. `moveAssign` requires an empty destination, which each
+    /// of the three steps has by construction.
+    ModuleChainBase scratch;
+    scratch.moveAssign(std::move(other));
+    other.moveAssign(std::move(*this));
+    this->moveAssign(std::move(scratch));
+}
+
 LE_COLD void ModuleChainBase::moveModule(std::uint8_t const sourceIndex,
                                          std::uint8_t const targetIndex)
 {

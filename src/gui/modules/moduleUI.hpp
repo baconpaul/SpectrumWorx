@@ -40,11 +40,6 @@
 namespace LE
 {
 //------------------------------------------------------------------------------
-namespace Utility
-{
-class CriticalSectionLock;
-}
-//------------------------------------------------------------------------------
 namespace SW
 {
 //------------------------------------------------------------------------------
@@ -338,8 +333,6 @@ class ModuleUI final : public WidgetBase<>, private juce::Button::Listener
     SpectrumWorxEditor &editor();
     SpectrumWorxEditor const &editor() const;
     SharedModuleControls &sharedControls();
-
-    Utility::CriticalSectionLock getProcessingLock() const; //...mrmlj...quick-fix...
 
     //...mrmlj...quick-fix...
     void holdSharedControls(bool doHold) const;

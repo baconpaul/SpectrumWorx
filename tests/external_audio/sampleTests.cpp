@@ -16,8 +16,6 @@
 //------------------------------------------------------------------------------
 #include "external_audio/sample.hpp"
 
-#include "le/utility/criticalSection.hpp"
-
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
@@ -28,9 +26,6 @@
 namespace
 {
 using LE::Sample;
-
-/// The lock a load swaps its result in under. Nothing else touches it here.
-LE::Utility::CriticalSection criticalSection;
 
 float peak(Sample::ChannelData const &channel)
 {
@@ -65,8 +60,8 @@ TEST_CASE("A file that is neither on disk nor embedded fails to load", "[externa
 {
     Sample sample;
 
-    CHECK(sample.load(juce::File::createFileWithoutCheckingPath("no such sample.mp3"), 48000,
-                      criticalSection) != nullptr);
+    CHECK(sample.load(juce::File::createFileWithoutCheckingPath("no such sample.mp3"), 48000) !=
+          nullptr);
     CHECK(!sample);
     CHECK(sample.sampleRate() == 0);
 }
@@ -80,7 +75,7 @@ TEST_CASE("Every factory sample decodes to two equal channels", "[external-audio
         UNSCOPED_INFO(file.getFileName());
 
         Sample sample;
-        REQUIRE(sample.load(file, rate, criticalSection) == nullptr);
+        REQUIRE(sample.load(file, rate) == nullptr);
         REQUIRE(static_cast<bool>(sample));
 
         CHECK(sample.sampleFile() == file);
@@ -109,8 +104,8 @@ TEST_CASE("The requested sample rate decides the length", "[external-audio]")
 
     Sample at44k;
     Sample at88k;
-    REQUIRE(at44k.load(file, 44100, criticalSection) == nullptr);
-    REQUIRE(at88k.load(file, 88200, criticalSection) == nullptr);
+    REQUIRE(at44k.load(file, 44100) == nullptr);
+    REQUIRE(at88k.load(file, 88200) == nullptr);
 
     // Twice the rate, twice the frames, to within the frame the ratio rounds
     // off -- the same audio either way.
@@ -129,7 +124,7 @@ TEST_CASE("A sample loaded with no rate keeps the file's own", "[external-audio]
     /// re-reads it once the host says what rate it wants, and sampleRate() being
     /// zero is how it knows to. See SpectrumWorxCLAP::activate().
     Sample sample;
-    REQUIRE(sample.load(file, 0, criticalSection) == nullptr);
+    REQUIRE(sample.load(file, 0) == nullptr);
     CHECK(sample.sampleRate() == 0);
     CHECK(!sample.channel1().empty());
 }
@@ -140,7 +135,7 @@ TEST_CASE("Clearing a sample forgets the file", "[external-audio]")
     REQUIRE(!samples.empty());
 
     Sample sample;
-    REQUIRE(sample.load(samples.front(), 48000, criticalSection) == nullptr);
+    REQUIRE(sample.load(samples.front(), 48000) == nullptr);
     REQUIRE(static_cast<bool>(sample));
 
     sample.clear();

@@ -21,7 +21,6 @@
 #include "le/spectrumworx/engine/configuration.hpp"
 #include "le/spectrumworx/engine/processor.hpp"
 #include "le/utility/buffers.hpp"
-#include "le/utility/criticalSection.hpp"
 #include "le/utility/cstdint.hpp"
 #include "le/utility/intrinsics.hpp"
 #include "le/utility/platformSpecifics.hpp"
@@ -143,11 +142,51 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
 
     Processor::LFO::Timer const &lfoTimer() const { return Engine::Processor::lfoTimer(); }
 
-    Utility::CriticalSectionLock getProcessingLock() const;
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Whether anything can be inside process() right now.
+    ///
+    /// \note The whole of stage 6's synchronisation, and it is not a lock. While
+    /// this is false there is no audio thread -- `clap_plugin::activate` and
+    /// `deactivate` bracket the only window in which one exists -- so the main
+    /// thread owns the engine outright and builds, installs and destroys
+    /// whatever it likes. While it is true the audio thread owns the engine, and
+    /// everything the main thread wants done crosses as a message.
+    ///
+    ///   That is why the publish helpers below take a queue *and* apply
+    /// themselves directly: which of the two it is depends only on this.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    bool engineIsRunning() const { return !suspended_; }
 
     Engine::StorageFactors const &currentStorageFactors() const { return currentStorageFactors_; }
 
     static SpectrumWorxCore const &fromEngineSetup(Engine::Setup const &);
+
+    ////////////////////////////////////////////////////////////////////////////
+    //
+    // Publish and retire: the only two ways the chain ever changes.
+    //
+    // \note Both are pure pointer surgery -- no allocation, no destruction, no
+    // file IO, no formatting -- so both are legal inside process(). Whoever
+    // *builds* the module or the chain does so on the main thread and hands it
+    // over; whatever comes back out is handed the other way and destroyed there.
+    // That is the whole of §5.
+    //
+    ////////////////////////////////////////////////////////////////////////////
+
+    /// \brief Puts \p pModule in \p slot, or empties the slot when it is null.
+    ///
+    /// \param pModule one reference, transferred; already resized and
+    ///        initialised against the current setup by whoever built it.
+    /// \return the module that came out, also one reference, for the caller to
+    ///         release -- never null-checked away and never released here.
+    Module *installModuleInSlot(std::uint8_t slot, Module *pModule);
+
+    /// \brief Exchanges the live chain with \p chain, which comes back holding
+    /// what used to be live.
+    void swapModuleChain(AutomatedModuleChain &chain);
 
   protected:
     SpectrumWorxCore();
@@ -157,25 +196,46 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
 
     ////////////////////////////////////////////////////////////////////////////
     ///
-    /// \brief One block, if the processing lock is free.
+    /// \brief One block. Always.
     ///
-    /// \return whether \p outputs was written. The lock is taken with
-    /// `try_lock`, because waiting for it on the audio thread is the one thing
-    /// this may not do -- so whenever the UI thread holds it (a preset load, an
-    /// FFT-size change) there is no output to give and the caller has to say
-    /// what the host hears instead.
-    ///
-    /// \note It returned `void`, and every caller then left the host's buffer
-    /// exactly as it found it -- so a preset load played back whatever the
-    /// previous plugin in the chain had written there, at full level. See
-    /// week_two.md §2.1b.
-    ///                                       (01.08.2026.) (SW port)
+    /// \note It returned `bool` -- "the processing lock was free, so `outputs`
+    /// was written" -- for the two stages in which the lock still existed and
+    /// meant something. Nothing takes a lock here now and nothing else mutates
+    /// the engine while this runs, so there is no longer a block to decline and
+    /// no caller left with a buffer to fill in for one. week_two.md §2.1b was
+    /// the earlier half of the same story: back then it returned `void` and the
+    /// callers left the host's buffer as they found it.
+    ///                                       (02.08.2026.) (SW port)
     ///
     ////////////////////////////////////////////////////////////////////////////
-    bool process(float const *const *inputs, float const *const *pSideChannels,
+    void process(float const *const *inputs, float const *const *pSideChannels,
                  float *const *outputs, float const &outputGainScale, unsigned int samples);
 
     bool updateEngineSetup();
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The spectral setup, deferred.
+    ///
+    /// \note FFT size, overlap factor and window function reallocate the whole
+    /// spectral working set and resize every module in the chain. That used to
+    /// happen on whichever thread wrote the parameter, under the processing
+    /// lock, while audio ran -- so a block either waited (forbidden) or was
+    /// dropped (§2.1b).
+    ///
+    ///   Now the parameter moves and the *setup* does not: this records that
+    /// they disagree, the plugin asks the host to restart, and `deactivate()`
+    /// applies it where the audio thread definitionally is not running. That is
+    /// also the only point at which `clap_plugin_latency` permits the latency to
+    /// change, and the FFT size *is* the latency.
+    ///
+    ///   `engineSetup()`'s assertion tolerates the gap while it is open; see the
+    /// note there.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    bool spectralSetupPending() const { return spectralSetupPending_; }
+    bool applyPendingSpectralSetup();
 
   public:
     using LFO = LE::Parameters::LFOImpl;
@@ -312,31 +372,30 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
   protected:
     void updateForWindowChange(unsigned int window);
 
-    bool currentThreadOwnsTheProcessLock() const;
-
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \brief Whether the calling thread may mutate engine state right now.
     ///
-    /// \note What the six `LE_ASSERT( currentThreadOwnsTheProcessLock() )` sites
-    /// meant, now that the answer is no longer a hardcoded `true` and they can be
-    /// wrong. Holding the lock is *one* way to be sure nothing else is inside
-    /// `process()`; the other is that `process()` cannot be running at all, which
-    /// is what `suspend()` records and what `clap_plugin::activate` guarantees
-    /// before `start_processing`. `activate()` reconfigures the channel count and
-    /// the block size on that basis and takes nothing, correctly -- so asserting
-    /// the lock alone made a legitimate path fire the moment the check became
-    /// real.
+    /// \note Stage 6's form, and the last of three. It began as a hardcoded
+    /// `true`; stage 0 made it "this thread holds the processing lock, or
+    /// nothing is processing"; there is no lock now, so what is left is the
+    /// second half of that and the rule §2 states: **the audio thread owns the
+    /// engine while one exists, and the main thread owns it while one does not**.
     ///
-    /// \note Both terms disappear at stage 6, when the audio thread owns the
-    /// engine outright and mutating it from anywhere else is the thing that is
-    /// wrong. See doc/tech/correct_the_threading.md.
+    ///   `Threading::isAudioThread()` is "this call is under `process()`", which
+    /// is exactly the question -- an engine can be driven from a test's own
+    /// thread, and a host is not obliged to use the same OS thread twice.
     ///
     ////////////////////////////////////////////////////////////////////////////
     bool currentThreadMayMutateEngineState() const;
 
+  public:
+    /// \note One of the three chain mutations, alongside the two above, and
+    /// public for the same reason: `Threading::publishModuleMove()` is what
+    /// reaches it, from whichever thread turns out to own the engine.
     void moveModule(std::uint8_t sourceIndex, std::uint8_t targetIndex);
 
+  protected:
     InputBuffers &buffers() { return buffers_; }
     InputBuffers const &buffers() const { return buffers_; }
 
@@ -350,6 +409,9 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
 
   private:
     bool isEngineSetupUpToDate() const;
+
+    /// \see the definition.
+    bool deferOrApplySpectralSetup();
 
     void resetChannelBuffers();
 
@@ -415,46 +477,21 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
         bool forceSideChannel_;
     }; // class InputBuffers
 
-    class ProcessLockUnlocker;
-
   private:
     InputBuffers buffers_;
 
     Program *LE_RESTRICT pProgram_;
 
-  protected: //...mrmlj...
-    mutable Utility::CriticalSection processCriticalSection_;
-
-  private:
-#ifndef NDEBUG
+    /// \note Always compiled, where it used to be `#ifndef NDEBUG`. It is not a
+    /// debugging aid any more: `engineIsRunning()` is what decides whether a
+    /// structural change is applied here and now or handed to the audio thread.
     bool suspended_;
-#endif // NDEBUG
+
+    bool spectralSetupPending_{false};
 
     Engine::StorageFactors currentStorageFactors_;
     Engine::HeapSharedStorage sharedStorage_;
 }; // class SpectrumWorxCore
-
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \class SpectrumWorxCore::ProcessLockUnlocker
-///
-////////////////////////////////////////////////////////////////////////////////
-
-class SpectrumWorxCore::ProcessLockUnlocker
-{
-  public:
-    ProcessLockUnlocker(ProcessLockUnlocker const &) = delete; // makes non-copyable
-    ProcessLockUnlocker &operator=(ProcessLockUnlocker const &) = delete;
-
-    ProcessLockUnlocker(SpectrumWorxCore &effect)
-        : processCriticalSectionGuard_(effect.processCriticalSection_)
-    {
-    }
-    ~ProcessLockUnlocker() { processCriticalSectionGuard_.unlock(); }
-
-  private:
-    Utility::CriticalSection &processCriticalSectionGuard_;
-};
 
 //------------------------------------------------------------------------------
 } // namespace SW

@@ -58,26 +58,14 @@ namespace SW
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace Detail
-{
-template <class OptionalGUI>
-void updateGUIForChangedModule(OptionalGUI *const pGUI, bool const addModule,
-                               bool const targetSlotFull)
-{
-    if (pGUI)
-    {
-        if (!addModule && targetSlotFull)
-            pGUI->moduleRemoved();
-        else if (addModule && !targetSlotFull)
-            pGUI->moduleAdded();
-    }
-}
-
-inline void updateGUIForChangedModule(void const * /*guiless*/, bool /*const addModule*/,
-                                      bool /*const targetSlotFull*/)
-{
-}
-} // namespace Detail
+/// \note A `Detail::updateGUIForChangedModule()` stood here, calling the
+/// editor's `moduleAdded()`/`moduleRemoved()` when a slot changed. This runs on
+/// whichever thread the parameter arrived on -- for a host automation event, the
+/// audio thread -- so it repositioned JUCE components from inside `process()`.
+/// The interface follows the chain now: the plugin raises `ToUI::ChainChanged`
+/// and the editor recomputes its rack on the main thread. See
+/// doc/tech/correct_the_threading.md §5.
+///                                           (02.08.2026.) (SW port)
 
 class ModuleChainParameter;
 
@@ -163,12 +151,16 @@ template <class Impl, class Protocol> class Host2PluginInteropImpl<Impl, Protoco
         if ((addModule == targetSlotFull) || (addModule && previousSlotFull) ||
             (!addModule && nextSlotEmpty))
         {
+            /// \note This allocates, and it may be running inside process() --
+            /// a host writing a slot selector is a parameter event like any
+            /// other. The granted concession, and the only one left: every
+            /// other route builds its module on the main thread and hands the
+            /// engine a pointer. See tech_debt.md.
+            ///                               (02.08.2026.) (SW port)
             auto const result(
                 moduleChain.setParameter(moduleIndex, effectIndex, pImpl->moduleInitialiser()));
             if (result.second == effectIndex)
             {
-                Detail::updateGUIForChangedModule(LE::Utility::getPointer(pImpl->gui()), addModule,
-                                                  targetSlotFull);
                 //...mrmlj...http://lists.apple.com/archives/coreaudio-api/2005/Oct/msg00164.html
                 if (pImpl->host().wantsManualDependentParameterNotifications())
                     pImpl->moduleChanged(moduleIndex, result.first.get());

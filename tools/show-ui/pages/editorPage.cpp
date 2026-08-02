@@ -28,7 +28,6 @@
 #include "core/spectrumWorxCore.hpp"
 #include "gui/editor/editorHost.hpp"
 #include "core/automatedModuleChain.hpp"
-#include "gui/editor/editorModuleInitialiser.hpp"
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
 #include "le/spectrumworx/factoryPresets.hpp"
 #include "gui/editor/spectrumWorxEditor.hpp"

@@ -11,7 +11,6 @@
 #include "presetLoading.hpp"
 
 #include "editorHost.hpp"
-#include "editorModuleInitialiser.hpp"
 #include "spectrumWorxEditor.hpp"
 
 #include "configuration/versionConfiguration.hpp" // MB_WARNING
@@ -21,6 +20,7 @@
 #include "core/modules/finalImplementations.hpp"
 #include "core/modules/moduleDSPAndGUI.hpp"
 #include "core/spectrumWorxCore.hpp"
+#include "core/threading/publish.hpp"
 
 #include "gui/gui.hpp" // warningMessageBox()
 
@@ -91,15 +91,22 @@ struct Loader
     {
         return {host.core()};
     }
-    Utility::CriticalSectionLock processingLock() const { return host.core().getProcessingLock(); }
 
-    /// \note The editor-aware initialiser, so that a preset which fills slots
-    /// builds their UI regions as it goes rather than leaving five modules with
-    /// nowhere to draw. With no editor it is the DSP half alone, which is all
-    /// there is to do.
-    EditorModuleInitialiser moduleInitialiser() const
+    /// \note The one point at which a preset load touches the engine; everything
+    /// before it built a chain nothing else could see. See
+    /// Threading::publishChain() and doc/tech/correct_the_threading.md §5.
+    void publishChain(AutomatedModuleChain &newChain) const
     {
-        return {host.core().moduleInitialiser(), pEditor};
+        Threading::publishChain(host.core(), host.toEngine(), newChain);
+    }
+
+    /// \note The DSP half alone. An `EditorModuleInitialiser` stood here, so
+    /// that a preset which filled slots built their strips as it went; the rack
+    /// follows the chain now, and `SpectrumWorxEditor::resyncModuleRack()` is
+    /// what builds them once the chain is installed.
+    SpectrumWorxCore::ModuleInitialiser moduleInitialiser() const
+    {
+        return host.core().moduleInitialiser();
     }
 
     static bool onlySetParameters() { return false; }

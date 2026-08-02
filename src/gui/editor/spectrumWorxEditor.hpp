@@ -22,7 +22,6 @@
 
 #include "le/parameters/lfoImpl.hpp" //...mrmlj...member typedefs...
 #include "le/parameters/parametersUtilities.hpp"
-#include "le/utility/criticalSection.hpp"
 #include "le/utility/cstdint.hpp"
 #include "le/utility/platformSpecifics.hpp"
 
@@ -145,8 +144,6 @@ class SpectrumWorxEditor final : private SkinLifetime,
 
     SpectrumWorxCore &moduleChainOwner() { return effect(); }
     SpectrumWorxCore const &moduleChainOwner() const { return effect(); }
-
-    Utility::CriticalSectionLock getProcessingLock() const;
 
   private:
   public: //...mrmlj...FMOD...
@@ -278,8 +275,7 @@ class SpectrumWorxEditor final : private SkinLifetime,
     void updateModuleParameterAndNotifyHost(ModuleUI &, std::uint8_t moduleParameterIndex,
                                             float parameterValue) const;
 
-    void createChainGUIs(AutomatedModuleChain &);
-    void destroyChainGUIs(AutomatedModuleChain &);
+    void destroyChainGUIs();
 
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -301,19 +297,26 @@ class SpectrumWorxEditor final : private SkinLifetime,
     ////////////////////////////////////////////////////////////////////////////
 
     /// \brief Builds \p module's strip at \p slotIndex, or moves the one it
-    /// already has. Called by EditorModuleInitialiser as a slot is filled.
+    /// already has.
     void createModuleRegion(LE::Utility::IntrusivePtr<Module> const &, std::uint8_t slotIndex);
 
     ModuleUI *regionFor(Module const &);
     ModuleUI *regionInSlot(std::uint8_t slotIndex);
+    ModuleUI *regionInRackSlot(std::uint8_t slotIndex);
 
-    /// \brief Drops any strip whose module has left the chain, and puts the rest
-    /// where the chain says they go.
-    void dropOrphanedRegions();
+    /// \brief What the *rack* shows in \p slotIndex, which is what the user
+    /// asked for; the chain may not have caught up. \see the definition.
+    std::int8_t effectInRackSlot(std::uint8_t slotIndex) const;
+
+  public:
+    /// \brief Makes the rack a function of the chain: drops strips whose module
+    /// has gone, builds strips for modules that have none, and puts every one of
+    /// them where the chain says. \see the definition.
+    void resyncModuleRack();
 
     /// \brief The same, on the next turn of the message loop. See the definition
-    /// for why it cannot be immediate.
-    void refreshModuleRegionsAsync();
+    /// for why it cannot always be immediate.
+    void refreshModuleRackAsync();
 
     /// \brief Lets go of a strip's controls before it is destroyed, so that
     /// JUCE's focus handling cannot re-enter through a control that is going.
@@ -324,6 +327,11 @@ class SpectrumWorxEditor final : private SkinLifetime,
     /// moduleControlDectivated() and detachFrom().
     void retireLFODisplay();
 
+    /// \brief The slot addUserAddedModule() wants focused once its strip exists,
+    /// or noSlotAwaitingFocus. \see addUserAddedModule().
+    static constexpr std::uint8_t noSlotAwaitingFocus{0xFF};
+    std::uint8_t slotAwaitingFocus_{noSlotAwaitingFocus};
+
   public:
     /// \note Both resync the rack afterwards, because both are reached from the
     /// host's side as well as from this editor's -- `updateGUIForChangedModule`
@@ -332,12 +340,12 @@ class SpectrumWorxEditor final : private SkinLifetime,
     void moduleRemoved()
     {
         setLastModulePosition(nextAvailableModuleSlot_ - 1);
-        refreshModuleRegionsAsync();
+        refreshModuleRackAsync();
     }
     void moduleAdded()
     {
         setLastModulePosition(nextAvailableModuleSlot_ + 1);
-        refreshModuleRegionsAsync();
+        refreshModuleRackAsync();
     }
 
   public: //...mrmlj...needed at end of preset loading...
@@ -432,9 +440,25 @@ class SpectrumWorxEditor final : private SkinLifetime,
     void showSettings(unsigned int pageIndexToActivate);
 
   private:
-    void moveModules(ModuleUI &targetSlotUI, std::uint8_t numberOfModules, std::int16_t offset);
-    std::pair<LE::Utility::IntrusivePtr<Module>, std ::int8_t>
-    setModuleInSlot(std::uint8_t slotIndex, std::int8_t effectIndex);
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Asks for \p effectIndex in \p slotIndex.
+    ///
+    /// \note It *was* the change: it built the module, linked it into the live
+    /// chain and built the strip, all from the message thread, and returned what
+    /// it had made. None of that can stay -- the chain belongs to the audio
+    /// thread -- so it now builds the module here and hands it over, and the
+    /// strip follows when the engine reports the chain changed.
+    ///
+    ///   Which is why nothing is returned. A caller that needs to do something
+    /// to the module it asked for -- addUserAddedModule() takes focus on it --
+    /// says so through slotAwaitingFocus_ and is answered by resyncModuleRack().
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    /// \return whether the module could be built at all -- an effect this build
+    /// does not have is still a synchronous failure.
+    bool setModuleInSlot(std::uint8_t slotIndex, std::int8_t effectIndex);
 
     void setActiveModuleName(juce::String const &newName);
     void setActiveControlName(juce::String const &newName);
