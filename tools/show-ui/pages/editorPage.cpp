@@ -104,6 +104,11 @@ class HarnessHost final : public GUI::EditorHost
     SpectrumWorxCore &core() override { return engine_; }
     Plugin2HostInteropControler &automation() override { return notifications_; }
 
+    /// \note Real, and nobody drains them: this harness renders a still image, so
+    /// whatever the editor asks the engine for stays in the queue.
+    Threading::ToEngineQueue &toEngine() const override { return toEngine_; }
+    Threading::ValueMailbox const &modulatedValues() const override { return values_; }
+
     void editorOpened(GUI::SpectrumWorxEditor &) override {}
     void editorClosed() override {}
 
@@ -123,6 +128,8 @@ class HarnessHost final : public GUI::EditorHost
   private:
     HarnessEngine engine_;
     SilentNotifications notifications_;
+    mutable Threading::ToEngineQueue toEngine_;
+    Threading::ValueMailbox values_;
 }; // class HarnessHost
 
 /// Owns the host so that it outlives the editor reaching into it.

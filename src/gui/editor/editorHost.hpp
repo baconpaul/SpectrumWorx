@@ -28,6 +28,9 @@
 #ifndef editorHost_hpp__0C5A1E7B_9D34_4F82_A6E1_37B0C4D8F925
 #define editorHost_hpp__0C5A1E7B_9D34_4F82_A6E1_37B0C4D8F925
 //------------------------------------------------------------------------------
+#include "core/threading/messages.hpp"
+#include "core/threading/valueMailbox.hpp"
+
 #include "le/utility/platformSpecifics.hpp"
 
 #include <juce_core/juce_core.h>
@@ -64,6 +67,28 @@ class LE_NOVTABLE EditorHost
     /// The other direction: telling the host that the user moved something.
     /// Gestures, automation notifications and module chain changes.
     virtual Plugin2HostInteropControler &automation() = 0;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The protocol, as the editor sees it: a queue to ask the engine for
+    /// something, and a mailbox to read what it is currently doing.
+    ///
+    /// \note These belong to the plugin and not to the editor, because the host
+    /// reads parameters through `clap_plugin_params` with the window shut. The
+    /// editor is a *user* of them, which is why they arrive through this
+    /// interface rather than through the editor's constructor.
+    ///
+    /// \note `const` on both, and a `const &` on the mailbox: the editor never
+    /// owns either, and it only ever reads the second. Pushing to a queue is a
+    /// mutation of the queue and not of the host, which is why the first is
+    /// const-qualified and hands back a non-const queue.
+    ///
+    /// \see core/threading/messages.hpp, doc/tech/correct_the_threading.md §3.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    virtual Threading::ToEngineQueue &toEngine() const = 0;
+    virtual Threading::ValueMailbox const &modulatedValues() const = 0;
 
     /// \note How the plugin comes to know about the editor at all. Called from
     /// the editor's constructor and destructor, on the UI thread -- opened()

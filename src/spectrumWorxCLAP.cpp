@@ -669,6 +669,12 @@ clap_process_status SpectrumWorxCLAP::process(clap_process const *const process)
     /// compile away without `-fsanitize=realtime`. See cmake/sw-sanitizers.cmake.
     Threading::ScopedAudioCallback const audioCallback;
 
+    /// \note Before the host's own events, so that a command the interface sent
+    /// and an automation event for the same parameter resolve in the order a user
+    /// would expect: the host's block wins, being newer than anything queued
+    /// before the block started.
+    drainCommands();
+
     bool effectChanged(false);
     if (auto const *const in = process->in_events)
     {
@@ -873,6 +879,8 @@ void SpectrumWorxCLAP::runEngine(clap_process const *const process) noexcept
 
 void SpectrumWorxCLAP::onMainThread() noexcept
 {
+    drainEngineEvents();
+
     auto const flags(pendingRescan_.exchange(0));
     if (flags && _host.canUseParams())
         _host.paramsRescan(static_cast<clap_param_rescan_flags>(flags));
@@ -885,41 +893,80 @@ void SpectrumWorxCLAP::onMainThread() noexcept
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+//
+// The protocol
+// ------------
+//
+//   Two rings and a mailbox, and the two places they are drained. Nothing is
+// routed through them yet -- see doc/tech/correct_the_threading.md, where stages
+// 4, 5 and 6 fill each case in. They are here first, and drained from the start,
+// so that the stages that follow are moves rather than moves and inventions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxCLAP::drainCommands()
+{
+    LE_ASSERT(Threading::isAudioThread());
+
+    Threading::ToEngine command;
+    while (toEngine_.pop(command))
+    {
+        switch (command.kind)
+        {
+        case Threading::ToEngine::Kind::None:
+            break;
+
+        case Threading::ToEngine::Kind::SetBaseParameter: // stage 4
+        case Threading::ToEngine::Kind::SetSlot:          // stage 6
+        case Threading::ToEngine::Kind::SwapProgram:      // stage 6
+        case Threading::ToEngine::Kind::SwapSample:       // stage 6
+            LE_ASSERT_MSG(false, "Command sent before its handler exists.");
+            break;
+        }
+    }
+}
+
+void SpectrumWorxCLAP::drainEngineEvents()
+{
+    LE_ASSERT(Threading::isMainThread() || !Threading::isAudioThread());
+
+    Threading::ToUI event;
+    while (toUI_.pop(event))
+    {
+        switch (event.kind)
+        {
+        case Threading::ToUI::Kind::None:
+            break;
+
+        case Threading::ToUI::Kind::BaseParameterChanged: // stage 5
+        case Threading::ToUI::Kind::SlotChanged:          // stage 5
+        case Threading::ToUI::Kind::Retire:               // stage 6
+        case Threading::ToUI::Kind::SetupChanged:         // stage 6
+            LE_ASSERT_MSG(false, "Event sent before its handler exists.");
+            break;
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Edits made in the editor
 ////////////////////////////////////////////////////////////////////////////////
 
-bool SpectrumWorxCLAP::UIEdits::push(Edit const &edit) const
-{
-    auto const written(written_.load(std::memory_order_relaxed));
-    // The consumer only ever advances read_, so a stale value here just makes
-    // the queue look fuller than it is -- never emptier.
-    if ((written - read_.load(std::memory_order_acquire)) >= capacity)
-        return false;
-    edits_[written & mask] = edit;
-    written_.store(written + 1, std::memory_order_release);
-    return true;
-}
-
-bool SpectrumWorxCLAP::UIEdits::pop(Edit &edit)
-{
-    auto const read(read_.load(std::memory_order_relaxed));
-    if (read == written_.load(std::memory_order_acquire))
-        return false;
-    edit = edits_[read & mask];
-    read_.store(read + 1, std::memory_order_release);
-    return true;
-}
+/// \note The push/pop pair that stood here is `Threading::SPSCQueue` now, which
+/// was generalised from it. Same ordering, same drop-on-full policy, one
+/// implementation for the three rings this plugin has.
+///                                           (02.08.2026.) (SW port)
 
 void SpectrumWorxCLAP::flushUIEdits(clap_output_events const *const out)
 {
-    UIEdits::Edit edit;
+    UIEdit edit;
     while (uiEdits_.pop(edit))
     {
         clap_event_param_gesture gesture{};
         clap_event_param_value value{};
         clap_event_header *pHeader{nullptr};
 
-        if (edit.kind == UIEdits::Kind::Value)
+        if (edit.kind == UIEdit::Kind::Value)
         {
             value.header.size = sizeof(value);
             value.header.time = 0;
@@ -937,7 +984,7 @@ void SpectrumWorxCLAP::flushUIEdits(clap_output_events const *const out)
             gesture.header.size = sizeof(gesture);
             gesture.header.time = 0;
             gesture.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
-            gesture.header.type = (edit.kind == UIEdits::Kind::GestureBegin)
+            gesture.header.type = (edit.kind == UIEdit::Kind::GestureBegin)
                                       ? CLAP_EVENT_PARAM_GESTURE_BEGIN
                                       : CLAP_EVENT_PARAM_GESTURE_END;
             gesture.header.flags = 0;
@@ -970,7 +1017,7 @@ void SpectrumWorxCLAP::HostProxy::automatedParameterChanged(
     plugin_.uiEdits_.push({parameter.value,
                            static_cast<Plugins::AutomatedParameterValue>(
                                CLAPEdge::toHost(parameterID, ranges, value)),
-                           UIEdits::Kind::Value});
+                           UIEdit::Kind::Value});
 
     /// \note The same rescan handleEvent() asks for when the *host* fills a slot.
     /// A slot selector is the one parameter whose value changes what the others
@@ -990,13 +1037,13 @@ void SpectrumWorxCLAP::HostProxy::automatedParameterChanged(
 void SpectrumWorxCLAP::HostProxy::automatedParameterBeginEdit(
     ParameterSelector const parameter) const
 {
-    plugin_.uiEdits_.push({parameter.value, 0, UIEdits::Kind::GestureBegin});
+    plugin_.uiEdits_.push({parameter.value, 0, UIEdit::Kind::GestureBegin});
     plugin_.requestParameterFlush();
 }
 
 void SpectrumWorxCLAP::HostProxy::automatedParameterEndEdit(ParameterSelector const parameter) const
 {
-    plugin_.uiEdits_.push({parameter.value, 0, UIEdits::Kind::GestureEnd});
+    plugin_.uiEdits_.push({parameter.value, 0, UIEdit::Kind::GestureEnd});
     plugin_.requestParameterFlush();
 }
 

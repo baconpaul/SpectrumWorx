@@ -24,6 +24,8 @@
 #include "core/host_interop/plugin2HostImpl.hpp"
 #include "core/modules/moduleDSPAndGUI.hpp"
 #include "core/spectrumWorxCore.hpp"
+#include "core/threading/messages.hpp"
+#include "core/threading/valueMailbox.hpp"
 #include "external_audio/sample.hpp"
 #include "gui/editor/editorHost.hpp"
 #include "gui/editor/editorModuleInitialiser.hpp"
@@ -121,9 +123,11 @@ class SpectrumWorxCLAP final
     ///
     ////////////////////////////////////////////////////////////////////////////
 
-    class UIEdits
+    /// \note The implementation moved to `Threading::SPSCQueue`, which was
+    /// generalised from it -- this was already the right ring and is now one
+    /// instantiation of it, sharing its tests with the two the redesign adds.
+    struct UIEdit
     {
-      public:
         enum class Kind : std::uint8_t
         {
             Value,
@@ -131,27 +135,12 @@ class SpectrumWorxCLAP final
             GestureEnd
         };
 
-        struct Edit
-        {
-            clap_id id;
-            double value;
-            Kind kind;
-        };
+        clap_id id;
+        double value;
+        Kind kind;
+    }; // struct UIEdit
 
-        /// UI thread. Returns false if the queue was full and the edit dropped.
-        bool push(Edit const &) const;
-        /// Audio thread.
-        bool pop(Edit &);
-
-      private:
-        /// A power of two, so the mask is an and.
-        static constexpr std::size_t capacity{1024};
-        static constexpr std::size_t mask{capacity - 1};
-
-        mutable std::array<Edit, capacity> edits_{};
-        mutable std::atomic<std::size_t> written_{0};
-        std::atomic<std::size_t> read_{0};
-    }; // class UIEdits
+    using UIEdits = Threading::SPSCQueue<UIEdit, 1024>;
 
     /// \note The 2016 host proxy answered a dozen questions about a VST or AU
     /// host. These are the ones the parameter path reaches.
@@ -334,7 +323,19 @@ class SpectrumWorxCLAP final
     bool registerOrUnregisterTimer(clap_id &, int milliseconds, bool registering) override;
     bool registerOrUnregisterPosixFd(int fd, clap_posix_fd_flags_t, bool registering) override;
 
+  protected: // GUI::EditorHost -- the protocol, as the editor sees it
+    Threading::ToEngineQueue &toEngine() const override { return toEngine_; }
+    Threading::ValueMailbox const &modulatedValues() const override { return values_; }
+
   private:
+    /// \brief Applies everything the main thread has asked for, at the top of
+    /// process(). `[audio-thread]`
+    void drainCommands();
+
+    /// \brief Applies everything the audio thread has reported, on the main
+    /// thread. `[main-thread]`
+    void drainEngineEvents();
+
     /// Applies a parameter event. Returns true if it changed a slot's effect,
     /// i.e. if the host's view of the parameter list is now stale.
     bool handleEvent(clap_event_header const *);
@@ -393,7 +394,32 @@ class SpectrumWorxCLAP final
 
     /// What the editor moved, waiting for a process() or flush() to carry it to
     /// the host.
-    UIEdits uiEdits_;
+    ///
+    /// \note Mutable because `HostProxy` holds the plugin by const reference and
+    /// its members are const: telling the host something is a const operation on
+    /// the plugin -- it changes nothing about what the plugin *is*. The previous
+    /// implementation said the same thing by marking the ring's own storage
+    /// mutable and its `push` const; saying it once here is the same claim with
+    /// one fewer place to get it wrong.
+    mutable UIEdits uiEdits_;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The two rings and the mailbox: everything that crosses between the
+    /// main thread and the audio thread.
+    ///
+    /// \note Owned here rather than by the editor, because `paramsValue`,
+    /// `paramsValueToText` and `stateSave` are `[main-thread]` calls a host makes
+    /// with the window shut. The editor is handed references, and the mailbox as
+    /// a `const &` -- it only ever reads it.
+    ///
+    /// \see core/threading/messages.hpp, doc/tech/correct_the_threading.md §3.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    mutable Threading::ToEngineQueue toEngine_;
+    Threading::ToUIQueue toUI_;
+    Threading::ValueMailbox values_;
 
     /// \note Written by setNewSample() on the message thread, read by
     /// runEngine() on the audio thread, and the process lock is what stands

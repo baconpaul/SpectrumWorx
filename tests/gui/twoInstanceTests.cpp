@@ -104,6 +104,12 @@ class Instance final : public GUI::EditorHost
     SpectrumWorxCore &core() override { return engine_; }
     Plugin2HostInteropControler &automation() override { return notifications_; }
 
+    /// \note Real ones, and nobody drains them: what the editor asks for goes
+    /// into the queue and stays there. These cases are about lifetime, and a
+    /// queue that fills would be a finding rather than a nuisance.
+    Threading::ToEngineQueue &toEngine() const override { return toEngine_; }
+    Threading::ValueMailbox const &modulatedValues() const override { return values_; }
+
     void editorOpened(GUI::SpectrumWorxEditor &) override {}
     void editorClosed() override {}
 
@@ -120,6 +126,8 @@ class Instance final : public GUI::EditorHost
   private:
     SWTest::Engine engine_;
     SilentNotifications notifications_;
+    mutable Threading::ToEngineQueue toEngine_;
+    Threading::ValueMailbox values_;
     std::unique_ptr<GUI::SpectrumWorxEditor> pEditor_;
 }; // class Instance
 

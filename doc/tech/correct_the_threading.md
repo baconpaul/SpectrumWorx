@@ -303,11 +303,7 @@ below for what it found.
 **1 — One owner for JUCE; per-instance statics; the reporter stops being a dialog.**
 ✅ *done, 02.08.2026;* see §6.1.
 
-**2 — The protocol, empty.** `core/threading/{spscQueue,messages,valueMailbox}.hpp`.
-`SpectrumWorxCLAP` owns the two rings, the mailbox and a `MainThreadModel`; the editor takes
-references. Nothing is routed through them yet — the model is maintained alongside the
-existing direct path, and a test asserts model == engine after every operation. Scaffold
-only, so that the stages that follow are moves rather than moves-and-inventions.
+**2 — The protocol, empty.** ✅ *done, 02.08.2026;* see §6.2.
 
 **3 — The base value in the engine.** §4. `paramsValue`, `savePresetParameters` and
 `stateSave` read the base; the LFO writes only live storage. The preset-save bug closes
@@ -450,6 +446,37 @@ implementation it is null. Plus: the survivor is still a working editor, reopeni
 closed one works, selection is independent, and a run over a whole factory bank with **no
 reporter installed** counts 806-style missing parameters and leaks nothing — which is
 symptom 1, stated as a test.
+
+### 6.2 — What stage 2 built
+
+Three headers under `core/threading/`, owned by `SpectrumWorxCLAP`, reached by the editor
+through two new `EditorHost` virtuals — which is where they belong, because the host reads
+parameters through `clap_plugin_params` with the window shut, so the protocol has to outlive
+any editor and exist when there has never been one.
+
+- **`spscQueue.hpp`** — `SPSCQueue<Message, Capacity>`, generalised from `UIEdits`, which
+  was already exactly this and is now one instantiation of it. Free-running counters masked
+  only on the way into the array, and `push` **refuses** when full rather than overwriting
+  the unread tail. That is the one place it differs from `sst::cpputils::SimpleRingBuffer`
+  and it is the whole reason for having our own: a dropped `Retire` is a leak, and
+  `SetSlot{2,Gain}` then `ClearSlot{2}` does not coalesce to the second.
+- **`valueMailbox.hpp`** — a value per dense parameter index plus a bitset of what moved,
+  swept with `exchange` so a write landing mid-sweep is carried into the next one rather
+  than lost.
+- **`messages.hpp`** — `ToEngine` and `ToUI`, tagged unions, trivially copyable, owning
+  nothing. Each case says which side is responsible for a pointer after it lands, which is
+  the entire memory-management story: no shared ownership anywhere in the protocol and
+  nothing destroyed on the audio thread.
+
+Both drains are wired and run from the start — `drainCommands()` at the top of `process()`,
+before the host's own events so a block's automation wins over anything queued before it
+began, and `drainEngineEvents()` in `onMainThread()`. Every unimplemented case asserts, so a
+stage that sends a message before writing its handler says so rather than dropping it.
+
+**Tests.** `tests/core/protocolTests.cpp`. The refusal-when-full property, survival past the
+end of the storage, and two cases that actually run two threads: 100k messages through an
+eight-slot ring arriving once and in order, and a mailbox swept while a writer runs flat out
+ending on the last value written.
 
 ---
 
