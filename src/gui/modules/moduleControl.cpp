@@ -42,7 +42,15 @@ namespace GUI
 //                                            (07.07.2011.) (Domagoj Saric)
 /// \todo Verify this on the Mac.
 ///                                           (07.07.2011.) (Domagoj Saric)
-ModuleControlBase *ModuleControlBase::pActiveControl(0);
+/// \note Verified, and the answer is no -- but not for the reason the note was
+/// worried about. Focus really is exclusive; *lifetime* is not. Two editors
+/// shared one pointer, so closing one left the other holding a control that had
+/// been freed, and `reportInactiveControl()` would then call
+/// `editor().moduleControlDectivated()` on it. It is
+/// SpectrumWorxEditor::pActiveControl_ now, one per editor.
+///                                           (02.08.2026.) (SW port)
+
+bool ModuleControlBase::isActive() const { return this == editor().activeControl(); }
 
 bool ModuleControlBase::tryActivateControl() const
 {
@@ -81,7 +89,7 @@ bool ModuleControlBase::reportActiveControl(double const minimum, double const m
         /// response to setParameter() before the LFO gets created).
         ///                                   (25.04.2013.) (Domagoj Saric)
         editor().moduleControlActivated(*this, minimum, maximum, interval);
-        pActiveControl = this;
+        editor().pActiveControl_ = this;
         return true;
     }
     return false;
@@ -92,7 +100,7 @@ bool ModuleControlBase::reportInactiveControl() const
     if (isActive() && !Detail::hasDirectFocus(widget()))
     {
         editor().moduleControlDectivated(*this);
-        pActiveControl = nullptr;
+        editor().pActiveControl_ = nullptr;
         return true;
     }
     else
@@ -101,7 +109,7 @@ bool ModuleControlBase::reportInactiveControl() const
 
 void ModuleControlBase::moduleParameterChanged()
 {
-    LE_ASSERT(!ModuleUI::selectedModule() || ModuleUI::selectedModule() == &moduleUI());
+    LE_ASSERT(!editor().selectedModule() || editor().selectedModule() == &moduleUI());
     LE_ASSERT(noModuleOrModuleControlFocused() || Detail::hasDirectFocus(widget()) ||
               moduleUI().hasDirectFocus());
     LE_ASSERT(isActive());
@@ -150,9 +158,16 @@ ModuleUI &ModuleControlBase::moduleUI()
     return *pModuleUI_;
 }
 
+/// \note Was `polymorphicDowncast<SpectrumWorxEditor *>( moduleUI().getParentComponent() )`,
+/// so it could only be asked once the module's region had been parented -- and
+/// `Module::createGUI` writes every parameter into the widgets before that
+/// happens. ModuleUI holds its editor now.
+///                                           (02.08.2026.) (SW port)
 SpectrumWorxEditor &ModuleControlBase::editor() const
 {
-    return *LE::Utility::polymorphicDowncast<SpectrumWorxEditor *>(moduleUI().getParentComponent());
+    /// \note The const_cast is what the previous body got for free: JUCE's
+    /// `getParentComponent() const` hands back a non-const `Component *`.
+    return const_cast<ModuleUI &>(moduleUI()).editor();
 }
 
 LE::Parameters::LFOImpl &ModuleControlBase::lfo() { return module().lfo(moduleParameterIndex()); }
@@ -164,7 +179,12 @@ char const *ModuleControlBase::name() const { return info().name; }
 
 bool ModuleControlBase::isActive(juce::Component const &widget)
 {
-    return activeControl() && (&widget == &activeControl()->widget());
+    /// \note Recovers the editor from the widget rather than asking a static
+    /// which control is active, so that the question is answered by the editor
+    /// the widget belongs to. The caller is Theme's painting, which has a widget
+    /// and nothing else.
+    auto const *const pControl(SpectrumWorxEditor::fromChild(widget).activeControl());
+    return pControl && (&widget == &pControl->widget());
 }
 
 juce::String ModuleControlBase::getValueString(float const *LE_RESTRICT const pValue) const
@@ -245,7 +265,7 @@ void ModuleControlBase::clearActiveControl()
                   "This functionality is meant only for the "
                   "SharedModuleControls::FrequencyRange class where the same "
                   "ModuleControlBase instance can map to a different logical control.");
-    pActiveControl = nullptr;
+    editor().pActiveControl_ = nullptr;
 }
 
 bool ModuleControlBase::isASharedModuleControl() const

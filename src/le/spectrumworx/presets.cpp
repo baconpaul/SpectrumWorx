@@ -441,41 +441,49 @@ std::string_view Preset::getComment() const
 
 namespace
 {
+/// \note Not a dialog. See PresetLoadReport for the whole argument; the short
+/// version is that one of these per problem meant 806 of them for the factory
+/// banks, from a layer that has no business knowing what a dialog is, on whatever
+/// thread a host chose to restore a session on.
+PresetLoadReport report_;
+
 LE_COLD void defaultPresetProblemReporter(PresetProblem const problem,
                                           std::string_view const detail)
 {
+    if (report_.firstDetail.empty() && !detail.empty())
+        report_.firstDetail.assign(detail);
+
     switch (problem)
     {
     case PresetProblem::LoadFailed:
-        GUI::warningMessageBox(MB_ERROR, "Unable to load preset.", false);
-        return;
     case PresetProblem::SaveFailed:
-        GUI::warningMessageBox(MB_ERROR, "Unable to save preset.", true);
-        return;
     case PresetProblem::FutureFormat:
-        GUI::warningMessageBox(MB_ERROR,
-                               "This preset was saved by a newer version of SpectrumWorx.", false);
+        ++report_.failures;
         return;
     case PresetProblem::UnknownEffect:
-        GUI::warningMessageBox(MB_ERROR " unknown effect in preset.", detail, false);
+        ++report_.unknownEffects;
         return;
     case PresetProblem::EffectNotAvailable:
-        GUI::warningMessageBox(MB_WARNING " effect not available in this edition.", detail, false);
+        ++report_.unavailableEffects;
         return;
     case PresetProblem::MissingParameter:
-        GUI::warningMessageBox("Missing parameter value in preset", detail, true);
+        ++report_.missingParameters;
         return;
     case PresetProblem::TempoSyncedLFOWithoutTempo:
-        GUI::warningMessageBox(MB_WARNING,
-                               "Loaded preset uses tempo-synced LFOs but the host does not "
-                               "provide tempo information.",
-                               false);
+        report_.tempoSyncedLFOWithoutTempo = true;
         return;
     }
 }
 
 PresetProblemReporter presetProblemReporter{&defaultPresetProblemReporter};
 } // anonymous namespace
+
+PresetLoadReport takePresetLoadReport()
+{
+    PresetLoadReport taken;
+    std::swap(taken, report_);
+    return taken;
+}
 
 PresetProblemReporter setPresetProblemReporter(PresetProblemReporter const reporter)
 {

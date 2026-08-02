@@ -125,6 +125,54 @@ void reportPresetProblem(PresetProblem, std::string_view detail = {});
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
+/// \struct PresetLoadReport
+///
+/// \brief What one load ran into, counted.
+///
+/// \note The default reporter was a `GUI::warningMessageBox` per problem, which
+/// was wrong three ways. It is a layering inversion -- the preset parser reaching
+/// up into the GUI. It is a *storm*: a 2011 preset does not mention parameters its
+/// effect grew later, and the 303 factory banks raise 806 `MissingParameter`
+/// reports between them, so opening a bank meant that many dialogs. And once the
+/// session state became the preset serialisation, it happened on a host restoring
+/// a project -- without anyone asking, on whatever thread the host chose, possibly
+/// before there is a window to put a dialog in front of.
+///
+///   So the default counts, and the caller decides. `GUI::loadPreset` raises one
+/// summary when a *user* opened something; `stateLoad` stays silent, a session
+/// restore being nobody's business. A test needs to install nothing to be quiet:
+/// before this, one that forgot leaked 809 `juce::AsyncUpdater`s.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+struct PresetLoadReport
+{
+    unsigned int missingParameters{0};
+    unsigned int unknownEffects{0};
+    unsigned int unavailableEffects{0};
+    unsigned int failures{0}; ///< LoadFailed, SaveFailed, FutureFormat
+    bool tempoSyncedLFOWithoutTempo{false};
+
+    /// The first `detail` seen, so a summary can name one thing rather than none.
+    std::string firstDetail;
+
+    unsigned int total() const
+    {
+        return missingParameters + unknownEffects + unavailableEffects + failures +
+               tempoSyncedLFOWithoutTempo;
+    }
+
+    explicit operator bool() const { return total() != 0; }
+}; // struct PresetLoadReport
+
+/// \brief Returns everything the default reporter has counted, and clears it.
+///
+/// \note Only meaningful while the default reporter is installed. A caller that
+/// replaced it is counting for itself.
+PresetLoadReport takePresetLoadReport();
+
+////////////////////////////////////////////////////////////////////////////////
+///
 /// \struct PresetHeader
 ///
 ////////////////////////////////////////////////////////////////////////////////

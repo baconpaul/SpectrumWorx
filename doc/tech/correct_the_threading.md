@@ -301,13 +301,7 @@ stage, on a branch.
 below for what it found.
 
 **1 — One owner for JUCE; per-instance statics; the reporter stops being a dialog.**
-Fixes the leak and the two-instance deadlock, and depends on nothing below it.
-Delete `ReferenceCountedGUIInitializationGuard`, `setCurrentThreadAsMessageThread()` and the
-multiple-editor throw; the shim owns JUCE's lifetime. `Theme` reference-counts against live
-editors. The four process-wide statics in the table in §1B become per-instance — the
-`LFOImpl::Timer` one also closes the flaky `[preset-corpus]` entry in `tech_debt.md`. The
-default `PresetProblemReporter` becomes a **collector**, and `sw-impl` decides what to do
-with the report. New test: two plugins, two editors, one process, interleaved.
+✅ *done, 02.08.2026;* see §6.1.
 
 **2 — The protocol, empty.** `core/threading/{spscQueue,messages,valueMailbox}.hpp`.
 `SpectrumWorxCLAP` owns the two rings, the mailbox and a `MainThreadModel`; the editor takes
@@ -335,7 +329,11 @@ four `LE_AUX_VIRTUAL*` virtuals become non-virtual. `ModuleWidgets<Effect>` come
 `juce_gui_basics` and `sw-gui-resources`.
 
 **6 — Publish and retire; the lock is deleted.** §5, applied to slot edits, preset load,
-state load, sample loads and the spectral setup. **`processCriticalSection_` is deleted**,
+state load, sample loads and the spectral setup. Also **`LFOImpl::Timer`'s three tempo
+statics**, deferred here from stage 1 (see §6.1): the transport becomes a per-instance value
+the audio thread publishes, and `clampFreePeriod`, `snapSyncedPeriod`, `defaultSyncType` and
+`adjustValue{For,From}Preset` take it rather than reading a global.
+**`processCriticalSection_` is deleted**,
 `SpectrumWorxCore::process` returns `void` again, and `runEngine`'s silence branch goes with
 it — which is `week_two.md`'s own stated measure of whether this worked, and closes the
 first threading entry in `tech_debt.md`.
@@ -406,6 +404,52 @@ rather than by reading the source: a host offering `clap.state` and no
 delivered to `process()` arrives at `request_callback` from inside the audio callback,
 and `mark_dirty` arrives only later at `on_main_thread`. Take the guard out of
 `process()` and the case goes red.
+
+### 6.1 — What stage 1 did
+
+**JUCE has one owner.** `ReferenceCountedGUIInitializationGuard` is `SkinLifetime`: it
+builds the `Theme` and installs it as the default LookAndFeel for as long as at least one
+editor exists, and it touches JUCE's lifetime not at all. `setCurrentThreadAsMessageThread()`
+and the "does not currently support multiple editor instances" throw are gone.
+`isThisTheGUIThread()` and `isGUIInitialised()` ask JUCE through
+`getInstanceWithoutCreating()` rather than asking a count of *our editors* whether JUCE was
+up — which answered "no" for the whole of a plugin's life with no window open.
+`GUI::Lock` went too: its body was an assertion about that count, and §2.5 of `week_two.md`
+had already found it has no callers anywhere.
+
+**Selection is per editor.** `ModuleUI::pSelectedModule_` and
+`ModuleControlBase::pActiveControl` are `SpectrumWorxEditor::pSelectedModule_` and
+`::pActiveControl_`. The enabler was `ModuleUI` holding its editor instead of recovering it
+from `getParentComponent()` — `Module::createGUI` writes every parameter into the widgets
+*before* parenting the region, which worked only because everything it reached went through
+those statics rather than through the editor.
+
+**The preset layer counts.** `PresetLoadReport`, `takePresetLoadReport()`, and a default
+reporter that raises nothing. `GUI::loadPreset` turns the count into **one** dialog, and
+only when an editor is open; `stateLoad` says nothing at all.
+
+**`PopupMenu::menuActive_` stays a static, deliberately.** A menu really is modal to the
+process — JUCE's own `getNumCurrentlyModalComponents()`, which `tryActivateControl()` reads
+two lines away, is process-wide for the same reason. It is a `bool` with no lifetime, so it
+dangles nothing.
+
+**`LFOImpl::Timer`'s three tempo statics did not move, and stage 6 gets them.** The plan put
+them here and that was the wrong home. They are read by `clampFreePeriod`,
+`snapSyncedPeriod`, `defaultSyncType` and `adjustValue{For,From}Preset` — LFO members that
+hold no `Timer` and would all have to start taking a tempo — so making them per-instance is
+a change to the shape of the parameter model, not a change to a variable. Stage 6 publishes
+the transport as a value the UI reads anyway, which is where a per-instance tempo belongs.
+Until then two instances share one tempo, which is *nearly* right — every instance in a host
+sees the same transport — and it is what makes `[preset-corpus]` flaky when the suite runs
+in one process, as `tech_debt.md` records.
+
+**Tests.** `tests/gui/twoInstanceTests.cpp`. The decisive assertion is one line: with a
+`ScopedJuceInitialiser_GUI` held across the case — standing in for the shim's — closing one
+editor must leave `MessageManager::getInstanceWithoutCreating()` non-null. Against the old
+implementation it is null. Plus: the survivor is still a working editor, reopening the
+closed one works, selection is independent, and a run over a whole factory bank with **no
+reporter installed** counts 806-style missing parameters and leaks nothing — which is
+symptom 1, stated as a test.
 
 ---
 

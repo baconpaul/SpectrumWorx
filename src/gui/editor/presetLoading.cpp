@@ -179,11 +179,51 @@ struct Consumer
 } // anonymous namespace
 //------------------------------------------------------------------------------
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief One dialog for a whole load, or none.
+///
+/// \note The preset layer counts now rather than raising a message box per
+/// problem -- see PresetLoadReport. This is the caller that turns the count back
+/// into something a user sees, and it is deliberately *this* caller: a user opened
+/// a preset and is owed an answer. `SpectrumWorxCLAP::stateLoad` takes the same
+/// report and says nothing, a session restore being nobody's business.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void reportToTheUser(PresetLoadReport const &report)
+{
+    if (!report)
+        return;
+
+    juce::String message;
+    if (report.failures)
+        message << "The preset could not be read.\n";
+    if (report.unknownEffects)
+        message << static_cast<int>(report.unknownEffects)
+                << " effect(s) in it are not in this build";
+    if (report.unavailableEffects)
+        message << static_cast<int>(report.unavailableEffects)
+                << " effect(s) in it are not in this edition";
+    if (report.unknownEffects || report.unavailableEffects)
+        message << " (" << juce::String(report.firstDetail) << " and so on).\n";
+    if (report.missingParameters)
+        message << static_cast<int>(report.missingParameters)
+                << " parameter(s) it does not mention were left at their defaults.\n";
+    if (report.tempoSyncedLFOWithoutTempo)
+        message << "It uses tempo-synced LFOs and the host reports no tempo.\n";
+
+    GUI::warningMessageBox(MB_WARNING, message.toRawUTF8(), false);
+}
+
 bool loadPreset(EditorHost &host, SpectrumWorxEditor *const pEditor, char *const inMemoryPreset,
                 bool const ignoreExternalSample, juce::String *const comment,
                 char const *const presetName, DawExtraState const *const pDawExtraState)
 {
     Consumer const consumer{host, pEditor};
+
+    // Whatever a previous load left uncollected is not this load's.
+    takePresetLoadReport();
 
     consumer.notifyHostAboutPresetChangeBegin();
     bool const succeeded(
@@ -191,6 +231,11 @@ bool loadPreset(EditorHost &host, SpectrumWorxEditor *const pEditor, char *const
     if (succeeded)
         copyPresetName(presetName, consumer.program().name());
     consumer.notifyHostAboutPresetChangeEnd();
+
+    /// \note Only with a window open. With none this is a session being restored,
+    /// which nobody asked for and which may not even have a message thread yet.
+    if (pEditor)
+        reportToTheUser(takePresetLoadReport());
 
     return succeeded;
 }

@@ -75,7 +75,7 @@ class EditorHost;
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
+class SpectrumWorxEditor final : private SkinLifetime,
                                  public WidgetBase<>,
                                  public juce::DragAndDropContainer,
                                  private juce::Button::Listener
@@ -206,6 +206,24 @@ class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
     void moduleControlActivated(ModuleControlBase &, double minimum, double maximum,
                                 double interval);
     void moduleControlDectivated(ModuleControlBase const &);
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Which module strip is selected, and which of its controls the mouse
+    /// or the keyboard is on. One of each, per editor.
+    ///
+    /// \note Both were file-scope statics -- `ModuleUI::pSelectedModule_` and
+    /// `ModuleControlBase::pActiveControl` -- which every instance of the plugin
+    /// in a host shared. Selecting a module in one window deselected the other's,
+    /// and closing a window left the survivor holding a pointer into freed
+    /// storage. The 2011 note on the second one argued a static was safe because
+    /// only one window can have focus; that is true and is not the question.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    ModuleUI *selectedModule() const { return pSelectedModule_; }
+    ModuleControlBase *activeControl() const { return pActiveControl_; }
 
     ParameterID moduleControlID(ModuleControlBase const &) const;
 
@@ -640,6 +658,14 @@ class SpectrumWorxEditor final : private ReferenceCountedGUIInitializationGuard,
         aboutPageIndex,
         numberOfSettingsPages
     };
+
+  private:
+    friend class ModuleControlBase;
+    /// \note Written by ModuleUI::activate()/deactivate() and by
+    /// ModuleControlBase::report{Active,Inactive}Control(), which are the four
+    /// places that used to write the statics these replace.
+    ModuleUI *pSelectedModule_{nullptr};
+    ModuleControlBase *pActiveControl_{nullptr};
 
   private:
     /// \note First member, and a reference: everything below is built in the

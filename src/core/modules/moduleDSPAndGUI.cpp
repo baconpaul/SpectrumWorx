@@ -63,7 +63,7 @@ void Module::createGUI(GUI::SpectrumWorxEditor &editor, std::uint8_t const modul
         LE_ASSERT(GUI::isThisTheGUIThread() ||
                   juce::MessageManager::getInstance()->currentThreadHasLockedMessageManager());
         LE_ASSERT(!ui_);
-        constructModuleUI(ui_.emplace());
+        constructModuleUI(ui_.emplace(editor));
         LE_ASSERT(gui());
 
 #ifndef NDEBUG

@@ -53,107 +53,79 @@ void initialiseMac() noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-// ReferenceCountedGUIInitializationGuard static member definitions.
-// -----------------------------------------------------------------
+// SkinLifetime
+// ------------
+//
+//   What is left of ReferenceCountedGUIInitializationGuard once JUCE's lifetime
+// is the shim's. The header has the whole account of what went and why.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-std::uint8_t ReferenceCountedGUIInitializationGuard::guiInitializationReferenceCount(0);
+std::uint8_t SkinLifetime::liveEditors_(0);
 
-namespace
+SkinLifetime::SkinLifetime()
 {
-void onGUIInitialization();
-void onGUIShutdown();
-} // anonymous namespace
+    /// \note The editor is built inside the shim's guiCreate(), under its
+    /// MessageManagerLock, so this is the message thread -- which is what makes a
+    /// plain counter enough. sw-show-ui reaches here from its own message thread.
+    LE_ASSERT(isThisTheGUIThread() || !isGUIInitialised());
 
-ReferenceCountedGUIInitializationGuard::ReferenceCountedGUIInitializationGuard()
-{
-    if (guiInitializationReferenceCount && !isThisTheGUIThread())
-    {
-        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
-                                               "SpectrumWorx error:",
-                                               "We are sorry but SpectrumWorx does not currently "
-                                               "support multiple editor instances with this host.");
-        throw std::exception();
-    }
+    if (liveEditors_++ != 0)
+        return;
 
-    if (guiInitializationReferenceCount++ == 0)
+    JUCE_AUTORELEASEPOOL
     {
 #if defined(__APPLE__)
+        /// \note Idempotent, and not JUCE's business: it puts Cocoa into
+        /// multithreaded mode, which it never leaves.
         initialiseMac();
 #elif defined(_WIN32)
         juce::Process::setCurrentModuleInstanceHandle(&__ImageBase);
 #endif // __APPLE__
-        //...mrmlj...
-        JUCE_AUTORELEASEPOOL
-        {
-            juce::initialiseJuce_GUI();
-            juce::MessageManager::getInstance()->setCurrentThreadAsMessageThread();
-            // juce::Desktop::create() is gone; initialiseJuce_GUI owns the
-            // Desktop's lifetime in JUCE 8 and its constructor is private.
-            onGUIInitialization();
-            juce::LookAndFeel::setDefaultLookAndFeel(&Theme::singleton());
-        }
+        Theme::createSingleton();
+        juce::LookAndFeel::setDefaultLookAndFeel(&Theme::singleton());
     }
 }
 
-ReferenceCountedGUIInitializationGuard::~ReferenceCountedGUIInitializationGuard()
+SkinLifetime::~SkinLifetime()
 {
     LE_ASSERT(isThisTheGUIThread());
 
-#if defined(__APPLE__) && !__LP64__
-    /// \note See the end note in detachComponentFromHostWindow() in gui.mm.
-    ///                                       (23.12.2011.) (Domagoj Saric)
-    /// \note Creation of another SW GUI might already be in the message queue
-    /// (e.g. when switching between multiple instances of SW in Reaper) so we
-    /// have to 'empty' the message queue before the reference count check to
-    /// avoid destroying JUCE in after another SW GUI has been constructed (i.e.
-    /// avoid the following scenario: reference-check...pump-message-queue-where
-    /// -a-new-GUI-is-constructed...destroy-JUCE).
-    ///                                       (20.02.2013.) (Domagoj Saric)
-    /// \note Original JUCE note from detachComponentFromHostWindow():
-    /// The event loop needs to be run between closing the window and deleting
-    /// the plugin, presumably to let the cocoa objects get tidied up. Leaving
-    /// out this line causes crashes in Live and Reaper when you delete the
-    /// plugin with its window open. (Doing it this way rather than using a
-    /// single longer timout means that we can guarantee how many messages will
-    /// be dispatched, which seems to be vital in Reaper).
-    ///                                           (13.09.2013.) (Domagoj Saric)
-    for (unsigned int i(20); i != 0; --i)
-        juce::MessageManager::getInstance()->runDispatchLoopUntil(1);
-#endif // Apple
+    if (--liveEditors_ != 0)
+        return;
 
-    if (--guiInitializationReferenceCount == 0)
+    JUCE_AUTORELEASEPOOL
     {
-        JUCE_AUTORELEASEPOOL
-        {
-            onGUIShutdown();
-            // Implementation note:
-            //   We must manually reset the animator otherwise its timer becomes
-            // orphaned when the juce::InternalTimerThread singleton is
-            // destroyed (so it thinks it is still running even though its
-            // parent juce::InternalTimerThread has been destroyed).
-            //                                (15.12.2011.) (Domagoj Saric)
-            // \note The stopTimer() that followed is unreachable in JUCE 8 --
-            // ComponentAnimator inherits Timer privately -- and the
-            // InternalTimerThread it was defending against no longer exists.
-            //                                (28.07.2026.) (SW port)
-            juce::Desktop::getInstance().getAnimator().cancelAllAnimations(false);
+        /// \note Before the Theme goes: JUCE asserts if the default LookAndFeel
+        /// is destroyed while still installed.
+        juce::LookAndFeel::setDefaultLookAndFeel(nullptr);
+
+        // Implementation note:
+        //   We must manually reset the animator otherwise its timer becomes
+        // orphaned when the juce::InternalTimerThread singleton is destroyed (so
+        // it thinks it is still running even though its parent
+        // juce::InternalTimerThread has been destroyed).
+        //                                    (15.12.2011.) (Domagoj Saric)
+        // \note The stopTimer() that followed is unreachable in JUCE 8 --
+        // ComponentAnimator inherits Timer privately -- and the
+        // InternalTimerThread it was defending against no longer exists.
+        //                                    (28.07.2026.) (SW port)
+        juce::Desktop::getInstance().getAnimator().cancelAllAnimations(false);
+
 #if defined(_WIN32)
-            LE_ASSERT(juce::Process::getCurrentModuleInstanceHandle() == &__ImageBase);
+        LE_ASSERT(juce::Process::getCurrentModuleInstanceHandle() == &__ImageBase);
 #endif // _WIN32
-            // Desktop::destroy() and MessageManager::destroySingleton() are
-            // both gone; shutdownJuce_GUI() does both.
-            juce::shutdownJuce_GUI();
 
-            LE_ASSERT(guiInitializationReferenceCount == 0);
-        }
+        Theme::destroySingleton();
     }
-}
 
-bool ReferenceCountedGUIInitializationGuard::isGUIInitialised()
-{
-    return guiInitializationReferenceCount != 0;
+    /// \note The twenty `runDispatchLoopUntil(1)` calls that stood here are gone
+    /// with the shutdown they were defending. They existed so that a queued
+    /// creation of the *next* editor could not run between the reference check
+    /// and `shutdownJuce_GUI()`; nothing is torn down here that a queued message
+    /// could want. They were also inside `#if defined(__APPLE__) && !__LP64__`,
+    /// so they had not run on any 64 bit build since 2013.
+    ///                                       (02.08.2026.) (SW port)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -357,23 +329,22 @@ void fadeOutComponent(juce::Component &component, float const finalAlpha,
     }
 }
 
+/// \note Both of these asked a reference count of ours whether JUCE was up. It
+/// was never a count of JUCE -- it was a count of *our editors*, which is a
+/// different question and answered "no" for the whole of a plugin's life with no
+/// window open, while the shim's MessageManager was running perfectly well. So
+/// they ask JUCE, which is the thing being asked about, and `getInstanceWithoutCreating()`
+/// is the call that does not bring one into existence to answer.
+///                                           (02.08.2026.) (SW port)
 LE_NOINLINE bool LE_COLD isThisTheGUIThread()
 {
-#ifndef NDEBUG
-    if (!GUI::
-            isGUIInitialised()) //...mrmlj...to avoid an LE_ASSUME/assertion failure in juce::MessageManager::getInstance()...
-        return false;
-#endif // NDEBUG
-#ifdef __APPLE__
-    if (!juce::MessageManager::getInstanceWithoutCreating())
-        return false; //...mrmlj...quick-hack to fix crashes on OSX when this function is called before the GUI is initialised...
-#endif                // __APPLE__
-    return juce::MessageManager::getInstance()->isThisTheMessageThread();
+    auto const *const pMessageManager(juce::MessageManager::getInstanceWithoutCreating());
+    return pMessageManager && pMessageManager->isThisTheMessageThread();
 }
 
 bool LE_COLD isGUIInitialised()
 {
-    return ReferenceCountedGUIInitializationGuard::isGUIInitialised();
+    return juce::MessageManager::getInstanceWithoutCreating() != nullptr;
 }
 
 float LE_COLD displayScale()

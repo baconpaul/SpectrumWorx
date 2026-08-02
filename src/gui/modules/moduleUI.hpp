@@ -347,12 +347,27 @@ class ModuleUI final : public WidgetBase<>, private juce::Button::Listener
     Module &module();
     Module const &module() const;
 
-    static ModuleUI *selectedModule() { return pSelectedModule_; }
-
-    bool selected() const { return this == selectedModule(); }
+    /// \note Was `static ModuleUI *selectedModule()` over a file-scope pointer,
+    /// with a 2011 note arguing that a static was safe "even if there are multiple
+    /// effect editor instances open" because no two windows can have focus at
+    /// once, and a `\todo Verify this on the Mac` under it. Focus is not the
+    /// question: two instances shared one pointer, so the second editor to select
+    /// a module silently deselected the first one's, and an editor closing left
+    /// the other holding a pointer into freed storage. It is the editor's now.
+    ///                                       (02.08.2026.) (SW port)
+    bool selected() const;
 
   public:
-    ModuleUI();
+    /// \note The editor is held rather than recovered from the component
+    /// hierarchy. `editor()` used to walk `getParentComponent()`, which meant it
+    /// could only be asked once the region had been parented -- and
+    /// `Module::createGUI` pushes every parameter value into the widgets *before*
+    /// `addToParentAndShow`. That worked only because everything reached from
+    /// there went through process-wide statics instead of through the editor.
+    /// Those statics are the editor's members now, so the reference has to be
+    /// there from the first line of the constructor.
+    ///                                       (02.08.2026.) (SW port)
+    explicit ModuleUI(SpectrumWorxEditor &);
     ~ModuleUI();
 
     void setUpForEffect(char const *effectName, char const *effectDescription);
@@ -385,6 +400,10 @@ class ModuleUI final : public WidgetBase<>, private juce::Button::Listener
     void buttonClicked(juce::Button *) override;
 
   private:
+    /// \note First, and a reference: the widgets below are built in the
+    /// constructor body and reach through it.
+    SpectrumWorxEditor &editor_;
+
     BitmapButton bypass_;
     BitmapButton eject_;
 
@@ -548,9 +567,9 @@ template <class Accumulated, class Parameters, std::size_t index,
           bool done = (index == Parameters::static_size)>
 struct FoldWidgets
 {
-    using type =
-        typename FoldWidgets<WidgetsStorage<Accumulated, LE::Parameters::ParameterAt<Parameters, index>>,
-                             Parameters, index + 1>::type;
+    using type = typename FoldWidgets<
+        WidgetsStorage<Accumulated, LE::Parameters::ParameterAt<Parameters, index>>, Parameters,
+        index + 1>::type;
 };
 
 template <class Accumulated, class Parameters, std::size_t index>

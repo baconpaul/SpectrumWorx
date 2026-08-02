@@ -315,13 +315,11 @@ void DiscreteParameter::mouseDown(juce::MouseEvent const &)
 
 void DiscreteParameter::focusChanged() { repaint(); }
 
-ModuleUI *ModuleUI::pSelectedModule_(0);
-
 #pragma warning(push)
 #pragma warning(disable : 4355) // 'this' used in base member initializer list.
 
-ModuleUI::ModuleUI()
-    : bypass_(*this, resourceBitmap<ModuleMuted>(), resourceBitmap<ModuleOn>()),
+ModuleUI::ModuleUI(SpectrumWorxEditor &editor)
+    : editor_(editor), bypass_(*this, resourceBitmap<ModuleMuted>(), resourceBitmap<ModuleOn>()),
       eject_(*this, resourceBitmap<Eject>(), resourceBitmap<Eject>(),
              juce::Colours::darkgrey.withAlpha(0.4f))
 {
@@ -371,7 +369,7 @@ ModuleUI::~ModuleUI()
     LE_ASSERT(isThisTheGUIThread() ||
               juce::MessageManager::getInstance()->currentThreadHasLockedMessageManager());
 
-    if (selectedModule() == this)
+    if (selected())
     {
         //...mrmlj...
         //LE_ASSERT( hasFocus() || editor()./*...mrmlj...sharedModuleControls().hasFocus()*/ sharedModuleControlsActive() );
@@ -385,7 +383,7 @@ ModuleUI::~ModuleUI()
 
         this->setWantsKeyboardFocus(false);
         editor().moduleDeactivated();
-        pSelectedModule_ = nullptr;
+        editor().pSelectedModule_ = nullptr;
     }
     else
     {
@@ -447,7 +445,7 @@ void ModuleUI::mouseExit(juce::MouseEvent const &event) noexcept
     /// open and the mouse is moved over a module) JUCE will call mouseExit()
     /// without first calling mouseEnter().
     ///                                       (24.05.2012.) (Domagoj Saric)
-    if (!selectedModule())
+    if (!editor().selectedModule())
         return;
 
     if (selectionTracksMouseMovements() &&
@@ -495,10 +493,10 @@ void ModuleUI::activate()
     // controls it will not deactivate (and thus repaint) itself in the
     // focusLost() handler so a repaint must be forced here.
     //                                        (14.11.2011.) (Domagoj Saric)
-    if (selectedModule())
-        selectedModule()->repaint();
+    if (editor().selectedModule())
+        editor().selectedModule()->repaint();
 
-    pSelectedModule_ = this;
+    editor().pSelectedModule_ = this;
     editor().moduleActivated();
     repaint();
 }
@@ -509,7 +507,7 @@ void ModuleUI::deactivate()
     LE_ASSERT(!hasFocus());
 
     editor().moduleDeactivated();
-    pSelectedModule_ = nullptr;
+    editor().pSelectedModule_ = nullptr;
     repaint();
 }
 
@@ -606,23 +604,22 @@ void ModuleUI::buttonClicked(juce::Button *LE_RESTRICT const pButton)
     {
         LE_ASSERT(pButton == &eject_);
         //...mrmlj...investigate why this doesn't work when placed inside the ModuleUI destructor...
-        if (ModuleControlBase::activeControl() &&
-            (this == &ModuleControlBase::activeControl()->moduleUI()))
-            editor().moduleControlDectivated(*ModuleControlBase::activeControl());
+        auto *const pActiveControl(editor().activeControl());
+        if (pActiveControl && (this == &pActiveControl->moduleUI()))
+            editor().moduleControlDectivated(*pActiveControl);
         editor().removeModule(*this);
     }
 }
 
-SpectrumWorxEditor &ModuleUI::editor()
-{
-    LE_ASSERT_MSG(getParentComponent(), "ModuleUI detached from editor.");
-    return *LE::Utility::polymorphicDowncast<SpectrumWorxEditor *>(getParentComponent());
-}
+/// \note Was a `polymorphicDowncast` of `getParentComponent()`, with an assertion
+/// that there was one. See the note on the constructor: the region is written to
+/// before it is parented, so the editor cannot be recovered that way.
+///                                           (02.08.2026.) (SW port)
+SpectrumWorxEditor &ModuleUI::editor() { return editor_; }
 
-SpectrumWorxEditor const &ModuleUI::editor() const
-{
-    return const_cast<ModuleUI &>(*this).editor();
-}
+SpectrumWorxEditor const &ModuleUI::editor() const { return editor_; }
+
+bool ModuleUI::selected() const { return this == editor().selectedModule(); }
 
 SharedModuleControls &ModuleUI::sharedControls()
 {

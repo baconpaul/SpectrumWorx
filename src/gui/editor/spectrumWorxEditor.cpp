@@ -829,10 +829,10 @@ bool SpectrumWorxEditor::presetLoadingInProgress() const
 void SpectrumWorxEditor::moduleActivated()
 {
     LE_ASSERT(isThisTheGUIThread());
-    LE_ASSERT(ModuleUI::selectedModule());
-    ModuleUI const &module(*ModuleUI::selectedModule());
+    LE_ASSERT(selectedModule());
+    ModuleUI const &module(*selectedModule());
     setActiveModuleName(module.getName());
-    if (!ModuleControlBase::activeControl())
+    if (!activeControl())
     {
         setActiveControlName(module.description());
         setActiveControlValue(juce::String());
@@ -852,7 +852,7 @@ void SpectrumWorxEditor::moduleActivated()
 
 void SpectrumWorxEditor::moduleDeactivated()
 {
-    LE_ASSERT(ModuleUI::selectedModule());
+    LE_ASSERT(selectedModule());
 
     // Implementation note:
     //   We need to prevent JUCE from transferring focus to other module UIs
@@ -865,7 +865,7 @@ void SpectrumWorxEditor::moduleDeactivated()
     // (and possibly destroyed) is currently focused.
     //                                        (03.01.2012.) (Domagoj Saric)
     LE_ASSERT(this->getWantsKeyboardFocus());
-    if (ModuleUI::selectedModule()->juce::Component::isParentOf(getCurrentlyFocusedComponent()))
+    if (selectedModule()->juce::Component::isParentOf(getCurrentlyFocusedComponent()))
     {
         this->grabKeyboardFocus();
         LE_ASSERT(hasDirectFocus());
@@ -938,8 +938,7 @@ void SpectrumWorxEditor::moduleControlDectivated(ModuleControlBase const &contro
                   "Deactivating active module control through a wrong control.");
     LE::Utility::ignoreUnused(control);
 
-    setActiveControlName(ModuleUI::selectedModule() ? ModuleUI::selectedModule()->description()
-                                                    : juce::String());
+    setActiveControlName(selectedModule() ? selectedModule()->description() : juce::String());
     setActiveControlValue(juce::String());
 
     if (lfoDisplay_)
@@ -1443,7 +1442,9 @@ juce::String phaseString(SpectrumWorxEditor::LFODisplay const & /*parent*/,
 juce::String rangeValueString(SpectrumWorxEditor::LFODisplay const &parent,
                               double const &periodScale)
 {
-    LE_ASSERT(ModuleControlBase::activeControl());
+    /// \note `LE_ASSERT( activeControl() )` stood above this, over the file-scope
+    /// pointer. It said "something is active"; the line below says "and it is this
+    /// control", which subsumes it.
     LE_ASSERT(parent.control().isActive());
     return parent.control().getTextFromValue(static_cast<float>(periodScale));
 }
@@ -1506,8 +1507,8 @@ void SpectrumWorxEditor::LFODisplay::paint(juce::Graphics &graphics)
     //...mrmlj...ugh...2.6.x quick-fix workarounds...reinvestigate and clean this up...
     if (!this->isEnabled())
         return;
-    LE_ASSERT(ModuleControlBase::activeControl() != nullptr);
-    LE_ASSERT(ModuleControlBase::activeControl() == &control());
+    LE_ASSERT(editor().activeControl() != nullptr);
+    LE_ASSERT(editor().activeControl() == &control());
     LE_ASSERT(control().isActive());
     LE_ASSERT(getParentComponent() == &editor());
 

@@ -23,6 +23,7 @@ add_executable(sw-tests
         goldens/goldenTests.cpp
         gui/pathsTests.cpp
         gui/skinTests.cpp
+        gui/twoInstanceTests.cpp
         math/fftTests.cpp
         math/scalarTests.cpp
         math/vectorTests.cpp

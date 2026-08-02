@@ -68,10 +68,10 @@ SharedModuleControls::SharedModuleControls()
       /// the control widgets must be added to the parent SharedModuleControls
       /// component in the correct order.
       ///                                       (11.02.2014.) (Domagoj Saric)
-      gain_(*this, *ModuleUI::selectedModule(), 05, 4,
+      gain_(*this, *editor().selectedModule(), 05, 4,
             IndexOf<Parameters, Gain>::value -
                 1), //...mrmlj...ModuleControlBase::moduleParameterIndex() excludes bypass...
-      wet_(*this, *ModuleUI::selectedModule(), 75, 4, IndexOf<Parameters, Wet>::value - 1)
+      wet_(*this, *editor().selectedModule(), 75, 4, IndexOf<Parameters, Wet>::value - 1)
 {
     gain_.setupForParameter(resourceBitmap<SmallSymmetricKnobStrip>(), ModuleKnob::Fixed,
                             Gain::discreteValueDistance);
@@ -97,9 +97,9 @@ void SharedModuleControls::updateForEngineSetupChanges(Engine::Setup const &setu
 
 void SharedModuleControls::updateForActiveModule()
 {
-    LE_ASSERT(ModuleUI::selectedModule());
+    LE_ASSERT(editor().selectedModule());
 
-    ModuleUI &moduleUI(*ModuleUI::selectedModule());
+    ModuleUI &moduleUI(*editor().selectedModule());
 
     gain_.reassignTo(moduleUI);
     wet_.reassignTo(moduleUI);
@@ -140,8 +140,8 @@ ModuleControlBase &SharedModuleControls::controlForParameter(std::uint8_t const 
 
 void SharedModuleControls::focusLost(FocusChangeType)
 {
-    LE_ASSERT(ModuleUI::selectedModule());
-    ModuleUI &moduleUI(*ModuleUI::selectedModule());
+    LE_ASSERT(editor().selectedModule());
+    ModuleUI &moduleUI(*editor().selectedModule());
     if (!moduleUI.hasFocus())
         moduleUI.deactivate();
 }
@@ -167,8 +167,13 @@ SpectrumWorxEditor const &SharedModuleControls::editor() const
 #pragma warning(push)
 #pragma warning(disable : 4355) // 'this' used in base member initializer list.
 
+/// \note `parent().editor()` and not `editor()`: this control's own editor() is
+/// `ModuleControlBase`'s, which goes through `pModuleUI_` -- the member this
+/// initialiser list is setting. `parent()` is pointer arithmetic from a member
+/// back to its owner and needs nothing constructed.
+///                                           (02.08.2026.) (SW port)
 SharedModuleControls::FrequencyRange::FrequencyRange()
-    : ModuleControlBase(Constants::invalidIndex, *ModuleUI::selectedModule()),
+    : ModuleControlBase(Constants::invalidIndex, *parent().editor().selectedModule()),
       parameterIndexForInternalWriteAccess_(Constants::invalidIndex),
       selectedThumb_(Constants::noThumb)
 {
@@ -307,8 +312,8 @@ void SharedModuleControls::FrequencyRange::paint(juce::Graphics &g)
 
 void SharedModuleControls::FrequencyRange::valueChanged() noexcept
 {
-    LE_ASSERT(ModuleUI::selectedModule());
-    LE_ASSERT(&this->module() == &ModuleUI::selectedModule()->module());
+    LE_ASSERT(editor().selectedModule());
+    LE_ASSERT(&this->module() == &editor().selectedModule()->module());
     /// \note juce::Slider might have updated the active thumb within its
     /// juce::Slider::mouseDown() handler before calling valueChanged().
     ///                                       (12.02.2014.) (Domagoj Saric)
@@ -321,7 +326,7 @@ void SharedModuleControls::FrequencyRange::valueChanged() noexcept
 
 LFOImpl &SharedModuleControls::FrequencyRange::lfo()
 {
-    auto &selectedModule(ModuleUI::selectedModule()->module());
+    auto &selectedModule(editor().selectedModule()->module());
     auto &controlModule(this->module());
     LE_ASSUME(&selectedModule == &controlModule);
     return controlModule.baseLFO(activeParameterIndex());
@@ -350,8 +355,7 @@ void SharedModuleControls::FrequencyRange::reportActiveControl()
         return;
     }
 
-    if ((ModuleControlBase::activeControl() == this) &&
-        (currentParameterIndex != newParameterIndex))
+    if ((editor().activeControl() == this) && (currentParameterIndex != newParameterIndex))
     {
         /// \note DIRTY HACK:
         /// If FrequencyRange is already the active control widget
@@ -394,7 +398,7 @@ std::uint8_t SharedModuleControls::FrequencyRange::activeParameterIndex() const
 
 void SharedModuleControls::FrequencyRange::updateSliderSelection(juce::MouseEvent const &event)
 {
-    if (ModuleControlBase::activeControl() && !this->isActive())
+    if (editor().activeControl() && !this->isActive())
     {
         selectedThumb_ = Constants::noThumb;
         return;

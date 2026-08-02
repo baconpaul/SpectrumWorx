@@ -82,24 +82,49 @@ namespace GUI
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \class ReferenceCountedGUIInitializationGuard
+/// \class SkinLifetime
 ///
-/// \brief Responsible for GUI library initialization and cleanup handling.
+/// \brief Keeps the skin alive for as long as at least one editor is.
+///
+///   The Theme owns two typefaces, the slider thumb and the default LookAndFeel
+/// registration, and none of that may outlive the JUCE it was made under. So the
+/// first editor builds it and the last one to go takes it down. A base class, and
+/// the first one, so that it is constructed before the editor's widgets and
+/// destroyed after them.
+///
+/// \note This was `ReferenceCountedGUIInitializationGuard`, and it did far more
+/// than its replacement: it called `juce::initialiseJuce_GUI()` and
+/// `juce::shutdownJuce_GUI()` **directly**, outside the `numScopedInitInstances`
+/// counter that `juce::ScopedJuceInitialiser_GUI` uses
+/// (juce_MessageManager.cpp:465-477). The CLAP shim holds one of those for the
+/// life of the plugin (clap_juce_shim_impl.cpp:115,235), so closing an editor ran
+/// `DeletedAtShutdown::deleteAll()` and `MessageManager::deleteInstance()` under a
+/// shim that still held a live reference -- and the counter, the shutdown list and
+/// the MessageManager singleton are one per binary, which is to say shared by
+/// every instance of this plugin the host has loaded. One instance closing its
+/// window deleted the message loop another was running on.
+///
+///   It also called `setCurrentThreadAsMessageThread()`, which is not a plugin's
+/// to say, and threw an exception refusing to open a second editor at all. JUCE's
+/// lifetime is the shim's; this keeps only what is ours.
+///                                           (02.08.2026.) (SW port)
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class ReferenceCountedGUIInitializationGuard
+class SkinLifetime
 {
-  public:
-    static bool isGUIInitialised();
-
   protected:
-    ReferenceCountedGUIInitializationGuard();
-    ~ReferenceCountedGUIInitializationGuard();
+    SkinLifetime();
+    ~SkinLifetime();
+
+    SkinLifetime(SkinLifetime const &) = delete; // makes non-copyable
+    SkinLifetime &operator=(SkinLifetime const &) = delete;
 
   private:
-    static std::uint8_t guiInitializationReferenceCount;
-}; // class ReferenceCountedGUIInitializationGuard
+    /// \note Editors are created and destroyed on the message thread, and only
+    /// there, so a plain counter is enough -- the constructor asserts it.
+    static std::uint8_t liveEditors_;
+}; // class SkinLifetime
 
 void paintImage(juce::Graphics &, juce::Image const &);
 void paintImage(juce::Graphics &, juce::Image const &, int x, int y);
@@ -265,16 +290,13 @@ void addToParentAndShow(juce::Component &parent, juce::Component &childToBe);
 void fadeOutComponent(juce::Component &, float finalAlpha, unsigned int duration,
                       bool useProxyComponent);
 
-class Lock : private juce::MessageManagerLock
-{
-  public:
-    /// \note The cast picks the Thread* overload. JUCE 8 also has one taking a
-    /// ThreadPoolJob*, so a bare nullptr is ambiguous.
-    LE_NOINLINE Lock() : juce::MessageManagerLock(static_cast<juce::Thread *>(nullptr))
-    {
-        LE_ASSERT(lockWasGained() || !ReferenceCountedGUIInitializationGuard::isGUIInitialised());
-    }
-}; // class Lock
+/// \note `class Lock : private juce::MessageManagerLock` stood here. It had no
+/// call sites anywhere in `src/`, `tests/` or `tools/` -- week_two.md §2.2 found
+/// that while auditing the threading, and §2.5 listed it as a free deletion this
+/// item owns. Its one line of body was an assertion about the reference count
+/// SkinLifetime no longer keeps, so it either had to be rewritten or removed, and
+/// nothing calls it.
+///                                           (02.08.2026.) (SW port)
 
 namespace Detail
 {

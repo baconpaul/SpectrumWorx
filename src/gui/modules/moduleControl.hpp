@@ -131,7 +131,7 @@ class LE_NOVTABLE ModuleControlBase
     //...mrmlj...excludes non-lfoable parameters (Bypass)...
     std::uint8_t moduleParameterIndex() const { return parameterIndex_; }
 
-    bool isActive() const { return this == activeControl(); }
+    bool isActive() const;
 
     bool isLFOEnabled() const;
 
@@ -155,8 +155,6 @@ class LE_NOVTABLE ModuleControlBase
     SpectrumWorxEditor &editor() const;
 
     static ModuleControlBase &controlForWidget(juce::Component &);
-
-    static ModuleControlBase *activeControl() { return pActiveControl; }
 
     static bool isActive(juce::Component const &);
 
@@ -190,7 +188,9 @@ class LE_NOVTABLE ModuleControlBase
     std::uint8_t parameterIndex_;
     ModuleUI *LE_RESTRICT pModuleUI_;
 
-    static ModuleControlBase *pActiveControl;
+    /// \note `static ModuleControlBase *pActiveControl` stood here, shared by
+    /// every instance of the plugin in the host. It is
+    /// SpectrumWorxEditor::pActiveControl_ now; see the note there.
 }; // class ModuleControlBase
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -252,7 +252,7 @@ class ModuleControlImpl final : public ModuleControlBase, public ImplWidget
             ImplWidget::moduleControlDeactivated();
     }
 
-    bool isActive() const { return this == activeControl(); }
+    using ModuleControlBase::isActive;
 
   private:
     virtual void focusGained(juce::Component::FocusChangeType) override
