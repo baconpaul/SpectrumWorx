@@ -137,27 +137,6 @@ bool Module::destroyGUI()
     return true;
 }
 
-float Module::setBaseParameter(std::uint8_t const sharedParameterIndex, float const parameterValue)
-{
-    float const setValue(ModuleDSP::setBaseParameter(sharedParameterIndex, parameterValue));
-    if (gui())
-        gui()->setBaseParameter(sharedParameterIndex, setValue, GUI::ModuleUI::AutomationOrPreset);
-    return setValue;
-}
-
-float Module::setEffectParameter(std::uint8_t const effectParameterIndex,
-                                 float const parameterValue)
-{
-    float const setValue(ModuleDSP::setEffectParameter(effectParameterIndex, parameterValue));
-    LE_ASSERT(
-        (parameterValue == setValue) ||
-        (effectSpecificParameterInfo(effectParameterIndex).type != ParameterInfo::FloatingPoint));
-    if (gui())
-        gui()->setEffectParameter(effectParameterIndex, setValue,
-                                  GUI::ModuleUI::AutomationOrPreset);
-    return setValue;
-}
-
 float Module::setParameterValueFromUI(std::uint8_t const parameterIndex, float const value)
 {
     LE_ASSERT_MSG((parameterIndex == 0) || !lfo(parameterIndex - 1).enabled(),
@@ -165,34 +144,6 @@ float Module::setParameterValueFromUI(std::uint8_t const parameterIndex, float c
     return (parameterIndex < numberOfBaseParameters)
                ? ModuleDSP::setBaseParameter(parameterIndex, value)
                : ModuleDSP::setEffectParameter(effectSpecificParameterIndex(parameterIndex), value);
-}
-
-void Module::setBaseParameterFromLFO(std::uint8_t const sharedParameterIndex,
-                                     LFO::value_type const lfoValue)
-{
-    auto const parameterValue(
-        ModuleParameters::setBaseParameterFromLFOAux(sharedParameterIndex, lfoValue));
-    if (gui())
-        gui()->setBaseParameter(sharedParameterIndex, parameterValue, GUI::ModuleUI::LFOValue);
-}
-
-void Module::setEffectParameterFromLFO(std::uint8_t const effectParameterIndex,
-                                       LFO::value_type const lfoValue)
-{
-    auto const parameterValue(
-        ModuleParameters::setEffectParameterFromLFOAux(effectParameterIndex, lfoValue));
-    if (gui())
-        gui()->setEffectParameter(effectParameterIndex, parameterValue, GUI::ModuleUI::LFOValue);
-}
-
-void LE_COLD Module::updateLFOGUI(std::uint8_t const parameterIndex,
-                                  std::uint8_t const lfoParameterIndex,
-                                  Plugins::AutomatedParameterValue const value)
-{
-    GUI::postMessage(*this, [=](GUI::ModuleUI &gui) {
-        gui.updateLFOParameter(parameterIndex, lfoParameterIndex, value);
-        return true;
-    });
 }
 
 Module &Module::fromGUI(GUI::ModuleUI &gui)

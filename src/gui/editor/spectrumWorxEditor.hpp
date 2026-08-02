@@ -78,7 +78,8 @@ class EditorHost;
 class SpectrumWorxEditor final : private SkinLifetime,
                                  public WidgetBase<>,
                                  public juce::DragAndDropContainer,
-                                 private juce::Button::Listener
+                                 private juce::Button::Listener,
+                                 private juce::Timer
 {
   public:
     static unsigned short const estimatedWidth = 563;
@@ -230,6 +231,18 @@ class SpectrumWorxEditor final : private SkinLifetime,
     void updateLFO(ModuleUI const &, std::uint8_t parameterIndex, std::uint8_t lfoParameterIndex,
                    /*LFO::AutomatedParameterValue*/ float value);
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief A parameter that something other than this editor moved -- host
+    /// automation, or a preset. `[main-thread]`
+    ///
+    /// \note This arrives as a `ToUI::BaseParameterChanged` off the ring. The
+    /// engine used to do it by writing the widget from inside the setter, on
+    /// whichever thread the change came in on.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    void parameterChangedElsewhere(ParameterID, float value);
+
     void moduleActivated();
     void moduleDeactivated();
     void moduleControlActivated(ModuleControlBase &, double minimum, double maximum,
@@ -313,6 +326,24 @@ class SpectrumWorxEditor final : private SkinLifetime,
 
   private: // JUCE ButtonListener overrides.
     void buttonClicked(juce::Button *) override;
+
+  private: // juce::Timer
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Sweeps the modulated-value mailbox and repaints what moved.
+    ///
+    ///   Thirty times a second, which is what a knob animation needs and about
+    /// one fiftieth of the rate the audio thread produces those values at. The
+    /// mailbox coalesces, so a slow sweep costs nothing but smoothness.
+    ///
+    /// \note This is what replaced an LFO writing `juce::Slider::setValue()` from
+    /// inside `preProcess()`. Same picture on screen; the thread that draws it is
+    /// now the one that is allowed to.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    void timerCallback() override;
+
+    static constexpr int modulationRefreshHz{30};
 
   public:
     /// \brief What the add-module menu calls when an entry is chosen.

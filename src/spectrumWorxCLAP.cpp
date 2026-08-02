@@ -608,7 +608,18 @@ bool SpectrumWorxCLAP::handleEvent(clap_event_header const *const header)
     if (!liveRanges(parameterID, ranges))
         return false;
 
-    setParameter(parameterID, CLAPEdge::fromHost(parameterID, ranges, event->value));
+    auto const value(CLAPEdge::fromHost(parameterID, ranges, event->value));
+    setParameter(parameterID, value);
+
+    /// \note And tell the interface, if there is one. A module used to do this
+    /// itself, from inside the setter, by writing a `juce::Slider` on whatever
+    /// thread the write arrived on -- which for a host automation event is this
+    /// one. It is a message now, drained on the main thread.
+    ///
+    ///   `request_callback` is already asked for by `markCurrentProgramAsModified()`
+    /// on this same path, so the drain happens without a second request.
+    if (pEditor_)
+        toUI_.push(Threading::baseParameterChanged(parameterID.binaryValue, value));
 
     /// \note Only a module-chain parameter changes what the *other* parameters
     /// are: it decides which effect a slot holds, and so how many parameters
@@ -698,6 +709,10 @@ clap_process_status SpectrumWorxCLAP::process(clap_process const *const process)
     updateLFOTiming(process);
 
     runEngine(process);
+
+    /// \note After the block, once, rather than from inside the engine per LFO
+    /// per module. See publishModulatedValues().
+    publishModulatedValues();
 
     return CLAP_PROCESS_CONTINUE;
 }
@@ -947,6 +962,41 @@ void SpectrumWorxCLAP::drainCommands()
     }
 }
 
+void SpectrumWorxCLAP::publishModulatedValues()
+{
+    /// \note Not gated on there being an editor. The loop is five modules by ten
+    /// parameters of `enabled()` checks -- noise beside one FFT -- and only an
+    /// enabled LFO does a store. Gating it would mean the one thing that reads
+    /// the mailbox is also the only thing that can be tested against it.
+    std::uint8_t slot(0);
+    moduleChain().forEach<Module>([&](Module const &module) {
+        auto const parameters(module.numberOfParameters());
+        /// \note From 1: Bypass has no LFO, and the LFO index is the parameter
+        /// index less it. Same convention as ModuleParameters::lfo().
+        for (std::uint8_t parameter(1); parameter < parameters; ++parameter)
+        {
+            if (!module.lfo(static_cast<std::uint8_t>(parameter - 1)).enabled())
+                continue;
+
+            ParameterID parameterID;
+            parameterID.value.type = ParameterID::ModuleParameter;
+            parameterID.value._.module = {ParameterID::Zero, parameter, slot};
+
+            /// \note The *live* value, which is the modulated one -- the whole
+            /// distinction stage 3 introduced. What a host reads is the
+            /// unmodulated value and does not belong here.
+            auto const value(
+                (parameter < Engine::ModuleParameters::numberOfBaseParameters)
+                    ? module.getBaseParameter(parameter)
+                    : module.getEffectParameter(
+                          Engine::ModuleParameters::effectSpecificParameterIndex(parameter)));
+
+            values_.set(parameterIndexFromBinaryID(parameterID.binaryValue), value);
+        }
+        ++slot;
+    });
+}
+
 void SpectrumWorxCLAP::drainEngineEvents()
 {
     LE_ASSERT(Threading::isMainThread() || !Threading::isAudioThread());
@@ -959,10 +1009,16 @@ void SpectrumWorxCLAP::drainEngineEvents()
         case Threading::ToUI::Kind::None:
             break;
 
-        case Threading::ToUI::Kind::BaseParameterChanged: // stage 5
-        case Threading::ToUI::Kind::SlotChanged:          // stage 5
-        case Threading::ToUI::Kind::Retire:               // stage 6
-        case Threading::ToUI::Kind::SetupChanged:         // stage 6
+        case Threading::ToUI::Kind::BaseParameterChanged:
+            if (pEditor_)
+                pEditor_->parameterChangedElsewhere(
+                    ParameterID{Plugins::ParameterID{event.baseParameterChanged.parameterID}},
+                    event.baseParameterChanged.value);
+            break;
+
+        case Threading::ToUI::Kind::SlotChanged:  // stage 6
+        case Threading::ToUI::Kind::Retire:       // stage 6
+        case Threading::ToUI::Kind::SetupChanged: // stage 6
             LE_ASSERT_MSG(false, "Event sent before its handler exists.");
             break;
         }

@@ -1224,6 +1224,63 @@ TEST_CASE("An edit made in the interface reaches the engine through the queue", 
                               (wanted - info.minimum) / (info.maximum - info.minimum), 1e-3));
 }
 
+TEST_CASE("What the LFOs did reaches the interface through the mailbox", "[clap][protocol][lfo]")
+{
+    // The other half of severing the engine from the interface. A module used to
+    // push each LFO value into a juce::Slider itself, from inside preProcess() --
+    // the stack in doc/tech/correct_the_threading.md §1A. The plugin publishes the
+    // same information after the block instead, into a slot the newest write
+    // overwrites, and whatever draws reads it on its own thread at its own rate.
+    constexpr float sampleRate{48000};
+    constexpr std::uint32_t blockSize{512};
+    constexpr std::uint8_t gainIndex{1};
+
+    Entry const entry;
+    ActivePlugin plugin(sampleRate, blockSize);
+    auto const &params(parameters(*plugin));
+
+    OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
+    params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+
+    auto const &mailbox(editorHostOf(*plugin).modulatedValues());
+    auto const target(LE::SW::parameterIndexFromBinaryID(modulatedParameterID(0, 0)));
+
+    std::vector<float> leftIn(blockSize, 0.0f), rightIn(blockSize, 0.0f);
+    std::vector<float> leftOut(blockSize), rightOut(blockSize);
+
+    // With no LFO enabled there is nothing to publish, however many blocks run.
+    for (unsigned block(0); block < 8; ++block)
+        plugin.process(leftIn, rightIn, leftOut, rightOut);
+    {
+        unsigned changes(0);
+        mailbox.forEachChanged([&](std::size_t, float) { ++changes; });
+        CHECK(changes == 0);
+    }
+
+    OneParameterEvent const enable(lfoParameterID(0, 0, lfoEnabled), 1);
+    params.flush(&*plugin, &*enable, &discardedOutputEvents());
+
+    std::set<float> published;
+    for (unsigned block(0); block < 160; ++block)
+    {
+        plugin.process(leftIn, rightIn, leftOut, rightOut);
+        mailbox.forEachChanged([&](std::size_t const index, float const value) {
+            if (index == target)
+                published.insert(value);
+        });
+    }
+
+    // It swept, and the last thing published is what the DSP is actually using.
+    CHECK(published.size() > 1);
+    CHECK(mailbox.value(target) == liveModuleParameter(*plugin, 0, gainIndex));
+
+    // ...and a sweep that finds nothing new reports nothing, which is what lets a
+    // 30 Hz repaint sit on top of a 1500 Hz producer without doing 1500 Hz of work.
+    unsigned changesWithoutABlock(0);
+    mailbox.forEachChanged([&](std::size_t, float) { ++changesWithoutABlock; });
+    CHECK(changesWithoutABlock == 0);
+}
+
 TEST_CASE("An LFO sweeps the DSP and not what the host reads", "[clap][lfo]")
 {
     // The base/modulated split, stated where a host would notice it. Before it,

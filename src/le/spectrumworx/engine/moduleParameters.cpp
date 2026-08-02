@@ -255,7 +255,7 @@ LE_COLD void ModuleParameters::updateBaseParametersFromLFOs(LFO::Timer const &ti
         if (parameterLFO.enabled())
         {
             auto const lfoValue(parameterLFO.getValue(timer));
-            setBaseParameterFromLFO(baseParameter, lfoValue);
+            setBaseParameterFromLFOAux(baseParameter, lfoValue);
         }
     }
 }
@@ -291,7 +291,7 @@ LE_COLD void ModuleParameters::updateEffectParametersFromLFOs(LFO::Timer const &
         if (parameterLFO.enabled())
         {
             auto const lfoValue(parameterLFO.getValue(timer));
-            setEffectParameterFromLFO(effectParameter, lfoValue);
+            setEffectParameterFromLFOAux(effectParameter, lfoValue);
         }
     }
 }

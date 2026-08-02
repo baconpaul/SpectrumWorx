@@ -96,15 +96,18 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
     // that do not actually exist (i.e. requested parameter index is greater
     // than the number of parameters provided by the effect).
     //                                        (26.06.2009.) (Domagoj Saric)
-#define LE_AUX_VIRTUAL_SET virtual
-#define LE_AUX_VIRTUAL_GET
+    /// \note `LE_AUX_VIRTUAL_SET` expanded to `virtual` and `SW::Module` overrode
+    /// both setters to push the value into a widget. Nothing overrides them now,
+    /// so they are ordinary functions -- which is the thing `dsp.cmake` says the
+    /// deleted `LE_SW_GUI` flag used to decide, "which in a release build decided
+    /// the layout of every module object, so the engine had two ABIs and only the
+    /// debug ones matched".
+    ///                                       (02.08.2026.) (SW port)
     float getBaseParameter(std::uint8_t baseParameterIndex) const;
-    LE_AUX_VIRTUAL_SET float setBaseParameter(std::uint8_t baseParameterIndex, float value);
+    float setBaseParameter(std::uint8_t baseParameterIndex, float value);
 
-    LE_AUX_VIRTUAL_GET float getEffectParameter(std::uint8_t effectParameterIndex) const;
-    LE_AUX_VIRTUAL_SET float setEffectParameter(std::uint8_t effectParameterIndex, float value);
-#undef LE_AUX_VIRTUAL_GET
-#undef LE_AUX_VIRTUAL_SET
+    float getEffectParameter(std::uint8_t effectParameterIndex) const;
+    float setEffectParameter(std::uint8_t effectParameterIndex, float value);
 
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -277,18 +280,13 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
     parameter_value_t setEffectParameterFromLFOAux(std::uint8_t parameterIndex, LFO::value_type);
 
   private:
-#define LE_AUX_VIRTUAL virtual
-    LE_AUX_VIRTUAL void setBaseParameterFromLFO(std::uint8_t const parameterIndex,
-                                                LFO::value_type const value)
-    {
-        setBaseParameterFromLFOAux(parameterIndex, value);
-    }
-    LE_AUX_VIRTUAL void setEffectParameterFromLFO(std::uint8_t const parameterIndex,
-                                                  LFO::value_type const value)
-    {
-        setEffectParameterFromLFOAux(parameterIndex, value);
-    }
-#undef LE_AUX_VIRTUAL
+    /// \note `virtual void set{Base,Effect}ParameterFromLFO()` stood here, and
+    /// `SW::Module` overrode both to push the new value into a `juce::Slider` --
+    /// from the audio thread, once per block, per enabled LFO. That is the stack
+    /// in doc/tech/correct_the_threading.md §1A, and these two virtuals were the
+    /// whole of why it existed. The engine no longer tells anyone anything; the
+    /// plugin publishes what the LFOs did into the ValueMailbox after the block.
+    ///                                       (02.08.2026.) (SW port)
 
     LFO *constructLFOs(LFOPlaceholder *) const;
 #endif // LE_NO_LFOs

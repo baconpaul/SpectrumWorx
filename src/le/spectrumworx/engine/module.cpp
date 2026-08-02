@@ -242,6 +242,11 @@ float ModuleParameters::getEffectParameter(std::uint8_t const parameterIndex) co
 float ModuleParameters::setEffectParameter(std::uint8_t const parameterIndex, float const value)
 {
     auto const setValue(setEffectParameterLive(parameterIndex, value));
+    /// \note Moved down from `SW::Module::setEffectParameter`, which was an
+    /// override that existed to push the value into a widget and carried this on
+    /// the way past. It is a statement about the engine, so it belongs here.
+    LE_ASSERT((value == setValue) ||
+              (effectSpecificParameterInfo(parameterIndex).type != ParameterInfo::FloatingPoint));
 #ifndef LE_NO_LFOs
     /// \note What the *user, the host or a preset* asked for, so it is the
     /// unmodulated value as well as the live one. The LFO comes through

@@ -46,19 +46,6 @@ class LE_NOVTABLE Module : public Engine::ModuleDSP,
     void createGUI(GUI::SpectrumWorxEditor &, std::uint8_t moduleIndex);
     bool destroyGUI();
 
-  public: // Automation
-    template <class AutomatedParameter>
-    std::optional<std::pair<std::uint8_t, LFO::value_type>>
-    setAutomatedLFOParameter(std::uint8_t const parameterIndex,
-                             std::uint8_t const lfoParameterIndex,
-                             Plugins::AutomatedParameterValue const value)
-    {
-        auto const result(Automation::setAutomatedLFOParameter<AutomatedParameter>(
-            parameterIndex, lfoParameterIndex, value, *this));
-        updateLFOGUI(parameterIndex, lfoParameterIndex, value);
-        return result;
-    }
-
   public:
     using OptionalUI = std::optional<GUI::ModuleUI>;
 
@@ -83,17 +70,21 @@ class LE_NOVTABLE Module : public Engine::ModuleDSP,
     ~Module();
 
   private:
+    /// \note Four overrides stood here -- `set{Base,Effect}Parameter` and
+    /// `set{Base,Effect}ParameterFromLFO` -- and every one of them existed to push
+    /// a value into a `juce::Slider`. The last two ran once per block per enabled
+    /// LFO, from the audio thread, which is the stack in
+    /// doc/tech/correct_the_threading.md §1A; the first two put a `juce::String`
+    /// there whenever the moved parameter's control happened to be the active one.
+    ///
+    ///   Nothing replaces them in the engine. The plugin publishes what the LFOs
+    /// did into the ValueMailbox after the block, and reports a host's parameter
+    /// event on the ToUI ring, both of which it can do because it is the thing
+    /// that knows about both sides. `dsp.cmake` predicted this: those setters were
+    /// virtual only because of the interface, and being virtual is what gave the
+    /// engine two ABIs.
+    ///                                       (02.08.2026.) (SW port)
     friend class AutomatedModuleImpl<Module>;
-    float setBaseParameter(std::uint8_t sharedParameterIndex, float parameterValue) override final;
-    float setEffectParameter(std::uint8_t effectParameterIndex,
-                             float parameterValue) override final;
-
-  private:
-    void setBaseParameterFromLFO(std::uint8_t parameterIndex, LFO::value_type) override final;
-    void setEffectParameterFromLFO(std::uint8_t parameterIndex, LFO::value_type) override final;
-
-    void updateLFOGUI(std::uint8_t parameterIndex, std::uint8_t lfoParameterIndex,
-                      Plugins::AutomatedParameterValue);
 
   private:
     OptionalUI ui_;

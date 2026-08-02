@@ -336,6 +336,21 @@ class SpectrumWorxCLAP final
     /// thread. `[main-thread]`
     void drainEngineEvents();
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Writes what the LFOs did this block into the mailbox.
+    ///
+    /// \note Here rather than in the engine, which is the whole point: a module
+    /// used to push each LFO value into a `juce::Slider` itself, from inside
+    /// `preProcess()`. This is the same information, published where anything
+    /// that draws can read it and nothing has to be on this thread to do so.
+    ///
+    /// \note Only LFO-driven parameters. Not gated on an editor being open; see
+    /// the note on the definition.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    void publishModulatedValues();
+
     /// Applies a parameter event. Returns true if it changed a slot's effect,
     /// i.e. if the host's view of the parameter list is now stale.
     bool handleEvent(clap_event_header const *);

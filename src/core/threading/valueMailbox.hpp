@@ -90,7 +90,11 @@ class ValueMailbox
     ///
     /// \note Clears by exchange rather than by clearing after reading, so a write
     /// that lands mid-sweep is carried into the next one instead of being lost.
-    template <class Functor> void forEachChanged(Functor &&f)
+    ///
+    /// \note `const`, with the dirty words `mutable`. The reader is handed a
+    /// `const &` on purpose -- it must not be able to write a *value* -- and
+    /// taking one's own notification is not a change to what the mailbox says.
+    template <class Functor> void forEachChanged(Functor &&f) const
     {
         for (std::size_t word(0); word < words; ++word)
         {
@@ -108,7 +112,7 @@ class ValueMailbox
 
     /// \brief Drops whatever has not been swept. For a reader that has just
     /// resynchronised from the model and does not want the backlog.
-    void discardChanges()
+    void discardChanges() const
     {
         for (auto &word : dirty_)
             word.store(0, std::memory_order_relaxed);
@@ -140,7 +144,8 @@ class ValueMailbox
     static_assert(std::atomic<Word>::is_always_lock_free, "...and the dirty words with them.");
 
     std::array<std::atomic<float>, capacity> values_{};
-    std::array<std::atomic<Word>, words> dirty_{};
+    /// Mutable: see forEachChanged().
+    mutable std::array<std::atomic<Word>, words> dirty_{};
 }; // class ValueMailbox
 
 //------------------------------------------------------------------------------

@@ -181,6 +181,11 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost)
     setOpaque(true);
     setVisible();
 
+    /// \note Whatever the mailbox has been accumulating with no editor open is
+    /// not this editor's news: it starts from what the widgets were built with.
+    editorHost_.modulatedValues().discardChanges();
+    startTimerHz(modulationRefreshHz);
+
     // Last: nothing may reach a half-built editor.
     editorHost_.editorOpened(*this);
 }
@@ -192,6 +197,7 @@ SpectrumWorxEditor::~SpectrumWorxEditor()
     LE_ASSERT(GUI::isThisTheGUIThread());
 
     // First: nothing may reach a dying editor.
+    stopTimer();
     editorHost_.editorClosed();
 
     editorHost_.deregisterSampleLoadedListener(*this);
@@ -1168,6 +1174,80 @@ void SpectrumWorxEditor::updateLFO(ModuleUI const &moduleUI, std::uint8_t const 
 /// \see doc/tech/correct_the_threading.md §3.
 ///
 ////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// What the engine has been doing
+//
+////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+/// \brief The module region for \p slot, or null if that slot has none.
+///
+/// \note Through the chain and `Module::gui()`, which is the bridge until the
+/// widgets stop living inside the module. See doc/tech/correct_the_threading.md.
+ModuleUI *regionForSlot(AutomatedModuleChain &chain, std::uint8_t const slot)
+{
+    auto const pModule(chain.moduleAs<SW::Module>(slot));
+    if (!pModule || !pModule->gui())
+        return nullptr;
+    return &*pModule->gui();
+}
+} // anonymous namespace
+
+void SpectrumWorxEditor::parameterChangedElsewhere(ParameterID const parameterID, float const value)
+{
+    LE_ASSERT(isThisTheGUIThread());
+
+    switch (parameterID.type())
+    {
+    case ParameterID::ModuleParameter:
+        if (auto *const pRegion =
+                regionForSlot(moduleChain(), parameterID.value._.module.moduleIndex))
+            pRegion->setParameter(parameterID.value._.module.moduleParameterIndex, value,
+                                  ModuleUI::AutomationOrPreset);
+        return;
+
+    case ParameterID::LFOParameter:
+        if (auto *const pRegion = regionForSlot(moduleChain(), parameterID.value._.lfo.moduleIndex))
+            updateLFO(*pRegion, parameterID.value._.lfo.moduleParameterIndex,
+                      parameterID.value._.lfo.lfoParameterIndex, value);
+        return;
+
+    case ParameterID::GlobalParameter:
+        /// \note The six global knobs. `updateForGlobalParameterChange()` and
+        /// `updateGlobalParameterWidget<>` have had no callers since the 2016
+        /// plugin class was deleted -- `tech_debt.md` records that host automation
+        /// of a global never moved the editor -- and this is the route that gives
+        /// them one back, without the audio-thread write the naive fix would have
+        /// recreated.
+        updateForGlobalParameterChange();
+        return;
+
+    case ParameterID::ModuleChainParameter:
+        /// \note A slot's effect changed under us. Rebuilding a strip is stage 6's
+        /// `ToUI::SlotChanged`; nothing sends this yet.
+        return;
+
+        LE_DEFAULT_CASE_UNREACHABLE();
+    }
+}
+
+void SpectrumWorxEditor::timerCallback()
+{
+    LE_ASSERT(isThisTheGUIThread());
+
+    auto &chain(moduleChain());
+    editorHost().modulatedValues().forEachChanged([&](std::size_t const index, float const value) {
+        ParameterID const parameterID{Plugins::ParameterIndex{static_cast<std::uint16_t>(index)}};
+        if (parameterID.type() != ParameterID::ModuleParameter)
+            return;
+        if (auto *const pRegion = regionForSlot(chain, parameterID.value._.module.moduleIndex))
+            pRegion->setParameter(parameterID.value._.module.moduleParameterIndex, value,
+                                  ModuleUI::LFOValue);
+    });
+}
 
 void SpectrumWorxEditor::queueGlobalParameter(std::uint8_t const index, float const value) const
 {
