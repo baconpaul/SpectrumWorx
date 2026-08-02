@@ -27,7 +27,7 @@
 
 #include "core/automatedModuleChain.hpp"
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
-#include "le/spectrumworx/presets.hpp"
+#include "le/spectrumworx/presetFile.hpp"
 
 /// \note For ScopedProblemCounter, which swaps the default preset-problem
 /// reporter -- a `juce::AlertWindow` per problem -- for a counter. Without it a

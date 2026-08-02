@@ -20,9 +20,7 @@
 #ifndef presetFile_hpp__0C4A6D19_8E37_4B52_9A6D_1F73B0C5E842
 #define presetFile_hpp__0C4A6D19_8E37_4B52_9A6D_1F73B0C5E842
 //------------------------------------------------------------------------------
-#include "presets.hpp"
-
-#include <span>
+#include "presetStorage.hpp"
 //------------------------------------------------------------------------------
 namespace juce
 {
@@ -39,16 +37,9 @@ namespace SW
 
 class Program;
 
-/// \brief Reads a preset file into the writable, NUL-terminated buffer that the
-/// destructive parse in Preset::loadFrom() requires.
-/// \return an empty pointer if the file cannot be read.
+/// \brief presetStorage.hpp's two, with a `juce::File` on them.
 Preset::InMemoryPreset readPresetFile(juce::File const &);
-
-/// \brief Replaces a preset file's contents, creating the file if it is absent.
 bool writePresetFile(juce::File const &, char const *data, unsigned int size);
-
-/// \brief Truncating copy of a NUL-terminated name into a Program::Name.
-void copyPresetName(char_t const *name, std::span<char> target);
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -59,7 +50,7 @@ void copyPresetName(char_t const *name, std::span<char> target);
 
 template <class PresetConsumer>
 bool LE_COLD loadPreset(juce::File const &presetFile, bool const ignoreExternalSample,
-                        juce::String *const pComment, char_t const *const presetName,
+                        std::string *const pComment, char const *const presetName,
                         PresetConsumer consumer)
 {
     auto const pPresetData(readPresetFile(presetFile));
@@ -80,6 +71,12 @@ bool LE_COLD loadPreset(juce::File const &presetFile, bool const ignoreExternalS
     return success;
 }
 
+/// \brief presets.hpp's `savePreset` with the interface's string types on it.
+/// \see the definition for why the conversion lives here.
+std::string savePreset(juce::File const &externalSampleFile, juce::String const &comment,
+                       Program const &, DawExtraState const *pDawExtraState = nullptr);
+
+/// \brief The same, written to \p file.
 void savePreset(juce::File const &, juce::File const &externalSampleFile,
                 juce::String const &comment, Program const &);
 

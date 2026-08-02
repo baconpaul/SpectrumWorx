@@ -15,7 +15,6 @@
 #include "le/utility/parentFromMember.hpp"
 #include "core/modules/factory.hpp"
 #include "le/spectrumworx/engine/moduleNode.hpp" // for intrusive_ptr_release_deleter
-#include "gui/editor/spectrumWorxEditor.hpp"
 
 #include "le/utility/intrusivePtr.hpp"
 

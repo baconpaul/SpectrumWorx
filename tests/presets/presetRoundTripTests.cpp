@@ -35,11 +35,10 @@
 #include "le/spectrumworx/effects/configuration/constants.hpp"
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
 #include "le/spectrumworx/engine/moduleParameters.hpp"
-#include "le/spectrumworx/presetFile.hpp"
+#include "le/spectrumworx/presetStorage.hpp"
 #include "le/spectrumworx/presets.hpp"
 
-#include <juce_core/juce_core.h>
-
+#include <filesystem>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
@@ -287,7 +286,7 @@ TEST_CASE("A saved preset loads back as itself", "[preset-roundtrip]")
 
             original = dump(engine).text;
 
-            saved = savePreset(juce::File(), juce::String("round trip"), engine.program());
+            saved = savePreset({}, "round trip", engine.program());
             REQUIRE_FALSE(saved.empty());
         }
 
@@ -381,7 +380,7 @@ TEST_CASE("Saving while an LFO is running stores the setting, not the sweep",
         [&](ModuleParameters const &module) { liveValue = module.getBaseParameter(gain); });
     REQUIRE(liveValue != setValue);
 
-    auto const saved(savePreset(juce::File(), juce::String("lfo running"), engine.program()));
+    auto const saved(savePreset({}, "lfo running", engine.program()));
     REQUIRE_FALSE(saved.empty());
 
     INFO("saved preset:\n" << saved);
@@ -412,7 +411,7 @@ TEST_CASE("A parameter under an enabled LFO takes its value from the LFO", "[pre
 
         REQUIRE(drivenValue != 0);
 
-        saved = savePreset(juce::File(), juce::String("lfo"), engine.program());
+        saved = savePreset({}, "lfo", engine.program());
         REQUIRE_FALSE(saved.empty());
     }
 
@@ -456,7 +455,7 @@ TEST_CASE("A parameter under an enabled LFO takes its value from the LFO", "[pre
 ///
 /// \note Stage 8's other "done when" is that a user's save and load round-trips.
 /// Everything above round-trips through a buffer; this is the layer under it --
-/// savePreset(juce::File) and readPresetFile() -- and nothing else covers it.
+/// writePresetFile() and readPresetFile() -- and nothing else covers it.
 /// The bug it exists to catch is a truncated or unterminated write, which the
 /// buffer path cannot have.
 ///
@@ -464,14 +463,15 @@ TEST_CASE("A parameter under an enabled LFO takes its value from the LFO", "[pre
 
 TEST_CASE("A preset saved to a file loads back from it", "[preset-roundtrip]")
 {
-    juce::File const directory(juce::String(SW_TEST_OUTPUT_DIR) + "/presets");
-    REQUIRE(directory.createDirectory().wasOk());
+    std::filesystem::path const directory(std::filesystem::path(SW_TEST_OUTPUT_DIR) / "presets");
+    std::filesystem::create_directories(directory);
+    REQUIRE(std::filesystem::is_directory(directory));
 
     /// \note A name with a space and a parenthesis in it, because those are what
     /// the shipped banks are full of and what CMakeRC's unescaped command line
     /// tripped over.
-    auto const file(directory.getChildFile("round trip (1).swp"));
-    file.deleteFile();
+    auto const file(directory / "round trip (1).swp");
+    std::filesystem::remove(file);
 
     std::string original;
     {
@@ -490,11 +490,13 @@ TEST_CASE("A preset saved to a file loads back from it", "[preset-roundtrip]")
 
         original = dump(engine).text;
 
-        savePreset(file, juce::File(), juce::String("through a file"), engine.program());
+        auto const preset(savePreset({}, "through a file", engine.program()));
+        REQUIRE(
+            writePresetFile(file, preset.c_str(), static_cast<unsigned int>(preset.size() + 1)));
     }
 
-    REQUIRE(file.existsAsFile());
-    REQUIRE(file.getSize() > 0);
+    REQUIRE(std::filesystem::is_regular_file(file));
+    REQUIRE(std::filesystem::file_size(file) > 0);
 
     auto const contents(readPresetFile(file));
     REQUIRE(contents);
@@ -512,13 +514,13 @@ TEST_CASE("A preset saved to a file loads back from it", "[preset-roundtrip]")
 
     /// \note And the comment, which is the one thing in a preset that is neither
     /// a parameter nor an effect and so is in none of the dumps above.
-    juce::String comment;
+    std::string comment;
     Fixture commentOnly;
     REQUIRE(LE::SW::loadPreset(readPresetFile(file).get(), true, &comment,
                                PresetConsumer{commentOnly.engine()}));
     CHECK(comment == "through a file");
 
-    file.deleteFile();
+    std::filesystem::remove(file);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -540,8 +542,9 @@ TEST_CASE("A preset saved to a file loads back from it", "[preset-roundtrip]")
 
 TEST_CASE("The committed 3.0 fixture loads without the writer's help", "[preset-roundtrip]")
 {
-    juce::File const fixtureFile(juce::String(SW_PRESET_SNAPSHOT_DIR) + "/format3.swp");
-    REQUIRE(fixtureFile.existsAsFile());
+    std::filesystem::path const fixtureFile(std::filesystem::path(SW_PRESET_SNAPSHOT_DIR) /
+                                            "format3.swp");
+    REQUIRE(std::filesystem::is_regular_file(fixtureFile));
 
     auto const contents(readPresetFile(fixtureFile));
     REQUIRE(contents);
@@ -549,14 +552,14 @@ TEST_CASE("The committed 3.0 fixture loads without the writer's help", "[preset-
     Fixture fixture;
     auto &engine(fixture.engine());
 
-    juce::String comment;
+    std::string comment;
     SWTest::clearPresetProblems();
     {
         ScopedProblemCounter const counting;
         REQUIRE(LE::SW::loadPreset(contents.get(), true, &comment, PresetConsumer{engine}));
     }
     CHECK(SWTest::presetProblems().total() == 0);
-    CHECK(comment.startsWith("A hand-written 3.0 fixture"));
+    CHECK(std::string_view(comment).starts_with("A hand-written 3.0 fixture"));
 
     /// \note The globals, read off the `<Global>` block. `MixPercentage` runs
     /// 0..1, not 0..100 -- the name and the "%" unit are both about how it is

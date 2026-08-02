@@ -232,9 +232,16 @@ bool loadPreset(EditorHost &host, SpectrumWorxEditor *const pEditor, char *const
     // Whatever a previous load left uncollected is not this load's.
     takePresetLoadReport();
 
+    /// \note The format layer speaks `std::string` -- it is below JUCE now, and
+    /// a preset's comment is UTF-8 bytes whatever the interface's string type is.
+    std::string commentBytes;
     consumer.notifyHostAboutPresetChangeBegin();
-    bool const succeeded(
-        SW::loadPreset(inMemoryPreset, ignoreExternalSample, comment, consumer, pDawExtraState));
+    bool const succeeded(SW::loadPreset(inMemoryPreset, ignoreExternalSample,
+                                        comment ? &commentBytes : nullptr, consumer,
+                                        pDawExtraState));
+    if (comment)
+        *comment =
+            juce::String::fromUTF8(commentBytes.data(), static_cast<int>(commentBytes.size()));
     if (succeeded)
         copyPresetName(presetName, consumer.program().name());
     consumer.notifyHostAboutPresetChangeEnd();

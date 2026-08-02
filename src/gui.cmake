@@ -41,7 +41,9 @@ add_library(sw-gui-widgets STATIC
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/gui.cpp
 )
 
-target_link_libraries(sw-gui-widgets PUBLIC sw-gui-resources sw-dsp)
+# sw-io rather than sw-dsp: the editor opens preset files and lists the factory
+# samples, and sw-io is what brings JUCE's file and audio-format modules with it.
+target_link_libraries(sw-gui-widgets PUBLIC sw-gui-resources sw-io)
 
 # Where the user's presets live -- ~/Documents/SpectrumWorx and its platform
 # equivalents, XDG included. PRIVATE: gui.cpp answers with a juce::File, so
@@ -62,14 +64,15 @@ sw_force_include_odr_header(sw-gui-widgets)
 ################################################################################
 # sw-gui -- the module layer: a module's UI and its parameter controls.
 #
-# core/modules/moduleDSPAndGUI.cpp lives here rather than in sw-dsp: it is
-# SW::Module's out-of-line half, and every one of its virtuals exists to push a
-# value into a widget. sw-dsp's factory instantiates the class and emits the
-# vtables; this target supplies what they point at.
+# \note core/modules/moduleDSPAndGUI.cpp used to live here, because it was
+# SW::Module's out-of-line half and every one of its virtuals existed to push a
+# value into a widget. Those virtuals are gone and the file names no widget, so
+# it is back in sw-dsp -- which is what lets a test that merely destroys a module
+# link without JUCE. (The file's name is now a misnomer; renaming it is a
+# fifteen-include diff and a separate change.)
 ################################################################################
 
 add_library(sw-gui STATIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/core/modules/moduleDSPAndGUI.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/modules/moduleControl.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/modules/moduleUI.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/modules/moduleWidgets.cpp

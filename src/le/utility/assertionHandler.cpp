@@ -70,15 +70,15 @@ namespace LE
 
 LE_WEAK_SYMBOL_CONST char const assertionFailureMessageTitle[] = "LE SDK assertion failure";
 
-#ifdef LEB_PRECOMPILE_JUCE
-namespace SW
-{
-namespace GUI
-{
-bool warningOkCancelBox(TCHAR const *title, TCHAR const *question);
-}
-} // namespace SW
-#endif // LEB_PRECOMPILE_JUCE
+/// \note A `LEB_PRECOMPILE_JUCE` arm declared `GUI::warningOkCancelBox()` here
+/// and called it from `assertMessageBox()` below, so that a failed assertion
+/// raised a JUCE dialog. Nothing defines that macro -- the only other mention is
+/// in `precompiledHeaders.hpp`, which no target includes -- so the arm has never
+/// compiled in this port, and it was the last thing in `sw-dsp` that named JUCE
+/// outside a comment. Deleted rather than kept for a build that does not exist:
+/// a dialog from an assertion is also the wrong shape for a plugin, which cannot
+/// know whether it has a message thread. See doc/tech/correct_the_threading.md §6.7.
+///                                           (02.08.2026.) (SW port)
 
 //------------------------------------------------------------------------------
 } // namespace LE
@@ -136,16 +136,11 @@ static void printDebugMessage(wchar_t const *const message)
 #pragma warning(push)
 #endif // _WIN32
 
-#if defined(LEB_PRECOMPILE_JUCE) /*...mrmlj...*/ || defined(_WIN32)
+#ifdef _WIN32
 #define LE_ASSERT_HAS_MSGBOX
 
 static bool assertMessageBox(char const *const message)
 {
-#ifdef LEB_PRECOMPILE_JUCE
-    return LE::SW::GUI::warningOkCancelBox(
-        juce::String(LE::assertionFailureMessageTitle).getCharPointer().getAddress(),
-        juce::String(message).getCharPointer().getAddress());
-#else
     int const userChoice(
         ::MessageBoxA(nullptr, message, LE::assertionFailureMessageTitle, MB_ABORTRETRYIGNORE));
     switch (userChoice)
@@ -157,7 +152,6 @@ static bool assertMessageBox(char const *const message)
     default:
         std::terminate();
     }
-#endif // LEB_PRECOMPILE_JUCE
 }
 
 #endif // LE_ASSERT_HAS_MSGBOX

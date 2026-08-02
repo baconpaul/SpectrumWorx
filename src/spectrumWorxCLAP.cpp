@@ -35,7 +35,7 @@
 // that this can call it with none, and savePreset() is the writer at the far end
 // of it. See doc/tech/streaming_format.md.
 #include "gui/editor/presetLoading.hpp"
-#include "le/spectrumworx/presets.hpp"
+#include "le/spectrumworx/presetFile.hpp"
 
 #include "le/math/vector.hpp" // Math::copy(), for the sample's wrap
 

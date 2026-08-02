@@ -42,14 +42,11 @@ add_library(sw-dsp STATIC
         le/utility/lexicalCast.cpp
         le/utility/trace.cpp
 
-        # The external audio file the side channel can be fed from, and the
-        # factory samples that are in the binary beside the banks.
-        external_audio/sample.cpp
-
-        # le/spectrumworx -- the preset format, the one file that opens files,
-        # and the factory banks that are in the binary rather than either
+        # le/spectrumworx -- the preset *format*, and the factory banks that are
+        # in the binary. Reading and writing an actual file is sw-io's, above;
+        # so is decoding an audio file.
         le/spectrumworx/factoryPresets.cpp
-        le/spectrumworx/presetFile.cpp
+        le/spectrumworx/presetStorage.cpp
         le/spectrumworx/presets.cpp
 
         # le/spectrumworx/engine
@@ -131,6 +128,7 @@ add_library(sw-dsp STATIC
         core/spectrumWorxCore.cpp
         core/modules/automatedModule.cpp
         core/modules/factory.cpp
+        core/modules/moduleDSPAndGUI.cpp
 
         # Which thread is this, may it do that, and how a change made on one
         # reaches the other. See doc/tech/correct_the_threading.md.
@@ -185,29 +183,55 @@ target_link_libraries(sw-dsp PUBLIC sst-cpputils)
 # same file.
 target_link_libraries(sw-dsp PUBLIC sst-plugininfra)
 
-# \note `target_link_libraries(sw-dsp PUBLIC juce::juce_gui_basics sw-gui-resources)`
+# \note **sw-dsp links no JUCE, and that is the point of the target.**
+#
+#   `target_link_libraries(sw-dsp PUBLIC juce::juce_gui_basics sw-gui-resources)`
 # stood here, because SW::Module embedded a GUI::ModuleUI and Module::Impl<Effect>
 # inherited that effect's widget storage -- so the engine's headers named JUCE
-# components and the factory had to know how big a rack of knobs is.
+# components and the factory had to know how big a rack of knobs is. Then
+# juce_audio_formats stood here for the sample decoder, and presets.{hpp,cpp}
+# carried a juce::String and a juce::File.
 #
-#   Neither is true now: a module's strip belongs to the editor and holds a
-# counted reference to the module rather than the other way round, and which
-# effect's widgets to build is an index looked up in sw-gui. See
-# doc/tech/correct_the_threading.md.
-#
-#   juce_audio_formats is still below, for external_audio/sample.cpp, and
-# presets.{hpp,cpp} still carry a juce::String and a juce::File. Stage 7 is what
-# takes those, and with them the last of JUCE off this target.
+#   None of it is true now. A module's strip belongs to the editor and holds a
+# counted reference to the module rather than the other way round; the preset
+# format speaks std::string_view and the conversion happens in sw-io; and the two
+# files that open files are in sw-io as well. The engine is what a DSP test can
+# link on its own. See doc/tech/correct_the_threading.md §6.7, and
+# checkNoJuceInDSP.cmake, which fails the build if any of it comes back.
 
-# The factory banks and the factory samples. PRIVATE: factoryPresets.cpp and
-# external_audio/sample.cpp are the only things that name cmrc, and neither
-# header says anything about where its bytes come from.
+# The factory banks. PRIVATE: factoryPresets.cpp is the only thing that names
+# cmrc, and no header says anything about where its bytes come from.
 target_link_libraries(sw-dsp PRIVATE sw::assets)
+
+################################################################################
+# sw-io -- the two things that open a file.
+#
+#   The preset reader/writer and the audio file decoder. They are here rather
+# than in sw-dsp because both are JUCE (`juce::File`, `juce::AudioFormatManager`)
+# and sw-dsp is the layer that must not be, and here rather than in sw-gui
+# because neither draws anything: the plugin reads a session's sample without an
+# editor open.
+#
+# \note This is also where the preset format's `std::string_view` interface meets
+# the interface's `juce::String` -- presetFile.cpp's savePreset() overload.
+################################################################################
+
+add_library(sw-io STATIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/external_audio/sample.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/le/spectrumworx/presetFile.cpp
+)
+
+sw_force_include_odr_header(sw-io)
+
+target_link_libraries(sw-io PUBLIC sw-dsp)
+
+# The factory samples, which are in the binary beside the banks.
+target_link_libraries(sw-io PRIVATE sw::assets)
 
 # The audio file decoder, replacing the DirectShow and ExtAudioFile ones. PUBLIC
 # because it compiles juce_audio_basics and juce_audio_formats into whatever
-# links sw-dsp, and the plugin's own translation units have to agree with it.
-target_link_libraries(sw-dsp PUBLIC juce::juce_audio_formats)
+# links sw-io, and the plugin's own translation units have to agree with it.
+target_link_libraries(sw-io PUBLIC juce::juce_audio_formats)
 
 # The factory samples are MP3, and off Apple and Windows nothing else decodes
 # one: registerBasicFormats() gets CoreAudioFormat on macOS and
@@ -215,10 +239,10 @@ target_link_libraries(sw-dsp PUBLIC juce::juce_audio_formats)
 # own decoder is behind this flag because it carries a patent disclaimer -- the
 # MP3 patents expired in 2017, and the licence JUCE's decoder ships under is the
 # one this whole tree is already built with.
-target_compile_definitions(sw-dsp PUBLIC JUCE_USE_MP3AUDIOFORMAT=1)
+target_compile_definitions(sw-io PUBLIC JUCE_USE_MP3AUDIOFORMAT=1)
 
 # Linking a JUCE module compiles that module's own sources into the consuming
-# target, so sw-dsp -- not the shim -- is what builds juce_core.cpp. It therefore
+# target, so sw-io -- not the shim -- is what builds juce_core.cpp. It therefore
 # has to carry the module settings itself: add_clap_juce_shim() puts these on
 # clap_juce_shim_requirements and clap_juce_shim, neither of which is on this
 # link line.
@@ -230,9 +254,9 @@ target_compile_definitions(sw-dsp PUBLIC JUCE_USE_MP3AUDIOFORMAT=1)
 #
 # \note Only the two. The shim also sets JUCE_MODAL_LOOPS_PERMITTED=0,
 # JUCE_USE_CAMERA and JUCE_REPORT_APP_USAGE; those would change what compiles in
-# gui/, and the preset browser's two async save-path callers (stage 6.4) are
-# exactly the code that would notice. Not this commit's business.
-target_compile_definitions(sw-dsp PUBLIC JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+# gui/, and the preset browser's two async save-path callers are exactly the code
+# that would notice.
+target_compile_definitions(sw-io PUBLIC JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
 
 # \note LE_NO_PRESETS stood here. It compiled out ModuleParameters::{load,save}
 # PresetParameters -- the whole preset serialisation -- because presets.cpp read

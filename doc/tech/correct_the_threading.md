@@ -314,14 +314,7 @@ see §6.5.
 
 **6 — Publish and retire; the lock is deleted.** ✅ *done, 02.08.2026;* see §6.6.
 
-**7 — `sw-dsp` links no JUCE; the test binary splits.** `presets.{hpp,cpp}` drop
-`juce::String`/`juce::File` for `std::string` (8 sites); `presetFile.cpp` and
-`external_audio/sample.{hpp,cpp}` move up, since only `spectrumWorxCLAP` and
-`spectrumWorxEditor` use them; `assertionHandler.cpp`'s two `juce::String` uses go.
-`sw-tests` splits into **`sw-dsp-tests`** — math, effects, goldens, parameters, presets,
-utility, with no JUCE on the link line — and **`sw-plugin-tests`**, plus a CMake gate in the
-shape of `checkODRHeaderScope.cmake` that fails if `sw-dsp`'s compile or link lines mention
-JUCE. The gate is the point: without it the layering rots back in a fortnight.
+**7 — `sw-dsp` links no JUCE; the test binary splits.** ✅ *done, 02.08.2026;* see §6.7.
 
 **8 — Prove it, and delete the corpses.** Editor open, every knob on all five slots dragged,
 **zero rtsan reports**. tsan over the two-instance test.
@@ -715,6 +708,58 @@ pinned instead: who may mutate the engine and when, that every block is written,
 spectral change waits and then lands, and that a published chain comes back holding what it
 displaced.
 
+### 6.7 — What stage 7 did
+
+Goal 3: **`sw-dsp` links no JUCE, and `sw-dsp-tests` is a binary that proves it.**
+
+**The format stopped speaking JUCE.** `presets.hpp` forward-declared `juce::File` and
+`juce::String`, and four signatures used them: `PresetHeader`'s constructor, `loadPreset`'s
+comment out-parameter, `savePreset`'s two, and a `char_t` typedef pinned to
+`juce::String::CharPointerType`. All four are `std::string_view`/`std::string`/`char` now,
+and the conversion happens one layer up, at the interface's edge, which is where a
+conversion between an interface's string type and a file format's bytes belongs anyway. The
+`JUCE_STRING_UTF_TYPE` switch with an `_alloca` in one arm went with it.
+
+**Four files moved, and one moved back.**
+
+- `external_audio/sample.cpp` and `le/spectrumworx/presetFile.cpp` are a new target,
+  **`sw-io`**: the two things that open a file. Not `sw-gui`, because neither draws anything
+  — a plugin reads a session's sample with no editor open.
+- `readPresetFile`/`writePresetFile` are **`presetStorage.cpp`**, in `sw-dsp`, over
+  `std::filesystem::path` and `<fstream>`. `presetFile.cpp` keeps the `juce::File` overloads
+  and is now only conversion. This is what lets the *preset* tests link without JUCE, which
+  goal 3 names specifically.
+- `core/modules/moduleDSPAndGUI.cpp` moved **back** to `sw-dsp`. It was in `sw-gui` because
+  every one of `Module`'s out-of-line virtuals existed to push a value into a widget; stage 5
+  deleted them, and its `#include "gui/editor/spectrumWorxEditor.hpp"` had been vestigial
+  since. It holds `intrusive_ptr_release_deleter`, so while it was up there *destroying a
+  module* needed JUCE on the link line.
+
+**`assertionHandler.cpp`'s JUCE arm had never compiled.** It declared and called
+`GUI::warningOkCancelBox` under `LEB_PRECOMPILE_JUCE`, which nothing defines — the only other
+mention is in `precompiledHeaders.hpp`, which no target includes. Deleted rather than kept
+for a build that does not exist.
+
+**Two things now enforce the boundary, and they fail differently.**
+
+- **`checkNoJuceInDSP.cmake`** (`ctest -R engine-links-no-juce`) reads `compile_commands.json`
+  and fails if any engine translation unit is compiled with `-DJUCE_MODULE_AVAILABLE_`. It
+  catches a JUCE module arriving on `sw-dsp`'s link line *before* anything includes a header
+  — which is the shape this rots back into, because a `target_link_libraries` line looks
+  harmless until six months later. Verified by reversion: put `juce::juce_core` back and it
+  reddens, naming the files.
+- **`sw-dsp-tests`** links `sw-dsp` and Catch2, full stop. `otool -L` on it lists Foundation,
+  Accelerate and libc++; `nm -u` finds no JUCE symbol at all. It catches the other direction
+  — a *test* reaching above the layer it is testing — and it does so as a link error.
+
+`sw-plugin-tests` is the rest: the CLAP cases, the editor cases, the decoder, and the two
+that turned out to belong there rather than where the plan put them — `threadCheckTests`
+drives a real `clap_plugin` through its C entry point, and `parameterTableTests` exercises
+the host-facing parameter enumeration, which is `plugin2Host.cpp` in `sw-impl`.
+
+**What is still on `sw-dsp`'s link line:** `sst-cpputils`, `sst-plugininfra`, `tinyxml`,
+`sw::assets`, and Accelerate or pffft. No JUCE, and nothing that pulls it.
+
 ---
 
 ## 6.9 — Where the cross-thread state is, as of stage 6
@@ -749,10 +794,8 @@ in `~SpectrumWorxEditor` says the same thing without a process-wide `bool`. Stag
 
 ## 7. What is still missing
 
-**Stages 7 and 8.** Stage 7 is a layering job — `sw-dsp` still links `juce_core`,
-`juce_audio_basics` and `juce_audio_formats`, and goal 3 is that it links none of them.
-Stage 8 is the proof: rtsan with the editor open and every knob dragged, tsan on two
-instances, and the DAWs.
+**Stage 8**, which is the proof: rtsan with the editor open and every knob dragged, tsan on
+two instances, and the DAWs.
 
 **`request_restart` has not been driven by a real host.** The test hosts in `tests/clap/`
 implement it as a no-op observer, which is enough to say the plugin asks and not enough to

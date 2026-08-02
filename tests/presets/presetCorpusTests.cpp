@@ -47,10 +47,8 @@
 #include "core/modules/finalImplementations.hpp"
 
 #include "le/spectrumworx/factoryPresets.hpp"
-#include "le/spectrumworx/presetFile.hpp"
+#include "le/spectrumworx/presetStorage.hpp"
 #include "le/spectrumworx/presets.hpp"
-
-#include <juce_core/juce_core.h>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -139,7 +137,7 @@ Loaded loadBuffer(std::vector<char> data, bool &succeeded, std::string *const pR
     CHECK(SWTest::presetProblems().unknownEffect == 0);
 
     if (pRewritten)
-        *pRewritten = savePreset(juce::File(), juce::String(), engine.program());
+        *pRewritten = savePreset({}, {}, engine.program());
 
     succeeded = true;
     auto loaded(dump(engine));
@@ -149,7 +147,7 @@ Loaded loadBuffer(std::vector<char> data, bool &succeeded, std::string *const pR
 
 std::vector<char> readPreset(std::filesystem::path const &file)
 {
-    auto const presetData(readPresetFile(juce::File(file.string())));
+    auto const presetData(readPresetFile(file));
     if (!presetData)
         return {};
     std::string_view const text(presetData.get());

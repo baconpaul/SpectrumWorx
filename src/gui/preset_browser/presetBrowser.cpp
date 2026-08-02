@@ -531,7 +531,8 @@ void PresetBrowser::saveDirtyComment()
             auto const pPresetData(readPresetFile(dirtyPreset));
             if (!pPresetData)
                 return;
-            PresetHeader const presetHeader(newComment);
+            PresetHeader const presetHeader(
+                std::string_view(newComment.toRawUTF8(), newComment.getNumBytesAsUTF8()));
             Preset preset;
             if (!preset.loadFrom(pPresetData.get()))
                 return;

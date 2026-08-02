@@ -16,7 +16,6 @@
 
 #ifndef _MSC_VER
 #include "configuration/versionConfiguration.hpp"
-#include "gui/gui.hpp" // warningMessageBox()
 #endif
 #endif // !LE_SW_SDK_BUILD
 
@@ -48,13 +47,8 @@
 #include <span>
 #include <string>
 #include <type_traits>
+#include <string_view>
 #include <utility> // rvalues
-//------------------------------------------------------------------------------
-namespace juce
-{
-class File;
-class String;
-} // namespace juce
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -181,7 +175,7 @@ struct PresetHeader
 {
     static unsigned int const maxCommentLength = 256;
 
-    PresetHeader(juce::String const &comment);
+    explicit PresetHeader(std::string_view comment);
 
     char version[8];
     char timeStamp[64];
@@ -574,7 +568,7 @@ class ParametersLoader : private PresetHandler
     friend class Engine::ModuleProcessorImpl;
 #else
     template <class PresetConsumer>
-    friend bool loadPreset(char *inMemoryPreset, bool ignoreExternalSample, juce::String *pComment,
+    friend bool loadPreset(char *inMemoryPreset, bool ignoreExternalSample, std::string *pComment,
                            PresetConsumer);
 #endif
 }; // class ParametersLoader
@@ -704,11 +698,17 @@ struct Parameters;
 }
 #endif // _MSC_VER
 
-using char_t = juce::String::CharPointerType::CharType;
+/// \note `juce::String::CharPointerType::CharType`, which on this build is
+/// `char` and on a `JUCE_STRING_UTF_TYPE != 8` one would not be. It is a
+/// `char` outright now, because a preset is UTF-8 bytes on disk whatever the
+/// interface's string type happens to be -- and because this header is below
+/// JUCE. presetFile.hpp is where the two meet.
+///                                           (02.08.2026.) (SW port)
+using char_t = char;
 
 template <class PresetConsumer>
 LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignoreExternalSample,
-                        juce::String *LE_RESTRICT const pComment, PresetConsumer const consumer,
+                        std::string *LE_RESTRICT const pComment, PresetConsumer const consumer,
                         DawExtraState const *const pDawExtraState = nullptr)
 {
     {
@@ -732,8 +732,7 @@ LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignor
         if (pComment)
         {
             auto const comment(preset.getComment());
-            *pComment =
-                juce::String::fromUTF8(comment.begin(), static_cast<unsigned int>(comment.size()));
+            pComment->assign(comment.begin(), comment.end());
         }
 
         /// \note Only if the element is there. A `.swp` has none, and calling
@@ -817,12 +816,14 @@ class Program;
 
 /// \note The `juce::File` overloads of these two -- and the `loadPreset` that
 /// reads a file before parsing it -- are in presetFile.hpp. This translation
-/// unit opens no files, which is what `LE_NO_PRESETS` used to stand in for.
+/// unit opens no files, which is what `LE_NO_PRESETS` used to stand in for, and
+/// as of stage 7 it names no JUCE type either.
 ///
+/// \param externalSampleFilePath empty when no sample is loaded.
 /// \param pDawExtraState null for a `.swp`, which carries only what the plugin
 /// sounds like; non-null for the session state a host holds, which carries that
 /// plus where the user had got to. See DawExtraState.
-std::string savePreset(juce::File const &externalSampleFile, juce::String const &comment,
+std::string savePreset(std::string_view externalSampleFilePath, std::string_view comment,
                        Program const &, DawExtraState const *pDawExtraState = nullptr);
 #endif // !LE_SW_SDK_BUILD
 

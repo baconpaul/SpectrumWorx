@@ -71,9 +71,9 @@ using PresetModule = Engine::ModuleDSP;
 using PresetModule = SW::Module;
 #endif // LE_SW_SDK_BUILD
 
-PresetHeader::PresetHeader(juce::String const &commentParam)
+PresetHeader::PresetHeader(std::string_view const commentParam)
 {
-    LE_ASSERT(commentParam.length() < _countof(comment) - 1);
+    LE_ASSERT(commentParam.size() < _countof(comment) - 1);
 
 /// \note Two levels, so that the argument is macro-expanded before it is
 /// stringized. Was BOOST_PP_STRINGIZE, which is the same two lines.
@@ -87,7 +87,10 @@ PresetHeader::PresetHeader(juce::String const &commentParam)
 #undef LE_STRINGIZE
 #undef LE_STRINGIZE_
     setCurrentTime();
-    commentParam.copyToUTF8(comment, sizeof(comment));
+
+    auto const kept(std::min(commentParam.size(), sizeof(comment) - 1));
+    std::memcpy(comment, commentParam.data(), kept);
+    comment[kept] = '\0';
 }
 
 void PresetHeader::setCurrentTime()
@@ -348,7 +351,7 @@ std::string Preset::saveTo() const
     /// rejected it.
     ///                                       (31.07.2026.) (SW port)
 #ifndef NDEBUG
-    PresetHeader dummyHeader{juce::String()};
+    PresetHeader dummyHeader{std::string_view()};
     getHeader(dummyHeader);
 #endif // NDEBUG
 
@@ -1013,8 +1016,15 @@ void ParametersSaver::setSampleFileName(std::string_view const &sampleFileName)
     saveParameter(sampleAttributeName_, std::string(sampleFileName));
 }
 
-std::string savePreset(juce::File const &externalSampleFile, juce::String const &comment,
-                       Program const &program, DawExtraState const *const pDawExtraState)
+/// \note It took a `juce::File` and a `juce::String` and converted both to UTF-8
+/// here, under a `JUCE_STRING_UTF_TYPE` switch with an `_alloca` in one arm. The
+/// conversion belongs at the interface's edge rather than in the format layer,
+/// and putting it there is what takes JUCE off `sw-dsp`: presetFile.hpp has the
+/// overload that speaks `juce::File`.
+///                                           (02.08.2026.) (SW port)
+std::string savePreset(std::string_view const externalSampleFilePath,
+                       std::string_view const comment, Program const &program,
+                       DawExtraState const *const pDawExtraState)
 {
     PresetHeader const presetHeader(comment);
     SavedPreset preset;
@@ -1024,7 +1034,7 @@ std::string savePreset(juce::File const &externalSampleFile, juce::String const 
 
     LE::Parameters::forEach(program.parameters(), parametersSaver);
 
-    if (externalSampleFile != juce::File())
+    if (!externalSampleFilePath.empty())
     {
         /*  ...mrmlj...temporarily reverting to old code for the 2.1 release...
 
@@ -1043,18 +1053,7 @@ std::string savePreset(juce::File const &externalSampleFile, juce::String const 
         );
         parametersSaver.setSampleFileName( sampleFileName );
         */
-        juce::String const &sampleFileName(externalSampleFile.getFullPathName());
-#if JUCE_STRING_UTF_TYPE == 8
-        char const *const pSampleFileName(sampleFileName.toUTF8());
-        unsigned int const sampleFileNameLength(std::strlen(pSampleFileName));
-#else
-        unsigned int const sampleFileNameLength(
-            static_cast<unsigned int>(sampleFileName.getNumBytesAsUTF8()));
-        char *const pSampleFileName(static_cast<char *>(_alloca(sampleFileNameLength + 1)));
-        LE_VERIFY(sampleFileName.copyToUTF8(pSampleFileName, sampleFileNameLength + 1) ==
-                  signed(sampleFileNameLength + 1));
-#endif // JUCE_STRING_UTF_TYPE
-        parametersSaver.setSampleFileName(std::string_view(pSampleFileName, sampleFileNameLength));
+        parametersSaver.setSampleFileName(externalSampleFilePath);
     }
 
     parametersSaver.saveEffectModuleChain(program.moduleChain());
