@@ -230,20 +230,22 @@ template <class Parameter> constexpr ParameterInfo info()
 
     using Tag = typename Parameter::Tag;
 
-    return {
-        ParameterType<Tag>::type,
+    return {ParameterType<Tag>::type,
 
-        static_cast<float>(Parameter::unscaledMinimum) / Parameter::rangeValuesDenominator,
-        static_cast<float>(Parameter::unscaledMaximum) / Parameter::rangeValuesDenominator,
-        static_cast<float>(Parameter::unscaledDefault) / Parameter::rangeValuesDenominator,
+            static_cast<float>(Parameter::unscaledMinimum) / Parameter::rangeValuesDenominator,
+            static_cast<float>(Parameter::unscaledMaximum) / Parameter::rangeValuesDenominator,
+            static_cast<float>(Parameter::unscaledDefault) / Parameter::rangeValuesDenominator,
 
-        Parameters::Name<Parameter>::string_, //...mrmlj...parameter names are required for presets
+            /// \note The display name, and beside it the name presets are keyed on.
+            /// They were one field until 08.2026, and the note that used to sit here
+            /// -- "parameter names are required for presets" -- was the warning that
+            /// they should not be: renaming a knob re-keyed every file that named it.
+            Parameters::Name<Parameter>::string_, Parameters::streamingName<Parameter>(),
 #ifdef LE_NO_PARAMETER_STRINGS
-        nullptr,
-        nullptr
+            nullptr, nullptr
 #else
-        Parameters::DisplayValueTransformer<Parameter>::Suffix::c_str(),
-        EnumeratedValueStrings<Parameter, Tag>::type::stringsBegin()
+            Parameters::DisplayValueTransformer<Parameter>::Suffix::c_str(),
+            EnumeratedValueStrings<Parameter, Tag>::type::stringsBegin()
 #endif // LE_NO_PARAMETER_STRINGS
     };
 }

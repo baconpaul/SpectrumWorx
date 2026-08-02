@@ -70,7 +70,14 @@ struct RuntimeInformation
     value_type const maximum;  ///< parameter's maximum possible/allowed value
     value_type const default_; ///< parameter's default value
 
-    char const *LE_RESTRICT const name; ///< parameter's name
+    char const *LE_RESTRICT const name; ///< parameter's name, as shown to a user
+
+    /// \brief The name the parameter is written to a preset or to session state
+    /// under. Defaults to \ref name and diverges from it only where a display
+    /// name has been changed since a file was written; see Parameters::
+    /// StreamingName. Never null.
+    char const *LE_RESTRICT const streamingName;
+
     char const *LE_RESTRICT const
         unit; ///< parameter's unit (e.g. "Hz" or "%", may be an empty string but never null)
 

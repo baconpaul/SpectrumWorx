@@ -293,7 +293,7 @@ LE_COLD std::optional<float> getParameterValueWithoutLFO(ParametersLoader const 
                                                          LFO &parameterLFO)
 {
     auto const parameterValueWithoutLFO(
-        parameterLoader.getLFOParameterValue<float>(parameterInfo.name, parameterLFO));
+        parameterLoader.getLFOParameterValue<float>(parameterInfo.streamingName, parameterLFO));
     if (parameterValueWithoutLFO && (*parameterValueWithoutLFO >= parameterInfo.minimum) &&
         (*parameterValueWithoutLFO <= parameterInfo.maximum))
         return parameterValueWithoutLFO;
@@ -311,7 +311,7 @@ LE_COLD void ModuleParameters::loadPresetParameters(ParametersLoader const &para
 
     {
         auto const bypassValue(parameterLoader.getSimpleParameterValue<bool>(
-            LE::Parameters::Name<Effects::BaseParameters::Bypass>::string_));
+            LE::Parameters::streamingName<Effects::BaseParameters::Bypass>()));
         if (bypassValue)
             setBaseParameter(
                 0, *bypassValue); //...mrmlj...assumes bypass is the first parameter/@ index 0
@@ -340,19 +340,20 @@ LE_COLD void ModuleParameters::savePresetParameters(ParametersSaver const &param
 {
     ParametersSaver &saver(const_cast<ParametersSaver &>(parameterSaver)); //...mrmlj...
 
-    saver.saveParameter<bool>(LE::Parameters::Name<Effects::BaseParameters::Bypass>::string_,
+    saver.saveParameter<bool>(LE::Parameters::streamingName<Effects::BaseParameters::Bypass>(),
                               bypass());
 
     for (std::uint8_t i(1); i < numberOfBaseParameters; ++i)
     {
-        saver.saveParameter<float>(parameterInfos()[i].name, getBaseParameter(i), baseLFO(i - 1));
+        saver.saveParameter<float>(parameterInfos()[i].streamingName, getBaseParameter(i),
+                                   baseLFO(i - 1));
     }
 
     auto const effectSpecificParameters(numberOfEffectSpecificParameters());
     for (std::uint8_t i(0); i < effectSpecificParameters; ++i)
     {
-        saver.saveParameter<float>(effectSpecificParameterInfo(i).name, getEffectParameter(i),
-                                   effectLFO(i));
+        saver.saveParameter<float>(effectSpecificParameterInfo(i).streamingName,
+                                   getEffectParameter(i), effectLFO(i));
         //...mrmlj...
         //ParameterInfo const &       info  ( effectSpecificParameterInfo( i ) );
         //LFO           const &       lfo   ( effectLFO                  ( i ) );

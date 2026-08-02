@@ -43,7 +43,11 @@ char const AhAh::description[] = "Wah ah ah...";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-EFFECT_PARAMETER_NAME(AhAh::Center, "Center (LFO me!)")
+/// \note Center's streaming name is pinned in ahAh.hpp, beside the parameter,
+/// and not here: a display name is an extern array the linker resolves, but a
+/// streaming name is a class template specialisation, so it has to be visible
+/// wherever `info<>()` builds the parameter table. See the note on it.
+EFFECT_PARAMETER_NAME(AhAh::Center, "Center frequency")
 EFFECT_PARAMETER_NAME(AhAh::Width, "Width")
 EFFECT_PARAMETER_NAME(AhAh::Strength, "Strength")
 

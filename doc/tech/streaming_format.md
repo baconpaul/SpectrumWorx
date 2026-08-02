@@ -1,0 +1,254 @@
+# SpectrumWorx — The streaming format
+
+What goes into a `.swp` file and into the session state a host hands back, how it
+is keyed, and what may and may not be renamed. Companion to
+[`implementation_sequence.md`](implementation_sequence.md) (the plan),
+[`week_two.md`](week_two.md) (the re-plan, item 4) and
+[`tech_debt.md`](tech_debt.md).
+
+Written 01.08.2026, as the work happened. Sections marked **⏳ planned** describe
+what has been decided and not yet built; everything else is in the tree and has
+tests naming it.
+
+---
+
+## 1. The problem this starts from
+
+A preset is keyed by *name*: modules by their effect's name, parameters by
+theirs. That is a good design — it is why the effect list can be reordered
+without touching a single file, and why a preset naming an effect this build does
+not have degrades rather than corrupting the chain (stage 0.7,
+`implementation_sequence.md:480`).
+
+It had one flaw, and it was invisible: **the name in the file was the name on the
+knob.** `Parameters::Name<Parameter>::string_` fed the editor *and*
+`RuntimeInformation::name`, and `RuntimeInformation::name` is what
+`ModuleParameters::{save,load}PresetParameters` wrote and matched on. So renaming
+a parameter re-keyed every file that had ever named it — and nothing said so. The
+preset still loaded; that one parameter silently took its default. The same was
+true of `Effect::title[]`, which is what a preset calls its modules.
+
+The 2016 author knew, and left the warning in the one place it would be read
+last — a comment beside the line, in `info()`:
+
+```cpp
+Parameters::Name<Parameter>::string_, //...mrmlj...parameter names are required for presets
+```
+
+---
+
+## 2. The rule
+
+> **Every string that reaches a file comes from a *streaming name*. Display names
+> are free to change; streaming names are not.**
+
+Two templates carry it, both defaulting to the display string:
+
+| | display | streaming | default |
+|---|---|---|---|
+| parameter | `Parameters::Name<P>::string_` | `Parameters::streamingName<P>()` | the display name |
+| effect | `Effects::effectName(i)` | `Effects::effectStreamingName(i)` | the title |
+
+**The default is what makes this free.** Today's display names *are* the 2016
+names — they are exactly the strings inside the 303 factory presets. Seeding the
+streaming name from the display name means the pre-port name table exists,
+complete and correct, at the point of definition, without a side table anyone has
+to maintain or trust. That is only true once: every rename that happens before
+the split is a silent break, and every rename after it is a decision.
+
+### Pinning one
+
+When a display name has to move, pin the streaming name to what files already
+say:
+
+```cpp
+// in the effect's header, beside the parameter
+EFFECT_PARAMETER_STREAMING_NAME(AhAh::Center, "Center (LFO me!)")
+
+// in effectNames.cpp, above the table
+LE_SW_EFFECT_STREAMING_NAME(SomeEffect, "What presets call it")
+```
+
+**A parameter pin goes in a header. This is not a style preference.**
+`UI_NAME` defines an extern array — one definition, found by the linker, so a
+`.cpp` is the right home. `STREAMING_NAME` specialises a class template, so every
+translation unit that instantiates `Detail::info<>()` must *see* it. One that does
+not gets the primary template, streams the parameter under its display name
+again, and is an ODR violation besides. Written in the `.cpp` first; the snapshot
+test below is what said so, immediately and by name.
+
+### Pinned today
+
+One, and it is the worked example rather than a real need:
+
+| | display | streaming |
+|---|---|---|
+| `AhAh::Center` | "Center frequency" | "Center (LFO me!)" |
+
+A 2011 instruction to the user wearing a parameter name. Its mangled form
+`<Center_(LFO_me!)>` is also one of the element names `repairLegacyElementNames()`
+exists to make parseable at all. Renaming it changed **one line** of
+`parameterTable.txt` and nothing else — not `streamingNames.txt`, not
+`presetCorpus.txt`, and no factory preset loads differently.
+
+### Where the strings come from
+
+`RuntimeInformation` (`le/parameters/runtimeInformation.hpp`) carries both, side
+by side, filled by `Detail::info<Parameter>()`
+(`le/spectrumworx/engine/moduleImpl.hpp`). Everything downstream reads the field
+rather than the template, so the four serialisation sites are ordinary field
+accesses:
+
+- `ModuleParameters::{save,load}PresetParameters` — module parameters
+- `ParametersLoader` / `ParametersSaver`'s `operator()` — globals
+- `LFODataSaver` / `LFODataLoader` — the seven LFO sub-parameters
+- `ParametersLoader::effectIndexFromMangledName` and
+  `ParametersSaver::saveEffectModuleChain` — module elements
+
+The LFO already worked this way and nobody had noticed: `on`, `T`, `ph`, `lbnd`,
+`ubnd`, `sync`, `wfrm` (`lfoImpl.cpp:47-53`) are file keys with no resemblance to
+a label. So are the globals — `In`, `Out`, `Mix`. The split was already there in
+spirit for two of the four tuples; this finishes it.
+
+---
+
+## 3. What guards it
+
+| | pins | moves when |
+|---|---|---|
+| `tests/parameters/data/streamingNames.txt` | every string that reaches a file — 57 effects, their parameters, the globals, the LFO | a key changes. **Always a break.** |
+| `tests/parameters/data/parameterTable.txt` | display names, types, ranges, defaults, units, and the host-visible id space | a label changes, or a range does |
+| `tests/presets/data/presetCorpus.txt` | what all 303 factory presets load into | a preset loads differently |
+
+`streamingNameTests.cpp` also asserts the mechanism itself rather than only its
+output: no streaming name is null or empty (the default is a null sentinel
+resolved in `streamingName()`, so a fallback that came undone would show up as a
+preset written with no key on half its parameters), and every effect's streaming
+name mangles and un-mangles back to its own index.
+
+`presetCorpus.txt`'s digests are taken over a dump that now names parameters and
+effects by their **streaming** names. That is deliberate: its contract is *"a row
+that moves is a preset that loads differently"*, and a relabelled knob is exactly
+a change that does not. Naming display strings there would have made every rename
+a 303-row diff that says nothing.
+
+### The order to trust
+
+Run the snapshots under `ctest`, or with `--order decl`. Running the `sw-tests`
+binary bare puts every case in one process, and `[preset-corpus]` then fails
+about one run in three — a pre-existing flake, not a regression, caused by
+process-global tempo state in `LFO::Timer`. See `tech_debt.md`, "Tests".
+
+---
+
+## 4. The format ⏳ planned
+
+The keys are now stable, which is the precondition for the rest of item 4. What
+follows is decided and not yet built.
+
+### 4.1 Version, and why not `Version`
+
+A new integer attribute, `Format`, distinct from `Version`. Absent means the
+legacy grammar; greater than the current value is refused with a
+`PresetProblem::FutureFormat` rather than a parse error, so "saved by a newer
+SpectrumWorx" reads as itself.
+
+`Version` cannot be the stamp because it is the **product** version
+(`presets.cpp:74-91`). The corpus carries 2.6 ×269, 2.7 ×20, 2.8 ×11, 2.9 ×1,
+2.93 ×2 — it tracked the format only because product and format moved together in
+2011. The tree is at 3.0.0, so this build already writes `Version="3.0"` onto
+2.6-shaped files, and `isPre27Preset()` — which gates a real default for
+`WindowSizeFactor` — already reads a product version as a format version.
+
+### 4.2 The 3.0 grammar
+
+```xml
+<SpectrumWorxPreset Format="3" Version="3.0.0" LastModified="…" Comment="" Name="Noosa">
+	<Global Sample="Carrier.mp3">
+		<p n="In" v="1"/>
+		<p n="FFT size" v="4096"/>
+	</Global>
+	<Modules>
+		<Module effect="Ah-ah">
+			<p n="Bypass" v="0"/>
+			<p n="Center (LFO me!)" v="2000" T="685.6681" sync="0"/>
+		</Module>
+	</Modules>
+	<dawExtraState/>
+</SpectrumWorxPreset>
+```
+
+Against 2.x:
+
+| 2.x | 3.0 | why |
+|---|---|---|
+| the element name *is* the mangled key — `<Start_frequency>`, `<1>`…`<12>`, `<Center_(LFO_me!)>` | the key is an attribute *value* — `<p n="Center (LFO me!)"/>` | anything is legal in an attribute value. 25 of the 303 factory files do not parse without `repairLegacyElementNames()`; 3.0 cannot produce a file that needs it |
+| an attribute on `<Global>`, element *text* on a module parameter | always `v="…"` | one lookup, not two |
+| the module element is the mangled effect title | `<Module effect="Ah-ah">` | resolved by `effectIndexFromStreamingName()` rather than 57 mangled string compares |
+| `Bypass` an attribute on the module element | `<p n="Bypass" v="0"/>` | uniform |
+| four decimal places (`lexicalCast.cpp:63-66`) | shortest round-trip-exact text | 4 dp on a frequency in Hz is lossy |
+| — | `<dawExtraState>`, in state and **never** in a `.swp` | §4.4 |
+
+The LFO attributes keep their names and their place, on what is now the `<p>`
+element, so `LFODataLoader`/`LFODataSaver` are untouched — the reversed-order
+load, the `SyncTypes`-before-`PeriodScale` ordering and `adjustValueForPreset`
+are the subtlest part of the format and this goes nowhere near them.
+
+### 4.3 Two readers, one writer
+
+One writer, so a `.swp` and a state blob are the same grammar. Two readers: the
+2.x one, unchanged and kept forever, and the 3.0 one, chosen on `Format`.
+`ParametersLoader` differs between them in four private members — where a
+parameter's value lives, where its LFO attributes live, how the module elements
+are walked, and how an element names its effect — so it takes an element-access
+strategy rather than growing a second class.
+
+The 303 factory presets **stay 2.x**. They are the only corpus of that grammar
+and the only thing keeping its reader honest.
+
+### 4.4 `dawExtraState`
+
+The paradigm surge and the rest of the Surge Synth Team plugins use, and the
+reason state and preset can share one serialisation without becoming the same
+thing: two hooks on `Preset`, mirroring
+`sst::plugininfra::patch_support::PatchBase`.
+
+```cpp
+std::function<void(TiXmlElement &)>       dawExtraStateTo  {nullptr};
+std::function<void(TiXmlElement const &)> dawExtraStateFrom{nullptr};
+```
+
+`savePreset` takes a flag; a `.swp` passes false and a state blob passes true.
+The element is written even when the hook writes nothing into it, so an empty
+`<dawExtraState/>` is a testable claim that the mechanism is there. `loadPreset`
+calls the reader only when the element is present, so loading a `.swp` into a
+live session is not a silent reset of session state.
+
+**Its payload is deliberately empty for now.** The mechanism is the deliverable;
+the payload accrues. The first candidates, all main-thread and none of them
+parameters: `loadLastSession_`, whose own note says session state is its proper
+home; the preset browser's location and selection; and the interface settings the
+CLAP build persists nowhere at all.
+
+Note what does *not* need it — the loaded sample. `<Global Sample="…">` has
+carried that since 2011, so putting state on the preset serialisation restores it
+for free, and `setNewSample()` can finally mark the session dirty.
+
+---
+
+## 5. Adding or changing a parameter
+
+- **Adding one.** Nothing to do. Its display name becomes its streaming name;
+  regenerate `streamingNames.txt` and `parameterTable.txt` and read the diff —
+  new rows only.
+- **Renaming a knob.** Change `EFFECT_PARAMETER_NAME`, add
+  `EFFECT_PARAMETER_STREAMING_NAME` in the effect's **header** with the *old*
+  string. `parameterTable.txt` moves; `streamingNames.txt` and
+  `presetCorpus.txt` must not. If either does, the pin is not visible where the
+  parameter table is built.
+- **Retitling an effect.** The same, with `LE_SW_EFFECT_STREAMING_NAME` in
+  `effectNames.cpp`. The `effect/NN` rows carry both columns, so the diff shows
+  the title moving beside a streaming name that did not.
+- **Changing a streaming name.** Don't. If there is a reason,
+  `streamingNames.txt` moving is the file telling you how many presets it is
+  worth.

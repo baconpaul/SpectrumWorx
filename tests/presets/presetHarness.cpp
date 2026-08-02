@@ -102,8 +102,16 @@ using ModuleParameters = LE::SW::Engine::ModuleParameters;
 void dumpModule(std::string &out, std::uint8_t const slot, ModuleParameters const &module)
 {
 
+    /// \note Streaming names throughout, not display names. This dump is hashed
+    /// into presetCorpus.txt, whose contract is "a row that moves is a preset
+    /// that loads differently" -- and retitling an effect or relabelling a knob
+    /// is precisely a change that does *not* load differently. Naming the
+    /// display strings here would have made every such rename a 303-row diff
+    /// that says nothing. They are the same strings for all but one parameter
+    /// today, so what this buys is not readability but the right sensitivity.
+    ///                                       (01.08.2026.) (SW port)
     out += "module " + std::to_string(slot) + " = " +
-           Effects::effectName(module.effectTypeIndex()) + '\n';
+           Effects::effectStreamingName(module.effectTypeIndex()) + '\n';
     out += "  bypass = " + std::string(module.bypass() ? "1" : "0") + '\n';
 
     auto const baseParameters(ModuleParameters::numberOfBaseParameters);
@@ -116,7 +124,7 @@ void dumpModule(std::string &out, std::uint8_t const slot, ModuleParameters cons
                    : module.getEffectParameter(static_cast<std::uint8_t>(index - baseParameters)));
 
         out += "  ";
-        out += module.parameterInfo(index).name;
+        out += module.parameterInfo(index).streamingName;
         out += " = " + number(value);
 
         /// \note Bypass is parameter 0 and is the one base parameter with no
@@ -188,7 +196,7 @@ Loaded dump(Engine &engine)
             loaded.effects.clear();
         else
             loaded.effects += ',';
-        loaded.effects += Effects::effectName(module.effectTypeIndex());
+        loaded.effects += Effects::effectStreamingName(module.effectTypeIndex());
 
         loaded.parameters += module.numberOfParameters();
         dumpModule(loaded.text, static_cast<std::uint8_t>(loaded.modules), module);

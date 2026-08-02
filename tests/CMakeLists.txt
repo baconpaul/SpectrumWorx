@@ -26,6 +26,7 @@ add_executable(sw-tests
         math/vectorTests.cpp
         parameters/parameterLayoutTests.cpp
         parameters/parameterTableTests.cpp
+        parameters/streamingNameTests.cpp
         presets/presetCorpusTests.cpp
         presets/presetHarness.cpp
         presets/presetRoundTripTests.cpp

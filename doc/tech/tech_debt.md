@@ -2,7 +2,8 @@
 
 A running list, appended to as work happens. Companion to
 [`implementation_sequence.md`](implementation_sequence.md), which is the plan,
-and [`week_two.md`](week_two.md), which is the re-plan.
+[`week_two.md`](week_two.md), which is the re-plan, and
+[`streaming_format.md`](streaming_format.md), which is what goes into a file.
 
 **What belongs here and what does not.** Those two documents track *work*: things
 someone will sit down and do, in an order, with a size next to them. This tracks
@@ -190,6 +191,44 @@ New entries go at the top of their area.
   with itself. Defensible, deliberate, and documented nowhere a user would look.
 
 ## Tests
+
+- **`[preset-corpus]` fails about one run in three when `sw-tests` is run bare,
+  and `ctest` cannot see it.** (01.08.2026, item 4) 153 of the 303 rows move —
+  the ones with a tempo-synced LFO. The cause is process-global state:
+  `LFOImpl::Timer` keeps `barDuration_`, `measureNumerator_` and
+  `hasTempoInformation_` as **statics**, and `Timer::reset()` deliberately does
+  not clear the last of them — a 2012 workaround for Ableton Live popping up
+  "preset uses tempo-synced LFOs but the host provides no tempo" while browsing
+  (`lfoImpl.cpp:766-784`). So once `pluginTests.cpp`'s three `[clap][lfo]`
+  transport cases have told the plugin a tempo, every later preset load in that
+  process converts `PeriodScale` differently, and the corpus digests move.
+
+  Reproduce it deterministically with
+  `./sw-tests --order decl "[lfo],[preset-corpus]"` — 153 failures, every time.
+  It hides because `catch_discover_tests` gives each case its own process, so
+  `ctest` is always green; only running the binary directly, which is the
+  quicker thing to do while working, exposes it.
+
+  Two things are wrong and only one of them is the test's. A plugin whose
+  tempo-to-period conversion depends on whether *any* instance in the process
+  ever saw a transport is a design smell independent of tests — it is benign in a
+  DAW, where there is one tempo, and it is not benign in a test binary or in an
+  offline renderer. The 2012 note explains why the flag is sticky but not why the
+  state is global. Fixing it properly means the tempo living on the engine;
+  fixing it cheaply means a way for the corpus test to establish a known tempo
+  state, which needs a reset the class does not expose.
+
+- **`LFOImpl::Timer::setPosition( float )` asserts two things that are both
+  false, and is dead.** (01.08.2026, item 4) `lfoImpl.cpp:753-755` reads
+  `LE_ASSUME( barDuration_ == 4 )` and
+  `LE_ASSUME( measureNumerator_ == 60.0f / 120 * 4 )` — the two values swapped
+  between them. The initialisers three hundred lines up are
+  `barDuration_( 60.0f / 120 * 4 )`, which is 2, and `measureNumerator_( 4 )`, so
+  both assumptions are false as written. Nothing has noticed because nothing
+  calls it: its only caller is `Engine::Processor::setPosition`, and that has no
+  callers at all in the CLAP path. Harmless while dead; `LE_ASSUME` is
+  `__builtin_assume` in a shipping build, so reviving the caller without fixing
+  the pair would hand the optimiser two false facts about live values.
 
 - **The GUI render tests assert an exit code.** (01.08.2026, from §2.3)
   `renderPage()` writes a PNG and returns 0; a page that paints solid black

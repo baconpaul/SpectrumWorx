@@ -62,6 +62,8 @@ namespace Parameters
 {
 class LFOImpl;
 template <class Parameter> struct Name;
+template <class Parameter> struct StreamingName;
+template <class Parameter> constexpr char const *streamingName();
 } // namespace Parameters
 //------------------------------------------------------------------------------
 namespace SW
@@ -344,7 +346,7 @@ class ParametersLoader : private PresetHandler
     {
         using binary_type = typename Parameter::binary_type;
         std::optional<binary_type> const parameterValue(
-            getSimpleParameterValue<binary_type>(LE::Parameters::Name<Parameter>::string_));
+            getSimpleParameterValue<binary_type>(LE::Parameters::streamingName<Parameter>()));
         if (parameterValue.has_value() && parameter.isValidValue(*parameterValue))
             parameter.setValue(*parameterValue);
     }
@@ -353,7 +355,7 @@ class ParametersLoader : private PresetHandler
     {
         using binary_type = typename Parameter::binary_type;
         std::optional<binary_type> const parameterValueWithoutLFO(getLFOParameterValue<binary_type>(
-            Parameters::Name<Parameter>::string_, lfo, &parameter));
+            Parameters::streamingName<Parameter>(), lfo, &parameter));
         if (parameterValueWithoutLFO.has_value() &&
             parameter.isValidValue(*parameterValueWithoutLFO))
             parameter.setValue(*parameterValueWithoutLFO);
@@ -466,14 +468,14 @@ class ParametersSaver : private PresetHandler
     template <class Parameter> void operator()(Parameter const &parameter) const
     {
         const_cast<ParametersSaver &>(*this). //...mrmlj...because of forEach()...
-            saveParameter<typename Parameter::param_type>(LE::Parameters::Name<Parameter>::string_,
-                                                          parameter.getValue());
+            saveParameter<typename Parameter::param_type>(
+                LE::Parameters::streamingName<Parameter>(), parameter.getValue());
     }
     template <class Parameter> void operator()(Parameter const &parameter, LFO const &lfo) const
     {
         const_cast<ParametersSaver &>(*this). //...mrmlj...because of forEach()...
-            saveParameter<typename Parameter::param_type>(LE::Parameters::Name<Parameter>::string_,
-                                                          parameter.getValue(), lfo);
+            saveParameter<typename Parameter::param_type>(
+                LE::Parameters::streamingName<Parameter>(), parameter.getValue(), lfo);
     }
 
     template <typename T>

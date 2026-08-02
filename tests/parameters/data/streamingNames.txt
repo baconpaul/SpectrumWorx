@@ -1,0 +1,574 @@
+# SpectrumWorx streaming names -- generated, do not hand edit.
+# Regenerate with SW_STREAMING_NAMES_UPDATE=1 ./sw-tests "[streaming-names]"
+#
+#   These are the strings that go *into a file*: the keys a preset and a
+#   session state are written under, and matched by on the way back in. They
+#   are not the strings a user sees -- see parameterTable.txt for those.
+#
+#   A row that moves is a file on someone's disk that stops being understood:
+#   the parameter it names loads its default instead, silently. Renaming a
+#   knob or retitling an effect must therefore be paired with a
+#   STREAMING_NAME / LE_SW_EFFECT_STREAMING_NAME pin, which holds the file key
+#   still and leaves this table alone.
+#
+# effect/<index> | <streaming name> | <title>
+#     what a preset calls the effect, and what a user sees. Equal unless the
+#     title has moved since presets were written naming it.
+#
+# param/<effect streaming name>/<index> | <streaming name>
+# global/<index> | <streaming name>
+# lfo/<index> | <streaming name>
+#     the module, global and LFO parameter keys. Spaces are written as
+#     underscores so that ' | ' stays unambiguous as a column separator.
+effect/00 | Pitch_Shifter | Pitch_Shifter
+effect/01 | Pitch_Follower | Pitch_Follower
+effect/02 | TuneWorx | TuneWorx
+effect/03 | Pitch_Magnet | Pitch_Magnet
+effect/04 | Sumo_Pitch | Sumo_Pitch
+effect/05 | Pitch_Spring | Pitch_Spring
+effect/06 | Octaver | Octaver
+effect/07 | Bandpass | Bandpass
+effect/08 | Bandstop | Bandstop
+effect/09 | Ah-ah | Ah-ah
+effect/10 | Smoother | Smoother
+effect/11 | Sharper | Sharper
+effect/12 | Centroid | Centroid
+effect/13 | Tonal | Tonal
+effect/14 | Atonal | Atonal
+effect/15 | Freeze | Freeze
+effect/16 | Slicer | Slicer
+effect/17 | Wobbler | Wobbler
+effect/18 | Reverser | Reverser
+effect/19 | Imploder | Imploder
+effect/20 | Exploder | Exploder
+effect/21 | Frecho | Frecho
+effect/22 | Frevcho | Frevcho
+effect/23 | Freqverb | Freqverb
+effect/24 | Robotizer | Robotizer
+effect/25 | Whisperer | Whisperer
+effect/26 | Phasevolution | Phasevolution
+effect/27 | Phlip | Phlip
+effect/28 | Gain | Gain
+effect/29 | Exaggerator | Exaggerator
+effect/30 | Denoiser | Denoiser
+effect/31 | Quiet_Boost | Quiet_Boost
+effect/32 | Freqnamics | Freqnamics
+effect/33 | Talking_Wind | Talking_Wind
+effect/34 | Convolver | Convolver
+effect/35 | Ethereal | Ethereal
+effect/36 | Vaxateer | Vaxateer
+effect/37 | Shapeless | Shapeless
+effect/38 | Colorifer | Colorifer
+effect/39 | Merger | Merger
+effect/40 | Blender | Blender
+effect/41 | Inserter | Inserter
+effect/42 | Burrito | Burrito
+effect/43 | PVD_start | PVD_start
+effect/44 | Pitch_Shifter_(pvd) | Pitch_Shifter_(pvd)
+effect/45 | Pitch_Follower_(pvd) | Pitch_Follower_(pvd)
+effect/46 | TuneWorx_(pvd) | TuneWorx_(pvd)
+effect/47 | Pitch_Magnet_(pvd) | Pitch_Magnet_(pvd)
+effect/48 | Pitch_Spring_(pvd) | Pitch_Spring_(pvd)
+effect/49 | Imploder_(pvd) | Imploder_(pvd)
+effect/50 | Exploder_(pvd) | Exploder_(pvd)
+effect/51 | PVD_stop | PVD_stop
+effect/52 | Armonizer | Armonizer
+effect/53 | Slew_Limiter | Slew_Limiter
+effect/54 | Shifter | Shifter
+effect/55 | Swappah | Swappah
+effect/56 | Quantizer | Quantizer
+global/00 | In
+global/01 | Out
+global/02 | Mix
+global/03 | FFT_size
+global/04 | Overlap_factor
+global/05 | Window_type
+lfo/00 | on
+lfo/01 | T
+lfo/02 | ph
+lfo/03 | lbnd
+lfo/04 | ubnd
+lfo/05 | sync
+lfo/06 | wfrm
+param/Ah-ah/00 | Bypass
+param/Ah-ah/01 | Gain
+param/Ah-ah/02 | Wet
+param/Ah-ah/03 | Start_frequency
+param/Ah-ah/04 | Stop_frequency
+param/Ah-ah/05 | Center_(LFO_me!)
+param/Ah-ah/06 | Width
+param/Ah-ah/07 | Strength
+param/Armonizer/00 | Bypass
+param/Armonizer/01 | Gain
+param/Armonizer/02 | Wet
+param/Armonizer/03 | Start_frequency
+param/Armonizer/04 | Stop_frequency
+param/Armonizer/05 | Interval
+param/Atonal/00 | Bypass
+param/Atonal/01 | Gain
+param/Atonal/02 | Wet
+param/Atonal/03 | Start_frequency
+param/Atonal/04 | Stop_frequency
+param/Atonal/05 | Peak_strength
+param/Atonal/06 | Global_threshold
+param/Atonal/07 | Local_threshold
+param/Atonal/08 | Attenuation
+param/Bandpass/00 | Bypass
+param/Bandpass/01 | Gain
+param/Bandpass/02 | Wet
+param/Bandpass/03 | Start_frequency
+param/Bandpass/04 | Stop_frequency
+param/Bandpass/05 | Attenuation
+param/Bandstop/00 | Bypass
+param/Bandstop/01 | Gain
+param/Bandstop/02 | Wet
+param/Bandstop/03 | Start_frequency
+param/Bandstop/04 | Stop_frequency
+param/Bandstop/05 | Attenuation
+param/Blender/00 | Bypass
+param/Blender/01 | Gain
+param/Blender/02 | Wet
+param/Blender/03 | Start_frequency
+param/Blender/04 | Stop_frequency
+param/Blender/05 | Amount
+param/Burrito/00 | Bypass
+param/Burrito/01 | Gain
+param/Burrito/02 | Wet
+param/Burrito/03 | Start_frequency
+param/Burrito/04 | Stop_frequency
+param/Burrito/05 | Target_creation
+param/Burrito/06 | Target_range
+param/Burrito/07 | Range_period
+param/Burrito/08 | Side_gain
+param/Centroid/00 | Bypass
+param/Centroid/01 | Gain
+param/Centroid/02 | Wet
+param/Centroid/03 | Start_frequency
+param/Centroid/04 | Stop_frequency
+param/Centroid/05 | Filter_center
+param/Centroid/06 | Bandwidth
+param/Centroid/07 | Border_slope
+param/Colorifer/00 | Bypass
+param/Colorifer/01 | Gain
+param/Colorifer/02 | Wet
+param/Colorifer/03 | Start_frequency
+param/Colorifer/04 | Stop_frequency
+param/Colorifer/05 | Spectrum_preprocess
+param/Colorifer/06 | Shape_width
+param/Colorifer/07 | Replace_phase
+param/Convolver/00 | Bypass
+param/Convolver/01 | Gain
+param/Convolver/02 | Wet
+param/Convolver/03 | Start_frequency
+param/Convolver/04 | Stop_frequency
+param/Convolver/05 | Type
+param/Convolver/06 | Grab_IR
+param/Convolver/07 | Phase
+param/Denoiser/00 | Bypass
+param/Denoiser/01 | Gain
+param/Denoiser/02 | Wet
+param/Denoiser/03 | Start_frequency
+param/Denoiser/04 | Stop_frequency
+param/Denoiser/05 | Noise_footprint
+param/Denoiser/06 | Amount
+param/Ethereal/00 | Bypass
+param/Ethereal/01 | Gain
+param/Ethereal/02 | Wet
+param/Ethereal/03 | Start_frequency
+param/Ethereal/04 | Stop_frequency
+param/Ethereal/05 | Swap_condition
+param/Ethereal/06 | Threshold
+param/Ethereal/07 | Target
+param/Exaggerator/00 | Bypass
+param/Exaggerator/01 | Gain
+param/Exaggerator/02 | Wet
+param/Exaggerator/03 | Start_frequency
+param/Exaggerator/04 | Stop_frequency
+param/Exaggerator/05 | Intensity
+param/Exploder/00 | Bypass
+param/Exploder/01 | Gain
+param/Exploder/02 | Wet
+param/Exploder/03 | Start_frequency
+param/Exploder/04 | Stop_frequency
+param/Exploder/05 | Growth
+param/Exploder/06 | Glissando
+param/Exploder/07 | Limit
+param/Exploder/08 | Gate
+param/Exploder_(pvd)/00 | Bypass
+param/Exploder_(pvd)/01 | Gain
+param/Exploder_(pvd)/02 | Wet
+param/Exploder_(pvd)/03 | Start_frequency
+param/Exploder_(pvd)/04 | Stop_frequency
+param/Exploder_(pvd)/05 | Growth
+param/Exploder_(pvd)/06 | Glissando
+param/Exploder_(pvd)/07 | Limit
+param/Exploder_(pvd)/08 | Gate
+param/Frecho/00 | Bypass
+param/Frecho/01 | Gain
+param/Frecho/02 | Wet
+param/Frecho/03 | Start_frequency
+param/Frecho/04 | Stop_frequency
+param/Frecho/05 | Distance
+param/Frecho/06 | Absorption
+param/Frecho/07 | Pitch
+param/Freeze/00 | Bypass
+param/Freeze/01 | Gain
+param/Freeze/02 | Wet
+param/Freeze/03 | Start_frequency
+param/Freeze/04 | Stop_frequency
+param/Freeze/05 | Freeze
+param/Freeze/06 | Melt
+param/Freeze/07 | Transition_time
+param/Freqnamics/00 | Bypass
+param/Freqnamics/01 | Gain
+param/Freqnamics/02 | Wet
+param/Freqnamics/03 | Start_frequency
+param/Freqnamics/04 | Stop_frequency
+param/Freqnamics/05 | Limiter
+param/Freqnamics/06 | Noise_gate
+param/Freqverb/00 | Bypass
+param/Freqverb/01 | Gain
+param/Freqverb/02 | Wet
+param/Freqverb/03 | Start_frequency
+param/Freqverb/04 | Stop_frequency
+param/Freqverb/05 | Life_time
+param/Freqverb/06 | Room_size
+param/Freqverb/07 | Pitch
+param/Freqverb/08 | HF_absorb
+param/Frevcho/00 | Bypass
+param/Frevcho/01 | Gain
+param/Frevcho/02 | Wet
+param/Frevcho/03 | Start_frequency
+param/Frevcho/04 | Stop_frequency
+param/Frevcho/05 | Distance
+param/Frevcho/06 | Absorption
+param/Frevcho/07 | Pitch
+param/Gain/00 | Bypass
+param/Gain/01 | Gain
+param/Gain/02 | Wet
+param/Gain/03 | Start_frequency
+param/Gain/04 | Stop_frequency
+param/Imploder/00 | Bypass
+param/Imploder/01 | Gain
+param/Imploder/02 | Wet
+param/Imploder/03 | Start_frequency
+param/Imploder/04 | Stop_frequency
+param/Imploder/05 | Decay
+param/Imploder/06 | Glissando
+param/Imploder/07 | Limit
+param/Imploder/08 | Gate
+param/Imploder_(pvd)/00 | Bypass
+param/Imploder_(pvd)/01 | Gain
+param/Imploder_(pvd)/02 | Wet
+param/Imploder_(pvd)/03 | Start_frequency
+param/Imploder_(pvd)/04 | Stop_frequency
+param/Imploder_(pvd)/05 | Decay
+param/Imploder_(pvd)/06 | Glissando
+param/Imploder_(pvd)/07 | Limit
+param/Imploder_(pvd)/08 | Gate
+param/Inserter/00 | Bypass
+param/Inserter/01 | Gain
+param/Inserter/02 | Wet
+param/Inserter/03 | Start_frequency
+param/Inserter/04 | Stop_frequency
+param/Inserter/05 | Target
+param/Inserter/06 | Source
+param/Inserter/07 | Destination
+param/Inserter/08 | Size
+param/Merger/00 | Bypass
+param/Merger/01 | Gain
+param/Merger/02 | Wet
+param/Merger/03 | Start_frequency
+param/Merger/04 | Stop_frequency
+param/Merger/05 | Condition
+param/Merger/06 | Threshold
+param/Octaver/00 | Bypass
+param/Octaver/01 | Gain
+param/Octaver/02 | Wet
+param/Octaver/03 | Start_frequency
+param/Octaver/04 | Stop_frequency
+param/Octaver/05 | Octave_1
+param/Octaver/06 | Gain_1
+param/Octaver/07 | Octave_2
+param/Octaver/08 | Gain_2
+param/Octaver/09 | Low_pass
+param/PVD_start/00 | Bypass
+param/PVD_start/01 | Gain
+param/PVD_start/02 | Wet
+param/PVD_start/03 | Start_frequency
+param/PVD_start/04 | Stop_frequency
+param/PVD_stop/00 | Bypass
+param/PVD_stop/01 | Gain
+param/PVD_stop/02 | Wet
+param/PVD_stop/03 | Start_frequency
+param/PVD_stop/04 | Stop_frequency
+param/Phasevolution/00 | Bypass
+param/Phasevolution/01 | Gain
+param/Phasevolution/02 | Wet
+param/Phasevolution/03 | Start_frequency
+param/Phasevolution/04 | Stop_frequency
+param/Phasevolution/05 | Period
+param/Phlip/00 | Bypass
+param/Phlip/01 | Gain
+param/Phlip/02 | Wet
+param/Phlip/03 | Start_frequency
+param/Phlip/04 | Stop_frequency
+param/Phlip/05 | Target_harmonics
+param/Pitch_Follower/00 | Bypass
+param/Pitch_Follower/01 | Gain
+param/Pitch_Follower/02 | Wet
+param/Pitch_Follower/03 | Start_frequency
+param/Pitch_Follower/04 | Stop_frequency
+param/Pitch_Follower/05 | Speed
+param/Pitch_Follower_(pvd)/00 | Bypass
+param/Pitch_Follower_(pvd)/01 | Gain
+param/Pitch_Follower_(pvd)/02 | Wet
+param/Pitch_Follower_(pvd)/03 | Start_frequency
+param/Pitch_Follower_(pvd)/04 | Stop_frequency
+param/Pitch_Follower_(pvd)/05 | Speed
+param/Pitch_Magnet/00 | Bypass
+param/Pitch_Magnet/01 | Gain
+param/Pitch_Magnet/02 | Wet
+param/Pitch_Magnet/03 | Start_frequency
+param/Pitch_Magnet/04 | Stop_frequency
+param/Pitch_Magnet/05 | Target
+param/Pitch_Magnet/06 | Strength
+param/Pitch_Magnet_(pvd)/00 | Bypass
+param/Pitch_Magnet_(pvd)/01 | Gain
+param/Pitch_Magnet_(pvd)/02 | Wet
+param/Pitch_Magnet_(pvd)/03 | Start_frequency
+param/Pitch_Magnet_(pvd)/04 | Stop_frequency
+param/Pitch_Magnet_(pvd)/05 | Target
+param/Pitch_Magnet_(pvd)/06 | Strength
+param/Pitch_Shifter/00 | Bypass
+param/Pitch_Shifter/01 | Gain
+param/Pitch_Shifter/02 | Wet
+param/Pitch_Shifter/03 | Start_frequency
+param/Pitch_Shifter/04 | Stop_frequency
+param/Pitch_Shifter/05 | Semitones
+param/Pitch_Shifter/06 | Cents
+param/Pitch_Shifter_(pvd)/00 | Bypass
+param/Pitch_Shifter_(pvd)/01 | Gain
+param/Pitch_Shifter_(pvd)/02 | Wet
+param/Pitch_Shifter_(pvd)/03 | Start_frequency
+param/Pitch_Shifter_(pvd)/04 | Stop_frequency
+param/Pitch_Shifter_(pvd)/05 | Semitones
+param/Pitch_Shifter_(pvd)/06 | Cents
+param/Pitch_Spring/00 | Bypass
+param/Pitch_Spring/01 | Gain
+param/Pitch_Spring/02 | Wet
+param/Pitch_Spring/03 | Start_frequency
+param/Pitch_Spring/04 | Stop_frequency
+param/Pitch_Spring/05 | Direction
+param/Pitch_Spring/06 | Depth
+param/Pitch_Spring/07 | Period
+param/Pitch_Spring_(pvd)/00 | Bypass
+param/Pitch_Spring_(pvd)/01 | Gain
+param/Pitch_Spring_(pvd)/02 | Wet
+param/Pitch_Spring_(pvd)/03 | Start_frequency
+param/Pitch_Spring_(pvd)/04 | Stop_frequency
+param/Pitch_Spring_(pvd)/05 | Direction
+param/Pitch_Spring_(pvd)/06 | Depth
+param/Pitch_Spring_(pvd)/07 | Period
+param/Quantizer/00 | Bypass
+param/Quantizer/01 | Gain
+param/Quantizer/02 | Wet
+param/Quantizer/03 | Start_frequency
+param/Quantizer/04 | Stop_frequency
+param/Quantizer/05 | Width
+param/Quantizer/06 | Origami
+param/Quiet_Boost/00 | Bypass
+param/Quiet_Boost/01 | Gain
+param/Quiet_Boost/02 | Wet
+param/Quiet_Boost/03 | Start_frequency
+param/Quiet_Boost/04 | Stop_frequency
+param/Quiet_Boost/05 | Threshold
+param/Quiet_Boost/06 | Ratio
+param/Quiet_Boost/07 | Noise_threshold
+param/Reverser/00 | Bypass
+param/Reverser/01 | Gain
+param/Reverser/02 | Wet
+param/Reverser/03 | Start_frequency
+param/Reverser/04 | Stop_frequency
+param/Reverser/05 | Chunk_length
+param/Robotizer/00 | Bypass
+param/Robotizer/01 | Gain
+param/Robotizer/02 | Wet
+param/Robotizer/03 | Start_frequency
+param/Robotizer/04 | Stop_frequency
+param/Shapeless/00 | Bypass
+param/Shapeless/01 | Gain
+param/Shapeless/02 | Wet
+param/Shapeless/03 | Start_frequency
+param/Shapeless/04 | Stop_frequency
+param/Shapeless/05 | Shape_width
+param/Sharper/00 | Bypass
+param/Sharper/01 | Gain
+param/Sharper/02 | Wet
+param/Sharper/03 | Start_frequency
+param/Sharper/04 | Stop_frequency
+param/Sharper/05 | Sharpness
+param/Sharper/06 | Intensity
+param/Sharper/07 | Limit
+param/Shifter/00 | Bypass
+param/Shifter/01 | Gain
+param/Shifter/02 | Wet
+param/Shifter/03 | Start_frequency
+param/Shifter/04 | Stop_frequency
+param/Shifter/05 | Target
+param/Shifter/06 | Offset
+param/Shifter/07 | Tail
+param/Slew_Limiter/00 | Bypass
+param/Slew_Limiter/01 | Gain
+param/Slew_Limiter/02 | Wet
+param/Slew_Limiter/03 | Start_frequency
+param/Slew_Limiter/04 | Stop_frequency
+param/Slew_Limiter/05 | Direction
+param/Slew_Limiter/06 | Slew_rate
+param/Slicer/00 | Bypass
+param/Slicer/01 | Gain
+param/Slicer/02 | Wet
+param/Slicer/03 | Start_frequency
+param/Slicer/04 | Stop_frequency
+param/Slicer/05 | On_time
+param/Slicer/06 | Slice_time
+param/Slicer/07 | Slice_content
+param/Smoother/00 | Bypass
+param/Smoother/01 | Gain
+param/Smoother/02 | Wet
+param/Smoother/03 | Start_frequency
+param/Smoother/04 | Stop_frequency
+param/Smoother/05 | Smoothness
+param/Sumo_Pitch/00 | Bypass
+param/Sumo_Pitch/01 | Gain
+param/Sumo_Pitch/02 | Wet
+param/Sumo_Pitch/03 | Start_frequency
+param/Sumo_Pitch/04 | Stop_frequency
+param/Sumo_Pitch/05 | Blend_amount
+param/Sumo_Pitch/06 | Speed
+param/Swappah/00 | Bypass
+param/Swappah/01 | Gain
+param/Swappah/02 | Wet
+param/Swappah/03 | Start_frequency
+param/Swappah/04 | Stop_frequency
+param/Swappah/05 | Target
+param/Swappah/06 | Swap_order
+param/Swappah/07 | Low-Mid_border
+param/Swappah/08 | Mid-High_border
+param/Talking_Wind/00 | Bypass
+param/Talking_Wind/01 | Gain
+param/Talking_Wind/02 | Wet
+param/Talking_Wind/03 | Start_frequency
+param/Talking_Wind/04 | Stop_frequency
+param/Talking_Wind/05 | Envelope_border
+param/Talking_Wind/06 | Envelope_gain
+param/Tonal/00 | Bypass
+param/Tonal/01 | Gain
+param/Tonal/02 | Wet
+param/Tonal/03 | Start_frequency
+param/Tonal/04 | Stop_frequency
+param/Tonal/05 | Peak_strength
+param/Tonal/06 | Global_threshold
+param/Tonal/07 | Local_threshold
+param/Tonal/08 | Attenuation
+param/TuneWorx/00 | Bypass
+param/TuneWorx/01 | Gain
+param/TuneWorx/02 | Wet
+param/TuneWorx/03 | Start_frequency
+param/TuneWorx/04 | Stop_frequency
+param/TuneWorx/05 | Key
+param/TuneWorx/06 | Direction
+param/TuneWorx/07 | 1
+param/TuneWorx/08 | 2
+param/TuneWorx/09 | 3
+param/TuneWorx/10 | 4
+param/TuneWorx/11 | 5
+param/TuneWorx/12 | 6
+param/TuneWorx/13 | 7
+param/TuneWorx/14 | 8
+param/TuneWorx/15 | 9
+param/TuneWorx/16 | 10
+param/TuneWorx/17 | 11
+param/TuneWorx/18 | 12
+param/TuneWorx/19 | Bypass_1
+param/TuneWorx/20 | Bypass_2
+param/TuneWorx/21 | Bypass_3
+param/TuneWorx/22 | Bypass_4
+param/TuneWorx/23 | Bypass_5
+param/TuneWorx/24 | Bypass_6
+param/TuneWorx/25 | Bypass_7
+param/TuneWorx/26 | Bypass_8
+param/TuneWorx/27 | Bypass_9
+param/TuneWorx/28 | Bypass_10
+param/TuneWorx/29 | Bypass_11
+param/TuneWorx/30 | Bypass_12
+param/TuneWorx/31 | Vibrato
+param/TuneWorx/32 | Pitch_range_lower_bound
+param/TuneWorx/33 | Pitch_range_upper_bound
+param/TuneWorx/34 | Out_of_tune_tolerance
+param/TuneWorx/35 | Retune_time
+param/TuneWorx/36 | Vibrato_delay
+param/TuneWorx/37 | Vibrato_rate
+param/TuneWorx/38 | Vibrato_extent
+param/TuneWorx/39 | Pitch_shift
+param/TuneWorx_(pvd)/00 | Bypass
+param/TuneWorx_(pvd)/01 | Gain
+param/TuneWorx_(pvd)/02 | Wet
+param/TuneWorx_(pvd)/03 | Start_frequency
+param/TuneWorx_(pvd)/04 | Stop_frequency
+param/TuneWorx_(pvd)/05 | Key
+param/TuneWorx_(pvd)/06 | Direction
+param/TuneWorx_(pvd)/07 | 1
+param/TuneWorx_(pvd)/08 | 2
+param/TuneWorx_(pvd)/09 | 3
+param/TuneWorx_(pvd)/10 | 4
+param/TuneWorx_(pvd)/11 | 5
+param/TuneWorx_(pvd)/12 | 6
+param/TuneWorx_(pvd)/13 | 7
+param/TuneWorx_(pvd)/14 | 8
+param/TuneWorx_(pvd)/15 | 9
+param/TuneWorx_(pvd)/16 | 10
+param/TuneWorx_(pvd)/17 | 11
+param/TuneWorx_(pvd)/18 | 12
+param/TuneWorx_(pvd)/19 | Bypass_1
+param/TuneWorx_(pvd)/20 | Bypass_2
+param/TuneWorx_(pvd)/21 | Bypass_3
+param/TuneWorx_(pvd)/22 | Bypass_4
+param/TuneWorx_(pvd)/23 | Bypass_5
+param/TuneWorx_(pvd)/24 | Bypass_6
+param/TuneWorx_(pvd)/25 | Bypass_7
+param/TuneWorx_(pvd)/26 | Bypass_8
+param/TuneWorx_(pvd)/27 | Bypass_9
+param/TuneWorx_(pvd)/28 | Bypass_10
+param/TuneWorx_(pvd)/29 | Bypass_11
+param/TuneWorx_(pvd)/30 | Bypass_12
+param/TuneWorx_(pvd)/31 | Vibrato
+param/TuneWorx_(pvd)/32 | Pitch_range_lower_bound
+param/TuneWorx_(pvd)/33 | Pitch_range_upper_bound
+param/TuneWorx_(pvd)/34 | Out_of_tune_tolerance
+param/TuneWorx_(pvd)/35 | Retune_time
+param/TuneWorx_(pvd)/36 | Vibrato_delay
+param/TuneWorx_(pvd)/37 | Vibrato_rate
+param/TuneWorx_(pvd)/38 | Vibrato_extent
+param/TuneWorx_(pvd)/39 | Pitch_shift
+param/Vaxateer/00 | Bypass
+param/Vaxateer/01 | Gain
+param/Vaxateer/02 | Wet
+param/Vaxateer/03 | Start_frequency
+param/Vaxateer/04 | Stop_frequency
+param/Vaxateer/05 | RMS_target
+param/Vaxateer/06 | RMS_threshold_gain
+param/Vaxateer/07 | Swap_condition
+param/Whisperer/00 | Bypass
+param/Whisperer/01 | Gain
+param/Whisperer/02 | Wet
+param/Whisperer/03 | Start_frequency
+param/Whisperer/04 | Stop_frequency
+param/Wobbler/00 | Bypass
+param/Wobbler/01 | Gain
+param/Wobbler/02 | Wet
+param/Wobbler/03 | Start_frequency
+param/Wobbler/04 | Stop_frequency
+param/Wobbler/05 | Amplitude
+param/Wobbler/06 | Period
+param/Wobbler/07 | Offset

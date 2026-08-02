@@ -573,7 +573,7 @@ ParametersLoader::operator()(Engine::WindowSizeFactor &parameter) const
 {
     using Parameter = Engine::WindowSizeFactor;
     using binary_type = Parameter::binary_type;
-    auto const parameterName(Parameters::Name<Parameter>::string_);
+    auto const parameterName(Parameters::streamingName<Parameter>());
     auto const pParameterAttribute(getParameterAttribute(parameterName));
     std::optional<binary_type> const parameterValue(
         (pParameterAttribute || !isPre27Preset())
@@ -596,10 +596,16 @@ ParametersLoader::operator()(Engine::WindowSizeFactor &parameter) const
 /// applies the same mangling the writer does, so `<Pitch_Shifter_(pvd)>` from
 /// 2013 and `<Pitch_Shifter__pvd_>` written today both arrive here as the
 /// latter.
+///
+/// \note The streaming name, not the title. They are the same string for every
+/// effect today -- that is how the table was seeded -- and the point of asking
+/// for the streaming one is that a retitled effect keeps loading its presets
+/// rather than quietly becoming an effect this build does not have.
+///                                           (01.08.2026.) (SW port)
 std::int8_t ParametersLoader::effectIndexFromMangledName(std::string_view const mangledName)
 {
     for (std::uint8_t effect(0); effect < Effects::Constants::numberOfEffects; ++effect)
-        if (mangleName(Effects::effectName(effect)) == mangledName)
+        if (mangleName(Effects::effectStreamingName(effect)) == mangledName)
             return static_cast<std::int8_t>(effect);
     return -1;
 }
@@ -643,7 +649,7 @@ class LFODataLoader
     template <class LFOParameter> void operator()(LFOParameter &element) const
     {
         using namespace Parameters;
-        doLoad(std::string(name<LFOParameter>()).c_str(), element);
+        doLoad(std::string(streamingName<LFOParameter>()).c_str(), element);
     }
 
   private:
@@ -756,8 +762,8 @@ void ParametersSaver::saveEffectModuleChain(AutomatedModuleChain const &moduleCh
     moduleChainSaved_ = true;
 
     moduleChain.forEach<PresetModule>([&](PresetModule const &module) {
-        auto *const pModuleNode(
-            new TiXmlElement(mangleName(Effects::effectName(module.effectTypeIndex())).c_str()));
+        auto *const pModuleNode(new TiXmlElement(
+            mangleName(Effects::effectStreamingName(module.effectTypeIndex())).c_str()));
         preset().moduleParametersNode().LinkEndChild(pModuleNode);
         pParametersNode_ = pModuleNode;
         module.savePresetParameters(*this);
@@ -806,7 +812,7 @@ class LFODataSaver
             return;
 
         using namespace Parameters;
-        parameterNode_.SetAttribute(std::string(name<LFOParameter>()),
+        parameterNode_.SetAttribute(std::string(streamingName<LFOParameter>()),
                                     PresetHandler::makeString(lfo_.adjustValueForPreset(element)));
     }
 

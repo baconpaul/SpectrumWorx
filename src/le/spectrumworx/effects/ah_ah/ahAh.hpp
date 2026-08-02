@@ -16,6 +16,7 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // EFFECT_PARAMETER_STREAMING_NAME, below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -43,8 +44,10 @@ namespace Effects
 
 struct AhAh
 {
-    LE_DEFINE_PARAMETER(Center, LinearUnsignedInteger, Minimum<0>, Maximum<6000>, Default<2000>, Unit<" Hz">);
-    LE_DEFINE_PARAMETER(Width, LinearUnsignedInteger, Minimum<50>, Maximum<2000>, Default<1000>, Unit<" Hz">);
+    LE_DEFINE_PARAMETER(Center, LinearUnsignedInteger, Minimum<0>, Maximum<6000>, Default<2000>,
+                        Unit<" Hz">);
+    LE_DEFINE_PARAMETER(Width, LinearUnsignedInteger, Minimum<50>, Maximum<2000>, Default<1000>,
+                        Unit<" Hz">);
     LE_DEFINE_PARAMETER(Strength, SymmetricFloat, MaximumOffset<24>, Unit<" dB">);
     LE_DEFINE_PARAMETERS(Center, Width, Strength);
 
@@ -60,6 +63,34 @@ struct AhAh
     static char const title[];
     static char const description[];
 }; // struct AhAh
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The one parameter in the plugin whose display name and streaming name
+/// differ, and deliberately so -- it is the worked example for the mechanism.
+/// "Center (LFO me!)" is a 2011 instruction to the user wearing a parameter
+/// name; it is also what the 303 factory presets and every user preset since
+/// call this knob, and `<Center_(LFO_me!)>` is one of the element names
+/// repairLegacyElementNames() exists to make parseable at all. So the label
+/// moved and the key did not.
+///
+/// \note In the header, and not beside EFFECT_PARAMETER_NAME in ahAhImpl.cpp,
+/// because the two are not the same kind of thing. A display name is an extern
+/// array: declared here, defined once, resolved by the linker. A streaming name
+/// is a class template specialisation, so every translation unit that
+/// instantiates `Detail::info<>()` -- which is where the parameter table is
+/// built -- has to *see* it, or it silently gets the primary template and the
+/// parameter streams under its display name again. Written in the .cpp first,
+/// and tests/parameters/streamingNameTests.cpp said so.
+///
+///   What proves the pin works: streamingNames.txt does not move across this
+/// rename, and neither does presetCorpus.txt. Only parameterTable.txt does,
+/// which is the display side.
+///                                           (01.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_STREAMING_NAME(AhAh::Center, "Center (LFO me!)")
 
 //------------------------------------------------------------------------------
 } // namespace Effects

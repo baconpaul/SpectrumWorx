@@ -68,6 +68,52 @@ template <class Parameter> constexpr std::string_view name() { return Name<Param
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
+/// \class StreamingName
+///
+/// \brief The name a parameter is written to a file under, which is not the
+/// same thing as the name it is shown under.
+///
+/// \note Until 08.2026 these were one string. `Name` fed both the editor and
+/// `RuntimeInformation::name`, and `RuntimeInformation::name` is what
+/// `ModuleParameters::{save,load}PresetParameters` key on -- so renaming a knob
+/// silently re-keyed every preset that had ever named it, which then loaded a
+/// default instead. The 2016 author knew: see the comment on the `Name` line in
+/// `info()` (moduleImpl.hpp).
+///
+///   The default is the display name, because that *is* what every preset ever
+/// saved contains: seeded here, this template is the pre-port name table, at the
+/// point of definition rather than in a file beside it. Pin one with
+/// STREAMING_NAME the moment a display name has to change, and the file keeps
+/// saying what it always said.
+///
+/// \note Not a placeholder like `Name` -- deliberately. A parameter with no
+/// streaming name of its own is the overwhelmingly common case and its answer is
+/// correct; making it a link error would buy nothing and cost 147 restatements
+/// of a string that is already there. What makes the default safe is
+/// tests/parameters/streamingNameTests.cpp, which pins every one of them.
+///                                           (01.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+/// \note Null, and not `Name<Parameter>::string_`, because `Name`'s definition
+/// lives in another translation unit: seeding the default with it would ask
+/// every parameter to instantiate a variable template it cannot see, which clang
+/// says out loud (-Wundefined-var-template) six times over. The fallback is in
+/// streamingName() instead, where it costs the same and is asked only of the
+/// parameters that are actually streamed.
+template <class Parameter> struct StreamingName
+{
+    static constexpr char const *string_{nullptr}; ///< null: the display name serves
+};
+
+template <class Parameter> constexpr char const *streamingName()
+{
+    return StreamingName<Parameter>::string_ ? StreamingName<Parameter>::string_
+                                             : Name<Parameter>::string_;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
 /// \struct DiscreteValues
 ///
 /// \brief Placeholder for individual value strings for discrete-valued
@@ -245,6 +291,49 @@ template <class Parameter> struct DisplayValueTransformer
     namespace Parameters                                                                           \
     {                                                                                              \
     UI_NAME(SW::Effects::parameter) = name;                                                        \
+    }                                                                                              \
+    namespace SW                                                                                   \
+    {                                                                                              \
+    namespace Effects                                                                              \
+    {
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \def STREAMING_NAME
+///
+/// \brief Pins the name a parameter is written to a file under, holding it still
+/// while its display name moves.
+///
+/// \note **In a header, beside the parameter -- never in a .cpp**, which is
+/// where UI_NAME goes and where this does not work. A display name is an extern
+/// array: one definition, found by the linker. This is a class template
+/// specialisation, so every translation unit that instantiates the parameter
+/// table has to see it; one that does not gets the primary template and streams
+/// the parameter under its display name, which is precisely the breakage being
+/// pinned against. Silent, per-translation-unit, and an ODR violation besides.
+/// tests/parameters/streamingNameTests.cpp catches it -- it reads the same
+/// runtime table the writer does -- but the place not to make the mistake is
+/// here.
+///
+/// \note The whole class template is specialised rather than its member: a
+/// member specialisation would leave the in-class default declared as well, and
+/// two answers to "what is this parameter called on disk" is exactly the bug
+/// this exists to prevent.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+#define STREAMING_NAME(parameter, name)                                                            \
+    template <> struct StreamingName<parameter>                                                    \
+    {                                                                                              \
+        static constexpr char const *string_{name};                                                \
+    };
+
+#define EFFECT_PARAMETER_STREAMING_NAME(parameter, name)                                           \
+    }                                                                                              \
+    }                                                                                              \
+    namespace Parameters                                                                           \
+    {                                                                                              \
+    STREAMING_NAME(SW::Effects::parameter, name)                                                   \
     }                                                                                              \
     namespace SW                                                                                   \
     {                                                                                              \
