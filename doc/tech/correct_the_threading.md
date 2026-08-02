@@ -309,14 +309,8 @@ below for what it found.
 
 **4 — UI → engine: every edit is a command.** ✅ *done, 02.08.2026;* see §6.4.
 
-**5 — Engine → UI: `Module` loses its `ModuleUI`.** `Module::set{Base,Effect}Parameter` push
-ToUI events; `set*ParameterFromLFO` writes the mailbox. Then the members go — `ui_`,
-`createGUI`, `destroyGUI`, `fromGUI`, `updateLFOGUI`, `ParameterWidgetsVTable` — and the
-four `LE_AUX_VIRTUAL*` virtuals become non-virtual. `ModuleWidgets<Effect>` comes out of
-`Module::Impl<Effect>` and moves to `sw-gui`, reached by a 57-entry table over
-`Effects::ValidIndices` — the same `switchOn` the factory already uses
-(`factory.cpp:170-182`) — and owned by the `ModuleUI`. `sw-dsp` stops linking
-`juce_gui_basics` and `sw-gui-resources`.
+**5 — Engine → UI: `Module` loses its `ModuleUI`.** ✅ *done, 02.08.2026, in two commits;*
+see §6.5.
 
 **6 — Publish and retire; the lock is deleted.** §5, applied to slot edits, preset load,
 state load, sample loads and the spectral setup. Also **`LFOImpl::Timer`'s three tempo
@@ -556,6 +550,55 @@ still go straight into the LFO. Stage 5 takes them with the rest of the LFO's st
 **Test.** `[clap][protocol]`: push a command, check the engine has *not* changed — a queue
 that applied itself on push would be the direct write with extra steps — then flush and check
 it has, and that the host reads the same value.
+
+### 6.5 — What stage 5 did
+
+Two commits, because the two halves are separable and only the first one is the crash.
+
+**The engine stops telling anyone anything.** The four virtuals on `Module` are gone, and
+nothing replaces them *in the engine*: the plugin publishes what the LFOs did after the
+block, and pushes a `ToUI::BaseParameterChanged` when a host event moves something. The
+editor sweeps the mailbox on a 30 Hz `juce::Timer`. `ModuleParameters`' two remaining
+setters stop being virtual, which is the second of the two ABIs `dsp.cmake` had been
+complaining about since the `LE_SW_GUI` flag was deleted.
+
+`publishModulatedValues()` is deliberately not gated on an editor being open. The loop is
+five modules by ten `enabled()` checks — noise beside one FFT — and gating it would have
+made the only thing that reads the mailbox also the only thing that can test it.
+
+**The strips move to the editor.** `Module` was a `juce::Component` container: a
+`std::optional<GUI::ModuleUI>` member plus a `ParameterWidgetsVTable` base holding two
+function pointers, planted in every module at construction, that built and destroyed that
+effect's widgets. So `Module::Impl<Effect>` inherited `ModuleWidgets<Effect>` and every
+module the factory `malloc`ed carried the widget storage for its effect *inline*.
+
+Now `SpectrumWorxEditor` owns the strips and each one holds a
+`Utility::IntrusivePtr<Module>`. Three things fall out:
+
+- **`intrusive_ptr_release_deleter` no longer posts a JUCE message.** It called
+  `destroyGUI()`, and the reference that reaches zero can be the audio thread's — the chain
+  holds one per node while it walks it, on purpose (`moduleChainImpl.hpp:314-320`) — so
+  removing a module mid-block allocated a message and posted it from inside the callback.
+  A module with a strip simply does not reach zero now.
+- **`destroyGUI()` took the processing lock on the message thread.** That was one half of a
+  plausible deadlock cycle (§1A). Gone with it.
+- **Strips are found by module, not by slot** — at most five, a pointer comparison. An array
+  indexed by slot has to be reordered on every drag and every removal, which is the
+  bookkeeping that used to go wrong.
+
+**Two things moved out of `sw-dsp` on the way past.** A `ModuleKnob::QuantizationFor`
+specialisation was sitting in `core/modules/factory.cpp` — a statement about a widget, in
+the module factory. And that factory raised a `juce::AlertWindow` for an effect not in the
+edition, which `week_two.md` §2.4 flags as "a live branch that raises a juce::AlertWindow
+from a path the audio thread can reach"; it reports through the counted preset reporter now.
+
+**`sw-dsp` is down to `juce_core`, `juce_audio_basics` and `juce_audio_formats`** — no
+`juce_gui_basics`, no `juce_graphics`, no `juce_events`. Checked against the generated
+compile lines, not against the CMake. Stage 7 takes the last three.
+
+**One thing to know for stage 6.** The strips are built and torn down by the editor now, but
+the *chain* is still mutated from the message thread — `setModuleInSlot`, `removeModule`,
+`moduleDragEnd`. That is what stage 6 is for; nothing in this stage made it better or worse.
 
 ---
 
