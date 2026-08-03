@@ -8,3 +8,9 @@ The state of the project is - 2016 - very outdated. This includes the directory 
 ## Where to start? 🚀
 - [doc/readme.txt](./doc/readme.txt)
 - [source/externals/le/doc/internal/readme.txt](./source/externals/le/doc/internal/readme.txt)
+
+## Licence ⚖️
+The source in this repository is **GPL-3.0-or-later**. A released binary links
+JUCE 8 under its AGPLv3 arm, so the plugin you can download is
+**AGPL-3.0-or-later**. [LICENSING.md](./LICENSING.md) has the reasoning, the
+per-dependency table and what it means if you hold a commercial JUCE licence.
