@@ -260,6 +260,66 @@ TEST_CASE("A published chain comes back holding what it displaced", "[core][owne
     CHECK(&LE::SW::Engine::actualModule<LE::SW::Module>(*replacement.module(0)) == pFirst);
 }
 
+TEST_CASE("A displaced module may outlive the chain it came out of", "[core][ownership]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Found by loading a preset with the editor open, and it is the case
+    /// the one above deliberately does not cover: there, nothing else owned the
+    /// displaced module, so destroying the retired chain destroyed it too. Here
+    /// something does -- which is every preset load with a window open, because
+    /// the editor's strips hold a counted reference to each module they draw.
+    ///
+    ///   `unlink()` writes the *neighbours*' links and leaves the removed node's
+    /// own pointing where they were, so an ex-member still holds a counted
+    /// pointer at the chain's root. That was free for as long as a chain outlived
+    /// every module that had been in it; a retired chain does not, and the root
+    /// was freed with those pointers still aimed at it. What follows is the
+    /// module's `IntrusivePtr` decrementing a refcount in freed memory the next
+    /// time a strip is dropped.
+    ///
+    ///   Remove the two `reset()` calls from `~ModuleChainBase` and this reddens
+    /// on its own assertion, before ASan has to be asked.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    using LE::SW::AutomatedModuleChain;
+    using LE::SW::Threading::createModuleForSlot;
+    using LE::SW::Threading::publishChain;
+
+    SWTest::Engine engine;
+    engine.setNumberOfChannels(channels, channels);
+    engine.setSampleRate(sampleRate);
+    engine.setBlockSize(blockSize);
+    REQUIRE(engine.initialise());
+
+    LE::SW::Threading::ToEngineQueue toEngine;
+
+    LE::SW::Threading::publishSlot(engine, toEngine, 0, 0, createModuleForSlot(engine, 0, 0));
+    REQUIRE(engine.moduleChain().size() == 1);
+
+    /// \note A strip's reference, in the one respect that matters here: somebody
+    /// other than the chain owns the module.
+    LE::Utility::IntrusivePtr<LE::SW::Module> const pStripsModule(
+        engine.moduleChain().moduleAs<LE::SW::Module>(0));
+    REQUIRE(pStripsModule);
+
+    {
+        AutomatedModuleChain replacement;
+        auto *const pSecond(createModuleForSlot(engine, 1, 0));
+        REQUIRE(pSecond != nullptr);
+        replacement.push_back(LE::SW::Engine::node(*pSecond));
+        intrusive_ptr_release(&LE::SW::Engine::node(*pSecond));
+
+        publishChain(engine, toEngine, replacement);
+        REQUIRE(replacement.size() == 1);
+    } // the retired chain dies here, and the displaced module does not
+
+    // Still usable, and holding nothing that has been freed.
+    CHECK(pStripsModule->effectTypeIndex() == 0);
+    CHECK(engine.moduleChain().size() == 1);
+}
+
 TEST_CASE("A slot change while running is a command rather than a mutation", "[core][ownership]")
 {
     // With audio running the same call queues instead, and nothing happens to

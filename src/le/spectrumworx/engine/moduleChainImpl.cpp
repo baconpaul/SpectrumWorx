@@ -54,13 +54,50 @@ LE_COLD ModuleChainBase &ModuleChainBase::operator=(ModuleChainBase &&other)
     return *this;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Because nodes form cyclic references through next and previous
+/// pointers, each node has to be explicitly unlinked in order to avoid leaks.
+///                                           (12.03.2014.) (Domagoj Saric)
+///
+/// \note `clear()` is not enough, and was for as long as a chain outlived every
+/// module that had ever been in it. `unlink()` writes the *neighbours*' links and
+/// deliberately leaves the removed node's own -- so every ex-member still holds a
+/// counted pointer at this root. That cost nothing while the chain was the last
+/// owner: the modules were destroyed on the spot and released it on the way out.
+///
+///   Stage 6 made chains that die first. A preset load builds a chain, publishes
+/// it, and the one it displaces comes back to be destroyed here -- while the
+/// editor's strips still hold counted references to the modules that were in it.
+/// The root was then freed with those pointers still aimed at it: this
+/// destructor's own assertion is what caught it, and what it caught was a
+/// use-after-free waiting for the user to close a strip.
+///
+///   So the links go too. Nothing walks a chain that is being destroyed, which is
+/// the one thing the note on `remove()` says they are kept for.
+///
+/// \note The 2016 sources met the same thing from the other end and left it: the
+/// two assertions in `resetRoot()` are commented out under "a module sent to be
+/// destroyed in the GUI thread might still be referencing the root node". That is
+/// this, exactly -- a module outliving the chain's account of it -- and it was
+/// silenced there rather than fixed. This destructor's copy of the same assertion
+/// is the one that survived to catch it.
+///                                           (02.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
 LE_COLD ModuleChainBase::~ModuleChainBase()
 {
-    /// \note Because nodes form cyclic references through next and previous
-    /// pointers, each node has to be explicitly unlinked in order to avoid
-    /// leaks.
-    ///                                       (12.03.2014.) (Domagoj Saric)
-    clear();
+    while (next_.get() != this)
+    {
+        /// \note Held across the unlink, because the unlink drops the chain's
+        /// reference and this may be the last one.
+        NodePtr const pNode(next_);
+        node_algorithms::unlink(pNode.get());
+        pNode->next_.reset();
+        pNode->previous_.reset();
+    }
+    LE_ASSERT(empty());
     LE_ASSERT(this->referenceCount_ == 1 || this->referenceCount_ == 3);
 }
 
