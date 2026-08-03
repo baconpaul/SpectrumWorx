@@ -433,10 +433,18 @@ as a rename:
 > `externals/boost/profile_templates2` — a directory that was never in this repo
 > to begin with (scan §4.1).
 >
-> **`EULA.txt` was moved to `doc/manual/`, not deleted.** It is the commercial
+> **`EULA.txt` was moved to `doc/manual/`, not deleted.** ~~It is the commercial
 > end-user licence agreement and it contradicts the repo's GPL-3.0 LICENSE, so
-> it should almost certainly go — but that is a licensing decision (§9.3), not a
+> it should almost certainly go~~ — but that is a licensing decision (§9.3), not a
 > file move, so it is preserved and flagged rather than quietly dropped.
+>
+>   *Read rather than assumed, 03.08.2026: it is not the commercial agreement.
+> The file is a 218-line plain-text copy of the GPL-3.0 licence, byte-for-byte
+> the terms in `LICENSE`, with no proprietary wording anywhere in it — replaced
+> before this port began. Preserving it was right; the reason given for it was
+> wrong, and it was repeated in three documents for a week without anyone opening
+> the file. The licensing decision it was flagged for is made and is about JUCE
+> rather than about this — see `LICENSING.md`.*
 >
 > **`src/CMakeLists.txt` still contains ~400 lines of CPack/WiX/PackageMaker
 > configuration pointing at the deleted `installer/resources/` tree.** Left
@@ -477,7 +485,10 @@ as a rename:
 >
 > - **`SPDX-License-Identifier: GPL-3.0-or-later` is a choice, not a finding.**
 >   It matches the repo's GPL-3.0 LICENSE and SST house style, but §9.3 is still
->   open — if the JUCE 8 question pushes this to AGPLv3, it is one `sed` away.
+>   open — ~~if the JUCE 8 question pushes this to AGPLv3, it is one `sed` away.~~
+>   *Settled 03.08.2026 and the `sed` is not wanted: the headers describe files,
+>   the files are GPL-3.0, and the AGPL is a property of the binary they are
+>   linked into. See `LICENSING.md`.*
 > - **`src/le/spectrumworx/effects/synth/synth.hpp` needed a manual fix.** It had
 >   `Unit< '°' >`, where `°` was a *single* CP-1252 byte (0xB0). Converting to
 >   UTF-8 would silently turn that into a two-byte multicharacter literal with a
@@ -2645,10 +2656,20 @@ Inno Setup on Windows, tar + deb on Linux.
 
 **9.2** Version information wired through `sst::plugininfra::version_information`.
 
-**9.3 — Settle the licence.** JUCE 8 is AGPLv3-or-commercial; the repo is
-currently GPL-3.0 with every file header still saying "All rights reserved"
-(scan §8.1.2–3). Pick a destination, make the headers agree with the LICENSE
-file, and write `THIRD_PARTY.md`.
+**9.3 — ✅ Settle the licence.** *Done, 03.08.2026 —
+[`LICENSING.md`](../../LICENSING.md).* It said: JUCE 8 is AGPLv3-or-commercial;
+the repo is currently GPL-3.0 with every file header still saying "All rights
+reserved" (scan §8.1.2–3); pick a destination, make the headers agree with the
+LICENSE file, and write `THIRD_PARTY.md`.
+
+  The headers were made to agree back in 0.6 — 452 of them say
+`SPDX-License-Identifier: GPL-3.0-or-later`. **The destination is two answers,
+not one**: the source is GPL-3.0-or-later and a released binary is
+AGPL-3.0-or-later, because GPL-3.0 §13 permits the combination while leaving the
+covered work under the GPL. So no header changes. `LICENSING.md` is the
+`THIRD_PARTY.md` this asked for as well, with the per-dependency table taken off
+the four link lines rather than off the submodule list — which is how the VST3
+SDK turned out to be MIT since 2025 rather than the GPL-or-proprietary it was.
 
 **9.4** Convert the `.doc` manual to Markdown; README with screenshots.
 

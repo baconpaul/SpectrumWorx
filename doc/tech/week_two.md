@@ -53,7 +53,7 @@ list: it is the only thing that can close item 3.
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone — macOS arm64. Linux arm64 proven at stage 4. Windows arrives as logs. |
 | Runs | Standalone, with audio, with the real editor, with presets. It deadlocked in Logic and in Bitwig; **the threading model those deadlocks were a property of has since been replaced and nobody has reloaded it in either host** — see §1 item 3. |
-| Tests | **194/194** as of 03.08.2026: 183 Catch2 + 9 `sw-show-ui --render` + 2 build-property checks, in both build trees. Goldens run in Release only. Two binaries — `sw-dsp-tests` and `sw-plugin-tests` — not one. |
+| Tests | **260/260** as of 03.08.2026: 192 Catch2 + 66 `sw-show-ui --render` + 2 build-property checks, in both build trees. Goldens run in Release only. Two binaries — `sw-dsp-tests` and `sw-plugin-tests` — not one. The renders assert what was drawn now, not an exit code. |
 | CI | **None.** There is no `.github/`. |
 | Warnings | **229 unique sites**, 227 of them one class — see §3. Everything else our targets emitted is fixed as of 02.08.2026. |
 | Identity | ✅ `org.surge-synth-team.spectrumworx`, AU `aufx`/`SWrx` by `SSTx` — see §4. |
@@ -548,11 +548,23 @@ belongs here because it is the same pass and the same judgement.
 
 ### 10 — Ship
 
-Unchanged from stage 9, with one item that should not wait for it: **the licence
-contradiction**. `doc/manual/EULA.txt` is the commercial end-user agreement and
-it contradicts the repo's GPL-3.0 `LICENSE`; every file header now says
-`SPDX-License-Identifier: GPL-3.0-or-later`. JUCE 8 is AGPLv3-or-commercial.
-Settling that is a decision, and decisions do not get cheaper.
+Unchanged from stage 9, less the one item that was not going to wait for it.
+
+> **The licence is settled, 03.08.2026** — [`LICENSING.md`](../../LICENSING.md),
+> and `README.md` points at it. Source GPL-3.0-or-later, released binary
+> AGPL-3.0-or-later because of JUCE 8. §5 item 5 has the reasoning and what the
+> claim below got wrong.
+
+~~One item that should not wait for it: **the licence contradiction**.
+`doc/manual/EULA.txt` is the commercial end-user agreement and it contradicts the
+repo's GPL-3.0 `LICENSE`~~ — *it is a copy of the GPL-3.0 licence, and has been
+since before the port; only the filename is from 2016.* Every file header says
+`SPDX-License-Identifier: GPL-3.0-or-later` and stays that way. JUCE 8 is
+AGPLv3-or-commercial, which is what makes the binary AGPL and the source not.
+
+What is left here is packaging rather than a decision: a duplicate licence file
+under a misleading name, and `src/legacy-build.cmake:386` pointing
+`CPACK_RESOURCE_FILE_LICENSE` outside the repository. `tech_debt.md` has both.
 
 One thing arrives here from §4: **the standalone's `CFBundleIdentifier` is
 clap-wrapper's `SpectrumWorx.standalone`**, and notarisation is the step that
@@ -752,11 +764,11 @@ which makes it the smallest existing instrument for item 3.
 | **Malformed / truncated / missing preset** | Nothing. The corpus proves 303 happy paths. The `unknownEffect` and `missing` counters are asserted zero and never driven above zero, so the reporting path is unexercised. `saveTo()`'s refusal to overrun is never triggered because every test hands it a 1 MiB buffer. |
 | **A loaded sample never reaches the DSP in a test** | New with item 7, and the honest half of it. `sampleTests.cpp` proves all seventeen factory samples decode to two equal channels at the requested rate; nothing proves that `runEngine()` then feeds them to the engine in place of the port. The obstacle is reach, not effort: `setNewSample` is an `EditorHost` virtual and `tests/clap/` only drives the C API. §2.8 step 5 is the way in — a golden fixture that loads a sample by name. |
 | **The side-chain port is never fed** | Re-verified 01.08.2026 and it is worse than one line: `ActivePlugin::process` hardcodes `audio_inputs_count = 1` (`pluginTests.cpp:218`), the port test only ever calls `ports->get(…, 0, …)` so the Side Chain port's *info* is unasserted, and `goldens/engineHarness.cpp:181` passes `inputPointers.data()` as **both** main and side. **Seven** side-chain effects are golden-pinned only in the degenerate side == main case. §2.8 has the recipe. |
-| **The test host is too thin** | *Half closed, 01.08.2026.* `StatefulHost` offers `clap.state` and deliberately no `clap.thread-check`, which is the combination §2.1a needed; `RecordingHost` still offers `clap.params` and nothing else. What is still missing is a host that offers `clap.thread-check` and *answers*, which is the only way to test the main-thread arm of a deferral rather than only the deferred one. |
+| **The test host is too thin** | ✅ *Closed, 03.08.2026.* One `TestHost` (`tests/clap/testHost.hpp`) offering whichever of `clap.params`, `clap.state`, `clap.thread-check` and `clap.log` it is asked for, replacing the three hand-rolled ones; no singleton, because `clap_host::host_data` is the host's and the old comment saying otherwise was wrong. It answers the thread check from its own bookkeeping — an `AudioCallback` window the harness opens around `process()`, `start_processing` and `flush` — so both arms of every `canUseThreadCheck()` branch are reachable, and `clap.log` catches what clap-helpers reports. `hostInteropTests.cpp` is the five cases that needed it, and it found two things in an afternoon: this harness had been flushing an *active* plugin from the main thread, which CLAP says is an audio-thread call, and clap-helpers validates a flush by calling its own `[main-thread]` entry point from the audio thread. |
 | **`lfoImpl.cpp` has no direct test** | Only LFO 0 of module 0 targeting Gain is ever exercised. Waveform shapes, sync types, `PeriodScale` snapping, `LowerBound > UpperBound`, an LFO on an enumerated target, several at once — none. A value-table golden fits the existing pattern. |
 | **Both text conversions are stubs, and they are one job** | `paramsTextToValue` is `return false` (`spectrumWorxCLAP.cpp:469`); `paramsValueToText` **ignores the value it is given** and prints the parameter's current one (`:414-441`). Both are documented at length with a shared `\todo`: give `AutomatedParameterPrinter` an arm that takes a value *and* the live parameter, so an LFO's dynamic range has an owner to validate against. Host-visible in every automation lane tooltip, and unpinned by any test. |
-| **The GUI tests assert exit code only** | *Still true of the nine renders, 03.08.2026.* `renderPage()` writes a PNG and returns 0; a page that paints solid black passes. Blank/uniform-colour detection is about ten lines and is what would have caught the empty settings panel 6.4 found by looking at a render. **What has changed is that there is now a second kind of GUI test beside them:** `tests/gui/moduleControlFocusTests.cpp` builds an editor, puts it on the desktop and drives a control, asserting focus, selection and parameter values rather than an exit code. `gui/editorHarness.hpp` is what makes another one cheap. It also found the ceiling — a synthesised mouse cannot set `isMouseOverOrDragging()`, and the real one needs an app bundle the test binary is not. |
-| **1 of 57 effects, 1 of 18 banks** | `SW_SHOW_UI_EFFECT`, `SW_SHOW_UI_PRESET` and `SW_SHOW_UI_PRESET_SWEEP` exist and are manual-only. A CMake `foreach` over the effect list is four lines for 57× the GUI breadth. |
+| **The GUI tests assert exit code only** | ✅ *Closed, 03.08.2026.* `renderPage()` measures the fraction of the canvas that is not its commonest colour and returns 1 under a thousandth of it — the modal colour rather than a distinct-colour count, because antialiasing one glyph over an empty panel produces dozens of colours and would satisfy a count. Measured floors: the pages draw 12 % (theme) to 80 % (editor-presets). The whole-canvas number cannot see the failure that motivated it, though — a 191 × 363 empty panel is 33 % of a 563 × 376 editor and would pass comfortably — so `tests/gui/overlayPanelTests.cpp` measures the overlay rectangle on its own, and pins 6.4's bug by clicking the logo. Reverting that fix takes the panel from 99 % of its rectangle to **2.8 %**, which is the tab bar over nothing. |
+| **1 of 57 effects, 1 of 18 banks** | *Half closed, 03.08.2026: 57 of 57 effects, still 1 of 18 banks.* `show-ui-renders-module-<Effect>` per entry in `effectsList.hpp`, with the list parsed out of that header rather than copied into CMake — the order is ABI and an appended effect should grow a test without anybody remembering. It cost 1.9 s of wall clock and immediately found that the page had been rendering **no module at all**: `addUserAddedModule` ends in `refreshModuleRackAsync()` and an offscreen render turns no message loop, so all 57 effects produced byte-identical PNGs. `tests/clap/pluginTests.cpp` had the `resyncModuleRack()` call for the same reason and this page never got it. |
 | **`ctest -LE slow` skips nothing** | No test in the repo sets `LABELS`; the one labelled case went with `check_gui_flag_parity.py`. Either re-establish the label or stop recommending the flag. |
 
 ### 2.4 Macros that make live code lie
@@ -1358,6 +1370,9 @@ identity being changed is the *publisher's*, not the author's.
 ## 5. Where to focus
 
 Beyond the ordered list, six things worth deciding rather than drifting into.
+**Four of them are settled as of 03.08.2026** — 1, 2 and 5 done, 3 declined —
+and each keeps what it said, because in three of the four the doing corrected the
+estimate.
 
 **0. ~~Capture the deadlocks before touching the threading.~~ *Expired,
 02.08.2026, unclaimed.*** It said: they reproduce in Logic and in Bitwig today,
@@ -1373,32 +1388,52 @@ to start from a live reproduction anyway.** So the ask is unchanged and now
 belongs to item 1: reload in both hosts, and if either still hangs, take both
 backtraces before anything else.
 
-**1. Thicken the test host before doing anything else to the host layer.**
-§2.1a is a null dereference that the whole green suite cannot see, because the
-test host offers one extension. Give `RecordingHost` `clap.state` and
-`clap.thread-check`, plus a variant that deliberately withholds thread-check, and
-record output events and gesture pairs. Almost every item in §1 items 3 and 4 is
-easier to verify afterwards, and this is half a day.
+**1. ✅ ~~Thicken the test host before doing anything else to the host layer.~~**
+*Done, 03.08.2026.* It said: §2.1a is a null dereference that the whole green
+suite cannot see, because the test host offers one extension; give
+`RecordingHost` `clap.state` and `clap.thread-check`, plus a variant that
+deliberately withholds thread-check, and record output events and gesture pairs.
 
-**2. Make the GUI tests assert something.** They currently check an exit code.
-Uniform-colour detection plus a dimension check is ten lines in `renderPage()`,
-and a `foreach` over the effect list turns one module UI into 57. That combination
-is the cheapest large increase in coverage available anywhere in this tree, and
-the GUI is where week one's bugs actually were.
+  All of that, in `tests/clap/testHost.hpp` — one `TestHost` with an `Offers`
+struct instead of three classes, `RecordedOutputEvents` for the list that used to
+be thrown away, and `clap.log` as a fourth extension the plan did not ask for and
+should have. §2.3's row has what it found. **The half-day estimate was right and
+the value was not where it said**: the four new cases are worth less than the two
+findings that fell out of writing them, which is the same lesson as §2.2 — a host
+that can be asked questions checks the harness as hard as it checks the plugin.
+
+**2. ✅ ~~Make the GUI tests assert something.~~** *Done, 03.08.2026.* It said:
+uniform-colour detection plus a dimension check is ten lines in `renderPage()`,
+and a `foreach` over the effect list turns one module UI into 57; the cheapest
+large increase in coverage available anywhere in this tree.
+
+  It was, and both halves landed — 9 render cases became 66, and none of them
+asserts an exit code any more. Two corrections to the estimate, both worth
+keeping. **Uniform-colour detection over the whole canvas would not have caught
+the bug it was justified by**: an empty settings panel is 33 % of the editor and
+every page draws less than 80 %, so the region has to be measured on its own, and
+`tests/gui/overlayPanelTests.cpp` is where that lives. And **the effect sweep's
+value was not the 57 renders** — it was that all 57 came out byte-identical,
+which is how a page that had never drawn a module at all was found. Breadth is
+worth having because it makes a *comparison* possible, not because 57 pictures
+are better than one.
 
 **2a. Feed the side chain a different signal.** The same argument, for the DSP:
 §2.8 has the four-step recipe, it is well under a day, and it converts seven
 effects' goldens from "cannot distinguish a working side chain from one that is
 ignored" into real pins. Both harnesses currently pass the main input twice.
 
-**3. CLAP preset discovery is a natural fit and nobody has mentioned it.** The
-303 factory banks are already in the binary behind a clean API
-(`FactoryPresets::{banks,presets,load}`). `clap_preset_discovery_factory` would
+**3. ~~CLAP preset discovery is a natural fit and nobody has mentioned it.~~
+*Declined, 03.08.2026, by Paul: it is buggy in Surge 1 and not worth carrying
+here.*** Kept for the reasoning rather than the recommendation. It said: the 303
+factory banks are already in the binary behind a clean API
+(`FactoryPresets::{banks,presets,load}`); `clap_preset_discovery_factory` would
 let a host browse them natively — one flat namespace, no files, no installer
-step. surge-xt2 has the hook stubbed out
-(`surge-xt2-clap-entry-impl.cpp:148-154`) as the reference. This is the one
-place where being a 2011 plugin with a big preset library is an *advantage*, and
-it is a day's work on top of what 8.2 built.
+step; surge-xt2 has the hook stubbed out
+(`surge-xt2-clap-entry-impl.cpp:148-154`) as the reference. That is all still
+true of *our* side and the reason it is not being done is the extension, not the
+fit. The plugin's own browser is what a user gets, and §2.3's preset-browser rows
+are where the effort goes instead.
 
 **4. Decide the sample question with 5.0, not before it.** ✅ *Done, and it was
 the right coupling.* The samples are embedded and the loader reads them from
@@ -1407,11 +1442,26 @@ nearly did ship content nothing could open was not the one predicted, though: it
 was MP3 on Linux, where `registerBasicFormats()` offers no decoder at all
 without `JUCE_USE_MP3AUDIOFORMAT`. Item 7 has it.
 
-**5. Settle the licence early, because it is a decision and not a task.**
-`doc/manual/EULA.txt` contradicts `LICENSE`; JUCE 8 is AGPLv3-or-commercial; 452
-file headers currently say `GPL-3.0-or-later`. If the answer is AGPL it is one
-`sed`. If the answer needs a conversation, that conversation should start now
-rather than in the week of a release.
+**5. ✅ ~~Settle the licence early, because it is a decision and not a task.~~**
+*Decided 03.08.2026 by Paul, and written down in
+[`LICENSING.md`](../../LICENSING.md): **the source in this repository is
+GPL-3.0-or-later and a released binary is AGPL-3.0-or-later**, because it links
+JUCE 8 under its AGPLv3 arm.* GPL-3.0 §13 permits the combination and says the
+covered work stays GPL while AGPL §13's network clause applies to the
+combination as such, which is exactly the two-answer shape above.
+
+  **The `sed` is not needed and would have been wrong.** The 452 headers describe
+*files*, and the files are GPL-3.0; the AGPL result is a property of one build of
+the combined work. Anyone holding a commercial JUCE licence builds the same
+source into a GPL-3.0 binary.
+
+  ~~`doc/manual/EULA.txt` contradicts `LICENSE`~~ — *it does not, and three
+documents said it did.* The file is a 218-line plain-text copy of the GPL-3.0
+licence with no proprietary wording in it; the commercial agreement was replaced
+before the port began, and what survived is a filename. `tech_debt.md` carries
+what is left: a duplicate of `LICENSE` under a misleading name, and
+`src/legacy-build.cmake:386` still pointing `CPACK_RESOURCE_FILE_LICENSE` at a
+path outside the repository. Both are packaging, both are item 10's.
 
 And one that is not a task at all: **write down what the first five minutes of
 using SpectrumWorx should be**, and check the plugin against it by hand. Week

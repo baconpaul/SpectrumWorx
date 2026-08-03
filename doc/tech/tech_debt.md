@@ -347,16 +347,38 @@ New entries go at the top of their area.
   `__builtin_assume` in a shipping build, so reviving the caller without fixing
   the pair would hand the optimiser two false facts about live values.
 
-- **The GUI render tests assert an exit code.** (01.08.2026, from §2.3)
+- ✅ ~~**The GUI render tests assert an exit code.**~~ (01.08.2026, from §2.3)
   `renderPage()` writes a PNG and returns 0; a page that paints solid black
   passes. Blank-and-uniform-colour detection is about ten lines, and it is what
   would have caught the empty settings panel that 6.4 found by looking at an
   image. Nine tests currently asserting almost nothing.
+  *Closed 03.08.2026. `renderPage()` measures what fraction of the canvas is not
+  its commonest colour and fails under a thousandth of it; the pages measure
+  12–80 %, so the floor is a long way below every one of them and the failure it
+  is for is "nothing was drawn". `tests/gui/overlayPanelTests.cpp` is the other
+  half — the whole-canvas number cannot see a 191 × 363 hole in a 563 × 376
+  editor, so the overlay rectangle is measured on its own.*
 
-- **One effect of 57 and one bank of 18 are ever drawn.** (01.08.2026, from
+- ✅ ~~**One effect of 57 and one bank of 18 are ever drawn.**~~ (01.08.2026, from
   §2.3) `SW_SHOW_UI_EFFECT`, `SW_SHOW_UI_PRESET` and `SW_SHOW_UI_PRESET_SWEEP`
   exist and are manual-only. A CMake `foreach` over the effect list is four lines
   for 57× the GUI breadth.
+  *Half closed, 03.08.2026: 57 `show-ui-renders-module-<Effect>` cases, with the
+  list read out of `effectsList.hpp` rather than copied into CMake. The banks are
+  still one of eighteen. What the sweep found on its first run is the next
+  bullet.*
+
+- **A slot filled from the editor needs its rack resynced by hand, and two
+  harnesses do it and one did not.** (03.08.2026, from §5.2)
+  `addUserAddedModule` ends in `refreshModuleRackAsync()`, so a caller with no
+  message loop has to call `resyncModuleRack()` itself; `pluginTests.cpp` did and
+  `tools/show-ui`'s editor-module page did not. For a month that page rendered an
+  editor with a highlighted empty slot and no module in it — the page whose whole
+  purpose is proving a module's widgets can be built. It was invisible until the
+  sweep above made all 57 effects produce *byte-identical* PNGs. Fixed there, but
+  the shape of it is not: "build the thing, then pump the async step by hand" is
+  an unwritten rule that three harnesses now follow separately, and the next one
+  will not know either.
 
 - **`ctest -LE slow` skips nothing.** (01.08.2026, from §2.3) No test in the repo
   sets `LABELS`; the one labelled case went with `check_gui_flag_parity.py`.
@@ -372,19 +394,72 @@ New entries go at the top of their area.
   created, through `plugin_data` and the `EditorHost` interface. What is left is
   only the block itself, which is the smaller half.
 
-- **A host that provides `clap.thread-check` and answers has never been
-  tested.** (01.08.2026, item 0) `StatefulHost` deliberately omits it, which is
+- ✅ ~~**A host that provides `clap.thread-check` and answers has never been
+  tested.**~~ (01.08.2026, item 0) `StatefulHost` deliberately omits it, which is
   what reaches the deferral. The other arm of every `canUseThreadCheck()` branch
   — the one where the plugin is told it *is* on the main thread and acts
   immediately — has no coverage at all.
+  *Closed 03.08.2026 by `tests/clap/testHost.hpp`: one configurable `TestHost`
+  replaces the three hand-rolled ones, answers the thread check out of its own
+  bookkeeping, and `hostInteropTests.cpp` drives both arms. What it left behind
+  is the next two bullets.*
+
+- **clap-helpers' flush validation calls its own `[main-thread]` entry point
+  from the audio thread.** (03.08.2026, from §5.1) `clapParamsFlush` guards
+  itself correctly with `ensureFlushThread` — `active ? audio : main`, matching
+  ext/params.h:303 — and then validates each event through
+  `checkValidFlushEvent` → `getParamInfoForParamId`, which opens with
+  `checkMainThread()` and then calls `clapParamsInfo`, whose C entry point opens
+  with `ensureMainThread`. So a correct host flushing a correct plugin is
+  reported for misbehaving, twice per event, at `CheckingLevel::Maximal`.
+  Upstream's, and it is only visible to a host that answers `clap.thread-check`,
+  which is why nothing had seen it. `TestHost` filters the two `clap.log`
+  messages by exact wording; the third — `getParamInfoForParamId`'s own
+  `checkMainThread()` — goes straight to `std::cerr` and cannot be intercepted at
+  all, so it is one line of noise per flush on the test output. Worth a
+  clap-helpers issue; worth nothing local.
+
+- **`ActivePlugin` is the only harness that flushes on the thread CLAP says to.**
+  (03.08.2026, from §5.1) `params.flush()` is `[active ? audio-thread :
+  main-thread]`, and every `params.flush(&*plugin, …)` call site in
+  `pluginTests.cpp` — several dozen — makes it from the main thread against an
+  active plugin. Harmless there, because those cases use hosts that offer no
+  thread check and so nothing asks; but it means the flush path has only ever
+  been driven from the wrong thread, and `paramsFlush()` calls `drainCommands()`
+  and `handleEvent()`, which are the two things `process()` does to the engine.
+  Converting them to `plugin.flush(…)` is mechanical and would put the whole
+  parameter-event path on the audio thread under tsan and rtsan, where it belongs.
+
+- **`SpectrumWorxCLAP::paramsFlush` opens no `Threading::ScopedAudioCallback`.**
+  (03.08.2026, from §5.1) Against an active plugin it *is* an audio-thread
+  callback by contract, and it mutates the engine — so `Threading::isAudioThread()`
+  answering `false` inside it is the plugin's own account of who owns the engine
+  being wrong on one path. Not a live bug, because nothing asserts on it today;
+  it is the sort of thing `engineOwnershipTests.cpp` exists to pin and does not.
+  Adding the scope also brings the path under rtsan, which would immediately
+  report the slot-selector allocation already recorded above — so it is a
+  deliberate pair of changes rather than a one-liner.
 
 ## Licence and shipping
 
-- **`doc/manual/EULA.txt` is a commercial end-user agreement and the repository
-  is GPL-3.0.** (01.08.2026, from item 10) Every file header says
-  `SPDX-License-Identifier: GPL-3.0-or-later`; JUCE 8 is AGPLv3-or-commercial.
-  Item 10 lists it, but it is the only entry there that is a *decision* rather
-  than a task, and decisions do not get cheaper by being scheduled last.
+- ✅ ~~**`doc/manual/EULA.txt` is a commercial end-user agreement and the
+  repository is GPL-3.0.**~~ (01.08.2026, from item 10)
+  *Wrong, and checked on 03.08.2026: the file in the tree is a plain-text copy of
+  the GPL-3.0 licence — 218 lines, the same terms as `LICENSE`, no proprietary
+  wording in it. The commercial agreement was replaced before the port began and
+  three documents went on describing the file by its 2016 name. The decision
+  itself is made and written down in [`LICENSING.md`](../../LICENSING.md): source
+  GPL-3.0-or-later, released binary AGPL-3.0-or-later because JUCE 8 is
+  AGPLv3-or-commercial, and the 452 file headers are right as they stand.*
+
+- **The duplicate licence file and the installer path that names it.**
+  (03.08.2026, from item 10) `doc/manual/EULA.txt` is now a byte-for-byte
+  duplicate of `LICENSE` under a filename that means the opposite of what it
+  contains, and `src/legacy-build.cmake:386` still points
+  `CPACK_RESOURCE_FILE_LICENSE` at `../installer/ProgramFolder/Licences/EULA.txt`
+  — a path outside this repository. Neither is reachable from a live target, so
+  neither is urgent; both are item 10's to clear when there is a real installer,
+  and the AGPL statement is what it has to show.
 
 - **The standalone's `CFBundleIdentifier` is clap-wrapper's
   `SpectrumWorx.standalone`.** (01.08.2026, from §4) Notarisation is the step
