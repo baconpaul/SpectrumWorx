@@ -854,7 +854,10 @@ LEDTextButton::LEDTextButton(juce::Component &parent, unsigned int const x, unsi
 {
     setName(text);
 
-    setBounds(x, y, getWidth() + DrawableText::defaultFont().getStringWidth(getName()), 14);
+    setBounds(x, y,
+              getWidth() +
+                  juce::GlyphArrangement::getStringWidthInt(DrawableText::defaultFont(), getName()),
+              14);
 }
 
 void LEDTextButton::paintButton(juce::Graphics &g, bool const isMouseOverButton,
@@ -873,7 +876,7 @@ TextButton::TextButton(juce::Component &parent, unsigned int const x, unsigned i
     juce::Font font(Theme::singleton().whiteFont());
     font.setHeight(static_cast<float>(height));
 
-    setBounds(x, y, font.getStringWidth(getName()), height);
+    setBounds(x, y, juce::GlyphArrangement::getStringWidthInt(font, getName()), height);
 
     setClickingTogglesState(true);
 
