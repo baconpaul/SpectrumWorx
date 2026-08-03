@@ -24,7 +24,10 @@
 /// "does an enabled LFO modulate anything" has to look at the engine, and reaches
 /// it through `clap_plugin::plugin_data` as processLockTests.cpp does.
 #include "core/modules/moduleDSPAndGUI.hpp"
+#include "gui/editor/presetLoading.hpp"
+#include "presets/presetHarness.hpp"
 #include "gui/editor/spectrumWorxEditor.hpp"
+#include "le/spectrumworx/presetStorage.hpp"
 #include "spectrumWorxCLAP.hpp"
 
 #include <clap/clap.h>
@@ -35,6 +38,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <filesystem>
 #include <cstring>
 #include <numbers>
 #include <functional>
@@ -260,7 +264,7 @@ class ActivePlugin
     ActivePlugin(double const sampleRate, std::uint32_t const blockSize,
                  clap_host const &host = nullHost(),
                  std::function<void(clap_plugin const &)> const &beforeActivate = {})
-        : blockSize_(blockSize)
+        : sampleRate_(sampleRate), blockSize_(blockSize)
     {
         pPlugin_ = factory().create_plugin(&factory(), &host, descriptorID());
         REQUIRE(pPlugin_ != nullptr);
@@ -328,6 +332,21 @@ class ActivePlugin
         return pPlugin_->process(pPlugin_, &process);
     }
 
+    /// \brief Deactivates and reactivates, as a host does when the plugin asks.
+    ///
+    /// \note Unconditionally rather than on `request_restart`, because the null
+    /// host cannot report one and because a restart the plugin did not ask for is
+    /// something a host is free to do anyway. It is also where a pending spectral
+    /// setup lands, so a case that changes the FFT size and never comes through
+    /// here is running the old one.
+    void restartIfAsked()
+    {
+        pPlugin_->stop_processing(pPlugin_);
+        pPlugin_->deactivate(pPlugin_);
+        REQUIRE(pPlugin_->activate(pPlugin_, sampleRate_, 1, blockSize_));
+        REQUIRE(pPlugin_->start_processing(pPlugin_));
+    }
+
     static char const *descriptorID()
     {
         auto const *const pDescriptor(factory().get_plugin_descriptor(&factory(), 0));
@@ -337,6 +356,7 @@ class ActivePlugin
 
   private:
     clap_plugin const *pPlugin_;
+    double sampleRate_;
     std::uint32_t blockSize_;
 }; // class ActivePlugin
 
@@ -1554,4 +1574,158 @@ TEST_CASE("Two instances process while their editors come and go", "[clap][threa
 
     CHECK(!sawNonFinite.load());
     CHECK(juce::MessageManager::getInstanceWithoutCreating() != nullptr);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Loading preset after preset with the window open, which is what a user
+/// does with the browser and what nothing headless did. Every preset case before
+/// this one loads into a *fresh* engine with no editor -- so it never saw a rack
+/// being replaced, a mailbox holding values about the chain that just left, or a
+/// spectral setup asking for a restart on the way past.
+///
+///   Three faults came out of it and all three are its business: a chain
+/// destroyed while a strip still held one of its modules, a stale mailbox entry
+/// delivered to whatever effect now occupies that slot, and the assertion this is
+/// written against. Each turn of the loop is one browser click: load, resync the
+/// rack, honour the restart if one was asked for, run audio, draw.
+///
+/// \note All 303 shipped banks, not a sample of them. The interesting presets are
+/// the 2011 ones whose effects have grown parameters since, and there is no way
+/// to know which those are without reading all of them.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("Loading preset after preset with the editor open", "[clap][presets][gui]")
+{
+    constexpr float sampleRate{48000};
+    constexpr std::uint32_t blockSize{512};
+
+    std::filesystem::path const banks(SW_PRESET_DATA_DIR);
+    REQUIRE(std::filesystem::is_directory(banks));
+
+    Entry const entry;
+    juce::ScopedJuceInitialiser_GUI const juceIsUp;
+
+    ActivePlugin plugin(sampleRate, blockSize);
+    auto &host(editorHostOf(*plugin));
+    auto editor(std::make_unique<LE::SW::GUI::SpectrumWorxEditor>(host));
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note A counting reporter, which also keeps `GUI::loadPreset` from
+    /// raising its summary dialog -- that reads the *default* collector, and with
+    /// this installed the default one never counts.
+    ///
+    ///   Not merely test hygiene. 104 of the 303 factory banks have something to
+    /// report, so browsing the shipped presets with the window open puts a dialog
+    /// in front of the user on one preset in three. This case found that by
+    /// leaking 104 `juce::AsyncUpdater`s -- there is no message loop here to run
+    /// them -- and it is recorded in tech_debt.md rather than changed here: what
+    /// a user is owed when they open a preset is a product decision.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    SWTest::ScopedProblemCounter const counting;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The mailbox is primed first, and that is the whole setup: an effect
+    /// with plenty of parameters, an LFO running on it, and blocks of audio to
+    /// make it write. What the presets then do is replace that chain under it.
+    ///
+    ///   A mailbox entry says "slot 3, parameter 9" and keeps its dirty bit until
+    /// somebody sweeps it. Load a preset that puts a two-parameter effect in slot
+    /// 3 and the sweep hands parameter 9 to a strip that has three knobs --
+    /// reported as "Parameter index out of range" from
+    /// `effectSpecificParameterControl`.
+    ///
+    ///   Priming rather than rendering each preset's own chain, because rendering
+    /// real spectra in a checked build aborts on the negative-amplitude
+    /// verification (see presetRenderTests.cpp) and this case has to run in the
+    /// build where the assertions are.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    {
+        auto const &params(parameters(*plugin));
+        for (std::uint8_t slot(0); slot < LE::SW::Constants::maxNumberOfModules; ++slot)
+        {
+            OneParameterEvent const fill(parameterID(moduleChainType, slot), slot / 64.0);
+            params.flush(&*plugin, &*fill, &discardedOutputEvents());
+            OneParameterEvent const enable(lfoParameterID(slot, 0, lfoEnabled), 1);
+            params.flush(&*plugin, &*enable, &discardedOutputEvents());
+        }
+
+        std::vector<float> leftIn(blockSize, 0.0f), rightIn(blockSize, 0.0f);
+        std::vector<float> leftOut(blockSize), rightOut(blockSize);
+        auto const playing(transportAt(120, 0, CLAP_TRANSPORT_IS_PLAYING));
+        for (unsigned block(0); block < 8; ++block)
+            plugin.process(leftIn, rightIn, leftOut, rightOut, &playing);
+    }
+    editor->resyncModuleRack();
+
+    unsigned int loaded(0);
+    for (auto const &file : std::filesystem::recursive_directory_iterator(banks))
+    {
+        if (file.path().extension() != ".swp")
+            continue;
+
+        auto const presetData(LE::SW::readPresetFile(file.path()));
+        REQUIRE(presetData);
+
+        auto const name(file.path().stem().string());
+        REQUIRE(LE::SW::GUI::loadPreset(host, editor.get(), presetData.get(),
+                                        true /*ignore external samples*/, nullptr, name.c_str()));
+        ++loaded;
+
+        /// \note The posted resync, run by hand: a headless test has no message
+        /// loop to turn, and what the rack looks like between the load and the
+        /// resync is exactly where the strips and the chain disagree.
+        editor->resyncModuleRack();
+
+        // The rack is a function of the chain, whatever the preset asked for.
+        auto const modules(editor->moduleChain().size());
+        for (std::uint8_t slot(0); slot < modules; ++slot)
+            REQUIRE(editor->regionInSlot(slot) != nullptr);
+
+        // A preset that moves the FFT size asks for a restart; a host honours it.
+        plugin.restartIfAsked();
+
+        ////////////////////////////////////////////////////////////////////////
+        ///
+        /// \note The audio thread's part, played by hand and deliberately out of
+        /// date: a value for the *last* parameter index a module can have, in
+        /// every slot. That is what an LFO on a wide effect leaves behind, and a
+        /// preset that puts a three-knob effect in the same slot is what makes it
+        /// wrong -- the sweep below then hands parameter nine to a strip that has
+        /// three.
+        ///
+        ///   Written rather than produced by running the wide effect, because it
+        /// has to be certain: priming with a real chain publishes whatever
+        /// parameters that chain's LFOs happen to drive, and the first attempt at
+        /// this case published index 1, which every effect has, and proved
+        /// nothing.
+        ///                                   (02.08.2026.) (SW port)
+        ///
+        ////////////////////////////////////////////////////////////////////////
+        auto &mailbox(const_cast<LE::SW::Threading::ValueMailbox &>(host.modulatedValues()));
+        for (std::uint8_t slot(0); slot < LE::SW::Constants::maxNumberOfModules; ++slot)
+        {
+            LE::SW::ParameterID stale;
+            stale.value.type = LE::SW::ParameterID::ModuleParameter;
+            stale.value._.module = {LE::SW::ParameterID::Zero,
+                                    LE::SW::Constants::maxNumberOfParametersPerModule - 1, slot};
+            mailbox.set(LE::SW::parameterIndexFromBinaryID(stale.binaryValue), 0.5f);
+        }
+
+        // ...and then the interface draws whatever the LFOs left behind, which is
+        // the sweep the reported "Parameter index out of range" came from.
+        editor->pumpModulatedValues();
+    }
+
+    INFO("presets loaded: " << loaded);
+    REQUIRE(loaded > 300);
+
+    editor.reset();
 }

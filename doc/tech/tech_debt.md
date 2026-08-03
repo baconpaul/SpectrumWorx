@@ -95,6 +95,25 @@ New entries go at the top of their area.
   to the main thread and back before the slot changes, which is a latency a
   generic panel would notice.
 
+- **Rendering real spectra trips the negative-amplitude verification.**
+  (02.08.2026, from `presetRenderTests.cpp`) `goldenTests.cpp` already records
+  this for one effect — a running sum across thousands of bins drifts a hair
+  below zero and the next module reads it as an amplitude — and playing the
+  factory banks shows it is not one effect: **at least eight of the 303 presets**
+  abort a checked build on it, and the iteration was stopped rather than
+  finished. Benign in the output, which is why both files are release-build
+  artifacts and why the release run renders all 303 finite. It is a weakness in
+  the vector primitives, and a skip list would need a dozen names and would grow.
+
+- **Browsing the factory banks puts a dialog in front of the user on one preset
+  in three.** (02.08.2026, from the preset loop in `pluginTests.cpp`) 104 of the
+  303 shipped presets have something to report — almost all of them parameters
+  their effects grew after 2011 — and `GUI::loadPreset` raises one summary per
+  load when a window is open. That is the designed behaviour and it is defensible
+  for a preset a user picked deliberately; it is not defensible while arrowing
+  down a bank. Found by the loop leaking 104 `juce::AsyncUpdater`s. What a user
+  is owed here is a product decision, not a threading one.
+
 - **The LFO panel does not follow the host's tempo.**
   (02.08.2026, from `correct_the_threading.md` §6.8)
   `SpectrumWorxEditor::updateForNewTimingInfo()` is correct and unreachable: its

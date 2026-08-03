@@ -318,6 +318,14 @@ class SpectrumWorxEditor final : private SkinLifetime,
     /// for why it cannot always be immediate.
     void refreshModuleRackAsync();
 
+    /// \brief Draws whatever the LFOs have done since the last sweep.
+    ///
+    /// \note What `timerCallback()` is, at `modulationRefreshHz`. Public so a
+    /// test can be the clock: a headless run has no message loop to turn, and
+    /// this is where a stale mailbox entry meets a rack that has changed under
+    /// it.
+    void pumpModulatedValues();
+
     /// \brief Lets go of a strip's controls before it is destroyed, so that
     /// JUCE's focus handling cannot re-enter through a control that is going.
     void detachFrom(ModuleUI &);

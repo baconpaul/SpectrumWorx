@@ -1396,6 +1396,13 @@ void SpectrumWorxEditor::resyncModuleRack()
     });
     setLastModulePosition(slot);
 
+    /// \note And whatever the mailbox is holding is about the rack that was here
+    /// a moment ago. It coalesces rather than queues, so there is nothing to
+    /// deliver late -- an LFO that is still running writes again within the
+    /// block, and one that is not has nothing to say.
+    ///                                       (02.08.2026.) (SW port)
+    editorHost().modulatedValues().discardChanges();
+
     if (slotAwaitingFocus_ != noSlotAwaitingFocus)
     {
         if (auto *const pRegion = regionInRackSlot(slotAwaitingFocus_))
@@ -1465,7 +1472,9 @@ void SpectrumWorxEditor::parameterChangedElsewhere(ParameterID const parameterID
     }
 }
 
-void SpectrumWorxEditor::timerCallback()
+void SpectrumWorxEditor::timerCallback() { pumpModulatedValues(); }
+
+void SpectrumWorxEditor::pumpModulatedValues()
 {
     LE_ASSERT(isThisTheGUIThread());
 
@@ -1473,9 +1482,32 @@ void SpectrumWorxEditor::timerCallback()
         ParameterID const parameterID{Plugins::ParameterIndex{static_cast<std::uint16_t>(index)}};
         if (parameterID.type() != ParameterID::ModuleParameter)
             return;
-        if (auto *const pRegion = regionInSlot(parameterID.value._.module.moduleIndex))
-            pRegion->setParameter(parameterID.value._.module.moduleParameterIndex, value,
-                                  ModuleUI::LFOValue);
+
+        auto *const pRegion(regionInSlot(parameterID.value._.module.moduleIndex));
+        if (!pRegion)
+            return;
+
+        ////////////////////////////////////////////////////////////////////////
+        ///
+        /// \note The slot's effect may have changed since the value was written,
+        /// and then this is a parameter index the *previous* effect had. The
+        /// mailbox is a fixed array indexed by the maximal parameter layout and
+        /// keeps a dirty bit until somebody sweeps it, so a preset load leaves
+        /// values for slots whose effects it replaced -- and a knob's index that
+        /// meant Whisperer's tenth parameter means nothing at all in a Gain.
+        ///
+        ///   Reported as "Parameter index out of range" from
+        /// `effectSpecificParameterControl`, which is that index walked off the
+        /// end of the strip's child list.
+        ///                                   (02.08.2026.) (SW port)
+        ///
+        ////////////////////////////////////////////////////////////////////////
+        if (parameterID.value._.module.moduleParameterIndex >=
+            pRegion->module().numberOfParameters())
+            return;
+
+        pRegion->setParameter(parameterID.value._.module.moduleParameterIndex, value,
+                              ModuleUI::LFOValue);
     });
 }
 

@@ -37,6 +37,7 @@ add_executable(sw-dsp-tests
         parameters/streamingNameTests.cpp
         presets/presetCorpusTests.cpp
         presets/presetHarness.cpp
+        presets/presetRenderTests.cpp
         presets/presetRoundTripTests.cpp
         utility/buffersTests.cpp
         utility/circularListTests.cpp
