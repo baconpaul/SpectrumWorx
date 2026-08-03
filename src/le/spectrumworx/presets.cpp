@@ -472,6 +472,9 @@ LE_COLD void defaultPresetProblemReporter(PresetProblem const problem,
     case PresetProblem::MissingParameter:
         ++report_.missingParameters;
         return;
+    case PresetProblem::UnknownParameter:
+        ++report_.unknownParameters;
+        return;
     case PresetProblem::TempoSyncedLFOWithoutTempo:
         report_.tempoSyncedLFOWithoutTempo = true;
         return;
@@ -618,7 +621,11 @@ LE_COLD void ParametersLoader::loadModuleChain(ModuleChain &newChain)
             if (pModule)
             {
                 newChain.push_back(*pModule);
+                readParameters_.clear();
                 pModule->loadPresetParameters(*this);
+                /// \note Here rather than after the whole chain: the cursor moves
+                /// to the next module below, and what was read is per module.
+                reportUnreadParameters();
                 ++moduleIndex;
             }
         }
@@ -813,6 +820,14 @@ TiXmlElement const *findParameterNode(TiXmlElement const &parent, char const *co
 }
 } // anonymous namespace
 
+TiXmlElement const *ParametersLoader::noteAsRead(TiXmlElement const *const pNode) const
+{
+    if (pNode &&
+        (std::find(readParameters_.begin(), readParameters_.end(), pNode) == readParameters_.end()))
+        readParameters_.push_back(pNode);
+    return pNode;
+}
+
 LE_NOINLINE char const *
 ParametersLoader::getParameterAttribute(char const *const parameterName) const
 {
@@ -820,9 +835,13 @@ ParametersLoader::getParameterAttribute(char const *const parameterName) const
         return nullptr;
     if (grammar_ == Grammar::V3)
     {
-        auto const *const pNode(findParameterNode(parameters(), parameterName));
+        auto const *const pNode(noteAsRead(findParameterNode(parameters(), parameterName)));
         return pNode ? pNode->Attribute(parameterValueAttributeName_) : nullptr;
     }
+    /// \note An attribute of the module element rather than a child of it, so
+    /// there is nothing to record: reportUnreadParameters() walks elements. A 2.x
+    /// plain parameter and a 2.x LFO-able one are two different shapes and the
+    /// latter goes through getParameterNode() below.
     return parameters().Attribute(mangleName(parameterName).c_str());
 }
 
@@ -832,8 +851,8 @@ ParametersLoader::getParameterNode(char const *const parameterName) const
     if (!pParameters_)
         return nullptr;
     if (grammar_ == Grammar::V3)
-        return findParameterNode(parameters(), parameterName);
-    return parameters().FirstChildElement(mangleName(parameterName).c_str());
+        return noteAsRead(findParameterNode(parameters(), parameterName));
+    return noteAsRead(parameters().FirstChildElement(mangleName(parameterName).c_str()));
 }
 
 char const *ParametersLoader::parameterValueText(TiXmlElement const &parameterNode) const
@@ -843,6 +862,51 @@ char const *ParametersLoader::parameterValueText(TiXmlElement const &parameterNo
     /// LFO-able parameter in the file, silently defaulted.
     return (grammar_ == Grammar::V3) ? parameterNode.Attribute(parameterValueAttributeName_)
                                      : parameterNode.GetText();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// ParametersLoader::reportUnreadParameters()
+/// ------------------------------------------
+///
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Elements only, and only the current module's direct children. A 2.x
+/// plain parameter is an *attribute* of the module element and a 2.x LFO-able one
+/// is a child element; 3.0 makes everything a `<p>` child. So this catches the
+/// LFO-able half of a 2.x file and all of a 3.0 one -- which is where a rename
+/// would land, because the mangled element name is what the reader looks up.
+///
+/// \note An element the reader deliberately declines is still unread and is still
+/// reported. There is exactly one such case in the shipped format -- a `<Gate>`
+/// or `<Transient sensitivity>` for a build compiled without it -- and none of
+/// the 303 factory banks has one, which is why this can be an error rather than a
+/// list of exemptions. If a build ever ships without those, this is where it will
+/// say so.
+///                                           (02.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void ParametersLoader::reportUnreadParameters() const
+{
+    if (!pParameters_)
+        return;
+
+    for (auto const *pNode(parameters().FirstChildElement()); pNode;
+         pNode = pNode->NextSiblingElement())
+    {
+        if (std::find(readParameters_.begin(), readParameters_.end(), pNode) !=
+            readParameters_.end())
+            continue;
+
+        /// \note The 3.0 name, where there is one: `<p n="Wet">` says more than
+        /// `p`. A 2.x element's own name is the mangled parameter name.
+        auto const *const pName((grammar_ == Grammar::V3)
+                                    ? pNode->Attribute(parameterNameAttributeName_)
+                                    : pNode->Value());
+        LE_TRACE_LOGONLY("Unreadable parameter in preset (%s).", pName ? pName : "?");
+        reportPresetProblem(PresetProblem::UnknownParameter, pName ? pName : "");
+    }
 }
 
 LE_COLD void ParametersLoader::warnAboutMissingParameter(char const *const pParameterName)

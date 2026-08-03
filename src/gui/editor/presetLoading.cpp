@@ -227,6 +227,14 @@ void reportToTheUser(PresetLoadReport const &report)
                 << " effect(s) in it are not in this edition";
     if (report.unknownEffects || report.unavailableEffects)
         message << " (" << juce::String(report.firstDetail) << " and so on).\n";
+    /// \note The one parameter case that is the user's business: the file carries
+    /// a value and nothing in this build knows where to put it, so the preset
+    /// will not sound the way it was saved. Named, because a name is the only
+    /// thing that makes it reportable.
+    if (report.unknownParameters)
+        message << static_cast<int>(report.unknownParameters)
+                << " value(s) in it could not be applied (" << juce::String(report.firstDetail)
+                << ").\n";
     if (report.missingParameters)
         message << static_cast<int>(report.missingParameters)
                 << " parameter(s) it does not mention were left at their defaults.\n";

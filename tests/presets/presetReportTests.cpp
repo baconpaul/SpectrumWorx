@@ -26,6 +26,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cstring>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -46,6 +47,7 @@ struct FactoryReport
     unsigned int presets{0};
     unsigned int presetsWorthTellingTheUser{0};
     unsigned int missingParameters{0};
+    unsigned int unknownParameters{0};
     unsigned int unknownEffects{0};
     unsigned int unavailableEffects{0};
     unsigned int failures{0};
@@ -84,6 +86,7 @@ FactoryReport loadEveryFactoryPreset()
 
         auto const report(LE::SW::takePresetLoadReport());
         summary.missingParameters += report.missingParameters;
+        summary.unknownParameters += report.unknownParameters;
         summary.unknownEffects += report.unknownEffects;
         summary.unavailableEffects += report.unavailableEffects;
         summary.failures += report.failures;
@@ -113,6 +116,7 @@ TEST_CASE("Loading a factory preset tells the user nothing", "[presets][report]"
     // have, or failing to parse, is a fault in what we ship rather than news for
     // the user -- so none of it may reach them, and none of it is here to.
     CHECK(summary.presetsWorthTellingTheUser == 0);
+    CHECK(summary.unknownParameters == 0);
     CHECK(summary.unknownEffects == 0);
     CHECK(summary.unavailableEffects == 0);
     CHECK(summary.failures == 0);
@@ -149,4 +153,65 @@ TEST_CASE("What the factory presets do not mention is exactly this much",
 
     INFO("across " << summary.presets << " presets");
     CHECK(summary.missingParameters == knownMissingParameters);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The other side of the ledger, and what makes the silence above safe.
+///
+///   Reading a preset is one lookup per parameter the *effect* has, so an element
+/// the effect does not have a parameter for was never visited: a renamed
+/// parameter, a changed streaming name, an element the reader stopped
+/// recognising, all silently discarded. The preset would then not sound the way
+/// it was saved and nothing anywhere would say so -- while the count that *would*
+/// have moved, `missingParameters`, is exactly the one no longer shown.
+///
+///   So the loader compares what it took out of a module against what was in it.
+/// This case renames one element in the committed 3.0 fixture, which is the same
+/// thing a rename in the source would do to every preset ever saved.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A value the preset carries and nothing can place is an error", "[presets][report]")
+{
+    auto const fixture(
+        LE::SW::readPresetFile(std::filesystem::path(SW_PRESET_SNAPSHOT_DIR) / "format3.swp"));
+    REQUIRE(fixture);
+
+    std::string preset(fixture.get());
+    REQUIRE(preset.find("n=\"Semitones\"") != std::string::npos);
+    preset.replace(preset.find("n=\"Semitones\""), std::strlen("n=\"Semitones\""),
+                   "n=\"Semitonez\"");
+
+    SWTest::Engine engine;
+    engine.setNumberOfChannels(2, 2);
+    engine.setSampleRate(48000);
+    engine.setBlockSize(512);
+    REQUIRE(engine.initialise());
+
+    LE::SW::takePresetLoadReport();
+    std::vector<char> buffer(preset.begin(), preset.end());
+    buffer.push_back('\0'); // the parse is destructive and wants a terminator
+    REQUIRE(LE::SW::loadPreset(buffer.data(), true, nullptr, SWTest::PresetConsumer{engine}));
+
+    auto const report(LE::SW::takePresetLoadReport());
+
+    // Both halves: the effect asked for a parameter that is not there, and the
+    // file carried one nothing asked for. Only the second is the user's business.
+    CHECK(report.missingParameters == 1);
+    CHECK(report.unknownParameters == 1);
+    CHECK(report.worthTellingTheUser());
+
+    // ...and the unchanged fixture says nothing at all.
+    LE::SW::takePresetLoadReport();
+    SWTest::Engine untouched;
+    untouched.setNumberOfChannels(2, 2);
+    untouched.setSampleRate(48000);
+    untouched.setBlockSize(512);
+    REQUIRE(untouched.initialise());
+
+    std::vector<char> original(fixture.get(), fixture.get() + preset.size());
+    original.push_back('\0');
+    REQUIRE(LE::SW::loadPreset(original.data(), true, nullptr, SWTest::PresetConsumer{untouched}));
+    CHECK_FALSE(LE::SW::takePresetLoadReport().worthTellingTheUser());
 }

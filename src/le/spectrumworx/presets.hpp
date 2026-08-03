@@ -46,6 +46,7 @@
 #include <memory>
 #include <span>
 #include <string>
+#include <vector>
 #include <type_traits>
 #include <string_view>
 #include <utility> // rvalues
@@ -104,6 +105,25 @@ enum struct PresetProblem : std::uint8_t
     UnknownEffect,      ///< names an effect this build does not have
     EffectNotAvailable, ///< names an effect this edition excludes
     MissingParameter,   ///< the effect has a parameter the preset does not mention
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The preset carries a value this build cannot place.
+    ///
+    /// \note The opposite of MissingParameter, and the reason that one can be
+    /// kept quiet. "The file does not mention a parameter" is the format working
+    /// -- the effect grew it later and the default applies. "The file mentions
+    /// something nothing asked for" is data being thrown away: a renamed
+    /// parameter, a changed streaming name, a reader that stopped recognising an
+    /// element. The preset will not sound the way it was saved, and that is worth
+    /// interrupting somebody for.
+    ///
+    ///   It needs the loader to *notice*, which it did not: reading is pull, one
+    /// lookup per parameter the effect has, so an element nobody asked for was
+    /// never visited. See ParametersLoader::reportUnreadParameters().
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    UnknownParameter,
     TempoSyncedLFOWithoutTempo
 };
 
@@ -142,6 +162,7 @@ void reportPresetProblem(PresetProblem, std::string_view detail = {});
 struct PresetLoadReport
 {
     unsigned int missingParameters{0};
+    unsigned int unknownParameters{0};
     unsigned int unknownEffects{0};
     unsigned int unavailableEffects{0};
     unsigned int failures{0}; ///< LoadFailed, SaveFailed, FutureFormat
@@ -152,8 +173,8 @@ struct PresetLoadReport
 
     unsigned int total() const
     {
-        return missingParameters + unknownEffects + unavailableEffects + failures +
-               tempoSyncedLFOWithoutTempo;
+        return missingParameters + unknownParameters + unknownEffects + unavailableEffects +
+               failures + tempoSyncedLFOWithoutTempo;
     }
 
     explicit operator bool() const { return total() != 0; }
@@ -184,7 +205,8 @@ struct PresetLoadReport
     ////////////////////////////////////////////////////////////////////////////
     bool worthTellingTheUser() const
     {
-        return (failures + unknownEffects + unavailableEffects + tempoSyncedLFOWithoutTempo) != 0;
+        return (failures + unknownParameters + unknownEffects + unavailableEffects +
+                tempoSyncedLFOWithoutTempo) != 0;
     }
 }; // struct PresetLoadReport
 
@@ -461,6 +483,19 @@ class ParametersLoader : private PresetHandler
 
     bool syncedLFOFound() const { return syncedLFOFound_; }
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Reports every element of the current module that nothing read.
+    ///
+    /// \note Reading a preset is one lookup per parameter the *effect* has, so
+    /// an element the effect does not have a parameter for is never visited --
+    /// and a renamed parameter is exactly that, silently discarded. This is the
+    /// other half of the ledger: what was in the file against what was taken out
+    /// of it. \see PresetProblem::UnknownParameter.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    void reportUnreadParameters() const;
+
     bool isPre27Preset() const;
 
     template <typename T>
@@ -586,12 +621,21 @@ class ParametersLoader : private PresetHandler
 
     bool switchedToModuleParameters() const;
 
+    /// \brief Records that \p pNode's value was taken, for reportUnreadParameters().
+    ///
+    /// \note Pointers into the parsed document, which outlives every read of it;
+    /// a vector rather than a set because a module has at most a dozen
+    /// parameters and this is a linear scan either way.
+    TiXmlElement const *noteAsRead(TiXmlElement const *pNode) const;
+
   private:
     TiXmlElement const *LE_RESTRICT pParameters_;
 
     Grammar grammar_;
 
     mutable bool syncedLFOFound_;
+
+    mutable std::vector<TiXmlElement const *> readParameters_;
 
 #ifdef LE_SW_SDK_BUILD //...mrmlj...ugh...
     friend class Engine::ModuleProcessorImpl;
