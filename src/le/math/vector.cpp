@@ -27,8 +27,12 @@
 #define LE_ACC_NO_VFORCE 0
 #define LE_MATH_USE_ACC
 #define LE_MATH_NATIVE_POINTER_SIZE_INTERFACE
-#pragma message("LE.Math.Vector using "                                                            \
-                "OS X 10.4 Accelerate framework.")
+/// \note The text named OS X 10.4, an OS from 2005 and the one thing in the
+/// message that had stopped being worth saying. What it is for -- telling you at
+/// build time which backend the vector primitives were compiled against -- is
+/// all that is left of it.
+///                                           (02.08.2026.) (SW port)
+#pragma message("LE.Math.Vector using the Accelerate framework.")
 // NT2 seems still slightly slower than Acc. on OS X...
 //#define LE_MATH_USE_NT2
 #endif // OSX/iOS
