@@ -646,8 +646,8 @@ void Plugin2HostPassiveInteropController::ParameterNameGetter::operator()(
     // It was however, simplified to a single std::sprintf() after revision
     // 3602 as it was deemed enough.
     //                                    (22.02.2011.) (Domagoj Saric)
-    LE_VERIFY(unsigned(LE_INT_SPRINTFA(buffer_.begin(), "Module %u", parameterID.moduleIndex + 1)) <
-              buffer_.size());
+    LE_VERIFY(unsigned(std::snprintf(buffer_.begin(), buffer_.size(), "Module %u",
+                                     parameterID.moduleIndex + 1)) < buffer_.size());
 }
 
 void Plugin2HostPassiveInteropController::ParameterNameGetter::operator()(
@@ -711,10 +711,10 @@ void Plugin2HostPassiveInteropController::ParameterNameGetter::operator()(
     if (!pModule &&
         (parameterID.moduleParameterIndex + 1 >= Effects::BaseParameters::Parameters::static_size))
     {
-        LE_VERIFY(
-            unsigned(LE_INT_SPRINTFA(buffer_.begin(), "M%u.P%u.LFO.%s", parameterID.moduleIndex + 1,
-                                     parameterID.moduleParameterIndex - (5 - 1) + 1,
-                                     lfoParameterName)) < buffer_.size());
+        LE_VERIFY(unsigned(std::snprintf(buffer_.begin(), buffer_.size(), "M%u.P%u.LFO.%s",
+                                         parameterID.moduleIndex + 1,
+                                         parameterID.moduleParameterIndex - (5 - 1) + 1,
+                                         lfoParameterName)) < buffer_.size());
         return;
     }
 

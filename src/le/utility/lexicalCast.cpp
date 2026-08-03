@@ -43,9 +43,18 @@ LE_OPTIMIZE_FOR_SIZE_BEGIN()
 // http://www.dreamincode.net/code/snippet2482.htm
 // http://www.piumarta.com/software/fcvt
 
+/// \note The buffer is a bare pointer, so the bound snprintf gets is the one the
+/// interface asks its callers for: RequiredStringStorage<T>::value. The asserts
+/// are what says so -- snprintf returns the length it *wanted*, so a buffer the
+/// constant sizes too small shows up as a truncation in a debug build rather
+/// than as an overrun in a release one.
+///                                           (02.08.2026.) (SW port)
 LE_COLD unsigned int lexical_cast(std::int32_t const value, char *const buffer)
 {
-    return LE_INT_SPRINTFA(buffer, "%d", value);
+    auto const charactersWritten(
+        std::snprintf(buffer, RequiredStringStorage<std::int32_t>::value, "%d", value));
+    LE_ASSERT(charactersWritten < RequiredStringStorage<std::int32_t>::value);
+    return static_cast<unsigned int>(charactersWritten);
 }
 LE_COLD unsigned int lexical_cast(long const value, char *const buffer)
 {
@@ -53,7 +62,10 @@ LE_COLD unsigned int lexical_cast(long const value, char *const buffer)
 }
 LE_COLD unsigned int lexical_cast(std::uint32_t const value, char *const buffer)
 {
-    return LE_INT_SPRINTFA(buffer, "%u", value);
+    auto const charactersWritten(
+        std::snprintf(buffer, RequiredStringStorage<std::uint32_t>::value, "%u", value));
+    LE_ASSERT(charactersWritten < RequiredStringStorage<std::uint32_t>::value);
+    return static_cast<unsigned int>(charactersWritten);
 }
 LE_COLD unsigned int lexical_cast(unsigned long const value, char *const buffer)
 {
@@ -77,7 +89,10 @@ LE_COLD LE_NOINLINE unsigned int lexical_cast(double const value, std::uint8_t c
                                               char *const buffer)
 {
     char const format[] = {'%', '.', static_cast<char>('0' + decimalPlaces), 'f', '\0'};
-    unsigned int totalCharactersWritten(std::sprintf(buffer, format, value));
+    auto const charactersWanted(
+        std::snprintf(buffer, RequiredStringStorage<double>::value, format, value));
+    LE_ASSERT(charactersWanted < RequiredStringStorage<double>::value);
+    unsigned int totalCharactersWritten(static_cast<unsigned int>(charactersWanted));
     if (decimalPlaces)
     {
         /// \note Trim trailing zeros.

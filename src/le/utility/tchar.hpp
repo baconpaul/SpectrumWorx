@@ -55,23 +55,14 @@ typedef char TCHAR;
 #endif
 #endif // _MSC_VER
 
-#ifdef _WIN32
-extern "C" __declspec(dllimport) int __cdecl wsprintfA(__out char *,
-                                                       __in __format_string char const *, ...);
-extern "C" __declspec(dllimport) int __cdecl wsprintfW(__out wchar_t *,
-                                                       __in __format_string wchar_t const *, ...);
-#define LE_INT_SPRINTFA ::wsprintfA
-#define LE_INT_SPRINTFW ::wsprintfW
-#else // _WIN32
-#define LE_INT_SPRINTFA std::sprintf
-#define LE_INT_SPRINTFW std::swprintf
-#endif // _WIN32
-
-#ifdef _UNICODE
-#define LE_INT_SPRINTF LE_INT_SPRINTFW
-#else
-#define LE_INT_SPRINTF LE_INT_SPRINTFA
-#endif // _UNICODE
+/// \note The LE_INT_SPRINTFA/W/LE_INT_SPRINTF family stood here, over USER32's
+/// wsprintfA on Windows and std::sprintf elsewhere, to keep the statically linked
+/// CRT's printf out of the binary -- the same size argument lexicalCast.cpp
+/// retired. Every one of its six call sites knew the size of the buffer it was
+/// writing into and none of them passed it, which is what the deprecation of
+/// sprintf is about; they say std::snprintf now, with that size. The wide arm
+/// never had a caller.
+///                                           (02.08.2026.) (SW port)
 
 #include "platformSpecifics.hpp"
 

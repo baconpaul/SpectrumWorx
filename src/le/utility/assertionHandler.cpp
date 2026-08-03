@@ -197,16 +197,11 @@ void breakIntoDebugger()
 #endif
 }
 
-#pragma warning(push)
-#pragma warning(                                                                                   \
-    disable                                                                                        \
-    : 4996) // 'itoa': The POSIX name for this item is deprecated. Instead, use the ISO C++ conformant name: _itoa.
-
-static
-    LE_NOINLINE void assertionFailedMsgAux([[maybe_unused]] char const *const expression,
-                                           char const *const message,
-                                           [[maybe_unused]] char const *const function,
-                                           [[maybe_unused]] char const *const file, long const line)
+static LE_NOINLINE void assertionFailedMsgAux([[maybe_unused]] char const *const expression,
+                                              char const *const message,
+                                              [[maybe_unused]] char const *const function,
+                                              [[maybe_unused]] char const *const file,
+                                              long const line)
 {
 
     bool ignore;
@@ -230,11 +225,10 @@ static
     std::strcat(fullMessage, file);
     std::strcat(fullMessage, "\n at line\n  ");
 #endif // LE_PUBLIC_BUILD
-#ifdef _MSC_VER
-    /*std*/ ::itoa(line, &fullMessage[std::strlen(fullMessage)], 10);
-#else
-    std::sprintf(&fullMessage[std::strlen(fullMessage)], "%ld", line);
-#endif // _MSC_VER
+    // Every strcat above is unbounded, so by here the buffer may be full; the
+    // line number is the one write that can be told where the end is.
+    auto const used(std::strlen(fullMessage));
+    std::snprintf(&fullMessage[used], sizeof(fullMessage) - used, "%ld", line);
 #ifdef LE_PUBLIC_BUILD
     std::strcat(fullMessage, ")");
 #endif // LE_PUBLIC_BUILD
@@ -259,7 +253,6 @@ static
     }
 }
 
-#pragma warning(pop)
 } // anonymous namespace
 
 /// \note This used to define boost::assertion_failed and

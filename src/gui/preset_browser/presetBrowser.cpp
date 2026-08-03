@@ -581,7 +581,10 @@ void PresetBrowser::buttonClicked(juce::Button *const pButton)
             unsigned int const suffixLength(1 + 1 + 2 + counter / 100 + 1);
             newPreset.preallocateBytes((newPresetNameLength + suffixLength) * sizeof(char_t));
             char_t *const pSuffix(newPreset.getCharPointer().getAddress() + newPresetNameLength);
-            LE_VERIFY(LE_INT_SPRINTF(pSuffix, _T( " (%02u)" ), ++counter) <= signed(suffixLength));
+            // preallocateBytes() reserves the terminating null over and above
+            // what it is asked for, so the suffix gets suffixLength + 1.
+            LE_VERIFY(std::snprintf(pSuffix, suffixLength + 1, " (%02u)", ++counter) <=
+                      signed(suffixLength));
         }
 
         // Implementation note:

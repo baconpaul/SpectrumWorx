@@ -1792,9 +1792,9 @@ juce::String periodRatioString(SpectrumWorxEditor::LFODisplay const &parent,
         LE_DEFAULT_CASE_UNREACHABLE();
     }
 
-    unsigned int const charactersWritten(
-        LE_INT_SPRINTFA(&buffer[0], "%u/%u%s bars", Math::convert<unsigned int>(numerator),
-                        Math::convert<unsigned int>(denominator), suffix));
+    unsigned int const charactersWritten(std::snprintf(
+        &buffer[0], buffer.size(), "%u/%u%s bars", Math::convert<unsigned int>(numerator),
+        Math::convert<unsigned int>(denominator), suffix));
     LE_ASSERT(charactersWritten < buffer.size());
     return juce::String(&buffer[0], charactersWritten);
 }
