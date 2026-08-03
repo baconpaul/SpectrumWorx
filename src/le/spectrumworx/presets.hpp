@@ -431,7 +431,7 @@ class PresetHandler
         auto const numberOfCharacters(Utility::lexical_cast(
             std::is_enum<T>::value ? static_cast<std::uint8_t>(binarySource) : binarySource,
             buffer.data()));
-        LE_ASSUME(numberOfCharacters <= buffer.size());
+        LE_ASSERT(numberOfCharacters <= buffer.size());
         return std::string(buffer.data(), numberOfCharacters);
     }
 

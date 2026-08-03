@@ -403,7 +403,7 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
     bool blockAutomation() const
     {
         //...mrmlj...
-        LE_ASSUME(Host2PluginInteropControler::blockAutomation() == false);
+        LE_ASSERT(Host2PluginInteropControler::blockAutomation() == false);
         return false;
     }
 
@@ -414,8 +414,6 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
     bool deferOrApplySpectralSetup();
 
     void resetChannelBuffers();
-
-    void handleTimingInformationChange(LFO::Timer::TimingInformationChange);
 
     bool resize(Engine::StorageFactors const &newfactors);
 

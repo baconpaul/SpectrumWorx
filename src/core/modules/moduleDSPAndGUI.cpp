@@ -70,7 +70,7 @@ namespace Engine
 void LE_NOINLINE intrusive_ptr_release_deleter(ModuleNode const *LE_RESTRICT const pModuleNode)
 {
     auto const &module(actualModule<Module>(*pModuleNode));
-    LE_ASSUME(module.referenceCount_ == 0);
+    LE_ASSERT(module.referenceCount_ == 0);
     ModuleFactory::destroy(module);
 }
 } // namespace Engine

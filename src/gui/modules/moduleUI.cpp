@@ -697,7 +697,7 @@ ModuleUI::effectSpecificParameterControl(std::uint8_t const parameterIndex) cons
 
 ModuleUI::Module &ModuleUI::module()
 {
-    LE_ASSUME(pModule_.get() != nullptr);
+    LE_ASSERT(pModule_.get() != nullptr);
     return *pModule_;
 }
 ModuleUI::Module const &ModuleUI::module() const { return const_cast<ModuleUI &>(*this).module(); }

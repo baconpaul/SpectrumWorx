@@ -765,7 +765,7 @@ parameterIDFromIndex(Plugins::ParameterIndex const parameterIndex)
     // http://stackoverflow.com/questions/5069489/performance-of-built-in-types-char-vs-short-vs-int-vs-float-vs-double
     ParameterID parameterID;
 
-    LE_ASSUME(parameterIndex < maxNumberOfParameters);
+    LE_ASSERT(parameterIndex < maxNumberOfParameters);
     LE_ASSERT(maxNumberOfParameters <= std::numeric_limits<std::uint16_t>::max());
     auto index(parameterIndex.value);
 

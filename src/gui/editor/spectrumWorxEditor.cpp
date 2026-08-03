@@ -1802,7 +1802,7 @@ juce::String periodRatioString(SpectrumWorxEditor::LFODisplay const &parent,
 juce::String periodMillisecondsString(SpectrumWorxEditor::LFODisplay const &parent,
                                       double const &periodScale)
 {
-    LE_ASSUME(parent.period().milliseconds() == periodScale);
+    LE_ASSERT(parent.period().milliseconds() == periodScale);
 
     bool const skipRatio(skipPeriodRatio(parent.period()));
     unsigned char const precision(!skipRatio * 2);
@@ -2387,7 +2387,7 @@ SpectrumWorxEditor::Settings::~Settings()
 
 void SpectrumWorxEditor::Settings::sliderValueChanged(juce::Slider *const pSlider) noexcept
 {
-    LE_ASSUME(pSlider == &interfacePage_.opacitySlider());
+    LE_ASSERT(pSlider == &interfacePage_.opacitySlider());
     Theme::singleton().settings().globalOpacity = pSlider->getValue();
 
     juce::Colour const tabBackground(juce::Colours::black.withAlpha(

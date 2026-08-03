@@ -592,14 +592,19 @@ void SpectrumWorxCore::resetChannelBuffers()
     Engine::Processor::resetChannelBuffers();
 }
 
-void SpectrumWorxCore::handleTimingInformationChange(
-    LFO::Timer::TimingInformationChange const timingInformationChange)
-{
-    /// \note We assume that SpectrumWorxCore is used by protocols that do not
-    /// provide tempo information.
-    ///                                       (02.02.2012.) (Domagoj Saric)
-    LE_ASSUME(!timingInformationChange.timingInfoChanged());
-}
+/// \note `SpectrumWorxCore::handleTimingInformationChange()` stood here. It hid
+/// `Processor`'s -- non-virtually -- to assert that the timing never changes,
+/// "because SpectrumWorxCore is used by protocols that do not provide tempo
+/// information" (02.02.2012.). The CLAP made that false the moment it started
+/// feeding the host's tempo, and the assumption was one of the nine `LE_ASSUME`s
+/// clang was dropping on the floor for containing a call -- so it never fired.
+///
+///   Nothing named it: `Processor::updatePosition()` and the two
+/// `updatePositionAndTimingInformation()`s call their own, statically, and it was
+/// private here. Deleted rather than turned into an assert, because reachable it
+/// would have been the wrong behaviour twice over -- an assert on a legitimate
+/// tempo change, and, in release, an LFO update swallowed.
+///                                           (02.08.2026.) (SW port)
 
 //namespace GUI { bool isThisTheGUIThread(); bool isGUIInitialised(); }
 SpectrumWorxCore const &SpectrumWorxCore::fromEngineSetup(Engine::Setup const &engineSetup)
