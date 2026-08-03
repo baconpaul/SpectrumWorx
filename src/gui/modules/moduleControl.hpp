@@ -272,9 +272,17 @@ class ModuleControlImpl final : public ModuleControlBase, public ImplWidget
         reportActiveControl();
         ImplWidget::focusChanged();
     }
+    /// \note `|| !isEnabled()`. JUCE spells getWantsKeyboardFocus() as
+    /// `wantsKeyboardFocusFlag && !isDisabledFlag`, and
+    /// `Component::setEnabled( false )` sets that flag *before* handing the
+    /// focus to the parent -- so a control disabled while it holds the focus
+    /// arrives here reading "does not want focus", having never stopped wanting
+    /// it. `ModuleKnob::mouseDown` does exactly that to a knob whose LFO is on,
+    /// which is why clicking one fired this.
+    ///                                       (03.08.2026.) (SW port)
     virtual void focusLost(juce::Component::FocusChangeType) noexcept override
     {
-        LE_ASSERT(this->getWantsKeyboardFocus());
+        LE_ASSERT(this->getWantsKeyboardFocus() || !this->isEnabled());
         reportInactiveControl();
         ImplWidget::focusChanged();
     }

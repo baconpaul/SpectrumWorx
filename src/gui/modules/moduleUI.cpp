@@ -159,21 +159,25 @@ void ModuleKnob::setupForParameter(juce::Image const &imageStrip,
     }
 }
 
-void ModuleKnob::mouseDown(juce::MouseEvent const &event) noexcept
+/// \note `mouseDown` was `Knob::mouseDown( event ); setEnabled( !isLFOEnabled() )`
+/// and `mouseUp` put the enabled flag back, with "in order for the base class to
+/// handle the mouseDown() event, the control has to be disabled afterwards"
+/// (09.12.2011.) over it. What that bought was one thing --
+/// `juce::Slider::mouseDrag` is gated on `isEnabled()` -- and what it cost was
+/// the focus: `Component::setEnabled( false )` hands the keyboard focus to the
+/// parent, so pressing a knob whose LFO was on deactivated the control and took
+/// its own LFO display off the screen, on the way to tripping
+/// `ModuleControlImpl::focusLost`'s assertion.
+///
+///   Blocking the one gesture instead is also what the other two already do:
+/// `lfoStateChanged()` keys `setScrollWheelEnabled()` and
+/// `setDoubleClickReturnValue()` on the same question. This is the drag.
+///                                           (03.08.2026.) (SW port)
+void ModuleKnob::mouseDrag(juce::MouseEvent const &event) noexcept
 {
-    // Implementation note:
-    //   In order for the base class to handle the mouseDown() event, the
-    // control has to be disabled afterwards.
-    //                                        (09.12.2011.) (Domagoj Saric)
-    Knob::mouseDown(event);
-    setEnabled(!isLFOEnabled());
-}
-
-void ModuleKnob::mouseUp(juce::MouseEvent const &event) noexcept
-{
-    LE_ASSERT(isEnabled() == !isLFOEnabled());
-    Knob::mouseUp(event);
-    setEnabled(true);
+    if (isLFOEnabled())
+        return;
+    Knob::mouseDrag(event);
 }
 
 void ModuleKnob::paint(juce::Graphics &graphics)

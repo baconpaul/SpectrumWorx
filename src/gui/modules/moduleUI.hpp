@@ -118,8 +118,7 @@ class LE_NOVTABLE ModuleKnob : public Knob, public ModuleControl<ModuleKnob>
                            std::uint8_t quantizationStep);
 
   private: // juce::Component overrides
-    void mouseDown(juce::MouseEvent const &) noexcept override;
-    void mouseUp(juce::MouseEvent const &) noexcept override;
+    void mouseDrag(juce::MouseEvent const &) noexcept override;
 
     void valueChanged() noexcept override;
 

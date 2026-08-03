@@ -65,6 +65,7 @@ add_executable(sw-plugin-tests
         # sw-impl -- plugin2Host.cpp -- rather than in the engine.
         parameters/parameterTableTests.cpp
         presets/presetHarness.cpp
+        gui/moduleControlFocusTests.cpp
         gui/pathsTests.cpp
         gui/skinTests.cpp
         gui/twoInstanceTests.cpp

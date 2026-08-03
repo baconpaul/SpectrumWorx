@@ -277,24 +277,22 @@ void SharedModuleControls::FrequencyRange::mouseDown(juce::MouseEvent const &eve
 {
     //...mrmlj...LE_ASSERT( hasFocus() == this->isActive() );
     updateSliderSelection(event);
-    // Implementation note:
-    //   The slider is disabled if the LFO for the activated control/thumb is
-    // enabled in order to disable changing the parameter value through the GUI
-    // (in juce::Slider mouseDown() or mouseDrag() member functions).
-    //                                        (04.10.2011.) (Domagoj Saric)
-    if (selectedThumb_ != Constants::noThumb)
-    {
-        setEnabled(!lfo().enabled());
-    }
     verifyThumbAndParameterIndicies();
     juce::Slider::mouseDown(event);
     verifyThumbAndParameterIndicies();
 }
 
-void SharedModuleControls::FrequencyRange::mouseUp(juce::MouseEvent const &event) noexcept
+/// \note `setEnabled( !lfo().enabled() )` stood in mouseDown and `setEnabled(
+/// true )` in mouseUp, "in order to disable changing the parameter value through
+/// the GUI" (04.10.2011.) -- the same trick, and the same cost, as
+/// ModuleKnob::mouseDown; see the note there. Only the drag needs blocking, and
+/// disabling a focused control makes JUCE deactivate it.
+///                                           (03.08.2026.) (SW port)
+void SharedModuleControls::FrequencyRange::mouseDrag(juce::MouseEvent const &event) noexcept
 {
-    setEnabled(true);
-    juce::Slider::mouseUp(event);
+    if ((selectedThumb_ != Constants::noThumb) && lfo().enabled())
+        return;
+    juce::Slider::mouseDrag(event);
 }
 
 void SharedModuleControls::FrequencyRange::mouseMove(juce::MouseEvent const &event) noexcept

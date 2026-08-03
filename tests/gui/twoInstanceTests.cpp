@@ -27,20 +27,16 @@
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
-#include "goldens/engineHarness.hpp"
+#include "gui/editorHarness.hpp"
 #include "presets/presetHarness.hpp"
 
 #include "core/automatedModuleChain.hpp"
-#include "core/host_interop/plugin2Host.hpp"
 
 /// \note Before anything that names SW::Module: loadPreset() is a template over
 /// its consumer and downcasts a chain node to it, so this translation unit needs
 /// the complete type -- and this is the header that has it.
 #include "core/modules/moduleDSPAndGUI.hpp"
 
-#include "gui/editor/editorHost.hpp"
-#include "gui/editor/spectrumWorxEditor.hpp"
-#include "gui/resources.hpp"
 #include "gui/theme.hpp"
 
 #include "le/spectrumworx/presetFile.hpp"
@@ -59,86 +55,12 @@ namespace
 using namespace LE;
 using namespace LE::SW;
 
-/// \note Every one of these is a notification travelling plugin -> host, and
-/// there is no host.
-class SilentNotifications final : public Plugin2HostInteropControler
-{
-  private:
-    void automatedParameterBeginEdit(ParameterID) const override {}
-    void automatedParameterEndEdit(ParameterID) const override {}
-    void gestureBegin(char const *) const override {}
-    void gestureEnd() const override {}
-    void automatedParameterChanged(ParameterID, ParameterValueForAutomation) const override {}
-    void moduleChanged(std::uint8_t, Module const *) const override {}
-    bool parameterListChanged() const override { return true; }
-    void presetChangeBegin() const override {}
-    void presetChangeEnd() const override {}
-    bool latencyChanged() override { return true; }
-
-#if LE_SW_ENGINE_INPUT_MODE >= 2
-    bool hostTryIOConfigurationChange(std::uint8_t, std::uint8_t) override { return false; }
-    bool hostSupportsIOConfigurationChanges() const override { return false; }
-#endif // LE_SW_ENGINE_INPUT_MODE >= 2
-}; // class SilentNotifications
-
-/// One plugin's worth of everything an editor reaches into.
-class Instance final : public GUI::EditorHost
-{
-  public:
-    Instance()
-    {
-        engine_.setNumberOfChannels(2, 2);
-        engine_.setSampleRate(48000);
-        engine_.setBlockSize(512);
-        REQUIRE(engine_.initialise());
-    }
-
-    void openEditor() { pEditor_ = std::make_unique<GUI::SpectrumWorxEditor>(*this); }
-    void closeEditor() { pEditor_.reset(); }
-    GUI::SpectrumWorxEditor &editor() const
-    {
-        REQUIRE(pEditor_ != nullptr);
-        return *pEditor_;
-    }
-
-    SpectrumWorxCore &core() override { return engine_; }
-    Plugin2HostInteropControler &automation() override { return notifications_; }
-
-    /// \note Real ones, and nobody drains them: what the editor asks for goes
-    /// into the queue and stays there. These cases are about lifetime, and a
-    /// queue that fills would be a finding rather than a nuisance.
-    Threading::ToEngineQueue &toEngine() const override { return toEngine_; }
-    Threading::ValueMailbox const &modulatedValues() const override { return values_; }
-
-    void editorOpened(GUI::SpectrumWorxEditor &) override {}
-    void editorClosed() override {}
-
-    juce::File currentSampleFile() const override { return {}; }
-    void setNewSample(juce::File const &) override {}
-    bool isSampleLoadInProgress() const override { return false; }
-    void registerSampleLoadedListener(GUI::SpectrumWorxEditor &) override {}
-    void deregisterSampleLoadedListener(GUI::SpectrumWorxEditor const &) override {}
-
-    bool completelyDisableIOChanges() const override { return false; }
-    bool shouldLoadLastSessionOnStartup() const override { return false; }
-    void shouldLoadLastSessionOnStartup(bool) override {}
-
-  private:
-    SWTest::Engine engine_;
-    SilentNotifications notifications_;
-    mutable Threading::ToEngineQueue toEngine_;
-    Threading::ValueMailbox values_;
-    std::unique_ptr<GUI::SpectrumWorxEditor> pEditor_;
-}; // class Instance
-
-/// \brief JUCE, owned the way the shim owns it: one reference held across
-/// everything the case does.
-struct HostSideJuce
-{
-    juce::ScopedJuceInitialiser_GUI initialiser;
-    /// The skin caches juce::Images, and no juce::Image may outlive JUCE.
-    ~HostSideJuce() { GUI::releaseCachedResources(); }
-};
+/// \note Instance, SilentNotifications and HostSideJuce were defined here until
+/// moduleControlFocusTests.cpp needed an editor too; they are in
+/// gui/editorHarness.hpp now, unchanged.
+///                                           (03.08.2026.) (SW port)
+using SWTest::HostSideJuce;
+using SWTest::Instance;
 } // anonymous namespace
 
 TEST_CASE("Closing one editor leaves JUCE standing for the other", "[gui][two-instances]")

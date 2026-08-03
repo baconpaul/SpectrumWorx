@@ -90,7 +90,7 @@ class SharedModuleControls : public WidgetBase<>
         void focusLost(juce::Component::FocusChangeType) override;
 
         void mouseDown(juce::MouseEvent const &) noexcept override;
-        void mouseUp(juce::MouseEvent const &) noexcept override;
+        void mouseDrag(juce::MouseEvent const &) noexcept override;
 
         void mouseEnter(juce::MouseEvent const &) noexcept override;
         void mouseExit(juce::MouseEvent const &) noexcept override;
