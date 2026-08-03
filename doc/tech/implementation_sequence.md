@@ -1,5 +1,22 @@
 # SpectrumWorx — Implementation Sequence (CLAP-first)
 
+> ### 📕 Evidence, not a plan. *Retained deliberately; see [`README.md`](README.md).*
+>
+> **Stages 0–8 are closed.** This document was executed between 27.07.2026 and
+> 01.08.2026 and is no longer what anyone works from —
+> [`week_two.md`](week_two.md) is. It is kept for two things nothing else has:
+> *why* each decision went the way it did, and the per-stage "done when" that
+> each commit was measured against.
+>
+> Read it knowing that **the port disproved some of it**. The largest: 5.8's
+> paragraph on threading treats the model as something to patch, and it was
+> replaced instead — see [`correct_the_threading.md`](correct_the_threading.md).
+> Stage 8's account of the preset browser, and every test count in here, are
+> likewise dated rather than current. Where this and `week_two.md` disagree,
+> `week_two.md` is right; where `week_two.md` and `correct_the_threading.md`
+> disagree about threading, the latter is.
+>                                                     (03.08.2026.) (SW port)
+
 Companion to [`initial_scan.md`](initial_scan.md), which is the analysis. This
 is the plan: a stage-by-stage path from the 2016 tree to a modern three-OS
 plugin, each stage ending in something you can build, test and commit.

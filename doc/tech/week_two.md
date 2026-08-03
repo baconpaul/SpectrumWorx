@@ -31,13 +31,19 @@ reasons this document exists rather than another pass over the old one:
    `FactoryPresets` landed with the presets-button fix. 6.4 is smaller than
    advertised, and §1 says by how much.
 
-**Since then — 01.08.2026 — a third thing, and it outweighs both.** The plugin
-has been loaded in Logic and in Bitwig, and it **deadlocks in both** in certain
-situations. Everything this document says about threading was written from
-reading; it is now written from running, and the conclusion changed: §1 item 3 is
-a **redesign of the threading model**, taken as its own project, not the six-step
-fixup the audit implied. The audit in §2.2 keeps all of its value as the
-inventory that redesign has to satisfy. It is no longer the plan.
+**Since then — 01.08.2026 — a third thing, and it outweighed both.** The plugin
+was loaded in Logic and in Bitwig, and it **deadlocked in both** in certain
+situations. Everything this document said about threading had been written from
+reading; that made it written from running, and the conclusion changed: §1 item 3
+became a **redesign of the threading model**, taken as its own project, not the
+six-step fixup the audit implied. The audit in §2.2 keeps all of its value as the
+inventory that redesign had to satisfy. It is no longer the plan.
+
+**And on 02.08.2026 that redesign landed** —
+[`correct_the_threading.md`](correct_the_threading.md), nine stages, the
+processing lock deleted. **It has not been back into either host since**, so the
+deadlocks are unverified rather than fixed, and item 1 is now the top of the
+list: it is the only thing that can close item 3.
 
 ---
 
@@ -46,8 +52,8 @@ inventory that redesign has to satisfy. It is no longer the plan.
 | | |
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone — macOS arm64. Linux arm64 proven at stage 4. Windows arrives as logs. |
-| Runs | Standalone, with audio, with the real editor, with presets. **Loads in Logic and in Bitwig, and deadlocks in both** in certain situations — see §1 item 3. |
-| Tests | **192/192**: 181 Catch2 + 9 `sw-show-ui --render` + 2 build-property checks, in both build trees. Goldens run in Release only. |
+| Runs | Standalone, with audio, with the real editor, with presets. It deadlocked in Logic and in Bitwig; **the threading model those deadlocks were a property of has since been replaced and nobody has reloaded it in either host** — see §1 item 3. |
+| Tests | **194/194** as of 03.08.2026: 183 Catch2 + 9 `sw-show-ui --render` + 2 build-property checks, in both build trees. Goldens run in Release only. Two binaries — `sw-dsp-tests` and `sw-plugin-tests` — not one. |
 | CI | **None.** There is no `.github/`. |
 | Warnings | **229 unique sites**, 227 of them one class — see §3. Everything else our targets emitted is fixed as of 02.08.2026. |
 | Identity | ✅ `org.surge-synth-team.spectrumworx`, AU `aufx`/`SWrx` by `SSTx` — see §4. |
@@ -66,23 +72,32 @@ Ordering principle, as written on 01.08.2026: *the plugin has never met a host,
 and the audit in §2 says the host is where it will break.*
 
 **It has now met two, and it broke where §2.2 said it would.** SpectrumWorx loads
-in Logic and in Bitwig and **deadlocks in both** in certain situations. That is
-the single most important fact in this document and it re-sorts the list below:
+in Logic and in Bitwig and **deadlocked in both** in certain situations. That is
+the single most important fact in this document and it re-sorted the list below:
 everything that makes a DAW session survive comes before everything that makes
-the build tidy, and item 3 is no longer a fixup.
+the build tidy, and item 3 stopped being a fixup.
+
+> **Since then — 02.08.2026 — item 3 has been designed and executed**, all nine
+> stages, in [`correct_the_threading.md`](correct_the_threading.md). The lock the
+> deadlock was a property of no longer exists. **Nobody has reloaded the plugin in
+> Logic or Bitwig since**, so the deadlocks are *unverified*, not fixed, and item
+> 1 is what settles it — which makes item 1, not item 3, the top of this list.
+>
+>   Item 1 has grown a second job because of that: it is no longer only
+> "does it load", it is the whole of `correct_the_threading.md` §9's by-hand list.
 
 | # | What | Stage | Size |
 |---|---|---|---|
 | 0 | ✅ **Three bugs found writing this document** | — | *done* |
-| 1 | **Load it in a DAW**, and run `clap-validator` / `auval` | 1, 5.9 | 1–2 days |
+| 1 | **Load it in a DAW**, run `clap-validator` / `auval`, and settle whether the deadlocks are gone | 1, 5.9 | 1–2 days |
 | 2 | ✅ **Plugin identity** — Surge Synth Team ids, before any binary exists | new | *done* |
-| 3 | **Threading — a redesign, not the fixup below.** Deadlocks in Logic and Bitwig | 5.8 | its own project |
+| 3 | ✅ **Threading — a redesign, not a fixup.** Executed; unverified in a host, which is item 1 | 5.8 | *done, 02.08.2026* |
 | 4 | **A real state format**, and the tests it has never had | 5.6 | 3–4 days |
 | 5 | ✅ **The owned-window collapse** | 6.4 | *done* |
 | 6 | **CI**, three OSes × four formats, with the gates that already exist | 1.5, 5.9 | 3–5 days |
 | 7 | ✅ **The audio file loader**, and dropping the last flag | 5.0 | *done* |
 | 8 | ✅ **Property tests for the nine amplifying effects** | 4.4 | *done* |
-| 9 | **The stage 7 tail** — include-what-you-use, and seven macros no build can define | 7 | 3–4 days |
+| 9 | **The stage 7 tail** — include-what-you-use, seven macros no build can define, and the 227 `-Wundefined-var-template` of §3 | 7 | 3–4 days |
 | 10 | **Ship** — licence, README, manual, installers, notarisation | 9 | 1–2 weeks |
 
 ### 0 — Three bugs, first, because they are one line each ✅ *done, 01.08.2026*
@@ -113,7 +128,12 @@ Found while auditing for this document, not by a test. Details and evidence in
   three location setters and `refreshAndSelectPreset()` all pass through; the
   constructor starts it disabled like the other two.
 
-**What the coverage is, and what it is not.** `tests/core/processLockTests.cpp`
+**What the coverage is, and what it is not.** *(Written 01.08.2026, against the
+lock. `processLockTests.cpp` is `tests/core/engineOwnershipTests.cpp` now — the
+lock is gone, so what it pins is who owns the engine rather than who holds the
+lock, and every case that was about contention was deleted rather than ported.
+The reasoning below about reaching the C++ object survives the rename.)*
+`tests/core/processLockTests.cpp`
 holds the processing lock on a thread of its own and drives both sides: the
 engine, which must decline and leave the buffer alone, and *the plugin a host
 holds*, which must hand back silence. Reaching the second needed the C++ object
@@ -125,19 +145,27 @@ what no test host had. **Save-As has no test.** It is a `juce::Button` enabled
 state on a component that needs an editor to exist; §2.3's "the GUI tests assert
 exit code only" is the row that owns it.
 
-### 1 — Load it in a DAW — *begun; it deadlocks*
+### 1 — Load it in a DAW — *begun; it deadlocked, and the model has changed under it*
 
-**Logic and Bitwig have both loaded it, and it deadlocks in both** in certain
-situations. So this row is no longer "everything below is speculation until it
+**Logic and Bitwig both loaded it, and it deadlocked in both** in certain
+situations. So this row stopped being "everything below is speculation until it
 happens" — it happened, and it produced the single largest finding in this
 document. See item 3, which it re-scoped from a fixup into a redesign.
 
-What it still owes: Reaper, `clap-cpp-validator validate` (not the Rust one — see
-stage 1's findings) and `auval -v aufx SpWx SSTx`, and the deliberate drive
-through the joins listed below. None of that is worth doing carefully until the
-threading is settled, because a deadlock will mask every other finding — but the
-*situations that deadlock* are worth writing down now, precisely, while they
-still reproduce.
+> **This is now the top of the list, 02.08.2026.** The redesign landed and
+> deleted every part of the cycle the deadlock was attributed to, and nothing has
+> been back into a host since. So this row owns two questions it did not have
+> before — *are the deadlocks gone*, and *does a real host honour
+> `request_restart`* — and until it answers the first one, item 3 is executed but
+> not confirmed. `correct_the_threading.md` §9's last bullet is the by-hand list:
+> the situations that deadlocked, a preset load while audio runs, an FFT-size
+> change while audio runs, a slot change from the host's generic panel, and
+> save/reload. §7 there says what a failure would need — both backtraces, taken
+> before anything else, because §5 item 0 expired without them.
+
+What it still owes beyond that: Reaper, `clap-cpp-validator validate` (not the
+Rust one — see stage 1's findings) and `auval -v aufx SWrx SSTx`, and the
+deliberate drive through the joins listed below.
 
 Specifically worth driving, because §2 says these are where the joins are — and
 because the first two are prime suspects for the deadlocks:
@@ -159,15 +187,29 @@ plist and a test.
 One thing it leaves for item 1: the CLAP installed in
 `~/Library/Audio/Plug-Ins/CLAP` is still the old build under the old id.
 
-### 3 — Threading (5.8): a redesign, and its own project
+### 3 — Threading (5.8): a redesign, and its own project ✅ *done, 02.08.2026*
 
-> **The design is written and this row is now a pointer to it:**
+> **The design is written and executed, and this row is a pointer to it:**
 > [`correct_the_threading.md`](correct_the_threading.md), 02.08.2026. It takes §2.2
 > below as its inventory, as this row asked, and adds four causes the audit did not
 > have — two owners of JUCE's lifetime, four process-wide UI statics that two
 > instances share, an allocation and a JUCE message post reachable from the audio
 > thread through a module's *destructor*, and the absence of any base parameter value
 > distinct from the LFO's output. Everything below is retained as the evidence.
+>
+> **All nine stages landed.** There is no processing lock: the audio thread owns
+> the engine while the plugin is activated and the main thread owns it otherwise,
+> edits cross as commands on two SPSC queues, modulated values cross in a
+> coalescing mailbox, and `sw-dsp` links no JUCE at all — which
+> `checkNoJuceInDSP.cmake` now fails the build over. rtsan and tsan are clean.
+>
+> **What is not settled is whether the deadlocks are gone.** Every part of the
+> cycle §1A named is gone, the lock included, but that is an argument rather than
+> an observation and nobody has reloaded the plugin in Logic or Bitwig. That is
+> item 1, and `correct_the_threading.md` §7 and §9 say exactly what to drive.
+> Two other things it left open are there too: `request_restart` has never been
+> answered by a real host, and a backtrace pair from the two-instance deadlock is
+> only collectable if it still reproduces.
 
 **SpectrumWorx deadlocks in Logic and in Bitwig**, in certain situations. That is
 first-hand, from running it, and it settles an argument this document was still
@@ -613,7 +655,18 @@ location setters and `refreshAndSelectPreset()` meet — the button depends on
 *where the browser is*, not on what is selected in it, which is why it never
 belonged with the other two.
 
-### 2.2 Threading: the audit
+### 2.2 Threading: the audit ✅ *the inventory it lists is satisfied, 02.08.2026*
+
+> **Superseded by [`correct_the_threading.md`](correct_the_threading.md), and
+> kept as the evidence it was written to be.** Every violation named below is
+> gone, along with the arrangement that permitted them: there is no
+> `processCriticalSection_`, `SW::Module` holds no `ModuleUI`, and `sw-dsp` links
+> no JUCE. Read this section for *what the 2016 model was and how it was found*,
+> not for anything to do. The one thing here that is still live is the note on
+> `currentThreadOwnsTheProcessLock()` being a hardcoded answer — its replacement,
+> `Threading::{isMainThread,isAudioThread}`, is real, and `threadCheckTests.cpp`
+> is what says so.
+>                                                     (03.08.2026.) (SW port)
 
 The sequence budgets 1–2 weeks for 5.8 and describes the starting point as "a
 `BackgroundThread`, a `GUI::Lock` over `MessageManagerLock`, and no lock-free
@@ -682,6 +735,14 @@ processing lock on a second thread and drives both the engine and the plugin a
 host holds. It is also the first test in the tree that contends the lock at all,
 which makes it the smallest existing instrument for item 3.
 
+> **It was, and item 3 used it.** The file is `engineOwnershipTests.cpp` now:
+> there is no lock to contend, so it pins the successor question — which thread
+> may mutate the engine, and when — and `threadCheckTests.cpp` pins the thread
+> identity that answer is made of. They are in *different* binaries, which is the
+> point of the split: the first needs only the engine and is in `sw-dsp-tests`,
+> the second needs the CLAP and is in `sw-plugin-tests`.
+>                                                     (03.08.2026.) (SW port)
+
 **The holes, by value:**
 
 | Hole | State |
@@ -694,7 +755,7 @@ which makes it the smallest existing instrument for item 3.
 | **The test host is too thin** | *Half closed, 01.08.2026.* `StatefulHost` offers `clap.state` and deliberately no `clap.thread-check`, which is the combination §2.1a needed; `RecordingHost` still offers `clap.params` and nothing else. What is still missing is a host that offers `clap.thread-check` and *answers*, which is the only way to test the main-thread arm of a deferral rather than only the deferred one. |
 | **`lfoImpl.cpp` has no direct test** | Only LFO 0 of module 0 targeting Gain is ever exercised. Waveform shapes, sync types, `PeriodScale` snapping, `LowerBound > UpperBound`, an LFO on an enumerated target, several at once — none. A value-table golden fits the existing pattern. |
 | **Both text conversions are stubs, and they are one job** | `paramsTextToValue` is `return false` (`spectrumWorxCLAP.cpp:469`); `paramsValueToText` **ignores the value it is given** and prints the parameter's current one (`:414-441`). Both are documented at length with a shared `\todo`: give `AutomatedParameterPrinter` an arm that takes a value *and* the live parameter, so an LFO's dynamic range has an owner to validate against. Host-visible in every automation lane tooltip, and unpinned by any test. |
-| **The GUI tests assert exit code only** | `renderPage()` writes a PNG and returns 0. A page that paints solid black passes. Blank/uniform-colour detection is about ten lines and would make the existing nine tests assert something — and it is what would have caught the empty settings panel 6.4 found by looking at a render. |
+| **The GUI tests assert exit code only** | *Still true of the nine renders, 03.08.2026.* `renderPage()` writes a PNG and returns 0; a page that paints solid black passes. Blank/uniform-colour detection is about ten lines and is what would have caught the empty settings panel 6.4 found by looking at a render. **What has changed is that there is now a second kind of GUI test beside them:** `tests/gui/moduleControlFocusTests.cpp` builds an editor, puts it on the desktop and drives a control, asserting focus, selection and parameter values rather than an exit code. `gui/editorHarness.hpp` is what makes another one cheap. It also found the ceiling — a synthesised mouse cannot set `isMouseOverOrDragging()`, and the real one needs an app bundle the test binary is not. |
 | **1 of 57 effects, 1 of 18 banks** | `SW_SHOW_UI_EFFECT`, `SW_SHOW_UI_PRESET` and `SW_SHOW_UI_PRESET_SWEEP` exist and are manual-only. A CMake `foreach` over the effect list is four lines for 57× the GUI breadth. |
 | **`ctest -LE slow` skips nothing** | No test in the repo sets `LABELS`; the one labelled case went with `check_gui_flag_parity.py`. Either re-establish the label or stop recommending the flag. |
 
@@ -718,10 +779,13 @@ and defined nowhere a live build can reach.** Two of them are defined *only* in
 
 Two of these are worth more than tidying:
 
-- **`LE_SW_FULL` leaves a live branch that raises a `juce::AlertWindow` from a
-  path the audio thread can reach** (`factory.cpp:159-167`). The only thing
-  stopping it is `Effects::includedEffects`, a `constexpr` table that is
+- ✅ ~~**`LE_SW_FULL` leaves a live branch that raises a `juce::AlertWindow` from a
+  path the audio thread can reach**~~ (`factory.cpp:159-167`). The only thing
+  stopping it was `Effects::includedEffects`, a `constexpr` table that is
   currently all-`true`. A compile-time table is not a thread guard.
+  *Fixed 02.08.2026 by `correct_the_threading.md` §1C: the branch reports through
+  the same counted reporter a preset load uses, which is in this layer and raises
+  nothing. `factory.cpp` carries the note. The macro itself is still item 9's.*
 - **`LE_HAS_NT2` / `LE_MATH_USE_NT2`** account for roughly **534 lines across 33
   regions of `le/math/vector.cpp`** — about a quarter of the file — that cannot
   be reached now stage 4 is done. Careful when deleting: `math.cpp:414` and
@@ -752,8 +816,10 @@ audit harder: the threading audit spent real effort proving that
 `core/modules/{moduleGUI.cpp,moduleGUI.hpp,moduleDSP.hpp}` (superseded by
 `moduleDSPAndGUI.cpp`, and their own comments say so), `src/debugConsole.cpp`,
 `le/build/{precompiledHeaders.{cpp,hpp},juceIncludeWrapper.hpp}` (no target uses
-a PCH), `le/utility/{conditionVariable.hpp,pimpl.hpp,pimplPrivate.hpp,
-entryPoint.hpp,filesystemImpl.inl}`, `le/plugins/{entryPoint.hpp,plugin.hpp}`
+a PCH), `le/utility/{`~~`conditionVariable.hpp,`~~`pimpl.hpp,pimplPrivate.hpp,
+entryPoint.hpp,filesystemImpl.inl}` (`conditionVariable.hpp` and
+`criticalSection.hpp` went with the processing lock, 02.08.2026),
+`le/plugins/{entryPoint.hpp,plugin.hpp}`
 (0.3 kept `le/plugins/` "until `le/plugins/clap/` works" — the VST2/AU/FMOD/Unity
 backends are already gone, and these two are what is left), `GUI::Lock`,
 ~~`gui.mm`'s `hideCursor`/`showCursor`~~ (gone with 6.4), and eight symbols that
@@ -815,13 +881,17 @@ come back for the Windows build, or `sst-plugininfra` already covers them.
 
 ### 2.7 Small things that have drifted
 
-- **The tree is no longer clang-format clean.** 67 files fail
-  `clang-format --dry-run -Werror` (21.1.5), and **56 of them were touched by the
-  stage 7 de-Boost range** `42c720a..db8c423` — mostly effect headers, from the
-  variadic-macro conversion. Stage 0.6 established "format-stable" and recorded
-  the reformat in `.git-blame-ignore-revs`; that property has lapsed. One
-  reformat commit plus the CI gate in item 6. Pin the clang-format version in CI
-  while you are there, since nothing in `.clang-format` does.
+- **The tree is no longer clang-format clean.** 67 files failed
+  `clang-format --dry-run -Werror` (21.1.5) when this was written, and **56 of
+  them were touched by the stage 7 de-Boost range** `42c720a..db8c423` — mostly
+  effect headers, from the variadic-macro conversion. Stage 0.6 established
+  "format-stable" and recorded the reformat in `.git-blame-ignore-revs`; that
+  property has lapsed. One reformat commit plus the CI gate in item 6. Pin the
+  clang-format version in CI while you are there, since nothing in
+  `.clang-format` does.
+  *Re-counted 03.08.2026: **80** files, and only **2** of them outside
+  `src/le/`. So it is still one reformat commit, and it is still almost entirely
+  the 2016 sources rather than anything the port has written.*
 - **The preset browser's header strip prints
   `currentDirectory_.getFullPathName()` unconditionally**
   (`presetBrowser.cpp:907-912`),
@@ -1289,11 +1359,19 @@ identity being changed is the *publisher's*, not the author's.
 
 Beyond the ordered list, six things worth deciding rather than drifting into.
 
-**0. Capture the deadlocks before touching the threading.** They reproduce in
-Logic and in Bitwig today; the moment the model changes they stop being
-collectable, and a stack from each side of a held lock is worth more to the
-redesign than the whole of §2.2. Which host, which situation, both backtraces.
-This is the only item here with an expiry date.
+**0. ~~Capture the deadlocks before touching the threading.~~ *Expired,
+02.08.2026, unclaimed.*** It said: they reproduce in Logic and in Bitwig today,
+the moment the model changes they stop being collectable, and a stack from each
+side of a held lock is worth more to the redesign than the whole of §2.2. It was
+the only item here with an expiry date and the date passed — the redesign landed
+without the backtraces.
+
+  What that costs, exactly: the redesign deleted every part of the cycle §1A of
+`correct_the_threading.md` names, so if the deadlock is gone we will not know
+*which* of those parts it was, and **if it survives we have no evidence and have
+to start from a live reproduction anyway.** So the ask is unchanged and now
+belongs to item 1: reload in both hosts, and if either still hangs, take both
+backtraces before anything else.
 
 **1. Thicken the test host before doing anything else to the host layer.**
 §2.1a is a null dereference that the whole green suite cannot see, because the

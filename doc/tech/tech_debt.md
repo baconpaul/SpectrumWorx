@@ -288,8 +288,10 @@ New entries go at the top of their area.
 
 ## Tests
 
-- **`[preset-corpus]` fails about one run in three when `sw-tests` is run bare,
-  and `ctest` cannot see it.** (01.08.2026, item 4) 153 of the 303 rows move —
+- **`LFO::Timer`'s tempo is three process-global statics, and a test binary is
+  where that stops being benign.** (01.08.2026, item 4; symptom closed
+  03.08.2026) It read: `[preset-corpus]` fails about one run in three when
+  `sw-tests` is run bare, and `ctest` cannot see it. 153 of the 303 rows move —
   the ones with a tempo-synced LFO. The cause is process-global state:
   `LFOImpl::Timer` keeps `barDuration_`, `measureNumerator_` and
   `hasTempoInformation_` as **statics**, and `Timer::reset()` deliberately does
@@ -302,11 +304,27 @@ New entries go at the top of their area.
   transport cases have told the plugin a tempo, every later preset load in that
   process converts `PeriodScale` differently, and the corpus digests move.
 
-  Reproduce it deterministically with
-  `./sw-tests --order decl "[lfo],[preset-corpus]"` — 153 failures, every time.
-  It hides because `catch_discover_tests` gives each case its own process, so
-  `ctest` is always green; only running the binary directly, which is the
-  quicker thing to do while working, exposes it.
+  ~~Reproduce it deterministically with
+  `./sw-tests --order decl "[lfo],[preset-corpus]"` — 153 failures, every time.~~
+  It hid because `catch_discover_tests` gives each case its own process, so
+  `ctest` was always green; only running the binary directly, which is the
+  quicker thing to do while working, exposed it.
+
+  > **The symptom is gone as of 02.08.2026, by accident, and the cause is not.**
+  > The threading redesign's stage 7 split `sw-tests` into `sw-dsp-tests` and
+  > `sw-plugin-tests` so that the engine's cases could link without JUCE.
+  > `[preset-corpus]` went to the first and `pluginTests.cpp`'s `[clap][lfo]`
+  > transport cases to the second, so the two are no longer in one process and
+  > neither binary can pollute the other. Measured 03.08.2026: `./sw-dsp-tests
+  > --order decl` is 108 passed / 3 skipped and `./sw-plugin-tests --order decl`
+  > is 72 passed, both bare, both green.
+  >
+  >   Nothing was fixed. `LFOImpl::Timer`'s three statics are still statics and
+  > `hasTempoInformation_` is still sticky; what changed is that no test now runs
+  > on the far side of them. A case added to `sw-dsp-tests` that establishes a
+  > tempo would bring the whole thing straight back, with no warning, which is
+  > why this entry stays.
+  >                                                   (03.08.2026.)
 
   Two things are wrong and only one of them is the test's. A plugin whose
   tempo-to-period conversion depends on whether *any* instance in the process

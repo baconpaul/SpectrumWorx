@@ -135,10 +135,13 @@ a 303-row diff that says nothing.
 
 ### The order to trust
 
-Run the snapshots under `ctest`, or with `--order decl`. Running the `sw-tests`
-binary bare puts every case in one process, and `[preset-corpus]` then fails
-about one run in three — a pre-existing flake, not a regression, caused by
-process-global tempo state in `LFO::Timer`. See `tech_debt.md`, "Tests".
+Run the snapshots under `ctest`. All three live in `sw-dsp-tests`, which as of
+02.08.2026 is one of two test binaries — the split put the only cases that could
+pollute them, `pluginTests.cpp`'s `[clap][lfo]` transport ones, in the other one.
+Running `sw-dsp-tests` bare is green today for that reason and not because
+anything was fixed: `LFO::Timer`'s tempo state is still three process-global
+statics, and a case added to this binary that sets a tempo would move 153 of the
+303 `[preset-corpus]` rows again. See `tech_debt.md`, "Tests".
 
 ---
 

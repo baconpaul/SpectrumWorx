@@ -294,8 +294,9 @@ restart with it and installs its chain in `activate()`.
 
 ## 6. Stages
 
-Each leaves a working plugin and a green `sw-tests` in both build trees. One commit per
-stage, on a branch.
+Each leaves a working plugin and a green `ctest` in both build trees. One commit per
+stage, on a branch. (`sw-tests` is what stage 7 split into `sw-dsp-tests` and
+`sw-plugin-tests`; the stage notes below name it as it was at the time.)
 
 **0 — Instruments and evidence.** ✅ *done, 02.08.2026.* No behaviour change; see §6.0
 below for what it found.
@@ -870,8 +871,17 @@ These go to `tech_debt.md` as this project's own leavings.
   called from the parameter layer and the editor. That is the LFO parameter interface's
   redesign rather than this one's.
 - **Dragging the base with the LFO active.** The data is plumbed in stage 3 — the model
-  carries both values — but the four sites that disable the knob stay, and drawing the sweep
+  carries both values — but the mouse still refuses the gesture, and drawing the sweep
   around a live knob is a skin decision.
+
+  > **Amended 03.08.2026.** This read "the four sites that disable the knob stay". There
+  > are no such sites now: `ModuleKnob` and `SharedModuleControls::FrequencyRange` disabled
+  > themselves for the duration of a press, which made JUCE hand the keyboard focus to the
+  > parent and *deselect the control the user had just pressed* — so a modulated knob could
+  > not be selected in order to reach its own LFO. Both now return at the top of `mouseDrag`
+  > instead, beside the wheel and double-click switches that were already keyed on the same
+  > question. What is deferred is unchanged and is now a one-line change per gesture: let
+  > the drag through and route it to the base value rather than the modulated one.
 - **The preset browser's file IO** stays synchronous on the message thread.
 - **`UIEdits` drops gestures when full** — an existing entry, unchanged by this.
 
@@ -879,7 +889,8 @@ These go to `tech_debt.md` as this project's own leavings.
 
 ## 9. Verification
 
-- `sw-tests` green in **both** build trees at every stage; the goldens run in Release only.
+- `ctest` green in **both** build trees at every stage; the goldens run in Release only.
+  Two binaries as of stage 7, not one: `sw-dsp-tests` and `sw-plugin-tests`.
 - `presetCorpus.txt`, `streamingNames.txt` and `parameterTable.txt` must not move. If a
   digest shifts, a value changed, and that is a bug rather than a snapshot to refresh.
 - **By reversion**, as this project does elsewhere: drop the base write and the preset-save

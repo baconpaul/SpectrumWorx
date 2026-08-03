@@ -8,6 +8,16 @@ Written against commit `6e09d15` (post-restructure: `source/` → `src/`,
 [`initial_scan.md`](initial_scan.md) §1.6.2 and §8.3, which state the conclusion;
 this document shows the mechanism.
 
+> **Still accurate as of 03.08.2026**, and the only document about this layer.
+> The port did not change the parameter system: the skeleton, the addressing and
+> the runtime re-meaning are what they were. Two things it does not know about,
+> both additive — the base value now travels separately from the LFO's output
+> (`correct_the_threading.md` §4), and `tests/parameters/parameterTable.txt`
+> pins the whole 286-row enumeration. The one open item against this layer is
+> `week_two.md` §3's 227 `-Wundefined-var-template`, which is a missing
+> declaration in `Parameters::Name<>` rather than a flaw in what is described
+> here.
+
 ---
 
 ## 1. The short version
