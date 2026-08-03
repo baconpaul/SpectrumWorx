@@ -14,7 +14,7 @@
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
-#include "swClapEntryImpl.hpp"
+#include "clap/testHost.hpp"
 
 #include "core/host_interop/parameters.hpp" // the fixed parameter count
 
@@ -29,7 +29,6 @@
 #include "presets/presetHarness.hpp"
 #include "gui/editor/spectrumWorxEditor.hpp"
 #include "le/spectrumworx/presetStorage.hpp"
-#include "spectrumWorxCLAP.hpp"
 
 #include <clap/clap.h>
 
@@ -50,316 +49,7 @@ namespace
 {
 //------------------------------------------------------------------------------
 
-/// The smallest host that answers everything clap::helpers::Plugin asks at
-/// construction. Every extension is absent, which is legal and is the
-/// interesting case: it means the plugin may not assume any of them.
-clap_host const &nullHost()
-{
-    static clap_host host{CLAP_VERSION,
-                          nullptr,
-                          "sw-tests",
-                          "SpectrumWorx",
-                          "",
-                          "0",
-                          [](clap_host const *, char const *) -> void const * { return nullptr; },
-                          [](clap_host const *) {},
-                          [](clap_host const *) {},
-                          [](clap_host const *) {}};
-    return host;
-}
-
-/// \brief A host that supports clap_host_params and counts what it is asked.
-///
-/// \note nullHost() above deliberately has no extensions, which makes it useless
-/// for the one thing a slot change is supposed to cause. Rescans are deferred to
-/// the main thread, so a test has to pump on_main_thread() before looking.
-class RecordingHost
-{
-  public:
-    RecordingHost()
-        : params_{[](clap_host const *, clap_param_rescan_flags const flags) {
-                      instance().rescanFlags |= flags;
-                  },
-                  [](clap_host const *, clap_id, clap_param_clear_flags) {},
-                  [](clap_host const *) { ++instance().flushRequests; }},
-          host_{CLAP_VERSION, nullptr, "sw-tests", "SpectrumWorx", "", "0",
-                [](clap_host const *, char const *const id) -> void const * {
-                    return (std::strcmp(id, CLAP_EXT_PARAMS) == 0) ? &instance().params_ : nullptr;
-                },
-                // request_restart, request_process, request_callback -- in that
-                // order; the last is the one a deferred rescan asks for.
-                [](clap_host const *) {}, [](clap_host const *) {},
-                [](clap_host const *) { ++instance().mainThreadCallbacks; }}
-    {
-        rescanFlags = 0;
-        flushRequests = 0;
-        mainThreadCallbacks = 0;
-    }
-
-    RecordingHost(RecordingHost const &) = delete; // the callbacks reach the singleton
-    RecordingHost &operator=(RecordingHost const &) = delete;
-
-    clap_host const &operator*() const { return host_; }
-
-    clap_param_rescan_flags rescanFlags{0};
-    unsigned flushRequests{0};
-    unsigned mainThreadCallbacks{0};
-
-    /// \note The C callbacks carry no context of their own -- clap_host::host_data
-    /// is the plugin's, not ours -- so there is one of these at a time.
-    static RecordingHost &instance()
-    {
-        REQUIRE(pInstance != nullptr);
-        return *pInstance;
-    }
-    static RecordingHost *pInstance;
-
-  private:
-    clap_host_params params_;
-    clap_host host_;
-}; // class RecordingHost
-
-RecordingHost *RecordingHost::pInstance{nullptr};
-
-/// Scopes RecordingHost::instance() to one test.
-class CurrentRecordingHost
-{
-  public:
-    CurrentRecordingHost() { RecordingHost::pInstance = &host_; }
-    ~CurrentRecordingHost() { RecordingHost::pInstance = nullptr; }
-
-    CurrentRecordingHost(CurrentRecordingHost const &) = delete;
-    CurrentRecordingHost &operator=(CurrentRecordingHost const &) = delete;
-
-    RecordingHost &operator*() { return host_; }
-    RecordingHost *operator->() { return &host_; }
-
-  private:
-    RecordingHost host_;
-}; // class CurrentRecordingHost
-
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \brief A host that provides `clap.state` and, deliberately, no
-/// `clap.thread-check`.
-///
-///   RecordingHost above offers `clap.params` and nothing else, which is why
-/// week_two.md §2.1a was invisible: `markCurrentProgramAsModified()` returns at
-/// its `canUseState()` check before it can ask a thread-check that is not there.
-/// Every real DAW provides state. This is the shape that reaches the bug --
-/// state present, thread-check absent -- and CLAP explicitly allows it:
-/// `clap.thread-check` is optional and a plugin may not assume it.
-///
-/// \note The interesting assertion is that nothing crashes. What it also pins
-/// is the *consequence* of not being able to ask: the dirty mark has to go
-/// through on_main_thread(), because "am I already on it" is exactly the
-/// question this host refuses to answer.
-///
-////////////////////////////////////////////////////////////////////////////////
-
-class StatefulHost
-{
-  public:
-    StatefulHost()
-        : state_{[](clap_host const *) { ++instance().dirtyMarks; }},
-          host_{CLAP_VERSION,
-                nullptr,
-                "sw-tests",
-                "SpectrumWorx",
-                "",
-                "0",
-                [](clap_host const *, char const *const id) -> void const * {
-                    return (std::strcmp(id, CLAP_EXT_STATE) == 0) ? &instance().state_ : nullptr;
-                },
-                [](clap_host const *) {},
-                [](clap_host const *) {},
-                [](clap_host const *) { ++instance().mainThreadCallbacks; }}
-    {
-        dirtyMarks = 0;
-        mainThreadCallbacks = 0;
-    }
-
-    StatefulHost(StatefulHost const &) = delete; // the callbacks reach the singleton
-    StatefulHost &operator=(StatefulHost const &) = delete;
-
-    clap_host const &operator*() const { return host_; }
-
-    unsigned dirtyMarks{0};
-    unsigned mainThreadCallbacks{0};
-
-    static StatefulHost &instance()
-    {
-        REQUIRE(pInstance != nullptr);
-        return *pInstance;
-    }
-    static StatefulHost *pInstance;
-
-  private:
-    clap_host_state state_;
-    clap_host host_;
-}; // class StatefulHost
-
-StatefulHost *StatefulHost::pInstance{nullptr};
-
-/// Scopes StatefulHost::instance() to one test. \see CurrentRecordingHost
-class CurrentStatefulHost
-{
-  public:
-    CurrentStatefulHost() { StatefulHost::pInstance = &host_; }
-    ~CurrentStatefulHost() { StatefulHost::pInstance = nullptr; }
-
-    CurrentStatefulHost(CurrentStatefulHost const &) = delete;
-    CurrentStatefulHost &operator=(CurrentStatefulHost const &) = delete;
-
-    StatefulHost &operator*() { return host_; }
-    StatefulHost *operator->() { return &host_; }
-
-  private:
-    StatefulHost host_;
-}; // class CurrentStatefulHost
-
-clap_input_events const &noInputEvents()
-{
-    static clap_input_events events{
-        nullptr, [](clap_input_events const *) -> std::uint32_t { return 0; },
-        [](clap_input_events const *, std::uint32_t) -> clap_event_header const * {
-            return nullptr;
-        }};
-    return events;
-}
-
-clap_output_events const &discardedOutputEvents()
-{
-    static clap_output_events events{
-        nullptr, [](clap_output_events const *, clap_event_header const *) { return true; }};
-    return events;
-}
-
-clap_plugin_factory const &factory()
-{
-    auto const *const pFactory(static_cast<clap_plugin_factory const *>(
-        LE::SW::ClapFirst::getFactory(CLAP_PLUGIN_FACTORY_ID)));
-    REQUIRE(pFactory != nullptr);
-    return *pFactory;
-}
-
-/// \brief RAII around the entry point, whose init/deinit are refcounted and
-/// must bracket every factory call.
-class Entry
-{
-  public:
-    Entry() { REQUIRE(LE::SW::ClapFirst::clapInit("sw-tests")); }
-    ~Entry() { LE::SW::ClapFirst::clapDeinit(); }
-
-    Entry(Entry const &) = delete; // makes non-copyable
-    Entry &operator=(Entry const &) = delete;
-}; // class Entry
-
-/// \brief A plugin taken all the way to "processing", and torn down in order.
-class ActivePlugin
-{
-  public:
-    /// \param beforeActivate run against the initialised-but-inactive plugin,
-    /// which is when a host restores state and when params.flush() is legal but
-    /// the engine has no sample rate yet.
-    ActivePlugin(double const sampleRate, std::uint32_t const blockSize,
-                 clap_host const &host = nullHost(),
-                 std::function<void(clap_plugin const &)> const &beforeActivate = {})
-        : sampleRate_(sampleRate), blockSize_(blockSize)
-    {
-        pPlugin_ = factory().create_plugin(&factory(), &host, descriptorID());
-        REQUIRE(pPlugin_ != nullptr);
-        REQUIRE(pPlugin_->init(pPlugin_));
-        if (beforeActivate)
-            beforeActivate(*pPlugin_);
-        REQUIRE(pPlugin_->activate(pPlugin_, sampleRate, 1, blockSize));
-        REQUIRE(pPlugin_->start_processing(pPlugin_));
-    }
-
-    ~ActivePlugin()
-    {
-        pPlugin_->stop_processing(pPlugin_);
-        pPlugin_->deactivate(pPlugin_);
-        pPlugin_->destroy(pPlugin_);
-    }
-
-    ActivePlugin(ActivePlugin const &) = delete; // makes non-copyable
-    ActivePlugin &operator=(ActivePlugin const &) = delete;
-
-    clap_plugin const &operator*() const { return *pPlugin_; }
-    clap_plugin const *operator->() const { return pPlugin_; }
-
-    /// Runs one block of stereo audio through, in place of a host's callback.
-    ///
-    /// \param transport what the host reports, nullptr being a host that reports
-    /// nothing -- which is the default because most of these cases do not care,
-    /// and because it is the harder half of the LFO timing contract.
-    void process(std::vector<float> &leftIn, std::vector<float> &rightIn,
-                 std::vector<float> &leftOut, std::vector<float> &rightOut,
-                 clap_event_transport const *const transport = nullptr)
-    {
-        REQUIRE(processStatus(leftIn, rightIn, leftOut, rightOut, transport) != CLAP_PROCESS_ERROR);
-    }
-
-    /// \brief The same, without asserting.
-    ///
-    /// \note For the cases that call this from a thread of their own. Catch2's
-    /// assertion machinery is not thread safe -- `RunContext::handleExpr` writes
-    /// a shared counter -- so a `REQUIRE` on a worker thread is a data race in
-    /// the *harness*, and tsan says so at length while saying nothing about the
-    /// plugin.
-    ///                                       (02.08.2026.) (SW port)
-    clap_process_status processStatus(std::vector<float> &leftIn, std::vector<float> &rightIn,
-                                      std::vector<float> &leftOut, std::vector<float> &rightOut,
-                                      clap_event_transport const *const transport = nullptr)
-    {
-        float *inputChannels[]{leftIn.data(), rightIn.data()};
-        float *outputChannels[]{leftOut.data(), rightOut.data()};
-
-        clap_audio_buffer input{&inputChannels[0], nullptr, 2, 0, 0};
-        clap_audio_buffer output{&outputChannels[0], nullptr, 2, 0, 0};
-
-        clap_process process{};
-        process.steady_time = -1;
-        process.frames_count = blockSize_;
-        process.transport = transport;
-        process.audio_inputs = &input;
-        process.audio_inputs_count = 1;
-        process.audio_outputs = &output;
-        process.audio_outputs_count = 1;
-        process.in_events = &noInputEvents();
-        process.out_events = &discardedOutputEvents();
-
-        return pPlugin_->process(pPlugin_, &process);
-    }
-
-    /// \brief Deactivates and reactivates, as a host does when the plugin asks.
-    ///
-    /// \note Unconditionally rather than on `request_restart`, because the null
-    /// host cannot report one and because a restart the plugin did not ask for is
-    /// something a host is free to do anyway. It is also where a pending spectral
-    /// setup lands, so a case that changes the FFT size and never comes through
-    /// here is running the old one.
-    void restartIfAsked()
-    {
-        pPlugin_->stop_processing(pPlugin_);
-        pPlugin_->deactivate(pPlugin_);
-        REQUIRE(pPlugin_->activate(pPlugin_, sampleRate_, 1, blockSize_));
-        REQUIRE(pPlugin_->start_processing(pPlugin_));
-    }
-
-    static char const *descriptorID()
-    {
-        auto const *const pDescriptor(factory().get_plugin_descriptor(&factory(), 0));
-        REQUIRE(pDescriptor != nullptr);
-        return pDescriptor->id;
-    }
-
-  private:
-    clap_plugin const *pPlugin_;
-    double sampleRate_;
-    std::uint32_t blockSize_;
-}; // class ActivePlugin
+using namespace SWTest;
 
 void fillWithSine(std::vector<float> &buffer, float const sampleRate, float const frequency,
                   std::uint32_t const startFrame)
@@ -381,78 +71,6 @@ float peak(std::vector<float> const &buffer)
     for (auto const sample : buffer)
         largest = std::max(largest, std::abs(sample));
     return largest;
-}
-
-/// \note ParameterID's members are laid out in reverse so that the hex reads
-/// naturally on a little-endian machine: the type is the top byte and the module
-/// index the one below it. See core/parameterID.hpp.
-enum ParameterType : clap_id
-{
-    globalType = 0,
-    moduleChainType = 1,
-    moduleType = 2,
-    lfoType = 3
-};
-
-clap_id parameterID(ParameterType const type, unsigned const moduleIndex = 0,
-                    unsigned const parameterIndex = 0)
-{
-    return (static_cast<clap_id>(type) << 24) | (moduleIndex << 16) | parameterIndex;
-}
-
-/// An input event list holding exactly one parameter value, which is how a host
-/// delivers an edit to flush() or process().
-class OneParameterEvent
-{
-  public:
-    OneParameterEvent(clap_id const id, double const value) : list_{this, size, get}, event_{}
-    {
-        event_.header.size = sizeof(event_);
-        event_.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
-        event_.header.type = CLAP_EVENT_PARAM_VALUE;
-        event_.param_id = id;
-        event_.note_id = event_.port_index = event_.channel = event_.key = -1;
-        event_.value = value;
-    }
-
-    OneParameterEvent(OneParameterEvent const &) = delete; // self-referential ctx
-    OneParameterEvent &operator=(OneParameterEvent const &) = delete;
-
-    clap_input_events const &operator*() const { return list_; }
-
-  private:
-    static std::uint32_t size(clap_input_events const *) { return 1; }
-    static clap_event_header const *get(clap_input_events const *self, std::uint32_t)
-    {
-        return &static_cast<OneParameterEvent const *>(self->ctx)->event_.header;
-    }
-
-    clap_input_events list_;
-    clap_event_param_value event_;
-}; // class OneParameterEvent
-
-/// Every parameter's description, indexed the way the host reads them.
-std::vector<clap_param_info> allParameterInfo(clap_plugin const &plugin,
-                                              clap_plugin_params const &params)
-{
-    std::vector<clap_param_info> infos(params.count(&plugin));
-    for (std::uint32_t index(0); index < infos.size(); ++index)
-        REQUIRE(params.get_info(&plugin, index, &infos[index]));
-    return infos;
-}
-
-clap_plugin_params const &parameters(clap_plugin const &plugin)
-{
-    auto const *const params(
-        static_cast<clap_plugin_params const *>(plugin.get_extension(&plugin, CLAP_EXT_PARAMS)));
-    REQUIRE(params != nullptr);
-    return *params;
-}
-
-bool isNormalisedType(clap_id const id)
-{
-    auto const type(id >> 24);
-    return (type == moduleType) || (type == lfoType);
 }
 
 /// An LFO's own parameters, in the order lfoImpl.hpp declares them.
@@ -502,17 +120,6 @@ float liveModuleParameter(clap_plugin const &plugin, std::uint8_t const moduleIn
         implementation.program().moduleChain().moduleAs<LE::SW::Module>(moduleIndex));
     REQUIRE(pModule);
     return pModule->getBaseParameter(parameterIndex);
-}
-
-/// \brief The plugin as the editor sees it -- the queue and the mailbox.
-///
-/// \note A public base of SpectrumWorxCLAP, which is how the editor reaches them
-/// without sw-gui naming the plugin. A test stands in for the editor here.
-LE::SW::GUI::EditorHost &editorHostOf(clap_plugin const &plugin)
-{
-    auto *const pHelper(static_cast<LE::SW::PluginHelper *>(plugin.plugin_data));
-    REQUIRE(pHelper != nullptr);
-    return *static_cast<LE::SW::SpectrumWorxCLAP *>(pHelper);
 }
 
 /// \brief A module parameter's static description, for a value inside its range.
@@ -955,8 +562,8 @@ TEST_CASE("Filling a slot makes the host re-read the descriptions", "[clap]")
     // first read with -- "N/A" for a slot that was empty at startup -- which is
     // what a host shows however correct get_info would be if it were asked again.
     Entry const entry;
-    CurrentRecordingHost host;
-    ActivePlugin plugin(48000, 512, **host);
+    TestHost host{{.params = true}};
+    ActivePlugin plugin(48000, 512, host);
 
     auto const &params(parameters(*plugin));
 
@@ -965,16 +572,16 @@ TEST_CASE("Filling a slot makes the host re-read the descriptions", "[clap]")
 
     // Deferred, because a rescan is main-thread-only and flush() is not: the
     // plugin asks for a callback and does it there.
-    CHECK(host->mainThreadCallbacks > 0);
+    CHECK(host.mainThreadCallbacks > 0);
     plugin->on_main_thread(&*plugin);
 
-    CHECK((host->rescanFlags & CLAP_PARAM_RESCAN_INFO) != 0);
-    CHECK((host->rescanFlags & CLAP_PARAM_RESCAN_TEXT) != 0);
-    CHECK((host->rescanFlags & CLAP_PARAM_RESCAN_VALUES) != 0);
+    CHECK((host.rescanFlags & CLAP_PARAM_RESCAN_INFO) != 0);
+    CHECK((host.rescanFlags & CLAP_PARAM_RESCAN_TEXT) != 0);
+    CHECK((host.rescanFlags & CLAP_PARAM_RESCAN_VALUES) != 0);
 
     /// \note And never RESCAN_ALL, which is the one a host may only be given
     /// while the plugin is deactivated. This one is active.
-    CHECK((host->rescanFlags & CLAP_PARAM_RESCAN_ALL) == 0);
+    CHECK((host.rescanFlags & CLAP_PARAM_RESCAN_ALL) == 0);
 
     // The names really did move, so the rescan had something to find.
     std::uint32_t named{0};
@@ -991,9 +598,13 @@ TEST_CASE("A host with state and no thread check survives a parameter write", "[
     // makes markCurrentProgramAsModified() get as far as asking for it. Before
     // the fix this asserted in a checked build and dereferenced null in a
     // shipping one, on the path every automated parameter change takes.
+    //
+    /// \note State and nothing else, deliberately -- the combination is the point
+    /// of the case. hostInteropTests.cpp is the same plugin against a host that
+    /// *can* be asked, which is the other arm of the same branch.
     Entry const entry;
-    CurrentStatefulHost host;
-    ActivePlugin plugin(48000, 512, **host);
+    TestHost host{{.state = true}};
+    ActivePlugin plugin(48000, 512, host);
 
     auto const &params(parameters(*plugin));
 
@@ -1008,12 +619,12 @@ TEST_CASE("A host with state and no thread check survives a parameter write", "[
 
     // Not marked yet -- it cannot be, since the plugin has no way to establish
     // that this is the main thread, and mark_dirty is main-thread-only.
-    CHECK(host->dirtyMarks == 0);
-    CHECK(host->mainThreadCallbacks > 0);
+    CHECK(host.dirtyMarks == 0);
+    CHECK(host.mainThreadCallbacks > 0);
 
     // It is the callback that discharges it, which is what the deferral is for.
     plugin->on_main_thread(&*plugin);
-    CHECK(host->dirtyMarks == 1);
+    CHECK(host.dirtyMarks == 1);
 }
 
 TEST_CASE("A module parameter's range and step flag survive an effect swap", "[clap]")
