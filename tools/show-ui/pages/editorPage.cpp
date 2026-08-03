@@ -252,6 +252,24 @@ class EditorPage final : public juce::Component
 
         auto const pModule(host_.core().moduleChain().module(0));
         LE_ASSERT_MSG(pModule, "The harness could not create a module.");
+
+        ////////////////////////////////////////////////////////////////////////
+        ///
+        /// \note The posted resync, run by hand -- `addUserAddedModule` ends in
+        /// `refreshModuleRackAsync()` and an offscreen render turns no message
+        /// loop, so without this the strip is never built.
+        ///
+        ///   Which is what it was doing until 03.08.2026: this page rendered an
+        /// editor with a highlighted empty slot and no module in it, and the
+        /// giveaway was that all 57 effects produced *byte-identical* PNGs. So
+        /// the page that exists to prove a module's widgets can be built was
+        /// building none of them, and "editor-module renders" meant "the empty
+        /// editor renders, again". `tests/clap/pluginTests.cpp` had the same
+        /// call for the same reason and this page never got it.
+        ///                                   (03.08.2026.) (SW port)
+        ///
+        ////////////////////////////////////////////////////////////////////////
+        editor_->resyncModuleRack();
     }
 
     HarnessHost host_;

@@ -67,6 +67,7 @@ add_executable(sw-plugin-tests
         parameters/parameterTableTests.cpp
         presets/presetHarness.cpp
         gui/moduleControlFocusTests.cpp
+        gui/overlayPanelTests.cpp
         gui/pathsTests.cpp
         gui/skinTests.cpp
         gui/twoInstanceTests.cpp

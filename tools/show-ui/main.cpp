@@ -37,8 +37,10 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include <map>
 //------------------------------------------------------------------------------
 namespace
 {
@@ -145,6 +147,107 @@ class ShowUIApplication final : public juce::JUCEApplication
 // Offscreen mode
 //------------------------------------------------------------------------------
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief What a rendered page actually put on the canvas.
+///
+///   `--render` used to write a PNG and return 0, so a page that painted solid
+/// black passed and so did a page that painted nothing at all -- which is most of
+/// how GUI code fails. week_two.md §2.3 owns the row; §5.2 asks for exactly this.
+///
+/// \note The modal colour rather than a distinct-colour count. A count is easy to
+/// satisfy by accident: antialiasing one glyph over an otherwise empty panel
+/// produces dozens of colours and would pass a "more than sixteen" rule. "What
+/// fraction of the canvas is *not* the single commonest colour" is the question
+/// being asked -- how much was drawn -- and it degrades gracefully: a flat
+/// background is the modal colour whatever that background happens to be.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+struct Ink
+{
+    std::size_t pixels{0};
+    std::size_t distinctColours{0};
+    /// The commonest colour and how much of the canvas it covers.
+    juce::uint32 modalColour{0};
+    std::size_t modalPixels{0};
+    /// Pixels the page left fully transparent.
+    std::size_t transparentPixels{0};
+
+    double drawnFraction() const
+    {
+        return pixels ? double(pixels - modalPixels) / double(pixels) : 0;
+    }
+}; // struct Ink
+
+Ink measure(juce::Image const &image)
+{
+    Ink ink;
+    std::map<juce::uint32, std::size_t> histogram;
+
+    juce::Image::BitmapData const pixels(image, juce::Image::BitmapData::readOnly);
+    for (int y(0); y < image.getHeight(); ++y)
+        for (int x(0); x < image.getWidth(); ++x)
+        {
+            auto const colour(pixels.getPixelColour(x, y));
+            ++histogram[colour.getARGB()];
+            ink.transparentPixels += (colour.getAlpha() == 0);
+            ++ink.pixels;
+        }
+
+    ink.distinctColours = histogram.size();
+    for (auto const &[colour, count] : histogram)
+        if (count > ink.modalPixels)
+        {
+            ink.modalPixels = count;
+            ink.modalColour = colour;
+        }
+    return ink;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Whether \p ink is enough to call the page drawn, complaining usefully
+/// when it is not.
+///
+/// \note One thousandth of the canvas, which is 212 pixels of the 563 x 376
+/// editor. Deliberately far below what the pages actually measure -- theme is the
+/// thinnest at 12.0 %, skin 17.5 %, and the five editor pages 73-80 % -- because
+/// the failure this is for is *nothing was drawn*, not "less was drawn than last
+/// time". A tighter bound would be a golden, and a golden over a whole editor is
+/// a test that fails on every legitimate change.
+///                                           (measured 03.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+bool drewSomething(Ink const &ink, char const *const pageName)
+{
+    constexpr double leastDrawnFraction{0.001};
+
+    if (ink.distinctColours <= 1)
+    {
+        std::fprintf(stderr, "sw-show-ui: '%s' painted one colour (%08x) over the whole page.\n",
+                     pageName, ink.modalColour);
+        return false;
+    }
+    if (ink.transparentPixels == ink.pixels)
+    {
+        std::fprintf(stderr, "sw-show-ui: '%s' painted nothing -- every pixel is transparent.\n",
+                     pageName);
+        return false;
+    }
+    if (ink.drawnFraction() < leastDrawnFraction)
+    {
+        std::fprintf(stderr,
+                     "sw-show-ui: '%s' is %.3f %% drawn, which is under the %.1f %% floor: %zu of "
+                     "%zu pixels are the background colour %08x.\n",
+                     pageName, 100 * ink.drawnFraction(), 100 * leastDrawnFraction, ink.modalPixels,
+                     ink.pixels, ink.modalColour);
+        return false;
+    }
+    return true;
+}
+
 int renderPage(juce::String const &pageName, juce::File const &output)
 {
     auto const *const page(resolve(pageName));
@@ -160,6 +263,12 @@ int renderPage(juce::String const &pageName, juce::File const &output)
         juce::Graphics graphics(image);
         component->paintEntireComponent(graphics, true);
     }
+
+    /// \note Before the PNG is written rather than after, so that a failing page
+    /// still leaves the image that shows why.
+    auto const ink(measure(image));
+    std::fprintf(stderr, "sw-show-ui: %s is %.1f %% drawn, %zu colours\n", page->name,
+                 100 * ink.drawnFraction(), ink.distinctColours);
 
     output.deleteFile();
     std::unique_ptr<juce::FileOutputStream> stream(output.createOutputStream());
@@ -177,7 +286,10 @@ int renderPage(juce::String const &pageName, juce::File const &output)
 
     std::fprintf(stderr, "sw-show-ui: wrote %d x %d to %s\n", image.getWidth(), image.getHeight(),
                  output.getFullPathName().toRawUTF8());
-    return 0;
+
+    /// \note Last, and it is what makes `--render` a test rather than a
+    /// screenshot: the PNG is on disk either way, so a red case can be looked at.
+    return drewSomething(ink, page->name) ? 0 : 1;
 }
 
 int render(juce::String const &pageName, juce::File const &output)
