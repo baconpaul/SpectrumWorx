@@ -54,24 +54,55 @@ void forgetMainThread();
 // The audio thread
 ////////////////////////////////////////////////////////////////////////////////
 
-/// \brief Whether the calling thread is *inside an audio callback*.
+/// \brief Whether this call is inside one of CLAP's `[audio-thread]` entry
+/// points.
 ///
 /// \note Deliberately not "is this thread the audio thread". A host with a worker
 /// pool -- Bitwig and Reaper both have one -- delivers successive blocks of the
 /// same plugin on different threads, so there is no such thread to name. What can
-/// be answered is whether this call is happening underneath process(), which is
-/// what every `[audio-thread]` rule actually means.
+/// be answered is whether the host is currently inside a call it is entitled to
+/// make on the audio thread.
+///
+/// \note ~~"whether this call is happening underneath process(), which is what
+/// every `[audio-thread]` rule actually means"~~ -- *what this said until
+/// 03.08.2026, and it is not what the rule means.* `plugin.h` puts four entry
+/// points in that set and only one of them is `process()`; `reset()` is
+/// `[audio-thread & active]` and runs between blocks, not under one. The
+/// narrower reading was not a simplification, it was a hole: `vst3-validator`
+/// walked straight into it the first time anything called `reset()` outside
+/// `process()`, and the engine's own mutation assert fired on a host that was
+/// behaving correctly. See ScopedAudioThreadEntry.
 bool isAudioThread();
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \class ScopedAudioCallback
+/// \class ScopedAudioThreadEntry
 ///
-/// \brief One line at the top of process(). Two jobs:
+/// \brief One line at the top of **every** `[audio-thread]` entry point. Two jobs:
 ///
 ///   - makes isAudioThread() true for the duration, on this thread only;
 ///   - opens a RealtimeSanitizer realtime region, so that an allocation, a lock or
 ///     a syscall reached from anywhere underneath is reported with a stack.
+///
+/// \note Named for the contract rather than for `process()`. It was
+/// `ScopedAudioCallback`, which is why for a year it was opened in exactly one
+/// place: "callback" reads as "the audio callback", and the other three entry
+/// points in `plugin.h`'s `[audio-thread]` set do not look like one.
+///
+///   What owes one, from `clap/plugin.h`:
+///
+///   | | annotation | ours |
+///   |---|---|---|
+///   | `process` | `[audio-thread & active & processing]` | overridden |
+///   | `reset` | `[audio-thread & active]` | overridden |
+///   | `start_processing` | `[audio-thread & active & !processing]` | not overridden |
+///   | `stop_processing` | `[audio-thread & active & processing]` | not overridden |
+///
+///   Plus one that is not in that table because its annotation is conditional:
+/// `clap_plugin_params::flush` is `[active ? audio-thread : main-thread]`
+/// (ext/params.h:303). It takes this **only while active** -- opening it
+/// unconditionally would be wrong in the other direction, telling an inactive
+/// plugin that the audio thread owns an engine the main thread owns.
 ///
 /// \note The sanitizer half is the runtime entry point rather than the
 /// `[[clang::nonblocking]]` attribute. The attribute would do the same at runtime
@@ -81,15 +112,16 @@ bool isAudioThread();
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class ScopedAudioCallback
+class ScopedAudioThreadEntry
 {
   public:
-    ScopedAudioCallback();
-    ~ScopedAudioCallback();
+    ScopedAudioThreadEntry();
+    ~ScopedAudioThreadEntry();
 
-    ScopedAudioCallback(ScopedAudioCallback const &) = delete; // makes non-copyable
-    ScopedAudioCallback &operator=(ScopedAudioCallback const &) = delete;
-}; // class ScopedAudioCallback
+    // makes non-copyable
+    ScopedAudioThreadEntry(ScopedAudioThreadEntry const &) = delete;
+    ScopedAudioThreadEntry &operator=(ScopedAudioThreadEntry const &) = delete;
+}; // class ScopedAudioThreadEntry
 
 //------------------------------------------------------------------------------
 } // namespace Threading

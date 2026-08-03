@@ -171,7 +171,7 @@ target_link_libraries(sw-dsp PUBLIC sst-plugininfra::tinyxml)
 # asserts degrade to the CRT's and the DAW never sees them.
 target_compile_definitions(sw-dsp PUBLIC LE_ENABLE_ASSERT_HANDLER)
 
-# rtsan_support.h, for the RealtimeSanitizer region ScopedAudioCallback opens, and
+# rtsan_support.h, for the RealtimeSanitizer region ScopedAudioThreadEntry opens, and
 # for the RTSAN_DISABLE guards the conceded audio-thread allocations will carry.
 # PUBLIC: sw-impl marks those sites and the header is where the macro comes from.
 # It is header only and compiles to nothing without -fsanitize=realtime.

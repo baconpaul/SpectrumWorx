@@ -72,7 +72,7 @@ class RunningEngine
 
 /// One block of whatever \p input holds, into \p output, through the engine.
 ///
-/// \note Under a ScopedAudioCallback, which is what a host's process() opens and
+/// \note Under a ScopedAudioThreadEntry, which is what a host's process() opens and
 /// what makes `Threading::isAudioThread()` true -- so the engine's own
 /// assertions see what they would see in a DAW rather than what a test happens
 /// to be doing.
@@ -87,7 +87,7 @@ void runOneBlock(SWTest::Engine &engine, std::vector<std::vector<float>> &input,
         outputPointers[channel] = output[channel].data();
     }
 
-    LE::SW::Threading::ScopedAudioCallback const audioCallback;
+    LE::SW::Threading::ScopedAudioThreadEntry const audioCallback;
     engine.process(inputPointers.data(), inputPointers.data(), outputPointers.data(), 1.0f,
                    blockSize);
 }
@@ -134,7 +134,7 @@ TEST_CASE("Who may mutate the engine follows from whether anything is processing
 
     // Unless it is: inside a process callback, the audio thread is the owner.
     {
-        LE::SW::Threading::ScopedAudioCallback const audioCallback;
+        LE::SW::Threading::ScopedAudioThreadEntry const audioCallback;
         CHECK(engine.currentThreadMayMutateEngineState());
     }
     CHECK(!engine.currentThreadMayMutateEngineState());
@@ -341,7 +341,7 @@ TEST_CASE("A slot change while running is a command rather than a mutation", "[c
     REQUIRE(toEngine.pop(command));
     CHECK(command.kind == LE::SW::Threading::ToEngine::Kind::SetSlot);
     {
-        LE::SW::Threading::ScopedAudioCallback const audioCallback;
+        LE::SW::Threading::ScopedAudioThreadEntry const audioCallback;
         CHECK(engine->installModuleInSlot(command.setSlot.slot,
                                           static_cast<LE::SW::Module *>(command.setSlot.pModule)) ==
               nullptr);

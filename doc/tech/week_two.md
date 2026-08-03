@@ -53,8 +53,8 @@ list: it is the only thing that can close item 3.
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone — macOS arm64. Linux arm64 proven at stage 4. Windows arrives as logs. |
 | Runs | Standalone, with audio, with the real editor, with presets. It deadlocked in Logic and in Bitwig; **the threading model those deadlocks were a property of has since been replaced and nobody has reloaded it in either host** — see §1 item 3. |
-| Tests | **261/261** as of 03.08.2026: 193 Catch2 + 66 `sw-show-ui --render` + 2 build-property checks, in both build trees. Goldens run in Release only. Two binaries — `sw-dsp-tests` and `sw-plugin-tests` — not one. The renders assert what was drawn now, not an exit code. |
-| Validators | `auval` **passes**, 10 runs of 10. `clap-cpp-validator` **18 pass / 4 fail**, the four being one LFO state bug that is item 4's. See §1 item 1. |
+| Tests | **263/263** as of 03.08.2026: 195 Catch2 + 66 `sw-show-ui --render` + 2 build-property checks, in both build trees. Goldens run in Release only. Two binaries — `sw-dsp-tests` and `sw-plugin-tests` — not one. The renders assert what was drawn now, not an exit code. |
+| Validators | `auval` **passes**, 10 runs of 10. `vst3-validator` **47/47**. `clap-cpp-validator` **18 pass / 4 fail**, the four being one LFO state bug that is item 4's. See §1 item 1. |
 | CI | **None.** There is no `.github/`. |
 | Warnings | **229 unique sites**, 227 of them one class — see §3. Everything else our targets emitted is fixed as of 02.08.2026. |
 | Identity | ✅ `org.surge-synth-team.spectrumworx`, AU `aufx`/`SWrx` by `SSTx` — see §4. |
@@ -164,9 +164,15 @@ document. See item 3, which it re-scoped from a fixup into a redesign.
 > save/reload. §7 there says what a failure would need — both backtraces, taken
 > before anything else, because §5 item 0 expired without them.
 
-> **Both validators have now run, 03.08.2026, and between them they found three
-> bugs.** The two questions above are still open — they need a host — but the
+> **All three validators have now run, 03.08.2026, and between them they found
+> four bugs.** The two questions above are still open — they need a host — but the
 > half of this row that does not is done, and it did not come back empty.
+>
+>   `vst3-validator` is the third and it is not obvious it exists: clap-wrapper
+> ships a `vst3_validator` target that configures and builds Steinberg's own
+> validator out of the already-fetched SDK, so
+> `cmake --build <dir> --target vst3_validator` is all it takes and the binary
+> lands in `<dir>/validator-build/bin/Debug/validator`.
 >
 >   - **`auval -v aufx SWrx SSTx`: PASS**, 10 runs of 10. It failed 5 of 5
 >     before, on a NaN inside the forward FFT of the **side chain**, and the
@@ -190,9 +196,26 @@ document. See item 3, which it re-scoped from a fixup into a redesign.
 >   - ~~**`scan-time` 301 ms against a 100 ms limit.**~~ *Gone with the
 >     clap-wrapper bump: 18 ms.* It was the wrapper's scan doing the work, not
 >     ours, which is not what the first reading of it assumed.
+>   - **`vst3-validator`** — built out of clap-wrapper's own `vst3_validator`
+>     target — ran 19 tests and then **aborted** in `Process Test`, on
+>     `currentThreadMayMutateEngineState()` inside `resetChannelBuffers()`. This
+>     one was entirely ours and it was a *definition*, not a missing line:
+>     `Threading::isAudioThread()` was documented as "this call is under
+>     `process()`" and `plugin.h` puts **four** entry points in `[audio-thread]`.
+>     `reset()` is one of them and runs between blocks, which is exactly what
+>     `ClapAsVst3::setProcessing(false)` does. Renamed to
+>     `ScopedAudioThreadEntry`, opened by `reset()` unconditionally and by
+>     `paramsFlush()` on `isActive()` — the one conditional annotation in CLAP —
+>     and pinned by two cases in `hostInteropTests.cpp`. **With that fixed the
+>     suite runs to the end: 47 passed, 0 failed.** The 19 was a floor and not a
+>     result, which is worth remembering the next time a validator aborts: the
+>     number it stops on says nothing about what is behind it.
 >
->   Three findings, and **not one of them was reachable from the 261-case suite**
-> — which is the argument for this row rather than for more headless coverage.
+>   Four findings, and **not one of them was reachable from the suite as it then
+> stood** — which is the argument for this row rather than for more headless
+> coverage. Each is pinned by a case now, so the suite would catch a regression;
+> what it could not do was find them, because every one of them needed a host
+> doing something no test had thought to do.
 
 What it still owes beyond that: Reaper, and the deliberate drive through the
 joins listed below.

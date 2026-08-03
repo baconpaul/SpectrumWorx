@@ -160,7 +160,7 @@ class OneEvent
 
 TEST_CASE("An audio callback scope is bounded, and is per thread", "[core][threading]")
 {
-    /// \note Observed inside the scope, asserted outside it. `ScopedAudioCallback`
+    /// \note Observed inside the scope, asserted outside it. `ScopedAudioThreadEntry`
     /// opens a RealtimeSanitizer realtime region, and Catch2's `CHECK` allocates
     /// -- so under `-fsanitize=realtime` a case that asserted in here would abort
     /// on its own expression macro. Which is rtsan being right: this is a scope in
@@ -173,11 +173,11 @@ TEST_CASE("An audio callback scope is bounded, and is per thread", "[core][threa
 
     CHECK(!Threading::isAudioThread());
     {
-        Threading::ScopedAudioCallback const audioCallback;
+        Threading::ScopedAudioThreadEntry const audioCallback;
         insideScope = Threading::isAudioThread();
 
         {
-            Threading::ScopedAudioCallback const nested;
+            Threading::ScopedAudioThreadEntry const nested;
             insideNested = Threading::isAudioThread();
         }
         afterNested = Threading::isAudioThread();
@@ -212,7 +212,7 @@ TEST_CASE("An audio callback scope is bounded, and is per thread", "[core][threa
     });
 
     {
-        Threading::ScopedAudioCallback const audioCallback;
+        Threading::ScopedAudioThreadEntry const audioCallback;
         scopeIsOpen.store(true, std::memory_order_release);
         while (!hasObserved.load(std::memory_order_acquire))
         {
@@ -248,7 +248,7 @@ TEST_CASE("The main thread is the one that said so", "[core][threading]")
 TEST_CASE("The plugin calls its host back from inside the audio callback",
           "[core][threading][clap]")
 {
-    // The point of the case: it proves ScopedAudioCallback is really at the top of
+    // The point of the case: it proves ScopedAudioThreadEntry is really at the top of
     // process(), and it does so through the host API rather than by reading the
     // source. Delete the guard from process() and this goes red.
     Entry const entry;

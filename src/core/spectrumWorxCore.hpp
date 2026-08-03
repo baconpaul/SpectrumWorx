@@ -383,9 +383,17 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
     /// second half of that and the rule §2 states: **the audio thread owns the
     /// engine while one exists, and the main thread owns it while one does not**.
     ///
-    ///   `Threading::isAudioThread()` is "this call is under `process()`", which
-    /// is exactly the question -- an engine can be driven from a test's own
-    /// thread, and a host is not obliged to use the same OS thread twice.
+    ///   `Threading::isAudioThread()` is "this call is inside an `[audio-thread]`
+    /// entry point", which is the question -- an engine can be driven from a
+    /// test's own thread, and a host is not obliged to use the same OS thread
+    /// twice.
+    ///
+    /// \note ~~"this call is under `process()`"~~ is what that said, and the
+    /// predicate was only accidentally right for as long as `process()` was the
+    /// only entry point that opened the scope. `reset()` is `[audio-thread]` too
+    /// and runs between blocks; it now opens its own. See
+    /// `Threading::ScopedAudioThreadEntry`, which is what the class was renamed to
+    /// so that the next one is not missed the same way.
     ///
     ////////////////////////////////////////////////////////////////////////////
     bool currentThreadMayMutateEngineState() const;

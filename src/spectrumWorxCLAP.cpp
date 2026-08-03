@@ -45,6 +45,7 @@
 #include <algorithm>
 #include <cstring>
 #include <mutex>
+#include <optional>
 //------------------------------------------------------------------------------
 namespace LE::SW
 {
@@ -316,8 +317,24 @@ void SpectrumWorxCLAP::deactivate() noexcept
     sampleRate_ = 0;
 }
 
+/// \note `reset()` is `[audio-thread & active]` (plugin.h:89) -- *not* under
+/// `process()`, which is the whole point of it: a host calls it between blocks to
+/// throw away the tail. So it owns the engine while it runs and has to say so,
+/// exactly as `process()` does.
+///
+///   Nothing said so until 03.08.2026, and nothing noticed because no host in
+/// this tree had ever called it: `vst3-validator` was the first, through
+/// `ClapAsVst3::setProcessing(false)`, which does `stop_processing()` then
+/// `reset()` off Steinberg's own call-sequence diagram. The wrapper is correct
+/// and the plugin asserted anyway -- `resetChannelBuffers()` checks
+/// `currentThreadMayMutateEngineState()`, which is `!engineIsRunning() ||
+/// Threading::isAudioThread()`, and the second half was false because only
+/// `process()` ever opened the scope.
+///                                           (03.08.2026.) (SW port)
 void SpectrumWorxCLAP::reset() noexcept
 {
+    Threading::ScopedAudioThreadEntry const audioThread;
+
     if (engineRunning_)
         SpectrumWorxCore::reset();
 }
@@ -685,6 +702,22 @@ void SpectrumWorxCLAP::requestRescan(clap_param_rescan_flags const flags)
 void SpectrumWorxCLAP::paramsFlush(clap_input_events const *const in,
                                    clap_output_events const *const out) noexcept
 {
+    /// \note The conditional one. `clap_plugin_params::flush` is
+    /// `[active ? audio-thread : main-thread]` (ext/params.h:303), and this is the
+    /// only entry point whose owning thread depends on state rather than being
+    /// fixed -- so the scope is taken on the same condition. Unconditionally would
+    /// be wrong in the other direction: on an inactive plugin it would tell the
+    /// engine the audio thread owns it while the main thread does, which is the
+    /// mirror image of the bug this fixes.
+    ///
+    ///   What it drains and applies -- drainCommands(), handleEvent() -- is what
+    /// process() does to the engine, so while active this genuinely is an audio
+    /// callback and belongs under the same instrument, rtsan included.
+    ///                                       (03.08.2026.) (SW port)
+    std::optional<Threading::ScopedAudioThreadEntry> audioThread;
+    if (isActive())
+        audioThread.emplace();
+
     drainCommands();
 
     auto const size(in->size(in));
@@ -727,7 +760,7 @@ clap_process_status SpectrumWorxCLAP::process(clap_process const *const process)
     /// opens a RealtimeSanitizer realtime region so that an allocation, a lock or
     /// a syscall reached from anywhere under here is reported with a stack. Both
     /// compile away without `-fsanitize=realtime`. See cmake/sw-sanitizers.cmake.
-    Threading::ScopedAudioCallback const audioCallback;
+    Threading::ScopedAudioThreadEntry const audioThread;
 
     /// \note Before the host's own events, so that a command the interface sent
     /// and an automation event for the same parameter resolve in the order a user

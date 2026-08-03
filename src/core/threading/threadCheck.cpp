@@ -33,9 +33,10 @@ namespace
 /// writes the same value the first did.
 std::atomic<void const *> mainThread_{nullptr};
 
-/// \note Per thread, and a depth rather than a flag: nothing nests process()
-/// today, but a counter cannot be got wrong by a future caller that does.
-thread_local unsigned int audioCallbackDepth_{0};
+/// \note Per thread, and a depth rather than a flag: nothing nests the
+/// `[audio-thread]` entry points today, but a counter cannot be got wrong by a
+/// future caller that does.
+thread_local unsigned int audioThreadDepth_{0};
 } // anonymous namespace
 
 void markMainThread()
@@ -50,22 +51,22 @@ bool isMainThread()
 
 void forgetMainThread() { mainThread_.store(nullptr, std::memory_order_release); }
 
-bool isAudioThread() { return audioCallbackDepth_ != 0; }
+bool isAudioThread() { return audioThreadDepth_ != 0; }
 
-ScopedAudioCallback::ScopedAudioCallback()
+ScopedAudioThreadEntry::ScopedAudioThreadEntry()
 {
-    ++audioCallbackDepth_;
+    ++audioThreadDepth_;
 #if SST_CPPUTILS_HAS_RTSAN
     __rtsan_realtime_enter();
 #endif
 }
 
-ScopedAudioCallback::~ScopedAudioCallback()
+ScopedAudioThreadEntry::~ScopedAudioThreadEntry()
 {
 #if SST_CPPUTILS_HAS_RTSAN
     __rtsan_realtime_exit();
 #endif
-    --audioCallbackDepth_;
+    --audioThreadDepth_;
 }
 
 //------------------------------------------------------------------------------

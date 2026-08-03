@@ -629,6 +629,25 @@ class ActivePlugin
                        out ? out : &discardedOutputEvents());
     }
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief reset() as a host calls it: `[audio-thread & active]`, and
+    /// **between blocks rather than under one**.
+    ///
+    /// \note Which is the whole point of it, and the reason it is its own helper
+    /// rather than something process() does. Nothing in this tree called reset()
+    /// at all until 03.08.2026; `vst3-validator` was the first thing that did,
+    /// through `ClapAsVst3::setProcessing(false)`, and it found that the plugin
+    /// only declared itself to own the engine underneath process(). See
+    /// `Threading::ScopedAudioThreadEntry`.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    void reset() const
+    {
+        auto const audioThread(scopedAudioCallback());
+        pPlugin_->reset(pPlugin_);
+    }
+
     /// \brief Deactivates and reactivates, as a host does when the plugin asks.
     ///
     /// \note Unconditionally rather than on `request_restart`, because the null

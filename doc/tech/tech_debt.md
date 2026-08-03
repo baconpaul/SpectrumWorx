@@ -470,15 +470,41 @@ New entries go at the top of their area.
   Converting them to `plugin.flush(…)` is mechanical and would put the whole
   parameter-event path on the audio thread under tsan and rtsan, where it belongs.
 
-- **`SpectrumWorxCLAP::paramsFlush` opens no `Threading::ScopedAudioCallback`.**
-  (03.08.2026, from §5.1) Against an active plugin it *is* an audio-thread
-  callback by contract, and it mutates the engine — so `Threading::isAudioThread()`
-  answering `false` inside it is the plugin's own account of who owns the engine
-  being wrong on one path. Not a live bug, because nothing asserts on it today;
-  it is the sort of thing `engineOwnershipTests.cpp` exists to pin and does not.
-  Adding the scope also brings the path under rtsan, which would immediately
-  report the slot-selector allocation already recorded above — so it is a
-  deliberate pair of changes rather than a one-liner.
+- ~~**`SpectrumWorxCLAP::paramsFlush` opens no `Threading::ScopedAudioCallback`.**~~
+  (03.08.2026, from §5.1) *Fixed the same day, and it turned out to be the
+  smaller half of a bigger error.* It said: against an active plugin flush *is*
+  an audio-thread callback by contract, and it mutates the engine, so
+  `Threading::isAudioThread()` answering `false` inside it is the plugin's own
+  account of who owns the engine being wrong on one path.
+
+  **It was wrong on two paths, and the second one was a live bug.** `reset()` is
+  `[audio-thread & active]` and opened no scope either; `vst3-validator` called
+  it — through `ClapAsVst3::setProcessing(false)` — and `resetChannelBuffers()`
+  aborted against a host doing nothing wrong. The root cause was a definition
+  rather than two missing lines: the marker was called `ScopedAudioCallback` and
+  documented as "this call is under `process()`", which is *not* what
+  `[audio-thread]` means — `plugin.h` puts four entry points in that set. It is
+  `ScopedAudioThreadEntry` now, documented against the contract and carrying the
+  table of what owes one, and flush takes it **conditionally on `isActive()`**
+  because its annotation is the only conditional one.
+  `hostInteropTests.cpp` pins both.
+
+  What is still owed: those two paths are now under rtsan for the first time, so
+  a sanitizer build is expected to report the slot-selector allocation recorded
+  above, and possibly more. That is the deliberate second half and it has not
+  been run yet.
+
+- **A `checkMainThread()` failure is invisible to `TestHost`, and one case
+  overclaims because of it.** (03.08.2026, from item 1) clap-helpers'
+  `checkMainThread`/`checkAudioThread` write to `std::cerr` directly
+  (plugin.hxx:2219, 2233) rather than through `hostMisbehaving`, so nothing that
+  routes through `clap.log` can see them — which is the same limitation the flush
+  entry above records, seen from the other end. The consequence is that
+  `hostInteropTests.cpp`'s "Driven the way a DAW drives it, **nobody
+  misbehaves**" asserts only over the reports that *can* be intercepted: that
+  case emits one such line to stderr and passes. Either capture stderr in
+  `TestHost` for the duration of a case and assert on it too, or rename the case
+  to what it actually checks. The first is worth more and is not hard.
 
 ## Licence and shipping
 

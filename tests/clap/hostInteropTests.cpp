@@ -36,6 +36,7 @@
 
 #include "core/host_interop/plugin2Host.hpp"
 #include "core/parameterID.hpp"
+#include "core/threading/threadCheck.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -387,4 +388,105 @@ TEST_CASE("A parameter written outside its range is clamped, not asserted", "[cl
             CHECK(reported <= info.max_value);
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Which calls own the engine
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("Resetting between blocks may still mutate the engine", "[clap][host]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The case `vst3-validator` was. `clap_plugin::reset` is
+    /// `[audio-thread & active]` (plugin.h:89) and is called *between* blocks --
+    /// `ClapAsVst3::setProcessing(false)` does `stop_processing()` then `reset()`,
+    /// off Steinberg's own call-sequence diagram. Nothing in this tree had ever
+    /// called it, so `Threading::ScopedAudioThreadEntry` being opened only by
+    /// `process()` went unnoticed for as long as `process()` was the only
+    /// `[audio-thread]` entry point anything drove, and
+    /// `SpectrumWorxCore::resetChannelBuffers()` aborted on
+    /// `currentThreadMayMutateEngineState()` against a host doing nothing wrong.
+    ///
+    /// \note What failure looks like without the fix is an **abort, not a failed
+    /// assertion** -- the guard is `LE_ASSERT`, so a checked build dies inside
+    /// reset(). `catch_discover_tests` runs each case as its own ctest test, so
+    /// that lands as this test failing rather than as the binary taking the suite
+    /// with it. Checked by reverting the scope: this case aborts, the rest pass.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    Entry const entry;
+    TestHost host{TestHost::everything()};
+    ActivePlugin plugin(48000, 512, host);
+
+    std::vector<float> leftIn(512, 0.25f), rightIn(512, -0.25f);
+    std::vector<float> leftOut(512), rightOut(512);
+
+    // A tail to throw away, so reset() has something to do.
+    for (unsigned block(0); block < 4; ++block)
+        plugin.process(leftIn, rightIn, leftOut, rightOut);
+
+    plugin.reset();
+
+    // And the engine still runs afterwards, which is what says reset() left it
+    // usable rather than merely survived.
+    for (unsigned block(0); block < 4; ++block)
+        plugin.process(leftIn, rightIn, leftOut, rightOut);
+
+    CHECK(!LE::SW::Threading::isAudioThread()); // the scope closed behind it
+
+    INFO("what the plugin was reported for:" << joined(host.pluginMisbehaviours()));
+    CHECK(host.pluginMisbehaviours().empty());
+    INFO("what this harness was reported for:" << joined(host.hostMisbehaviours()));
+    CHECK(host.hostMisbehaviours().empty());
+}
+
+TEST_CASE("Flushing is an audio-thread call only while the plugin is active", "[clap][host]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note `clap_plugin_params::flush` is `[active ? audio-thread :
+    /// main-thread]` (ext/params.h:303) -- the one entry point whose owning
+    /// thread is decided by state rather than fixed, and so the one place a
+    /// scope taken unconditionally would be wrong in the *other* direction.
+    ///
+    /// \note **What this case does not prove.** That the inactive flush declines
+    /// to claim the audio thread is not observable from outside the plugin:
+    /// nothing the host can see differs, because claiming it wrongly breaks no
+    /// contract the host checks -- it only makes the engine's own ownership
+    /// predicate lie. What would catch it is rtsan, which the scope also opens:
+    /// under `-fsanitize=realtime` an inactive flush that took the scope would
+    /// report every allocation on the main thread. That is a sanitizer build's
+    /// job, not this one's, and it is recorded in tech_debt.md rather than
+    /// pretended at here. What is pinned below is the half that *is* visible:
+    /// both flushes are legal, neither is reported, and neither leaks the scope.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    Entry const entry;
+    TestHost host{TestHost::everything()};
+
+    bool flushedWhileInactive{false};
+    ActivePlugin plugin(48000, 512, host, [&](clap_plugin const &inactive) {
+        // Legal, and main-thread: the plugin is initialised
+        // and not yet activated. This is the arm a host takes
+        // when it restores a session before saying what the
+        // sample rate is.
+        auto const *const pParams(static_cast<clap_plugin_params const *>(
+            inactive.get_extension(&inactive, CLAP_EXT_PARAMS)));
+        REQUIRE(pParams != nullptr);
+        pParams->flush(&inactive, &noInputEvents(), &discardedOutputEvents());
+        flushedWhileInactive = true;
+        CHECK(!LE::SW::Threading::isAudioThread());
+    });
+
+    CHECK(flushedWhileInactive);
+
+    // And the active arm, which is the audio thread by contract.
+    plugin.flush();
+    CHECK(!LE::SW::Threading::isAudioThread());
+
+    INFO("what the plugin was reported for:" << joined(host.pluginMisbehaviours()));
+    CHECK(host.pluginMisbehaviours().empty());
+    INFO("what this harness was reported for:" << joined(host.hostMisbehaviours()));
+    CHECK(host.hostMisbehaviours().empty());
 }
