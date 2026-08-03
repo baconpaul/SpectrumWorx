@@ -702,7 +702,13 @@ LE_FORCEINLINE int round(double const floatingPointValue)
 
 LE_FORCEINLINE int truncate(float const floatingPointValue)
 {
-    LE_ASSERT_MSG(floatingPointValue < std::numeric_limits<int>::max(), "Float out of int range.");
+    /// \note The upper bound used to read std::numeric_limits<int>::max(),
+    /// which no float can hold: it converts to 2147483648.0f, one more than it
+    /// says, and the compiler said so. Written as the constant the comparison
+    /// was already made against. The lower bound stays a limits call because
+    /// -2^31 is a power of two and converts exactly.
+    ///                                       (02.08.2026.) (SW port)
+    LE_ASSERT_MSG(floatingPointValue < 2147483648.0f, "Float out of int range.");
     LE_ASSERT_MSG(floatingPointValue > std::numeric_limits<int>::min(), "Float out of int range.");
 #ifdef BOOST_SIMD_HAS_SSE_SUPPORT
     return _mm_cvttss_si32(_mm_set_ss(floatingPointValue));

@@ -837,8 +837,14 @@ float rangedRand(float const maximum) { return normalisedRand() * maximum; }
 
 float LE_HOT normalisedRand()
 {
-    auto const result(static_cast<float>(static_cast<double>(xorshift128pRNG()) /
-                                         std::numeric_limits<rand_t>::max()));
+    /// \note The divisor used to be std::numeric_limits<rand_t>::max(), which no
+    /// double can hold: it converts to one more than it is -- 2^digits -- and
+    /// the compiler said so. 2^digits is therefore the scale that was being
+    /// applied, and it is spelt here as something a double does hold exactly.
+    ///                                       (02.08.2026.) (SW port)
+    constexpr double scale(1 /
+                           (static_cast<double>((std::numeric_limits<rand_t>::max() / 2) + 1) * 2));
+    auto const result(static_cast<float>(static_cast<double>(xorshift128pRNG()) * scale));
     LE_ASSUME(result >= 0);
     LE_ASSUME(result <= 1);
     return result;
