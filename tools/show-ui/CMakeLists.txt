@@ -17,12 +17,14 @@ add_executable(sw-show-ui
         pages/themePage.cpp
 )
 
+# \note sw-gui-resources -- which the skin and theme pages are made of -- was
+# named here too, and the linker answered "ignoring duplicate libraries". It
+# comes with sw-gui below, PUBLIC by way of sw-gui-widgets, headers included.
 target_link_libraries(sw-show-ui PRIVATE
         juce::juce_gui_basics
         juce::juce_gui_extra
-        sw-gui-resources
 
-        # The editor page.
+        # The editor page, and the skin and theme pages under it.
         sw-gui
 )
 

@@ -6,9 +6,14 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# gui.cmake first: sw-dsp links sw-gui-resources for the skin its module class
-# now reaches, and sw-gui-widgets links sw-dsp back. CMake resolves target names
-# at generate time either way, but reading it in dependency order is kinder.
+# gui.cmake first: sw-gui-widgets links sw-io, which dsp.cmake defines. CMake
+# resolves target names at generate time either way, but reading it in dependency
+# order is kinder.
+#
+# \note This used to read "sw-dsp links sw-gui-resources for the skin its module
+# class now reaches". It does not: a module's strip belongs to the editor now and
+# sw-dsp links no JUCE at all -- see the note over sw::assets in dsp.cmake, and
+# checkNoJuceInDSP.cmake, which fails the build if it comes back.
 include(${CMAKE_CURRENT_SOURCE_DIR}/gui.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/dsp.cmake)
 
