@@ -336,3 +336,55 @@ TEST_CASE("Driven the way a DAW drives it, nobody misbehaves", "[clap][host]")
     INFO("what this harness was reported for:" << joined(host.hostMisbehaviours()));
     CHECK(host.hostMisbehaviours().empty());
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// What the host is allowed to write
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A parameter written outside its range is clamped, not asserted", "[clap][host]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Found by `clap-cpp-validator validate`, whose `param-range-robustness`
+    /// took the plugin down with `Abort trap: 6` -- `Parameter::setValue`'s
+    /// `isValidValue(value)` assert, from a global gain ranged 0.001..2. A release
+    /// build has no assert and *stores* the out-of-range value instead, which is
+    /// the worse half.
+    ///
+    ///   `CLAPEdge::fromHost` clamped the normalised parameters across their fixed
+    /// 0..1 edge and passed everything else through as the host sent it. Both
+    /// branches clamp now.
+    ///
+    /// \note Every parameter rather than the one that aborted: the two branches of
+    /// fromHost() divide this list, a slot selector is stepped where a gain is not,
+    /// and an ID no effect currently owns takes a third path out of handleEvent()
+    /// before any of this. One case cannot tell those apart.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    Entry const entry;
+    TestHost host{TestHost::everything()};
+    ActivePlugin plugin(48000, 512, host);
+
+    auto const &params(parameters(*plugin));
+    auto const all(allParameterInfo(*plugin, params));
+    REQUIRE(!all.empty());
+
+    std::vector<float> leftIn(512, 0.0f), rightIn(512, 0.0f);
+    std::vector<float> leftOut(512), rightOut(512);
+
+    for (auto const &info : all)
+    {
+        for (double const wanted : {info.min_value - 1000, info.max_value + 1000})
+        {
+            OneParameterEvent const event(info.id, wanted);
+            plugin.process(leftIn, rightIn, leftOut, rightOut, nullptr, &*event);
+
+            double reported{0};
+            REQUIRE(params.get_value(&*plugin, info.id, &reported));
+
+            CAPTURE(info.name, info.module, wanted, info.min_value, info.max_value, reported);
+            CHECK(reported >= info.min_value);
+            CHECK(reported <= info.max_value);
+        }
+    }
+}

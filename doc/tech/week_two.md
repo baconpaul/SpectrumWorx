@@ -53,7 +53,8 @@ list: it is the only thing that can close item 3.
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone — macOS arm64. Linux arm64 proven at stage 4. Windows arrives as logs. |
 | Runs | Standalone, with audio, with the real editor, with presets. It deadlocked in Logic and in Bitwig; **the threading model those deadlocks were a property of has since been replaced and nobody has reloaded it in either host** — see §1 item 3. |
-| Tests | **260/260** as of 03.08.2026: 192 Catch2 + 66 `sw-show-ui --render` + 2 build-property checks, in both build trees. Goldens run in Release only. Two binaries — `sw-dsp-tests` and `sw-plugin-tests` — not one. The renders assert what was drawn now, not an exit code. |
+| Tests | **261/261** as of 03.08.2026: 193 Catch2 + 66 `sw-show-ui --render` + 2 build-property checks, in both build trees. Goldens run in Release only. Two binaries — `sw-dsp-tests` and `sw-plugin-tests` — not one. The renders assert what was drawn now, not an exit code. |
+| Validators | `auval` **passes**, 10 runs of 10. `clap-cpp-validator` **18 pass / 4 fail**, the four being one LFO state bug that is item 4's. See §1 item 1. |
 | CI | **None.** There is no `.github/`. |
 | Warnings | **229 unique sites**, 227 of them one class — see §3. Everything else our targets emitted is fixed as of 02.08.2026. |
 | Identity | ✅ `org.surge-synth-team.spectrumworx`, AU `aufx`/`SWrx` by `SSTx` — see §4. |
@@ -163,9 +164,38 @@ document. See item 3, which it re-scoped from a fixup into a redesign.
 > save/reload. §7 there says what a failure would need — both backtraces, taken
 > before anything else, because §5 item 0 expired without them.
 
-What it still owes beyond that: Reaper, `clap-cpp-validator validate` (not the
-Rust one — see stage 1's findings) and `auval -v aufx SWrx SSTx`, and the
-deliberate drive through the joins listed below.
+> **Both validators have now run, 03.08.2026, and between them they found three
+> bugs.** The two questions above are still open — they need a host — but the
+> half of this row that does not is done, and it did not come back empty.
+>
+>   - **`auval -v aufx SWrx SSTx`: PASS**, 10 runs of 10. It failed 5 of 5
+>     before, on a NaN inside the forward FFT of the **side chain**, and the
+>     cause was outside this repository: clap-wrapper handed every channel of an
+>     unconnected AUv2 bus a buffer it allocated and never zeroed. Fixed
+>     upstream and merged as clap-wrapper #498, with the submodule bumped to it,
+>     so this needs no local patch. `tech_debt.md` has what it cost.
+>   - **`clap-cpp-validator validate`: 18 pass, 4 fail, 0 warnings.** It crashed
+>     the validator outright before (`param-range-robustness`, `Abort trap: 6`):
+>     `CLAPEdge::fromHost` clamped normalised parameters and passed everything
+>     else through as the host sent it, so an out-of-range write reached
+>     `Parameter::setValue`'s assert — and in a release build would simply have
+>     been stored. Fixed, and pinned by a case that walks all 286 parameters off
+>     both ends; reverting the clamp aborts the test binary with the same assert.
+>   - **The 4 remaining failures are one bug**, and it belongs to item 4: every
+>     mismatch is an LFO period (`M*.*.LFO.T`), 0.0373588 where 0.0408341 was
+>     saved. `state-reproducibility-flush` is the sharp one — *the same value
+>     written through `flush()` and through `process()` reports differently* — so
+>     this is two write paths disagreeing, not a serialisation rounding error.
+>     The period resnap in `handleTimingInformationChange()` is the suspect.
+>   - ~~**`scan-time` 301 ms against a 100 ms limit.**~~ *Gone with the
+>     clap-wrapper bump: 18 ms.* It was the wrapper's scan doing the work, not
+>     ours, which is not what the first reading of it assumed.
+>
+>   Three findings, and **not one of them was reachable from the 261-case suite**
+> — which is the argument for this row rather than for more headless coverage.
+
+What it still owes beyond that: Reaper, and the deliberate drive through the
+joins listed below.
 
 Specifically worth driving, because §2 says these are where the joins are — and
 because the first two are prime suspects for the deadlocks:

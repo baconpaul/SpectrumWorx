@@ -24,6 +24,24 @@ New entries go at the top of their area.
 
 ## Build and platform
 
+- ~~**clap-wrapper's AUv2 "silent" input is uninitialised heap.**~~
+  *Fixed upstream and merged, 03.08.2026 — clap-wrapper #498, "Create silence
+  buffers as empty buffers"; the submodule is bumped to it.* Kept because the
+  shape of it is worth remembering. `ProcessAdapter::setupProcessing` allocated
+  `_silent_input` with `new float[numMaxSamples]` and never zeroed it, and
+  `process()` points every channel of any bus whose `PullInput` failed at that
+  buffer. SpectrumWorx declares two input busses and `auval` connects only the
+  first, so **the side chain was fed uninitialised memory every block** —
+  measured: 5 of 5 `auval` runs aborted on a NaN in `rectangular2polar`, 10 of 10
+  pass now. The AUv3 path in the same repository already memset its equivalent,
+  so it was an omission on one path rather than a design.
+
+  Two things it cost, both worth more than the fix: the failure was **~50 %
+  intermittent**, so a single green run "proving" it was worthless, and the
+  garbage was **huge but finite** rather than NaN — see the entry under "Host
+  interface" — so it walked through every finiteness check in the engine before
+  becoming a NaN three layers away.
+
 - **`RequiredStringStorage<T>` is the contract for every `lexical_cast` buffer
   and nothing had ever checked it.** (02.08.2026, §3 `-Wdeprecated-declarations`)
   The three `lexical_cast(value, char *)` overloads take a bare pointer, so when
@@ -218,6 +236,28 @@ New entries go at the top of their area.
   deleted 2016 plugin class. A live UX bug with no owner, and one where the
   naive fix (call them from the parameter path) recreates a documented
   audio-thread violation.
+
+- **An unconnected side-chain port is indistinguishable from a connected one.**
+  (03.08.2026, from item 1) `runEngine` falls back to the main input only when
+  `audio_inputs[1].data32` is *null* (`spectrumWorxCLAP.cpp:876`), and no real
+  host gives us null — every wrapper hands over a buffer it owns. So what an
+  unpatched side chain contains is whatever the host put there, and the plugin
+  cannot tell "silence" from "not connected" from "never written". This is how
+  the auval NaN below reached the engine, and the fallback §2.8 documents as the
+  intended behaviour — an unpatched side chain being the main input — is
+  therefore effectively dead code. CLAP's own mechanism for this is
+  `clap_audio_buffer::constant_mask`, which nothing here reads.
+
+- **The engine's guards are finiteness guards, and garbage is usually finite.**
+  (03.08.2026, from item 1) Every `LE_MATH_VERIFY_VALUES` on the input path
+  tests `Invalid` (NaN/infinity) or denormals. Uninitialised memory read as
+  float is overwhelmingly *huge and finite* — the measured value was 2.9e33 —
+  so it passes `time2DFT`'s checks on the time domain, on the window and on both
+  FFT outputs, and only becomes NaN when squared inside `vDSP_zvabs`. The assert
+  that fires is therefore three layers away from where the bad data entered,
+  which is why this cost a day. A magnitude bound on the incoming block would
+  have named it immediately; whether the engine should carry one in a release
+  build is a real question and not obviously yes.
 
 ## DSP and effects
 

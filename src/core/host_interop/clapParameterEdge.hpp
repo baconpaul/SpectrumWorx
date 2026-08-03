@@ -87,10 +87,28 @@ inline double toHost(ParameterID const parameterID, Info const &info, Value cons
 }
 
 /// \brief The value the host writes -> natural stored value.
+///
+/// \note Clamped on both branches, because a host may write anything.
+/// clap-validator's `param-range-robustness` deliberately writes outside
+/// min_value..max_value, and `Parameter::setValue` answers an out-of-range value
+/// with an assert -- in a release build, by storing it. The normalised branch has
+/// always clamped, across its fixed 0..1 edge; the other one passed the host's
+/// double straight through to the engine. A global gain ranged 0.001..2 was the
+/// one that aborted.
+///                                           (03.08.2026.) (SW port)
 inline Value fromHost(ParameterID const parameterID, Info const &info, double const host)
 {
     if (!isNormalised(parameterID))
-        return static_cast<Value>(host);
+    {
+        /// \note An absent parameter has nothing to clamp against -- see
+        /// isPresent() -- and globals are never absent, so this is the
+        /// belt-and-braces arm rather than a case that happens.
+        if (!isPresent(info))
+            return static_cast<Value>(host);
+        auto const minimum(static_cast<double>(info.minimum()));
+        auto const maximum(static_cast<double>(info.maximum()));
+        return static_cast<Value>((host < minimum) ? minimum : (host > maximum) ? maximum : host);
+    }
     if (!isPresent(info))
         return static_cast<Value>(info.minimum());
     auto const clamped((host < 0) ? 0 : (host > 1) ? 1 : host);
