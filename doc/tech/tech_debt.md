@@ -24,6 +24,28 @@ New entries go at the top of their area.
 
 ## Build and platform
 
+- **`RequiredStringStorage<T>` is the contract for every `lexical_cast` buffer
+  and nothing had ever checked it.** (02.08.2026, §3 `-Wdeprecated-declarations`)
+  The three `lexical_cast(value, char *)` overloads take a bare pointer, so when
+  their `sprintf`s became `snprintf`s the only bound available was the size the
+  interface tells callers to allocate — `2 + digits * 3010 / 10000`. Two values
+  of it look short on paper:
+
+  | | constant | worst case |
+  |---|---:|---|
+  | `std::int32_t` | 11 | `-2147483648` is 11 characters **plus** the null |
+  | `double`, `%.9f` | 17 | `1000000.000000000` is 17 characters plus the null |
+
+  Neither is reachable from anything the plugin prints — parameter values, LFO
+  periods, module indices — and the 192 cases and the 303 factory presets all
+  pass with the new `LE_ASSERT` on the return live. So this is not a bug report:
+  it is that the guard is an assert in a debug build, which is the *first* thing
+  that has ever checked the constant, and the release build still truncates
+  rather than overruns. Either widen the constant by one for the sign and give
+  the `double` arm a real bound, or give the overloads a size parameter and
+  delete the constant. There are 13 call sites and they all have a `std::array`
+  or a `_countof` in hand already.
+
 - **MP3 decoding is a different decoder on macOS than on Windows and Linux, and
   which one answers is decided by registration order.** (01.08.2026, item 7)
   `registerBasicFormats()` gives `CoreAudioFormat` on macOS,

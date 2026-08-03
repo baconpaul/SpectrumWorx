@@ -47,9 +47,9 @@ inventory that redesign has to satisfy. It is no longer the plan.
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone — macOS arm64. Linux arm64 proven at stage 4. Windows arrives as logs. |
 | Runs | Standalone, with audio, with the real editor, with presets. **Loads in Logic and in Bitwig, and deadlocks in both** in certain situations — see §1 item 3. |
-| Tests | **144/144**: 134 Catch2 + 9 `sw-show-ui --render` + 1 build-property check, in both build trees. Goldens run in Release only. |
+| Tests | **192/192**: 181 Catch2 + 9 `sw-show-ui --render` + 2 build-property checks, in both build trees. Goldens run in Release only. |
 | CI | **None.** There is no `.github/`. |
-| Warnings | 254 unique sites in a from-scratch Debug build, 248 of them ours — see §3. |
+| Warnings | **229 unique sites**, 227 of them one class — see §3. Everything else our targets emitted is fixed as of 02.08.2026. |
 | Identity | ✅ `org.surge-synth-team.spectrumworx`, AU `aufx`/`SWrx` by `SSTx` — see §4. |
 
 **There is no longer a feature flag switched on.** `LE_SW_DISABLE_SIDE_CHANNEL`
@@ -936,12 +936,24 @@ that constant. Either something generated consumes it and the grep is wrong, or
 
 ---
 
-## 3. The warnings
+## 3. The warnings — *nine of the ten classes done, 02.08.2026*
 
 A from-scratch Debug configure and build of the whole tree — every target,
 including the four plugin formats, the tests and `sw-show-ui`.
 
 **420 warning lines, 254 unique sites. 248 of them are ours.**
+
+> **Done, 02.08.2026.** Everything below except `-Wundefined-var-template` is
+> fixed — nine commits, one per class, `192/192` in both build trees with the
+> Release goldens green. A rebuild of every target we own now emits **230
+> warning lines, 229 unique sites**: the 227 `-Wundefined-var-template` and the
+> two deliberate `#pragma message`s. `ld` is silent.
+>
+>   Each subsection keeps its analysis and gains a line saying what was done,
+> because in three places what the fix turned up was not what the analysis
+> predicted. The count of `-Wundefined-var-template` is **227**, not the 218
+> below: the earlier figure came from a build that predated `sw-io` and
+> `moduleWidgets.cpp`.
 
 The first thing that finding is about is not any particular warning:
 
@@ -956,19 +968,19 @@ disable/pop)` blocks that are scattered through the tree for MSVC's benefit.
 
 ### The inventory
 
-| Flag | Unique sites | Whose |
-|---|---:|---|
-| `-Wundefined-var-template` | 218 | ours |
-| `-Wdeprecated-declarations` | 13 | ours |
-| `-Wassume` | 9 | ours |
-| `-Wvla-cxx-extension` | 3 | rtaudio, rtmidi |
-| `-Wimplicit-const-int-float-conversion` | 3 | 2 ours, 1 vst3sdk |
-| `-Wnontrivial-memcall` | 2 | vst3sdk |
-| `-W#pragma-messages` | 2 | ours, deliberate |
-| `-Wdeprecated-volatile` | 1 | ours |
-| `-Wdeprecated-builtins` | 1 | ours |
-| `-Wdeprecated-anon-enum-enum-conversion` | 1 | ours |
-| `ld: ignoring duplicate libraries` | 1 | ours |
+| Flag | Unique sites | Whose | Now |
+|---|---:|---|---|
+| `-Wundefined-var-template` | 218 → **227** | ours | open — item 9 |
+| `-Wdeprecated-declarations` | 13 | ours | ✅ |
+| `-Wassume` | 9 | ours | ✅ |
+| `-Wvla-cxx-extension` | 3 | rtaudio, rtmidi | not ours |
+| `-Wimplicit-const-int-float-conversion` | 3 | 2 ours, 1 vst3sdk | ✅ (the 2) |
+| `-Wnontrivial-memcall` | 2 | vst3sdk | not ours |
+| `-W#pragma-messages` | 2 | ours, deliberate | kept, one reworded |
+| `-Wdeprecated-volatile` | 1 | ours | ✅ |
+| `-Wdeprecated-builtins` | 1 | ours | ✅ |
+| `-Wdeprecated-anon-enum-enum-conversion` | 1 | ours | ✅ |
+| `ld: ignoring duplicate libraries` | 1 → **2 links** | ours | ✅ |
 
 ### What each one is, and how to dismiss it
 
@@ -1016,10 +1028,31 @@ at all.
   "safe to `memset`", which is `std::is_trivially_copyable_v` plus
   `std::is_trivially_default_constructible_v`.
 
+> **Done, 02.08.2026**, as four commits, and the `sprintf` one is bigger than
+> "mechanical". Only five of the eight had a size at hand; `lexicalCast.cpp`'s
+> three take a bare `char *`, so the bound had to be the one the interface asks
+> its callers for — `RequiredStringStorage<T>::value` — with an assert that
+> nothing was truncated, which is now the only thing checking that constant is
+> big enough. The `LE_INT_SPRINTF` family went with them: it existed to reach
+> USER32's `wsprintfA` and keep the static CRT's `printf` out of the binary, the
+> same size argument `lexicalCast.cpp` had already retired, and its wide arm
+> never had a caller. The assertion handler's `itoa` arm and the MSVC `4996`
+> pragma over it went too.
+>
+>   `getStringWidth` is `GlyphArrangement::getStringWidthInt`, not
+> `getStringWidth` — the `Int` overload is the same `ceil` the deprecated call
+> did, and the check that it *is* the same is that the editor, skin, theme,
+> editor-module and editor-settings pages render **byte-identical PNGs** across
+> the change.
+
 **`-Wdeprecated-builtins` — 1 site.** The other half of the same line:
 `__has_trivial_assign(POD)`, a clang builtin that has been deprecated in favour
 of `__is_trivially_assignable`. It is there because of a 2011 Boost bug the
 comment links to. Both halves of `clear.hpp:38` go together.
+
+> **Done, 02.08.2026**, with the `is_pod` half in the same commit, as the
+> analysis said. Note it also drops the standard-layout requirement `is_pod`
+> carried and `memset` has no opinion about.
 
 **`-Wassume` — 9 sites, and every one of them is currently inert.**
 "assumption is ignored because it contains (potential) side-effects": on clang
@@ -1036,12 +1069,26 @@ second look on its own — `spectrumWorxCore.cpp:598` assumes
 started feeding real tempo. It appears unreachable; if it is not, `LE_ASSUME` on
 a false predicate is UB in release.
 
+> **Done, 02.08.2026.** Eight became `LE_ASSERT`. The ninth is **deleted**: it
+> was unreachable, and the reason is worth keeping. `SpectrumWorxCore`'s
+> `handleTimingInformationChange()` *hid* `Processor`'s, non-virtually and
+> privately, and nothing named it — `Processor::updatePosition()` and both
+> `updatePositionAndTimingInformation()`s call their own, statically. Reachable
+> it would have been wrong twice: an assert on a legitimate tempo change, and, in
+> release, an LFO update swallowed.
+
 **`-Wimplicit-const-int-float-conversion` — 2 ours.** `math.hpp:705` asserts
 `floatingPointValue < std::numeric_limits<int>::max()`, where the `int` becomes
 `2147483648.0f` — one more than it says. `math.cpp:841` divides by
 `numeric_limits<uint64_t>::max()` as a `double`, likewise rounded up. Both are
 harmless as written and both hide their intent. Write the constant the compiler
 actually uses: `< 2147483648.0f` and `* 0x1p-64`, with a comment.
+
+> **Done, 02.08.2026**, and `0x1p-64` was the wrong constant: `rand_t` is
+> `std::size_t`, not `std::uint64_t`, and the division it replaces was generic in
+> the type's width. It is `1 / (double((max() / 2) + 1) * 2)` — 2^digits, built
+> out of a halved max that a `double` does hold exactly. The scaling is
+> bit-identical either way and the Release goldens say so.
 
 **`-Wdeprecated-volatile` — 1 site.** `processor.cpp:955-959` takes
 `float const volatile mixAmount` **on `__APPLE__` only**, with the comment
@@ -1050,6 +1097,11 @@ Delete the `volatile` and the `#ifdef` around it, then **re-run the release
 goldens** — that is exactly what they are for, and if the workaround was load
 bearing they will say so.
 
+> **Done, 02.08.2026. The workaround was not load bearing** — Release goldens
+> green. Worth knowing: the class declaration never carried the qualifier, and a
+> top-level `volatile` on a parameter is not part of the function type, so all it
+> ever did was force the two reads in the member initialiser list.
+
 **`-Wdeprecated-anon-enum-enum-conversion` — 1 site.**
 `spectrumWorxCore.cpp:77` computes `maxNumberOfInputs - maxNumberOfOutputs`,
 which are two *different* unnamed enums (`spectrumWorxCore.hpp:62-70`). Deprecated
@@ -1057,17 +1109,34 @@ in C++20. They are unnamed enums because of a comment reading
 "`...mrmlj...Xcode7 linker errors`"; C++17 inline variables solved that.
 `static constexpr unsigned` both, and the arithmetic stops being a conversion.
 
+> **Done, 02.08.2026**, as `constexpr std::uint8_t` rather than `unsigned` —
+> `setReportedNumberOfChannels()` takes `std::uint8_t`, and every constant around
+> them in that class is already sized.
+
 **`-W#pragma-messages` — 2 sites, ours, deliberate.** "LEB: assertion handling
 enabled" (`assertionHandler.cpp:69`) and "LE.Math.Vector using OS X 10.4
 Accelerate framework" (`vector.cpp:30`). Keep the first; it tells you which
 configuration you built. Fix the text of the second or drop it — the tree has
 had a portable arm since stage 4 and the message names an OS from 2005.
 
+> **Both kept, 02.08.2026**, the second reworded to "LE.Math.Vector using the
+> Accelerate framework". They are the only two warnings a build of `src/` still
+> emits that are not `-Wundefined-var-template`.
+
 **`ld: ignoring duplicate libraries: 'src/libsw-gui-resources.a'` — 2 links.**
 `sw-dsp` already links `sw-gui-resources` `PUBLIC` (`dsp.cmake:179`), and
 `sw-tests` (`tests/CMakeLists.txt:41`) and `sw-show-ui`
 (`tools/show-ui/CMakeLists.txt:23`) name it again. Drop the two redundant
 entries.
+
+> **Done, 02.08.2026**, but the first clause was already stale when it was
+> written: `sw-dsp` links no `sw-gui-resources` and no JUCE at all — item 7 and
+> the strip move took that out, and `checkNoJuceInDSP.cmake` now fails the build
+> if it returns. What the duplicate really was: `sw-plugin-tests` and
+> `sw-show-ui` each named it *ahead* of `sw-gui`, which carries it PUBLIC by way
+> of `sw-gui-widgets`. Dropping both entries left the transitive copy in the
+> right place. `src/CMakeLists.txt`'s opening comment repeated the same stale
+> claim and is corrected.
 
 **Third-party — 6 sites, not ours.** rtaudio and rtmidi use C99 VLAs in C++
 (`-Wvla-cxx-extension`); the VST3 SDK `memset`s a non-trivially-copyable
@@ -1080,8 +1149,9 @@ those targets only.
 
 Not "turn on `-Werror`". In order:
 
-1. Fix the nine classes above (everything except the 218, which is one change to
-   the parameter system, and the six third-party ones).
+1. ~~Fix the nine classes above~~ ✅ **done, 02.08.2026** (everything except the
+   227, which is one change to the parameter system, and the six third-party
+   ones). Step 2 is now the next one to do, and it starts from a clean floor.
 2. Add `-Wall -Wextra -Wno-unused-parameter` **to our targets only**, via the
    same per-source mechanism `sw_force_include_odr_header` already uses to decide
    what "ours" means — CMake cannot express it any other way, and 7.5 has already
