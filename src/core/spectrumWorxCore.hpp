@@ -58,14 +58,15 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
     ///  - parameterIndexFromBinaryID
     ///                                       (07.03.2013.) (Domagoj Saric)
     static std::uint16_t constexpr maxNumberOfParameters = ParameterCounts::maxNumberOfParameters;
-    enum /*...mrmlj...Xcode7 linker errors*/
-    {
-        maxNumberOfOutputs = 13 + 1
-    }; // Auro 13.1 http://www.auro-technologies.com/system/engine
-    enum
-    {
-        maxNumberOfInputs = maxNumberOfOutputs * 2
-    };
+    /// \note These were two separate unnamed enums, "...mrmlj...Xcode7 linker
+    /// errors" -- the ODR problem a static constant used to have before C++17
+    /// made a constexpr static data member implicitly inline. Subtracting one
+    /// from the other is then arithmetic between two *different* enumeration
+    /// types, which C++20 deprecates and which the compiler pointed at.
+    ///                                       (02.08.2026.) (SW port)
+    // Auro 13.1 http://www.auro-technologies.com/system/engine
+    static std::uint8_t constexpr maxNumberOfOutputs = 13 + 1;
+    static std::uint8_t constexpr maxNumberOfInputs = maxNumberOfOutputs * 2;
     static std::uint16_t constexpr maxLatency = Engine::Constants::maximumFFTSize;
     static std::uint16_t constexpr maxLookAhead = Engine::Constants::maximumFFTSize;
     static std::uint16_t constexpr maxTailSize = 0;
