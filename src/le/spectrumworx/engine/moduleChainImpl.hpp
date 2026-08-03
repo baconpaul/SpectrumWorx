@@ -27,6 +27,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <utility>
 //------------------------------------------------------------------------------
 namespace LE
@@ -112,13 +113,22 @@ class ModuleChainBase :
     using node_algorithms = LE::Utility::CircularListAlgorithms<Detail::module_node_traits>;
 
   public: // Iterator
-    class chain_const_iterator
-        : public Node::NodeCPtr,
-          public std::iterator<std::bidirectional_iterator_tag, Node const, std::int8_t>
+    class chain_const_iterator : public Node::NodeCPtr
     {
       public:
         using Node = ModuleChainBase::Node const;
         using smart_ptr_t = Node::NodeCPtr;
+
+        /// \note `std::iterator<std::bidirectional_iterator_tag, Node const,
+        /// std::int8_t>` was a second base and is deprecated in C++17. The five
+        /// typedefs it supplied are spelt out instead, the way chain_iterator
+        /// below already spells its three.
+        ///                                   (02.08.2026.) (SW port)
+        using iterator_category = std::bidirectional_iterator_tag;
+        using difference_type = ModuleChainBase::difference_type;
+        using value_type = Node;
+        using pointer = value_type *;
+        using reference = value_type &;
 
       public:
 #ifdef __clang__
