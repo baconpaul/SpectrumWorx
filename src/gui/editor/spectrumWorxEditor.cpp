@@ -1726,9 +1726,15 @@ void SpectrumWorxEditor::LFODisplay::setupForControl(ModuleControlBase &control,
 
 namespace
 {
+/// \note `|| !LFO::Timer::hasTempoInformation()` stood here, so a host that
+/// reported no transport printed every period in milliseconds. There is always a
+/// tempo -- the host's, or an assumed 120 BPM in four four -- so a note ratio
+/// always means something, and only the LFO's own sync setting decides which of
+/// the two to show. See the note on updateSnapControls().
+///                                           (02.08.2026.) (SW port)
 bool skipPeriodRatio(SpectrumWorxEditor::LFODisplay::Period const &period)
 {
-    return (period.lastSyncType() == LFO::Free) || !LFO::Timer::hasTempoInformation();
+    return period.lastSyncType() == LFO::Free;
 }
 
 juce::String periodRatioString(SpectrumWorxEditor::LFODisplay const &parent,
@@ -1941,8 +1947,6 @@ void SpectrumWorxEditor::LFODisplay::buttonClicked(juce::Button *const pButton)
     }
     else
     {
-        LE_ASSERT(LFO::Timer::hasTempoInformation());
-
         LFO::SyncType syncType;
         if (pButton == &quarter_)
         {
@@ -2069,21 +2073,34 @@ void SpectrumWorxEditor::LFODisplay::updateRangeControl()
                        juce::dontSendNotification, false);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The N, T and D buttons used to be disabled whenever
+/// `LFO::Timer::hasTempoInformation()` was false -- which is every host that
+/// reports no transport, the standalone among them. So an LFO could be *loaded*
+/// tempo-synced there and run at the assumed 120 BPM, and the three buttons that
+/// say so could not be touched.
+///
+///   There is always a tempo. A host that reports one gives it; one that does not
+/// gets 120 BPM in four four, which every LFO already free-runs against -- see
+/// pluginTests.cpp's "With no transport the LFO clock is 120 BPM in four four".
+/// So a quarter note always means half a second of something, and the question
+/// the flag answers -- "did the host tell us?" -- is not the question the panel
+/// was asking.
+///
+/// \note The disabling was also one-way: nothing ever called `setEnabled( true )`
+/// on these. A host that reported a tempo, stopped, and started again left them
+/// dead for the rest of the session.
+///                                           (02.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
 void SpectrumWorxEditor::LFODisplay::updateSnapControls()
 {
-    if (LFO::Timer::hasTempoInformation())
-    {
-        auto &lfo(this->lfo());
-        quarter_.setToggleState(lfo.hasEnabledSync(LFO::Quarter), juce::dontSendNotification);
-        triplet_.setToggleState(lfo.hasEnabledSync(LFO::Triplet), juce::dontSendNotification);
-        dotted_.setToggleState(lfo.hasEnabledSync(LFO::Dotted), juce::dontSendNotification);
-    }
-    else
-    {
-        quarter_.setEnabled(false);
-        triplet_.setEnabled(false);
-        dotted_.setEnabled(false);
-    }
+    auto &lfo(this->lfo());
+    quarter_.setToggleState(lfo.hasEnabledSync(LFO::Quarter), juce::dontSendNotification);
+    triplet_.setToggleState(lfo.hasEnabledSync(LFO::Triplet), juce::dontSendNotification);
+    dotted_.setToggleState(lfo.hasEnabledSync(LFO::Dotted), juce::dontSendNotification);
 }
 
 void SpectrumWorxEditor::LFODisplay::updateLFOAndHostFromPeriodControl()

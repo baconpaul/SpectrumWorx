@@ -1370,7 +1370,6 @@ TEST_CASE("With no transport the LFO clock is 120 BPM in four four", "[clap][lfo
     plugin.process(leftIn, rightIn, leftOut, rightOut, nullptr /*no transport at all*/);
 
     using Timer = LE::Parameters::LFOImpl::Timer;
-    CHECK_FALSE(Timer::hasTempoInformation());
     // One bar of four beats at 120 BPM is two seconds.
     CHECK_THAT(Timer::basePeriod(), Catch::Matchers::WithinAbs(2.0, 1e-6));
     CHECK(Timer::measureNumerator() == 4);

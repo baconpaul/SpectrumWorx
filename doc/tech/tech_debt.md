@@ -127,6 +127,23 @@ New entries go at the top of their area.
   honest shape, and choosing one is a DSP decision with an audible answer.
   The unexplained `/ 2` in its normaliser is worth the same look.
 
+- **An LFO's default sync type depends on whether a host has reported a tempo.**
+  (02.08.2026, from making the N/T/D buttons work in the standalone)
+  `LFOImpl::SyncTypes::default_()` is `hasTempoInformation() ? Quarter : Free`,
+  and it is the last reader of that flag now that the interface has stopped
+  asking. A parameter's *default* is supposed to be a property of the parameter:
+  this one is a property of the host's transport at the moment somebody asks, on
+  a process-global flag that `Timer::reset()` deliberately never clears. So the
+  same preset, loaded into the same build, can get a different sync type
+  depending on what happened earlier in the process — which is the shape of the
+  order-dependent `[preset-corpus]` digests recorded below, and plausibly a
+  direct cause rather than a coincidence.
+
+  Making it a constant `Quarter` is the obvious fix and is deliberately not done
+  here: it would move `parameterTable.txt`, and possibly `presetCorpus.txt`, and
+  a committed digest moving is a decision rather than a chore. Worth doing with
+  the fixtures regenerated in the same commit and the reason written on it.
+
 - **The LFO panel does not follow the host's tempo.**
   (02.08.2026, from `correct_the_threading.md` §6.8)
   `SpectrumWorxEditor::updateForNewTimingInfo()` is correct and unreachable: its

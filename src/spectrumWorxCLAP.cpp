@@ -775,9 +775,11 @@ clap_process_status SpectrumWorxCLAP::process(clap_process const *const process)
 /// forever, so enabling an LFO pinned its target to one end of the range instead
 /// of sweeping it; no period boundary was ever crossed, so the per-period
 /// waveforms (RandomHold, RandomSlide, Dirac) never retriggered; and
-/// `hasTempoInformation()` stayed false, which is what greys out the editor's
-/// N/T/D sync buttons, prints the period in milliseconds rather than note
-/// ratios, and defaults every new LFO to Free.
+/// `hasTempoInformation()` stayed false, which at the time greyed out the
+/// editor's N/T/D sync buttons, printed the period in milliseconds rather than
+/// note ratios, and defaulted every new LFO to Free. The first two no longer ask
+/// -- there is always a tempo, the host's or an assumed 120 BPM 4/4 -- and the
+/// third is the flag's last reader; see tech_debt.md.
 ///
 ///   Three cases where 2016 had two, because a CLAP transport can be present and
 /// parked:
