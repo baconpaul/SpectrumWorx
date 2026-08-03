@@ -950,15 +950,17 @@ namespace
 float const *const dummyNullSidePointer(nullptr);
 } // anonymous namespace
 
+/// \note mixAmount was `float const volatile` on __APPLE__ only, against
+/// "broken codegen by Xcode 7.1(.1) Clang" -- a 2015 compiler. A volatile
+/// qualified parameter is deprecated in C++20, and the declaration up in the
+/// class never carried it, so only the two reads in the member initialiser list
+/// were ever affected. Dropped, and the Release goldens say the arithmetic did
+/// not move.
+///                                           (02.08.2026.) (SW port)
 LE_FORCEINLINE Processor::ProcessParameters::ProcessParameters(
     InputData const inputs, InputData const sideChannels, OutputData const outputs,
     Channels const &channels, std::uint32_t const numberOfSamples, float const outputGain,
-#ifdef __APPLE__
-    float const volatile mixAmount ///...mrmlj...!? broken codegen by Xcode 7.1(.1) Clang...
-#else
-    float const mixAmount
-#endif // __APPLE__
-    )
+    float const mixAmount)
     : ppMainChannels_(inputs), ppSideChannels_(sideChannels ? sideChannels : &dummyNullSidePointer),
       pOutput_(outputs),
 
