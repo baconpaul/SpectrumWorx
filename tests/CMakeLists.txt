@@ -38,6 +38,7 @@ add_executable(sw-dsp-tests
         presets/presetCorpusTests.cpp
         presets/presetHarness.cpp
         presets/presetRenderTests.cpp
+        presets/presetReportTests.cpp
         presets/presetRoundTripTests.cpp
         utility/buffersTests.cpp
         utility/circularListTests.cpp

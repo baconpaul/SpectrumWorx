@@ -196,11 +196,24 @@ struct Consumer
 /// a preset and is owed an answer. `SpectrumWorxCLAP::stateLoad` takes the same
 /// report and says nothing, a session restore being nobody's business.
 ///
+/// \note "Owed an answer" is not "owed a count". A missing parameter on its own
+/// says nothing to a user: the effect grew that parameter after the preset was
+/// written and the value defaulted, which is the format's forward compatibility
+/// doing its job. 104 of the 303 shipped banks raise one, and it is the only kind
+/// any of them raises -- so this used to interrupt one factory preset in three
+/// with a number nobody could act on. See PresetLoadReport::worthTellingTheUser()
+/// and presetReportTests.cpp, which is what actually watches that total.
+///
+///   It is still *mentioned* when something else has gone wrong, because "two
+/// effects are missing and so are forty parameters" is a fuller account of the
+/// same event.
+///                                           (02.08.2026.) (SW port)
+///
 ////////////////////////////////////////////////////////////////////////////////
 
 void reportToTheUser(PresetLoadReport const &report)
 {
-    if (!report)
+    if (!report.worthTellingTheUser())
         return;
 
     juce::String message;

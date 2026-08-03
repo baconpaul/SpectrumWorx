@@ -1,0 +1,152 @@
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \file presetReportTests.cpp
+/// ---------------------------
+///
+///   What the shipped presets have to say for themselves.
+///
+///   **Loading a factory preset must tell the user nothing.** That is the whole
+/// of this file, and it is a stronger claim than "no dialog appears": what makes
+/// it safe to suppress the one thing all 303 banks do raise is that the total is
+/// pinned here, so a parameter that goes missing for a *bad* reason -- a rename,
+/// a dropped streaming name, a reader that stopped recognising an element --
+/// moves the number and reddens.
+///
+/// Copyright (c) 2026 the SpectrumWorx contributors.
+/// SPDX-License-Identifier: GPL-3.0-or-later
+///
+////////////////////////////////////////////////////////////////////////////////
+//------------------------------------------------------------------------------
+#include "presets/presetHarness.hpp"
+
+#include "core/modules/finalImplementations.hpp"
+#include "core/modules/moduleDSPAndGUI.hpp"
+
+#include "le/spectrumworx/presetStorage.hpp"
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <filesystem>
+#include <string>
+#include <vector>
+//------------------------------------------------------------------------------
+namespace
+{
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief What every shipped preset reported, in one pass.
+///
+/// \note The *default* collector, deliberately, because that is the one
+/// `GUI::loadPreset` reads when it decides whether to raise a dialog. Installing
+/// a reporter of this file's own would measure something else.
+///
+////////////////////////////////////////////////////////////////////////////////
+struct FactoryReport
+{
+    unsigned int presets{0};
+    unsigned int presetsWorthTellingTheUser{0};
+    unsigned int missingParameters{0};
+    unsigned int unknownEffects{0};
+    unsigned int unavailableEffects{0};
+    unsigned int failures{0};
+    unsigned int tempoSyncedLFOsWithoutTempo{0};
+    std::vector<std::string> offenders; ///< presets with anything user-facing
+};
+
+FactoryReport loadEveryFactoryPreset()
+{
+    FactoryReport summary;
+
+    std::filesystem::path const banks(SW_PRESET_DATA_DIR);
+    REQUIRE(std::filesystem::is_directory(banks));
+
+    LE::SW::takePresetLoadReport(); // whatever an earlier case left
+
+    for (auto const &file : std::filesystem::recursive_directory_iterator(banks))
+    {
+        if (file.path().extension() != ".swp")
+            continue;
+
+        /// \note One engine per preset, as presetCorpusTests.cpp does: loading B
+        /// on top of A is a merge, and it is not what this case is about.
+        SWTest::Engine engine;
+        engine.setNumberOfChannels(2, 2);
+        engine.setSampleRate(48000);
+        engine.setBlockSize(512);
+        REQUIRE(engine.initialise());
+
+        auto const preset(LE::SW::readPresetFile(file.path()));
+        REQUIRE(preset);
+
+        REQUIRE(LE::SW::loadPreset(preset.get(), true /*ignore external samples*/, nullptr,
+                                   SWTest::PresetConsumer{engine}));
+        ++summary.presets;
+
+        auto const report(LE::SW::takePresetLoadReport());
+        summary.missingParameters += report.missingParameters;
+        summary.unknownEffects += report.unknownEffects;
+        summary.unavailableEffects += report.unavailableEffects;
+        summary.failures += report.failures;
+        summary.tempoSyncedLFOsWithoutTempo += report.tempoSyncedLFOWithoutTempo;
+
+        if (report.worthTellingTheUser())
+        {
+            ++summary.presetsWorthTellingTheUser;
+            summary.offenders.push_back(file.path().string() + " (" + report.firstDetail + ")");
+        }
+    }
+
+    return summary;
+}
+} // anonymous namespace
+
+TEST_CASE("Loading a factory preset tells the user nothing", "[presets][report]")
+{
+    auto const summary(loadEveryFactoryPreset());
+
+    REQUIRE(summary.presets > 300);
+
+    for (auto const &offender : summary.offenders)
+        UNSCOPED_INFO("raised a dialog: " << offender);
+
+    // The shipped content is ours. A preset naming an effect this build does not
+    // have, or failing to parse, is a fault in what we ship rather than news for
+    // the user -- so none of it may reach them, and none of it is here to.
+    CHECK(summary.presetsWorthTellingTheUser == 0);
+    CHECK(summary.unknownEffects == 0);
+    CHECK(summary.unavailableEffects == 0);
+    CHECK(summary.failures == 0);
+    CHECK(summary.tempoSyncedLFOsWithoutTempo == 0);
+}
+
+TEST_CASE("What the factory presets do not mention is exactly this much",
+          "[presets][report][fixture]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The number that makes suppressing `MissingParameter` safe.
+    ///
+    ///   All 722 of these are the same thing: an effect that grew a parameter
+    /// after the preset was written. Freqverb gained `HF absorb` (104 presets --
+    /// every one that uses it); TuneWorx gained twelve per-semitone bypasses,
+    /// the whole vibrato section, the pitch range, the retune time and the
+    /// tuning direction (28 presets, 22 parameters each); two presets predate a
+    /// `Phase`. tuneWorx.hpp still carries the pre-growth parameter list beside
+    /// the current one, which is the same fact from the other end.
+    ///
+    ///   The value defaults, which is what the format is for. What would *not*
+    /// be fine is this number going **up**: that is a parameter the reader
+    /// stopped recognising -- a rename, a changed streaming name, a broken
+    /// element -- and it looks identical from inside the loader while silently
+    /// throwing away shipped preset data. Same discipline as the corpus digests:
+    /// if it moves, something is wrong, and refreshing it is not the fix.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    constexpr unsigned int knownMissingParameters{722};
+
+    auto const summary(loadEveryFactoryPreset());
+
+    INFO("across " << summary.presets << " presets");
+    CHECK(summary.missingParameters == knownMissingParameters);
+}

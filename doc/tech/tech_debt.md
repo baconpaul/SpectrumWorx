@@ -105,14 +105,27 @@ New entries go at the top of their area.
   artifacts and why the release run renders all 303 finite. It is a weakness in
   the vector primitives, and a skip list would need a dozen names and would grow.
 
-- **Browsing the factory banks puts a dialog in front of the user on one preset
-  in three.** (02.08.2026, from the preset loop in `pluginTests.cpp`) 104 of the
-  303 shipped presets have something to report — almost all of them parameters
-  their effects grew after 2011 — and `GUI::loadPreset` raises one summary per
-  load when a window is open. That is the designed behaviour and it is defensible
-  for a preset a user picked deliberately; it is not defensible while arrowing
-  down a bank. Found by the loop leaking 104 `juce::AsyncUpdater`s. What a user
-  is owed here is a product decision, not a threading one.
+- ~~**Browsing the factory banks puts a dialog in front of the user on one preset
+  in three.**~~ *Closed 02.08.2026.* All 104 were `MissingParameter` and nothing
+  else — an effect that grew a parameter after the preset was written, the value
+  defaulting, which is what the format is for. A user can neither act on that nor
+  avoid it, so it no longer reaches them: see
+  `PresetLoadReport::worthTellingTheUser()`. It is still counted and still traced,
+  and `presetReportTests.cpp` pins the total at 722 so that a parameter going
+  missing for a *bad* reason — a rename, a changed streaming name — reddens
+  rather than hiding behind the suppression.
+
+- **The Exaggerator's behaviour next to an empty bin is a cliff.**
+  (02.08.2026, from `presetRenderTests.cpp`) Its intensity maps to an exponent
+  over [-1, 4] and it raises every normalised bin to it, so with a negative
+  intensity the gain applied to a bin grows without bound as that bin approaches
+  zero. The NaN this produced is fixed — `pow( 0, negative )` is `+inf`, one
+  infinity zeroed the normaliser and the whole spectrum followed, in four shipped
+  presets — but the fix is "an empty bin stays empty", which is a discontinuity
+  rather than a rounding of one: a bin at 1e-30 is still boosted enormously and a
+  bin at exactly zero is not boosted at all. A floor on the input would be the
+  honest shape, and choosing one is a DSP decision with an audible answer.
+  The unexplained `/ 2` in its normaliser is worth the same look.
 
 - **The LFO panel does not follow the host's tempo.**
   (02.08.2026, from `correct_the_threading.md` §6.8)

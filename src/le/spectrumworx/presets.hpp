@@ -157,6 +157,35 @@ struct PresetLoadReport
     }
 
     explicit operator bool() const { return total() != 0; }
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Whether any of this is the user's business.
+    ///
+    /// \note Everything except `missingParameters`, and that omission is the
+    /// point. A preset that does not mention a parameter is not a damaged
+    /// preset: the effect grew that parameter after the file was written, the
+    /// value defaults, and this is the format's forward compatibility working
+    /// exactly as designed.
+    ///
+    ///   It is also not rare. **104 of the 303 shipped banks** raise one --
+    /// every Freqverb preset predates `HF absorb`, every TuneWorx preset
+    /// predates its twelve per-semitone bypasses and its whole vibrato section
+    /// -- and `MissingParameter` is the *only* kind any of them raises. So
+    /// mentioning it put a dialog in front of anyone arrowing through the
+    /// factory content, saying something they could neither act on nor avoid.
+    ///
+    ///   Still counted, still traced: a parameter that goes missing because
+    /// somebody renamed one is a real defect, and it looks exactly like this
+    /// from here. What catches that is the pinned total in
+    /// presetReportTests.cpp, not a dialog the user learns to dismiss.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    bool worthTellingTheUser() const
+    {
+        return (failures + unknownEffects + unavailableEffects + tempoSyncedLFOWithoutTempo) != 0;
+    }
 }; // struct PresetLoadReport
 
 /// \brief Returns everything the default reporter has counted, and clears it.

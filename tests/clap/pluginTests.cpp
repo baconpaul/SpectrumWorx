@@ -1613,23 +1613,6 @@ TEST_CASE("Loading preset after preset with the editor open", "[clap][presets][g
 
     ////////////////////////////////////////////////////////////////////////////
     ///
-    /// \note A counting reporter, which also keeps `GUI::loadPreset` from
-    /// raising its summary dialog -- that reads the *default* collector, and with
-    /// this installed the default one never counts.
-    ///
-    ///   Not merely test hygiene. 104 of the 303 factory banks have something to
-    /// report, so browsing the shipped presets with the window open puts a dialog
-    /// in front of the user on one preset in three. This case found that by
-    /// leaking 104 `juce::AsyncUpdater`s -- there is no message loop here to run
-    /// them -- and it is recorded in tech_debt.md rather than changed here: what
-    /// a user is owed when they open a preset is a product decision.
-    ///                                       (02.08.2026.) (SW port)
-    ///
-    ////////////////////////////////////////////////////////////////////////////
-    SWTest::ScopedProblemCounter const counting;
-
-    ////////////////////////////////////////////////////////////////////////////
-    ///
     /// \note The mailbox is primed first, and that is the whole setup: an effect
     /// with plenty of parameters, an LFO running on it, and blocks of audio to
     /// make it write. What the presets then do is replace that chain under it.
@@ -1674,6 +1657,20 @@ TEST_CASE("Loading preset after preset with the editor open", "[clap][presets][g
         auto const presetData(LE::SW::readPresetFile(file.path()));
         REQUIRE(presetData);
 
+        ////////////////////////////////////////////////////////////////////
+        ///
+        /// \note No reporter of this case's own, on purpose. `GUI::loadPreset`
+        /// decides for itself whether the load is worth a dialog, and a dialog
+        /// here is a `juce::AlertWindow::showMessageBoxAsync` with no message
+        /// loop to run it -- so JUCE's leak detector fails the run at exit and
+        /// names the count. Which is how "browsing the factory banks interrupts
+        /// you on one preset in three" was found: 104 leaked `AsyncUpdater`s.
+        ///
+        ///   presetReportTests.cpp is the direct statement of the same thing;
+        /// this is the end-to-end one, with a real editor attached.
+        ///                               (02.08.2026.) (SW port)
+        ///
+        ////////////////////////////////////////////////////////////////////
         auto const name(file.path().stem().string());
         REQUIRE(LE::SW::GUI::loadPreset(host, editor.get(), presetData.get(),
                                         true /*ignore external samples*/, nullptr, name.c_str()));
