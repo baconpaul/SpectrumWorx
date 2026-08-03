@@ -139,7 +139,7 @@ And the UI keeps process-wide mutable state that two instances silently share:
 
 The default `PresetProblemReporter` is a message box per problem
 (`presets.cpp:444-478`), and a 2011 preset raises one `MissingParameter` per parameter its
-effect grew afterwards — 806 across the 303 factory banks. `SWTest::ScopedProblemCounter`
+effect grew afterwards — 722 across the 303 factory banks, measured since and pinned. `SWTest::ScopedProblemCounter`
 exists precisely so the test suite does not leak 809 `AsyncUpdater`s
 (`presetHarness.hpp:126-128`).
 
@@ -410,7 +410,7 @@ in one process, as `tech_debt.md` records.
 editor must leave `MessageManager::getInstanceWithoutCreating()` non-null. Against the old
 implementation it is null. Plus: the survivor is still a working editor, reopening the
 closed one works, selection is independent, and a run over a whole factory bank with **no
-reporter installed** counts 806-style missing parameters and leaks nothing — which is
+reporter installed** counts the missing parameters and leaks nothing — which is
 symptom 1, stated as a test.
 
 ### 6.2 — What stage 2 built

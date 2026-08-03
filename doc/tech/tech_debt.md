@@ -152,17 +152,13 @@ New entries go at the top of their area.
 
 ## Host interface
 
-- **Restoring a session puts up one modal dialog per parameter the file does not
-  mention.** (02.08.2026, item 4) The default `PresetProblemReporter` is
-  `GUI::warningMessageBox`, and `MissingParameter` is raised once per parameter
-  an effect grew after the file was written — 806 times across the 303 factory
-  banks. That was already true of opening a preset; it is now also true of a host
-  restoring a project, which happens without anyone asking for it and possibly
-  before there is a window to put a dialog in front of. The machinery to fix it
-  exists and is used by the tests: `setPresetProblemReporter` takes a function
-  pointer, and `SWTest::ScopedProblemCounter` counts instead of alerting. What is
-  missing is the shipping plugin's own choice of reporter — a status line, a
-  once-per-load summary, anything that is not a dialog per parameter.
+- ~~**Restoring a session puts up one modal dialog per parameter the file does
+  not mention.**~~ *Closed 02.08.2026.* The default reporter counts rather than
+  alerting, `stateLoad` says nothing at all, and a parameter the file does not
+  mention is no longer the user's business in the first place — see
+  `PresetLoadReport::worthTellingTheUser()` and `presetReportTests.cpp`. The
+  figure this entry quoted, 806, was never measured: the counted total across the
+  303 banks is **722**, pinned as a fixture.
 
 - ~~**The CLAP state does not hold which external audio file is loaded.**~~
   *Fixed 02.08.2026, item 4.* State is the preset serialisation now, and
@@ -260,7 +256,10 @@ New entries go at the top of their area.
   `hasTempoInformation_` as **statics**, and `Timer::reset()` deliberately does
   not clear the last of them — a 2012 workaround for Ableton Live popping up
   "preset uses tempo-synced LFOs but the host provides no tempo" while browsing
-  (`lfoImpl.cpp:766-784`). So once `pluginTests.cpp`'s three `[clap][lfo]`
+  (`lfoImpl.cpp:766-784`). That dialog is gone as of 02.08.2026 — a host with no
+  transport gets 120 BPM 4/4, which is an answer rather than a fault — but the
+  workaround it produced is still what makes `hasTempoInformation_` sticky, and
+  the statics are still shared. So once `pluginTests.cpp`'s `[clap][lfo]`
   transport cases have told the plugin a tempo, every later preset load in that
   process converts `PeriodScale` differently, and the corpus digests move.
 

@@ -445,7 +445,7 @@ std::string_view Preset::getComment() const
 namespace
 {
 /// \note Not a dialog. See PresetLoadReport for the whole argument; the short
-/// version is that one of these per problem meant 806 of them for the factory
+/// version is that one of these per problem meant 722 of them for the factory
 /// banks, from a layer that has no business knowing what a dialog is, on whatever
 /// thread a host chose to restore a session on.
 PresetLoadReport report_;
@@ -474,9 +474,6 @@ LE_COLD void defaultPresetProblemReporter(PresetProblem const problem,
         return;
     case PresetProblem::UnknownParameter:
         ++report_.unknownParameters;
-        return;
-    case PresetProblem::TempoSyncedLFOWithoutTempo:
-        report_.tempoSyncedLFOWithoutTempo = true;
         return;
     }
 }

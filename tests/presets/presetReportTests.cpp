@@ -51,7 +51,6 @@ struct FactoryReport
     unsigned int unknownEffects{0};
     unsigned int unavailableEffects{0};
     unsigned int failures{0};
-    unsigned int tempoSyncedLFOsWithoutTempo{0};
     std::vector<std::string> offenders; ///< presets with anything user-facing
 };
 
@@ -90,7 +89,6 @@ FactoryReport loadEveryFactoryPreset()
         summary.unknownEffects += report.unknownEffects;
         summary.unavailableEffects += report.unavailableEffects;
         summary.failures += report.failures;
-        summary.tempoSyncedLFOsWithoutTempo += report.tempoSyncedLFOWithoutTempo;
 
         if (report.worthTellingTheUser())
         {
@@ -120,7 +118,6 @@ TEST_CASE("Loading a factory preset tells the user nothing", "[presets][report]"
     CHECK(summary.unknownEffects == 0);
     CHECK(summary.unavailableEffects == 0);
     CHECK(summary.failures == 0);
-    CHECK(summary.tempoSyncedLFOsWithoutTempo == 0);
 }
 
 TEST_CASE("What the factory presets do not mention is exactly this much",

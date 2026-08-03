@@ -87,7 +87,7 @@ struct WindowSizeFactor;
 /// one dialog per problem. Two things wrong with that. It is a layering
 /// inversion -- `sw-dsp` reaching up into the GUI -- and, more concretely, a
 /// 2009-2011 preset does not mention parameters that the 2016 effects grew: the
-/// 303 committed factory presets raise **806** MissingParameter reports between
+/// 303 committed factory presets raise **722** MissingParameter reports between
 /// them, which as dialogs is a wall of them in front of a user who opened a
 /// bank.
 ///
@@ -123,8 +123,13 @@ enum struct PresetProblem : std::uint8_t
     ///                                       (02.08.2026.) (SW port)
     ///
     ////////////////////////////////////////////////////////////////////////////
-    UnknownParameter,
-    TempoSyncedLFOWithoutTempo
+    UnknownParameter
+    /// \note A `TempoSyncedLFOWithoutTempo` stood here, for a preset with
+    /// tempo-synced LFOs loaded into a host that reports no transport. That is
+    /// not a problem: such a host gets 120 BPM in four four, which is a defined
+    /// answer, and the standalone is one of them. See the note in
+    /// presetLoading.cpp's moduleChainFinished().
+    ///                                       (02.08.2026.) (SW port)
 };
 
 /// \param detail the effect or parameter name where there is one, else empty.
@@ -146,7 +151,7 @@ void reportPresetProblem(PresetProblem, std::string_view detail = {});
 /// \note The default reporter was a `GUI::warningMessageBox` per problem, which
 /// was wrong three ways. It is a layering inversion -- the preset parser reaching
 /// up into the GUI. It is a *storm*: a 2011 preset does not mention parameters its
-/// effect grew later, and the 303 factory banks raise 806 `MissingParameter`
+/// effect grew later, and the 303 factory banks raise 722 `MissingParameter`
 /// reports between them, so opening a bank meant that many dialogs. And once the
 /// session state became the preset serialisation, it happened on a host restoring
 /// a project -- without anyone asking, on whatever thread the host chose, possibly
@@ -166,7 +171,6 @@ struct PresetLoadReport
     unsigned int unknownEffects{0};
     unsigned int unavailableEffects{0};
     unsigned int failures{0}; ///< LoadFailed, SaveFailed, FutureFormat
-    bool tempoSyncedLFOWithoutTempo{false};
 
     /// The first `detail` seen, so a summary can name one thing rather than none.
     std::string firstDetail;
@@ -174,7 +178,7 @@ struct PresetLoadReport
     unsigned int total() const
     {
         return missingParameters + unknownParameters + unknownEffects + unavailableEffects +
-               failures + tempoSyncedLFOWithoutTempo;
+               failures;
     }
 
     explicit operator bool() const { return total() != 0; }
@@ -205,8 +209,7 @@ struct PresetLoadReport
     ////////////////////////////////////////////////////////////////////////////
     bool worthTellingTheUser() const
     {
-        return (failures + unknownParameters + unknownEffects + unavailableEffects +
-                tempoSyncedLFOWithoutTempo) != 0;
+        return (failures + unknownParameters + unknownEffects + unavailableEffects) != 0;
     }
 }; // struct PresetLoadReport
 

@@ -25,6 +25,7 @@
 /// it through `clap_plugin::plugin_data` as processLockTests.cpp does.
 #include "core/modules/moduleDSPAndGUI.hpp"
 #include "gui/editor/presetLoading.hpp"
+#include "le/parameters/lfoImpl.hpp"
 #include "presets/presetHarness.hpp"
 #include "gui/editor/spectrumWorxEditor.hpp"
 #include "le/spectrumworx/presetStorage.hpp"
@@ -1339,6 +1340,40 @@ TEST_CASE("An LFO sweeps the DSP and not what the host reads", "[clap][lfo]")
         CHECK(distinctHostVisibleValues(plugin, parameters(*plugin), sampleRate, blockSize, blocks,
                                         nullptr) == 1);
     }
+}
+
+TEST_CASE("With no transport the LFO clock is 120 BPM in four four", "[clap][lfo]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The assumed tempo, stated rather than described. A host that
+    /// reports no transport -- the standalone is one -- leaves every LFO free
+    /// running against this, and it is a defined answer rather than a failure:
+    /// there used to be a dialog on loading any preset with a tempo-synced LFO
+    /// into such a host, saying so. The 2016 sources already record it firing
+    /// spuriously in Live.
+    ///
+    ///   Pinned because the removal of that dialog rests on it. If the assumed
+    /// tempo ever stops being 120 BPM 4/4, a preset written against note ratios
+    /// plays at some other rate and nothing says anything at all.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    constexpr float sampleRate{48000};
+    constexpr std::uint32_t blockSize{512};
+
+    Entry const entry;
+    ActivePlugin plugin(sampleRate, blockSize);
+
+    std::vector<float> leftIn(blockSize, 0.0f), rightIn(blockSize, 0.0f);
+    std::vector<float> leftOut(blockSize), rightOut(blockSize);
+    plugin.process(leftIn, rightIn, leftOut, rightOut, nullptr /*no transport at all*/);
+
+    using Timer = LE::Parameters::LFOImpl::Timer;
+    CHECK_FALSE(Timer::hasTempoInformation());
+    // One bar of four beats at 120 BPM is two seconds.
+    CHECK_THAT(Timer::basePeriod(), Catch::Matchers::WithinAbs(2.0, 1e-6));
+    CHECK(Timer::measureNumerator() == 4);
 }
 
 TEST_CASE("An enabled LFO keeps running while the transport is stopped", "[clap][lfo]")

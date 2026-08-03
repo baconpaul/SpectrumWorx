@@ -148,19 +148,33 @@ struct Loader
         return true;
     }
 
-    void moduleChainFinished(std::uint8_t const moduleCount, bool const syncedLFOFound) const
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note A `TempoSyncedLFOWithoutTempo` report stood here, raised when a
+    /// preset used tempo-synced LFOs and the host had never said what the tempo
+    /// was. It is gone, and so is the problem kind, because there is no problem:
+    /// a host that reports no transport gets 120 BPM in four four, which is a
+    /// defined answer and a common one -- the standalone is such a host, so every
+    /// preset with a synced LFO opened there raised it.
+    ///
+    ///   The 2016 sources had already met it from the other side: `Timer::reset()`
+    /// deliberately does not clear `hasTempoInformation_` because doing so
+    /// produced "bogus sporadic" versions of this dialog while browsing presets
+    /// in Live. A warning that needs a workaround to stop firing at the wrong
+    /// time is describing something that is not wrong.
+    ///
+    ///   What the interface does say is better placed and stays: with no tempo
+    /// the LFO panel greys its N/T/D buttons and prints periods in milliseconds
+    /// rather than note ratios, so the state is visible where it matters without
+    /// interrupting anybody. See pluginTests.cpp's "With no transport the LFO
+    /// clock is 120 BPM in four four", which pins the assumption this rests on.
+    ///                                       (02.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    void moduleChainFinished(std::uint8_t const moduleCount, bool /*syncedLFOFound*/) const
     {
         if (pEditor)
             pEditor->setLastModulePosition(moduleCount);
-
-        /// \note Some hosts (Renoise 2.8) provide tempo information lazily,
-        /// after the first process() call, so the transport position is checked
-        /// too rather than warning at a host that simply has not said yet.
-        ///                                   (03.07.2012.) (Domagoj Saric)
-        using Timer = SpectrumWorxCore::LFO::Timer;
-        if (syncedLFOFound && !Timer::hasTempoInformation() &&
-            host.core().lfoTimer().currentTimeInBars())
-            reportPresetProblem(PresetProblem::TempoSyncedLFOWithoutTempo);
     }
 }; // struct Loader
 
@@ -238,8 +252,6 @@ void reportToTheUser(PresetLoadReport const &report)
     if (report.missingParameters)
         message << static_cast<int>(report.missingParameters)
                 << " parameter(s) it does not mention were left at their defaults.\n";
-    if (report.tempoSyncedLFOWithoutTempo)
-        message << "It uses tempo-synced LFOs and the host reports no tempo.\n";
 
     GUI::warningMessageBox(MB_WARNING, message.toRawUTF8(), false);
 }
