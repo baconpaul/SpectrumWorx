@@ -37,7 +37,7 @@ namespace SW
 ///
 ///   The region belongs to the editor now and holds a counted reference *to* the
 /// module -- the other way round -- so nothing here knows the interface exists.
-/// See gui/modules/moduleUI.hpp and doc/tech/correct_the_threading.md.
+/// See gui/modules/moduleUI.hpp and doc/tech/threading_model.md.
 ///                                           (02.08.2026.) (SW port)
 ///
 ////////////////////////////////////////////////////////////////////////////////
@@ -64,7 +64,7 @@ class LE_NOVTABLE Module : public Engine::ModuleDSP, public AutomatedModuleImpl<
     /// `set{Base,Effect}ParameterFromLFO` -- and every one of them existed to push
     /// a value into a `juce::Slider`. The last two ran once per block per enabled
     /// LFO, from the audio thread, which is the stack in
-    /// doc/tech/correct_the_threading.md §1A; the first two put a `juce::String`
+    /// doc/tech/threading_model.md §1; the first two put a `juce::String`
     /// there whenever the moved parameter's control happened to be the active one.
     ///
     ///   Nothing replaces them in the engine. The plugin publishes what the LFOs

@@ -16,7 +16,7 @@
 /// instantiation happens behind one table here rather than through a pair of
 /// function pointers planted in each module at construction.
 ///
-/// See doc/tech/correct_the_threading.md.
+/// See doc/tech/threading_model.md.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later

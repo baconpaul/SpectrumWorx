@@ -77,7 +77,7 @@ LE_WEAK_SYMBOL_CONST char const assertionFailureMessageTitle[] = "LE SDK asserti
 /// compiled in this port, and it was the last thing in `sw-dsp` that named JUCE
 /// outside a comment. Deleted rather than kept for a build that does not exist:
 /// a dialog from an assertion is also the wrong shape for a plugin, which cannot
-/// know whether it has a message thread. See doc/tech/correct_the_threading.md §6.7.
+/// know whether it has a message thread. See doc/tech/threading_model.md §6.
 ///                                           (02.08.2026.) (SW port)
 
 //------------------------------------------------------------------------------

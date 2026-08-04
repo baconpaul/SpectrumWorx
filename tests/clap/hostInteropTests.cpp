@@ -25,7 +25,8 @@
 ///     check (plugin.hxx:2262-2287), and `CheckingLevel::Maximal` is what this
 ///     plugin is built at. Offering `clap.log` catches what they report.
 ///
-/// See doc/tech/week_two.md §2.3 and §5.1.
+/// See doc/tech/threading_model.md §2 for which calls owe a
+/// `ScopedAudioThreadEntry`, and §8 for what else pins it.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later
@@ -518,19 +519,17 @@ TEST_CASE("Learning the host's tempo does not move the LFO periods", "[clap][hos
 
     clap_id periodID{};
     double beforeAnyBlock{-1};
-    ActivePlugin plugin(48000, 512, host,
-                        [&](clap_plugin const &inactive)
-                        {
-                            auto const *const pParams(static_cast<clap_plugin_params const *>(
-                                inactive.get_extension(&inactive, CLAP_EXT_PARAMS)));
-                            REQUIRE(pParams != nullptr);
+    ActivePlugin plugin(48000, 512, host, [&](clap_plugin const &inactive) {
+        auto const *const pParams(static_cast<clap_plugin_params const *>(
+            inactive.get_extension(&inactive, CLAP_EXT_PARAMS)));
+        REQUIRE(pParams != nullptr);
 
-                            OneParameterEvent const fill(parameterID(moduleChainType, 0), 0);
-                            pParams->flush(&inactive, &*fill, &discardedOutputEvents());
+        OneParameterEvent const fill(parameterID(moduleChainType, 0), 0);
+        pParams->flush(&inactive, &*fill, &discardedOutputEvents());
 
-                            periodID = lfoPeriodParameter(inactive, *pParams).id;
-                            REQUIRE(pParams->get_value(&inactive, periodID, &beforeAnyBlock));
-                        });
+        periodID = lfoPeriodParameter(inactive, *pParams).id;
+        REQUIRE(pParams->get_value(&inactive, periodID, &beforeAnyBlock));
+    });
 
     auto const &params(parameters(*plugin));
 

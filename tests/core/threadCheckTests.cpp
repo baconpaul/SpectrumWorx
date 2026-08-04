@@ -10,7 +10,7 @@
 /// process() is actually wrapped, which is checked through the host's own API
 /// rather than by reading the source.
 ///
-/// See doc/tech/correct_the_threading.md.
+/// See doc/tech/threading_model.md.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later

@@ -6,11 +6,10 @@
 ///   Which thread is this, and may it do that.
 ///
 ///   CLAP annotates every entry point `[main-thread]`, `[audio-thread]` or
-/// `[thread-safe]`, and those annotations are contractual. Nothing in this port
-/// could check one: `GUI::isThisTheGUIThread()` asks JUCE, which is only an answer
-/// once there is a message thread, and `currentThreadOwnsTheProcessLock()` returned
-/// a hardcoded `true`. This is the instrument the threading redesign is read by --
-/// see doc/tech/correct_the_threading.md.
+/// `[thread-safe]`, and those annotations are contractual. This is what answers
+/// them: `GUI::isThisTheGUIThread()` asks JUCE, which is only an answer once
+/// there is a message thread, and there is no processing lock to ask instead.
+/// The rules these two functions serve are doc/tech/threading_model.md §2.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later
@@ -106,9 +105,10 @@ bool isAudioThread();
 ///
 /// \note The sanitizer half is the runtime entry point rather than the
 /// `[[clang::nonblocking]]` attribute. The attribute would do the same at runtime
-/// *and* run a static analysis whose diagnostics this tree cannot answer yet --
-/// stage 6 is what makes process() genuinely allocation free. The runtime region
-/// costs nothing in a build without the sanitizer, where both calls compile away.
+/// *and* run a static analysis whose diagnostics this tree cannot answer: the one
+/// allocation `process()` still reaches is deliberate and recorded in
+/// doc/tech/tech_debt.md. The runtime region costs nothing in a build without the
+/// sanitizer, where both calls compile away.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 

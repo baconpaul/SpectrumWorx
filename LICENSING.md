@@ -103,15 +103,14 @@ answer.
 
 ## Two loose ends, recorded rather than hidden
 
-**`doc/manual/EULA.txt` is not a contradiction, and three tech documents say it
-is.** It was Little Endian's commercial end-user agreement in 2016; the file in
-the tree today is a plain-text copy of the GPL-3.0 licence — 218 lines,
+**`doc/manual/EULA.txt` is not a contradiction, and three tech documents used to
+say it was.** It was Little Endian's commercial end-user agreement in 2016; the
+file in the tree today is a plain-text copy of the GPL-3.0 licence — 218 lines,
 byte-for-byte the terms in `LICENSE`, with no proprietary wording anywhere in it.
-So the "licence contradiction" `week_two.md` §5.5, `tech_debt.md` and
-`implementation_sequence.md` all flag does not exist; what survives is a filename
-from a shipping model that does not. It is a duplicate of `LICENSE` under a name
-that means the opposite, and the packaging step should rename or drop it rather
-than ship it.
+So there is no "licence contradiction"; what survives is a filename from a
+shipping model that does not. It is a duplicate of `LICENSE` under a name that
+means the opposite, and the packaging step should rename or drop it rather than
+ship it.
 
 **`src/legacy-build.cmake:386` still points `CPACK_RESOURCE_FILE_LICENSE` at
 `../installer/ProgramFolder/Licences/EULA.txt`**, a path outside this repository

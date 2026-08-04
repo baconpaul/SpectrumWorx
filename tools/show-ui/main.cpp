@@ -153,7 +153,7 @@ class ShowUIApplication final : public juce::JUCEApplication
 ///
 ///   `--render` used to write a PNG and return 0, so a page that painted solid
 /// black passed and so did a page that painted nothing at all -- which is most of
-/// how GUI code fails. week_two.md §2.3 owns the row; §5.2 asks for exactly this.
+/// how GUI code fails.
 ///
 /// \note The modal colour rather than a distinct-colour count. A count is easy to
 /// satisfy by accident: antialiasing one glyph over an otherwise empty panel

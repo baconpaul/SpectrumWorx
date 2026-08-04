@@ -51,7 +51,7 @@ class Engine : public LE::SW::SpectrumWorxCore
 
     /// Likewise protected, and likewise something only a test asks directly.
     /// Six assertions in the engine depend on it; engineOwnershipTests.cpp is
-    /// where that is pinned. See doc/tech/correct_the_threading.md.
+    /// where that is pinned. See doc/tech/threading_model.md.
     using Core::applyPendingSpectralSetup;
     using Core::currentThreadMayMutateEngineState;
     using Core::spectralSetupPending;

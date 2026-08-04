@@ -200,12 +200,12 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
     /// \brief One block. Always.
     ///
     /// \note It returned `bool` -- "the processing lock was free, so `outputs`
-    /// was written" -- for the two stages in which the lock still existed and
-    /// meant something. Nothing takes a lock here now and nothing else mutates
-    /// the engine while this runs, so there is no longer a block to decline and
-    /// no caller left with a buffer to fill in for one. week_two.md §2.1b was
-    /// the earlier half of the same story: back then it returned `void` and the
-    /// callers left the host's buffer as they found it.
+    /// was written" -- for as long as the lock existed and meant something.
+    /// Nothing takes a lock here now and nothing else mutates the engine while
+    /// this runs, so there is no longer a block to decline and no caller left
+    /// with a buffer to fill in for one. Earlier still it returned `void` and a
+    /// failed `try_lock` left the host's buffer as it found it, which is worse
+    /// than either: the host played whatever was already there.
     ///                                       (02.08.2026.) (SW port)
     ///
     ////////////////////////////////////////////////////////////////////////////

@@ -10,7 +10,7 @@
 /// contention, so each has a case that actually runs two threads and one that
 /// pins the property in the single-threaded case where the answer is exact.
 ///
-/// See doc/tech/correct_the_threading.md §3.
+/// See doc/tech/threading_model.md §3.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later

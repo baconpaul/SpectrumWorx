@@ -577,10 +577,10 @@ TEST_CASE("Filling a slot makes the host re-read the descriptions", "[clap]")
 
 TEST_CASE("A host with state and no thread check survives a parameter write", "[clap]")
 {
-    // week_two.md §2.1a. `clap.thread-check` is optional; `clap.state` is what
-    // makes markCurrentProgramAsModified() get as far as asking for it. Before
-    // the fix this asserted in a checked build and dereferenced null in a
-    // shipping one, on the path every automated parameter change takes.
+    // `clap.thread-check` is optional; `clap.state` is what makes
+    // markCurrentProgramAsModified() get as far as asking for it. Before the fix
+    // this asserted in a checked build and dereferenced null in a shipping one,
+    // on the path every automated parameter change takes.
     //
     /// \note State and nothing else, deliberately -- the combination is the point
     /// of the case. hostInteropTests.cpp is the same plugin against a host that
@@ -859,7 +859,7 @@ TEST_CASE("What the LFOs did reaches the interface through the mailbox", "[clap]
 {
     // The other half of severing the engine from the interface. A module used to
     // push each LFO value into a juce::Slider itself, from inside preProcess() --
-    // the stack in doc/tech/correct_the_threading.md §1A. The plugin publishes the
+    // the stack in doc/tech/threading_model.md §1. The plugin publishes the
     // same information after the block instead, into a slot the newest write
     // overwrites, and whatever draws reads it on its own thread at its own rate.
     constexpr float sampleRate{48000};
@@ -1033,7 +1033,7 @@ TEST_CASE("A playing transport drives the LFO from song position", "[clap][lfo]"
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \note The acceptance test for doc/tech/correct_the_threading.md, and it looks
+/// \note The acceptance test for doc/tech/threading_model.md, and it looks
 /// like an ordinary functional case on purpose. Goal 4 is "with the UI open you
 /// can change params and not trigger rtsan at all"; what says so is *this run*,
 /// built with `-fsanitize=realtime`, where every allocation, lock and syscall
@@ -1112,10 +1112,10 @@ TEST_CASE("A full rack with LFOs running and an editor open processes cleanly", 
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \note Two instances, two real audio threads, one message thread -- which is
-/// the arrangement symptom 2 of doc/tech/correct_the_threading.md is about, and
-/// the only one every case above deliberately avoids: they call `process()` on
-/// the thread that also drives the editor, so the two never actually overlap.
+/// \note Two instances, two real audio threads, one message thread -- the
+/// arrangement the two-instance deadlock was reported in, and the one every case
+/// above deliberately avoids: they call `process()` on the thread that also
+/// drives the editor, so the two never actually overlap.
 ///
 ///   `REQUIRE` allocates, so the worker threads record rather than assert; the
 /// process loop is what is being measured and it must be what a host runs. Under

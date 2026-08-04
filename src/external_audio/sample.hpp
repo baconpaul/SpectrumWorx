@@ -75,7 +75,7 @@ class Sample
     /// into a Sample the audio thread might be reading. Nothing reads a Sample
     /// while it is being loaded any more: the caller decodes into one of its own
     /// and publishes it, and the one it displaces is destroyed on the main
-    /// thread. See doc/tech/correct_the_threading.md §5.
+    /// thread. See doc/tech/threading_model.md §5.
     ///                                       (02.08.2026.) (SW port)
     char const *load(juce::File const &sampleFile, unsigned int desiredSampleRate);
 

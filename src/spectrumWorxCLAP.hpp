@@ -9,7 +9,7 @@
 /// module paths change under the host when a slot's effect is swapped - can be
 /// exercised in every DAW before any SpectrumWorx code is ported.
 ///
-/// See doc/tech/parameter-system.md for what is being modelled.
+/// See doc/tech/parameter_system.md for what is being modelled.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later
@@ -236,9 +236,9 @@ class SpectrumWorxCLAP final
     // \note Loading is synchronous, on the calling thread, which is the message
     // thread at all three call sites (the editor's menu, a preset that names a
     // sample, and activate() re-reading one at a new sample rate). The 2016
-    // build gave it a raw-pthread BackgroundThread; that thread is in no target
-    // and giving it a new one is the threading redesign's decision, not this
-    // file's. doc/tech/week_two.md §1 item 3 has the whole account.
+    // build gave it a raw-pthread BackgroundThread; that thread is deleted, and
+    // what a deferred load would need instead is on the definition of
+    // setNewSample.
     ////////////////////////////////////////////////////////////////////////////
 
     juce::File currentSampleFile() const override { return sampleFile_; }
@@ -431,7 +431,7 @@ class SpectrumWorxCLAP final
     /// with the window shut. The editor is handed references, and the mailbox as
     /// a `const &` -- it only ever reads it.
     ///
-    /// \see core/threading/messages.hpp, doc/tech/correct_the_threading.md §3.
+    /// \see core/threading/messages.hpp, doc/tech/threading_model.md §3.
     ///
     ////////////////////////////////////////////////////////////////////////////
 

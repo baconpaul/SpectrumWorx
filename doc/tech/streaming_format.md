@@ -2,9 +2,8 @@
 
 What goes into a `.swp` file and into the session state a host hands back, how it
 is keyed, and what may and may not be renamed. Companion to
-[`implementation_sequence.md`](implementation_sequence.md) (the plan),
-[`week_two.md`](week_two.md) (the re-plan, item 4) and
-[`tech_debt.md`](tech_debt.md).
+[`parameter_system.md`](parameter_system.md), which is how a parameter is
+addressed before it reaches a file, and [`tech_debt.md`](tech_debt.md).
 
 Written 01–02.08.2026, as the work happened. Everything described here is in the
 tree and has tests naming it.
@@ -16,8 +15,8 @@ tree and has tests naming it.
 A preset is keyed by *name*: modules by their effect's name, parameters by
 theirs. That is a good design — it is why the effect list can be reordered
 without touching a single file, and why a preset naming an effect this build does
-not have degrades rather than corrupting the chain (stage 0.7,
-`implementation_sequence.md:480`).
+not have degrades rather than corrupting the chain (pinned by "State naming an
+effect this build does not have loads the rest").
 
 It had one flaw, and it was invisible: **the name in the file was the name on the
 knob.** `Parameters::Name<Parameter>::string_` fed the editor *and*
@@ -141,7 +140,7 @@ pollute them, `pluginTests.cpp`'s `[clap][lfo]` transport ones, in the other one
 Running `sw-dsp-tests` bare is green today for that reason and not because
 anything was fixed: `LFO::Timer`'s tempo state is still three process-global
 statics, and a case added to this binary that sets a tempo would move 153 of the
-303 `[preset-corpus]` rows again. See `tech_debt.md`, "Tests".
+303 `[preset-corpus]` rows again. See `tech_debt.md`, "Threading".
 
 ---
 
@@ -293,10 +292,11 @@ Three things fall out of state being a preset:
   `setNewSample()` can call `markCurrentProgramAsModified()` — it deliberately
   did not, because marking a session dirty would have promised to remember
   something the old format could not hold.
-- **The chain rebuild is no longer unlocked.** `loadPreset` takes
-  `loader.processingLock()` around the swap; the old `stateLoad` took nothing
-  while `process()` might be walking the chain (`week_two.md` §2.2). This does
-  not close item 3 — it stops one race the audit named.
+- **The chain rebuild is not a mutation of the live chain.** `loadPreset` builds
+  the whole replacement on the main thread and publishes it, and whatever it
+  displaces comes back to be destroyed there — `threading_model.md` §5. The old
+  `stateLoad` rebuilt the chain in place, on the main thread, while `process()`
+  might be walking it.
 - **All four formats move together**, because clap-wrapper's VST3, AUv2 and
   standalone all carry the CLAP blob.
 

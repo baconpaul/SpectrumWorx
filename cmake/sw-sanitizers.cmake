@@ -12,9 +12,9 @@
 #             afternoon of reading had not. build-asan/ predates this file and is
 #             configured from an older CMake; a fresh -D SW_SANITIZER=address is
 #             the supported way now.
-#   thread    the instrument for the two-instance work. week_two.md §2.2's whole
-#             audit is a list of things tsan should have been finding.
-#   realtime  the acceptance test for doc/tech/correct_the_threading.md: with the
+#   thread    the instrument for the two-instance work. Every violation the 2016
+#             threading model carried is something tsan should have been finding.
+#   realtime  the acceptance test for doc/tech/threading_model.md: with the
 #             editor open, moving a knob must not allocate, lock or syscall on the
 #             audio thread.
 #

@@ -72,7 +72,7 @@ struct PresetLoader
     /// \note No queue behind it, because the harness engine is never running:
     /// Threading::publishChain() therefore installs it here and now, and
     /// `newChain` comes back holding what it displaced. See
-    /// doc/tech/correct_the_threading.md §5.
+    /// doc/tech/threading_model.md §5.
     void publishChain(LE::SW::AutomatedModuleChain &newChain) const
     {
         engine.swapModuleChain(newChain);

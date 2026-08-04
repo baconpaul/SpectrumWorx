@@ -654,15 +654,16 @@ class SpectrumWorxEditor final : private SkinLifetime,
         /// \brief One LFO parameter, queued rather than written.
         ///
         /// \note `lfo().parameters().set<LFOParameter>()` stood in the middle of
-        /// this: the message thread writing an LFO the audio thread reads every
-        /// block, unsynchronised, and `week_two.md` §2.2's "a widget write every
-        /// block" is the same object seen from the other side.
+        /// this for every parameter: the message thread writing an LFO the audio
+        /// thread reads every block, unsynchronised.
         ///
-        /// \note The parameters past `lfoExportedParameters` -- Waveform and
-        /// SyncTypes -- have no ParameterID and so no route through the queue.
-        /// They still go straight into the LFO, which is the one write this stage
-        /// leaves behind; stage 5 takes it with the rest of the LFO's state.
-        ///                                   (02.08.2026.) (SW port)
+        /// \note **Two of them still do it.** The parameters past
+        /// `lfoExportedParameters` -- Waveform and SyncTypes -- have no
+        /// ParameterID and so no route through the queue, so they go straight
+        /// into the LFO. That is the last unsynchronised write from the interface
+        /// into engine state; doc/tech/tech_debt.md has it and what it would take
+        /// to close.
+        ///                                   (02.08.2026, amended 04.08.2026.) (SW port)
         template <class LFOParameter, typename T>
         void updateParameterAndNotifyHost(T const widgetValue)
         {

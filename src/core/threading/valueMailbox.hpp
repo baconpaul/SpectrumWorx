@@ -18,7 +18,7 @@
 /// coalesce to the second one, and a dropped `Retire{ptr}` is a leak; those are
 /// the ring's, in spscQueue.hpp.
 ///
-/// See doc/tech/correct_the_threading.md §3.
+/// See doc/tech/threading_model.md §3.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later

@@ -20,7 +20,7 @@
 /// the shim's half is stood in for by the ScopedJuceInitialiser_GUI each case
 /// holds -- which is exactly the reference the old code deleted out from under.
 ///
-/// See doc/tech/correct_the_threading.md.
+/// See doc/tech/threading_model.md.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later

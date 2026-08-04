@@ -1,8 +1,8 @@
 # Checks that nothing compiled into sw-dsp is given a JUCE include path.
 #
-#   Goal 3 of doc/tech/correct_the_threading.md: "DSP only tests and preset
-# loading tests could link without JUCE at all -- JUCE ends up in a set of TUs
-# well above the engine." Stage 7 got it there. This is what keeps it there.
+#   doc/tech/threading_model.md §6: DSP-only tests and preset loading tests link
+# without JUCE at all, because JUCE lives in a set of TUs well above the engine.
+# This is what keeps it that way.
 #
 #   It has to be a build check rather than a code one, and it has to look at the
 # *compile* lines rather than the link line. A single `target_link_libraries(
@@ -112,7 +112,7 @@ if (offenders)
 Something has put a JUCE module on sw-dsp's link line, or added a source to sw-dsp that \
 belongs above it. The engine is the layer a DSP test links on its own; anything that needs \
 juce::File, juce::String or juce::AudioFormatManager goes in sw-io or higher. See \
-doc/tech/correct_the_threading.md and the note above sw-io in src/dsp.cmake.")
+doc/tech/threading_model.md and the note above sw-io in src/dsp.cmake.")
 endif ()
 
 # A silent pass is also what a typo in the search string looks like.

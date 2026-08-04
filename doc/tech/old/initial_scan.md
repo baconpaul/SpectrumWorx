@@ -1,10 +1,10 @@
 # SpectrumWorx — Initial Modernisation Scan
 
-> ### 📕 Evidence, not a plan. *Retained deliberately; see [`README.md`](README.md).*
+> ### 📕 Archived. *This describes the 2016 tree, not this one. See [`../README.md`](../README.md) for what is current.*
 >
 > Written 27.07.2026 against the 2016 tree **before anything was touched**, in
 > answer to the eight questions below. Everything it recommends has since been
-> done, deferred into [`week_two.md`](week_two.md), or overtaken.
+> done, carried into [`../todo.md`](../todo.md), or overtaken.
 >
 > It is kept because it is the only record of what the 2016 tree actually
 > contained — the licence manager, the Boost surface, the vendored externals,
@@ -12,7 +12,7 @@
 > rest on. Read it as a description of the starting point, not of this tree: the
 > file layout it describes (`source/`, `src/externals/le/`) no longer exists, and
 > its estimates were estimates.
->                                                     (03.08.2026.) (SW port)
+>                                                     (04.08.2026.) (SW port)
 
 ## The ask
 

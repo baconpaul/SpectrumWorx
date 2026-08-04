@@ -11,7 +11,7 @@
 # unit of every target that links sw-dsp -- JUCE, fmt and clap-wrapper included.
 # That produced five separate Windows build failures, none of them in our code
 # and none of them naming the cause; see stage 7.5 in
-# doc/tech/implementation_sequence.md for the list.
+# doc/tech/old/implementation_sequence.md for the list.
 #
 # Two things make a target-wide option the wrong tool here even when it is
 # PRIVATE:

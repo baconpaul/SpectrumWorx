@@ -12,10 +12,10 @@
 /// out-of-range index to -1, so the panel opened with no page in it. As a
 /// transparent desktop window that was invisible; as an overlay it is a hole in
 /// the editor. Nothing headless could see it, because `sw-show-ui --render`
-/// asserted an exit code and a panel that paints nothing exits 0 -- which is the
-/// week_two.md §2.3 row this file is one half of. `--render` measures the whole
-/// canvas now; a 191 x 363 hole in a 563 x 376 editor is 33 % of it and would
-/// pass that floor comfortably, so the region is what has to be looked at.
+/// asserted an exit code and a panel that paints nothing exits 0. `--render`
+/// measures the whole canvas now; a 191 x 363 hole in a 563 x 376 editor is 33 %
+/// of it and would pass that floor comfortably, so the region is what has to be
+/// looked at, and that is this file.
 ///
 /// \note Pixels rather than the component tree, deliberately. "Is the About page
 /// a child of the tabbed component" is a question the broken build answered

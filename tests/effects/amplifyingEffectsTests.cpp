@@ -3,8 +3,9 @@
 /// amplifyingEffectsTests.cpp
 /// --------------------------
 ///
-///   Stage 4.4, week_two.md item 8: properties for the nine effects the golden
-/// contract deliberately holds loosely.
+///   Properties for the nine effects the golden contract deliberately holds
+/// loosely, because a one-ulp FFT difference becomes a percent-level output
+/// difference in each of them.
 ///
 ///   Those nine -- Pitch Spring, Pitch Spring (pvd), Pitch Magnet, Octaver,
 /// PVD start, PVD stop, Imploder, Exploder and Slew Limiter -- each make a

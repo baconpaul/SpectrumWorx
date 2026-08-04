@@ -25,7 +25,7 @@
 //   It used to be a PUBLIC compile option on sw-dsp, so it reached every
 // translation unit of every target that links sw-dsp -- JUCE, fmt and
 // clap-wrapper included. Five separate Windows failures came of that, none of
-// them in our code; stage 7.5 of doc/tech/implementation_sequence.md lists them.
+// them in our code; stage 7.5 of doc/tech/old/implementation_sequence.md lists them.
 //
 //   Nothing here applies to C, and <cstddef> below is a hard error in it. Now
 // that the header only reaches our own sources, none of which are C, this guard

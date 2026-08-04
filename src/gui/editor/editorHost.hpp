@@ -83,7 +83,7 @@ class LE_NOVTABLE EditorHost
     /// mutation of the queue and not of the host, which is why the first is
     /// const-qualified and hands back a non-const queue.
     ///
-    /// \see core/threading/messages.hpp, doc/tech/correct_the_threading.md §3.
+    /// \see core/threading/messages.hpp, doc/tech/threading_model.md §3.
     ///
     ////////////////////////////////////////////////////////////////////////////
 
@@ -104,9 +104,9 @@ class LE_NOVTABLE EditorHost
     // \note The listener registration is the 2016 shape and the last three are
     // vestigial while a load is synchronous -- isSampleLoadInProgress() is what
     // the editor asks before it registers, and today it is always false. Kept
-    // because the threading redesign is what decides whether loading gets a
-    // thread again, and this is the interface it would come back through. See
-    // doc/tech/week_two.md §1 item 3.
+    // whole because they are the interface a deferred load would come back
+    // through, and the note on SpectrumWorxCLAP::setNewSample says what such a
+    // load would need first.
     ////////////////////////////////////////////////////////////////////////////
 
     virtual juce::File currentSampleFile() const = 0;

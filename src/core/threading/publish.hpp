@@ -15,7 +15,7 @@
 /// comes back for the main thread to destroy. Nothing is ever destroyed under the
 /// callback.
 ///
-/// See doc/tech/correct_the_threading.md §5.
+/// See doc/tech/threading_model.md §5.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later

@@ -11,10 +11,9 @@
 /// `<fstream>` so that it can live in `sw-dsp` beside the format it serves.
 ///
 /// \note presetFile.hpp is the same two functions with a `juce::File` on them,
-/// for the interface, and it is above `sw-dsp`. Both directions matter: goal 3
-/// of doc/tech/correct_the_threading.md names *preset loading tests* as
-/// something that must link without JUCE, and reading the file is most of what
-/// such a test does.
+/// for the interface, and it is above `sw-dsp`. Both directions matter:
+/// doc/tech/threading_model.md §6 requires *preset loading tests* to link
+/// without JUCE, and reading the file is most of what such a test does.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later

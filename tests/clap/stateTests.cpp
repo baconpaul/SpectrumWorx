@@ -500,8 +500,8 @@ TEST_CASE("The loaded sample survives a session", "[clap][state]")
     InStream stream(saved.data());
     REQUIRE(restored.state().load(&*restored, &stream));
 
-    /// \note This is the whole of week_two.md item 4's inherited bug: a session
-    /// that restored everything except which audio file was loaded.
+    /// \note The bug the 3.0 state format was written to close: a session that
+    /// restored everything except which audio file was loaded.
     CHECK(restored.editorHost().currentSampleFile().getFileName() == "Carrier.mp3");
 }
 

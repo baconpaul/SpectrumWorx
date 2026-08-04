@@ -88,8 +88,8 @@ if (SW_BUILD_TESTS)
     ############################################################################
     # One module UI per effect
     #
-    #   editor-module renders effect 0 and nothing else did, which week_two.md
-    # §2.3 calls "1 of 57". Building a module's widgets is per-effect work --
+    #   editor-module rendered effect 0 and nothing else did -- one of fifty-seven.
+    # Building a module's widgets is per-effect work --
     # every widget type an effect uses is a template instantiation of its own and
     # the ranges are quantised against the engine setup per parameter -- so one
     # effect rendering says very little about the other fifty-six.

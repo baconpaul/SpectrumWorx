@@ -561,7 +561,7 @@ LE::Utility::IntrusivePtr<PresetModule> createModule(std::uint8_t effectIndex);
 /// so the reuse cannot survive and the lock has nothing left to hold: every
 /// module in the new chain is built here, the finished chain is published, and
 /// what it displaces comes back to be destroyed. See
-/// doc/tech/correct_the_threading.md §5.
+/// doc/tech/threading_model.md §5.
 ///
 ///   It also fixes a smaller thing on the way. A reused module kept its channel
 /// state -- its analysis history, its LFO phase -- so loading a preset over one

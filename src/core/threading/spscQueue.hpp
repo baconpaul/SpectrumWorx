@@ -15,7 +15,7 @@
 /// coalesce to the second, and a dropped `Retire{ptr}` is a leak. This refuses
 /// instead, and says so, so a caller can decide.
 ///
-/// See doc/tech/correct_the_threading.md.
+/// See doc/tech/threading_model.md.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later

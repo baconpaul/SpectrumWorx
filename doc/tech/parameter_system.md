@@ -4,17 +4,17 @@ How SpectrumWorx addresses, names and exports parameters, and why the answer is
 "dynamic" in a way that constrains the plugin-format choice.
 
 Written against commit `6e09d15` (post-restructure: `source/` → `src/`,
-`src/externals/le/` → `src/le/`). Companion to
-[`initial_scan.md`](initial_scan.md) §1.6.2 and §8.3, which state the conclusion;
-this document shows the mechanism.
+`src/externals/le/` → `src/le/`), and companion to
+[`streaming_format.md`](streaming_format.md), which is what happens to a
+parameter once it reaches a file.
 
 > **Still accurate as of 03.08.2026**, and the only document about this layer.
 > The port did not change the parameter system: the skeleton, the addressing and
 > the runtime re-meaning are what they were. Two things it does not know about,
 > both additive — the base value now travels separately from the LFO's output
-> (`correct_the_threading.md` §4), and `tests/parameters/parameterTable.txt`
-> pins the whole 286-row enumeration. The one open item against this layer is
-> `week_two.md` §3's 227 `-Wundefined-var-template`, which is a missing
+> (`threading_model.md` §4), and `tests/parameters/parameterTable.txt` pins the
+> whole 286-row enumeration. The one open item against this layer is the 227
+> `-Wundefined-var-template` in [`todo.md`](todo.md) item 3, which is a missing
 > declaration in `Parameters::Name<>` rather than a flaw in what is described
 > here.
 
@@ -316,7 +316,8 @@ of different shapes" is true of the *framework*. This repo builds one plugin.
 
 ## 9. Why this drives the format decision
 
-Restating [`initial_scan.md`](initial_scan.md) §1.6.2 with the mechanism attached:
+Restating [`old/initial_scan.md`](old/initial_scan.md) §1.6.2 with the mechanism
+attached:
 
 | Protocol | Fit |
 |---|---|
@@ -337,10 +338,10 @@ Concrete mapping for the CLAP backend:
 | `useDynamicParameterLists()` probe | **deleted** — the extension is contractual |
 
 The one thing CLAP does *not* hand you: `clap_plugin_params::count` and the ID
-list are `[main-thread]`, and today the module chain is mutated from the GUI
-thread with a `GUI::Lock` and read on the audio thread with no visible lock-free
-queue. Effect swaps become a main-thread/audio-thread handoff, not just a
-notification. That is the "thread discipline: +1–2 wk" line in §1.6.4.
+list are `[main-thread]`, while the chain those IDs describe is the audio
+thread's property. So an effect swap is a main-thread/audio-thread handoff and
+not just a notification — which is what `ToEngine::SetSlot` and
+`ToUI::ChainChanged` are (`threading_model.md` §3 and §5).
 
 ---
 
@@ -364,7 +365,10 @@ For anyone touching this:
 - **`lfoExportedParameters` 5 vs 7.** The GUI build hides SyncTypes and Waveform
   from automation. Under CLAP there is no reason to keep them hidden; exporting
   them changes the parameter count and therefore any host-side automation
-  bindings.
+  bindings — and would also move `parameterTable.txt`. It has since acquired a
+  second reason to be decided: having no `ParameterID` is exactly why those two
+  are the last edits written straight into the engine from the message thread.
+  See `tech_debt.md`, "Threading".
 - **Preset compatibility.** Decided before the Boost.Fusion refactor, per
-  §8.3 — §7 above says the format is name-keyed, which gives more freedom than
-  the index-based reading might suggest.
+  `old/initial_scan.md` §8.3 — §7 above says the format is name-keyed, which
+  gives more freedom than the index-based reading might suggest.

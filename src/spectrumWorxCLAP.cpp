@@ -974,10 +974,10 @@ void SpectrumWorxCLAP::onMainThread() noexcept
 // The protocol
 // ------------
 //
-//   Two rings and a mailbox, and the two places they are drained. Nothing is
-// routed through them yet -- see doc/tech/correct_the_threading.md, where stages
-// 4, 5 and 6 fill each case in. They are here first, and drained from the start,
-// so that the stages that follow are moves rather than moves and inventions.
+//   Two rings and a mailbox, and the two places they are drained. Every edit an
+// interface or a host makes crosses one of them -- see
+// doc/tech/threading_model.md §3 for which carries what, and why a coalescing
+// mailbox rather than a third ring.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1456,8 +1456,8 @@ bool SpectrumWorxCLAP::stateLoad(clap_istream const *const stream) noexcept
 ///   - `loadLastSession_`, whose own note on the declaration says the session
 ///     state a host hands back is a better home for it than the settings file
 ///     this plugin does not have;
-///   - the preset browser's location and selection -- week_two.md §2.7's "the
-///     browser does not remember where it was", for the session case;
+///   - the preset browser's location and selection -- it does not remember where
+///     it was, doc/tech/todo.md, for the session case;
 ///   - the interface settings (opacity, mouse-over reaction, LFO update
 ///     behaviour, hide-cursor-on-knob-drag), which the CLAP build persists
 ///     nowhere at all. Those are arguably user preferences rather than session
@@ -1494,12 +1494,13 @@ void SpectrumWorxCLAP::editorClosed() { pEditor_ = nullptr; }
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \note `[main-thread]`, and synchronous: it decodes the whole file here and
-/// takes the process lock only to swap the result in. An MP3 of the size the
-/// factory samples are is single-digit milliseconds; a long file the user picks
-/// is not, and stalling the message thread is the cost of not having a loader
-/// thread. That is a deliberate deferral -- see the note on the declaration and
-/// doc/tech/week_two.md §1 item 3 -- and not something to fix here, because the
-/// answer is a queue this plugin does not have yet.
+/// publishes the result, which is why it needs no lock (doc/tech/threading_model.md
+/// §5). An MP3 of the size the factory samples are is single-digit milliseconds;
+/// a long file the user picks is not, and stalling the message thread is the cost
+/// of not having a loader thread. That is a deliberate deferral -- see the note on
+/// the declaration -- and not something to fix here: the answer is a main-thread
+/// work queue with a completion the editor can be told about, and building one for
+/// the loader alone would be building it twice.
 ///
 ///   Two things the 2016 worker did that are gone with the buffers they served:
 /// InputBuffers::forceSideChannel() and a resize() around the load. activate()

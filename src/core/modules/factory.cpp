@@ -163,11 +163,12 @@ LE::Utility::IntrusivePtr<ModuleInterface> ModuleFactory::create(std::int8_t con
     if (!moduleEnabled)
     {
         /// \note Was `GUI::warningMessageBox`, from a path a host's parameter
-        /// event reaches -- week_two.md §2.4 flags it as "a live branch that
-        /// raises a juce::AlertWindow from a path the audio thread can reach",
-        /// held off only by `includedEffects` being a constexpr table of all
-        /// `true`. It reports through the same counted reporter a preset uses,
-        /// which is in this layer and raises nothing.
+        /// event reaches -- a live branch raising a juce::AlertWindow from a path
+        /// the audio thread can reach, held off only by `includedEffects` being a
+        /// constexpr table of all `true`. It reports through the same counted
+        /// reporter a preset uses, which is in this layer and raises nothing.
+        /// (`LE_SW_FULL` above is one of the seven macros no live build defines;
+        /// doc/tech/todo.md item 3 owns them.)
         ///                                   (02.08.2026.) (SW port)
         reportPresetProblem(PresetProblem::EffectNotAvailable, Effects::effectName(effectIndex));
         return nullptr;

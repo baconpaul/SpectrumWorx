@@ -121,7 +121,7 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
     ///
     /// \note Called *unmodulated* rather than *base* in the code, because "base
     /// parameters" already means the five shared ones -- Bypass, Gain, Wet and
-    /// the two frequencies. doc/tech/correct_the_threading.md §4 calls the same
+    /// the two frequencies. doc/tech/threading_model.md §4 calls the same
     /// thing the base value, in the CLAP sense.
     ///
     /// \note There was no such value at all: `setEffectParameterFromLFOAux` wrote
@@ -283,7 +283,7 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
     /// \note `virtual void set{Base,Effect}ParameterFromLFO()` stood here, and
     /// `SW::Module` overrode both to push the new value into a `juce::Slider` --
     /// from the audio thread, once per block, per enabled LFO. That is the stack
-    /// in doc/tech/correct_the_threading.md §1A, and these two virtuals were the
+    /// in doc/tech/threading_model.md §1, and these two virtuals were the
     /// whole of why it existed. The engine no longer tells anyone anything; the
     /// plugin publishes what the LFOs did into the ValueMailbox after the block.
     ///                                       (02.08.2026.) (SW port)

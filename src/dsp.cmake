@@ -131,7 +131,7 @@ add_library(sw-dsp STATIC
         core/modules/moduleDSPAndGUI.cpp
 
         # Which thread is this, may it do that, and how a change made on one
-        # reaches the other. See doc/tech/correct_the_threading.md.
+        # reaches the other. See doc/tech/threading_model.md.
         core/threading/threadCheck.cpp
         core/threading/publish.cpp
 )
@@ -196,7 +196,7 @@ target_link_libraries(sw-dsp PUBLIC sst-plugininfra)
 # counted reference to the module rather than the other way round; the preset
 # format speaks std::string_view and the conversion happens in sw-io; and the two
 # files that open files are in sw-io as well. The engine is what a DSP test can
-# link on its own. See doc/tech/correct_the_threading.md §6.7, and
+# link on its own. See doc/tech/threading_model.md §6, and
 # checkNoJuceInDSP.cmake, which fails the build if any of it comes back.
 
 # The factory banks. PRIVATE: factoryPresets.cpp is the only thing that names

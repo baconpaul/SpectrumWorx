@@ -1,19 +1,22 @@
 # SpectrumWorx — Tech debt
 
 A running list, appended to as work happens. Companion to
-[`implementation_sequence.md`](implementation_sequence.md), which is the plan,
-[`week_two.md`](week_two.md), which is the re-plan, and
-[`streaming_format.md`](streaming_format.md), which is what goes into a file.
+[`todo.md`](todo.md), which is the work queue.
 
-**What belongs here and what does not.** Those two documents track *work*: things
-someone will sit down and do, in an order, with a size next to them. This tracks
-what is left behind by work that is otherwise finished — the half-fix, the
+**What belongs here and what does not.** `todo.md` tracks *work*: things somebody
+will sit down and do, in an order, with a size next to them. This tracks what is
+left behind by work that is otherwise finished — the half-fix, the
 correct-but-unsatisfying answer, the finding that has no owner because it is not
-big enough to be a stage and not small enough to be a `\todo`. A thing that is
+big enough to be an item and not small enough to be a `\todo`. A thing that is
 squarely inside a numbered item is that item's; it does not need a bullet here.
 
-The test for a bullet: **if the plan were executed exactly as written, would this
-still be true at the end?** If yes, it belongs here.
+The test for a bullet: **if `todo.md` were executed exactly as written, would
+this still be true at the end?** If yes, it belongs here.
+
+**A remediated entry comes out.** Not struck through, not marked done — removed,
+because the point of this file is what is still true. If the reasoning behind a
+closed entry was worth keeping, it goes into whichever "how it works" document
+owns the mechanism.
 
 Every entry carries the date it was written and, where there is one, the item or
 section it fell out of — because half of these are true only until someone
@@ -24,26 +27,8 @@ New entries go at the top of their area.
 
 ## Build and platform
 
-- ~~**clap-wrapper's AUv2 "silent" input is uninitialised heap.**~~
-  *Fixed upstream and merged, 03.08.2026 — clap-wrapper #498, "Create silence
-  buffers as empty buffers"; the submodule is bumped to it.* Kept because the
-  shape of it is worth remembering. `ProcessAdapter::setupProcessing` allocated
-  `_silent_input` with `new float[numMaxSamples]` and never zeroed it, and
-  `process()` points every channel of any bus whose `PullInput` failed at that
-  buffer. SpectrumWorx declares two input busses and `auval` connects only the
-  first, so **the side chain was fed uninitialised memory every block** —
-  measured: 5 of 5 `auval` runs aborted on a NaN in `rectangular2polar`, 10 of 10
-  pass now. The AUv3 path in the same repository already memset its equivalent,
-  so it was an omission on one path rather than a design.
-
-  Two things it cost, both worth more than the fix: the failure was **~50 %
-  intermittent**, so a single green run "proving" it was worthless, and the
-  garbage was **huge but finite** rather than NaN — see the entry under "Host
-  interface" — so it walked through every finiteness check in the engine before
-  becoming a NaN three layers away.
-
 - **`RequiredStringStorage<T>` is the contract for every `lexical_cast` buffer
-  and nothing had ever checked it.** (02.08.2026, §3 `-Wdeprecated-declarations`)
+  and nothing had ever checked it.** (02.08.2026, from the warnings pass)
   The three `lexical_cast(value, char *)` overloads take a bare pointer, so when
   their `sprintf`s became `snprintf`s the only bound available was the size the
   interface tells callers to allocate — `2 + digits * 3010 / 10000`. Two values
@@ -65,7 +50,7 @@ New entries go at the top of their area.
   or a `_countof` in hand already.
 
 - **MP3 decoding is a different decoder on macOS than on Windows and Linux, and
-  which one answers is decided by registration order.** (01.08.2026, item 7)
+  which one answers is decided by registration order.** (01.08.2026)
   `registerBasicFormats()` gives `CoreAudioFormat` on macOS,
   `WindowsMediaAudioFormat` on Windows and **nothing** on Linux, so `sw-dsp`
   defines `JUCE_USE_MP3AUDIOFORMAT=1` — JUCE's own decoder, behind a flag because
@@ -97,43 +82,41 @@ New entries go at the top of their area.
     platform's — encoder delay is exactly where MP3 decoders disagree — which is
     what would actually happen.
 
-- **`clang-format` is clean where the port has been and not where it has not.**
-  (01.08.2026) 66 of 465 files deviate; **63 of them are under `src/le/`**, the
-  2016 tree, and the other three are `core/modules/factory.cpp`,
-  `gui/editor/moduleMenuHolder.cpp` and `gui/modules/moduleUI.hpp`. So this is
-  not "the tree is dirty" — it is a boundary between ported and unported code
-  that happens to be visible to a formatter. The three outliers are worth fixing
-  now; reformatting `src/le/` wholesale would put a 60-file diff between every
-  future change and its history, and is a decision rather than a chore.
-
-- **`build-asan/` exists and is configured from an older CMake.** (01.08.2026,
-  from `week_two.md` §1 item 3) It registers three of the nine GUI tests, so a
-  sanitiser run over it is quietly a third of the coverage a normal run has.
-  Item 3 wants ASan; nothing owns the directory being stale, and a stale build
-  directory is exactly the kind of thing that gets trusted.
+- **`build-asan/` exists and is configured from an older CMake.** (01.08.2026)
+  It registers three of the nine GUI tests, so a sanitiser run over it is quietly
+  a third of the coverage a normal run has. Superseded in principle by
+  `SW_SANITIZER` — one cache variable rather than a pair of blessed build
+  directories, `threading_model.md` §8 — but nothing owns the directory itself
+  being stale, and a stale build directory is exactly the kind of thing that gets
+  trusted.
 
 ## Threading
 
-- ~~**A block that cannot have the processing lock is still dropped.**~~ *Closed
-  02.08.2026 by `correct_the_threading.md` stage 6.* There is no lock, so there
-  is no block to drop: `SpectrumWorxCore::process()` returns `void` again and
-  `runEngine()`'s silence branch is gone, which is the measure of success
-  `week_two.md` item 3 set for itself.
+- **An LFO's Waveform and SyncTypes are still written straight into the engine
+  from the message thread.** (04.08.2026, found rereading the source against
+  `threading_model.md`) Every other edit crosses as a `SetBaseParameter`
+  command, but these two are past `ParameterCounts::lfoExportedParameters`, so
+  they have no `ParameterID` and no route through the queue:
+  `SpectrumWorxEditor::…::updateParameterAndNotifyHost` (`spectrumWorxEditor.hpp:676-680`)
+  branches on the index and calls `lfo().parameters().set<LFOParameter>()`
+  directly. The audio thread reads that LFO every block. It is the last
+  unsynchronised write from the interface into engine state, and the redesign
+  recorded it as something a later stage would take — no stage did.
 
-- ~~**`currentThreadOwnsTheProcessLock()` returns a hardcoded `true`.**~~ *Closed
-  02.08.2026.* Stage 0 made it real; stage 6 deleted the lock it was about. The
-  six assertion sites now read `currentThreadMayMutateEngineState()`, which is
-  "the audio thread owns the engine while one exists, and the main thread owns it
-  while one does not". The invalid `reinterpret_cast` to a `CRITICAL_SECTION`
-  went with it, so the Windows half is closed too.
+  Neither value is a smooth control (a waveform choice and a sync mode, both
+  changed by a menu click), so nothing has been heard, and both are single
+  `float`s written with a plain store. Closing it means either a `ToEngine` case
+  that carries an LFO sub-parameter by index rather than by `ParameterID`, or
+  exporting the two — which would move `parameterTable.txt` and is a decision
+  about what a host should see rather than a threading fix.
 
-- **A host writing a slot selector allocates on the audio thread.** (02.08.2026,
-  from `correct_the_threading.md` §8) What is left of the concession stage 6 was
-  granted. Every other route — the interface, a preset, a session — builds its
-  modules on the main thread and hands the engine a pointer to link. A host's
-  parameter event arrives inside `process()`, and deferring it means a round trip
-  to the main thread and back before the slot changes, which is a latency a
-  generic panel would notice.
+- **A host writing a slot selector allocates on the audio thread.** (02.08.2026)
+  The one exception to "modules are built on the main thread"
+  (`threading_model.md` §5). Every other route — the interface, a preset, a
+  session — builds its modules on the main thread and hands the engine a pointer
+  to link. A host's parameter event arrives inside `process()`, and deferring it
+  means a round trip to the main thread and back before the slot changes, which
+  is a latency a generic panel would notice.
 
 - **Rendering real spectra trips the negative-amplitude verification.**
   (02.08.2026, from `presetRenderTests.cpp`) `goldenTests.cpp` already records
@@ -144,16 +127,6 @@ New entries go at the top of their area.
   finished. Benign in the output, which is why both files are release-build
   artifacts and why the release run renders all 303 finite. It is a weakness in
   the vector primitives, and a skip list would need a dozen names and would grow.
-
-- ~~**Browsing the factory banks puts a dialog in front of the user on one preset
-  in three.**~~ *Closed 02.08.2026.* All 104 were `MissingParameter` and nothing
-  else — an effect that grew a parameter after the preset was written, the value
-  defaulting, which is what the format is for. A user can neither act on that nor
-  avoid it, so it no longer reaches them: see
-  `PresetLoadReport::worthTellingTheUser()`. It is still counted and still traced,
-  and `presetReportTests.cpp` pins the total at 722 so that a parameter going
-  missing for a *bad* reason — a rename, a changed streaming name — reddens
-  rather than hiding behind the suppression.
 
 - **The Exaggerator's behaviour next to an empty bin is a cliff.**
   (02.08.2026, from `presetRenderTests.cpp`) Its intensity maps to an exponent
@@ -184,126 +157,122 @@ New entries go at the top of their area.
   a committed digest moving is a decision rather than a chore. Worth doing with
   the fixtures regenerated in the same commit and the reason written on it.
 
-- **The LFO panel does not follow the host's tempo.**
-  (02.08.2026, from `correct_the_threading.md` §6.8)
+- **The LFO panel does not follow the host's tempo.** (02.08.2026)
   `SpectrumWorxEditor::updateForNewTimingInfo()` is correct and unreachable: its
   one caller was `SpectrumWorx::updatePosition()` in the 2016 host class, which
-  stage 8 deleted. The CLAP's equivalent is `updateLFOTiming()`, on the audio
-  thread, and reaching a widget from there is what this whole redesign forbids —
+  is deleted. The CLAP's equivalent is `updateLFOTiming()`, on the audio thread,
+  and reaching a widget from there is what the whole threading model forbids —
   so the answer is a `ToUI` message, and the function is where it lands. Visible
   as an LFO panel showing the old period after a tempo change.
 
 - **`LFOImpl::Timer`'s tempo is one value for every instance in the process.**
-  (02.08.2026, from §8) `std::atomic` since stage 6, so it is no longer a data
-  race — but two tracks at two tempi still see one tempo. Making it per-instance
-  means threading a timer through `snapPeriodScale()`, `clampFreePeriod()` and
-  the two period-scale bounds, all of them static and all called from the
-  parameter layer and the editor; that is the LFO parameter interface's redesign
-  rather than the threading model's.
+  (02.08.2026) `std::atomic`, so it is no longer a data race — but two tracks at
+  two tempi still see one tempo. Making it per-instance means threading a timer
+  through `snapPeriodScale()`, `clampFreePeriod()` and the two period-scale
+  bounds, all of them static and all called from the parameter layer and the
+  editor; that is the LFO parameter interface's redesign rather than the
+  threading model's.
 
-- **`UIEdits` drops on full, and that is wrong for gestures.** (01.08.2026, from
-  §2.2) The ring is otherwise correct. Dropping a `Kind::Value` is right — the
-  next one supersedes it. Dropping a `GestureBegin` whose `GestureEnd` survives
-  leaves the host holding an unbalanced gesture, which some hosts never recover
-  from. §2.2 calls it "worth a follow-up, not a blocker" and no item took it.
+  **A test binary is where this stops being benign**, and it has been live once
+  already. `[preset-corpus]` used to fail about one run in three when the whole
+  suite ran bare in one process — 153 of the 303 rows move, the ones with a
+  tempo-synced LFO — because once a `[clap][lfo]` transport case had told the
+  plugin a tempo, every later preset load in that process converted
+  `PeriodScale` differently. `ctest` could never see it: `catch_discover_tests`
+  gives each case its own process. What ended the symptom was the split into
+  `sw-dsp-tests` and `sw-plugin-tests`, which put the two sets in different
+  binaries — **nothing was fixed**. A case added to `sw-dsp-tests` that
+  establishes a tempo brings the whole thing back with no warning.
+
+  `Timer::reset()` deliberately does not clear `hasTempoInformation_` — a 2012
+  workaround for Ableton Live raising "preset uses tempo-synced LFOs but the host
+  provides no tempo" while browsing (`lfoImpl.cpp:766-784`). That dialog is gone
+  (a host with no transport gets 120 BPM 4/4, which is an answer rather than a
+  fault) but the stickiness it produced is not. The 2012 note explains why the
+  flag is sticky and not why the state is global.
+
+- **`UIEdits` drops on full, and that is wrong for gestures.** (01.08.2026) The
+  ring is otherwise correct. Dropping a `Kind::Value` is right — the next one
+  supersedes it. Dropping a `GestureBegin` whose `GestureEnd` survives leaves the
+  host holding an unbalanced gesture, which some hosts never recover from.
+  Recorded when the ring was audited as "worth a follow-up, not a blocker", and
+  nothing took it.
 
 ## Host interface
 
-- ~~**Restoring a session puts up one modal dialog per parameter the file does
-  not mention.**~~ *Closed 02.08.2026.* The default reporter counts rather than
-  alerting, `stateLoad` says nothing at all, and a parameter the file does not
-  mention is no longer the user's business in the first place — see
-  `PresetLoadReport::worthTellingTheUser()` and `presetReportTests.cpp`. The
-  figure this entry quoted, 806, was never measured: the counted total across the
-  303 banks is **722**, pinned as a fixture.
-
-- ~~**The CLAP state does not hold which external audio file is loaded.**~~
-  *Fixed 02.08.2026, item 4.* State is the preset serialisation now, and
-  `<p n="Sample">` has been in that since 2011, so `setNewSample()` marks the
-  session dirty and a reopened project has its sample.
-
 - **`paramsTextToValue` is `return false` and `paramsValueToText` ignores the
-  value it is given.** (01.08.2026, from §2.3) The second prints the parameter's
-  *current* value whatever it was asked about, which is visible in every
-  automation-lane tooltip in every host. Both are documented at length in the
-  source with a shared `\todo`, and both are one job: give
-  `AutomatedParameterPrinter` an arm that takes a value *and* the live parameter.
-  No stage owns it. It is the most user-visible thing on this page.
+  value it is given.** (01.08.2026) The second prints the parameter's *current*
+  value whatever it was asked about, which is visible in every automation-lane
+  tooltip in every host. Both are documented at length in the source with a
+  shared `\todo`, and both are one job: give `AutomatedParameterPrinter` an arm
+  that takes a value *and* the live parameter. Nothing owns it. It is the most
+  user-visible thing on this page.
 
 - **Host automation of the six global parameters does not move the editor's
-  knobs.** (01.08.2026, from §2.2) `updateGlobalParameterWidget<>` and
+  knobs.** (01.08.2026) `updateGlobalParameterWidget<>` and
   `updateForGlobalParameterChange()` have no callers — their only caller was the
   deleted 2016 plugin class. A live UX bug with no owner, and one where the
-  naive fix (call them from the parameter path) recreates a documented
-  audio-thread violation.
+  naive fix (call them from the parameter path) recreates the audio-thread
+  violation `threading_model.md` §1 exists to forbid. The answer is a `ToUI`
+  message, the same as the LFO panel above.
 
 - **An unconnected side-chain port is indistinguishable from a connected one.**
-  (03.08.2026, from item 1) `runEngine` falls back to the main input only when
+  (03.08.2026) `runEngine` falls back to the main input only when
   `audio_inputs[1].data32` is *null* (`spectrumWorxCLAP.cpp:876`), and no real
   host gives us null — every wrapper hands over a buffer it owns. So what an
   unpatched side chain contains is whatever the host put there, and the plugin
-  cannot tell "silence" from "not connected" from "never written". This is how
-  the auval NaN below reached the engine, and the fallback §2.8 documents as the
-  intended behaviour — an unpatched side chain being the main input — is
-  therefore effectively dead code. CLAP's own mechanism for this is
-  `clap_audio_buffer::constant_mask`, which nothing here reads.
+  cannot tell "silence" from "not connected" from "never written".
+
+  Two consequences. The documented intended behaviour — **an unpatched side chain
+  is the main input, so a Blender with nothing patched blends the signal with
+  itself** — is therefore effectively dead code, undocumented anywhere a user
+  would look and unreachable anywhere it would matter. And it is how uninitialised
+  memory reached the FFT from an AU host: clap-wrapper handed every channel of an
+  unconnected AUv2 bus a buffer it had allocated and never zeroed, `auval` aborted
+  5 runs of 5 on a NaN in `rectangular2polar`, and the plugin had no way to know
+  the port was not really connected. Fixed upstream (clap-wrapper #498) rather
+  than here. CLAP's own mechanism is `clap_audio_buffer::constant_mask`, which
+  nothing here reads.
 
 - **The engine's guards are finiteness guards, and garbage is usually finite.**
-  (03.08.2026, from item 1) Every `LE_MATH_VERIFY_VALUES` on the input path
-  tests `Invalid` (NaN/infinity) or denormals. Uninitialised memory read as
-  float is overwhelmingly *huge and finite* — the measured value was 2.9e33 —
-  so it passes `time2DFT`'s checks on the time domain, on the window and on both
-  FFT outputs, and only becomes NaN when squared inside `vDSP_zvabs`. The assert
-  that fires is therefore three layers away from where the bad data entered,
-  which is why this cost a day. A magnitude bound on the incoming block would
-  have named it immediately; whether the engine should carry one in a release
-  build is a real question and not obviously yes.
+  (03.08.2026) Every `LE_MATH_VERIFY_VALUES` on the input path tests `Invalid`
+  (NaN/infinity) or denormals. Uninitialised memory read as float is
+  overwhelmingly *huge and finite* — the measured value was 2.9e33 — so it passes
+  `time2DFT`'s checks on the time domain, on the window and on both FFT outputs,
+  and only becomes NaN when squared inside `vDSP_zvabs`. The assert that fires is
+  therefore three layers away from where the bad data entered, which is why the
+  entry above cost a day. A magnitude bound on the incoming block would have named
+  it immediately; whether the engine should carry one in a release build is a real
+  question and not obviously yes.
 
 ## Parameters and LFOs
 
-- ~~**Every LFO period moves on the first block of a session that is not at 120
-  BPM.**~~ *Fixed 03.08.2026, from item 1.* `LFOImpl::updateForNewTimingInformation()`
-  rescales a **Free** LFO's period by the bar-duration ratio, so that its period
-  stays constant in seconds when the tempo changes — which is right. But
-  `barDuration_` starts life, and goes back on `reset()`, holding an *assumption*:
-  120 BPM in 4/4. A host announcing 140 was therefore indistinguishable from a
-  user changing the tempo, and the plugin silently moved a parameter no host had
-  written. `LFOImpl::Timer` now carries a per-instance
-  `timingInformationEstablished_` and reports the first update after construction
-  or `reset()` as no change at all. Pinned by "Learning the host's tempo does not
-  move the LFO periods".
-
-  **What it cost to find, which is the part worth keeping.** This was
-  `clap-cpp-validator`'s four state failures, and *none of them was about state* —
-  its first instance randomises through `process()` on an activated plugin and
-  reads back while active, its second only `init()`s. Four earlier attempts at a
-  reproduction all passed: writing the period, flush against process, activation
-  on its own, and a full randomised save/reload round trip. **Every one of them
-  drove the plugin at 120 BPM, where the ratio is exactly one.** A fixture that
-  uses the default tempo cannot see any tempo-dependent bug, and 120 is the
-  default everywhere in this tree.
-
 - **Should a genuine tempo change move a host-visible parameter at all?**
-  (03.08.2026, from item 1) Deliberately *not* decided with the fix above, which
-  only stops an assumption being mistaken for a change. Mid-session, a real tempo
-  change still rescales every Free LFO's period, and the number the host sees —
-  and automates, and saved in its project — moves with it. Holding the sounding
-  period constant and holding the automation value constant are incompatible;
-  the honest resolutions are bigger than a flag. Either export the
-  tempo-independent quantity at the CLAP edge and convert in `CLAPEdge`, or store
-  the period in seconds internally and convert to bars where it is used. The
-  first does not touch the file format, which makes it the cheaper of the two.
+  (03.08.2026) `LFOImpl::updateForNewTimingInformation()` rescales a **Free**
+  LFO's period by the bar-duration ratio, so that the period stays constant in
+  seconds when the tempo changes. `LFOImpl::Timer::establishedChange()` stops the
+  *first* announcement of a tempo counting as a change — the engine assumes 120
+  BPM until told, and a host announcing 140 used to be indistinguishable from a
+  user retempoing the project — but that only settles the assumption. Mid-session,
+  a real tempo change still rescales every Free LFO's period, and the number the
+  host sees — and automates, and has saved in its project — moves with it.
 
-- **The measure-numerator half of that fix is reasoned, not measured.**
-  (03.08.2026, from item 1) `establishedChange()` reports no change for the meter
-  as well as for the bar duration, on the same argument — there was nothing to
-  change *from*. The synced arm of `updateForNewTimingInformation()` resnaps the
-  period when the numerator changes, so the same class of bug exists there. But
-  **nothing in the suite drives a meter other than 4/4**, so that arm is
-  unexercised in both directions. A case at 3/4 would settle it.
+  Holding the sounding period constant and holding the automation value constant
+  are incompatible; the honest resolutions are bigger than a flag. Either export
+  the tempo-independent quantity at the CLAP edge and convert in `CLAPEdge`, or
+  store the period in seconds internally and convert to bars where it is used.
+  The first does not touch the file format, which makes it the cheaper of the two.
+
+- **The measure-numerator half of `establishedChange()` is reasoned, not
+  measured.** (03.08.2026) It reports no change for the meter as well as for the
+  bar duration, on the same argument — there was nothing to change *from*. The
+  synced arm of `updateForNewTimingInformation()` resnaps the period when the
+  numerator changes, so the same class of bug exists there. But **nothing in the
+  suite drives a meter other than 4/4**, so that arm is unexercised in both
+  directions. A case at 3/4 would settle it.
 
 - **An out-of-range LFO sub-parameter index asserts instead of being dropped.**
-  (03.08.2026, from item 1) `ParameterCounts::lfoExportedParameters` is 5, so a
+  (03.08.2026) `ParameterCounts::lfoExportedParameters` is 5, so a
   host sees Enabled, PeriodScale, Phase, LowerBound and UpperBound; SyncTypes and
   Waveform are internal. Writing index 5 anyway reaches
   `Automation::Detail::autoAdjustedLFOParameter` and trips
@@ -318,7 +287,7 @@ New entries go at the top of their area.
 ## DSP and effects
 
 - **A phase-vocoder pitch shift's accuracy depends on the FFT size, and not
-  monotonically.** (01.08.2026, item 8) Measured, with Pitch Magnet asked to
+  monotonically.** (01.08.2026) Measured, with Pitch Magnet asked to
   move a 220 Hz partial to 880 Hz and the output's dominant frequency read back:
 
   | FFT size | lands at | error |
@@ -336,7 +305,7 @@ New entries go at the top of their area.
   setting where the measurement is unambiguous, not a fix.
 
 - **Three effect parameters have ranges most of which do nothing useful.**
-  (01.08.2026, item 8) All three were found by writing property tests and all
+  (01.08.2026) All three were found by writing property tests and all
   three read as bugs to a user:
   - **Slew Limiter's rise starts from `FLT_EPSILON`**, which the implementation
     floors the previous amplitude to so that a bin can leave silence at all.
@@ -368,71 +337,20 @@ New entries go at the top of their area.
   8's property tests are the first DSP assertions a checked build makes, and
   they cover nine effects of 57.
 
-- **Fourteen side-chain effects are golden-pinned only where side == main.**
-  (01.08.2026, from §2.8) `engineHarness.cpp` passes `inputPointers.data()` as
-  both main and side — the one case in which a side-chain effect cannot be told
-  apart from a bug that ignores the side chain entirely. §2.8 has a five-step
-  recipe and no item owns it. Related and stranger: `convolver.hpp` declares
-  `usesSideChannel = false` while `convolverImpl.hpp` takes
-  `MainSideChannelData_AmPh`, and the reason nobody has noticed is that
-  **`usesSideChannel` has no reader anywhere in `src/` or `tests/`** — 57 files
-  maintaining metadata that nothing consumes.
-
-- **An unconnected side-chain port is fed the main input, not silence.**
-  (01.08.2026, from §2.8) So a Blender with nothing patched blends the signal
-  with itself. Defensible, deliberate, and documented nowhere a user would look.
+- **`usesSideChannel` is metadata nothing consumes.** (01.08.2026) Every effect
+  declares `static bool const usesSideChannel` and `effects.hpp:61` documents it
+  as part of the effect contract, but a grep of `src/` and `tests/` finds **no
+  reader** — dispatch is by parameter type. So 57 files maintain a constant that
+  cannot be wrong in any way that matters, and one of them already is:
+  `convolver.hpp` declares it `false` while `convolverImpl.hpp` takes
+  `MainSideChannelData_AmPh`. Either something generated consumes it and the grep
+  is wrong, or it should go. (Filling in the side-chain goldens — `todo.md` — is
+  what would make the constant worth having.)
 
 ## Tests
 
-- **`LFO::Timer`'s tempo is three process-global statics, and a test binary is
-  where that stops being benign.** (01.08.2026, item 4; symptom closed
-  03.08.2026) It read: `[preset-corpus]` fails about one run in three when
-  `sw-tests` is run bare, and `ctest` cannot see it. 153 of the 303 rows move —
-  the ones with a tempo-synced LFO. The cause is process-global state:
-  `LFOImpl::Timer` keeps `barDuration_`, `measureNumerator_` and
-  `hasTempoInformation_` as **statics**, and `Timer::reset()` deliberately does
-  not clear the last of them — a 2012 workaround for Ableton Live popping up
-  "preset uses tempo-synced LFOs but the host provides no tempo" while browsing
-  (`lfoImpl.cpp:766-784`). That dialog is gone as of 02.08.2026 — a host with no
-  transport gets 120 BPM 4/4, which is an answer rather than a fault — but the
-  workaround it produced is still what makes `hasTempoInformation_` sticky, and
-  the statics are still shared. So once `pluginTests.cpp`'s `[clap][lfo]`
-  transport cases have told the plugin a tempo, every later preset load in that
-  process converts `PeriodScale` differently, and the corpus digests move.
-
-  ~~Reproduce it deterministically with
-  `./sw-tests --order decl "[lfo],[preset-corpus]"` — 153 failures, every time.~~
-  It hid because `catch_discover_tests` gives each case its own process, so
-  `ctest` was always green; only running the binary directly, which is the
-  quicker thing to do while working, exposed it.
-
-  > **The symptom is gone as of 02.08.2026, by accident, and the cause is not.**
-  > The threading redesign's stage 7 split `sw-tests` into `sw-dsp-tests` and
-  > `sw-plugin-tests` so that the engine's cases could link without JUCE.
-  > `[preset-corpus]` went to the first and `pluginTests.cpp`'s `[clap][lfo]`
-  > transport cases to the second, so the two are no longer in one process and
-  > neither binary can pollute the other. Measured 03.08.2026: `./sw-dsp-tests
-  > --order decl` is 108 passed / 3 skipped and `./sw-plugin-tests --order decl`
-  > is 72 passed, both bare, both green.
-  >
-  >   Nothing was fixed. `LFOImpl::Timer`'s three statics are still statics and
-  > `hasTempoInformation_` is still sticky; what changed is that no test now runs
-  > on the far side of them. A case added to `sw-dsp-tests` that establishes a
-  > tempo would bring the whole thing straight back, with no warning, which is
-  > why this entry stays.
-  >                                                   (03.08.2026.)
-
-  Two things are wrong and only one of them is the test's. A plugin whose
-  tempo-to-period conversion depends on whether *any* instance in the process
-  ever saw a transport is a design smell independent of tests — it is benign in a
-  DAW, where there is one tempo, and it is not benign in a test binary or in an
-  offline renderer. The 2012 note explains why the flag is sticky but not why the
-  state is global. Fixing it properly means the tempo living on the engine;
-  fixing it cheaply means a way for the corpus test to establish a known tempo
-  state, which needs a reset the class does not expose.
-
 - **`LFOImpl::Timer::setPosition( float )` asserts two things that are both
-  false, and is dead.** (01.08.2026, item 4) `lfoImpl.cpp:753-755` reads
+  false, and is dead.** (01.08.2026) `lfoImpl.cpp:753-755` reads
   `LE_ASSUME( barDuration_ == 4 )` and
   `LE_ASSUME( measureNumerator_ == 60.0f / 120 * 4 )` — the two values swapped
   between them. The initialisers three hundred lines up are
@@ -443,65 +361,24 @@ New entries go at the top of their area.
   `__builtin_assume` in a shipping build, so reviving the caller without fixing
   the pair would hand the optimiser two false facts about live values.
 
-- ✅ ~~**The GUI render tests assert an exit code.**~~ (01.08.2026, from §2.3)
-  `renderPage()` writes a PNG and returns 0; a page that paints solid black
-  passes. Blank-and-uniform-colour detection is about ten lines, and it is what
-  would have caught the empty settings panel that 6.4 found by looking at an
-  image. Nine tests currently asserting almost nothing.
-  *Closed 03.08.2026. `renderPage()` measures what fraction of the canvas is not
-  its commonest colour and fails under a thousandth of it; the pages measure
-  12–80 %, so the floor is a long way below every one of them and the failure it
-  is for is "nothing was drawn". `tests/gui/overlayPanelTests.cpp` is the other
-  half — the whole-canvas number cannot see a 191 × 363 hole in a 563 × 376
-  editor, so the overlay rectangle is measured on its own.*
-
-- ✅ ~~**One effect of 57 and one bank of 18 are ever drawn.**~~ (01.08.2026, from
-  §2.3) `SW_SHOW_UI_EFFECT`, `SW_SHOW_UI_PRESET` and `SW_SHOW_UI_PRESET_SWEEP`
-  exist and are manual-only. A CMake `foreach` over the effect list is four lines
-  for 57× the GUI breadth.
-  *Half closed, 03.08.2026: 57 `show-ui-renders-module-<Effect>` cases, with the
-  list read out of `effectsList.hpp` rather than copied into CMake. The banks are
-  still one of eighteen. What the sweep found on its first run is the next
-  bullet.*
-
 - **A slot filled from the editor needs its rack resynced by hand, and two
-  harnesses do it and one did not.** (03.08.2026, from §5.2)
+  harnesses do it and one did not.** (03.08.2026)
   `addUserAddedModule` ends in `refreshModuleRackAsync()`, so a caller with no
   message loop has to call `resyncModuleRack()` itself; `pluginTests.cpp` did and
   `tools/show-ui`'s editor-module page did not. For a month that page rendered an
   editor with a highlighted empty slot and no module in it — the page whose whole
   purpose is proving a module's widgets can be built. It was invisible until the
-  sweep above made all 57 effects produce *byte-identical* PNGs. Fixed there, but
-  the shape of it is not: "build the thing, then pump the async step by hand" is
-  an unwritten rule that three harnesses now follow separately, and the next one
-  will not know either.
+  sweep that drew all 57 effects made them produce *byte-identical* PNGs. Fixed
+  there, but the shape of it is not: "build the thing, then pump the async step by
+  hand" is an unwritten rule that three harnesses now follow separately, and the
+  next one will not know either.
 
-- **`ctest -LE slow` skips nothing.** (01.08.2026, from §2.3) No test in the repo
-  sets `LABELS`; the one labelled case went with `check_gui_flag_parity.py`.
-  Either re-establish the label or stop recommending the flag — several documents
-  do.
-
-- **Nothing has ever loaded a sample and then processed a block.** (01.08.2026,
-  item 7) `sampleTests.cpp` proves all seventeen factory samples decode to two
-  equal channels at the requested rate; nothing proves `runEngine()` then feeds
-  them to the engine in place of the port. The obstacle *was* reach —
-  `setNewSample` is an `EditorHost` virtual and `tests/clap/` drives the C API —
-  and that is now gone: `stateTests.cpp` loads a sample into a plugin the factory
-  created, through `plugin_data` and the `EditorHost` interface. What is left is
-  only the block itself, which is the smaller half.
-
-- ✅ ~~**A host that provides `clap.thread-check` and answers has never been
-  tested.**~~ (01.08.2026, item 0) `StatefulHost` deliberately omits it, which is
-  what reaches the deferral. The other arm of every `canUseThreadCheck()` branch
-  — the one where the plugin is told it *is* on the main thread and acts
-  immediately — has no coverage at all.
-  *Closed 03.08.2026 by `tests/clap/testHost.hpp`: one configurable `TestHost`
-  replaces the three hand-rolled ones, answers the thread check out of its own
-  bookkeeping, and `hostInteropTests.cpp` drives both arms. What it left behind
-  is the next two bullets.*
+- **`ctest -LE slow` skips nothing.** (01.08.2026) No test in the repo sets
+  `LABELS`; the one labelled case went with `check_gui_flag_parity.py`. Either
+  re-establish the label or stop recommending the flag — several documents do.
 
 - **clap-helpers' flush validation calls its own `[main-thread]` entry point
-  from the audio thread.** (03.08.2026, from §5.1) `clapParamsFlush` guards
+  from the audio thread.** (03.08.2026) `clapParamsFlush` guards
   itself correctly with `ensureFlushThread` — `active ? audio : main`, matching
   ext/params.h:303 — and then validates each event through
   `checkValidFlushEvent` → `getParamInfoForParamId`, which opens with
@@ -516,7 +393,7 @@ New entries go at the top of their area.
   clap-helpers issue; worth nothing local.
 
 - **`ActivePlugin` is the only harness that flushes on the thread CLAP says to.**
-  (03.08.2026, from §5.1) `params.flush()` is `[active ? audio-thread :
+  (03.08.2026) `params.flush()` is `[active ? audio-thread :
   main-thread]`, and every `params.flush(&*plugin, …)` call site in
   `pluginTests.cpp` — several dozen — makes it from the main thread against an
   active plugin. Harmless there, because those cases use hosts that offer no
@@ -526,32 +403,8 @@ New entries go at the top of their area.
   Converting them to `plugin.flush(…)` is mechanical and would put the whole
   parameter-event path on the audio thread under tsan and rtsan, where it belongs.
 
-- ~~**`SpectrumWorxCLAP::paramsFlush` opens no `Threading::ScopedAudioCallback`.**~~
-  (03.08.2026, from §5.1) *Fixed the same day, and it turned out to be the
-  smaller half of a bigger error.* It said: against an active plugin flush *is*
-  an audio-thread callback by contract, and it mutates the engine, so
-  `Threading::isAudioThread()` answering `false` inside it is the plugin's own
-  account of who owns the engine being wrong on one path.
-
-  **It was wrong on two paths, and the second one was a live bug.** `reset()` is
-  `[audio-thread & active]` and opened no scope either; `vst3-validator` called
-  it — through `ClapAsVst3::setProcessing(false)` — and `resetChannelBuffers()`
-  aborted against a host doing nothing wrong. The root cause was a definition
-  rather than two missing lines: the marker was called `ScopedAudioCallback` and
-  documented as "this call is under `process()`", which is *not* what
-  `[audio-thread]` means — `plugin.h` puts four entry points in that set. It is
-  `ScopedAudioThreadEntry` now, documented against the contract and carrying the
-  table of what owes one, and flush takes it **conditionally on `isActive()`**
-  because its annotation is the only conditional one.
-  `hostInteropTests.cpp` pins both.
-
-  What is still owed: those two paths are now under rtsan for the first time, so
-  a sanitizer build is expected to report the slot-selector allocation recorded
-  above, and possibly more. That is the deliberate second half and it has not
-  been run yet.
-
 - **A `checkMainThread()` failure is invisible to `TestHost`, and one case
-  overclaims because of it.** (03.08.2026, from item 1) clap-helpers'
+  overclaims because of it.** (03.08.2026) clap-helpers'
   `checkMainThread`/`checkAudioThread` write to `std::cerr` directly
   (plugin.hxx:2219, 2233) rather than through `hostMisbehaving`, so nothing that
   routes through `clap.log` can see them — which is the same limitation the flush
@@ -564,28 +417,27 @@ New entries go at the top of their area.
 
 ## Licence and shipping
 
-- ✅ ~~**`doc/manual/EULA.txt` is a commercial end-user agreement and the
-  repository is GPL-3.0.**~~ (01.08.2026, from item 10)
-  *Wrong, and checked on 03.08.2026: the file in the tree is a plain-text copy of
-  the GPL-3.0 licence — 218 lines, the same terms as `LICENSE`, no proprietary
-  wording in it. The commercial agreement was replaced before the port began and
-  three documents went on describing the file by its 2016 name. The decision
-  itself is made and written down in [`LICENSING.md`](../../LICENSING.md): source
-  GPL-3.0-or-later, released binary AGPL-3.0-or-later because JUCE 8 is
-  AGPLv3-or-commercial, and the 452 file headers are right as they stand.*
+The decision itself is settled and written down in
+[`LICENSING.md`](../../LICENSING.md): source GPL-3.0-or-later, released binary
+AGPL-3.0-or-later because JUCE 8 is AGPLv3-or-commercial. The 452 file headers
+are right as they stand. What is below is packaging.
 
 - **The duplicate licence file and the installer path that names it.**
-  (03.08.2026, from item 10) `doc/manual/EULA.txt` is now a byte-for-byte
-  duplicate of `LICENSE` under a filename that means the opposite of what it
-  contains, and `src/legacy-build.cmake:386` still points
+  (03.08.2026) `doc/manual/EULA.txt` is a byte-for-byte duplicate of `LICENSE`
+  under a filename that means the opposite of what it contains — 2016's
+  commercial agreement was replaced before the port began and only the name
+  survived. `src/legacy-build.cmake:386` still points
   `CPACK_RESOURCE_FILE_LICENSE` at `../installer/ProgramFolder/Licences/EULA.txt`
   — a path outside this repository. Neither is reachable from a live target, so
-  neither is urgent; both are item 10's to clear when there is a real installer,
-  and the AGPL statement is what it has to show.
+  neither is urgent; both are for whoever builds a real installer, and the AGPL
+  statement is what it has to show.
 
 - **The standalone's `CFBundleIdentifier` is clap-wrapper's
-  `SpectrumWorx.standalone`.** (01.08.2026, from §4) Notarisation is the step
-  that cares. The fix belongs upstream — a `BUNDLE_IDENTIFIER` the standalone
-  wrapper honours the way the plugin wrappers already do — so it wants a
-  clap-wrapper PR rather than a local workaround, and an upstream PR is not
-  something a stage can be sized around.
+  `SpectrumWorx.standalone`.** (01.08.2026) A bundle *name* with a suffix rather
+  than a reverse-DNS identifier, hardcoded in clap-wrapper's own `Info.plist.in`,
+  and no CMake property overrides that one key. Notarisation is the step that
+  cares. The only local remedy is to carry a whole copy of their template to
+  change one line, so the fix belongs upstream — a `BUNDLE_IDENTIFIER` the
+  standalone wrapper honours the way the plugin wrappers already do.
+  `src/clap-first/CMakeLists.txt` carries the note so the next person to look does
+  not re-derive it.

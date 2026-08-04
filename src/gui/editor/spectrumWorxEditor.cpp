@@ -1262,7 +1262,7 @@ void SpectrumWorxEditor::updateLFO(ModuleUI const &moduleUI, std::uint8_t const 
 /// is a bool. So the value arriving here is the snapped one, which is what the old
 /// assertion in `Module::setEffectParameter` says too.
 ///
-/// \see doc/tech/correct_the_threading.md §3.
+/// \see doc/tech/threading_model.md §3.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 

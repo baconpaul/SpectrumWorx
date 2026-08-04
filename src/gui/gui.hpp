@@ -291,11 +291,9 @@ void fadeOutComponent(juce::Component &, float finalAlpha, unsigned int duration
                       bool useProxyComponent);
 
 /// \note `class Lock : private juce::MessageManagerLock` stood here. It had no
-/// call sites anywhere in `src/`, `tests/` or `tools/` -- week_two.md §2.2 found
-/// that while auditing the threading, and §2.5 listed it as a free deletion this
-/// item owns. Its one line of body was an assertion about the reference count
-/// SkinLifetime no longer keeps, so it either had to be rewritten or removed, and
-/// nothing calls it.
+/// call sites anywhere in `src/`, `tests/` or `tools/`, and its one line of body
+/// was an assertion about the reference count SkinLifetime no longer keeps -- so
+/// it either had to be rewritten or removed, and nothing calls it.
 ///                                           (02.08.2026.) (SW port)
 
 namespace Detail

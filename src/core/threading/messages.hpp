@@ -11,7 +11,7 @@
 /// case below. That is the whole of the memory management -- there is no shared
 /// ownership anywhere in the protocol, and nothing is deleted on the audio thread.
 ///
-/// See doc/tech/correct_the_threading.md §3 and §5.
+/// See doc/tech/threading_model.md §3 and §5.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later

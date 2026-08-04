@@ -1,27 +1,28 @@
 # SpectrumWorx — Implementation Sequence (CLAP-first)
 
-> ### 📕 Evidence, not a plan. *Retained deliberately; see [`README.md`](README.md).*
+> ### 📕 Archived. *This describes the path, not the tree. See [`../README.md`](../README.md) for what is current.*
 >
 > **Stages 0–8 are closed.** This document was executed between 27.07.2026 and
-> 01.08.2026 and is no longer what anyone works from —
-> [`week_two.md`](week_two.md) is. It is kept for two things nothing else has:
-> *why* each decision went the way it did, and the per-stage "done when" that
-> each commit was measured against.
+> 01.08.2026 and is no longer what anyone works from. It is kept for two things
+> nothing else has: *why* each decision went the way it did, and the per-stage
+> "done when" that each commit was measured against.
 >
 > Read it knowing that **the port disproved some of it**. The largest: 5.8's
 > paragraph on threading treats the model as something to patch, and it was
-> replaced instead — see [`correct_the_threading.md`](correct_the_threading.md).
+> replaced instead — see [`../threading_model.md`](../threading_model.md).
 > Stage 8's account of the preset browser, and every test count in here, are
-> likewise dated rather than current. Where this and `week_two.md` disagree,
-> `week_two.md` is right; where `week_two.md` and `correct_the_threading.md`
-> disagree about threading, the latter is.
->                                                     (03.08.2026.) (SW port)
+> likewise dated rather than current.
+>
+> Its pointers *into* the live documents are to those documents as they were on
+> 03.08.2026. The plan they named — `week_two.md` §-numbers and item numbers —
+> has since been reduced to what is still open, in
+> [`../todo.md`](../todo.md), so a section reference may no longer resolve.
+> Nothing in here is authoritative about this tree in any case.
+>                                                     (04.08.2026.) (SW port)
 
 Companion to [`initial_scan.md`](initial_scan.md), which is the analysis. This
 is the plan: a stage-by-stage path from the 2016 tree to a modern three-OS
 plugin, each stage ending in something you can build, test and commit.
-[`week_two.md`](week_two.md) is the re-plan and supersedes this where the two
-disagree; [`tech_debt.md`](tech_debt.md) is what closed stages left behind.
 
 **The decision this document assumes** (scan §1.6): SpectrumWorx becomes a
 **native CLAP**, and [clap-wrapper](https://github.com/free-audio/clap-wrapper)
@@ -71,7 +72,7 @@ What is left, in the order it is worth doing:
 | | | Where |
 |---|---|---|
 | 1 | **Load it in a DAW.** Reaper first. Nothing below is worth much until the thing has been driven by a mouse. | — |
-| 2 | ✅ **The audio file loader** — done 01.08.2026: one `doLoad` over `juce::AudioFormatManager`, the two platform decoders deleted, the factory samples embedded and `LE_SW_DISABLE_SIDE_CHANNEL` dropped. Whether loading gets a thread is deferred into row 3 — `week_two.md` §1 item 3a. | 5.0 |
+| 2 | ✅ **The audio file loader** — done 01.08.2026: one `doLoad` over `juce::AudioFormatManager`, the two platform decoders deleted, the factory samples embedded and `LE_SW_DISABLE_SIDE_CHANNEL` dropped. Whether loading gets a thread is deferred into row 3 — `todo.md` §1 item 3a. | 5.0 |
 | 3 | **Threading.** The `UIEdits` queue is the first piece; the rest of the main/audio split is not done. | 5.8 |
 | 4 | **`clap-validator` and CI** across the four formats and now three OSes. | 5.9 |
 | 5 | **6.4**, the owned-window collapse — and with it the preset browser's data source, which is the last thing between the embedded factory banks and a user. | stage 6, then 8 |
@@ -1212,7 +1213,7 @@ actually tests them.
 > nine now fails a test rather than passing an 8 dB bound. What is still open is
 > narrower than it was: the goldens remain the only thing that *compares* two
 > platforms, and a drift too small to break a property is still only visible to
-> them. See `week_two.md` item 8, which also records the four properties that had
+> them. See `todo.md` item 8, which also records the four properties that had
 > to be measured rather than reasoned out.
 
 **Done when:** `sw-tests` green on macOS (arm64 + x86_64), Windows (x64 +
@@ -1502,7 +1503,7 @@ samples to decode on Linux, where `registerBasicFormats()` offers no MP3 reader
 at all.
 
 Whether the loader gets a thread is deliberately **not** answered here: it is
-deferred into the threading redesign, and `week_two.md` §1 item 3a is the
+deferred into the threading redesign, and `todo.md` §1 item 3a is the
 handover — what the 2016 `BackgroundThread` did, what a synchronous load costs
 instead, and what the redesign has to build.
 
@@ -1625,8 +1626,8 @@ now correct rather than merely tolerated.
 The policy is `CLAPEdge` in `core/host_interop/clapParameterEdge.hpp` — free
 functions over a `ParameterInformation`, deliberately not members of the plugin,
 so `tests/clap` can exercise what the host sees without a host. That is
-[surge-xt2](../../../sst/surge-xt2)'s `clap_edge::` (`src/clap/param_edge.h`)
-shape, and the reason for it is the same.
+surge-xt2's `clap_edge::` (`src/clap/param_edge.h`) shape, and the reason for it
+is the same.
 
 Two things worth knowing about the implementation:
 
@@ -2094,7 +2095,7 @@ sufficient — `juce_graphics`, `juce_data_structures`, `juce_events` and
 | 6.2 `Theme` | ✅ `LookAndFeel_V2`, in `src/gui/theme.{hpp,cpp}`, rendered by `sw-show-ui theme` |
 | 6.3 assets | ✅ |
 | 6.1 — the widget set | ☐ blocked on the two rewrites below |
-| 6.4 | ✅ 01.08.2026 — both panels are child components sharing one 191 × 363 overlay at (362, 6); `OwnedWindow*`, the Win32 hook, the Carbon path and `-framework Carbon` deleted, 923 lines out of `src/`. See `week_two.md` §1.5 |
+| 6.4 | ✅ 01.08.2026 — both panels are child components sharing one 191 × 363 overlay at (362, 6); `OwnedWindow*`, the Win32 hook, the Carbon path and `-framework Carbon` deleted, 923 lines out of `src/`. See `todo.md` §1.5 |
 | 6.5 – 6.7 | ☐ |
 
 **These two are not ports.** Everything swept so far was a substitution: the
@@ -2657,7 +2658,7 @@ Inno Setup on Windows, tar + deb on Linux.
 **9.2** Version information wired through `sst::plugininfra::version_information`.
 
 **9.3 — ✅ Settle the licence.** *Done, 03.08.2026 —
-[`LICENSING.md`](../../LICENSING.md).* It said: JUCE 8 is AGPLv3-or-commercial;
+[`LICENSING.md`](../../../LICENSING.md).* It said: JUCE 8 is AGPLv3-or-commercial;
 the repo is currently GPL-3.0 with every file header still saying "All rights
 reserved" (scan §8.1.2–3); pick a destination, make the headers agree with the
 LICENSE file, and write `THIRD_PARTY.md`.
@@ -2729,7 +2730,7 @@ Rows below are in stage-number order, not running order. Running order is
 | 2 | Boost tier-1 sweep ✅ (CI wiring deferred) | 1–2 |
 | 3 | DSP core + goldens ✅ | 3–5 |
 | 4 | Portable SIMD/FFT — *deferred, runs after 6* | 1.5–2.5 |
-| 5 | CLAP host layer — *5.1–5.7 done; 5.0, ranges, 5.9 open.* **5.8 is a threading redesign, not a fixup** — it deadlocks in Logic and Bitwig; see `week_two.md` §1.3 | 2.5–4 + 5.8 |
+| 5 | CLAP host layer — *5.1–5.7 done; 5.0, ranges, 5.9 open.* **5.8 is a threading redesign, not a fixup** — it deadlocks in Logic and Bitwig; see `todo.md` §1.3 | 2.5–4 + 5.8 |
 | 6 | GUI — *widgets, module layer, editor, the browser's async save path and 6.4 done; 6.5–6.7 open* | 4–6 |
 | 7 | De-Boost the parameter system | 4–6 |
 | 8 | Presets and content ✅ *including the browser, once 6.4 landed* | 1–2 |

@@ -8,8 +8,8 @@
 ///
 ///   There were three hand-rolled `clap_host`s in `tests/clap/` and each one
 /// offered exactly the extensions its own file needed, which is how
-/// week_two.md §2.1a survived a green suite: a null dereference on the path every
-/// parameter write takes, invisible because no test host offered `clap.state`.
+/// a null dereference on the path every parameter write takes survived a green
+/// suite -- invisible because no test host offered `clap.state`.
 /// One configurable host instead, so that "what does this case's host offer" is a
 /// line of the case rather than a hundred lines of boilerplate.
 ///

@@ -2,7 +2,7 @@
 #
 #   sw-dsp-tests    the engine, the effects and the preset format. Links sw-dsp
 #                   and nothing else -- **no JUCE at all**, which is goal 3 of
-#                   doc/tech/correct_the_threading.md and the reason the split
+#                   doc/tech/threading_model.md and the reason the split
 #                   exists. If a case here starts needing juce::File it will not
 #                   link, which is the point: the boundary is checked by the
 #                   build rather than by a reviewer.
@@ -142,7 +142,7 @@ add_test(NAME odr-header-stays-in-our-sources
         -P "${CMAKE_CURRENT_SOURCE_DIR}/checkODRHeaderScope.cmake")
 
 # Likewise: the engine must be linkable without JUCE, which is goal 3 of
-# doc/tech/correct_the_threading.md. sw-dsp-tests above is the other half of the
+# doc/tech/threading_model.md. sw-dsp-tests above is the other half of the
 # same claim -- this one catches a JUCE module arriving on sw-dsp's link line
 # even while nothing includes a JUCE header yet.
 add_test(NAME engine-links-no-juce

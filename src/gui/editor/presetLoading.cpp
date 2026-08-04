@@ -94,7 +94,7 @@ struct Loader
 
     /// \note The one point at which a preset load touches the engine; everything
     /// before it built a chain nothing else could see. See
-    /// Threading::publishChain() and doc/tech/correct_the_threading.md §5.
+    /// Threading::publishChain() and doc/tech/threading_model.md §5.
     void publishChain(AutomatedModuleChain &newChain) const
     {
         Threading::publishChain(host.core(), host.toEngine(), newChain);

@@ -64,7 +64,7 @@ namespace SW
 /// audio thread -- so it repositioned JUCE components from inside `process()`.
 /// The interface follows the chain now: the plugin raises `ToUI::ChainChanged`
 /// and the editor recomputes its rack on the main thread. See
-/// doc/tech/correct_the_threading.md §5.
+/// doc/tech/threading_model.md §5.
 ///                                           (02.08.2026.) (SW port)
 
 class ModuleChainParameter;

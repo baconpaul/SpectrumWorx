@@ -18,7 +18,7 @@
 /// `SpectrumWorxCore::currentThreadMayMutateEngineState()` is that sentence, and
 /// six assertions in the engine are written against it.
 ///
-/// See doc/tech/correct_the_threading.md §2 and §5.
+/// See doc/tech/threading_model.md §2 and §5.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later
@@ -148,8 +148,8 @@ TEST_CASE("Every block is processed and written", "[core][ownership]")
     // The property the lock cost us. `process()` returned false whenever another
     // thread held the processing lock, and every caller then had to decide what
     // the host heard instead -- silence, in the end, because the alternative was
-    // the previous plugin's output at full level (week_two.md §2.1b). There is
-    // no such case now: nothing else can be inside the engine while this runs.
+    // the previous plugin's output at full level. There is no such case now:
+    // nothing else can be inside the engine while this runs.
     RunningEngine engine;
 
     auto input(makeInput());

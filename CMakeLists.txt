@@ -108,7 +108,7 @@ option(SW_BUILD_TOOLS "Build the developer tools (sw-show-ui)" ON)
 # What this switches off is clap-wrapper's per-format wrapping, which fetches the
 # VST3 and AudioUnit SDKs over the network at *configure* time. A sanitizer build
 # wants the test binaries and nothing else, and a machine with no network cannot
-# configure one otherwise. See doc/tech/correct_the_threading.md §6.8.
+# configure one otherwise. See doc/tech/threading_model.md §8.
 option(SW_BUILD_PLUGIN_BUNDLES "Build the .clap/.vst3/.component bundles" ON)
 
 if (SW_BUILD_TESTS)
