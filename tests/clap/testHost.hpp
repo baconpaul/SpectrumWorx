@@ -723,6 +723,46 @@ inline std::vector<clap_param_info> allParameterInfo(clap_plugin const &plugin,
 // Naming a parameter the way the host addresses it
 ////////////////////////////////////////////////////////////////////////////////
 
+/// \brief An LFO period -- the `.T` of some slot's LFO.
+///
+/// \note The family `clap-cpp-validator` fails on, every one of them: its four
+/// state cases disagree only about `M*.*.LFO.T`. Found by name rather than by a
+/// hardcoded id because which LFO-able parameters a slot has depends on the
+/// effect in it.
+inline clap_param_info lfoPeriodParameter(clap_plugin const &plugin,
+                                          clap_plugin_params const &params)
+{
+    for (auto const &info : allParameterInfo(plugin, params))
+    {
+        std::string const name(info.name);
+        if ((name.size() > 2) && (name.compare(name.size() - 2, 2, ".T") == 0))
+            return info;
+    }
+    FAIL("no LFO period parameter -- is there an effect in slot 1?");
+    return {};
+}
+
+/// \brief A host's transport, at \p tempo in 4/4, parked at \p positionInBeats.
+///
+/// \note Shared rather than per file since 03.08.2026: `pluginTests.cpp` had it,
+/// and the LFO cases need one too -- and need it at a tempo that is *not* the
+/// engine's assumed 120, which is where the periods stop being rescaled.
+inline clap_event_transport transportAt(double const tempo, double const positionInBeats,
+                                        std::uint32_t const extraFlags)
+{
+    clap_event_transport transport{};
+    transport.header.size = sizeof(transport);
+    transport.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+    transport.header.type = CLAP_EVENT_TRANSPORT;
+    transport.flags = CLAP_TRANSPORT_HAS_TEMPO | CLAP_TRANSPORT_HAS_TIME_SIGNATURE |
+                      CLAP_TRANSPORT_HAS_BEATS_TIMELINE | extraFlags;
+    transport.tempo = tempo;
+    transport.tsig_num = 4;
+    transport.tsig_denom = 4;
+    transport.song_pos_beats = static_cast<clap_beattime>(positionInBeats * CLAP_BEATTIME_FACTOR);
+    return transport;
+}
+
 /// \note ParameterID's members are laid out in reverse so that the hex reads
 /// naturally on a little-endian machine: the type is the top byte and the module
 /// index the one below it. See core/parameterID.hpp.

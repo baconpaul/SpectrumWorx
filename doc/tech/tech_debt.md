@@ -259,6 +259,62 @@ New entries go at the top of their area.
   have named it immediately; whether the engine should carry one in a release
   build is a real question and not obviously yes.
 
+## Parameters and LFOs
+
+- ~~**Every LFO period moves on the first block of a session that is not at 120
+  BPM.**~~ *Fixed 03.08.2026, from item 1.* `LFOImpl::updateForNewTimingInformation()`
+  rescales a **Free** LFO's period by the bar-duration ratio, so that its period
+  stays constant in seconds when the tempo changes — which is right. But
+  `barDuration_` starts life, and goes back on `reset()`, holding an *assumption*:
+  120 BPM in 4/4. A host announcing 140 was therefore indistinguishable from a
+  user changing the tempo, and the plugin silently moved a parameter no host had
+  written. `LFOImpl::Timer` now carries a per-instance
+  `timingInformationEstablished_` and reports the first update after construction
+  or `reset()` as no change at all. Pinned by "Learning the host's tempo does not
+  move the LFO periods".
+
+  **What it cost to find, which is the part worth keeping.** This was
+  `clap-cpp-validator`'s four state failures, and *none of them was about state* —
+  its first instance randomises through `process()` on an activated plugin and
+  reads back while active, its second only `init()`s. Four earlier attempts at a
+  reproduction all passed: writing the period, flush against process, activation
+  on its own, and a full randomised save/reload round trip. **Every one of them
+  drove the plugin at 120 BPM, where the ratio is exactly one.** A fixture that
+  uses the default tempo cannot see any tempo-dependent bug, and 120 is the
+  default everywhere in this tree.
+
+- **Should a genuine tempo change move a host-visible parameter at all?**
+  (03.08.2026, from item 1) Deliberately *not* decided with the fix above, which
+  only stops an assumption being mistaken for a change. Mid-session, a real tempo
+  change still rescales every Free LFO's period, and the number the host sees —
+  and automates, and saved in its project — moves with it. Holding the sounding
+  period constant and holding the automation value constant are incompatible;
+  the honest resolutions are bigger than a flag. Either export the
+  tempo-independent quantity at the CLAP edge and convert in `CLAPEdge`, or store
+  the period in seconds internally and convert to bars where it is used. The
+  first does not touch the file format, which makes it the cheaper of the two.
+
+- **The measure-numerator half of that fix is reasoned, not measured.**
+  (03.08.2026, from item 1) `establishedChange()` reports no change for the meter
+  as well as for the bar duration, on the same argument — there was nothing to
+  change *from*. The synced arm of `updateForNewTimingInformation()` resnaps the
+  period when the numerator changes, so the same class of bug exists there. But
+  **nothing in the suite drives a meter other than 4/4**, so that arm is
+  unexercised in both directions. A case at 3/4 would settle it.
+
+- **An out-of-range LFO sub-parameter index asserts instead of being dropped.**
+  (03.08.2026, from item 1) `ParameterCounts::lfoExportedParameters` is 5, so a
+  host sees Enabled, PeriodScale, Phase, LowerBound and UpperBound; SyncTypes and
+  Waveform are internal. Writing index 5 anyway reaches
+  `Automation::Detail::autoAdjustedLFOParameter` and trips
+  `LE_ASSUME(lfoParameterIndex < lfoExportedParameters)`
+  (`automatedModule.cpp:140`) — in a release build, an index past the end. No
+  conforming host can reach it, since the id is not exported; neither could a
+  conforming host send an out-of-range parameter *value*, and that one is now
+  clamped at the edge rather than trusted. This is the same guard and the same
+  argument. Found by accident, writing the id by hand while chasing the entry
+  above.
+
 ## DSP and effects
 
 - **A phase-vocoder pitch shift's accuracy depends on the FFT size, and not

@@ -490,3 +490,71 @@ TEST_CASE("Flushing is an audio-thread call only while the plugin is active", "[
     INFO("what this harness was reported for:" << joined(host.hostMisbehaviours()));
     CHECK(host.hostMisbehaviours().empty());
 }
+
+TEST_CASE("Learning the host's tempo does not move the LFO periods", "[clap][host]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note All four of `clap-cpp-validator`'s state failures, and none of them
+    /// was about state. Its first instance randomises the parameters **through
+    /// process() on an activated plugin** and reads them back while active; its
+    /// second is only `init()`ed and never processes. So the two sides read the
+    /// same stored period either side of one event -- the host announcing its
+    /// tempo -- and `LFOImpl::updateForNewTimingInformation()` rescales every
+    /// *Free* LFO's period by the bar-duration ratio, to hold its period constant
+    /// in seconds. Against a real tempo change that is right. Against the engine's
+    /// assumed 120 BPM it is a parameter moving under a host that never wrote it.
+    ///
+    /// \note **The transport has to disagree with 120.** Four earlier attempts at
+    /// this case passed -- writing the period, flush against process, activation
+    /// on its own, a whole randomised save/reload round trip -- because every one
+    /// of them drove the plugin at 120 BPM, where the ratio is exactly one and the
+    /// bug is invisible. That is why the tempo here is 140 and why it is the first
+    /// thing to check if this case ever stops failing on a revert.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    Entry const entry;
+    TestHost host{TestHost::everything()};
+
+    clap_id periodID{};
+    double beforeAnyBlock{-1};
+    ActivePlugin plugin(48000, 512, host,
+                        [&](clap_plugin const &inactive)
+                        {
+                            auto const *const pParams(static_cast<clap_plugin_params const *>(
+                                inactive.get_extension(&inactive, CLAP_EXT_PARAMS)));
+                            REQUIRE(pParams != nullptr);
+
+                            OneParameterEvent const fill(parameterID(moduleChainType, 0), 0);
+                            pParams->flush(&inactive, &*fill, &discardedOutputEvents());
+
+                            periodID = lfoPeriodParameter(inactive, *pParams).id;
+                            REQUIRE(pParams->get_value(&inactive, periodID, &beforeAnyBlock));
+                        });
+
+    auto const &params(parameters(*plugin));
+
+    std::vector<float> leftIn(512, 0.0f), rightIn(512, 0.0f);
+    std::vector<float> leftOut(512), rightOut(512);
+
+    // Not 120: the engine assumes 120 BPM 4/4 until a host says otherwise, and at
+    // 120 the ratio is one whether or not this is fixed.
+    auto const playing(transportAt(140, 0, CLAP_TRANSPORT_IS_PLAYING));
+    plugin.process(leftIn, rightIn, leftOut, rightOut, &playing);
+
+    double afterLearningTheTempo{-1};
+    REQUIRE(params.get_value(&*plugin, periodID, &afterLearningTheTempo));
+
+    // ...and it stays put over the blocks that follow, which is the half that
+    // says the first block established the tempo rather than merely deferring the
+    // rescale by one.
+    for (unsigned block(0); block < 4; ++block)
+        plugin.process(leftIn, rightIn, leftOut, rightOut, &playing);
+
+    double afterMoreBlocks{-1};
+    REQUIRE(params.get_value(&*plugin, periodID, &afterMoreBlocks));
+
+    CAPTURE(beforeAnyBlock, afterLearningTheTempo, afterMoreBlocks);
+    CHECK(afterLearningTheTempo == beforeAnyBlock);
+    CHECK(afterMoreBlocks == beforeAnyBlock);
+}

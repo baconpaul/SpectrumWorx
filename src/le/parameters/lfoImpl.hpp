@@ -227,8 +227,39 @@ class LFOImpl : public LFO
         static value_type measureNumeratorFloat();
 
       private:
+        /// \brief What to report for incoming timing, given what was already
+        /// known. See the definition: the first call after construction or
+        /// reset() establishes the timing rather than changing it.
+        TimingInformationChange establishedChange(value_type barDuration,
+                                                  std::uint8_t measureNumerator);
+
+      private:
         value_type currentTimeInBars_;
         value_type previousTimeInBars_;
+
+        ////////////////////////////////////////////////////////////////////////
+        ///
+        /// \brief Whether this timer has ever been told the timing, as opposed to
+        /// still holding the assumed 120 BPM 4/4.
+        ///
+        /// \note Per instance and *not* the static hasTempoInformation_ below,
+        /// which cannot answer this: reset() deliberately leaves that flag alone
+        /// -- a 2012 workaround for preset browsing in Live -- while it does put
+        /// barDuration_ back to the assumption, so after a reset the flag says
+        /// "known" about a value that is a placeholder again. It is also process
+        /// wide, and this question is per engine.
+        ///
+        ///   What it is for: the first block after construction or reset()
+        /// *establishes* the timing rather than changing it, and the difference
+        /// matters because a Free LFO's period is rescaled by every bar-duration
+        /// change (see updateForNewTimingInformation). Comparing a host's real
+        /// tempo against an assumption we invented and calling the difference a
+        /// change silently moved every LFO period in the plugin on the first
+        /// block of any session not at 120 BPM.
+        ///                                   (03.08.2026.) (SW port)
+        ///
+        ////////////////////////////////////////////////////////////////////////
+        bool timingInformationEstablished_{false};
 
         static std::atomic<value_type> barDuration_;
         static std::atomic<std::uint8_t> measureNumerator_;

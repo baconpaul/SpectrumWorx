@@ -187,15 +187,24 @@ document. See item 3, which it re-scoped from a fixup into a redesign.
 >     `Parameter::setValue`'s assert — and in a release build would simply have
 >     been stored. Fixed, and pinned by a case that walks all 286 parameters off
 >     both ends; reverting the clamp aborts the test binary with the same assert.
->   - **The 4 remaining failures are one bug**, and it belongs to item 4: every
->     mismatch is an LFO period (`M*.*.LFO.T`), 0.0373588 where 0.0408341 was
->     saved. `state-reproducibility-flush` is the sharp one — *the same value
->     written through `flush()` and through `process()` reports differently* — so
->     this is two write paths disagreeing, not a serialisation rounding error.
->     The period resnap in `handleTimingInformationChange()` is the suspect.
->   - ~~**`scan-time` 301 ms against a 100 ms limit.**~~ *Gone with the
->     clap-wrapper bump: 18 ms.* It was the wrapper's scan doing the work, not
->     ours, which is not what the first reading of it assumed.
+>   - ~~**The 4 remaining failures are one bug**, and it belongs to item 4.~~
+>     *Fixed 03.08.2026 — and it was not item 4's, because it was not about state
+>     at all.* Every mismatch was an LFO period, and the two sides of the
+>     comparison differed by one event: the host announcing its tempo. A **Free**
+>     LFO's period is rescaled by the bar-duration ratio to hold it constant in
+>     seconds, and the engine assumes 120 BPM until told — so the first block of
+>     any session at another tempo moved every LFO period in the plugin, with no
+>     host write. `LFOImpl::Timer` now distinguishes learning the tempo from a
+>     change to it. `tech_debt.md`'s "Parameters and LFOs" has what it cost and
+>     the two questions it deliberately leaves open.
+>   - **`scan-time` against a 100 ms limit: still over, and it varies wildly.**
+>     301 ms, then 18 ms, then 274 ms across three runs of the same binary — so
+>     it is dominated by whether the bundle and its dependencies are in the page
+>     cache, and a single reading of it means nothing in either direction. *An
+>     earlier line here claimed the clap-wrapper bump had fixed it, on the
+>     strength of the 18 ms run alone; it had not.* Whatever we do at scan time
+>     is worth reducing, but the measurement needs a cold-cache protocol before
+>     it can say so.
 >   - **`vst3-validator`** — built out of clap-wrapper's own `vst3_validator`
 >     target — ran 19 tests and then **aborted** in `Process Test`, on
 >     `currentThreadMayMutateEngineState()` inside `resetChannelBuffers()`. This

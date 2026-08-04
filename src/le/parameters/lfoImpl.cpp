@@ -684,6 +684,42 @@ template <typename T> void relaxed(std::atomic<T> &value, T const newValue)
 
 LFOImpl::Timer::Timer() { reset(); }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief The timing change to report, given what this timer already knew.
+///
+/// \note The whole of the fix for "every LFO period moves on the first block of a
+/// session that is not at 120 BPM". Both overloads below compare the incoming
+/// timing against `barDuration_`/`measureNumerator_`, which start life -- and go
+/// back, on reset() -- holding an *assumption*: 120 BPM in 4/4. A host that says
+/// 140 is not changing the tempo, it is telling us the tempo for the first time,
+/// and the difference matters because `updateForNewTimingInformation()` rescales
+/// every Free LFO's period by the bar-duration ratio to keep its period constant
+/// in seconds. Against a real change that is right; against an assumption it
+/// silently moved a parameter the host had never written, which is what
+/// clap-validator's four state cases were reporting.
+///
+/// \note Reported for the measure numerator as well as the bar duration, not just
+/// the arm that was failing: the same sentence is true of both -- there was
+/// nothing to change *from* -- and the synced arm resnaps the period on a
+/// numerator change for the same reason the free arm rescales it. Nothing in the
+/// suite drives a meter other than 4/4, so that half is reasoned rather than
+/// measured; see tech_debt.md.
+///                                           (03.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+LFOImpl::Timer::TimingInformationChange
+LFOImpl::Timer::establishedChange(value_type const barDuration, std::uint8_t const measureNumerator)
+{
+    if (!timingInformationEstablished_)
+    {
+        timingInformationEstablished_ = true;
+        return {1, false}; // a ratio of one rescales nothing
+    }
+    return {relaxed(barDuration_) / barDuration, relaxed(measureNumerator_) != measureNumerator};
+}
+
 LFOImpl::Timer::TimingInformationChange LFOImpl::Timer::updatePositionAndTimingInformation(
     float const positionInBars, float const barDuration, std::uint8_t const measureNumerator)
 {
@@ -706,10 +742,7 @@ LFOImpl::Timer::TimingInformationChange LFOImpl::Timer::updatePositionAndTimingI
     // (therefore their relative duration must be updated when the bar
     // duration changes).
     //                                        (02.02.2011.) (Domagoj Saric)
-    TimingInformationChange const changeInfo = {
-        relaxed(barDuration_) / barDuration,           // barDurationChangeRatio_
-        relaxed(measureNumerator_) != measureNumerator // measureNumeratorChanged_
-    };
+    TimingInformationChange const changeInfo(establishedChange(barDuration, measureNumerator));
 
     relaxed(hasTempoInformation_, true);
 
@@ -740,10 +773,7 @@ LFOImpl::Timer::updatePositionAndTimingInformation(unsigned int const deltaNumbe
     std::uint8_t const measureNumerator(4);
     float const barDuration(60.0f / 120 * measureNumerator);
 
-    TimingInformationChange const changeInfo = {
-        relaxed(barDuration_) / barDuration,           // barDurationChangeRatio_
-        relaxed(measureNumerator_) != measureNumerator // measureNumeratorChanged_
-    };
+    TimingInformationChange const changeInfo(establishedChange(barDuration, measureNumerator));
 
     relaxed(hasTempoInformation_, false);
 

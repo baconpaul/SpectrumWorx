@@ -205,23 +205,6 @@ std::size_t distinctHostVisibleValues(ActivePlugin &plugin, clap_plugin_params c
     return seen.size();
 }
 
-/// A host's transport, at \p tempo in 4/4, parked at \p positionInBeats.
-clap_event_transport transportAt(double const tempo, double const positionInBeats,
-                                 std::uint32_t const extraFlags)
-{
-    clap_event_transport transport{};
-    transport.header.size = sizeof(transport);
-    transport.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
-    transport.header.type = CLAP_EVENT_TRANSPORT;
-    transport.flags = CLAP_TRANSPORT_HAS_TEMPO | CLAP_TRANSPORT_HAS_TIME_SIGNATURE |
-                      CLAP_TRANSPORT_HAS_BEATS_TIMELINE | extraFlags;
-    transport.tempo = tempo;
-    transport.tsig_num = 4;
-    transport.tsig_denom = 4;
-    transport.song_pos_beats = static_cast<clap_beattime>(positionInBeats * CLAP_BEATTIME_FACTOR);
-    return transport;
-}
-
 //------------------------------------------------------------------------------
 } // anonymous namespace
 //------------------------------------------------------------------------------
