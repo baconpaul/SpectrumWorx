@@ -26,11 +26,11 @@
 #include "le/utility/tracePrivate.hpp"
 
 #include "le/utility/assert.hpp"
-#include "le/utility/ignoreUnused.hpp"
 #include "le/utility/intrusivePtr.hpp"
 
 #include <algorithm>
 #include <cctype>
+#include <ctime>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -85,25 +85,19 @@ PresetHeader::PresetHeader(std::string_view const commentParam)
     comment[kept] = '\0';
 }
 
+/// \note One implementation, not two. The Windows arm called GetSystemTime(),
+/// GetDateFormatA() and GetTimeFormatA() to assemble the same "dd.MM.yyyy HH:mm"
+/// that the four lines below produce, and it did not compile: it needs
+/// <windows.h>, which this file has never included and which has no business in
+/// sw-dsp -- the layer whose whole point is that it depends on nothing above it.
+/// Two ways to write a timestamp is also two ways to get it wrong; the standard
+/// one is the same on every platform this builds for.
+///                                           (05.08.2026.) (SW port)
 void PresetHeader::setCurrentTime()
 {
-#ifdef _MSC_VER
-    SYSTEMTIME currentUTCTime;
-    ::GetSystemTime(&currentUTCTime);
-    unsigned int const dateCharsWritten(::GetDateFormatA(
-        LOCALE_INVARIANT, 0, &currentUTCTime, "dd'.'MM'.'yyyy", timeStamp, _countof(timeStamp)));
-    timeStamp[dateCharsWritten - 1] = ' ';
-    unsigned int const timeCharsWritten(::GetTimeFormatA(
-        LOCALE_INVARIANT, 0, &currentUTCTime, "HH':'mm", &timeStamp[dateCharsWritten],
-        _countof(timeStamp) - (dateCharsWritten - 1)));
-    LE_ASSERT((dateCharsWritten + timeCharsWritten) <= _countof(timeStamp));
-    LE_ASSERT(std::strlen(timeStamp) == (dateCharsWritten - 1 + timeCharsWritten));
-    LE::Utility::ignoreUnused(timeCharsWritten);
-#else
-    ::time_t const currentUTCTime(::time(nullptr));
-    LE_VERIFY(
-        ::strftime(timeStamp, sizeof(timeStamp), "%d.%m.%Y %H:%M", ::gmtime(&currentUTCTime)) > 0);
-#endif // _MSC_VER
+    std::time_t const currentUTCTime(std::time(nullptr));
+    LE_VERIFY(std::strftime(timeStamp, sizeof(timeStamp), "%d.%m.%Y %H:%M",
+                            std::gmtime(&currentUTCTime)) > 0);
 }
 
 namespace
