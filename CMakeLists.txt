@@ -131,6 +131,22 @@ add_subdirectory(src)
 
 if (SW_BUILD_PLUGIN_BUNDLES)
     add_subdirectory(src/clap-first)
+
+    # The installer packages the bundles, so it only exists when they do.
+    # `cmake --build <dir> --target spectrumworx-installer` is what CI runs and
+    # what a release is cut with; it is not part of `all`.
+    include(basic_installer_clapfirst)
+    add_clapfirst_installer(
+            INSTALLER_TARGET spectrumworx-installer
+            ASSET_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/sw_assets
+            INSTALLER_PREFIX "spectrumworx"
+            PRODUCT_NAME "${PRODUCT_NAME}"
+            TARGETS
+                spectrumworx_clapfirst_clap
+                spectrumworx_clapfirst_vst3
+                spectrumworx_clapfirst_auv2
+                spectrumworx_clapfirst_standalone
+    )
 endif()
 
 if (SW_BUILD_TOOLS)

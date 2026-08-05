@@ -575,15 +575,32 @@ The decision itself is settled and written down in
 AGPL-3.0-or-later because JUCE 8 is AGPLv3-or-commercial. The 452 file headers
 are right as they stand. What is below is packaging.
 
-- **The duplicate licence file and the installer path that names it.**
+- **The duplicate licence file, and the two dead references to it.**
   (03.08.2026) `doc/manual/EULA.txt` is a byte-for-byte duplicate of `LICENSE`
   under a filename that means the opposite of what it contains — 2016's
   commercial agreement was replaced before the port began and only the name
   survived. `src/legacy-build.cmake:386` still points
-  `CPACK_RESOURCE_FILE_LICENSE` at `../installer/ProgramFolder/Licences/EULA.txt`
-  — a path outside this repository. Neither is reachable from a live target, so
-  neither is urgent; both are for whoever builds a real installer, and the AGPL
-  statement is what it has to show.
+  `CPACK_RESOURCE_FILE_LICENSE` at `../installer/ProgramFolder/Licences/EULA.txt`,
+  a path outside this repository. Neither is reachable from a live target and
+  neither is urgent: the installer that ships reads
+  `assets/installer/License.txt`, which is the AGPL statement followed by the
+  GPL-3.0 text it refers to. What is left is a file and a line that say
+  otherwise, in a build nobody runs.
+
+- **The licence file is assembled by hand and nothing checks it.**
+  (05.08.2026) `assets/installer/License.txt` is a notice written for the
+  installer with `LICENSE` appended verbatim, and the append is a `cat` somebody
+  ran once. If `LICENSE` were ever replaced the installer would keep showing the
+  old text, silently. It is the GPL-3.0, which does not change, so this is a
+  hazard rather than a problem — but it is the reason the file is 674 lines
+  longer than anything anyone will edit.
+
+- **The AGPL text is linked, not shipped.** (05.08.2026) That licence file
+  states the binary is AGPL-3.0-or-later, gives the URL for the text, and then
+  reproduces GPL-3.0 — which is the source's licence and the AGPL's own body
+  bar section 13. Whether a released installer should carry the AGPL in full is
+  a question for whoever ships it; nothing here fabricated a licence text to
+  avoid asking it.
 
 - **The standalone's `CFBundleIdentifier` is clap-wrapper's
   `SpectrumWorx.standalone`.** (01.08.2026) A bundle *name* with a suffix rather
