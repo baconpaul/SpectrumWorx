@@ -171,22 +171,12 @@ Three drifts, all visible to a user, all in `presetBrowser.cpp`:
 
 ### Dead code that needs a decision rather than a sweep
 
-Roughly 7,400 lines across 35 files are in the tree and in no target. Worth
-removing not for tidiness but because each one makes the next audit harder.
-
-**Free deletions, no decision needed** (~1,700 lines):
-`core/modules/{moduleGUI.cpp,moduleGUI.hpp,moduleDSP.hpp}` — superseded by
-`moduleDSPAndGUI.cpp`, and their own comments say so; `src/debugConsole.cpp`;
-`le/build/{precompiledHeaders.{cpp,hpp},juceIncludeWrapper.hpp}` (no target uses
-a PCH); `le/utility/{pimpl.hpp,pimplPrivate.hpp,entryPoint.hpp,
-filesystemImpl.inl}`; `le/plugins/{entryPoint.hpp,plugin.hpp}` — stage 0.3 kept
-`le/plugins/` "until `le/plugins/clap/` works", and it does.
-
-Two joined the list on 04.08.2026, when `LE_SW_SDK_BUILD` went: the SDK's public
-module interface `le/spectrumworx/engine/moduleBase.hpp` (202 lines), whose only
-remaining mention is in the record-not-build `core/sources.cmake`, and
-`le/spectrumworx/effects/configuration/effectTypeNames.hpp` (38), which had one
-include and it was inside the macro.
+The free deletions are done — 1,400 lines across 13 files on 05.08.2026, which
+is 300 fewer than the estimate because **`le/plugins/plugin.hpp` was on the list
+and is not dead**: `spectrumWorxCore.hpp` includes it, and so do
+`automatedModule.{cpp,hpp}` and three of `core/host_interop/`. Only
+`le/plugins/entryPoint.hpp` went. `filesystemImpl.inl` moved to the platform
+batch below, being included by exactly the three files in it.
 
 **Platform arms with no platform** (~1,100 lines): `le/utility/`'s Android, JNI,
 Matlab and MSVC-universal-build files. `filesystemWindows.cpp` and
