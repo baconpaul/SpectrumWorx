@@ -42,6 +42,15 @@ TEST_CASE("The transcendentals have exactly one definition and it is the right o
     // has always taken the CRT here.
     for (float exponent(-8); exponent <= 8; ++exponent)
         CHECK(Math::exp2(exponent) == Approx(std::exp2(exponent)));
+
+    // \note And the same sweep for log2, which is the one that was actually
+    // wrong: on MSVC it divided an already-base-two result by ln2 and so
+    // returned 1/ln2 times the answer. The two point checks above caught it,
+    // but only because 8 and 0.5 are far enough from 1 -- at a value near 1 the
+    // error is a fraction of the tolerance, and a scale factor deserves to be
+    // checked across a range rather than at a lucky point.
+    for (float exponent(-8); exponent <= 8; ++exponent)
+        CHECK(Math::log2(std::exp2(exponent)) == Approx(exponent).margin(1e-5f));
 }
 
 TEST_CASE("Integer log2 counts bits", "[math][scalar]")

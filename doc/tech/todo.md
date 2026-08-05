@@ -123,34 +123,55 @@ renders DSP and Debug is the only one that runs the ~1200 asserts. Release also
 carries warnings Debug does not — two of the twenty-two the baseline first found
 were variables kept only to feed an assert.
 
-**What is expected to break, in the order it will.**
+**What is still open.**
 
-- **Linux has never been compiled by a GCC.** The 469 warnings of the 04.08.2026
-  log were fixed by reading, and `-DSW_WERROR=ON` is on every leg, so the first
-  Linux run is the first time any of that is checked. Two legs make the same
-  bet twice over: the runner's GCC 12 and the container's **GCC 11**, which is
-  older than anything this C++20 tree has been near.
+- **Four Linux segfaults, all in one place.** `show-ui-renders-editor-settings`,
+  and the three `sw-plugin-tests` cases that open the settings or About overlay.
+  It is not the display: 65 of the 66 `show-ui` renders pass under `xvfb-run`,
+  the 57 per-effect module UIs among them. One component crashes and the rest of
+  the editor draws.
+- **Two LFO knob-gesture cases fail on Linux** — `#235` and `#250` — and are
+  failures rather than crashes, so they have an assertion to read.
+- **The two build gates fail on Linux** — `odr-header-stays-in-our-sources` and
+  `engine-links-no-juce`. Nothing to do with the GUI; both print a
+  `FATAL_ERROR` saying what they found, and neither has been read yet.
 - **MSVC has no warning baseline at all**, deliberately — see `tech_debt.md`.
   `SW_WERROR` is a no-op there by construction (`sw-our-sources.cmake`), so
   Windows compiles warning-blind, and `/W4 /WX` is still a decision rather than
   a setting. The first run of it is the only cheap one.
-- **The GUI tests want a display.** `sw-plugin-tests` instantiates the real
-  editor, so the Linux `test` leg runs `ctest` under `xvfb-run`. Whether that is
-  enough is not something a Mac can answer.
+- **The Ubuntu 20 / GCC 11 container has not got far enough to say anything**,
+  and it is the oldest compiler this C++20 tree has been near.
 - **Seven secrets and a tag have to exist** before a push to `main` publishes
   anything: `MAC_CERTS_P12`, `CERT_PWD`, `MAC_SIGNING_CERT_NAME`,
   `MAC_INSTALLING_CERT_NAME`, `MAC_SIGNING_ID`, `MAC_SIGNING_1UPW` and
   `MAC_SIGNING_TEAM` — and the `Nightly` tag, which the workflow reuses and
   deliberately does not create.
 
-**What writing it found, before running any of it.** Counting the tests the
-matrix would run turned up seventeen that had stopped existing: the 05.08.2026
-clang-format sweep reflowed `effectsList.hpp`, and `tools/show-ui/CMakeLists.txt`
-parses that table to register one UI-render test per effect, so 57 became 40 and
-the suite went quiet about it. Fixed — the header now holds its layout and the
-parse asserts its count against the header's own `LE_SW_NUMBER_OF_EFFECTS`.
-**A test that stops being registered reports nothing**, which is the argument for
-this whole item: the only thing that noticed was a number not matching.
+**What it has already found.** Eleven fixes so far, and two of them are the
+argument for the whole item.
+
+> **`Math::log2( float )` returned 1/ln2 times the answer on MSVC.** It divided
+> an already-base-two result by ln2, and had done since the 2016 import — but
+> the block is guarded on `__APPLE__ || !LE_HAS_NT2`, so in 2016 every Windows
+> build took `nt2::log2` instead and the wrong arm was never compiled. Stage 4
+> removed NT2, which made it the only arm; the `__GNUC__` branch beside it then
+> covered for it on the two platforms anybody built. The live callers are
+> `interval12TET2Semitone()` — every pitch effect — musical-scale octave
+> detection and the LFO's skew factor. **The first Windows build in this port
+> is what found it**, in a test written to ask exactly that question.
+
+> **Seventeen tests had stopped existing**, found by counting what the matrix
+> would run rather than by running it. The 05.08.2026 clang-format sweep
+> reflowed `effectsList.hpp`, and `tools/show-ui/CMakeLists.txt` parses that
+> table to register one UI-render test per effect, so 57 became 40 and the suite
+> went quiet about it. The header holds its layout now and the parse asserts its
+> count against the header's own `LE_SW_NUMBER_OF_EFFECTS`. **A test that stops
+> being registered reports nothing.**
+
+The rest were build failures rather than bugs: `__has_feature` on GCC, a
+flexible array member in an empty struct, a zero-length dispatch table, `M_PI`,
+`std::fputc`, JUCE reaching for libcurl, a message box linked into the engine,
+and `_CONSOLE`. Every one of them was invisible from a Mac.
 
 ### 3 — Ship
 

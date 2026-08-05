@@ -416,14 +416,31 @@ bool isNegative(unsigned int /*value*/) { return false; }
 // LE_MATH_SCALAR_NT2, Apple included (Xcode 6.3/7 Clang miscompiled nt2::exp2).
 #if defined(__APPLE__) || !defined(LE_HAS_NT2)
 float ln(float const value) { return std::log(value); }
-float log2(float const value)
-{
-#if defined(__GNUC__) && !defined(__ANDROID__)
-    return ::__builtin_log2f(value);
-#else
-    return /*std*/ ::log2(value) / LE::Math::Constants::ln2;
-#endif
-}
+/// \note `std::log2`, like its four neighbours, and previously
+///
+///     #if defined(__GNUC__) && !defined(__ANDROID__)
+///         return ::__builtin_log2f(value);
+///     #else
+///         return /*std*/ ::log2(value) / LE::Math::Constants::ln2;
+///     #endif
+///
+/// -- where the `#else` is wrong and always was. `::log2` is already base two,
+/// so dividing by ln2 multiplies by 1/ln2: log2(8) came back 4.328 and
+/// log2(0.5) came back -1.443. The commented-out `std` is the fossil of it; the
+/// divisor belongs to a natural log, which is what the call must once have been.
+///
+///   It had never been compiled. This block is guarded on
+/// `__APPLE__ || !LE_HAS_NT2`, and in 2016 every Windows build had NT2, so
+/// MSVC took `nt2::log2` from vector.cpp and the arm meant for it was dead.
+/// Stage 4 removed NT2, which made this the only arm on every platform -- and
+/// the `__GNUC__` branch then covered for it everywhere except the compiler it
+/// was written for. The first Windows build in this port is what found it, in
+/// `scalarTests.cpp`, which exists to ask exactly this.
+///
+///   Live callers: interval12TET2Semitone() -- so every pitch effect --
+/// musicalScales.cpp's octave detection, and the LFO's skew factor.
+///                                           (05.08.2026.) (SW port)
+float log2(float const value) { return std::log2(value); }
 float log10(float const value) { return std::log10(value); }
 float exp(float const value) { return std::exp(value); }
 float exp2(float const value) { return std::exp2(value); }
