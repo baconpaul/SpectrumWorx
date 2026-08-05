@@ -54,11 +54,19 @@ add_clap_juce_shim(JUCE_PATH "${JUCE_PATH}")
 # juce_core because every other module depends on it, and INTERFACE because the
 # consumer is what does the compiling.
 #
-# \note Only the two. add_clap_juce_shim() also sets JUCE_MODAL_LOOPS_PERMITTED,
+# \note Only these. add_clap_juce_shim() also sets JUCE_MODAL_LOOPS_PERMITTED,
 # JUCE_USE_CAMERA and JUCE_REPORT_APP_USAGE on its own targets; those change what
 # compiles in gui/, where the preset browser's two async save-path callers are
 # exactly the code that would notice.
 target_compile_definitions(juce_core INTERFACE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+
+# The factory samples are MP3, and off Apple and Windows nothing else decodes
+# one: registerBasicFormats() gets CoreAudioFormat on macOS and
+# WindowsMediaAudioFormat on Windows, and on Linux it would get neither. JUCE's
+# own decoder is behind this flag because it carries a patent disclaimer -- the
+# MP3 patents expired in 2017, and the licence JUCE's decoder ships under is the
+# one this whole tree is already built with.
+target_compile_definitions(juce_audio_formats INTERFACE JUCE_USE_MP3AUDIOFORMAT=1)
 
 add_subdirectory(sst/sst-cpputils)
 add_subdirectory(sst/sst-basic-blocks)
