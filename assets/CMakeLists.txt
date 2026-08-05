@@ -14,6 +14,14 @@
 # and the skin and the presets are wanted by the same binary in every
 # configuration that has either.
 #
+# **Not everything under assets/ is an asset in that sense.** `LOGO.png` and
+# `installer/` are the packaging side -- the icons, the wizard banner, the
+# licence the installers show -- and belong in the .pkg and the .exe rather than
+# in the binary. Nothing below reaches them, because every glob here names the
+# subdirectory it wants; a `GLOB_RECURSE *.png` added later would put a 1024px
+# application icon in the plugin, which is the kind of thing that is only ever
+# noticed as an unexplained megabyte.
+#
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 include(CmakeRC)
