@@ -97,7 +97,7 @@ namespace
     /// what a DAW log and a test runner both capture.
     ///                               (28.07.2026.) (SW port)
     std::fputs(LE::assertionFailureMessageTitle, stderr);
-    std::fputc('\n', stderr);
+    std::fputs("\n", stderr);
 #elif defined(_WIN32)
     ::OutputDebugStringA(LE::assertionFailureMessageTitle);
     std::fputs(LE::assertionFailureMessageTitle, stderr);
@@ -180,9 +180,9 @@ static bool assertMessageBox(char const *const message)
 static void printBacktrace()
 {
 #ifdef LE_ASSERT_HAS_BACKTRACE
-    std::fputc('\n', stderr);
+    std::fputs("\n", stderr);
     std::fputs(sst::plugininfra::misc_platform::stackTraceToString().c_str(), stderr);
-    std::fputc('\n', stderr);
+    std::fputs("\n", stderr);
 #endif // LE_ASSERT_HAS_BACKTRACE
 }
 

@@ -62,20 +62,37 @@ typename std::remove_reference_t<F>::result_type switchOn(TypeList<Types...>, In
     using Functor = std::remove_reference_t<F>;
     using Case = typename Functor::result_type (*)(Functor &);
 
-    // Implementation note:
-    //   Positional, which is why switchOn() below takes only an IndexList: the
-    // Boost original switched on `at_c<V, n>::type::value` and so could take any
-    // list of integral constants, but it was never given one whose value was not
-    // its position. A table indexed directly is the honest spelling of that, and
-    // it compiles to the jump table the generated `switch` was there to produce.
-    //                                        (30.07.2026.) (SW port)
-    static constexpr Case cases[]{+[](Functor &functor) ->
-                                  typename Functor::result_type { return functor(Types()); }...};
+    /// \note The empty list has to compile and can never be called. An effect
+    /// with no parameters -- Robotizer is one -- instantiates
+    /// invokeFunctorOnIndexedParameter() over an empty ValidIndices, so this
+    /// function exists for it; there is no index it could be reached with,
+    /// because there is nothing to index. Without the `if constexpr` the table
+    /// below is `Case cases[]{}`, a zero-length array, which Clang and GCC take
+    /// as an extension and **MSVC rejects** (C2466, "cannot allocate an array of
+    /// constant size 0").
+    ///                                       (05.08.2026.) (SW port)
+    if constexpr (sizeof...(Types) == 0)
+    {
+        LE_UNREACHABLE_CODE();
+    }
+    else
+    {
+        // Implementation note:
+        //   Positional, which is why switchOn() below takes only an IndexList:
+        // the Boost original switched on `at_c<V, n>::type::value` and so could
+        // take any list of integral constants, but it was never given one whose
+        // value was not its position. A table indexed directly is the honest
+        // spelling of that, and it compiles to the jump table the generated
+        // `switch` was there to produce.
+        //                                    (30.07.2026.) (SW port)
+        static constexpr Case cases[]{
+            +[](Functor &functor) -> typename Functor::result_type { return functor(Types()); }...};
 
-    LE_ASSERT_MSG(static_cast<std::size_t>(index) < sizeof...(Types),
-                  "Index outside the dispatched list.");
-    LE_ASSUME(static_cast<std::size_t>(index) < sizeof...(Types));
-    return cases[static_cast<std::size_t>(index)](f);
+        LE_ASSERT_MSG(static_cast<std::size_t>(index) < sizeof...(Types),
+                      "Index outside the dispatched list.");
+        LE_ASSUME(static_cast<std::size_t>(index) < sizeof...(Types));
+        return cases[static_cast<std::size_t>(index)](f);
+    }
 }
 } // namespace Detail
 
