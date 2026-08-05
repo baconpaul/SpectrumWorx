@@ -101,6 +101,15 @@ answer.
 
 ---
 
+## What the installer shows
+
+`assets/installer/License.txt` — the same file for the macOS `.pkg` and the
+Windows Inno Setup `.exe`, and copied into the Linux zip. It says what this
+document says, in the words somebody installing a plugin needs: that what they
+are installing is AGPL-3.0-or-later, that its source is GPL-3.0-or-later and
+where to get it, and that every other dependency is permissive and changes none
+of it. Then the GPL-3.0 text itself, which the AGPL differs from in one section.
+
 ## Two loose ends, recorded rather than hidden
 
 **`doc/manual/EULA.txt` is not a contradiction, and three tech documents used to
@@ -115,6 +124,6 @@ ship it.
 **`src/legacy-build.cmake:386` still points `CPACK_RESOURCE_FILE_LICENSE` at
 `../installer/ProgramFolder/Licences/EULA.txt`**, a path outside this repository
 that no longer exists. That file is reachable from no live target and carries the
-"record, not build" banner; whatever replaces it for the real installer should
-point at `LICENSE`, and the AGPL statement above is what the installer needs to
-show alongside it.
+"record, not build" banner, and the installer that does run reads
+`assets/installer/License.txt` instead — so what is left is a line in a dead
+build that names a file nobody has.
