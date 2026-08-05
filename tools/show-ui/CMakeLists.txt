@@ -113,6 +113,11 @@ if (SW_BUILD_TESTS)
     file(READ "${effectsListHeader}" effectsListSource)
     string(REGEX MATCHALL "\n[ \t]*x\\([^\n]*\\)" effectListEntries "${effectsListSource}")
 
+    # The same header's own count, to check the parse against below.
+    string(REGEX MATCH "#define[ \t]+LE_SW_NUMBER_OF_EFFECTS[ \t]+([0-9]+)"
+            declaredEffectCountMatch "${effectsListSource}")
+    set(declaredEffectCount "${CMAKE_MATCH_1}")
+
     set(effectIndex 0)
     foreach (entry IN LISTS effectListEntries)
         # x( folder, module, EffectName, GroupName )
@@ -126,13 +131,25 @@ if (SW_BUILD_TESTS)
         math(EXPR effectIndex "${effectIndex} + 1")
     endforeach ()
 
-    # A regex that quietly matched nothing would register no tests and read as a
-    # suite that simply has none, which is the one failure mode of parsing a C++
-    # header from CMake worth guarding against. The count itself is not asserted
-    # here -- effectsListTests.cpp static_asserts it against the same header, and
-    # a number in this file would be a third copy of it.
-    if (effectIndex LESS 1)
-        message(FATAL_ERROR "no effects parsed out of ${effectsListHeader}")
+    # \note This guard used to be `if (effectIndex LESS 1)` -- matching nothing
+    # at all was taken to be the only way parsing a C++ header from CMake could
+    # go wrong, on the reasoning that effectsListTests.cpp static_asserts the
+    # count already and a number here would be a third copy of it. It is not the
+    # only way, and the reasoning had a hole in it: that static_assert is against
+    # the *header's* two macros, so it stays true however the table is laid out,
+    # and it cannot see this file.
+    #
+    # On 05.08.2026 clang-format reflowed the table -- three entries on some
+    # lines, one broken across two others -- and the regex above, which takes the
+    # first x(...) after each newline, came back with 40 of the 57. Seventeen
+    # tests stopped existing and nothing failed, because a suite that does not
+    # run a test reports no failure from it. The header now says to leave its
+    # layout alone; this says so too, and loudly.
+    if (NOT effectIndex EQUAL declaredEffectCount)
+        message(FATAL_ERROR
+                "parsed ${effectIndex} effects out of ${effectsListHeader}, "
+                "which declares LE_SW_NUMBER_OF_EFFECTS ${declaredEffectCount}. "
+                "The table's layout has changed under the regex above.")
     endif ()
 endif()
 
