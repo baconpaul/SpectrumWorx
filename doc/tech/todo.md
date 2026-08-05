@@ -17,7 +17,7 @@ they were scoped to do.
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone — macOS arm64. Linux built on 04.08.2026 under GCC 15, as a log rather than here; its 469 warnings are fixed and **the fixes have not been compiled by a GCC**. Windows arrives as logs. |
 | Runs | Standalone, with audio, with the real editor, with presets. It deadlocked in Logic and in Bitwig on the 2016 threading model; **that model has been replaced and nobody has reloaded it in either host** — item 1. |
-| Tests | **280/280** as of 05.08.2026, in both build trees. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`. Goldens run in Release only. |
+| Tests | **293/293** as of 05.08.2026, in both build trees. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`. Goldens run in Release only. |
 | Validators | `auval` 10 runs of 10. `vst3-validator` 47/47. `clap-cpp-validator` 21/21, one warning (`scan-time`, below). |
 | CI | **None.** There is no `.github/`. |
 | Warnings | **Two**, both deliberate `#pragma message` build banners. Our own sources compile under `-Wall -Wextra -Werror`, on Apple by default and elsewhere with `-DSW_WERROR=ON`. MSVC has no baseline yet — item 2. |
@@ -170,7 +170,6 @@ because `Triggered` is its default and nothing has pressed Grab IR.
 
 | Hole | Why it matters |
 |---|---|
-| **`lfoImpl.cpp` has no direct test** | Only LFO 0 of module 0 targeting Gain is ever exercised. Waveform shapes, sync types, `PeriodScale` snapping, `LowerBound > UpperBound`, an LFO on an enumerated target, several at once — none. A value-table golden fits the existing pattern. Related: nothing in the suite drives a meter other than 4/4, which `tech_debt.md` records as an unmeasured half of a landed fix. |
 | **1 of 18 preset banks is ever drawn** | The effect sweep went from 1 of 57 to 57 of 57 and immediately found a page that had been rendering no module at all. The banks are the same shape of cheap breadth and have not had it. |
 
 ### The preset browser

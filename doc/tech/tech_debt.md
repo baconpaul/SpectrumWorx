@@ -454,6 +454,24 @@ New entries go at the top of their area.
 
 ## Tests
 
+- **A new LFO's default sync type depends on what some other instance was told.**
+  (05.08.2026, from `lfoTests.cpp`) `LFOImpl::SyncTypes::default_()` is
+  `Timer::hasTempoInformation() ? Quarter : Free`, and that flag is one of the
+  three **process-wide statics** on `Timer`. So the default is `Free` until
+  anything anywhere in the process reports a tempo and `Quarter` for ever after:
+  `reset()` deliberately does not clear it — a 2012 workaround for preset
+  browsing in Live — and only the no-transport overload of
+  `updatePositionAndTimingInformation` does.
+
+  Which makes it order-dependent in a way that reaches the *preset format*:
+  `adjustValueForPreset` writes a Free LFO's period in milliseconds and a synced
+  one in bars, so the same session saved before and after the host's first
+  transport report writes different files. Found because the first version of
+  `lfoTests.cpp` left the flag set and turned 303 preset digests red in
+  `presetCorpusTests.cpp`, a file that never mentions an LFO. The test now scopes
+  it (`ScopedHostTiming`); the fix is the same per-instance timer the note on
+  `Timer`'s statics already asks for.
+
 - **`LFOImpl::Timer::setPosition( float )` asserts two things that are both
   false, and is dead.** (01.08.2026) `lfoImpl.cpp:753-755` reads
   `LE_ASSUME( barDuration_ == 4 )` and

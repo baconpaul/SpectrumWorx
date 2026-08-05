@@ -34,6 +34,7 @@ add_executable(sw-dsp-tests
         math/fftTests.cpp
         math/scalarTests.cpp
         math/vectorTests.cpp
+        parameters/lfoTests.cpp
         parameters/parameterLayoutTests.cpp
         parameters/streamingNameTests.cpp
         presets/presetCorpusTests.cpp
