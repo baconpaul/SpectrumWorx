@@ -6,6 +6,15 @@
 # nobody touched. CI should install that version rather than whatever the runner
 # ships -- there is no CI yet; see todo.md item 2.
 #
+# **A table the build parses needs `// clang-format off`.** WhitespaceSensitiveMacros
+# below covers macro *invocations*; it does nothing for a macro *definition*
+# whose body is a table, and this tree has one the build reads as data --
+# src/le/spectrumworx/effects/configuration/effectsList.hpp, out of which
+# tools/show-ui/CMakeLists.txt generates one test per effect. The 05.08.2026
+# sweep reflowed it into a staircase and seventeen of those tests silently
+# stopped existing. Whitespace-only in C++ is not whitespace-only when something
+# other than a compiler reads the file.
+#
 # The reformat commits are in .git-blame-ignore-revs.
 ---
 BasedOnStyle: LLVM
