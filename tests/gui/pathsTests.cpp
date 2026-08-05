@@ -45,7 +45,27 @@ TEST_CASE("The user preset paths answer without an initialisation step", "[paths
     INFO("root " << root.getFullPathName());
     CHECK(root != juce::File());
     CHECK(root.isAbsolutePath(root.getFullPathName()));
-    CHECK(root.getFileName() == "SpectrumWorx");
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Either name, and only on Linux is there a second one. The folder
+    /// comes from `sst::plugininfra::paths::bestDocumentsFolderPathFor()`, whose
+    /// Linux waterfall is XDG_DOCUMENTS_DIR, then an existing `~/Documents`, and
+    /// failing both a hidden `~/.SpectrumWorx` -- so the name depends on the home
+    /// directory of whoever runs this and not on anything the build decides. A
+    /// developer's machine has `~/Documents` and takes the first branch; a fresh
+    /// CI runner has neither and takes the last, which is why this passed
+    /// everywhere it was written and failed the first time CI ran it. The dot is
+    /// the intended answer on that branch -- it is the assertion that was wrong,
+    /// not the path.
+    ///                                       (05.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    auto const rootName(root.getFileName());
+#ifdef __linux__
+    CHECK((rootName == "SpectrumWorx" || rootName == ".SpectrumWorx"));
+#else
+    CHECK(rootName == "SpectrumWorx");
+#endif // __linux__
 
     auto const &presets(GUI::presetsFolder());
 
