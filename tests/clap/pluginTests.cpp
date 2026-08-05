@@ -24,6 +24,7 @@
 /// "does an enabled LFO modulate anything" has to look at the engine, and reaches
 /// it through `clap_plugin::plugin_data` as processLockTests.cpp does.
 #include "core/modules/moduleDSPAndGUI.hpp"
+#include "le/spectrumworx/effects/configuration/effectNames.hpp"
 #include "gui/editor/presetLoading.hpp"
 #include "le/parameters/lfoImpl.hpp"
 #include "presets/presetHarness.hpp"
@@ -242,13 +243,135 @@ TEST_CASE("Audio ports are stereo in, stereo out, plus a side chain", "[clap]")
     CHECK(ports->count(&*plugin, true) == 2);
     CHECK(ports->count(&*plugin, false) == 1);
 
-    clap_audio_port_info info{};
-    REQUIRE(ports->get(&*plugin, 0, true, &info));
-    CHECK(info.channel_count == 2);
-    CHECK((info.flags & CLAP_AUDIO_PORT_IS_MAIN) != 0);
+    clap_audio_port_info main{};
+    REQUIRE(ports->get(&*plugin, 0, true, &main));
+    CHECK(main.channel_count == 2);
+    CHECK(std::strcmp(main.port_type, CLAP_PORT_STEREO) == 0);
+    CHECK((main.flags & CLAP_AUDIO_PORT_IS_MAIN) != 0);
 
     /// \note Never an in-place pair -- see the note in spectrumWorxCLAP.cpp.
-    CHECK(info.in_place_pair == CLAP_INVALID_ID);
+    CHECK(main.in_place_pair == CLAP_INVALID_ID);
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note And the second port, which the case above described in its title
+    /// and never asked about: it checked `count(true) == 2` and then read index
+    /// 0 twice over. A `get()` that answered `false` for index 1, or handed back
+    /// a port flagged `IS_MAIN`, would have passed.
+    ///
+    /// \note The ids are literals because that is what they are to a host --
+    /// `spectrumWorxCLAP.cpp` keeps them in an anonymous namespace, and a host
+    /// matching a saved routing against port 1 has nothing else to go on. The
+    /// two must at least differ, which is the part a copy-paste gets wrong.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    clap_audio_port_info side{};
+    REQUIRE(ports->get(&*plugin, 1, true, &side));
+    CHECK(side.id == 1);
+    CHECK(side.id != main.id);
+    CHECK(side.channel_count == 2);
+    CHECK(std::strcmp(side.port_type, CLAP_PORT_STEREO) == 0);
+    CHECK((side.flags & CLAP_AUDIO_PORT_IS_MAIN) == 0);
+    CHECK(side.in_place_pair == CLAP_INVALID_ID);
+    CHECK(std::strlen(side.name) > 0);
+
+    /// \note No out-of-range case here on purpose: clap-helpers checks the index
+    /// against `count()` before `audioPortsInfo()` is reached, so asking for
+    /// index 2 tests upstream's guard and prints its complaint over the run.
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The port-1 branch of `runEngine()`, driven for the first time on
+/// 05.08.2026. `ActivePlugin::process` hardcoded `audio_inputs_count = 1`, so
+/// every CLAP case in the tree took the *fallback* -- the side chain quietly
+/// wired to the main input -- and the three lines that read the second port had
+/// never run at all.
+///
+///   `tests/effects/sideChainTests.cpp` is the same question asked of the
+/// engine. This is the plugin edge: that what a host puts on port 1 is what the
+/// engine receives, and that the two ways a host can decline to fill it both
+/// fall back rather than fault.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("What a host puts on the side chain port reaches the engine", "[clap][side-chain]")
+{
+    constexpr float sampleRate{48000};
+    constexpr std::uint32_t blockSize{512};
+    constexpr unsigned int blocks{24}; // past the engine's latency
+
+    /// \note Colorifer: one of the fifteen effects measured to read a side
+    /// chain, and one of the eleven that does so at its default parameters.
+    /// \see sideChainTests.cpp for the set and for the four that do not.
+    auto const colorifer(LE::SW::Effects::effectIndex("Colorifer"));
+    REQUIRE(colorifer >= 0);
+
+    /// \brief One run of \p blocks, with the side chain arranged by \p connect.
+    ///
+    /// The main input is a 440 Hz sine throughout; what changes between runs is
+    /// only what is on the other port.
+    auto const run([&](std::function<void(ActivePlugin &, std::vector<float> &,
+                                          std::vector<float> &)> const &connect) {
+        Entry const entry;
+        ActivePlugin plugin(sampleRate, blockSize);
+
+        OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), colorifer);
+        parameters(*plugin).flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+
+        std::vector<float> leftIn(blockSize), rightIn(blockSize);
+        std::vector<float> sideLeft(blockSize), sideRight(blockSize);
+        std::vector<float> leftOut(blockSize), rightOut(blockSize);
+
+        connect(plugin, sideLeft, sideRight);
+
+        std::vector<float> tail;
+        for (unsigned int block(0); block < blocks; ++block)
+        {
+            fillWithSine(leftIn, sampleRate, 440.0f, block * blockSize);
+            rightIn = leftIn;
+            // 1100 Hz on the side chain: a different partial, in a different
+            // bin, so "the output moved" cannot be the main signal leaking.
+            fillWithSine(sideLeft, sampleRate, 1100.0f, block * blockSize);
+            sideRight = sideLeft;
+
+            plugin.process(leftIn, rightIn, leftOut, rightOut);
+            REQUIRE(allFinite(leftOut));
+            tail.assign(leftOut.begin(), leftOut.end());
+        }
+        return tail;
+    });
+
+    auto const noPort(run([](ActivePlugin &, std::vector<float> &, std::vector<float> &) {}));
+    auto const connected(
+        run([](ActivePlugin &plugin, std::vector<float> &left, std::vector<float> &right) {
+            plugin.connectSideChain(left, right);
+        }));
+    auto const emptyPort(run([](ActivePlugin &plugin, std::vector<float> &, std::vector<float> &) {
+        plugin.connectSideChainWithNoBuffers();
+    }));
+
+    REQUIRE(noPort.size() == connected.size());
+    REQUIRE(noPort.size() == emptyPort.size());
+
+    // A carrier the engine could not have got from the main input changed what
+    // came out. This is the whole case: without it, every arrangement below is
+    // the same arrangement.
+    CHECK(connected != noPort);
+    CHECK(peak(connected) > 0);
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note And both ways of not filling the port land on the *same* fallback,
+    /// bit for bit. `runEngine()` reads
+    /// `(audio_inputs_count > 1) && audio_inputs[1].data32`, so a host that
+    /// declares one port and a host that declares two and fills one have to be
+    /// indistinguishable -- the second is what a DAW hands over when the side
+    /// chain is exposed and nothing is patched into it, and it is the arm that
+    /// would have dereferenced null had the `&&` been the other way round.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    CHECK(emptyPort == noPort);
 }
 
 TEST_CASE("The engine reports the latency its FFT size implies", "[clap]")

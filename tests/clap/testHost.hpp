@@ -548,6 +548,44 @@ class ActivePlugin
     clap_plugin const &operator*() const { return *pPlugin_; }
     clap_plugin const *operator->() const { return pPlugin_; }
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Patches something into the second input port, as a host does when
+    /// a user routes a track into the side chain.
+    ///
+    /// \note Off by default, and that is not laziness: a host which offers no
+    /// side chain hands over `audio_inputs_count == 1`, `runEngine()` falls back
+    /// to the main input for it, and that is the arrangement most hosts will
+    /// actually use. Both have to work, so the connected one is opt-in per case
+    /// and the fallback is what everything else here keeps exercising.
+    ///
+    /// \note The buffers are held by reference for the plugin's lifetime, the
+    /// way a host's own do not move between blocks. Pass a null pair to
+    /// `connectSideChainWithNoBuffers()` for the third arrangement: a port that
+    /// is present in the count and carries no `data32`, which `runEngine()` also
+    /// has to fall back from.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    void connectSideChain(std::vector<float> &left, std::vector<float> &right)
+    {
+        pSideChainLeft_ = &left;
+        pSideChainRight_ = &right;
+        sideChainPortPresent_ = true;
+    }
+
+    /// A second port in the count, with no buffers behind it. \see connectSideChain
+    void connectSideChainWithNoBuffers()
+    {
+        pSideChainLeft_ = pSideChainRight_ = nullptr;
+        sideChainPortPresent_ = true;
+    }
+
+    void disconnectSideChain()
+    {
+        pSideChainLeft_ = pSideChainRight_ = nullptr;
+        sideChainPortPresent_ = false;
+    }
+
     /// Runs one block of stereo audio through, in place of a host's callback.
     ///
     /// \param transport what the host reports, nullptr being a host that reports
@@ -578,17 +616,26 @@ class ActivePlugin
                                       clap_output_events const *const out = nullptr)
     {
         float *inputChannels[]{leftIn.data(), rightIn.data()};
+        float *sideChannels[]{pSideChainLeft_ ? pSideChainLeft_->data() : nullptr,
+                              pSideChainRight_ ? pSideChainRight_->data() : nullptr};
         float *outputChannels[]{leftOut.data(), rightOut.data()};
 
-        clap_audio_buffer input{&inputChannels[0], nullptr, 2, 0, 0};
+        /// \note Two buffers always built, one or two of them declared. The
+        /// count is what tells the plugin whether the port is there at all, and
+        /// `runEngine()` branches on it *and* on the second buffer's `data32` --
+        /// so a port with no buffers is a third arrangement rather than a
+        /// nonsense one.
+        clap_audio_buffer inputs[]{
+            {&inputChannels[0], nullptr, 2, 0, 0},
+            {pSideChainLeft_ ? &sideChannels[0] : nullptr, nullptr, 2, 0, 0}};
         clap_audio_buffer output{&outputChannels[0], nullptr, 2, 0, 0};
 
         clap_process process{};
         process.steady_time = -1;
         process.frames_count = blockSize_;
         process.transport = transport;
-        process.audio_inputs = &input;
-        process.audio_inputs_count = 1;
+        process.audio_inputs = &inputs[0];
+        process.audio_inputs_count = sideChainPortPresent_ ? 2u : 1u;
         process.audio_outputs = &output;
         process.audio_outputs_count = 1;
         process.in_events = events ? events : &noInputEvents();
@@ -699,6 +746,11 @@ class ActivePlugin
     clap_plugin const *pPlugin_{nullptr};
     double sampleRate_;
     std::uint32_t blockSize_;
+
+    /// \see connectSideChain
+    std::vector<float> *pSideChainLeft_{nullptr};
+    std::vector<float> *pSideChainRight_{nullptr};
+    bool sideChainPortPresent_{false};
 }; // class ActivePlugin
 
 inline clap_plugin_params const &parameters(clap_plugin const &plugin)
