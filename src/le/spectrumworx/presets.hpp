@@ -13,15 +13,19 @@
 //------------------------------------------------------------------------------
 #include "configuration/constants.hpp"
 
-#ifndef _MSC_VER
+/// \note These were `#ifndef _MSC_VER`, the second of them commented "for eager
+/// compilers" -- 2016 MSVC did not look names up in a template definition until
+/// instantiation, so it did not need what the templates below name and the
+/// includes were withheld from it. A conforming MSVC is eager too, and the
+/// header did not compile on one: `GlobalParameters::Parameters` and
+/// `Engine::actualModule` were undeclared at loadPreset()'s definition, which
+/// MSVC reported as a cascade of syntax errors rather than as missing names.
+///                                           (05.08.2026.) (SW port)
 #include "configuration/versionConfiguration.hpp"
-#endif
 
-#ifndef _MSC_VER // for eager compilers
 #include "le/math/conversion.hpp"
 #include "le/parameters/parametersUtilities.hpp"
 #include "le/spectrumworx/engine/parameters.hpp"
-#endif // _MSC_VER
 #include "le/utility/countof.hpp"
 #include "le/utility/lexicalCast.hpp"
 #include "le/utility/platformSpecifics.hpp"
@@ -752,7 +756,9 @@ class ParametersSaver : private PresetHandler
     bool moduleChainSaved_{false};
 }; // class ParametersSaver
 
-#ifndef _MSC_VER
+/// \note Unconditional, for the reason given over the includes at the top: a
+/// conforming compiler needs these two names declared before loadPreset() below
+/// mentions them, and modern MSVC is one.
 namespace Engine
 {
 class ModuleNode;
@@ -762,7 +768,6 @@ namespace GlobalParameters
 {
 struct Parameters;
 }
-#endif // _MSC_VER
 
 /// \note `juce::String::CharPointerType::CharType`, which on this build is
 /// `char` and on a `JUCE_STRING_UTF_TYPE != 8` one would not be. It is a
