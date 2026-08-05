@@ -1233,34 +1233,10 @@ bool shouldUpdateLFOControl(ModuleControlBase const &control)
 } // namespace LE
 //------------------------------------------------------------------------------
 
-/// \note OSX 10.6 does not provide a std::strnlen implementation so we have to
-/// provide one on our own.
-///                                           (27.09.2013.) (Domagoj Saric)
-#if defined(__APPLE__) /*&& !defined( __LP64__ )*/
-extern "C"
-{
-    size_t __attribute__((weak)) __cdecl strnlen(char const *str, size_t const maxsize_param)
-    {
-        LE_ASSERT(str);
-        unsigned int const maxsize(static_cast<unsigned int>(maxsize_param));
-        LE_ASSERT(maxsize == maxsize_param);
-        unsigned int n;
-        for (n = 0; n < maxsize && *str; n++, str++)
-        {
-        }
-        return n;
-    }
-
-    size_t __attribute__((weak)) __cdecl wcsnlen(wchar_t const *wcs, size_t const maxsize_param)
-    {
-        LE_ASSERT(wcs);
-        unsigned int const maxsize(static_cast<unsigned int>(maxsize_param));
-        LE_ASSERT(maxsize == maxsize_param);
-        unsigned int n;
-        for (n = 0; n < maxsize && *wcs; n++, wcs++)
-        {
-        }
-        return n;
-    }
-};
-#endif // __APPLE__ /*&& !__LP64__*/
+/// \note Two weak `extern "C"` definitions of `strnlen` and `wcsnlen` stood
+/// here, from 2013, for an OS X 10.6 whose libc had neither. They went on
+/// 05.08.2026: the deployment target is 10.15, nothing in this tree calls
+/// either, and being *weak* they lost to libc's own strong definitions anyway --
+/// so what they had been doing since 2016 was occupying two symbols in every
+/// macOS build. The `!__LP64__` guard that once narrowed them to 32-bit was
+/// commented out, which is how they came to be compiled at all.

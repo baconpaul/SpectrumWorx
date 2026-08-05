@@ -212,9 +212,6 @@ stay; only the scaffolding went.
   unreachable. Stripping it is a refactor of the vector math the whole engine
   runs on, which is why it is a decision and not a sweep — and it is what would
   let `boost/simd` and `boost/dispatch` off `scripts/check_boost_allowlist.sh`.
-- **Hand-written weak `strnlen`/`wcsnlen`** — `gui.cpp:1236-1264`, "OSX 10.6 does
-  not provide std::strnlen", with the `!__LP64__` guard **commented out**. They
-  are compiled into every macOS build today, in 2026.
 
 ### Formatting
 
