@@ -1403,7 +1403,18 @@ void SpectrumWorxEditor::resyncModuleRack()
         if (auto *const pRegion = regionInRackSlot(slotAwaitingFocus_))
         {
             slotAwaitingFocus_ = noSlotAwaitingFocus;
-            pRegion->grabKeyboardFocus();
+            /// \note JUCE's own precondition for the call, spelled out: a
+            /// component that is on no screen cannot take the keyboard, and
+            /// `grabKeyboardFocus()` says so with a jassert rather than by
+            /// declining. An offscreen render reaches here with the editor on no
+            /// desktop -- tools/show-ui builds a rack this way -- so the request
+            /// is dropped here instead of being made and complained about. The
+            /// slot is cleared either way: the grab was already a no-op in this
+            /// state, and holding the request back for a later resync would let
+            /// focus jump to a slot chosen some time ago.
+            ///                                   (05.08.2026.) (SW port)
+            if (pRegion->isShowing() || pRegion->isOnDesktop())
+                pRegion->grabKeyboardFocus();
         }
     }
 }
