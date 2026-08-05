@@ -36,6 +36,30 @@ add_subdirectory(clap/clap-helpers EXCLUDE_FROM_ALL)
 add_subdirectory(sst/sst-clap-helpers)
 add_clap_juce_shim(JUCE_PATH "${JUCE_PATH}")
 
+# JUCE's module settings, on the module rather than on one of its consumers.
+#
+# **Linking a JUCE module compiles that module's own sources into the linking
+# target.** juce_core.cpp is built once inside sw-io, again inside
+# sw-gui-resources and again inside sw-show-ui, so a setting put on any one of
+# them is a setting the other two do not have -- and one of those builds JUCE
+# with different settings than the rest, which is an ODR violation waiting for
+# something to notice it. These were on sw-io, PUBLIC, and sw-gui-resources does
+# not link sw-io: it takes juce::juce_gui_basics directly, built juce_core.cpp
+# with JUCE's defaults, and reached for <curl/curl.h>.
+#
+# Only on Linux, which is why it took until there was a Linux build. JUCE's URL
+# backend is NSURLSession on macOS and WinINet on Windows; on Linux it is
+# libcurl, wanted by a plugin that does no networking at all.
+#
+# juce_core because every other module depends on it, and INTERFACE because the
+# consumer is what does the compiling.
+#
+# \note Only the two. add_clap_juce_shim() also sets JUCE_MODAL_LOOPS_PERMITTED,
+# JUCE_USE_CAMERA and JUCE_REPORT_APP_USAGE on its own targets; those change what
+# compiles in gui/, where the preset browser's two async save-path callers are
+# exactly the code that would notice.
+target_compile_definitions(juce_core INTERFACE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+
 add_subdirectory(sst/sst-cpputils)
 add_subdirectory(sst/sst-basic-blocks)
 add_subdirectory(sst/sst-plugininfra)

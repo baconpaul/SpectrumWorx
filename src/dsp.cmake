@@ -270,22 +270,11 @@ target_link_libraries(sw-io PUBLIC juce::juce_audio_formats)
 # one this whole tree is already built with.
 target_compile_definitions(sw-io PUBLIC JUCE_USE_MP3AUDIOFORMAT=1)
 
-# Linking a JUCE module compiles that module's own sources into the consuming
-# target, so sw-io -- not the shim -- is what builds juce_core.cpp. It therefore
-# has to carry the module settings itself: add_clap_juce_shim() puts these on
-# clap_juce_shim_requirements and clap_juce_shim, neither of which is on this
-# link line.
-#
-# It shows up as a Linux-only link failure. JUCE's macOS URL backend is
-# NSURLSession, its Linux one is libcurl, so juce_core.cpp reached for -lcurl on
-# a plugin that does no networking. PUBLIC, so every translation unit that sees
-# a JUCE header agrees with the ones the shim compiles.
-#
-# \note Only the two. The shim also sets JUCE_MODAL_LOOPS_PERMITTED=0,
-# JUCE_USE_CAMERA and JUCE_REPORT_APP_USAGE; those would change what compiles in
-# gui/, and the preset browser's two async save-path callers are exactly the code
-# that would notice.
-target_compile_definitions(sw-io PUBLIC JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+# \note JUCE_USE_CURL and JUCE_WEB_BROWSER were set here, PUBLIC, on the
+# reasoning that sw-io is what compiles juce_core.cpp. It is, and so is every
+# other target that links a JUCE module -- which is the half that was missed.
+# They are on the module itself now; see libs/CMakeLists.txt.
+#                                         (05.08.2026.) (SW port)
 
 # \note LE_NO_PRESETS stood here. It compiled out ModuleParameters::{load,save}
 # PresetParameters -- the whole preset serialisation -- because presets.cpp read
