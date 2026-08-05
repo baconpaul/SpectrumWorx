@@ -454,6 +454,27 @@ New entries go at the top of their area.
 
 ## Tests
 
+- **25 golden fixtures render silence, and none of it is about external audio.**
+  (05.08.2026, from `silentDefaultsTests.cpp`) A silent render hashes identically
+  on every platform and has zeroes in every numeric column, so those rows agree
+  with any build ever made — 25 of 464 fixtures that cannot fail. `todo.md` put
+  it down to the sample loader having been compiled out and proposed feeding a
+  fixture a factory sample; **both halves are wrong**. `Sample` is built on
+  `juce::File` and the goldens live in `sw-dsp-tests`, which links no JUCE at all
+  by design, so such a fixture would not link. And the four causes are ordinary
+  parameter defaults:
+  - **Convolver** (8 rows) defaults to `Triggered`, so there is no impulse
+    response until Grab IR is pressed. Unarmed rather than quiet.
+  - **Frecho and Frevcho** (16) default to 100 m, and the delay is the round trip
+    at 343 m/s: 583 ms against a 371 ms fixture. These sixteen are a statement
+    about the *fixture length* — a two second matrix would never have had them.
+  - **Freqnamics** (1) gates at −60 dB, and one impulse spread over 2048 bins is
+    quieter than that per bin. The same render at 512 bins is not, which is why
+    only one of its eight rows is silent.
+
+  All four are 2016 behaviour and moving any of them changes what a preset sounds
+  like, so none is a fix. The count is now held by a case and can only fall.
+
 - **A new LFO's default sync type depends on what some other instance was told.**
   (05.08.2026, from `lfoTests.cpp`) `LFOImpl::SyncTypes::default_()` is
   `Timer::hasTempoInformation() ? Quarter : Free`, and that flag is one of the

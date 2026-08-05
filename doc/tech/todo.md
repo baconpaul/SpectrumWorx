@@ -17,7 +17,7 @@ they were scoped to do.
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone — macOS arm64. Linux built on 04.08.2026 under GCC 15, as a log rather than here; its 469 warnings are fixed and **the fixes have not been compiled by a GCC**. Windows arrives as logs. |
 | Runs | Standalone, with audio, with the real editor, with presets. It deadlocked in Logic and in Bitwig on the 2016 threading model; **that model has been replaced and nobody has reloaded it in either host** — item 1. |
-| Tests | **295/295** as of 05.08.2026, in both build trees. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`. Goldens run in Release only. |
+| Tests | **299/299** as of 05.08.2026, in both build trees. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`. Goldens run in Release only. |
 | Validators | `auval` 10 runs of 10. `vst3-validator` 47/47. `clap-cpp-validator` 21/21, one warning (`scan-time`, below). |
 | CI | **None.** There is no `.github/`. |
 | Warnings | **Two**, both deliberate `#pragma message` build banners. Our own sources compile under `-Wall -Wextra -Werror`, on Apple by default and elsewhere with `-DSW_WERROR=ON`. MSVC has no baseline yet — item 2. |
@@ -111,9 +111,10 @@ Take `add_clapfirst_installer` from two-filters' `basic_installer_clapfirst.cmak
 **The one thing to get right on day one: run `ctest` in Debug *and* Release.**
 The goldens `SKIP` under `!NDEBUG` (`goldenTests.cpp:287-298`), so Release is the
 only configuration that renders DSP and Debug is the only one that runs the
-~1200 asserts. Neither alone is 264/264. The nine effects' property tests run in
-both and narrow the gap without closing it. Release also carries warnings Debug
-does not — two of the twenty-two the baseline first found were variables kept
+~1200 asserts. Neither alone is 299/299. The effect property tests — the nine
+amplifying ones, the fifteen side-chain ones and the four silent-default ones —
+run in both and narrow the gap without closing it. Release also carries warnings
+Debug does not — two of the twenty-two the baseline first found were variables kept
 only to feed an assert.
 
 **Pass `-DSW_WERROR=ON` on every leg.** The warning baseline is on our own
@@ -148,23 +149,6 @@ and the three loose ends `tech_debt.md` records under "Licence and shipping".
 ## Smaller work, not in the order
 
 Each of these is under a day and none of them blocks anything.
-
-### The side chain, above the engine
-
-The engine and the plugin edge are both done —
-`tests/effects/sideChainTests.cpp` drives fifteen effects with a signal of their
-own and 60 fixtures pin the result, and `pluginTests.cpp` now declares a second
-`clap_audio_buffer` so `runEngine`'s port-1 branch runs. That found four effects
-that hear nothing at their defaults and a `usesSideChannel` constant that is
-both unread and wrong; both are in [`tech_debt.md`](tech_debt.md).
-
-What is left is the sample. **The harness can feed a *file* now.** 25 golden
-fixtures hash identically on every platform because they render pure silence —
-`Convolver`, `Frecho`, `Frevcho` at default parameters — and the old explanation
-was the flag that compiled the sample loader out. The loader is back and the
-factory samples are in the binary, so a fixture can load one by name and those 25
-can pin something. Convolver's three are already understood: it renders silence
-because `Triggered` is its default and nothing has pressed Grab IR.
 
 ### The preset browser
 

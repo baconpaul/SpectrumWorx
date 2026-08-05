@@ -28,6 +28,7 @@ add_executable(sw-dsp-tests
         effects/amplifyingEffectsTests.cpp
         effects/effectsListTests.cpp
         effects/sideChainTests.cpp
+        effects/silentDefaultsTests.cpp
         goldens/engineHarness.cpp
         goldens/goldenDigest.cpp
         goldens/goldenTests.cpp
