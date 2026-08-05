@@ -262,18 +262,17 @@ target_link_libraries(sw-io PRIVATE sw::assets)
 # links sw-io, and the plugin's own translation units have to agree with it.
 target_link_libraries(sw-io PUBLIC juce::juce_audio_formats)
 
-# The factory samples are MP3, and off Apple and Windows nothing else decodes
-# one: registerBasicFormats() gets CoreAudioFormat on macOS and
-# WindowsMediaAudioFormat on Windows, and on Linux it would get neither. JUCE's
-# own decoder is behind this flag because it carries a patent disclaimer -- the
-# MP3 patents expired in 2017, and the licence JUCE's decoder ships under is the
-# one this whole tree is already built with.
-target_compile_definitions(sw-io PUBLIC JUCE_USE_MP3AUDIOFORMAT=1)
-
-# \note JUCE_USE_CURL and JUCE_WEB_BROWSER were set here, PUBLIC, on the
-# reasoning that sw-io is what compiles juce_core.cpp. It is, and so is every
-# other target that links a JUCE module -- which is the half that was missed.
-# They are on the module itself now; see libs/CMakeLists.txt.
+# \note JUCE's module settings -- JUCE_USE_MP3AUDIOFORMAT as well as
+# JUCE_USE_CURL and JUCE_WEB_BROWSER -- were set here, PUBLIC, on the reasoning
+# that sw-io is what compiles those modules. It is, and so is every other target
+# that links one, which is the half that was missed: sw-gui-resources takes
+# juce::juce_gui_basics directly and built juce_core with JUCE's defaults.
+# They are on the modules themselves now; see libs/CMakeLists.txt.
+#
+#   The MP3 one was not yet broken -- nothing reaches juce_audio_formats except
+# through sw-io -- and is moved with the others because that is one link away
+# from being the same bug, silently: a target that linked the module directly
+# would compile a decoder-less copy of it into the binary beside ours.
 #                                         (05.08.2026.) (SW port)
 
 # \note LE_NO_PRESETS stood here. It compiled out ModuleParameters::{load,save}
