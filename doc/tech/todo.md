@@ -17,9 +17,9 @@ they were scoped to do.
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone — macOS arm64. Linux built on 04.08.2026 under GCC 15, as a log rather than here; its 469 warnings are fixed and **the fixes have not been compiled by a GCC**. Windows arrives as logs. |
 | Runs | Standalone, with audio, with the real editor, with presets. It deadlocked in Logic and in Bitwig on the 2016 threading model; **that model has been replaced and nobody has reloaded it in either host** — item 1. |
-| Tests | **299/299** as of 05.08.2026, in both build trees. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`. Goldens run in Release only. |
+| Tests | **299/299** as of 05.08.2026, in both build trees. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`, plus 66 `sw-show-ui` renders. Goldens run in Release only. |
 | Validators | `auval` 10 runs of 10. `vst3-validator` 47/47. `clap-cpp-validator` 21/21, one warning (`scan-time`, below). |
-| CI | **None.** There is no `.github/`. |
+| CI | `.github/workflows/build-plugin.yml`, five jobs over three platforms. **Written on 05.08.2026 and never run** — item 2. |
 | Warnings | **Two**, both deliberate `#pragma message` build banners. Our own sources compile under `-Wall -Wextra -Werror`, on Apple by default and elsewhere with `-DSW_WERROR=ON`. MSVC has no baseline yet — item 2. |
 | Sanitizers | rtsan and tsan clean over both test binaries, against the model as it stood on 02.08.2026. `reset()` and `paramsFlush()` entered the realtime region on 03.08.2026 and **have not been run under rtsan since** — item 1. |
 
@@ -30,8 +30,8 @@ they were scoped to do.
 | # | What | Size |
 |---|---|---|
 | 1 | **Drive it in a DAW** and settle whether the deadlocks are gone | 1–2 days |
-| 2 | **CI**, three OSes × four formats, with the gates that already exist | 3–5 days |
-| 3 | **Ship** — README, manual, installers, notarisation | 1–2 weeks |
+| 2 | **Get the CI matrix green** — it is written and has never run | 1–3 days |
+| 3 | **Ship** — README, manual, notarisation | 1–2 weeks |
 
 ### 1 — Drive it in a DAW
 
@@ -103,47 +103,54 @@ survivor:
 already-fetched SDK, so `cmake --build <dir> --target vst3_validator` is all it
 takes and the binary lands in `<dir>/validator-build/bin/Debug/validator`.
 
-### 2 — CI
+### 2 — Get the CI matrix green
 
-Nothing exists. The gates mostly do — they are just not wired:
-`scripts/check_boost_allowlist.sh` (run by hand),
-`tests/checkODRHeaderScope.cmake` and `tests/checkNoJuceInDSP.cmake` (ctest cases
-already), and `clang-format --dry-run -Werror`, which the tree passes as of
-05.08.2026.
+**The workflow is written and no leg of it has ever run.** Everything below is
+therefore a claim, and the whole point of this item is to find out which of them
+are true. `.github/workflows/build-plugin.yml`:
 
-**Install clang-format by version — 21.1.5 — rather than taking the runner's.**
-`.clang-format` says so and cannot enforce it: the defaults move between
-releases, so a newer major re-lays-out files nobody touched and the gate fails on
-somebody else's afternoon. The sweep's commit is in `.git-blame-ignore-revs`,
-which GitHub reads by name.
+| Job | What | Where |
+|---|---|---|
+| `gates` | `scripts/check_format.sh` and `scripts/check_boost_allowlist.sh` | ubuntu |
+| `test` | `ctest`, Debug **and** Release, `SW_BUILD_PLUGIN_BUNDLES=OFF` | ×3 |
+| `build_plugin` | the four bundles; the installer too off a pull request | ×3 |
+| `build_plugin_docker` | the Linux binary against Ubuntu 20's glibc | ubuntu |
+| `publish-*` | Nightly on `main`, a release on a `v*` tag | ubuntu |
 
-Model it on OB-Xf's `build-plugin.yml` with `sst-githubactions/prepare-for-juce`.
-Matrix: macos-universal, windows-msvc-x64, windows-arm64, linux-x64, linux-arm64.
-Take `add_clapfirst_installer` from two-filters' `basic_installer_clapfirst.cmake`.
+**Both configurations, because neither alone is 299/299.** The goldens `SKIP`
+under `!NDEBUG` (`goldenTests.cpp:287-298`), so Release is the only one that
+renders DSP and Debug is the only one that runs the ~1200 asserts. Release also
+carries warnings Debug does not — two of the twenty-two the baseline first found
+were variables kept only to feed an assert.
 
-**The one thing to get right on day one: run `ctest` in Debug *and* Release.**
-The goldens `SKIP` under `!NDEBUG` (`goldenTests.cpp:287-298`), so Release is the
-only configuration that renders DSP and Debug is the only one that runs the
-~1200 asserts. Neither alone is 299/299. The effect property tests — the nine
-amplifying ones, the fifteen side-chain ones and the four silent-default ones —
-run in both and narrow the gap without closing it. Release also carries warnings
-Debug does not — two of the twenty-two the baseline first found were variables kept
-only to feed an assert.
+**What is expected to break, in the order it will.**
 
-**Pass `-DSW_WERROR=ON` on every leg.** The warning baseline is on our own
-sources everywhere (`cmake/sw-our-sources.cmake`); what the option adds is that a
-warning stops the build. It is on by default on Apple only, because that is where
-the development happens and nowhere else can a new compiler's new warning be
-somebody's problem at the wrong moment.
+- **Linux has never been compiled by a GCC.** The 469 warnings of the 04.08.2026
+  log were fixed by reading, and `-DSW_WERROR=ON` is on every leg, so the first
+  Linux run is the first time any of that is checked. Two legs make the same
+  bet twice over: the runner's GCC 12 and the container's **GCC 11**, which is
+  older than anything this C++20 tree has been near.
+- **MSVC has no warning baseline at all**, deliberately — see `tech_debt.md`.
+  `SW_WERROR` is a no-op there by construction (`sw-our-sources.cmake`), so
+  Windows compiles warning-blind, and `/W4 /WX` is still a decision rather than
+  a setting. The first run of it is the only cheap one.
+- **The GUI tests want a display.** `sw-plugin-tests` instantiates the real
+  editor, so the Linux `test` leg runs `ctest` under `xvfb-run`. Whether that is
+  enough is not something a Mac can answer.
+- **Seven secrets and a tag have to exist** before a push to `main` publishes
+  anything: `MAC_CERTS_P12`, `CERT_PWD`, `MAC_SIGNING_CERT_NAME`,
+  `MAC_INSTALLING_CERT_NAME`, `MAC_SIGNING_ID`, `MAC_SIGNING_1UPW` and
+  `MAC_SIGNING_TEAM` — and the `Nightly` tag, which the workflow reuses and
+  deliberately does not create.
 
-**Two of the five legs have never compiled our sources with it.** Windows is one
-of them and the bigger one: MSVC gets no baseline at all, deliberately — see
-`tech_debt.md` — so `/W4 /WX` is a decision for whoever wires the matrix, and the
-first run of it is the only cheap one. Linux is the other, and its first GCC 15
-build (04.08.2026, against `00383f6`) is the argument for the whole item: 469
-warnings from four causes, three of them ours, one of them a `-Wnonnull` on a
-null-`this` offset computation the source had been calling UB since 2016. All
-four are fixed; none of them was visible from a Mac.
+**What writing it found, before running any of it.** Counting the tests the
+matrix would run turned up seventeen that had stopped existing: the 05.08.2026
+clang-format sweep reflowed `effectsList.hpp`, and `tools/show-ui/CMakeLists.txt`
+parses that table to register one UI-render test per effect, so 57 became 40 and
+the suite went quiet about it. Fixed — the header now holds its layout and the
+parse asserts its count against the header's own `LE_SW_NUMBER_OF_EFFECTS`.
+**A test that stops being registered reports nothing**, which is the argument for
+this whole item: the only thing that noticed was a number not matching.
 
 ### 3 — Ship
 
@@ -154,8 +161,24 @@ the first thing anyone sees, and it is the cheapest item on this page.
 The licence is settled — [`LICENSING.md`](../../LICENSING.md): source
 GPL-3.0-or-later, released binary AGPL-3.0-or-later because JUCE 8 is
 AGPLv3-or-commercial. The 452 file headers are right as they stand and no `sed`
-is needed. What is left here is packaging: installers, the manual, notarisation,
-and the three loose ends `tech_debt.md` records under "Licence and shipping".
+is needed. `assets/installer/License.txt` is what both installers show: that
+statement, then the GPL-3.0 text it refers to.
+
+**The installers build.** `spectrumworx-installer` makes a `.pkg` in a `.dmg` on
+macOS, a `.zip` and an Inno Setup `.exe` on Windows, and a `.zip` on Linux; the
+icons all come from `assets/LOGO.png` through `scripts/make_icons.sh`. Only the
+macOS one has been run, and only unsigned. What is left here:
+
+- **Notarisation has never been attempted.** The path exists — `make_installer.sh`
+  signs, submits and staples when `MAC_SIGNING_CERT` and the rest are set — and
+  an unsigned build takes the same path with the signing steps skipped, so what
+  is untested is the credentials and Apple's answer, not the plumbing.
+- **The standalone's macOS bundle identifier is not ours.** clap-wrapper
+  hardcodes `"<name>.standalone"` in its own `Info.plist.in` and no CMake
+  property overrides that key; `src/clap-first/CMakeLists.txt` says so at
+  length. It matters at notarisation and nowhere before.
+- **The manual**, and the three loose ends `tech_debt.md` records under "Licence
+  and shipping".
 
 ---
 

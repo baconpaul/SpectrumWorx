@@ -1,0 +1,308 @@
+# SpectrumWorx CI.
+#
+# Three things happen here, and they are separate jobs because they fail for
+# separate reasons and a red square should say which:
+#
+#   gates          the two checks that need no compiler -- formatting and the
+#                  Boost allowlist. Under a minute, and first to tell you.
+#   test           ctest, on three platforms, in **both** Debug and Release.
+#                  Neither configuration alone runs the whole suite: the
+#                  goldens SKIP under !NDEBUG, so Release is the only one that
+#                  renders DSP, and Debug is the only one that runs the ~1200
+#                  asserts. Built with SW_BUILD_PLUGIN_BUNDLES=OFF, which leaves
+#                  out the per-format wrapping and with it the VST3 and
+#                  AudioUnit SDK fetches -- the test binaries link sw-dsp and
+#                  sw-impl and want none of it (verified: that configuration
+#                  writes no _deps/ at all).
+#   build_plugin   the four bundles, and on anything but a pull request the
+#                  installer as well.
+#
+# A pull request builds and tests but makes no installer: what a PR has to
+# answer is whether the code compiles and the suite passes on all three
+# platforms, and packaging it answers nothing that merging will not.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: Build Plugin
+
+on:
+  push:
+    branches:
+      - main
+      - rel_*
+      - test/*
+    tags:
+      - 'v**'
+  pull_request:
+
+# A second push to the same branch makes the first one's answer irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  gates:
+    name: Gates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        # No submodules: both gates read our own sources only, and cloning
+        # JUCE to check whitespace would be most of this job's runtime.
+
+      # Its own Python, rather than the runner's. Ubuntu's system interpreter is
+      # marked externally-managed (PEP 668) and refuses `pip install` outright,
+      # which would fail this job for a reason that has nothing to do with the
+      # tree.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # By version, not whatever the runner ships. clang-format's defaults move
+      # between releases, so a newer major re-lays-out files nobody touched and
+      # the gate fails on somebody else's afternoon. .clang-format names 21.1.5
+      # and scripts/check_format.sh refuses to run against anything else.
+      - name: Install clang-format 21.1.5
+        run: pip install clang-format==21.1.5
+
+      - name: Formatting
+        run: scripts/check_format.sh
+
+      - name: Boost allowlist
+        run: scripts/check_boost_allowlist.sh
+
+  test:
+    name: Test - ${{ matrix.name }} ${{ matrix.config }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      # One platform's failure is not a reason to stop learning what the other
+      # two would have said.
+      fail-fast: false
+      matrix:
+        config: [Debug, Release]
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        include:
+          - os: windows-latest
+            name: windows-x64
+            cmake_args: -Ax64
+          - os: macos-latest
+            name: macos
+            # Host architecture only. The bundles are universal; the tests are
+            # not shipped and building them twice buys nothing.
+            cmake_args: -GNinja
+          - os: ubuntu-latest
+            name: linux-x64
+            cmake_args: -GNinja
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Prepare for JUCE
+        uses: surge-synthesizer/sst-githubactions/prepare-for-juce@main
+        with:
+          os: ${{ runner.os }}
+
+      # The runner image usually has it. "Usually" is not a thing to find out
+      # from a red square six jobs into a matrix.
+      - name: Install Xvfb
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y xvfb
+
+      # SW_BUILD_TOOLS stays ON, and it is not optional: 66 of the 299 tests are
+      # sw-show-ui rendering a page or a module UI offscreen, which is the only
+      # thing that notices GUI code that compiles and then throws. Turning the
+      # tools off to save a link would quietly run 233 and report success.
+      - name: Configure
+        run: |
+          cmake -S . -B ./build ${{ matrix.cmake_args }} \
+            -DCMAKE_BUILD_TYPE=${{ matrix.config }} \
+            -DSW_BUILD_PLUGIN_BUNDLES=OFF \
+            -DSW_WERROR=ON \
+            -DGITHUB_ACTIONS_BUILD=TRUE
+
+      - name: Build the test binaries
+        run: |
+          cmake --build ./build --config ${{ matrix.config }} \
+            --target sw-dsp-tests sw-plugin-tests sw-show-ui --parallel 3
+
+      # sw-plugin-tests instantiates the real editor, and JUCE wants a display
+      # server to do that even for a component that is never shown. macOS and
+      # Windows have one; a Linux runner does not, so it gets a virtual one.
+      - name: Test
+        if: runner.os != 'Linux'
+        run: ctest --test-dir ./build -C ${{ matrix.config }} --output-on-failure
+
+      - name: Test under Xvfb
+        if: runner.os == 'Linux'
+        run: xvfb-run -a ctest --test-dir ./build -C ${{ matrix.config }} --output-on-failure
+
+  build_plugin:
+    name: Build - ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows-x64
+            cmake_args: -Ax64
+
+          - os: macos-latest
+            name: macos
+            cmake_args: -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -GNinja
+
+          - os: ubuntu-latest
+            name: linux-x64
+            cmake_args: -GNinja
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Prepare for JUCE
+        uses: surge-synthesizer/sst-githubactions/prepare-for-juce@main
+        with:
+          os: ${{ runner.os }}
+
+      # A no-op off Windows. sst-cmake looks for iscc on PATH at configure
+      # time, so this has to happen before cmake runs or there is no .exe.
+      - name: Install Inno Setup
+        uses: surge-synthesizer/sst-githubactions/install-innosetup@main
+        with:
+          version: "6.7.1"
+
+      # Pull requests come from forks as well as branches, and a fork cannot
+      # read the signing secrets. They also do not build an installer, so there
+      # is nothing here for them to sign.
+      - uses: apple-actions/import-codesign-certs@v3
+        if: runner.os == 'macOS' && github.event_name != 'pull_request'
+        with:
+          p12-file-base64: ${{ secrets.MAC_CERTS_P12 }}
+          p12-password: ${{ secrets.CERT_PWD }}
+
+      - name: Build pull request version
+        if: github.event_name == 'pull_request'
+        run: |
+          cmake -S . -B ./build ${{ matrix.cmake_args }} \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DSW_BUILD_TESTS=OFF \
+            -DSW_BUILD_TOOLS=OFF \
+            -DSW_WERROR=ON \
+            -DGITHUB_ACTIONS_BUILD=TRUE
+          cmake --build ./build --config Debug \
+            --target spectrumworx_clapfirst_all --parallel 3
+
+      - name: Build release version
+        if: github.event_name != 'pull_request'
+        run: |
+          export MAC_SIGNING_CERT="${{ secrets.MAC_SIGNING_CERT_NAME }}"
+          export MAC_INSTALLING_CERT="${{ secrets.MAC_INSTALLING_CERT_NAME }}"
+
+          export MAC_SIGNING_ID="${{ secrets.MAC_SIGNING_ID }}"
+          export MAC_SIGNING_1UPW="${{ secrets.MAC_SIGNING_1UPW }}"
+          export MAC_SIGNING_TEAM="${{ secrets.MAC_SIGNING_TEAM }}"
+
+          cmake -S . -B ./build ${{ matrix.cmake_args }} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSW_BUILD_TESTS=OFF \
+            -DSW_BUILD_TOOLS=OFF \
+            -DSW_WERROR=ON \
+            -DGITHUB_ACTIONS_BUILD=TRUE
+          cmake --build ./build --config Release \
+            --target spectrumworx-installer --parallel 3
+
+      - name: Show Installer Directory
+        if: github.event_name != 'pull_request'
+        run: ls -l build/installer
+
+      # Linux ships from the docker job below, which builds against an older
+      # glibc than this runner has.
+      - name: Upload artifact
+        if: github.event_name != 'pull_request' && runner.os != 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          path: build/installer
+          name: dawplugin-${{ matrix.name }}
+
+  build_plugin_docker:
+    name: Build - Docker Ubuntu 20
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      # The point of the old image is its glibc: a binary linked against
+      # Ubuntu 20's runs on the distributions people actually have, and one
+      # linked against the runner's does not.
+      - name: Build in Docker
+        uses: surge-synthesizer/sst-githubactions/cmake-in-docker@main
+        with:
+          image: ghcr.io/surge-synthesizer/sst-dockerimages/ubuntu20_gcc11:main
+          username: ${{ github.actor }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          cmakeArgs: -DCMAKE_BUILD_TYPE=Release -GNinja -DSW_BUILD_TESTS=OFF -DSW_BUILD_TOOLS=OFF -DSW_WERROR=ON -DGITHUB_ACTIONS_BUILD=TRUE
+          # No installer off a pull request, the same as every other leg.
+          target: ${{ github.event_name == 'pull_request' && 'spectrumworx_clapfirst_all' || 'spectrumworx-installer' }}
+
+      - name: Show Installer Directory
+        if: github.event_name != 'pull_request'
+        run: ls -l ./build/installer
+
+      - name: Upload artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          path: build/installer
+          name: build-docker-linux
+
+  publish-plugin-nightly:
+    name: Publish Nightly
+    if: ${{ github.ref == 'refs/heads/main' && github.repository_owner == 'baconpaul' }}
+    runs-on: ubuntu-latest
+    needs: [gates, test, build_plugin, build_plugin_docker]
+
+    steps:
+      # create_tag is false: the Nightly tag is made by hand, once, and every
+      # run after that replaces its assets.
+      - name: Upload to Nightly
+        uses: surge-synthesizer/sst-githubactions/upload-to-release@main
+        with:
+          tag: Nightly
+          reuse_tag: true
+          create_tag: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release_blurb_file: assets/installer/NightlyBlurb.md
+
+  publish-plugin-release:
+    name: Publish Release
+    if: startsWith(github.ref, 'refs/tags/v') && github.repository_owner == 'baconpaul'
+    runs-on: ubuntu-latest
+    needs: [gates, test, build_plugin, build_plugin_docker]
+
+    steps:
+      - name: Upload to Release
+        uses: surge-synthesizer/sst-githubactions/upload-to-release@main
+        with:
+          tag: ${{ github.ref_name }}
+          reuse_tag: false
+          create_tag: true
+          token: ${{ secrets.GITHUB_TOKEN }}

@@ -3,8 +3,8 @@
 # **Pin the version.** clang-format's defaults move between releases, so "the
 # tree is clean" is only true against a stated one: this tree was last swept
 # with **21.1.5** (05.08.2026), and a different major will re-lay-out files
-# nobody touched. CI should install that version rather than whatever the runner
-# ships -- there is no CI yet; see todo.md item 2.
+# nobody touched. scripts/check_format.sh refuses to run against any other
+# version, and CI installs 21.1.5 by number rather than taking the runner's.
 #
 # **A table the build parses needs `// clang-format off`.** WhitespaceSensitiveMacros
 # below covers macro *invocations*; it does nothing for a macro *definition*
