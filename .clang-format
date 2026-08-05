@@ -1,3 +1,12 @@
+# SpectrumWorx formatting.
+#
+# **Pin the version.** clang-format's defaults move between releases, so "the
+# tree is clean" is only true against a stated one: this tree was last swept
+# with **21.1.5** (05.08.2026), and a different major will re-lay-out files
+# nobody touched. CI should install that version rather than whatever the runner
+# ships -- there is no CI yet; see todo.md item 2.
+#
+# The reformat commits are in .git-blame-ignore-revs.
 ---
 BasedOnStyle: LLVM
 IndentWidth: 4
@@ -28,8 +37,9 @@ BraceWrapping:
   SplitEmptyNamespace: true
 ColumnLimit: 100
 SortIncludes: false
-# This tree has order-dependent includes (the Boost.SIMD and NT2 headers) and a
-# dense //...mrmlj... comment style worth preserving verbatim.
+# This tree has order-dependent includes -- finalImplementations.hpp needs
+# Module complete, and le/math/vector.cpp's Boost.SIMD block is sequenced -- and
+# a dense //...mrmlj... comment style worth preserving verbatim.
 ReflowComments: false
 AttributeMacros:
   - LE_CDECL
