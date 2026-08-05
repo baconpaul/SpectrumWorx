@@ -203,9 +203,15 @@ stay; only the scaffolding went.
   `effectsList.cmake` already had three of them commented out. `effectsList.hpp`
   fixes the count at 57 and the order is ABI, so appending them is legal and
   reordering is not.
-- **`src/nt2_static_fft/`** — 5,519 lines, the largest orphan, kept as the stage
-  4 reference. Stage 4 is done and `tests/math/fftTests.cpp` is the grading
-  harness now. Does the reference still earn its place?
+- **`le/math/vector.cpp`'s dead NT2 arm** — ~750 lines across 18
+  `#ifdef LE_MATH_USE_NT2` sites in a 2,034-line **live** file, each with a live
+  `#else` beside it. Left when `src/nt2_static_fft/` went on 05.08.2026, and it
+  is not a dangling reference the way the deleted files' callers were: the arm
+  needs `boost/simd/…`, which **is not vendored either**, so it has been
+  un-compilable for as long as this port has existed rather than merely
+  unreachable. Stripping it is a refactor of the vector math the whole engine
+  runs on, which is why it is a decision and not a sweep — and it is what would
+  let `boost/simd` and `boost/dispatch` off `scripts/check_boost_allowlist.sh`.
 - **Hand-written weak `strnlen`/`wcsnlen`** — `gui.cpp:1236-1264`, "OSX 10.6 does
   not provide std::strnlen", with the `!__LP64__` guard **commented out**. They
   are compiled into every macOS build today, in 2026.

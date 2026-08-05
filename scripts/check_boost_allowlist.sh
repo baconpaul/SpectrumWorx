@@ -7,20 +7,26 @@
 # fetched, and nothing that compiles includes a Boost header. What is left is
 # deliberate, unreachable in this build, and each entry has an owner stage:
 #
-#   simd, dispatch, type_traits  the NT2 vector backend, and the restrict
-#                                fix-ups it brings its own Boost for. Guarded by
-#                                LE_HAS_NT2 / LE_MATH_USE_NT2, which this build
-#                                does not define        -> stage 4 (tier 3b)
+#   simd, dispatch, type_traits  the NT2 vector backend in le/math/vector.cpp,
+#                                and the restrict fix-ups it brings its own
+#                                Boost for. Guarded by LE_HAS_NT2 /
+#                                LE_MATH_USE_NT2, which this build does not
+#                                define -- and could not satisfy if it did,
+#                                since Boost.SIMD is not vendored either.
+#                                                       -> stage 4 (tier 3b)
 #
 # Gone since this list was last written: mmap, which stage 8.0 took out of the
 # preset reader. Before it: fusion, mpl and preprocessor -- the parameter
 # system -- and intrusive, the module chain's circular_list_algorithms.
 #
-# Not scanned, all reachable only from src/legacy-build.cmake and named by no
-# live target: src/nt2_static_fft, which is vendored NT2;
-# le/build/precompiledHeaders.hpp and le/build/juceIncludeWrapper.hpp; and
-# spectrumWorx.cpp, the 2016 VST2/AU plugin class the CLAP replaced, retained as
-# the reference 5.0 still needs and holding the last boost::mmap in the tree.
+# Not scanned, reachable only from src/legacy-build.cmake and named by no live
+# target: spectrumWorx.cpp, the 2016 VST2/AU plugin class the CLAP replaced,
+# retained as the reference 5.0 still needs and holding the last boost::mmap in
+# the tree.
+#
+# src/nt2_static_fft -- vendored NT2, the stage 4 reference -- was also on that
+# list until 05.08.2026, when it was deleted: stage 4 is done and
+# tests/math/fftTests.cpp is the grading harness now.
 #
 set -uo pipefail
 
