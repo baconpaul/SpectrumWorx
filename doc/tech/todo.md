@@ -74,6 +74,12 @@ reproduction anyway.
   `tech_debt.md` records, and possibly more. `threading_model.md` §8 has the
   configure line. This is cheap and it is upstream of the DAW pass.
 
+  **And `runEngine()`'s sample branch has never executed under anything**, rtsan
+  included: it was guarded on side buffers that `activate()` never asked for
+  until 05.08.2026, so twenty lines of per-block work — `sampleChunk()`, a
+  wrapping read and a copy into the side buffers — enter the realtime region for
+  the first time with this pass. `sampleFeedTests.cpp` is what drives them.
+
 **Convert `doc/manual/SpectrumWorx test procedure.doc` first.** It is Little
 Endian's own version of exactly this list, sitting unread in the tree since stage
 0.5 moved it. Week one's four bugs were all found by driving the plugin by hand

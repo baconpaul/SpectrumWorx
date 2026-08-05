@@ -312,6 +312,13 @@ New entries go at the top of their area.
   than here. CLAP's own mechanism is `clap_audio_buffer::constant_mask`, which
   nothing here reads.
 
+  Still open, and not closed by the tests added on 05.08.2026 — those drive all
+  three arms `runEngine` can distinguish (no second port, a second port with no
+  `data32`, a second port with audio) and confirm the first two are the same
+  fallback. What they cannot do is give the plugin a way to tell a *connected*
+  port carrying silence from an unpatched one carrying whatever the host left
+  behind, which is the entry.
+
 - **The engine's guards are finiteness guards, and garbage is usually finite.**
   (03.08.2026) Every `LE_MATH_VERIFY_VALUES` on the input path tests `Invalid`
   (NaN/infinity) or denormals. Uninitialised memory read as float is
@@ -411,9 +418,11 @@ New entries go at the top of their area.
   rounding drifts a hair below zero, so `Smoother` hands `amph2DFT()` a negative
   "amplitude". Benign in the output, real as a numerical weakness. The
   consequence is structural: **Release is the only configuration that renders
-  DSP**, so a debug-only regression in the engine has nothing to catch it. Item
-  8's property tests are the first DSP assertions a checked build makes, and
-  they cover nine effects of 57.
+  DSP**, so a debug-only regression in the engine has nothing to catch it. The
+  effect property tests are what a checked build has instead, and as of
+  05.08.2026 they reach all 57: nine in `amplifyingEffectsTests.cpp`, four in
+  `silentDefaultsTests.cpp`, and every one of the 57 in `sideChainTests.cpp` —
+  which has to name Smoother as its single exception for exactly this reason.
 
 - **`usesSideChannel` is metadata nothing consumes, and it is wrong.**
   (01.08.2026, measured 05.08.2026) Every effect declares
@@ -441,9 +450,9 @@ New entries go at the top of their area.
     the one that ignores the side channel (`Hold`, `Main`, `Triggered`).
   - **Convolver**'s is the strongest form of it: `Triggered` means the impulse
     response is grabbed on a button press, so until then the effect renders
-    **silence**. Three of the 25 identically-hashed golden fixtures `todo.md`
-    records are Convolver, and they are not a quiet render — they are an unarmed
-    one.
+    **silence**. Eight of the 25 identically-hashed golden fixtures are
+    Convolver's, and they are not a quiet render — they are an unarmed one. See
+    "25 golden fixtures render silence" under Tests.
   - **Burrito** chooses its replacement positions only when its frame counter
     wraps `Period`, which defaults to 250 ms, so nothing at all happens for the
     first quarter second whatever is on the port.
