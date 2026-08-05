@@ -215,19 +215,23 @@ stay; only the scaffolding went.
 
 ### Formatting
 
-**58 files fail `clang-format --dry-run -Werror`** (21.1.5), counted 04.08.2026,
-and only **1** of them is outside `src/le/`. So it is one reformat commit and it
-is almost entirely the 2016 sources rather than anything the port has written.
-Stage 0.6 established "format-stable" and recorded its reformat in
-`.git-blame-ignore-revs`; do the same, and pin the clang-format version in CI
-while you are there, since nothing in `.clang-format` does.
+Done on 05.08.2026: 52 files (58 before the dead-code deletions took six of
+them), 51 of them under `src/le/`. The value-string tables survived — all 92
+pairs across the 26 `ENUMERATED_PARAMETER_STRINGS` uses, one per line, checked
+line by line rather than assumed.
 
-One thing that reformat must not eat, and now cannot: a value-string table is one
-`{ Value, "string" }` pair per line so that the pairs line up against the
-enumerators they name, and clang-format's default is to reflow all of them into a
-paragraph. `.clang-format` names `ENUMERATED_PARAMETER_STRINGS` and
-`EFFECT_ENUMERATED_PARAMETER_STRINGS` under `WhitespaceSensitiveMacros`, which
-holds every one of the twenty-two still.
+Two things the row asked for and did not exist: **`.git-blame-ignore-revs` had
+never been written** — stage 0.6 did not record its reformat anywhere, whatever
+this file said — and nothing pinned the clang-format version. Both are there
+now. The ignore file needs one command per clone, which nobody will remember, so
+it is in the file's own header:
+
+    git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+GitHub and GitLab read it by name and need no configuring. **When CI is wired
+(item 2), install clang-format 21.1.5 by version** rather than taking the
+runner's: a different major re-lays-out files nobody touched, and the gate then
+fails on somebody else's afternoon.
 
 ---
 
