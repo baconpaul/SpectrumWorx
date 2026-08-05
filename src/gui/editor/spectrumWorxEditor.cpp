@@ -2490,8 +2490,17 @@ void SpectrumWorxEditor::Settings::EnginePage::setNewQualityFactor(float const &
         description = "% (poor)";
     char buffer[32];
     LE_VERIFY(Utility::lexical_cast(qualityFactor * 100.0f, 2, buffer) < _countof(buffer));
-    *engineQuality_.getCharPointer().getAddress() = 0;
-    engineQuality_ += "Ripple amount: ";
+    /// \note Assigned rather than truncated in place. This read
+    /// `*engineQuality_.getCharPointer().getAddress() = 0;` -- a poke of a nul
+    /// into the string's own buffer, to empty it while keeping the allocation.
+    /// An empty juce::String does not own a buffer: it points at the shared
+    /// `emptyString` singleton, which JUCE 8 declares `constexpr` and the linker
+    /// therefore puts in .rodata. So the first call -- and it is always the
+    /// first call, the string is default-constructed and this is what fills it
+    /// -- wrote to a read-only page. Every case that opened the settings panel
+    /// segfaulted here.
+    ///                                       (05.08.2026.) (SW port)
+    engineQuality_ = "Ripple amount: ";
     engineQuality_ += buffer;
     engineQuality_ += description;
 }
