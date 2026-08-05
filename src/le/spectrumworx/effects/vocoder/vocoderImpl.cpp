@@ -64,10 +64,6 @@
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/processor.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
-#if LE_UTILITY_MATLAB_INTEROP
-#include "le/utility/matlab.hpp"
-#endif // LE_UTILITY_MATLAB_INTEROP
-
 #include <ranges>
 
 #include "le/utility/stackBuffer.hpp"
@@ -260,14 +256,6 @@ LE_HOT void VocoderImpl::process(Engine::MainSideChannelData_AmPh data,
     std::uint16_t const skippedLeadingBins(data.beginBin());
     std::uint16_t const skippedTrailingBins(fullNumberOfBins - data.endBin());
 
-#if LE_UTILITY_MATLAB_INTEROP
-    auto &filter(parameters().get<FilterMethod>());
-    filter; // make it easier to change from the debugger
-    namespace Matlab = Utility::Matlab;
-
-    Matlab::Engine::singleton().setVariable("amps", envelope);
-#endif // LE_UTILITY_MATLAB_INTEROP
-
     if (filterMethod() == FilterMethod::MovingAverage)
     {
         //...mrmlj...probably still broken 'reduced range' operation...
@@ -355,10 +343,6 @@ LE_HOT void VocoderImpl::process(Engine::MainSideChannelData_AmPh data,
         envelope[1] /= 2;
     }
 
-#if LE_UTILITY_MATLAB_INTEROP
-    Matlab::Engine::singleton().setVariable("envs", envelope);
-#endif // LE_UTILITY_MATLAB_INTEROP
-
     if (LE_UNLIKELY(parameters().get<NoiseIntensity>()))
     {
         /// \note Modifying the carrier directly is easier and faster but does
@@ -386,32 +370,6 @@ LE_HOT void VocoderImpl::process(Engine::MainSideChannelData_AmPh data,
     copy(data.side().phases(), data.main().phases());
 
     //LE_ASSERT( data.main().amps()[ 0 ] == 0 ); //...mrmlj...envelope DC bin is currently not fully zeroed
-
-#if LE_UTILITY_MATLAB_INTEROP
-    static bool freqsSet(false);
-    if (!freqsSet)
-    {
-        Matlab::Array freqs;
-        freqs.resize(envelope.size());
-        auto *pFreqs(freqs.get());
-        for (std::uint16_t freq(0); freq < setup.numberOfBins(); ++freq)
-            *pFreqs++ = freq * setup.frequencyRangePerBin<float>();
-        Matlab::Engine::singleton().setVariable("freqs", freqs);
-        Matlab::Engine::singleton().execute(
-            //"close all;"
-            //"figure( 'units', 'normalized', 'outerposition', [0 0 1 1] );"
-            "set( gca, 'position', [.02,.02,.98,.97] );");
-        freqsSet = true;
-    }
-    Matlab::Engine::singleton().setVariable("carrier", data.side().amps());
-    Matlab::Engine::singleton().setVariable("voco", data.main().amps());
-    Matlab::Engine::singleton().execute("hold off;"
-                                        "semilogy( freqs(1:200), amps   (1:200), 'b--.' );"
-                                        "hold on;"
-                                        "semilogy( freqs(1:200), envs   (1:200), 'r-o'  );"
-                                        "semilogy( freqs(1:200), carrier(1:200), 'g-^'  );"
-                                        "semilogy( freqs(1:200), voco   (1:200), 'k-*'  );");
-#endif // LE_UTILITY_MATLAB_INTEROP
 }
 
 #ifdef _MSC_VER

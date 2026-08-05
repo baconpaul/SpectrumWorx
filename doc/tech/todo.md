@@ -178,10 +178,20 @@ and is not dead**: `spectrumWorxCore.hpp` includes it, and so do
 `le/plugins/entryPoint.hpp` went. `filesystemImpl.inl` moved to the platform
 batch below, being included by exactly the three files in it.
 
-**Platform arms with no platform** (~1,100 lines): `le/utility/`'s Android, JNI,
-Matlab and MSVC-universal-build files. `filesystemWindows.cpp` and
-`filesystemApple.cpp` are the two to think about rather than delete — either they
-come back for the Windows build, or `sst-plugininfra` already covers them.
+The platform arms are gone too — 1,698 lines across 12 files on 05.08.2026.
+The question the row left open is answered: **`sst-plugininfra` already covers
+them.** `filesystemApple.cpp` and `filesystemWindows.cpp` existed to specialise
+`PathResolver<SpecialLocations>`, and nothing outside `le/utility/filesystem*`
+names `SpecialLocations` or `PathResolver` at all — the port asks
+`sst::plugininfra::paths::bestDocumentsFolderPathFor` for its one special
+location (`gui/gui.cpp:234`, "the same answer Surge gives"). So the live build
+only ever resolved absolute paths, and `filesystem.cpp` does that on its own.
+
+Deleting `jni.*` and `matlab.*` also took the guarded blocks that included
+them: the tracer's four `__ANDROID__` arms, and four
+`#if LE_UTILITY_MATLAB_INTEROP` blocks in `vocoderImpl.cpp` and `synthImpl.cpp`
+— Matlab plotting scaffolding behind an option nothing sets. The two effects
+stay; only the scaffolding went.
 
 **Actual decisions:**
 

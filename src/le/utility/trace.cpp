@@ -24,12 +24,6 @@
 #endif // iOS
 #endif // __APPLE__
 
-#ifdef __ANDROID__
-#include "jni.hpp"
-
-#include <android/log.h>
-#endif // __ANDROID__
-
 #ifdef _WIN32
 extern "C" __declspec(dllimport) void __stdcall OutputDebugStringA(char const *lpOutputString);
 #endif // _WIN32
@@ -51,23 +45,7 @@ LE_WEAK_SYMBOL char const *Tracer::pTagString = "LE";
 
 namespace
 {
-#ifdef __ANDROID__
-JNI::GlobalRef<> userMessageObject = nullptr;
-jmethodID userMessageMethod = nullptr;
-
-LE_COLD void userMessage(char const *const pFormatString, va_list /*const*/ arglist)
-{
-    if (!userMessageMethod)
-        return;
-    LE_ASSERT(userMessageObject);
-    char formattedMessage[512];
-    /*auto const charactersWritten*/ (
-        /*std*/ ::vsnprintf(formattedMessage, sizeof(formattedMessage), pFormatString, arglist));
-    auto const pJNI(JNI::env());
-    auto const javaString(pJNI->NewStringUTF(formattedMessage));
-    pJNI->CallVoidMethod(userMessageObject.get(), userMessageMethod, javaString);
-}
-#elif TARGET_OS_IPHONE
+#if TARGET_OS_IPHONE
 void (^userMessageCallback)(NSString *message) = nullptr;
 
 LE_COLD void iOSLog(char const *const pFormatString, va_list /*const*/ arglist)
@@ -94,14 +72,7 @@ LE_COLD void iOSLog(char const *const pFormatString, va_list /*const*/ arglist)
 #endif // target
 } // anonymous namespace
 
-#ifdef __ANDROID__
-void *Tracer_setUserMessageMethod(void *const opaquePtr)
-{
-    auto const previous(userMessageMethod);
-    userMessageMethod = static_cast<decltype(userMessageMethod)>(opaquePtr);
-    return previous;
-}
-#elif TARGET_OS_IPHONE
+#if TARGET_OS_IPHONE
 void *Tracer_setUserMessageMethod(void *const opaquePtr)
 {
     auto const previous(userMessageCallback);
@@ -116,10 +87,7 @@ void Tracer::error(char const *const pFormatString, ...)
 {
     va_list arglist;
     va_start(arglist, pFormatString);
-#if defined(__ANDROID__)
-    ::__android_log_vprint(ANDROID_LOG_ERROR, pTagString, pFormatString, arglist);
-    userMessage(pFormatString, arglist);
-#elif (TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR)
+#if (TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR)
     iOSLog(pFormatString, arglist);
 #else
     auto const bufferSize(1024);
@@ -168,10 +136,7 @@ void Tracer::message(char const *const pFormatString, ...)
 {
     va_list arglist;
     va_start(arglist, pFormatString);
-#if defined(__ANDROID__)
-    ::__android_log_vprint(ANDROID_LOG_INFO, pTagString, pFormatString, arglist);
-    userMessage(pFormatString, arglist);
-#elif (TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR)
+#if (TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR)
     iOSLog(pFormatString, arglist);
 #else
     unsigned int const bufferSize(1024);
@@ -195,18 +160,7 @@ void Tracer::message(char const *const pFormatString, ...)
     va_end(arglist);
 }
 
-#ifdef __ANDROID__
-bool Tracer::setJavaCallback(JNIEnv &jni, jobject const callbackObject,
-                             char const *const callbackMethodName)
-{
-    jclass const callbackClass(jni.GetObjectClass(callbackObject));
-    LE_ASSERT(callbackClass);
-    userMessageMethod = jni.GetMethodID(callbackClass, callbackMethodName, "(Ljava/lang/String;)V");
-    LE_ASSERT(userMessageMethod);
-    userMessageObject = JNI::globalReference(callbackObject);
-    return userMessageObject != nullptr;
-}
-#elif TARGET_OS_IPHONE
+#if TARGET_OS_IPHONE
 bool Tracer::setObjCCallback(void (^newCallback)(NSString *message))
 {
     Block_release(userMessageCallback);

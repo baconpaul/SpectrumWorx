@@ -87,11 +87,6 @@
 #include "le/spectrumworx/engine/processor.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 
-//#define LE_UTILITY_MATLAB_INTEROP 1
-#if LE_UTILITY_MATLAB_INTEROP
-#include "le/utility/matlab.hpp"
-#endif // LE_UTILITY_MATLAB_INTEROP
-
 #include "le/utility/stackBuffer.hpp"
 
 #include <cmath>
