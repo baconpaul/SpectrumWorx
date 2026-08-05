@@ -27,6 +27,21 @@ New entries go at the top of their area.
 
 ## Build and platform
 
+- **The factory samples decode to different lengths on different macOS
+  versions.** (05.08.2026) `MW-Metallica1.mp3` holds, by `afinfo`, "21454 valid
+  frames + 576 priming + 1010 remainder = 23040" at 44.1 kHz. At 48 kHz it
+  decodes to 25077 frames on macOS 26 and to 23351 on a GitHub `macos-latest`
+  runner — exactly the padded and the unpadded lengths — so the two decoders
+  disagree about whether LAME's encoder delay is theirs to strip.
+
+  It surfaced as a test that asserted the padded length (`sampleTests.cpp`, now
+  a floor rather than a duration), but the difference is not confined to the
+  test: the side-chain sample feed plays whatever the decoder returned, so on
+  one platform a factory sample begins with ~33 ms of encoder priming and on
+  another it does not. Nobody has listened for it and no preset depends on the
+  alignment. If one ever does, the fix is to trim by the gapless metadata
+  ourselves rather than to ask which decoder answered.
+
 - **Window presum is an option now, and turning it on does not work.**
   (04.08.2026, from the stage 7 macro pass) `SW_ENGINE_WINDOW_PRESUM`
   (`src/dsp.cmake`) is the surviving one of the seven macros no live build could

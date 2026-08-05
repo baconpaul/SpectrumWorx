@@ -81,9 +81,19 @@ TEST_CASE("Every factory sample decodes to two equal channels", "[external-audio
         CHECK(sample.sampleFile() == file);
         CHECK(sample.sampleRate() == rate);
 
-        // Half a second of audio is the least any of these is; something
-        // shorter means a decoder that stopped early rather than failed.
-        CHECK(sample.channel1().size() > (rate / 2));
+        // A floor, not a duration -- and a quarter second rather than the half
+        // it used to be, because half a second is more audio than the shortest
+        // of these files holds and the check only ever passed on padding.
+        //
+        //   MW-Metallica1.mp3 is that file. `afinfo` reads it as "21454 valid
+        // frames + 576 priming + 1010 remainder = 23040" at 44.1 kHz, and at
+        // 48 kHz it decoded to 25077 frames on one macOS and 23351 on a GitHub
+        // runner. Those are precisely the padded and the unpadded lengths
+        // resampled: the two decoders disagree about whether LAME's encoder
+        // delay is theirs to strip. `> rate / 2` sat between the two answers,
+        // so what it tested was a padding policy.
+        //                                    (05.08.2026.) (SW port)
+        CHECK(sample.channel1().size() > (rate / 4));
         CHECK(sample.channel1().size() == sample.channel2().size());
         CHECK(sample.channel(0).begin() == sample.channel1().begin());
         CHECK(sample.channel(1).begin() == sample.channel2().begin());
