@@ -33,11 +33,15 @@
 /// node to it, and this is the header with the complete type.
 #include "core/modules/moduleDSPAndGUI.hpp"
 
+#include "le/spectrumworx/factoryPresets.hpp"
+
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstddef>
+#include <map>
+#include <string>
 //------------------------------------------------------------------------------
 namespace
 {
@@ -290,4 +294,111 @@ TEST_CASE("The two panels are mutually exclusive and land in the same place", "[
     auto const leftColumn(editor.getLocalBounds().withWidth(Editor::overlayX));
     CHECK(!moved.isEmpty());
     CHECK(leftColumn.contains(moved));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// The banks
+// ---------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+///   One of the eighteen factory banks was ever drawn -- the root listing, which
+/// is two rows saying "Factory" and "User" -- and no case had ever opened one.
+///
+///   The precedent is the effect sweep: `tools/show-ui`'s editor-module page
+/// rendered one effect of 57 for a month, and widening it to all 57 immediately
+/// found that it had been rendering *no module at all* and that every one of the
+/// 57 PNGs was byte-identical. The banks are the same shape of cheap breadth,
+/// and the same failure is available to them: a browser that lists nothing draws
+/// its chrome, covers its rectangle, and passes anything that only asks whether
+/// the panel opened.
+///
+/// \note So this asks two things, and the second is the one with teeth: that
+/// each bank draws, and that the eighteen renders are **eighteen different
+/// pictures**. `sw-show-ui` can render a bank by name through
+/// SW_SHOW_UI_PRESET_BANK, one process per bank, and could not have compared
+/// them.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("Every factory bank draws, and draws something of its own", "[gui][overlay][presets]")
+{
+    SWTest::HostSideJuce const juce;
+    SWTest::Instance instance;
+    instance.openEditor();
+    auto &editor(instance.editor());
+
+    auto const closed(rendered(editor));
+
+    auto const banks(LE::SW::FactoryPresets::banks());
+    REQUIRE(banks.size() >= 15);
+
+    /// \note Hashed rather than kept: eighteen 563 x 376 ARGB images is 15 MB,
+    /// and what is being asked is only whether any two agree.
+    std::map<std::size_t, std::string> byPicture;
+    unsigned int drawn{0};
+
+    for (auto const &bank : banks)
+    {
+        INFO("bank " << bank);
+
+        editor.showFactoryBank(bank);
+        auto const open(rendered(editor));
+
+        // It opened, and it painted the rectangle rather than a tab bar's worth
+        // of it -- the same measure the settings pages are held to.
+        CHECK(differenceOver(closed, open, overlayRectangle()) > leastOfTheRectangleAPanelCovers);
+
+        std::size_t hash{0};
+        {
+            juce::Image::BitmapData const pixels(open, juce::Image::BitmapData::readOnly);
+            auto const area(overlayRectangle());
+            for (int y(area.getY()); y < area.getBottom(); ++y)
+                for (int x(area.getX()); x < area.getRight(); ++x)
+                    hash = hash * 1099511628211u + pixels.getPixelColour(x, y).getARGB();
+        }
+
+        auto const [entry, inserted](byPicture.emplace(hash, bank));
+        // Two banks that render identically are two banks whose *contents* never
+        // reached the list -- which is what the effect sweep found.
+        INFO("identical to bank " << entry->second);
+        CHECK(inserted);
+        ++drawn;
+    }
+
+    CHECK(drawn == banks.size());
+    CHECK(byPicture.size() == banks.size());
+
+    /// \note And back to where it started, so the panel is an overlay rather
+    /// than something that ate what was under it -- eighteen banks deep.
+    editor.showPresetBrowser(false);
+    CHECK(differenceOver(closed, rendered(editor), overlayRectangle()) == 0);
+}
+
+TEST_CASE("A bank that is not there leaves the browser drawable", "[gui][overlay][presets]")
+{
+    /// \note `setFactoryBank` takes a string and the browser filters its list by
+    /// it, so a name nothing matches produces an empty listing rather than a
+    /// failure -- which is reachable from a saved location the banks have since
+    /// been renamed under. What it must not do is leave the panel unpaintable.
+    SWTest::HostSideJuce const juce;
+    SWTest::Instance instance;
+    instance.openEditor();
+    auto &editor(instance.editor());
+
+    auto const closed(rendered(editor));
+
+    editor.showFactoryBank("No Such Bank");
+    auto const open(rendered(editor));
+
+    // The panel is there; what is in the list is the browser's business.
+    CHECK(differenceOver(closed, open, overlayRectangle()) > leastOfTheRectangleAPanelCovers);
+    CHECK(drawnFractionOver(open, overlayRectangle()) > 0);
+
+    // ...and a real bank after it still lists, so the browser is not stuck.
+    auto const banks(LE::SW::FactoryPresets::banks());
+    REQUIRE_FALSE(banks.empty());
+    editor.showFactoryBank(banks.front());
+    CHECK(differenceOver(open, rendered(editor), overlayRectangle()) > 0);
 }
