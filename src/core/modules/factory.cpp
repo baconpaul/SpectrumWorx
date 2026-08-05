@@ -71,9 +71,15 @@ template <class ModuleInterface> struct ModuleSizeGetter
 /// \struct ModuleConstructor
 ////////////////////////////////////////////////////////////////////////////
 
-#pragma warning(push)
-#pragma warning(disable : 4200) // Nonstandard extension used : zero-sized array in struct/union.
-
+/// \note This has no data members, and used to have one: `char storage[]`, a
+/// flexible array member that both operator()s below placement-new'd into.
+/// It was never anything but the address of the object itself -- create()
+/// mallocs, casts the block to a ModuleConstructor & and calls through it, so a
+/// zero-sized array at offset 0 is spelled `this`. **GCC rejects a flexible
+/// array member in an otherwise empty struct**, where Clang and MSVC take it as
+/// an extension; MSVC needed a #pragma warning(disable : 4200) to keep quiet
+/// about it, which is gone with it.
+///                                           (05.08.2026.) (SW port)
 template <class ModuleInterface> struct ModuleConstructor
 {
     /// \note Was `ModuleInterface *LE_RESTRICT`, and this is the return type of
@@ -87,7 +93,7 @@ template <class ModuleInterface> struct ModuleConstructor
     {
         using EffectImplementation = typename Effects::ImplForIndex<EffectIndex::value>::type;
         using ModuleImplementation = typename ModuleInterface::template Impl<EffectImplementation>;
-        result_type const result(new (storage) ModuleImplementation(EffectIndex()));
+        result_type const result(new (this) ModuleImplementation(EffectIndex()));
         LE_ASSUME(result);
         return result;
     }
@@ -103,7 +109,7 @@ template <class ModuleInterface> struct ModuleConstructor
         typedef typename ModuleInterface::template Impl<EffectImplementation> ModuleImplementation;
         static_assert(std::is_same<EffectImplementation, Effects::ArmonizerImpl>::value,
                       "Internal inconsistency");
-        auto const pModule(new (storage) ModuleImplementation(ArmonizerIndex()));
+        auto const pModule(new (this) ModuleImplementation(ArmonizerIndex()));
         LE_ASSUME(pModule);
         /// \note Through setBaseParameter() rather than into the parameter
         /// directly, so that the unmodulated value moves with it. Writing the
@@ -118,8 +124,6 @@ template <class ModuleInterface> struct ModuleConstructor
             50.0f);
         return pModule;
     }
-
-    char storage[];
 }; // struct ModuleConstructor
 
 ////////////////////////////////////////////////////////////////////////////
@@ -143,7 +147,6 @@ template <class ModuleInterface> struct ModuleDestroyer
     ModuleInterface *pInterface;
 }; // struct ModuleDestroyer
 
-#pragma warning(pop)
 } // anonymous namespace
 
 ////////////////////////////////////////////////////////////////////////////////

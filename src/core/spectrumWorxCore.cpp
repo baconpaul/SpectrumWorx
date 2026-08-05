@@ -178,8 +178,14 @@ bool SpectrumWorxCore::InputBuffers::resize(std::uint16_t const blockSize,
         (numberOfSideChannels == this->numberOfSideChannels()))
         return true;
 
-    static_assert(std::is_pointer<float *LE_RESTRICT>::value,
-                  ""); //...mrmlj...typeTraits.hpp debugging...
+    /// \note A `static_assert(std::is_pointer<float *LE_RESTRICT>::value, "")`
+    /// stood here, marked "typeTraits.hpp debugging" -- somebody's scratch check
+    /// on how the compiler of the day treated the restrict qualifier, with an
+    /// empty message, asserting nothing about this function. GCC fails it:
+    /// `__restrict__` is part of the type there and `std::is_pointer` does not
+    /// know to look through it. A leftover probe should not decide whether the
+    /// engine builds.
+    ///                                       (05.08.2026.) (SW port)
     using Utility::align;
     std::uint8_t const numberOfChannels(numberOfMainChannels + numberOfSideChannels);
     std::uint8_t const baseChannelStorage(sizeof(Channels::iterator));
