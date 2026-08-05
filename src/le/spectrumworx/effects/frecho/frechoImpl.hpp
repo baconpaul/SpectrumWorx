@@ -45,7 +45,7 @@ class FrechoImpl : public EffectImpl<Frecho>
     struct DynamicChannelState : DynamicChannelState_<DynamicChannelState>
     {
         PhaseVocoderShared::PitchShifter::ChannelState pvState;
-        History                                        historyBuffer;
+        History historyBuffer;
         auto members() { return std::tie(pvState, historyBuffer); }
     };
 

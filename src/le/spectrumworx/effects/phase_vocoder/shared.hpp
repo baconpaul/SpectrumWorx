@@ -263,9 +263,10 @@ namespace Detail
 /// says it in one line and does not need the macro to have been included by
 /// somebody else.
 ///                                           (30.07.2026.) (SW port)
-template <class T> struct has_ChannelState : std::bool_constant<requires { typename T::ChannelState; }>
+template <class T> struct has_ChannelState : std::bool_constant < requires
 {
-};
+    typename T::ChannelState;
+}>{};
 
 struct DummyChannelStateHolder
 {

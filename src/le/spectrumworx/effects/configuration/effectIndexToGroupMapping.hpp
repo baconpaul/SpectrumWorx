@@ -41,16 +41,10 @@ template <unsigned int effectIndex> struct Group
     using type = std::tuple_element_t<effectIndex, EffectGroups>;
 };
 
-using Groups = LE::Utility::TypeList<
-    ModuleGroups::Pitch,
-    ModuleGroups::Timbre,
-    ModuleGroups::Time,
-    ModuleGroups::Space,
-    ModuleGroups::Phase,
-    ModuleGroups::Loudness,
-    ModuleGroups::Combine,
-    ModuleGroups::PVD,
-    ModuleGroups::Misc>;
+using Groups =
+    LE::Utility::TypeList<ModuleGroups::Pitch, ModuleGroups::Timbre, ModuleGroups::Time,
+                          ModuleGroups::Space, ModuleGroups::Phase, ModuleGroups::Loudness,
+                          ModuleGroups::Combine, ModuleGroups::PVD, ModuleGroups::Misc>;
 
 //------------------------------------------------------------------------------
 } // namespace Effects

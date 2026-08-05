@@ -48,7 +48,7 @@ class LE_NOVTABLE ModuleNode
   protected:
     ModuleNode() = default;
 
-#if   !defined(NDEBUG)
+#if !defined(NDEBUG)
   protected:
     ~ModuleNode() = default;
     virtual void rtti_enforcer() {}

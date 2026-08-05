@@ -27,7 +27,6 @@
 #include "le/plugins/plugin.hpp"
 #include "le/utility/staticLog2.hpp"
 
-
 #include <array>
 #include <cstring>
 #include <type_traits>

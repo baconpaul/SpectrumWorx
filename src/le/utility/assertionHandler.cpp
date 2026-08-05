@@ -134,7 +134,7 @@ static void printDebugMessage(wchar_t const *const message)
     ::fputws(message, stderr);
 }
 #pragma warning(pop) // was a second push
-#endif // _WIN32
+#endif               // _WIN32
 
 #ifdef _WIN32
 #define LE_ASSERT_HAS_MSGBOX

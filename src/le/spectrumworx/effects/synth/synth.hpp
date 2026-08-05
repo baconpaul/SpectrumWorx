@@ -41,9 +41,12 @@ namespace Effects
 struct Synth
 {
     LE_DEFINE_PARAMETER(Frequency, LinearFloat, Minimum<40>, Maximum<8000>, Default<110>);
-    LE_DEFINE_PARAMETER(HarmonicSlope, LinearUnsignedInteger, Minimum<0>, Maximum<100>, Default<50>, Unit<"%">);
-    LE_DEFINE_PARAMETER(FlangeIntensity, LinearUnsignedInteger, Minimum<0>, Maximum<100>, Default<0>, Unit<"%">);
-    LE_DEFINE_PARAMETER(FlangeOffset, SymmetricFloat, MaximumOffset<180>, Default<10>, Unit<"\xB0">);
+    LE_DEFINE_PARAMETER(HarmonicSlope, LinearUnsignedInteger, Minimum<0>, Maximum<100>, Default<50>,
+                        Unit<"%">);
+    LE_DEFINE_PARAMETER(FlangeIntensity, LinearUnsignedInteger, Minimum<0>, Maximum<100>,
+                        Default<0>, Unit<"%">);
+    LE_DEFINE_PARAMETER(FlangeOffset, SymmetricFloat, MaximumOffset<180>, Default<10>,
+                        Unit<"\xB0">);
     LE_DEFINE_PARAMETERS(Frequency, HarmonicSlope, FlangeIntensity, FlangeOffset);
 
     /// \typedef Frequency

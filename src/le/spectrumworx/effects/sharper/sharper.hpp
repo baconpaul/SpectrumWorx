@@ -43,7 +43,8 @@ namespace Effects
 
 struct Sharper
 {
-    LE_DEFINE_PARAMETER(AveragingWidth, LinearUnsignedInteger, Minimum<0>, Maximum<5000>, Default<1000>, Unit<" Hz">);
+    LE_DEFINE_PARAMETER(AveragingWidth, LinearUnsignedInteger, Minimum<0>, Maximum<5000>,
+                        Default<1000>, Unit<" Hz">);
     LE_DEFINE_PARAMETER(Intensity, LinearFloat, Minimum<0>, Maximum<+72>, Default<20>, Unit<" dB">);
     LE_DEFINE_PARAMETER(Limiter, LinearFloat, Minimum<-80>, Maximum<0>, Default<-20>, Unit<" dB">);
     LE_DEFINE_PARAMETERS(AveragingWidth, Intensity, Limiter);

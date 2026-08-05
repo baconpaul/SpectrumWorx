@@ -38,11 +38,14 @@ class FreezeImpl : public EffectImpl<Freeze>
     struct DynamicChannelState : DynamicChannelState_<DynamicChannelState>
     {
         PhaseVocoderShared::PitchShifter::ChannelState pvState;
-        Engine::HalfFFTBuffer<float>                   frozenMagNew;
-        Engine::HalfFFTBuffer<float>                   frozenFreqNew;
-        Engine::HalfFFTBuffer<float>                   frozenMagOld;
-        Engine::HalfFFTBuffer<float>                   frozenFreqOld;
-        auto members() { return std::tie(pvState, frozenMagNew, frozenFreqNew, frozenMagOld, frozenFreqOld); }
+        Engine::HalfFFTBuffer<float> frozenMagNew;
+        Engine::HalfFFTBuffer<float> frozenFreqNew;
+        Engine::HalfFFTBuffer<float> frozenMagOld;
+        Engine::HalfFFTBuffer<float> frozenFreqOld;
+        auto members()
+        {
+            return std::tie(pvState, frozenMagNew, frozenFreqNew, frozenMagOld, frozenFreqOld);
+        }
     };
 
     struct ChannelState : DynamicChannelState

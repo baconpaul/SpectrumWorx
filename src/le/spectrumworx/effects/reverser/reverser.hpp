@@ -41,7 +41,8 @@ namespace Effects
 
 struct Reverser
 {
-    LE_DEFINE_PARAMETER(Length, LinearUnsignedInteger, Minimum<1>, Maximum<5000>, Default<1000>, Unit<" ms">);
+    LE_DEFINE_PARAMETER(Length, LinearUnsignedInteger, Minimum<1>, Maximum<5000>, Default<1000>,
+                        Unit<" ms">);
     LE_DEFINE_PARAMETERS(Length);
 
     /// \typedef Length

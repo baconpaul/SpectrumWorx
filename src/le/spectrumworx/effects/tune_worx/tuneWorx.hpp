@@ -67,15 +67,27 @@ struct TuneWorxBase ///<
     LE_DEFINE_PARAMETER(BypassSemi11, Boolean);
     LE_DEFINE_PARAMETER(BypassSemi12, Boolean);
     LE_DEFINE_PARAMETER(Vibrato, Boolean);
-    LE_DEFINE_PARAMETER(PitchMinFreq, LinearFloat, Minimum<50>, Maximum<2000>, Default<70>, Unit<"Hz">);
-    LE_DEFINE_PARAMETER(PitchMaxFreq, LinearFloat, Minimum<100>, Maximum<10000>, Default<2000>, Unit<"Hz">);
-    LE_DEFINE_PARAMETER(TuneTolerance, LinearFloat, Minimum<0>, Maximum<50>, Default<0>, Unit<"Hz">);
-    LE_DEFINE_PARAMETER(RetuneTime, LinearUnsignedInteger, Minimum<0>, Maximum<500>, Default<50>, Unit<"ms">);
-    LE_DEFINE_PARAMETER(VibratoDelay, LinearUnsignedInteger, Minimum<0>, Maximum<1000>, Default<100>, Unit<"ms">);
-    LE_DEFINE_PARAMETER(VibratoPeriod, LinearUnsignedInteger, Minimum<10>, Maximum<250>, Default<100>, Unit<"ms">);
-    LE_DEFINE_PARAMETER(VibratoDepth, LinearUnsignedInteger, Minimum<0>, Maximum<100>, Default<50>, Unit<"\"">);
+    LE_DEFINE_PARAMETER(PitchMinFreq, LinearFloat, Minimum<50>, Maximum<2000>, Default<70>,
+                        Unit<"Hz">);
+    LE_DEFINE_PARAMETER(PitchMaxFreq, LinearFloat, Minimum<100>, Maximum<10000>, Default<2000>,
+                        Unit<"Hz">);
+    LE_DEFINE_PARAMETER(TuneTolerance, LinearFloat, Minimum<0>, Maximum<50>, Default<0>,
+                        Unit<"Hz">);
+    LE_DEFINE_PARAMETER(RetuneTime, LinearUnsignedInteger, Minimum<0>, Maximum<500>, Default<50>,
+                        Unit<"ms">);
+    LE_DEFINE_PARAMETER(VibratoDelay, LinearUnsignedInteger, Minimum<0>, Maximum<1000>,
+                        Default<100>, Unit<"ms">);
+    LE_DEFINE_PARAMETER(VibratoPeriod, LinearUnsignedInteger, Minimum<10>, Maximum<250>,
+                        Default<100>, Unit<"ms">);
+    LE_DEFINE_PARAMETER(VibratoDepth, LinearUnsignedInteger, Minimum<0>, Maximum<100>, Default<50>,
+                        Unit<"\"">);
     LE_DEFINE_PARAMETER(PitchShift, SymmetricInteger, MaximumOffset<1200>, Default<0>, Unit<"\"">);
-    LE_DEFINE_PARAMETERS(Key, SpringType, Semi01, Semi02, Semi03, Semi04, Semi05, Semi06, Semi07, Semi08, Semi09, Semi10, Semi11, Semi12, BypassSemi01, BypassSemi02, BypassSemi03, BypassSemi04, BypassSemi05, BypassSemi06, BypassSemi07, BypassSemi08, BypassSemi09, BypassSemi10, BypassSemi11, BypassSemi12, Vibrato, PitchMinFreq, PitchMaxFreq, TuneTolerance, RetuneTime, VibratoDelay, VibratoPeriod, VibratoDepth, PitchShift);
+    LE_DEFINE_PARAMETERS(Key, SpringType, Semi01, Semi02, Semi03, Semi04, Semi05, Semi06, Semi07,
+                         Semi08, Semi09, Semi10, Semi11, Semi12, BypassSemi01, BypassSemi02,
+                         BypassSemi03, BypassSemi04, BypassSemi05, BypassSemi06, BypassSemi07,
+                         BypassSemi08, BypassSemi09, BypassSemi10, BypassSemi11, BypassSemi12,
+                         Vibrato, PitchMinFreq, PitchMaxFreq, TuneTolerance, RetuneTime,
+                         VibratoDelay, VibratoPeriod, VibratoDepth, PitchShift);
 #else  // LE_SIMPLE_TUNEWORX
     LE_DEFINE_PARAMETER(Semi01, Boolean);
     LE_DEFINE_PARAMETER(Semi02, Boolean);
@@ -89,7 +101,8 @@ struct TuneWorxBase ///<
     LE_DEFINE_PARAMETER(Semi10, Boolean);
     LE_DEFINE_PARAMETER(Semi11, Boolean);
     LE_DEFINE_PARAMETER(Semi12, Boolean);
-    LE_DEFINE_PARAMETERS(Key, Semi01, Semi02, Semi03, Semi04, Semi05, Semi06, Semi07, Semi08, Semi09, Semi10, Semi11, Semi12);
+    LE_DEFINE_PARAMETERS(Key, Semi01, Semi02, Semi03, Semi04, Semi05, Semi06, Semi07, Semi08,
+                         Semi09, Semi10, Semi11, Semi12);
 #endif // LE_SIMPLE_TUNEWORX
 
     /// \typedef Key

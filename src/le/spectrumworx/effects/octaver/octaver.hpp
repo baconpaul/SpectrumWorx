@@ -48,9 +48,12 @@ struct Octaver
     LE_ENUMERATED_PARAMETER(Octave1, Down2, Down1, Off, Up1, Up2);
     LE_ENUMERATED_PARAMETER(Octave2, Down2, Down1, Off, Up1, Up2);
 
-    LE_DEFINE_PARAMETER(GainOctave1, LinearFloat, Minimum<-48>, Maximum<+24>, Default<0>, Unit<" dB">);
-    LE_DEFINE_PARAMETER(GainOctave2, LinearFloat, Minimum<-48>, Maximum<+24>, Default<0>, Unit<" dB">);
-    LE_DEFINE_PARAMETER(CutoffFrequency, LinearUnsignedInteger, Minimum<0>, Maximum<16000>, Default< 350>, Unit<" Hz">);
+    LE_DEFINE_PARAMETER(GainOctave1, LinearFloat, Minimum<-48>, Maximum<+24>, Default<0>,
+                        Unit<" dB">);
+    LE_DEFINE_PARAMETER(GainOctave2, LinearFloat, Minimum<-48>, Maximum<+24>, Default<0>,
+                        Unit<" dB">);
+    LE_DEFINE_PARAMETER(CutoffFrequency, LinearUnsignedInteger, Minimum<0>, Maximum<16000>,
+                        Default<350>, Unit<" Hz">);
     LE_DEFINE_PARAMETERS(Octave1, GainOctave1, Octave2, GainOctave2, CutoffFrequency);
 
     /// \typedef Octave1

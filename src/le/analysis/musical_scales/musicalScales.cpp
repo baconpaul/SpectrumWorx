@@ -130,9 +130,7 @@ float LE_HOT Scale::snap2Scale(float const freq, std::uint8_t const keyIndex) co
         float const upperPitchScale(lowerPitchScale * 2);
         float const lowerRatio(pitchScaleComparisonSource / lowerPitchScale);
         float const upperRatio(upperPitchScale / pitchScaleComparisonSource);
-        if (
-            (targetPitchChangeDirection_ > 0) ||
-            (upperRatio < lowerRatio))
+        if ((targetPitchChangeDirection_ > 0) || (upperRatio < lowerRatio))
         {
             pitchScaleDeltas[n].ratio = upperRatio;
             pitchScaleDeltas[n].inverted = false;

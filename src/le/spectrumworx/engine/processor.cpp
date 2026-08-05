@@ -690,7 +690,7 @@ void LE_COLD Processor::calculateWindowAndWOLAGain()
 
         engineSetup().setWOLAGainAndRipple(wolaGain, variation);
 
-#if 0 //...mrmlj...can be noisy/not needed that much anymore...
+#if 0  //...mrmlj...can be noisy/not needed that much anymore...
         LE_TRACE("\tWindow ID: %u, window overlap factor: %u, gain: %f, variation: %f%%.",
                  engineSetup().windowFunction(), windowSize / stepSize, wolaGain, variation * 100);
 #endif // _DEBUG

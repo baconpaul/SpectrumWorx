@@ -43,8 +43,10 @@ namespace Effects
 
 struct Freqnamics
 {
-    LE_DEFINE_PARAMETER(LimiterThreshold, LinearFloat, Minimum<-90>, Maximum<0>, Default<-10>, Unit<" dB">);
-    LE_DEFINE_PARAMETER(NoisegateThreshold, LinearFloat, Minimum<-90>, Maximum<0>, Default<-60>, Unit<" dB">);
+    LE_DEFINE_PARAMETER(LimiterThreshold, LinearFloat, Minimum<-90>, Maximum<0>, Default<-10>,
+                        Unit<" dB">);
+    LE_DEFINE_PARAMETER(NoisegateThreshold, LinearFloat, Minimum<-90>, Maximum<0>, Default<-60>,
+                        Unit<" dB">);
     LE_DEFINE_PARAMETERS(LimiterThreshold, NoisegateThreshold);
 
     /// \typedef LimiterThreshold

@@ -143,10 +143,7 @@ template <class Parameter> struct DiscreteValues
     /// \note What ParameterInfo carries, beside the nullptr a parameter with no
     /// value strings gives it. constexpr to match NonEnumeratedParameter's, now
     /// that ENUMERATED_PARAMETER_STRINGS produces a constant.
-    static constexpr char const *LE_RESTRICT const *stringsBegin()
-    {
-        return strings.data();
-    }
+    static constexpr char const *LE_RESTRICT const *stringsBegin() { return strings.data(); }
 };
 
 namespace Detail ///< \internal

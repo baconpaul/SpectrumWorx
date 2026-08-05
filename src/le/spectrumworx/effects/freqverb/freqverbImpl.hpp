@@ -35,8 +35,8 @@ class FreqverbImpl : public EffectImpl<Freqverb>
   public: // LE::Effect required interface.
     struct ChannelState : DynamicChannelState_<ChannelState>
     {
-        Engine::HalfFFTBuffer<>                        feedbackSumReals;
-        Engine::HalfFFTBuffer<>                        feedbackSumImags;
+        Engine::HalfFFTBuffer<> feedbackSumReals;
+        Engine::HalfFFTBuffer<> feedbackSumImags;
         PhaseVocoderShared::PitchShifter::ChannelState ps;
         auto members() { return std::tie(feedbackSumReals, feedbackSumImags, ps); }
     };

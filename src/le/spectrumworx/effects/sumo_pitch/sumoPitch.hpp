@@ -45,7 +45,8 @@ namespace Effects
 
 struct SumoPitch
 {
-    LE_DEFINE_PARAMETER(Blend, LinearUnsignedInteger, Minimum<0>, Maximum<100>, Default<50>, Unit<" %">);
+    LE_DEFINE_PARAMETER(Blend, LinearUnsignedInteger, Minimum<0>, Maximum<100>, Default<50>,
+                        Unit<" %">);
     LE_DEFINE_PARAMETER(Speed, LinearFloat, Minimum<0>, Maximum<60>, Default<1>, Unit<" '/s">);
     LE_DEFINE_PARAMETERS(Blend, Speed);
 

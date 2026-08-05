@@ -19,7 +19,6 @@
 #include "le/spectrumworx/effects/channelStateStatic.hpp"
 #include "le/spectrumworx/engine/channelData_fwd.hpp"
 
-
 #include <cstdint>
 #include <utility>
 #include "le/utility/span.hpp"

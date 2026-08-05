@@ -61,8 +61,8 @@ LE_FORCEINLINE void addModulesToMenu(Menus &menus, std::false_type /*end not rea
 
     typedef typename Effects::Group<moduleIndex>::type CurrentModuleGroup;
     typedef typename Effects::Group<nextModuleIndex>::type NextModuleGroup;
-    unsigned int const nextSubMenuIndex(
-        subMenuIndex + !std::is_same_v<CurrentModuleGroup, NextModuleGroup>);
+    unsigned int const nextSubMenuIndex(subMenuIndex +
+                                        !std::is_same_v<CurrentModuleGroup, NextModuleGroup>);
 
     addModulesToMenu<nextModuleIndex, nextSubMenuIndex>(menus, LastModule());
 }

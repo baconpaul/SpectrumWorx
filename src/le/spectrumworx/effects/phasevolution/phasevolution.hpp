@@ -43,7 +43,8 @@ namespace Effects
 
 struct Phasevolution
 {
-    LE_DEFINE_PARAMETER(PhasePeriod, LinearFloat, Minimum<1>, Maximum<5000>, Default<500>, ValuesDenominator< 1000>, Unit<" s">);
+    LE_DEFINE_PARAMETER(PhasePeriod, LinearFloat, Minimum<1>, Maximum<5000>, Default<500>,
+                        ValuesDenominator<1000>, Unit<" s">);
     LE_DEFINE_PARAMETERS(PhasePeriod);
 
     /// \typedef PhasePeriod

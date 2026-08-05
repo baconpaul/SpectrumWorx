@@ -119,10 +119,9 @@ template <class ParametersParam, unsigned int memberIndex> class ParametersFromM
     {
         DummyStorage<Parameters> const fakeContainer;
 
-        ptrdiff_t const offset(
-            reinterpret_cast<char const *>(&LE::Parameters::at<memberIndex>(
-                reinterpret_cast<Parameters const &>(fakeContainer))) -
-            reinterpret_cast<char const *>(&fakeContainer));
+        ptrdiff_t const offset(reinterpret_cast<char const *>(&LE::Parameters::at<memberIndex>(
+                                   reinterpret_cast<Parameters const &>(fakeContainer))) -
+                               reinterpret_cast<char const *>(&fakeContainer));
 
         return *reinterpret_cast<Parameters *>(reinterpret_cast<char *>(&member) - offset);
     }

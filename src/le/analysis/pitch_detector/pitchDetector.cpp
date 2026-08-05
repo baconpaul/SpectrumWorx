@@ -290,10 +290,7 @@ Peak const *PitchDetector::binPeak(std::uint16_t const bin, PeakDetector const &
 
 LE_OPTIMIZE_FOR_SPEED_END()
 
-void PitchDetector::ChannelState::reset()
-{
-    lastPitch = 0;
-}
+void PitchDetector::ChannelState::reset() { lastPitch = 0; }
 
 //------------------------------------------------------------------------------
 } // namespace LE

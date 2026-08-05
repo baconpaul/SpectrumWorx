@@ -74,8 +74,7 @@ LE_NOINLINE void BaseParameters::setup(Engine::Setup const &engineSetupParam)
     expctRate_ = twoPi_d * pEngineSetup->stepSize<double>() / pEngineSetup->fftSize<double>();
     deviationFactor_ = freqPerBin * pEngineSetup->windowOverlappingFactor<double>() / twoPi_d;
 
-#if defined(_DEBUG) && !defined(__clang__) &&                                                    \
-    0 //...mrmlj...started failing even on msvc10...
+#if defined(_DEBUG) && !defined(__clang__) && 0 //...mrmlj...started failing even on msvc10...
     float const inverseDeviationFactor(1 / deviationFactor_);
     float const inverseInverseDeviationFactor(1 / inverseDeviationFactor);
     LE_ASSERT_MSG(inverseInverseDeviationFactor == deviationFactor_,

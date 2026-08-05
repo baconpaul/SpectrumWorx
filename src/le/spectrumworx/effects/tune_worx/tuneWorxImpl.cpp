@@ -121,9 +121,9 @@ LE_OPTIMIZE_FOR_SIZE_END()
 
 LE_OPTIMIZE_FOR_SPEED_BEGIN()
 
-float LE_NOINLINE
-LE_HOT TuneWorxBaseImpl::findNewPitchScale(Engine::ChannelData_AmPh const &data,
-                                           Engine::Setup const &engineSetup, ChannelState &cs) const
+float LE_NOINLINE LE_HOT TuneWorxBaseImpl::findNewPitchScale(Engine::ChannelData_AmPh const &data,
+                                                             Engine::Setup const &engineSetup,
+                                                             ChannelState &cs) const
 {
     unsigned int const vibratoPitch(1);
     unsigned int const pitchShift_(1);
@@ -132,12 +132,9 @@ LE_HOT TuneWorxBaseImpl::findNewPitchScale(Engine::ChannelData_AmPh const &data,
         return pitchShift_ * vibratoPitch;
 
     // Current pitch:
-    float const pitch(
-        PitchDetector::findPitch(data.full().amps(), cs,
-                                 70,
-                                 70 * 2 * 2 * 2 * 2 * 2, // 5 octaves
-                                 engineSetup)
-    );
+    float const pitch(PitchDetector::findPitch(data.full().amps(), cs, 70,
+                                               70 * 2 * 2 * 2 * 2 * 2, // 5 octaves
+                                               engineSetup));
 
     if (pitch == 0)
     {
