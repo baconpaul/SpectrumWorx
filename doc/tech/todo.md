@@ -108,7 +108,14 @@ takes and the binary lands in `<dir>/validator-build/bin/Debug/validator`.
 Nothing exists. The gates mostly do — they are just not wired:
 `scripts/check_boost_allowlist.sh` (run by hand),
 `tests/checkODRHeaderScope.cmake` and `tests/checkNoJuceInDSP.cmake` (ctest cases
-already), and `clang-format` (see below — the tree is not clean).
+already), and `clang-format --dry-run -Werror`, which the tree passes as of
+05.08.2026.
+
+**Install clang-format by version — 21.1.5 — rather than taking the runner's.**
+`.clang-format` says so and cannot enforce it: the defaults move between
+releases, so a newer major re-lays-out files nobody touched and the gate fails on
+somebody else's afternoon. The sweep's commit is in `.git-blame-ignore-revs`,
+which GitHub reads by name.
 
 Model it on OB-Xf's `build-plugin.yml` with `sst-githubactions/prepare-for-juce`.
 Matrix: macos-universal, windows-msvc-x64, windows-arm64, linux-x64, linux-arm64.
@@ -171,38 +178,33 @@ Three drifts, all visible to a user, all in `presetBrowser.cpp`:
 
 ### Dead code that needs a decision rather than a sweep
 
-The free deletions are done — 1,400 lines across 13 files on 05.08.2026, which
-is 300 fewer than the estimate because **`le/plugins/plugin.hpp` was on the list
-and is not dead**: `spectrumWorxCore.hpp` includes it, and so do
-`automatedModule.{cpp,hpp}` and three of `core/host_interop/`. Only
-`le/plugins/entryPoint.hpp` went. `filesystemImpl.inl` moved to the platform
-batch below, being included by exactly the three files in it.
+Roughly 8,000 lines across 51 files are in the tree and in no target. Every one
+of them needs somebody to decide rather than somebody to sweep, which is why
+each is a paragraph and not a line on a list.
 
-The platform arms are gone too — 1,698 lines across 12 files on 05.08.2026.
-The question the row left open is answered: **`sst-plugininfra` already covers
-them.** `filesystemApple.cpp` and `filesystemWindows.cpp` existed to specialise
-`PathResolver<SpecialLocations>`, and nothing outside `le/utility/filesystem*`
-names `SpecialLocations` or `PathResolver` at all — the port asks
-`sst::plugininfra::paths::bestDocumentsFolderPathFor` for its one special
-location (`gui/gui.cpp:234`, "the same answer Surge gives"). So the live build
-only ever resolved absolute paths, and `filesystem.cpp` does that on its own.
-
-Deleting `jni.*` and `matlab.*` also took the guarded blocks that included
-them: the tracer's four `__ANDROID__` arms, and four
-`#if LE_UTILITY_MATLAB_INTEROP` blocks in `vocoderImpl.cpp` and `synthImpl.cpp`
-— Matlab plotting scaffolding behind an option nothing sets. The two effects
-stay; only the scaffolding went.
-
-**Actual decisions:**
-
-- **`src/le/spectrumworx/effects/_unfinished/`** — 16 effects, 3,778 lines.
-  `old/initial_scan.md` says read before deleting. A branch or an `attic/` gets
-  it out of `git ls-files 'src/**'` without losing it.
+- **`src/le/spectrumworx/effects/_unfinished/`** — 16 effects, 33 files, 3,908
+  lines. `old/initial_scan.md` says read before deleting. A branch or an
+  `attic/` gets it out of `git ls-files 'src/**'` without losing it.
 - **Four finished effects that were never shipped** — `vocoder`, `synth`,
-  `talk_box`, `dissonancizer`, 1,325 lines. **Not port leftovers**: the 2016
-  `effectsList.cmake` already had three of them commented out. `effectsList.hpp`
-  fixes the count at 57 and the order is ABI, so appending them is legal and
-  reordering is not.
+  `talk_box`, `dissonancizer`, 12 files, 1,859 lines. **Not port leftovers**:
+  the 2016 `effectsList.cmake` already had three of them commented out.
+  `effectsList.hpp` fixes the count at 57 and the order is ABI, so appending
+  them is legal and reordering is not.
+
+  **Nothing compiles these, so nothing checks them.** They are in no target and
+  `allEffectImpls.hpp` does not name them, so an edit here is checked by reading
+  and by nothing else — which is a live hazard, not a hypothetical one: their
+  Matlab scaffolding was removed by hand and no compiler has seen the result.
+  Whoever revives one starts by getting it into a target.
+- **Five cmake files that record a build nobody runs** — `legacy-build.cmake`
+  (768 lines), `core/sources.cmake` (342), `le/utility/CMakeLists.txt` (220) and
+  two `configuration.cmake` (189). Nothing includes any of them;
+  `src/CMakeLists.txt` says so in its second line. They were kept as the record
+  of the 2016 build, and the deletions of 05.08.2026 cost them that: **65 of the
+  names in them are now files that do not exist**, so as a record of anything
+  they are already wrong. Either delete them — git has the 2016 build — or
+  accept that they are prose and stop expecting them to resolve.
+
 - **`le/math/vector.cpp`'s dead NT2 arm** — ~750 lines across 18
   `#ifdef LE_MATH_USE_NT2` sites in a 2,034-line **live** file, each with a live
   `#else` beside it. Left when `src/nt2_static_fft/` went on 05.08.2026, and it
@@ -212,26 +214,6 @@ stay; only the scaffolding went.
   unreachable. Stripping it is a refactor of the vector math the whole engine
   runs on, which is why it is a decision and not a sweep — and it is what would
   let `boost/simd` and `boost/dispatch` off `scripts/check_boost_allowlist.sh`.
-
-### Formatting
-
-Done on 05.08.2026: 52 files (58 before the dead-code deletions took six of
-them), 51 of them under `src/le/`. The value-string tables survived — all 92
-pairs across the 26 `ENUMERATED_PARAMETER_STRINGS` uses, one per line, checked
-line by line rather than assumed.
-
-Two things the row asked for and did not exist: **`.git-blame-ignore-revs` had
-never been written** — stage 0.6 did not record its reformat anywhere, whatever
-this file said — and nothing pinned the clang-format version. Both are there
-now. The ignore file needs one command per clone, which nobody will remember, so
-it is in the file's own header:
-
-    git config blame.ignoreRevsFile .git-blame-ignore-revs
-
-GitHub and GitLab read it by name and need no configuring. **When CI is wired
-(item 2), install clang-format 21.1.5 by version** rather than taking the
-runner's: a different major re-lays-out files nobody touched, and the gate then
-fails on somebody else's afternoon.
 
 ---
 
