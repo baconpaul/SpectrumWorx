@@ -17,8 +17,11 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <sstream>
+#include <string>
 //------------------------------------------------------------------------------
 namespace SWTest
 {
@@ -164,6 +167,55 @@ Fixture Fixture::parse(std::string const &line)
     for (auto &band : fixture.digest.bands)
         stream >> band;
     return fixture;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// The fixture file
+////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+constexpr char provenanceMarker[]{"# provenance "};
+constexpr std::size_t provenanceMarkerLength{sizeof(provenanceMarker) - 1};
+} // anonymous namespace
+
+bool FixtureFile::mintedByThisBuild() const { return provenance == SWTest::provenance(); }
+
+FixtureFile readFixtures(std::string const &path)
+{
+    FixtureFile file;
+    std::ifstream stream(path);
+    std::string line;
+    while (std::getline(stream, line))
+    {
+        if (line.compare(0, provenanceMarkerLength, provenanceMarker) == 0)
+        {
+            file.provenance = line.substr(provenanceMarkerLength);
+            continue;
+        }
+        if (line.empty() || (line.front() == '#'))
+            continue;
+        auto const fixture(Fixture::parse(line));
+        file.fixtures.emplace(fixture.key, fixture.digest);
+    }
+    return file;
+}
+
+void writeFixtures(std::string const &path, std::span<Fixture const> const fixtures,
+                   std::span<char const *const> const preamble)
+{
+    std::ofstream file(path, std::ios::trunc);
+    for (auto const *const line : preamble)
+        file << "# " << line << '\n';
+    file << provenanceMarker << provenance() << '\n';
+    for (auto const &fixture : fixtures)
+        file << fixture.serialise() << '\n';
+}
+
+bool goldenUpdateRequested()
+{
+    auto const *const value(std::getenv("SW_GOLDEN_UPDATE"));
+    return value && (std::string(value) != "0");
 }
 
 std::string provenance()

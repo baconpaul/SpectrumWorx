@@ -23,6 +23,7 @@
 #include <array>
 #include <cstdint>
 #include <iosfwd>
+#include <map>
 #include <span>
 #include <string>
 #include <vector>
@@ -56,6 +57,38 @@ struct Fixture
     std::string serialise() const;
     static Fixture parse(std::string const &line);
 };
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief A whole fixture file: the rows, plus the one line in it that is not a
+/// row.
+///
+/// \note Here rather than in goldenTests.cpp since 05.08.2026, when the
+/// side-chain fixtures became a second file of the same shape. What the
+/// provenance marker decides -- whether the bit-exact hash column is a contract
+/// at all -- is a property of the format, so it belongs with the format.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+struct FixtureFile
+{
+    std::string provenance; ///< empty if the file predates the marker
+    std::map<std::string, Digest> fixtures;
+
+    /// Whether this build is the one that minted the file, and so whether the
+    /// hashes are being checked.
+    bool mintedByThisBuild() const;
+}; // struct FixtureFile
+
+FixtureFile readFixtures(std::string const &path);
+
+/// \param preamble the explanatory "#" lines, written above the provenance
+/// marker; each is emitted as given, prefixed with "# ".
+void writeFixtures(std::string const &path, std::span<Fixture const> fixtures,
+                   std::span<char const *const> preamble);
+
+/// Whether SW_GOLDEN_UPDATE asked for the fixture files to be rewritten.
+bool goldenUpdateRequested();
 
 /// \brief What produced a fixture file, to the granularity that decides whether
 /// its bit-exact hashes mean anything here.

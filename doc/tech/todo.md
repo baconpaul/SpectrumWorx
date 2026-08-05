@@ -17,7 +17,7 @@ they were scoped to do.
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone — macOS arm64. Linux built on 04.08.2026 under GCC 15, as a log rather than here; its 469 warnings are fixed and **the fixes have not been compiled by a GCC**. Windows arrives as logs. |
 | Runs | Standalone, with audio, with the real editor, with presets. It deadlocked in Logic and in Bitwig on the 2016 threading model; **that model has been replaced and nobody has reloaded it in either host** — item 1. |
-| Tests | **264/264** as of 04.08.2026, in both build trees. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`. Goldens run in Release only. |
+| Tests | **269/269** as of 05.08.2026, in both build trees. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`. Goldens run in Release only. |
 | Validators | `auval` 10 runs of 10. `vst3-validator` 47/47. `clap-cpp-validator` 21/21, one warning (`scan-time`, below). |
 | CI | **None.** There is no `.github/`. |
 | Warnings | **Two**, both deliberate `#pragma message` build banners. Our own sources compile under `-Wall -Wextra -Werror`, on Apple by default and elsewhere with `-DSW_WERROR=ON`. MSVC has no baseline yet — item 2. |
@@ -144,33 +144,28 @@ and the three loose ends `tech_debt.md` records under "Licence and shipping".
 
 Each of these is under a day and none of them blocks anything.
 
-### The side chain has never been fed a different signal
+### The side chain, above the engine
 
-Fourteen shipping effects take a side chain and every one of them is pinned only
-where side == main — the one case in which a side-chain effect cannot be
-distinguished from a bug that ignores the side chain entirely. The recipe, and
-it is small:
+The DSP half is done — `tests/effects/sideChainTests.cpp` drives fifteen effects
+with a signal of their own on the side chain, and 60 fixtures pin the result. It
+found that four of the fifteen hear nothing at their defaults and that
+`usesSideChannel` is both unread and wrong; both are in
+[`tech_debt.md`](tech_debt.md). What is left is the plugin edge and the sample:
 
-1. **`tests/goldens/engineHarness.cpp`** — `render()` passes
-   `inputPointers.data()` twice (`:181`). Give it a second signal and a second
-   pointer array, generated from a *different* `signal` than the main one. The
-   comment at `:166` already claims the side-chain effects "are driven
-   separately"; this makes an existing comment true.
-2. **A golden case per side-chain effect**, main and side deliberately dissimilar
-   — a sine against noise is enough, and the corpus already has both generators.
-3. **`tests/clap/pluginTests.cpp`** — `ActivePlugin::process` hardcodes
+1. **`tests/clap/pluginTests.cpp`** — `ActivePlugin::process` hardcodes
    `audio_inputs_count = 1`. A second `clap_audio_buffer` with its own two
    channels exercises the port-1 branch of `runEngine` for the first time. Keep a
    variant that still passes 1: the fallback path is what most hosts will do.
-4. **Assert the Side Chain port's info.** The port test checks `count(true) == 2`
+2. **Assert the Side Chain port's info.** The port test checks `count(true) == 2`
    and then only calls `ports->get(…, 0, …)`. One more call with index 1,
    asserting the id, the stereo type and that `IS_MAIN` is clear.
-5. **The harness can feed a *file* now.** 25 golden fixtures hash identically on
+3. **The harness can feed a *file* now.** 25 golden fixtures hash identically on
    every platform because they render pure silence — `Convolver`, `Frecho`,
    `Frevcho` at default parameters — and the old explanation was the flag that
    compiled the sample loader out. The loader is back and the factory samples are
    in the binary, so a fixture can load one by name and those 25 can pin
-   something.
+   something. Convolver's three are already understood: it renders silence
+   because `Triggered` is its default and nothing has pressed Grab IR.
 
 ### Test holes worth the effort
 

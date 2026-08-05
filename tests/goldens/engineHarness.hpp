@@ -147,8 +147,21 @@ struct RenderSetup
 ///
 /// \param effectIndex index into Effects::effectsList.hpp, or -1 for a bypassed
 ///        chain (which the goldens use to pin the engine's own WOLA path).
+///
+/// \note The side chain is fed the main signal, which is what every fixture
+/// minted before 05.08.2026 was rendered under. See renderWithSideChain().
 std::vector<float> render(RenderSetup const &, std::int8_t effectIndex, Signal,
                           std::uint32_t frames);
+
+/// \brief The same, with the side chain fed a *different* signal.
+///
+/// \note The only arrangement in which a side-chain effect can be told apart
+/// from one that ignores its side chain entirely: with side == main the two
+/// produce the same render, and fourteen shipping effects were pinned only that
+/// way. `sideChainTests.cpp` is what says which fourteen and what they do.
+///                                       (05.08.2026.) (SW port)
+std::vector<float> renderWithSideChain(RenderSetup const &, std::int8_t effectIndex, Signal main,
+                                       Signal side, std::uint32_t frames);
 
 //------------------------------------------------------------------------------
 // Chains
@@ -188,8 +201,13 @@ std::vector<float> renderChain(RenderSetup const &, std::span<Slot const>, Signa
 /// partial, so that "the dominant frequency moved" has an unambiguous subject --
 /// and a property about an envelope wants a note that starts and stops. Both are
 /// three lines at the call site and neither belongs in the golden enum.
+///
+/// \param monoSideInput what the side chain gets, or empty for the main signal
+///        -- which is what a host does when nothing is patched into the side
+///        chain port, and what every caller did before there was a parameter.
 std::vector<float> renderChain(RenderSetup const &, std::span<Slot const>,
-                               std::span<float const> monoInput);
+                               std::span<float const> monoInput,
+                               std::span<float const> monoSideInput = {});
 
 //------------------------------------------------------------------------------
 } // namespace SWTest

@@ -29,9 +29,6 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
-#include <cstdio>
-#include <cstdlib>
-#include <fstream>
 #include <iterator>
 #include <map>
 #include <sstream>
@@ -94,52 +91,20 @@ std::vector<SWTest::Fixture> renderAll()
     return fixtures;
 }
 
-/// The fixture file, plus the one thing about it that is not a fixture: what
-/// produced it.
-struct FixtureFile
-{
-    std::string provenance; ///< empty if the file predates the marker
-    std::map<std::string, SWTest::Digest> fixtures;
+/// \note The reader and the writer are `goldenDigest`'s since 05.08.2026: the
+/// side-chain fixtures are a second file of the same shape, and the provenance
+/// marker is a property of the format rather than of this case.
+constexpr char const *fixturePreamble[]{
+    "SpectrumWorx golden fixtures -- generated, do not hand edit.",
+    "Regenerate with SW_GOLDEN_UPDATE=1 ./sw-dsp-tests \"[golden]\"",
+    "",
+    "One row per effect/signal/fftSize/overlapFactor. Columns:",
+    "  key  hash  peak  rms  dcOffset  nonFinite  band0..band7 (dB)",
+    "",
+    "hash is FNV-1a over the raw sample bits and is a same-platform",
+    "contract only; the numeric columns are what a different",
+    "architecture or compiler is held to.",
 };
-
-constexpr char provenanceMarker[]{"# provenance "};
-
-FixtureFile readFixtures()
-{
-    FixtureFile file;
-    std::ifstream stream(fixturePath());
-    std::string line;
-    while (std::getline(stream, line))
-    {
-        if (line.compare(0, std::string(provenanceMarker).size(), provenanceMarker) == 0)
-        {
-            file.provenance = line.substr(std::string(provenanceMarker).size());
-            continue;
-        }
-        if (line.empty() || (line.front() == '#'))
-            continue;
-        auto const fixture(SWTest::Fixture::parse(line));
-        file.fixtures.emplace(fixture.key, fixture.digest);
-    }
-    return file;
-}
-
-void writeFixtures(std::vector<SWTest::Fixture> const &fixtures)
-{
-    std::ofstream file(fixturePath(), std::ios::trunc);
-    file << "# SpectrumWorx golden fixtures -- generated, do not hand edit.\n"
-            "# Regenerate with SW_GOLDEN_UPDATE=1 ./sw-tests \"[golden]\"\n"
-            "#\n"
-            "# One row per effect/signal/fftSize/overlapFactor. Columns:\n"
-            "#   key  hash  peak  rms  dcOffset  nonFinite  band0..band7 (dB)\n"
-            "#\n"
-            "# hash is FNV-1a over the raw sample bits and is a same-platform\n"
-            "# contract only; the numeric columns are what a different\n"
-            "# architecture or compiler is held to.\n"
-         << provenanceMarker << SWTest::provenance() << '\n';
-    for (auto const &fixture : fixtures)
-        file << fixture.serialise() << '\n';
-}
 
 /// \brief The effects whose output is not a continuous function of their input.
 ///
@@ -284,11 +249,6 @@ std::string driftReport(std::vector<SWTest::Fixture> const &rendered,
     return report.str();
 }
 
-bool updateRequested()
-{
-    auto const *const value(std::getenv("SW_GOLDEN_UPDATE"));
-    return value && (std::string(value) != "0");
-}
 } // anonymous namespace
 
 /// \note Rendering the whole matrix in a checked build aborts on a debug-only
@@ -319,14 +279,14 @@ TEST_CASE("Golden fixtures", "[golden]")
     REQUIRE(fixtures.size() == (Effects::Constants::numberOfEffects + 1) *
                                    std::size(configurations) * std::size(signals));
 
-    if (updateRequested())
+    if (SWTest::goldenUpdateRequested())
     {
-        writeFixtures(fixtures);
+        SWTest::writeFixtures(fixturePath(), fixtures, fixturePreamble);
         WARN("Golden fixtures regenerated -- read the diff before committing it.");
         return;
     }
 
-    auto const golden(readFixtures());
+    auto const golden(SWTest::readFixtures(fixturePath()));
     REQUIRE_FALSE(golden.fixtures.empty());
 
     /// The hash is a contract against the build that produced the file; the
@@ -342,7 +302,7 @@ TEST_CASE("Golden fixtures", "[golden]")
     /// it anyway turned the whole cross-platform question into 439 identical
     /// "bit-exact hash mismatch" lines that answered nothing.
     ///                                   (29.07.2026.) (SW port)
-    auto const sameBuild(golden.provenance == SWTest::provenance());
+    auto const sameBuild(golden.mintedByThisBuild());
 
     std::vector<std::string> failures;
     for (auto const &fixture : fixtures)

@@ -132,6 +132,18 @@ std::vector<float> render(RenderSetup const &setup, std::int8_t const effectInde
     return renderChain(setup, slots, signal, frames);
 }
 
+std::vector<float> renderWithSideChain(RenderSetup const &setup, std::int8_t const effectIndex,
+                                       Signal const main, Signal const side,
+                                       std::uint32_t const frames)
+{
+    std::vector<float> mainInput(frames), sideInput(frames);
+    generate(main, mainInput, static_cast<float>(setup.sampleRate));
+    generate(side, sideInput, static_cast<float>(setup.sampleRate));
+
+    Slot const slots[]{{effectIndex, {}}};
+    return renderChain(setup, slots, mainInput, sideInput);
+}
+
 std::vector<float> renderChain(RenderSetup const &setup, std::span<Slot const> const slots,
                                Signal const signal, std::uint32_t const frames)
 {
@@ -141,7 +153,8 @@ std::vector<float> renderChain(RenderSetup const &setup, std::span<Slot const> c
 }
 
 std::vector<float> renderChain(RenderSetup const &setup, std::span<Slot const> const slots,
-                               std::span<float const> const monoInput)
+                               std::span<float const> const monoInput,
+                               std::span<float const> const monoSideInput)
 {
     using namespace LE::SW;
 
@@ -182,13 +195,36 @@ std::vector<float> renderChain(RenderSetup const &setup, std::span<Slot const> c
 
     auto const channels(setup.numberOfChannels);
 
-    // Every channel gets the same signal; the effects that care about stereo
-    // are the side-chain ones, and those are driven separately.
+    // Every channel gets the same signal: what is being rendered is a mono
+    // source through a stereo engine, and nothing here is a stereo property.
     std::vector<std::vector<float>> inputChannels(
         channels, std::vector<float>(monoInput.begin(), monoInput.end()));
     std::vector<std::vector<float>> outputChannels(channels, std::vector<float>(frames, 0.0f));
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The side chain, and until 05.08.2026 this passed `inputPointers`
+    /// twice -- the comment here claimed the side-chain effects "are driven
+    /// separately" and nothing did. A side-chain effect fed its own main signal
+    /// renders identically to one that drops the side chain on the floor, so
+    /// fourteen effects had 112 fixtures apiece that could not fail.
+    ///
+    ///   Empty still means "the main signal", because that is what a host hands
+    /// over when nothing is patched into the port -- `runEngine()` falls back to
+    /// `input.data32` -- and it is what every fixture in `goldens.txt` was minted
+    /// under.
+    ///                                       (05.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    bool const separateSideChain(!monoSideInput.empty());
+    LE_ASSERT_MSG(!separateSideChain || (monoSideInput.size() == monoInput.size()),
+                  "The side chain must be as long as the main input.");
+    std::vector<std::vector<float>> sideChannels(
+        separateSideChain ? channels : 0,
+        std::vector<float>(monoSideInput.begin(), monoSideInput.end()));
+
     std::vector<float const *> inputPointers(channels);
+    std::vector<float const *> sidePointers(separateSideChain ? channels : 0);
     std::vector<float *> outputPointers(channels);
 
     for (std::uint32_t offset(0); offset < frames; offset += setup.blockSize)
@@ -198,9 +234,12 @@ std::vector<float> renderChain(RenderSetup const &setup, std::span<Slot const> c
         {
             inputPointers[channel] = inputChannels[channel].data() + offset;
             outputPointers[channel] = outputChannels[channel].data() + offset;
+            if (separateSideChain)
+                sidePointers[channel] = sideChannels[channel].data() + offset;
         }
-        engine.process(inputPointers.data(), inputPointers.data(), outputPointers.data(), 1.0f,
-                       block);
+        engine.process(inputPointers.data(),
+                       separateSideChain ? sidePointers.data() : inputPointers.data(),
+                       outputPointers.data(), 1.0f, block);
     }
 
     engine.suspend();

@@ -415,15 +415,42 @@ New entries go at the top of their area.
   8's property tests are the first DSP assertions a checked build makes, and
   they cover nine effects of 57.
 
-- **`usesSideChannel` is metadata nothing consumes.** (01.08.2026) Every effect
-  declares `static bool const usesSideChannel` and `effects.hpp:61` documents it
-  as part of the effect contract, but a grep of `src/` and `tests/` finds **no
-  reader** — dispatch is by parameter type. So 57 files maintain a constant that
-  cannot be wrong in any way that matters, and one of them already is:
-  `convolver.hpp` declares it `false` while `convolverImpl.hpp` takes
-  `MainSideChannelData_AmPh`. Either something generated consumes it and the grep
-  is wrong, or it should go. (Filling in the side-chain goldens — `todo.md` — is
-  what would make the constant worth having.)
+- **`usesSideChannel` is metadata nothing consumes, and it is wrong.**
+  (01.08.2026, measured 05.08.2026) Every effect declares
+  `static bool const usesSideChannel` and `effects.hpp:61` documents it as part
+  of the effect contract, but a grep of `src/` and `tests/` finds **no reader**
+  — dispatch is by parameter type, so what decides is whether the effect's
+  `process()` overload takes a `MainSideChannelData`.
+
+  Driving the side chain with a signal of its own settles how wrong: the
+  constant says **seven** effects, the engine's behaviour says **fifteen**. It
+  names Colorifer, Blender, Burrito, Inserter, Talking Wind and both Pitch
+  Followers, and misses Slicer, Convolver, Denoiser, Ethereal, Vaxateer,
+  Shapeless, Merger and Sumo Pitch. `convolver.hpp` declares `false` while
+  `convolverImpl.hpp` takes `MainSideChannelData_AmPh`, which is the same fault
+  seen from the other end. It should go; `sideChainTests.cpp` holds the measured
+  set and does not read it.
+
+- **Four side-chain effects are indistinguishable from deaf at their defaults.**
+  (05.08.2026, from `sideChainTests.cpp`) Which is why the side-chain fixtures
+  configure them, and it is worth reading as a *user*-facing observation rather
+  than a test one — dropping any of these four into a slot and patching a signal
+  into the side chain port does nothing until a second parameter is moved:
+  - **Slicer**, **Denoiser** and **Convolver** each have an enumerated mode whose
+    default is its *first* enumerator, and in all three cases that enumerator is
+    the one that ignores the side channel (`Hold`, `Main`, `Triggered`).
+  - **Convolver**'s is the strongest form of it: `Triggered` means the impulse
+    response is grabbed on a button press, so until then the effect renders
+    **silence**. Three of the 25 identically-hashed golden fixtures `todo.md`
+    records are Convolver, and they are not a quiet render — they are an unarmed
+    one.
+  - **Burrito** chooses its replacement positions only when its frame counter
+    wraps `Period`, which defaults to 250 ms, so nothing at all happens for the
+    first quarter second whatever is on the port.
+
+  None of this is a regression and all of it is 2016 behaviour. It is recorded
+  because "the side chain does nothing" is a plausible bug report against four of
+  the fifteen, and the answer is a parameter rather than a fix.
 
 ## Tests
 

@@ -27,6 +27,7 @@ add_executable(sw-dsp-tests
         core/protocolTests.cpp
         effects/amplifyingEffectsTests.cpp
         effects/effectsListTests.cpp
+        effects/sideChainTests.cpp
         goldens/engineHarness.cpp
         goldens/goldenDigest.cpp
         goldens/goldenTests.cpp
