@@ -42,11 +42,6 @@ namespace SW
 {
 //------------------------------------------------------------------------------
 
-namespace GUI
-{
-void warningMessageBox(std::string_view title, std::string_view message, bool canBlock);
-} // namespace GUI
-
 namespace Engine
 {
 ModuleChainImpl &Processor::modules() { return SpectrumWorxCore::modules(*this); }
@@ -92,50 +87,44 @@ void SpectrumWorxCore::process /// \throws nothing
     (float const *const *pMainChannels, float const *const *const pSideChannels,
      float *const *const outputs, float const &outputGainScale, unsigned int const samples)
 {
-#ifdef _DEBUG
-    // Implementation note:
-    //   To aid in algorithm debugging we locally enable FPU exceptions.
-    //                                        (01.07.2010.) (Domagoj Saric)
-    Math::FPUExceptionsEnabler const fpuDebuggerGuard;
-    try
+    /// \note An `#ifdef _DEBUG` block stood around this function's body: it
+    /// enabled FPU exceptions for the call and wrapped everything in
+    /// `catch (...)` that raised `GUI::warningMessageBox`. `_DEBUG` is
+    /// Microsoft's, defined by the debug CRT and by no other compiler, so the
+    /// block was live in exactly one configuration -- and that configuration
+    /// would not link, because sw-dsp has no GUI to call and must not: it is
+    /// goal 3 of threading_model.md and `engine-links-no-juce` checks it. The
+    /// engine's other message boxes went the same way, to the counted reporter
+    /// `reportPresetProblem` uses.
+    ///
+    ///   Raising a modal dialog is also the last thing to do here. This is the
+    /// audio callback; a dialog on this thread is the deadlock the whole
+    /// threading redesign was about, and the function's own contract two lines
+    /// above says it throws nothing.
+    ///                                       (05.08.2026.) (SW port)
+    LE_ASSERT_MSG(samples <= buffers_.blockSize(), "Process called with a too large block size.");
+    LE_ASSERT_MSG(!!buffers(), "Input buffers not initialised.");
+
+    // If gain needs to be applied to input data we first need to copy it to
+    // internal buffers:
+    using namespace GlobalParameters;
+    float const &inputGain(parameters().get<InputGain>());
+    if (!Math::is<1>(inputGain))
     {
-#endif // _DEBUG
-
-        LE_ASSERT_MSG(samples <= buffers_.blockSize(),
-                      "Process called with a too large block size.");
-        LE_ASSERT_MSG(!!buffers(), "Input buffers not initialised.");
-
-        // If gain needs to be applied to input data we first need to copy it to
-        // internal buffers:
-        using namespace GlobalParameters;
-        float const &inputGain(parameters().get<InputGain>());
-        if (!Math::is<1>(inputGain))
+        unsigned int const numberOfChannels(engineSetup().numberOfChannels());
+        LE_STACK_BUFFER(mainChannels, float const *, numberOfChannels);
+        for (unsigned int channel(0); channel < numberOfChannels; ++channel)
         {
-            unsigned int const numberOfChannels(engineSetup().numberOfChannels());
-            LE_STACK_BUFFER(mainChannels, float const *, numberOfChannels);
-            for (unsigned int channel(0); channel < numberOfChannels; ++channel)
-            {
-                float *LE_RESTRICT const pChannel(buffers().mainChannel(channel).begin());
-                Math::multiply(pMainChannels[channel], inputGain, pChannel, samples);
-                mainChannels[channel] = pChannel;
-            }
-            pMainChannels = &mainChannels[0];
+            float *LE_RESTRICT const pChannel(buffers().mainChannel(channel).begin());
+            Math::multiply(pMainChannels[channel], inputGain, pChannel, samples);
+            mainChannels[channel] = pChannel;
         }
-
-        Engine::Processor::process(pMainChannels, pSideChannels, outputs, samples,
-                                   parameters().get<OutputGain>() * outputGainScale,
-                                   parameters().get<MixPercentage>());
-
-#ifdef _DEBUG
+        pMainChannels = &mainChannels[0];
     }
-    catch (...)
-    {
-        static char const message[] =
-            "A serious error has occurred. It is recommended that you save all your work and "
-            "restart the host. Please report this inconvenience to Little Endian Ltd.";
-        GUI::warningMessageBox(MB_ERROR, message, false);
-    }
-#endif // DEBUG
+
+    Engine::Processor::process(pMainChannels, pSideChannels, outputs, samples,
+                               parameters().get<OutputGain>() * outputGainScale,
+                               parameters().get<MixPercentage>());
 }
 
 void SpectrumWorxCore::suspend() // pause
