@@ -25,6 +25,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+// \note std::numbers::pi, not M_PI and not LE::Math::pi_d. M_PI is a POSIX
+// extension MSVC only defines under _USE_MATH_DEFINES, and the engine's own
+// constant is what the reference below is checking the engine against.
+#include <numbers>
 #include <vector>
 //------------------------------------------------------------------------------
 
@@ -82,7 +86,7 @@ void referenceSpectrum(float const *const time, std::uint16_t const size,
         double real{0}, imaginary{0};
         for (std::uint16_t n(0); n < size; ++n)
         {
-            auto const angle(-2 * M_PI * bin * n / size);
+            auto const angle(-2 * std::numbers::pi * bin * n / size);
             real += time[n] * std::cos(angle);
             imaginary += time[n] * std::sin(angle);
         }
@@ -97,10 +101,10 @@ void fillTestSignal(float *const time, std::uint16_t const size)
     for (std::uint16_t n(0); n < size; ++n)
     {
         auto const t(static_cast<double>(n) / size);
-        time[n] =
-            static_cast<float>(std::sin(2 * M_PI * 3 * t) + 0.5 * std::cos(2 * M_PI * 29 * t) +
-                               0.25 * std::sin(2 * M_PI * 71 * t + 0.4) +
-                               0.125 * std::cos(2 * M_PI * (size / 2) * t) + 0.1);
+        time[n] = static_cast<float>(std::sin(2 * std::numbers::pi * 3 * t) +
+                                     0.5 * std::cos(2 * std::numbers::pi * 29 * t) +
+                                     0.25 * std::sin(2 * std::numbers::pi * 71 * t + 0.4) +
+                                     0.125 * std::cos(2 * std::numbers::pi * (size / 2) * t) + 0.1);
     }
 }
 } // anonymous namespace

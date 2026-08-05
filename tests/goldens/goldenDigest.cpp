@@ -20,6 +20,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+// \note std::numbers::pi rather than M_PI, which is a POSIX extension MSVC only
+// defines under _USE_MATH_DEFINES.
+#include <numbers>
 #include <sstream>
 #include <string>
 //------------------------------------------------------------------------------
@@ -107,8 +110,8 @@ Digest Digest::of(std::span<float const> const interleaved, std::uint8_t const c
                     if (!std::isfinite(sample))
                         continue;
                     // Hann, to keep leakage from smearing the band edges.
-                    auto const w(0.5 * (1 - std::cos(2 * M_PI * n / (window - 1))));
-                    auto const angle(-2 * M_PI * static_cast<double>(bin) * n / window);
+                    auto const w(0.5 * (1 - std::cos(2 * std::numbers::pi * n / (window - 1))));
+                    auto const angle(-2 * std::numbers::pi * static_cast<double>(bin) * n / window);
                     real += sample * w * std::cos(angle);
                     imaginary += sample * w * std::sin(angle);
                 }
