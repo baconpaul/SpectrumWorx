@@ -39,6 +39,12 @@ make_clapfirst_plugins(
         # target-postfix, output name, clap id
         STANDALONE_CONFIGURATIONS
         standalone "${PRODUCT_NAME}" "${SW_CLAP_ID}"
+
+        # Both generated from assets/LOGO.png by scripts/make_icons.sh, which
+        # is macOS-only -- so they are committed rather than built, and the
+        # Windows leg gets an .ico it could not have produced.
+        STANDALONE_MACOS_ICON "${CMAKE_SOURCE_DIR}/assets/installer/SpectrumWorxIcon.icns"
+        STANDALONE_WINDOWS_ICON "${CMAKE_SOURCE_DIR}/assets/installer/SpectrumWorxIcon.ico"
 )
 
 # Read back by the installer; clap-wrapper does not set it.
