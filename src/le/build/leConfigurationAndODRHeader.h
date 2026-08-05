@@ -220,6 +220,15 @@
 // lock acquisition per stdio call in ours. It also silently makes stdio
 // non-thread-safe, which is a poor trade to impose on code that never asked.
 //                                        (30.07.2026.) (SW port)
+//
+//   And it came back without us. On MSVC 14.51 `std::fputc` still expands to
+// `std::_fputc_nolock` -- nothing in this tree or under libs/ defines
+// _CRT_DISABLE_PERFCRIT_LOCKS, so the rewrite is the toolchain's own. What is
+// certain is the shape: `fputc` is a macro there and `fputs` on the adjacent
+// line is not. Our five one-character writes were all newlines, so they are
+// `std::fputs( "\n", stderr )` now -- one call, no macro to be caught by, and
+// nothing to re-diagnose the next time a compiler decides differently.
+//                                        (05.08.2026.) (SW port)
 
 #define __STDC_WANT_SECURE_LIB__ LE_CHECKED_BUILD
 #define _CRT_SECURE_CPP_OVERLOAD_SECURE_NAMES LE_CHECKED_BUILD

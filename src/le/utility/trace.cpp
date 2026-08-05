@@ -113,7 +113,7 @@ void Tracer::error(char const *const pFormatString, ...)
     /// log and a test runner both capture.
     ///                                   (28.07.2026.) (SW port)
     std::fputs(&formattedError[1], stderr);
-    std::fputc('\n', stderr);
+    std::fputs("\n", stderr);
 #elif defined(_WIN32)
     std::fputs(&formattedError[1], stderr);
     pFormattedError[charactersWritten + 0] = '\n';
@@ -126,7 +126,7 @@ void Tracer::error(char const *const pFormatString, ...)
     /// log and a test runner both capture.
     ///                                   (29.07.2026.) (SW port)
     std::fputs(&formattedError[1], stderr);
-    std::fputc('\n', stderr);
+    std::fputs("\n", stderr);
 #endif
 #endif // platform/compiler
     va_end(arglist);
