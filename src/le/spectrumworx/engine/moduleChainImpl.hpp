@@ -17,13 +17,7 @@
 #include "le/utility/platformSpecifics.hpp"
 
 #include "le/utility/intrusivePtr.hpp"
-#if defined(__clang__) && !defined(LE_EXCEPTION_ON)
-#define throw LE_UNREACHABLE_CODE()
-#endif // LE_EXCEPTION_ON
 #include "le/utility/circularListAlgorithms.hpp"
-#if defined(__clang__) && !defined(LE_EXCEPTION_ON)
-#undef throw
-#endif // LE_EXCEPTION_ON
 
 #include <cstddef>
 #include <cstdint>
