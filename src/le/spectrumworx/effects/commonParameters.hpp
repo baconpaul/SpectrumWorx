@@ -16,6 +16,7 @@
 #endif // MSVC && !Doxygen
 //------------------------------------------------------------------------------
 #include "le/parameters/enumerated/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -55,6 +56,25 @@ LE_ENUMERATED_PARAMETER(SpringType, Symmetric, Up, Down);
 } // namespace CommonParameters
 
 /// @}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// CommonParameters UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(CommonParameters::Mode, "Target")
+EFFECT_PARAMETER_NAME(CommonParameters::SpringType, "Direction")
+
+EFFECT_ENUMERATED_PARAMETER_STRINGS(CommonParameters, Mode,
+    {Both, "Mags&Phases"},
+    {Magnitudes, "Magnitudes"},
+    {Phases, "Phases"})
+
+EFFECT_ENUMERATED_PARAMETER_STRINGS(CommonParameters, SpringType,
+    {Symmetric, "Symmetric"},
+    {Up, "Up"},
+    {Down, "Down"})
 
 //------------------------------------------------------------------------------
 } // namespace Effects

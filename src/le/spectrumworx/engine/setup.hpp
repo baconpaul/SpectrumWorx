@@ -22,14 +22,16 @@
 namespace LE
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Math)
+namespace Math
+{
 template <typename Target, typename Source> void convert(Source const source, Target &target);
-LE_IMPL_NAMESPACE_END(Math)
+} // namespace Math
 //------------------------------------------------------------------------------
 namespace SW
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 //------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -208,7 +210,7 @@ template <typename T> void Setup::setOverlappingFactor(T const &newValue)
 }
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 //------------------------------------------------------------------------------
 } // namespace SW
 //------------------------------------------------------------------------------

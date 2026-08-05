@@ -15,6 +15,7 @@
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -61,6 +62,16 @@ struct Wobbler
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Wobbler UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Wobbler::Amplitude, "Amplitude")
+EFFECT_PARAMETER_NAME(Wobbler::Period, "Period")
+EFFECT_PARAMETER_NAME(Wobbler::PreGain, "Offset")
 
 //------------------------------------------------------------------------------
 } // namespace Effects

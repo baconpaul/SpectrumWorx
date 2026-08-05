@@ -14,6 +14,7 @@
 #include "le/spectrumworx/engine/configuration.hpp"
 #include "le/parameters/enumerated/parameter.hpp"
 #include "le/parameters/powerOfTwo/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -69,8 +70,18 @@ struct WindowSizeFactor : Parameters::PowerOfTwoParameter<Parameters::Traits::Mi
                                                           Parameters::Traits::Maximum<8>,
                                                           Parameters::Traits::Default<1>>
 {
+    /// \note The base named through a typedef rather than as
+    /// `PowerOfTwoParameter(...)`. Unqualified, that names nothing here -- the
+    /// template is LE::Parameters::PowerOfTwoParameter and this is
+    /// LE::SW::Engine -- so the mem-initialiser did not compile at all. Nothing
+    /// noticed for twelve years because nothing could define the macro over it.
+    ///                                       (04.08.2026.) (SW port)
+    using Base = Parameters::PowerOfTwoParameter<Parameters::Traits::Minimum<1>,
+                                                 Parameters::Traits::Maximum<8>,
+                                                 Parameters::Traits::Default<1>>;
+
     explicit WindowSizeFactor(unsigned int const initialValue = WindowSizeFactor::default_())
-        : PowerOfTwoParameter(initialValue)
+        : Base(initialValue)
     {
     }
 };
@@ -80,6 +91,51 @@ struct WindowSizeFactor : Parameters::PowerOfTwoParameter<Parameters::Traits::Mi
 } // namespace Engine
 //------------------------------------------------------------------------------
 } // namespace SW
+//------------------------------------------------------------------------------
+namespace Parameters
+{
+//------------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Engine UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+UI_NAME(SW::Engine::FFTSize, "FFT size")
+UI_NAME(SW::Engine::OverlapFactor, "Overlap factor")
+UI_NAME(SW::Engine::WindowFunction, "Window type")
+#if LE_SW_ENGINE_WINDOW_PRESUM
+UI_NAME(SW::Engine::WindowSizeFactor, "Window size factor")
+#endif // LE_SW_ENGINE_WINDOW_PRESUM
+
+//...mrmlj...this does not work yet because the Window enum is not a member
+//...of the WindowFunction parameter class...fix this...
+//ENUMERATED_PARAMETER_STRINGS
+//(
+//    SW::Engine, WindowFunction,
+//    (( Hamming       , "Hamming"         ))
+//    (( Hann          , "Hann"            ))
+//    (( Rectangle     , "Rectangle"       ))
+//    (( Triangle      , "Triangle"        ))
+//    (( Blackman      , "Blackman"        ))
+//    (( BlackmanHarris, "Blackman Harris" ))
+//    (( Welch         , "Welch"           ))
+//    (( FlatTop       , "Flat top"        ))
+//    (( Gaussian      , "Gaussian"        ))
+//)
+
+/// \note Written out rather than through ENUMERATED_PARAMETER_STRINGS for the
+/// reason above: that macro checks each string against the enumerator it names,
+/// and this parameter has no enumerators to name.
+template <>
+constexpr DiscreteValues<SW::Engine::WindowFunction>::Strings
+    DiscreteValues<SW::Engine::WindowFunction>::strings{"Hann",           "Hamming",  "Blackman",
+                                                        "BlackmanHarris", "Gaussian", "FlatTop",
+                                                        "Welch",          "Triangle", "Rectangle"};
+
+//------------------------------------------------------------------------------
+} // namespace Parameters
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------

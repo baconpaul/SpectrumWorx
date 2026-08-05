@@ -16,11 +16,24 @@
 //------------------------------------------------------------------------------
 
 // Implementation note:
-//   This header is force-included rather than #included, because the macros
-// below have to be seen before any other header and 47 files assume them without
-// saying so. cmake/sw-odr-header.cmake attaches it per source file, to files
-// under src/, tests/ and tools/ and to nothing else; tests/checkODRHeaderScope.cmake
-// fails the build if that ever stops being true.
+//   This header is force-included rather than #included, because what it sets
+// has to be seen before any other header. cmake/sw-our-sources.cmake attaches it
+// per source file, to files under src/, tests/ and tools/ and to nothing else;
+// tests/checkODRHeaderScope.cmake fails the build if that ever stops being true.
+//
+//   What it is *for* changed on 04.08.2026 and the difference is worth knowing.
+// It used to also define LE_IMPL_NAMESPACE_BEGIN/END, which 47 files used to
+// open a namespace without declaring where the macro came from -- so a file that
+// missed this header did not fail cleanly, it failed as thirty-odd errors that
+// named everything except the cause. Those macros are written out now, and every
+// one of our 148 translation units compiles with the force-include removed.
+//
+//   So what is left is configuration rather than syntax, and it is all the more
+// silent for it: the NDEBUG policy below decides whether the ~1200 asserts exist
+// at all, and the Windows blocks decide which API surface everything after them
+// sees. A translation unit that misses this header now builds -- as a different
+// build. That is the thing checkODRHeaderScope.cmake is guarding, and it is a
+// worse failure than the one it was written for, not a better one.
 //
 //   It used to be a PUBLIC compile option on sw-dsp, so it reached every
 // translation unit of every target that links sw-dsp -- JUCE, fmt and
@@ -55,26 +68,15 @@
 #endif // LE_PUBLIC_BUILD
 #endif // LE_CHECKED_BUILD
 
-/// \note Automatically build SDK projects with "hidden"/"static"/"anonymous"
-/// implementation details in order to enable simultaneous usage of multiple
-/// SDKs which internally use the same functionality (which would otherwise
-/// cause symbol clashes).
+/// \note LE_IMPL_NAMESPACE_BEGIN/END stood here. Under LE_SW_SDK_BUILD they
+/// nested an anonymous namespace inside the named one, so that two SDKs sharing
+/// this code could be linked into one binary without their internals clashing;
+/// otherwise they were `namespace X {` and `}`. There is no SDK build any more
+/// (doc/tech/todo.md's stage 7 settled that macro), so they were 55 obfuscated
+/// namespace openings across 47 files -- and 47 files that used them without
+/// declaring where they came from, which is the whole reason this header is
+/// force-included. Both are written out as of 04.08.2026.
 ///                                           (06.10.2014.) (Domagoj Saric)
-#ifdef LE_SW_SDK_BUILD
-#define LE_IMPL_NAMESPACE_BEGIN(namespaceName)                                                     \
-    namespace namespaceName                                                                        \
-    {                                                                                              \
-    namespace                                                                                      \
-    {
-#define LE_IMPL_NAMESPACE_END(namespaceName)                                                       \
-    }                                                                                              \
-    }
-#else
-#define LE_IMPL_NAMESPACE_BEGIN(namespaceName)                                                     \
-    namespace namespaceName                                                                        \
-    {
-#define LE_IMPL_NAMESPACE_END(namespaceName) }
-#endif // LE_SW_SDK_BUILD
 
 /// \note A quick way to disable the requriement for
 /// LE::Utility::assertionFailed to be defined in auxiliary projects when
@@ -378,8 +380,6 @@ typedef void const *const nullptr_t;
 #ifndef BOOST_EXCEPTION_DISABLE
 #define BOOST_EXCEPTION_DISABLE
 #endif // BOOST_EXCEPTION_DISABLE
-
-#include <ciso646>
 
 /// \note Import the fixes/workarounds for Boost.Range's lack of restricted
 /// pointer support from NT2.

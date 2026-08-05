@@ -16,7 +16,7 @@
 #include "le/parameters/parametersUtilities.hpp"
 #include "le/parameters/printer.hpp" // BaseParameters printers
 #include "le/plugins/plugin.hpp" //...ugh...mrmlj...for Plugins::*AutomatedParameter usage in printer.hpp...clean this up...
-#include "le/spectrumworx/effects/baseParametersUIElements.hpp" // BaseParameters printers
+#include "le/spectrumworx/effects/baseParameters.hpp" // BaseParameters printers
 #include "le/spectrumworx/engine/moduleParameters.hpp"
 #include <optional>
 //------------------------------------------------------------------------------

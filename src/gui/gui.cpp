@@ -960,7 +960,8 @@ void Knob::startedDragging() noexcept
     /// while nothing was dragging, i.e. it failed on every real knob drag.
     /// operator== compares the pimpl, which is the identity that was meant.
     ///                                       (29.07.2026.) (SW port)
-    auto const *const pDraggingSource(juce::Desktop::getInstance().getDraggingMouseSource(0));
+    [[maybe_unused]] auto const *const pDraggingSource(
+        juce::Desktop::getInstance().getDraggingMouseSource(0));
     LE_ASSERT(!pDraggingSource || //...mrmlj...double click...
               (*pDraggingSource == mouseSource));
 
@@ -1223,13 +1224,6 @@ bool shouldUpdateLFOControl(ModuleControlBase const &control)
            (lfoUpdateBehaviour == Theme::WhenControlSelected &&
             Detail::hasDirectFocus(control.widget()));
 }
-
-namespace
-{
-void onGUIInitialization() { Theme::createSingleton(); }
-
-void onGUIShutdown() { Theme::destroySingleton(); }
-} // namespace
 
 //------------------------------------------------------------------------------
 } // namespace GUI

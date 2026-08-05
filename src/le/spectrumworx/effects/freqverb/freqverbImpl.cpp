@@ -17,7 +17,6 @@
 #include "le/math/dft/domainConversion.hpp"
 #include "le/math/math.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/channelDataReIm.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
@@ -47,17 +46,6 @@ namespace Effects
 
 char const Freqverb::title[] = "Freqverb";
 char const Freqverb::description[] = "Frequency domain reverberation with pitch.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Freqverb UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Freqverb::Time60dB, "Life time")
-EFFECT_PARAMETER_NAME(Freqverb::RoomSize, "Room size")
-EFFECT_PARAMETER_NAME(Freqverb::ReverbPitch, "Pitch")
-EFFECT_PARAMETER_NAME(Freqverb::HFAbsorption, "HF absorb")
 
 ////////////////////////////////////////////////////////////////////////////////
 //

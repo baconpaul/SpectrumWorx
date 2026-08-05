@@ -13,7 +13,6 @@
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -33,21 +32,6 @@ namespace Effects
 
 char const Slicer::title[] = "Slicer";
 char const Slicer::description[] = "Slice and fill.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Slicer UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Slicer::TimeOn, "On time")
-EFFECT_PARAMETER_NAME(Slicer::TimeOff, "Slice time")
-EFFECT_PARAMETER_NAME(Slicer::Mode, "Slice content")
-
-EFFECT_ENUMERATED_PARAMETER_STRINGS(Slicer, Mode,
-    {Hold, "Sample&Hold"},
-    {Silence, "Silence"},
-    {Side, "Side"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

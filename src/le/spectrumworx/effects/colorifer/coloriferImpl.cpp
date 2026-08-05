@@ -15,7 +15,6 @@
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/math/math.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 
 #include "le/utility/stackBuffer.hpp"
 
@@ -39,26 +38,6 @@ namespace Effects
 
 char const Colorifer::title[] = "Colorifer";
 char const Colorifer::description[] = "Spectrum colour transfer.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Colorifer UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Colorifer::BandWidth, "Shape width")
-EFFECT_PARAMETER_NAME(Colorifer::SpectrumPreprocess, "Spectrum preprocess")
-EFFECT_PARAMETER_NAME(Colorifer::ReplacePhase, "Replace phase")
-
-EFFECT_ENUMERATED_PARAMETER_STRINGS(Colorifer, SpectrumPreprocess,
-    {NotUsed, "None"},
-    {SquareRoot, "Square root"},
-    {Square, "Square"},
-    {Exponential, "Exponent"})
-
-EFFECT_ENUMERATED_PARAMETER_STRINGS(Colorifer, ReplacePhase,
-    {No, "No"},
-    {Yes, "Yes"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

@@ -26,7 +26,7 @@ namespace Effects
 {
 //------------------------------------------------------------------------------
 
-#if defined(_DEBUG) && !(defined(LE_SW_SDK_BUILD) && !defined(__MSVC_RUNTIME_CHECKS))
+#if defined(_DEBUG)
 /// \note Testing phase...
 ///                                       (17.02.2012.) (Domagoj Saric)
 #define LE_BAND_FILTER_USE_ENGINE_WINDOW

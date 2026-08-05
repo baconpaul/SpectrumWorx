@@ -136,12 +136,6 @@ class LE_NOVTABLE Plugin2HostInteropControler
     virtual bool latencyChanged() = 0;
 
     // queries
-#if LE_SW_ENGINE_INPUT_MODE >= 2
-  public:
-    virtual bool hostTryIOConfigurationChange(std::uint8_t numberOfMainChannels,
-                                              std::uint8_t numberOfSideChannels) = 0;
-    virtual bool hostSupportsIOConfigurationChanges() const = 0;
-#endif // LE_SW_ENGINE_INPUT_MODE >= 2
 
   private:
     void globalParameterChanged(

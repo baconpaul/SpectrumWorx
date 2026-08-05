@@ -10,14 +10,10 @@
 //------------------------------------------------------------------------------
 #include "presets.hpp"
 
-#ifdef LE_SW_SDK_BUILD
-#include "le/spectrumworx/engine/moduleImpl.hpp"
-#else
 #include "configuration/versionConfiguration.hpp"
 #include "core/automatedModuleChain.hpp"
 #include "core/modules/factory.hpp"
 #include "core/modules/moduleDSPAndGUI.hpp"
-#endif // LE_SW_SDK_BUILD
 
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
@@ -65,11 +61,7 @@ namespace SW
 {
 //------------------------------------------------------------------------------
 
-#if defined(LE_SW_SDK_BUILD)
-using PresetModule = Engine::ModuleDSP;
-#else
 using PresetModule = SW::Module;
-#endif // LE_SW_SDK_BUILD
 
 PresetHeader::PresetHeader(std::string_view const commentParam)
 {
@@ -327,7 +319,6 @@ bool Preset::loadFrom(char const *const pBuffer)
     return false;
 }
 
-#ifndef LE_SW_SDK_BUILD
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Preset::saveTo()
@@ -366,7 +357,6 @@ std::string Preset::saveTo() const
     /// state stream is now one of those.
     return printer.CStr();
 }
-#endif // LE_SW_SDK_BUILD
 
 unsigned int Preset::formatVersion() const
 {
@@ -546,14 +536,6 @@ ParametersLoader::ParametersLoader(Preset const &preset)
     LE_ASSERT_MSG(pParameters_, "Preset node not found");
 }
 
-#ifdef LE_SW_SDK_BUILD //...mrmlj...
-namespace Engine
-{
-LE::Utility::IntrusivePtr<PresetModule> createModule(std::uint8_t effectIndex);
-}
-#define MB_WARNING "SW SDK warning:"
-#define MB_ERROR "SW SDK error:"
-#endif // LE_SW_SDK_BUILD
 /// \note It took the live chain and stole any module whose effect matched,
 /// leaving the rest to be created -- an allocation saved, at the price of the
 /// only mutation of the live chain a preset load performed, from the message
@@ -594,27 +576,20 @@ LE_COLD void ParametersLoader::loadModuleChain(ModuleChain &newChain)
     }
 
     std::int8_t const noModule(-1);
-    std::uint8_t moduleIndex(0);
+    /// \note Counted for the assert at the bottom and nothing else, so in a
+    /// release build it is set and never read.
+    [[maybe_unused]] std::uint8_t moduleIndex(0);
     while (pParameters_)
     {
         using namespace Effects;
         auto const [effectIndex, effectName](currentEffect());
         bool const foundEffect(effectIndex != noModule);
         bool const effectEnabled(foundEffect && includedEffects[effectIndex]);
-#ifdef LE_SW_FULL
-        LE_ASSUME(effectEnabled == true);
-#endif // LE_SW_FULL
         if (foundEffect && effectEnabled)
         {
             LE_ASSUME(effectIndex >= 0);
             using namespace Engine;
-            auto pModule(
-#ifdef LE_SW_SDK_BUILD
-                Engine::createModule(effectIndex)
-#else
-                ModuleFactory::create<PresetModule>(effectIndex)
-#endif // LE_SW_SDK_BUILD
-            );
+            auto pModule(ModuleFactory::create<PresetModule>(effectIndex));
             if (pModule)
             {
                 newChain.push_back(*pModule);
@@ -636,10 +611,8 @@ LE_COLD void ParametersLoader::loadModuleChain(ModuleChain &newChain)
                                                  : pParameters_->NextSiblingElement();
     }
 
-#ifndef LE_SW_SDK_BUILD
     LE_ASSERT_MSG(moduleIndex <= SW::Constants::maxNumberOfModules,
                   "Preset loaded too many modules?");
-#endif // LE_SW_SDK_BUILD
 }
 
 bool ParametersLoader::switchedToModuleParameters() const
@@ -793,7 +766,7 @@ bool ParametersLoader::loadLFO(TiXmlElement const &parameterNode, LFO &lfo) cons
     // parameter to already be loaded/set.
     //                                        (18.02.2011.) (Domagoj Saric)
     LE::Parameters::forEachReversed(lfo.parameters(), LFODataLoader(parameterNode, lfo));
-    syncedLFOFound_ |= lfo.enabled() & (lfo.syncTypes() != LFO::Free);
+    syncedLFOFound_ |= lfo.enabled() && (lfo.syncTypes() != LFO::Free);
     return lfo.enabled();
 }
 
@@ -921,7 +894,6 @@ LE_COLD void ParametersLoader::warnAboutMissingParameter(char const *const pPara
     }
 }
 
-#ifndef LE_SW_SDK_BUILD
 SavedPreset::SavedPreset()
 {
     auto *const pHeaderNode(new TiXmlElement(headerNodeName_));
@@ -998,8 +970,11 @@ class LFODataSaver
   public:
     using LFO = Parameters::LFOImpl;
 
-    LFODataSaver(PresetHandler &handler, TiXmlElement &parameterNode, LFO const &lfo)
-        : handler_(handler), parameterNode_(parameterNode), lfo_(lfo)
+    /// \note No handler: this used to hold a PresetHandler & and never ask it
+    /// anything, because the one thing it wants from one -- makeString() -- is
+    /// static. The reference outlived every use of it.
+    LFODataSaver(TiXmlElement &parameterNode, LFO const &lfo)
+        : parameterNode_(parameterNode), lfo_(lfo)
     {
     }
 
@@ -1032,7 +1007,6 @@ class LFODataSaver
 #pragma warning(pop)
 
   private:
-    PresetHandler &handler_;
     TiXmlElement &parameterNode_;
     LFO const &lfo_;
 };
@@ -1053,8 +1027,7 @@ void ParametersSaver::saveParameter(char const *const parameterName,
                                     std::string const &parameterValue, LFO const &parameterLFO)
 {
     auto &parameterNode(newParameterNode(parameterName, parameterValue));
-    LE::Parameters::forEach(parameterLFO.parameters(),
-                            LFODataSaver(*this, parameterNode, parameterLFO));
+    LE::Parameters::forEach(parameterLFO.parameters(), LFODataSaver(parameterNode, parameterLFO));
 }
 
 /*
@@ -1132,8 +1105,6 @@ std::string savePreset(std::string_view const externalSampleFilePath,
 
     return parametersSaver.saveTo();
 }
-
-#endif // LE_SW_SDK_BUILD
 
 //------------------------------------------------------------------------------
 } // namespace SW

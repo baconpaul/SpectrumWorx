@@ -15,6 +15,7 @@
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/linear/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -53,6 +54,14 @@ struct Phasevolution
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Phasevolution UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Phasevolution::PhasePeriod, "Period")
 
 //------------------------------------------------------------------------------
 } // namespace Effects

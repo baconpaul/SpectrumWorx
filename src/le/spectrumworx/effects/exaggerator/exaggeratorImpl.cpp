@@ -12,7 +12,6 @@
 
 #include "le/math/math.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 
@@ -36,14 +35,6 @@ namespace Effects
 
 char const Exaggerator::title[] = "Exaggerator";
 char const Exaggerator::description[] = "Emphasize or flatten spectral peaks.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Exaggerator UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Exaggerator::Exaggerate, "Intensity")
 
 ////////////////////////////////////////////////////////////////////////////////
 //

@@ -12,7 +12,6 @@
 
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
-#include "le/parameters/uiElements.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -41,27 +40,6 @@ char const Tonal::description[] = "Suppress non-tonal regions.";
 
 char const Atonal::title[] = "Atonal";
 char const Atonal::description[] = "Suppress tonal regions.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Tonal UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Detail::TonalBase::Strength, "Peak strength")
-EFFECT_PARAMETER_NAME(Detail::TonalBase::GlobalThreshold, "Global threshold")
-EFFECT_PARAMETER_NAME(Detail::TonalBase::LocalThreshold, "Local threshold")
-EFFECT_PARAMETER_NAME(Detail::TonalBase::Attenuation, "Attenuation")
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Atonal UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Atonal::Strength, "Peak strength")
-EFFECT_PARAMETER_NAME(Atonal::GlobalThreshold, "Global threshold")
-EFFECT_PARAMETER_NAME(Atonal::Attenuation, "Attenuation")
 
 namespace Detail
 {

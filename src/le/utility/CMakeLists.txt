@@ -5,6 +5,15 @@
 # Copyright (c) 2010 - 2016. Little Endian Ltd.
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
+#
+# **Record, not build.** Nothing adds this subdirectory, and nothing may: le/ is
+# compiled as part of sw-dsp, sw-io and sw-gui rather than as a library of its
+# own. This is the 2016 build's own account of how LE_Utility was built when it
+# was one, kept for the platform arms and dependencies it names.
+#
+# The live build is CMakeLists.txt, src/CMakeLists.txt, src/dsp.cmake and
+# src/gui.cmake. A definition here reaches no compiler.
+#
 ################################################################################
 
 

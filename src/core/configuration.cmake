@@ -5,6 +5,18 @@
 # Copyright (c) 2012 - 2015. Little Endian Ltd.
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
+#
+# **Record, not build.** Nothing includes this file, and nothing may: it is the
+# 2016 build's own account of which options the plugin was configured with, kept
+# because it is the only place several of those decisions are written down. The
+# live build is CMakeLists.txt, src/CMakeLists.txt, src/dsp.cmake and
+# src/gui.cmake.
+#
+# A definition here reaches no compiler. Anything this file sets that the tree
+# still tests with #if has to be set in a live .cmake as well, or the test reads
+# 0 and says nothing -- which is what stage 7 found in
+# le/spectrumworx/engine/configuration.cmake, beside this one.
+#
 ################################################################################
 
 set( leExternals "${PROJECT_SOURCE_DIR}/le" )

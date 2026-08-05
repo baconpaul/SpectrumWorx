@@ -28,7 +28,6 @@
 #include "le/math/math.hpp"
 #include "le/parameters/conversion.hpp"
 #include "le/parameters/parametersUtilities.hpp"
-#include "le/parameters/uiElements.hpp"
 #include "le/parameters/parametersUtilities.hpp"
 #include "le/utility/countof.hpp"
 #include "le/utility/parentFromMember.hpp"
@@ -43,41 +42,6 @@ namespace LE
 namespace Parameters
 {
 //------------------------------------------------------------------------------
-
-UI_NAME(LFOImpl::Enabled) = "on";
-UI_NAME(LFOImpl::PeriodScale) = "T";
-UI_NAME(LFOImpl::Phase) = "ph";
-UI_NAME(LFOImpl::LowerBound) = "lbnd";
-UI_NAME(LFOImpl::UpperBound) = "ubnd";
-UI_NAME(LFOImpl::SyncTypes) = "sync";
-UI_NAME(LFOImpl::Waveform) = "wfrm";
-
-//...mrmlj...this does not work yet because the Window enum is not a member
-//...of the WindowFunction parameter class...fix this...
-//ENUMERATED_PARAMETER_STRINGS
-//(
-//    LFOImpl, Waveform,
-//    (( Sine           , "Sine"       ))
-//    (( Triangle       , "Triangle"   ))
-//    (( Sawtooth       , "Sawtooth"   ))
-//    (( ReverseSawtooth, "htootwaS"   ))
-//    (( Square         , "Square"     ))
-//    (( Exponent       , "Exponent"   ))
-//    (( RandomHold     , "Hrandom"    ))
-//    (( RandomSlide    , "Grandom"    ))
-//    (( Whacko         , "Whacko"     ))
-//    (( Dirac          , "Dirac up"   ))
-//    (( dIRAC          , "Dirac down" ))
-//)
-
-/// \note Written out rather than through ENUMERATED_PARAMETER_STRINGS for the
-/// reason above: that macro checks each string against the enumerator it names,
-/// and this parameter has no enumerators to name.
-template <>
-DiscreteValues<Parameters::LFOImpl::Waveform>::Strings const
-    DiscreteValues<Parameters::LFOImpl::Waveform>::strings{
-        "Sine",    "Triangle", "Sawtooth", "htootwaS", "Square",    "Exponent",
-        "Hrandom", "Grandom",  "Whacko",   "Dirac up", "Dirac down"};
 
 using Enabled = LFOImpl::Enabled;
 using PeriodScale = LFOImpl::PeriodScale;

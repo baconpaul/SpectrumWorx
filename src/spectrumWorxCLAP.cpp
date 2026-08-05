@@ -136,7 +136,7 @@ std::optional<std::vector<char>> readWholeStream(clap_istream const *const strea
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-float const *LE_RESTRICT sampleChunk(Sample::ChannelData const &channelData,
+float const *sampleChunk(Sample::ChannelData const &channelData,
                                      std::uint32_t &position, std::uint32_t chunkSize,
                                      float *LE_RESTRICT const workBuffer)
 {
@@ -740,7 +740,7 @@ clap_process_status SpectrumWorxCLAP::process(clap_process const *const process)
     /// \note Stage 4.2, and the reason it is one line here rather than a fix to
     /// `Math::FPUDisableDenormalsGuard`: **nothing was flushing denormals at
     /// all**, on any platform. The engine's own two guards are inside
-    /// `#ifdef LE_SW_SDK_BUILD`, which nothing defines, and the third is in
+    /// `#ifdef LE_SW_SDK_BUILD`, which nothing defined, and the third is in
     /// `SpectrumWorx::process` — the 2016 host-facing class, which the CLAP does
     /// not call. The audio path is this function, `runEngine()` and
     /// `SpectrumWorxCore::process()`. So there was no working guard to rekey off
@@ -1446,7 +1446,7 @@ bool SpectrumWorxCLAP::stateLoad(clap_istream const *const stream) noexcept
 ///
 /// \brief Where session state that is not a parameter goes.
 ///
-///   Empty, and deliberately so. The mechanism is what item 4 owed; the payload
+///   Empty, and deliberately so. The mechanism is what the state work owed; the payload
 /// is a list that will grow one bullet at a time, and guessing at it now would
 /// be inventing a schema for settings nobody has asked to persist yet.
 ///

@@ -21,15 +21,17 @@
 namespace LE
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Math)
+namespace Math
+{
 template void convert<float, unsigned int>(unsigned int source, float &target);
 template void convert<unsigned int, unsigned int>(unsigned int source, unsigned int &target);
-LE_IMPL_NAMESPACE_END(Math)
+} // namespace Math
 //------------------------------------------------------------------------------
 namespace SW
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 //------------------------------------------------------------------------------
 
 Setup::Setup()
@@ -237,7 +239,7 @@ void Setup::verifyOverlapFactor()
 }
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 //------------------------------------------------------------------------------
 } // namespace SW
 //------------------------------------------------------------------------------

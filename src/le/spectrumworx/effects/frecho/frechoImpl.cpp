@@ -18,7 +18,6 @@
 #include "le/math/dft/domainConversion.hpp"
 #include "le/math/math.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 
 #include "le/utility/stackBuffer.hpp"
 //------------------------------------------------------------------------------
@@ -47,16 +46,6 @@ char const Frecho::description[] = "Frequency domain echo with pitch.";
 
 char const Frevcho::title[] = "Frevcho";
 char const Frevcho::description[] = "Frequency domain reversed echo with pitch.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Frecho UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Frecho::Distance, "Distance")
-EFFECT_PARAMETER_NAME(Frecho::Absorption, "Absorption")
-EFFECT_PARAMETER_NAME(Frecho::EchoPitch, "Pitch")
 
 ////////////////////////////////////////////////////////////////////////////////
 //

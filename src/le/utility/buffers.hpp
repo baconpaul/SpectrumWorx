@@ -34,9 +34,10 @@
 namespace LE
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Math)
+namespace Math
+{
 void *align(void *);
-LE_IMPL_NAMESPACE_END(Math)
+} // namespace Math
 //------------------------------------------------------------------------------
 namespace Utility
 {

@@ -93,14 +93,6 @@ template <class Impl, class Protocol> class Host2PluginInteropImpl<Impl, Protoco
                            : Plugins::ErrorCode<Protocol>::OutOfMemory;
         }
 
-#if LE_SW_ENGINE_INPUT_MODE == 1
-        template <> result_type operator()<GlobalParameters::InputMode>() const
-        {
-            LE_UNREACHABLE_CODE();
-            return result_type();
-        }
-#endif // LE_SW_ENGINE_INPUT_MODE == 1
-
         Impl &effect_;
         Plugins::AutomatedParameterValue const value_;
     }; // struct GlobalParameterSetter

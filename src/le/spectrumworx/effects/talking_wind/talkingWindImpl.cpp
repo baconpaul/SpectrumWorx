@@ -60,7 +60,6 @@
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/processor.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
@@ -87,15 +86,6 @@ namespace Effects
 
 char const TalkingWind::title[] = "Talking Wind";
 char const TalkingWind::description[] = "Classic vocoding.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// TalkingWind UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(TalkingWind ::EnvelopeBorder, "Envelope border")
-EFFECT_PARAMETER_NAME(TalkingWind ::EnvelopeGain, "Envelope gain")
 
 ////////////////////////////////////////////////////////////////////////////////
 //

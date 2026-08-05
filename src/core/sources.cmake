@@ -5,6 +5,15 @@
 # Copyright (c) 2012 - 2015. Little Endian Ltd.
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
+#
+# **Record, not build.** Nothing includes this file, and nothing may: it is the
+# 2016 build's own account of which sources each target was built from, kept
+# because it names files and groupings that no live .cmake repeats. The live
+# build is CMakeLists.txt, src/CMakeLists.txt, src/dsp.cmake and src/gui.cmake.
+#
+# It is a snapshot, so it lists sources this tree no longer has. That is what a
+# record is for; do not reconcile it.
+#
 ################################################################################
 
 set( leExternals "le" )

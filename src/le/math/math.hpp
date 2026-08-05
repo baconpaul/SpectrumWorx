@@ -71,7 +71,8 @@ inline int signbit(double const value) { return __signbit(value); }
 namespace LE
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Math)
+namespace Math
+{
 //------------------------------------------------------------------------------
 
 // http://www.strchr.com/optimized_abs_function
@@ -301,7 +302,7 @@ class FPUExceptionsDisabler : public FPUExceptionsGuard
     FPUExceptionsDisabler();
 }; // class FPUExceptionsDisabler
 
-#if defined(_DEBUG) && !(defined(LE_SW_SDK_BUILD) && !defined(__MSVC_RUNTIME_CHECKS))
+#if defined(_DEBUG)
 #define LE_LOCALLY_DISABLE_FPU_EXCEPTIONS() ::LE::Math::FPUExceptionsDisabler const fpuDebuggerGuard
 #else
 #define LE_LOCALLY_DISABLE_FPU_EXCEPTIONS()
@@ -766,7 +767,7 @@ LE_FORCEINLINE float valueIfGreater(float const testValue, float const lowerBoun
 }
 } // namespace PositiveFloats
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Math)
+} // namespace Math
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------

@@ -19,6 +19,7 @@
 #include "le/parameters/enumerated/parameter.hpp"
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -217,6 +218,66 @@ struct TuneWorxPVD : Detail::TuneWorxBase
 {
     static char const title[];
 };
+
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Key, "Key")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi01, "1")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi02, "2")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi03, "3")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi04, "4")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi05, "5")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi06, "6")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi07, "7")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi08, "8")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi09, "9")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi10, "10")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi11, "11")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi12, "12")
+/// \note These were behind #ifdef LE_SW_SDK_BUILD, so until then no plugin build
+/// had a name for them, and they shared the placeholder "N/A" -- which
+/// ParameterInfo carries into the preset, because presets serialise by name.
+/// Saving a TuneWorx preset therefore wrote twenty one elements called `<N/A>`,
+/// which is not even a legal XML name: reading one back failed the parse
+/// outright. The names below are the ones that were commented out beside each.
+///
+///   Safe by stage 0.7's rule, which forbids renaming anything a preset file
+/// references: no preset file can reference "N/A", because the 2011 banks
+/// predate every one of these parameters. The round-trip test is what noticed.
+///                                           (31.07.2026.) (SW port)
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi01, "Bypass 1")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi02, "Bypass 2")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi03, "Bypass 3")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi04, "Bypass 4")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi05, "Bypass 5")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi06, "Bypass 6")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi07, "Bypass 7")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi08, "Bypass 8")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi09, "Bypass 9")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi10, "Bypass 10")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi11, "Bypass 11")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi12, "Bypass 12")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::PitchMinFreq, "Pitch range lower bound")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::PitchMaxFreq, "Pitch range upper bound")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::TuneTolerance, "Out of tune tolerance")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::RetuneTime, "Retune time")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::PitchShift, "Pitch shift")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Vibrato, "Vibrato")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::VibratoDepth, "Vibrato extent")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::VibratoPeriod, "Vibrato rate")
+EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::VibratoDelay, "Vibrato delay")
+
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Detail::TuneWorxBase, Key,
+    {A, "A"},
+    {Ais, "A#"},
+    {B, "B"},
+    {C, "C"},
+    {Cis, "C#"},
+    {D, "D"},
+    {Dis, "D#"},
+    {E, "E"},
+    {F, "F"},
+    {Fis, "F#"},
+    {G, "G"},
+    {Gis, "G#"})
 
 //------------------------------------------------------------------------------
 } // namespace Effects

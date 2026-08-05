@@ -19,7 +19,8 @@ namespace LE
 namespace SW
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 //------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +63,7 @@ using FullMainSideChannelData_ReIm = MainSide<FullChannelData_ReIm>;
 using MainSideChannelData_ReIm = MainSide<SubRange<FullMainSideChannelData_ReIm, ChannelData_ReIm>>;
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 //------------------------------------------------------------------------------
 } // namespace SW
 //------------------------------------------------------------------------------

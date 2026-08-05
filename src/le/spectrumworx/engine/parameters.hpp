@@ -13,7 +13,6 @@
 //------------------------------------------------------------------------------
 #include "automatableParameters.hpp"
 
-#include "le/parameters/enumerated/parameter.hpp"
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/factoryMacro.hpp"
 //------------------------------------------------------------------------------
@@ -33,9 +32,6 @@ using WindowSizeFactor = Engine::WindowSizeFactor;
 using OverlapFactor = Engine::OverlapFactor;
 using WindowFunction = Engine::WindowFunction;
 
-#if LE_SW_ENGINE_INPUT_MODE >= 1
-LE_ENUMERATED_PARAMETER(InputMode, Stereo, StereoSideChain, Mono, MonoSideChain);
-#endif // LE_SW_ENGINE_INPUT_MODE
 //LE_ENUMERATED_PARAMETER(StreamMode, Always, MIDITrigger, MIDIGate); // ...MIDI not supported yet
 
 /// The parameter list is a comma separated one now, so a conditional member of
@@ -45,12 +41,6 @@ LE_ENUMERATED_PARAMETER(InputMode, Stereo, StereoSideChain, Mono, MonoSideChain)
 #else
 #define LE_SW_WINDOW_SIZEFACTOR_PARAMETER()
 #endif // LE_SW_ENGINE_WINDOW_PRESUM
-
-#if LE_SW_ENGINE_INPUT_MODE >= 1
-#define LE_SW_INPUTMODE_PARAMETER() , InputMode
-#else // LE_SW_ENGINE_INPUT_MODE
-#define LE_SW_INPUTMODE_PARAMETER()
-#endif // LE_SW_ENGINE_INPUT_MODE
 
 using LE::Parameters::Traits::Default;
 using LE::Parameters::Traits::Maximum;
@@ -63,16 +53,33 @@ LE_DEFINE_PARAMETER(OutputGain, InputGain);
 LE_DEFINE_PARAMETER(MixPercentage, LE::Parameters::LinearFloat, Minimum<0>, Maximum<1>, Default<1>);
 
 LE_DEFINE_PARAMETERS(InputGain, OutputGain, MixPercentage, FFTSize, OverlapFactor,
-                     WindowFunction LE_SW_WINDOW_SIZEFACTOR_PARAMETER() LE_SW_INPUTMODE_PARAMETER()
+                     WindowFunction LE_SW_WINDOW_SIZEFACTOR_PARAMETER()
                      //, StreamMode // ...MIDI not supported yet
 );
 
 #undef LE_SW_WINDOW_SIZEFACTOR_PARAMETER
-#undef LE_SW_INPUTMODE_PARAMETER
 //------------------------------------------------------------------------------
 } // namespace GlobalParameters
 //------------------------------------------------------------------------------
 } // namespace SW
+//------------------------------------------------------------------------------
+namespace Parameters
+{
+//------------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Global parameters UI elements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+UI_NAME(SW::GlobalParameters::InputGain, "In")
+UI_NAME(SW::GlobalParameters::OutputGain, "Out")
+UI_NAME(SW::GlobalParameters::MixPercentage, "Mix")
+//UI_NAME( SW::GlobalParameters::StreamMode, "Sampler streaming mode" ) // ...MIDI not supported yet
+
+//------------------------------------------------------------------------------
+} // namespace Parameters
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------

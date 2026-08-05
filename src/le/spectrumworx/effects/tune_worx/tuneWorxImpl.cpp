@@ -14,7 +14,6 @@
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
-#include "le/parameters/uiElements.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -50,67 +49,6 @@ char const TuneWorx ::title[] = "TuneWorx";
 char const TuneWorxPVD::title[] = "TuneWorx (pvd)";
 
 char const Detail::TuneWorxBase::description[] = "Chromatic scale pitch discretization.";
-
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Key, "Key")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi01, "1")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi02, "2")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi03, "3")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi04, "4")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi05, "5")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi06, "6")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi07, "7")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi08, "8")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi09, "9")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi10, "10")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi11, "11")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi12, "12")
-/// \note These were behind #ifdef LE_SW_SDK_BUILD, so until now no plugin build
-/// had a name for them, and they shared the placeholder "N/A" -- which
-/// ParameterInfo carries into the preset, because presets serialise by name.
-/// Saving a TuneWorx preset therefore wrote twenty one elements called `<N/A>`,
-/// which is not even a legal XML name: reading one back failed the parse
-/// outright. The names below are the ones that were commented out beside each.
-///
-///   Safe by stage 0.7's rule, which forbids renaming anything a preset file
-/// references: no preset file can reference "N/A", because the 2011 banks
-/// predate every one of these parameters. The round-trip test is what noticed.
-///                                           (31.07.2026.) (SW port)
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi01, "Bypass 1")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi02, "Bypass 2")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi03, "Bypass 3")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi04, "Bypass 4")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi05, "Bypass 5")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi06, "Bypass 6")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi07, "Bypass 7")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi08, "Bypass 8")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi09, "Bypass 9")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi10, "Bypass 10")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi11, "Bypass 11")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::BypassSemi12, "Bypass 12")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::PitchMinFreq, "Pitch range lower bound")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::PitchMaxFreq, "Pitch range upper bound")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::TuneTolerance, "Out of tune tolerance")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::RetuneTime, "Retune time")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::PitchShift, "Pitch shift")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Vibrato, "Vibrato")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::VibratoDepth, "Vibrato extent")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::VibratoPeriod, "Vibrato rate")
-EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::VibratoDelay, "Vibrato delay")
-
-EFFECT_ENUMERATED_PARAMETER_STRINGS(Detail::TuneWorxBase, Key,
-    {A, "A"},
-    {Ais, "A#"},
-    {B, "B"},
-    {C, "C"},
-    {Cis, "C#"},
-    {D, "D"},
-    {Dis, "D#"},
-    {E, "E"},
-    {F, "F"},
-    {Fis, "F#"},
-    {G, "G"},
-    {Gis, "G#"})
-
 namespace Detail
 {
 LE_OPTIMIZE_FOR_SIZE_BEGIN()
@@ -124,109 +62,6 @@ void LE_COLD TuneWorxBaseImpl::setup(IndexRange const &,
 
         std::int8_t pos(0);
 
-#ifdef LE_SW_SDK_BUILD
-        if (parameters().get<Semi01>() && !parameters().get<BypassSemi01>())
-        {
-            userTones[pos++] = 0;
-        }
-        if (parameters().get<Semi02>() && !parameters().get<BypassSemi02>())
-        {
-            userTones[pos++] = 1;
-        }
-        if (parameters().get<Semi03>() && !parameters().get<BypassSemi03>())
-        {
-            userTones[pos++] = 2;
-        }
-        if (parameters().get<Semi04>() && !parameters().get<BypassSemi04>())
-        {
-            userTones[pos++] = 3;
-        }
-        if (parameters().get<Semi05>() && !parameters().get<BypassSemi05>())
-        {
-            userTones[pos++] = 4;
-        }
-        if (parameters().get<Semi06>() && !parameters().get<BypassSemi06>())
-        {
-            userTones[pos++] = 5;
-        }
-        if (parameters().get<Semi07>() && !parameters().get<BypassSemi07>())
-        {
-            userTones[pos++] = 6;
-        }
-        if (parameters().get<Semi08>() && !parameters().get<BypassSemi08>())
-        {
-            userTones[pos++] = 7;
-        }
-        if (parameters().get<Semi09>() && !parameters().get<BypassSemi09>())
-        {
-            userTones[pos++] = 8;
-        }
-        if (parameters().get<Semi10>() && !parameters().get<BypassSemi10>())
-        {
-            userTones[pos++] = 9;
-        }
-        if (parameters().get<Semi11>() && !parameters().get<BypassSemi11>())
-        {
-            userTones[pos++] = 10;
-        }
-        if (parameters().get<Semi12>() && !parameters().get<BypassSemi12>())
-        {
-            userTones[pos++] = 11;
-        }
-
-        std::int8_t const userNumTones(pos);
-
-        if (parameters().get<BypassSemi01>())
-        {
-            userTones[pos++] = 0;
-        }
-        if (parameters().get<BypassSemi02>())
-        {
-            userTones[pos++] = 1;
-        }
-        if (parameters().get<BypassSemi03>())
-        {
-            userTones[pos++] = 2;
-        }
-        if (parameters().get<BypassSemi04>())
-        {
-            userTones[pos++] = 3;
-        }
-        if (parameters().get<BypassSemi05>())
-        {
-            userTones[pos++] = 4;
-        }
-        if (parameters().get<BypassSemi06>())
-        {
-            userTones[pos++] = 5;
-        }
-        if (parameters().get<BypassSemi07>())
-        {
-            userTones[pos++] = 6;
-        }
-        if (parameters().get<BypassSemi08>())
-        {
-            userTones[pos++] = 7;
-        }
-        if (parameters().get<BypassSemi09>())
-        {
-            userTones[pos++] = 8;
-        }
-        if (parameters().get<BypassSemi10>())
-        {
-            userTones[pos++] = 9;
-        }
-        if (parameters().get<BypassSemi11>())
-        {
-            userTones[pos++] = 10;
-        }
-        if (parameters().get<BypassSemi12>())
-        {
-            userTones[pos++] = 11;
-        }
-
-        std::int8_t const userBypassedTones(pos - userNumTones);
-#else
         if (parameters().get<Semi01>())
         {
             userTones[pos++] = 0;
@@ -277,156 +112,46 @@ void LE_COLD TuneWorxBaseImpl::setup(IndexRange const &,
         }
         std::int8_t const userNumTones(pos);
         std::int8_t const userBypassedTones(0);
-#endif // LE_SW_SDK_BUILD
 
         userScale_.tonesUpdated(userNumTones, userBypassedTones);
     }
-#if defined(LE_SW_SDK_BUILD)
-    // Retune Time
-    {
-        retuneTime_ = engineSetup.milliSecondsToSteps(parameters().get<RetuneTime>());
-    }
-    // Pitch Shift
-    {
-        // cents to scale:
-        pitchShift_ = Math::cents2Interval12TET(parameters().get<PitchShift>());
-    }
-    // Vibrato
-    {
-        VibratoEffect::setup(parameters().get<VibratoPeriod>(), engineSetup);
-        vibratoDelay_ = engineSetup.milliSecondsToSteps(parameters().get<VibratoDelay>());
-        vibratoDelay_ = std::max(vibratoDelay_, retuneTime_);
-    }
-#elif defined(LE_SW_TW_RETUNE_TEST)
-    retuneTime_ = engineSetup.milliSecondsToSteps(50);
-#endif // LE_SW_SDK_BUILD
 }
-
-#if defined(LE_MELODIFY_SDK_BUILD)
-static float const melodifyActualFixedPitch(164.8137784564f);
-static float melodifyFixedPitch(melodifyActualFixedPitch);
-void melodifyAdjustFixedPitch(unsigned int const sampleRate)
-{
-    melodifyFixedPitch = Math::convert<float>(sampleRate) / 44100 * melodifyActualFixedPitch;
-}
-#endif
 
 LE_OPTIMIZE_FOR_SIZE_END()
 
-#if defined(_MSC_VER) && !defined(_M_X64) && defined(LE_SW_SDK_BUILD)
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
-#else
 LE_OPTIMIZE_FOR_SPEED_BEGIN()
-#endif // MSVC10 x86 bad codegen workaround
 
 float LE_NOINLINE
 LE_HOT TuneWorxBaseImpl::findNewPitchScale(Engine::ChannelData_AmPh const &data,
                                            Engine::Setup const &engineSetup, ChannelState &cs) const
 {
-#ifdef LE_SW_SDK_BUILD
-    // Apply vibrato if selected
-    float const vibratoPitch(parameters().get<Vibrato>() && (cs.tuneStep == vibratoDelay_ ||
-                                                             userScale_.numberOfTones() == 0)
-                                 ? findVibratoPitch(cs)
-                                 : 1);
-#else
     unsigned int const vibratoPitch(1);
     unsigned int const pitchShift_(1);
-#endif // LE_SW_SDK_BUILD
 
     if (userScale_.numberOfTones() == 0)
         return pitchShift_ * vibratoPitch;
 
     // Current pitch:
     float const pitch(
-#if defined(LE_MELODIFY_SDK_BUILD)
-        Detail::melodifyFixedPitch
-#else
         PitchDetector::findPitch(data.full().amps(), cs,
-#ifdef LE_SW_SDK_BUILD
-                                 parameters().get<PitchMinFreq>(), parameters().get<PitchMaxFreq>(),
-#else
                                  70,
                                  70 * 2 * 2 * 2 * 2 * 2, // 5 octaves
-#endif // LE_SW_SDK_BUILD
                                  engineSetup)
-#endif // LE_MELODIFY_SDK_BUILD
     );
 
     if (pitch == 0)
     {
-#if defined(LE_SW_SDK_BUILD) || defined(LE_SW_TW_RETUNE_TEST)
-        cs.tuneStep = 0;
-#endif // LE_SW_SDK_BUILD
         return pitchShift_ * vibratoPitch;
     }
 
     // Target tone - detected pitch snapped to user scale:
     float const freqScaletone(userScale_.snap2Scale(pitch, parameters().get<Key>()));
 
-#if defined(LE_SW_SDK_BUILD)
-    // If the newly detected pitch differs from the previous targeted tone,
-    // set tuneStep to 0 and update the last targeted tone:
-    if (freqScaletone != cs.lastTargetTone)
-    {
-        cs.tuneStep = 0;
-        cs.lastTargetTone = freqScaletone;
-    }
-
-    // If the detected pitch is inside the tolerance area from a tone, do
-    // not autotune:
-    if (Math::abs(freqScaletone - pitch) < parameters().get<TuneTolerance>())
-    {
-        cs.tuneStep = 0;
-        return pitchShift_ * vibratoPitch;
-    }
-
-    // Target scale:
-    unsigned int const currentTuneStep(cs.tuneStep < retuneTime_ ? cs.tuneStep : retuneTime_);
-    float const pitchScale(1 + Math::convert<float>(currentTuneStep + 1) /
-                                   Math::convert<float>(retuneTime_ + 1) * (freqScaletone - pitch) /
-                                   pitch);
-
-    if (cs.tuneStep < vibratoDelay_)
-    {
-        ++cs.tuneStep;
-        // Reset vibrato:
-        cs.frameCounter.reset();
-    }
-
-    return pitchScale * pitchShift_ * vibratoPitch;
-#elif defined(LE_SW_TW_RETUNE_TEST)
-    if (freqScaletone != cs.lastTargetTone)
-    {
-        cs.tuneStep = 0;
-        cs.lastTargetTone = freqScaletone;
-    }
-    unsigned int const currentTuneStep(cs.tuneStep < retuneTime_ ? cs.tuneStep : retuneTime_);
-    float const pitchScale(1 + Math::convert<float>(currentTuneStep + 1) /
-                                   Math::convert<float>(retuneTime_ + 1) * (freqScaletone - pitch) /
-                                   pitch);
-    if (cs.tuneStep < retuneTime_)
-        ++cs.tuneStep;
-    return pitchScale;
-#else
     float const pitchScale(freqScaletone / pitch);
     return pitchScale;
-#endif // LE_SW_SDK_BUILD
 }
 
-#ifdef LE_SW_SDK_BUILD
-float LE_HOT TuneWorxBaseImpl::findVibratoPitch(ChannelState &cs) const
-{
-    return VibratoEffect::calculateNewPitch(cs, parameters().get<SpringType>(),
-                                            parameters().get<VibratoDepth>());
-}
-#endif // LE_SW_SDK_BUILD
-
-#if defined(_MSC_VER) && !defined(_M_X64) && defined(LE_SW_SDK_BUILD)
-LE_OPTIMIZE_FOR_SIZE_END()
-#else
 LE_OPTIMIZE_FOR_SPEED_END()
-#endif // MSVC10 x86 bad codegen workaround
 } // namespace Detail
 
 ////////////////////////////////////////////////////////////////////////////////

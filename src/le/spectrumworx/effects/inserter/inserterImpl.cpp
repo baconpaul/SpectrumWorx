@@ -15,7 +15,6 @@
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/math/math.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -35,16 +34,6 @@ namespace Effects
 
 char const Inserter::title[] = "Inserter";
 char const Inserter::description[] = "Insert side channel into main.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Inserter UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Inserter::Destination, "Destination")
-EFFECT_PARAMETER_NAME(Inserter::Source, "Source")
-EFFECT_PARAMETER_NAME(Inserter::InsertSize, "Size")
 
 ////////////////////////////////////////////////////////////////////////////////
 //

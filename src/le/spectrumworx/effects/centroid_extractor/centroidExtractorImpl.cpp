@@ -15,7 +15,6 @@
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 
@@ -39,21 +38,6 @@ namespace Effects
 
 char const CentroidExtractor::title[] = "Centroid";
 char const CentroidExtractor::description[] = "Adaptive bandpass filter.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// CentroidExtractor UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(CentroidExtractor::Mode, "Filter center")
-EFFECT_PARAMETER_NAME(CentroidExtractor::Bandwidth, "Bandwidth")
-EFFECT_PARAMETER_NAME(CentroidExtractor::Attenuation, "Border slope")
-
-EFFECT_ENUMERATED_PARAMETER_STRINGS(CentroidExtractor, Mode,
-    {Centroid, "Centroid"},
-    {Peak, "Peak"},
-    {Dominant, "Dominant"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

@@ -15,6 +15,7 @@
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/enumerated/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -60,6 +61,19 @@ struct Phlip
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Phlip UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Phlip::Mode, "Target harmonics")
+
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Phlip, Mode,
+    {All, "All"},
+    {Even, "Even"},
+    {Odd, "Odd"})
 
 //------------------------------------------------------------------------------
 } // namespace Effects

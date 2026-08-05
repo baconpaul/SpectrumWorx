@@ -15,7 +15,6 @@
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
-#include "le/parameters/uiElements.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -35,21 +34,6 @@ namespace Effects
 
 char const Burrito::title[] = "Burrito";
 char const Burrito::description[] = "Combination at random locations.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Burrito UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Burrito::Mode, "Target creation")
-EFFECT_PARAMETER_NAME(Burrito::Range, "Target range")
-EFFECT_PARAMETER_NAME(Burrito::Period, "Range period")
-EFFECT_PARAMETER_NAME(Burrito::SideGain, "Side gain")
-
-EFFECT_ENUMERATED_PARAMETER_STRINGS(Burrito, Mode,
-    {Replace, "Replace"},
-    {Sum, "Sum"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

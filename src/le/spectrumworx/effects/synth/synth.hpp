@@ -14,6 +14,7 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -59,6 +60,17 @@ struct Synth
     static char const title[];
     static char const description[];
 }; // struct Synth
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Synth UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Synth::Frequency, "Frequency")
+EFFECT_PARAMETER_NAME(Synth::HarmonicSlope, "Slope")
+EFFECT_PARAMETER_NAME(Synth::FlangeIntensity, "Flange amount")
+EFFECT_PARAMETER_NAME(Synth::FlangeOffset, "Flange offset")
 
 //------------------------------------------------------------------------------
 } // namespace Effects

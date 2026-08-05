@@ -15,6 +15,7 @@
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/linear/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -58,6 +59,15 @@ struct Quantizer
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Quantizer UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Quantizer::Width, "Width")
+EFFECT_PARAMETER_NAME(Quantizer::Origami, "Origami")
 
 //------------------------------------------------------------------------------
 } // namespace Effects

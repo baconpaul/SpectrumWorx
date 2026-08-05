@@ -18,7 +18,8 @@ namespace LE
 namespace SW
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Effects)
+namespace Effects
+{
 //------------------------------------------------------------------------------
 
 IndexRange::IndexRange(value_type const begin, value_type const end) : Pair(begin, end)
@@ -50,7 +51,7 @@ bool IndexRange::isValid(value_type const first, value_type const end) { return 
 bool IndexRange::isValid() const { return isValid(first(), end()); }
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Effects)
+} // namespace Effects
 //------------------------------------------------------------------------------
 } // namespace SW
 //------------------------------------------------------------------------------

@@ -12,7 +12,6 @@
 
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
-#include "le/parameters/uiElements.hpp"
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 //------------------------------------------------------------------------------
@@ -34,15 +33,6 @@ namespace Effects
 
 char const Freqnamics::title[] = "Freqnamics";
 char const Freqnamics::description[] = "Limit and noise-gate.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Freqnamics UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Freqnamics::LimiterThreshold, "Limiter")
-EFFECT_PARAMETER_NAME(Freqnamics::NoisegateThreshold, "Noise gate")
 
 ////////////////////////////////////////////////////////////////////////////////
 //

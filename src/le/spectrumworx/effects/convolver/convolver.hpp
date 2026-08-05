@@ -16,6 +16,7 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/enumerated/parameter.hpp"
 #include "le/parameters/trigger/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -71,6 +72,25 @@ struct Convolver
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Convolver UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Convolver::ConvolutionType, "Type")
+EFFECT_PARAMETER_NAME(Convolver::GrabIR, "Grab IR")
+EFFECT_PARAMETER_NAME(Convolver::Phase, "Phase")
+
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Convolver, ConvolutionType,
+    {Triggered, "Triggered"},
+    {Continuous, "Continuous"})
+
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Convolver, Phase,
+    {Sum, "Sum"},
+    {Side, "Side"},
+    {Main, "Main"})
 
 //------------------------------------------------------------------------------
 } // namespace Effects

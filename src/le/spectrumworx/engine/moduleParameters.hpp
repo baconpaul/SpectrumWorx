@@ -41,12 +41,11 @@ using ParameterInfo = Parameters::RuntimeInformation;
 
 #ifndef LE_NO_PRESETS
 class ParametersLoader;
-#ifndef LE_SW_SDK_BUILD
 class ParametersSaver;
-#endif // !LE_SW_SDK_BUILD
 #endif // !LE_NO_PRESETS
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 //------------------------------------------------------------------------------
 
 using parameter_value_t = Parameters::LFOImpl::value_type;
@@ -260,9 +259,7 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
 #ifndef LE_NO_PRESETS
   public: // Presets
     void loadPresetParameters(ParametersLoader const &);
-#ifndef LE_SW_SDK_BUILD
     void savePresetParameters(ParametersSaver const &) const;
-#endif // LE_SW_SDK_BUILD
 #endif // !LE_NO_PRESETS
 
 #ifndef LE_NO_LFOs
@@ -314,7 +311,7 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
 }; // class ModuleParameters
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 //------------------------------------------------------------------------------
 } // namespace SW
 //------------------------------------------------------------------------------

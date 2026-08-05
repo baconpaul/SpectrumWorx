@@ -11,7 +11,6 @@
 #include "swappahImpl.hpp"
 
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 #include "le/spectrumworx/effects/indexRange.hpp"
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 
@@ -37,23 +36,6 @@ namespace Effects
 
 char const Swappah::title[] = "Swappah";
 char const Swappah::description[] = "Swaps three spectral bands.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Swappah UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Swappah::BandLowMid, "Low-Mid border")
-EFFECT_PARAMETER_NAME(Swappah::BandMidHigh, "Mid-High border")
-EFFECT_PARAMETER_NAME(Swappah::BandOrder, "Swap order")
-
-EFFECT_ENUMERATED_PARAMETER_STRINGS(Swappah, BandOrder,
-    {LowHighMid, "Low-High-Mid"},
-    {MidLowHigh, "Mid-Low-High"},
-    {MidHighLow, "Mid-High-Low"},
-    {HighLowMid, "High-Low-Mid"},
-    {HighMidLow, "High-Mid-Low"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

@@ -13,9 +13,6 @@
 #define module_hpp__0A6DD89D_4BD6_4CE8_B0F1_4E83E0F5DABE
 //------------------------------------------------------------------------------
 #include "channelData_fwd.hpp"
-#ifdef LE_SW_SDK_BUILD
-#include "moduleBase.hpp"
-#endif // LE_SW_SDK_BUILD
 
 #include "le/spectrumworx/effects/indexRange.hpp"
 #include "le/spectrumworx/engine/buffers.hpp"
@@ -38,7 +35,8 @@ namespace Engine
 struct StorageFactors;
 using Storage = LE::Utility::Span<char>;
 } // namespace Engine
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 //------------------------------------------------------------------------------
 
 class ChannelData;
@@ -51,9 +49,6 @@ class Setup;
 ////////////////////////////////////////////////////////////////////////////////
 
 class LE_NOVTABLE ModuleDSP :
-#ifdef LE_SW_SDK_BUILD
-    public LE::SW::Engine::ModuleBase,
-#endif // LE_SW_SDK_BUILD
     public LE::SW::Engine::ModuleParameters
 {
   public:
@@ -118,14 +113,7 @@ class LE_NOVTABLE ModuleDSP :
         LE_ASSERT(storage_.begin() == nullptr);
     }
 
-#ifdef LE_SW_SDK_BUILD //...mrmlj...reinvestigate this...
-  public:
-    virtual ~ModuleDSP();
-
-  protected:
-#else
     ~ModuleDSP();
-#endif
 
     void setup(Setup const &);
 
@@ -138,12 +126,6 @@ class LE_NOVTABLE ModuleDSP :
   private:
     virtual void doPreProcess(Setup const &) = 0;
     virtual void doProcess(std::uint8_t channel, ChannelDataProxy, Setup const &) const = 0;
-
-#ifdef LE_SW_SDK_BUILD
-  private: // LE::Utility::IntrusivePtr required section
-    friend void intrusive_ptr_add_ref(ModuleBase const *);
-    friend void intrusive_ptr_release(ModuleBase const *);
-#endif // LE_SW_SDK_BUILD
 
   private:
     friend class LE::SW::Engine::ModuleParameters;
@@ -163,7 +145,7 @@ class LE_NOVTABLE ModuleDSP :
 }; // class ModuleDSP
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 //------------------------------------------------------------------------------
 } // namespace SW
 //------------------------------------------------------------------------------

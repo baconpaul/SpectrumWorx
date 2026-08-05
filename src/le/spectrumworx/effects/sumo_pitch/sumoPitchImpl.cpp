@@ -18,7 +18,6 @@
 #include "le/math/math.hpp"
 #include "le/math/conversion.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 
 #include "le/utility/stackBuffer.hpp"
 //------------------------------------------------------------------------------
@@ -40,15 +39,6 @@ namespace Effects
 
 char const SumoPitch::title[] = "Sumo Pitch";
 char const SumoPitch::description[] = "Pitch fight.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// SumoPitch UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(SumoPitch::Blend, "Blend amount")
-EFFECT_PARAMETER_NAME(SumoPitch::Speed, "Speed")
 
 ////////////////////////////////////////////////////////////////////////////////
 //

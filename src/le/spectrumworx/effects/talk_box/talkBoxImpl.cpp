@@ -13,7 +13,6 @@
 #include "le/math/math.hpp"
 #include "le/math/conversion.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 #include "le/spectrumworx/effects/indexRange.hpp"
 #include "le/spectrumworx/engine/channelData.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
@@ -36,16 +35,6 @@ namespace Effects
 
 char const TalkBox::title[] = "Talk Box";
 char const TalkBox::description[] = "Classic vocoding with a synthesized carrier.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// TalkBox UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(TalkBox::ExternalCarrier, "External carrier")
-EFFECT_PARAMETER_NAME(TalkBox::BaseFrequency, "Base frequency")
-EFFECT_PARAMETER_NAME(TalkBox::CutOff, "Cutoff")
 
 ////////////////////////////////////////////////////////////////////////////////
 //

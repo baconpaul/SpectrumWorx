@@ -15,6 +15,7 @@
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/linear/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -51,6 +52,14 @@ struct Reverser
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Reverser UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Reverser::Length, "Chunk length")
 
 //------------------------------------------------------------------------------
 } // namespace Effects

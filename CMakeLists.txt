@@ -93,8 +93,10 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 # Here rather than in src/, so that tests/ and tools/ -- siblings, not
-# subdirectories -- inherit sw_force_include_odr_header() too.
-include(sw-odr-header)
+# subdirectories -- inherit sw_force_include_odr_header() too. It carries the
+# warning baseline and -Werror as well, for the same reason and by the same
+# per-source path filter: our standards, our sources.
+include(sw-our-sources)
 
 # Before add_subdirectory(libs), and before any target exists: a sanitizer has to
 # be on every translation unit and on the link line, dependencies included.

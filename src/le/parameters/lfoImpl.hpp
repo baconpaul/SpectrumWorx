@@ -19,6 +19,7 @@
 #include "le/parameters/factoryMacro.hpp"
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 
 #include <atomic>
 #include <cstdint>
@@ -339,6 +340,46 @@ LFOImpl::PeriodScale::value_type LFOImpl::adjustValueForPreset(PeriodScale const
 template <>
 LFOImpl::PeriodScale::value_type
     LFOImpl::adjustValueFromPreset<LFOImpl::PeriodScale>(LFOImpl::PeriodScale::value_type) const;
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// LFOImpl UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+UI_NAME(LFOImpl::Enabled, "on")
+UI_NAME(LFOImpl::PeriodScale, "T")
+UI_NAME(LFOImpl::Phase, "ph")
+UI_NAME(LFOImpl::LowerBound, "lbnd")
+UI_NAME(LFOImpl::UpperBound, "ubnd")
+UI_NAME(LFOImpl::SyncTypes, "sync")
+UI_NAME(LFOImpl::Waveform, "wfrm")
+
+//...mrmlj...this does not work yet because the Window enum is not a member
+//...of the WindowFunction parameter class...fix this...
+//ENUMERATED_PARAMETER_STRINGS
+//(
+//    LFOImpl, Waveform,
+//    (( Sine           , "Sine"       ))
+//    (( Triangle       , "Triangle"   ))
+//    (( Sawtooth       , "Sawtooth"   ))
+//    (( ReverseSawtooth, "htootwaS"   ))
+//    (( Square         , "Square"     ))
+//    (( Exponent       , "Exponent"   ))
+//    (( RandomHold     , "Hrandom"    ))
+//    (( RandomSlide    , "Grandom"    ))
+//    (( Whacko         , "Whacko"     ))
+//    (( Dirac          , "Dirac up"   ))
+//    (( dIRAC          , "Dirac down" ))
+//)
+
+/// \note Written out rather than through ENUMERATED_PARAMETER_STRINGS for the
+/// reason above: that macro checks each string against the enumerator it names,
+/// and this parameter has no enumerators to name.
+template <>
+constexpr DiscreteValues<LFOImpl::Waveform>::Strings DiscreteValues<LFOImpl::Waveform>::strings{
+    "Sine",    "Triangle", "Sawtooth", "htootwaS", "Square",    "Exponent",
+    "Hrandom", "Grandom",  "Whacko",   "Dirac up", "Dirac down"};
 
 //------------------------------------------------------------------------------
 } // namespace Parameters

@@ -16,6 +16,7 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/enumerated/parameter.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -72,6 +73,30 @@ struct Vaxateer
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Vaxateer UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Vaxateer::RMSTarget, "RMS target")
+EFFECT_PARAMETER_NAME(Vaxateer::RMSGain, "RMS threshold gain")
+EFFECT_PARAMETER_NAME(Vaxateer::Mode, "Swap condition")
+
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Vaxateer, RMSTarget,
+    {MainRMS, "Main"},
+    {SideRMS, "Side"})
+
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Vaxateer, Mode,
+    {M1, "Main: >Thr >Side"},
+    {M2, "Main: >Thr <Side"},
+    {M3, "Main: <Thr >Side"},
+    {M4, "Main: <Thr <Side"},
+    {M5, "Side: >Thr >Main"},
+    {M6, "Side: >Thr <Main"},
+    {M7, "Side: <Thr >Main"},
+    {M8, "Side: <Thr <Main"})
 
 //------------------------------------------------------------------------------
 } // namespace Effects

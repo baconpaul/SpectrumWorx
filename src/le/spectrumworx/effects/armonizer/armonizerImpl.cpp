@@ -11,7 +11,6 @@
 #include "armonizerImpl.hpp"
 
 #include "le/spectrumworx/engine/setup.hpp"
-#include "le/parameters/uiElements.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -31,14 +30,6 @@ namespace Effects
 
 char const Armonizer::title[] = "Armonizer";
 char const Armonizer::description[] = "Add harmonics.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Armonizer UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Armonizer::Interval, "Interval")
 
 ////////////////////////////////////////////////////////////////////////////////
 //

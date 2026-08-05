@@ -17,7 +17,7 @@
 
 #if !defined(LE_NO_RTTI) && (!defined(LE_NO_EXCEPTIONS) || defined(_MSC_VER))
 #include "le/utility/polymorphicDowncast.hpp"
-#endif // LE_SW_SDK_BUILD
+#endif // !LE_NO_RTTI && ( !LE_NO_EXCEPTIONS || _MSC_VER )
 #include "le/utility/intrusivePtr.hpp"
 
 #include <type_traits>
@@ -28,7 +28,8 @@ namespace LE
 namespace SW
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 //------------------------------------------------------------------------------
 
 class LE_NOVTABLE ModuleNode
@@ -104,7 +105,7 @@ template <class ActualModule> ModuleNode const &node(ActualModule const &chained
 }
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 //------------------------------------------------------------------------------
 template <class ActualModule>
 LE_FORCEINLINE void intrusive_ptr_add_ref(ActualModule const *const pModule)

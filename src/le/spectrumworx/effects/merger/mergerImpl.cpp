@@ -12,7 +12,6 @@
 
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
-#include "le/parameters/uiElements.hpp"
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/utility/platformSpecifics.hpp"
@@ -35,23 +34,6 @@ namespace Effects
 
 char const Merger::title[] = "Merger";
 char const Merger::description[] = "Conditional combinations.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Merger UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Merger::Threshold, "Threshold")
-EFFECT_PARAMETER_NAME(Merger::Operation, "Condition")
-
-EFFECT_ENUMERATED_PARAMETER_STRINGS(Merger, Operation,
-    {MainLargerThanSide, "Main>Side"},
-    {SideLargerThanMain, "Side>Main"},
-    {MainAboveThreshold, "Main>Thr"},
-    {SideAboveThreshold, "Side>Thr"},
-    {MainBelowThreshold, "Main<Thr"},
-    {SideBelowThreshold, "Side<Thr"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

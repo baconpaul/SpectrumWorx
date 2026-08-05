@@ -16,7 +16,8 @@ namespace LE
 namespace SW
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 //------------------------------------------------------------------------------
 
 ChannelData_ReIm::ChannelData_ReIm(FullChannelData_ReIm &data, IndexRange const &workingRange)
@@ -25,7 +26,7 @@ ChannelData_ReIm::ChannelData_ReIm(FullChannelData_ReIm &data, IndexRange const 
 }
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 //------------------------------------------------------------------------------
 } // namespace SW
 //------------------------------------------------------------------------------

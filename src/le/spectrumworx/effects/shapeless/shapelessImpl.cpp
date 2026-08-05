@@ -10,7 +10,6 @@
 //------------------------------------------------------------------------------
 #include "shapelessImpl.hpp"
 
-#include "le/parameters/uiElements.hpp"
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/utility/platformSpecifics.hpp"
@@ -50,14 +49,6 @@ char const Shapeless::description[] = "Spectrum shape transfer.";
 /// See doShape function."
 ///                                    (08.03.2010.) (Danijel Domazet)
 ///
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Shapeless UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Shapeless::Width, "Shape width")
 
 ////////////////////////////////////////////////////////////////////////////////
 //

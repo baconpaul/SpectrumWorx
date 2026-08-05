@@ -60,7 +60,6 @@
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 #include "le/spectrumworx/effects/indexRange.hpp"
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/processor.hpp"
@@ -94,25 +93,6 @@ namespace Effects
 
 char const Vocoder::title[] = "Vocoder";
 char const Vocoder::description[] = "Classic vocoding.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Vocoder UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Vocoder ::EnvelopeBorder, "Envelope border")
-EFFECT_PARAMETER_NAME(Vocoder ::NoiseIntensity, "Carrier noise")
-EFFECT_PARAMETER_NAME(VocoderImpl::FilterMethod, "Filter method")
-
-EFFECT_ENUMERATED_PARAMETER_STRINGS(VocoderImpl, FilterMethod,
-    {CepstrumUdoBrick, "Cepstrum - Brick - Udo"},
-    {CepstrumBrick, "Cepstrum - Brick"},
-    {CepstrumHamming, "Cepstrum - Hamming"},
-    {MovingAverage, "Moving average"},
-    {Envelope, "Envelope"},
-    {MelEnvelope, "Mel envelope"},
-    {Passthrough, "Passthrough"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

@@ -24,7 +24,6 @@
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 
 #include <cmath>
 //------------------------------------------------------------------------------
@@ -52,17 +51,6 @@ char const PVExploder::description[] = "Spectral explosion with glissando.";
 
 char const Imploder::title[] = "Imploder";
 char const Exploder::title[] = "Exploder";
-
-EFFECT_PARAMETER_NAME(PVImploder::Decay, "Decay")
-EFFECT_PARAMETER_NAME(PVImploder::Gliss, "Glissando")
-EFFECT_PARAMETER_NAME(PVImploder::Threshold, "Limit")
-//EFFECT_PARAMETER_NAME( PVImploder::Gate     , "Gate"      )
-
-EFFECT_PARAMETER_NAME(PVExploder::Growth, "Growth")
-EFFECT_PARAMETER_NAME(PVExploder::Gliss, "Glissando")
-EFFECT_PARAMETER_NAME(PVExploder::Threshold, "Limit")
-EFFECT_PARAMETER_NAME(PVExploder::Gate, "Gate")
-
 namespace Detail
 {
 float dB2BinAmplitude(int const dBAmplitude, Engine::Setup const &engineSetup)

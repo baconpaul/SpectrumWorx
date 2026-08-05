@@ -12,7 +12,6 @@
 
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
-#include "le/parameters/uiElements.hpp"
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
 #include "le/math/vector.hpp"
@@ -35,25 +34,6 @@ namespace Effects
 
 char const Convolver::title[] = "Convolver";
 char const Convolver::description[] = "Convolution between main and side channels.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Convolver UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Convolver::ConvolutionType, "Type")
-EFFECT_PARAMETER_NAME(Convolver::GrabIR, "Grab IR")
-EFFECT_PARAMETER_NAME(Convolver::Phase, "Phase")
-
-EFFECT_ENUMERATED_PARAMETER_STRINGS(Convolver, ConvolutionType,
-    {Triggered, "Triggered"},
-    {Continuous, "Continuous"})
-
-EFFECT_ENUMERATED_PARAMETER_STRINGS(Convolver, Phase,
-    {Sum, "Sum"},
-    {Side, "Side"},
-    {Main, "Main"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

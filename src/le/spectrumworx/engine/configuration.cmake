@@ -5,6 +5,18 @@
 # Copyright (c) 2014 - 2015. Little Endian Ltd.
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
+#
+# **Record, not build.** Nothing includes this file, and nothing may -- it is
+# reachable only from src/legacy-build.cmake, which nothing includes either. It
+# is the 2016 build's own account of which engine features were switchable and
+# what they defaulted to, and it is worth keeping for exactly that.
+#
+# A definition here reaches no compiler, and this file is where stage 7 found out
+# what that costs: LE_SW_ENGINE_INPUT_MODE and LE_SW_ENGINE_WINDOW_PRESUM were
+# set here and tested with #if in thirty-odd compiled translation units, where an
+# undefined name reads 0 in silence. Both have been settled -- see src/dsp.cmake,
+# which is a file the build reads.
+#
 ################################################################################
 
 set( LE_SW_ENGINE_SIDE_CHANNEL true CACHE BOOL "include side chaining functionality" )

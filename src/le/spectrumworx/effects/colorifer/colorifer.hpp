@@ -16,6 +16,7 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/enumerated/parameter.hpp"
 #include "le/parameters/linear/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -67,6 +68,26 @@ struct Colorifer
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Colorifer UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Colorifer::BandWidth, "Shape width")
+EFFECT_PARAMETER_NAME(Colorifer::SpectrumPreprocess, "Spectrum preprocess")
+EFFECT_PARAMETER_NAME(Colorifer::ReplacePhase, "Replace phase")
+
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Colorifer, SpectrumPreprocess,
+    {NotUsed, "None"},
+    {SquareRoot, "Square root"},
+    {Square, "Square"},
+    {Exponential, "Exponent"})
+
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Colorifer, ReplacePhase,
+    {No, "No"},
+    {Yes, "Yes"})
 
 //------------------------------------------------------------------------------
 } // namespace Effects

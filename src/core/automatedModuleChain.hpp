@@ -49,7 +49,11 @@ LE_DEFINE_PARAMETER(ModuleChainParameter, Parameters::LinearSignedInteger,
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class AutomatedModuleChain : public Engine::ModuleChainImpl
+/// \note final because the two `delete`s of one -- publish.cpp and the CLAP's
+/// retire handler -- go through this exact static type, and ModuleNode grows a
+/// virtual in a checked build purely so dynamic_cast works. Saying so is what
+/// makes those deletes provably right rather than merely true.
+class AutomatedModuleChain final : public Engine::ModuleChainImpl
 {
   public:
     enum

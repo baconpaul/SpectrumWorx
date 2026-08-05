@@ -13,7 +13,6 @@
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/math/conversion.hpp"
-#include "le/parameters/uiElements.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -35,14 +34,6 @@ char const PitchFollower ::title[] = "Pitch Follower";
 char const PitchFollowerPVD::title[] = "Pitch Follower (pvd)";
 
 char const Detail::PitchFollowerBase::description[] = "Follow side channel's pitch.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// PitchFollower UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Detail::PitchFollowerBase::Speed, "Speed")
 
 namespace Detail
 {

@@ -157,9 +157,6 @@ LE::Utility::IntrusivePtr<ModuleInterface> ModuleFactory::create(std::int8_t con
     LE_ASSUME(effectIndex >= 0);
 
     bool const moduleEnabled(Effects::includedEffects[effectIndex]);
-#ifdef LE_SW_FULL
-    LE_ASSUME(moduleEnabled == true);
-#endif // LE_SW_FULL
     if (!moduleEnabled)
     {
         /// \note Was `GUI::warningMessageBox`, from a path a host's parameter
@@ -167,8 +164,8 @@ LE::Utility::IntrusivePtr<ModuleInterface> ModuleFactory::create(std::int8_t con
         /// the audio thread can reach, held off only by `includedEffects` being a
         /// constexpr table of all `true`. It reports through the same counted
         /// reporter a preset uses, which is in this layer and raises nothing.
-        /// (`LE_SW_FULL` above is one of the seven macros no live build defines;
-        /// doc/tech/todo.md item 3 owns them.)
+        /// (`LE_SW_FULL` stood above it, asserting the table's contents, and
+        /// went with the demo SKU it gated on 04.08.2026.)
         ///                                   (02.08.2026.) (SW port)
         reportPresetProblem(PresetProblem::EffectNotAvailable, Effects::effectName(effectIndex));
         return nullptr;

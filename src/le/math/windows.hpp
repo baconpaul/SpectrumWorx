@@ -20,7 +20,8 @@
 namespace LE
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Math)
+namespace Math
+{
 //------------------------------------------------------------------------------
 
 using DataRange = LE::Utility::Span<float>;
@@ -28,7 +29,7 @@ using DataRange = LE::Utility::Span<float>;
 void calculateWindow(DataRange const &window, LE::SW::Engine::Constants::Window);
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Math)
+} // namespace Math
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------

@@ -22,7 +22,8 @@ namespace LE
 namespace SW
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 //------------------------------------------------------------------------------
 
 LE_OPTIMIZE_FOR_SIZE_BEGIN()
@@ -383,7 +384,7 @@ LE_COLD bool ModuleChainImpl::resizeAll(Engine::StorageFactors const &newfactors
 LE_OPTIMIZE_FOR_SIZE_END()
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 //------------------------------------------------------------------------------
 } // namespace SW
 //------------------------------------------------------------------------------

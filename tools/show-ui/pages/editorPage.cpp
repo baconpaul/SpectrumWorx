@@ -89,10 +89,6 @@ class SilentNotifications final : public Plugin2HostInteropControler
     void presetChangeEnd() const override {}
     bool latencyChanged() override { return true; }
 
-#if LE_SW_ENGINE_INPUT_MODE >= 2
-    bool hostTryIOConfigurationChange(std::uint8_t, std::uint8_t) override { return false; }
-    bool hostSupportsIOConfigurationChanges() const override { return false; }
-#endif // LE_SW_ENGINE_INPUT_MODE >= 2
 }; // class SilentNotifications
 
 class HarnessHost final : public GUI::EditorHost

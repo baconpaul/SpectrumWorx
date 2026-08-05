@@ -41,9 +41,6 @@ template <class Impl>
 Plugins::AutomatedParameterValue AutomatedModuleImpl<Impl>::getEffectSpecificAutomatedParameter(
     std::uint8_t const effectSpecificParameterIndex, bool const normalised) const
 {
-#ifdef LE_SW_FMOD //...mrmlj...FMOD has "full range" but completely static parameters...
-    const_cast<bool &>(normalised) = true;
-#endif // LE_SW_FMOD
     /// \note The unmodulated value; see getSharedAutomatedParameter() above.
     float const parameterValue(impl().unmodulatedEffectParameter(effectSpecificParameterIndex));
     return Automation::effectInternal2AutomatedValue(effectSpecificParameterIndex, parameterValue,
@@ -84,9 +81,6 @@ void AutomatedModuleImpl<Impl>::setAutomatedParameter(std::uint8_t const paramet
         return;
     }
 
-#ifdef LE_SW_FMOD //...mrmlj...FMOD has "full range" but completely static parameters...
-    const_cast<bool &>(normalised) = true;
-#endif // LE_SW_FMOD
     std::uint8_t const effectSpecificParameterIndex(
         impl().effectSpecificParameterIndex(parameterIndex));
     impl().setEffectParameter(effectSpecificParameterIndex,
@@ -100,12 +94,6 @@ char const *AutomatedModuleImpl<Impl>::getParameterValueString(
 {
     if (index >= impl().numberOfParameters())
         return nullptr;
-
-#ifdef LE_SW_FMOD //...mrmlj...FMOD has "full range" but completely static parameters...
-    if ((printer.valueSource == LE::Parameters::AutomatedParameterPrinter::Linear) &&
-        (index >= Engine::ModuleParameters::BaseParameters::static_size))
-        printer.valueSource = LE::Parameters::AutomatedParameterPrinter::NormalisedLinear;
-#endif // LE_SW_FMOD
 
     if (printer.valueSource == LE::Parameters::AutomatedParameterPrinter::Internal)
     {

@@ -25,7 +25,8 @@
 #include <limits>
 #include <numeric>
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(LE)
+namespace LE
+{
 //------------------------------------------------------------------------------
 
 // https://www.littleendian.com/wiki/index.php/PitchDetectorSDK
@@ -137,61 +138,6 @@ float PitchDetector::findPitch(SW::Engine::ReadOnlyDataRange const &amplitudes, 
     findHarmonicProductSpectrumAndSort(filteredAmps, hps);
     // Estimate pitch:
     float pitch(estimatePitch(cs.lastPitch, lfb, hfb, hps, pd));
-
-#ifdef LE_SW_PURE_ANALYSIS
-    std::uint8_t const maximumConfidence(5);
-    float const maximumAllowedPitchChange(0.2f);
-
-    if (pitch)
-    { // Valid new pitch:
-        if (!cs.lastPitch)
-        { // No previous pitch - simply use the new one:
-            cs.confidence = 1;
-        }
-        else if ((Math::abs(cs.lastPitch - pitch)) / pitch < maximumAllowedPitchChange)
-        { // Pitch changed within limits - save it and increase confidence:
-            cs.confidence = std::min<std::uint8_t>(maximumConfidence, cs.confidence + 1);
-        }
-        else
-        { // Pitch changed significantly/out of limits:
-            if (cs.confidence > 2)
-            { // we have a somewhat confident previous pitch - use it but decrease confidence:
-                pitch = cs.lastPitch;
-                --cs.confidence;
-            }
-            else
-            { // no previous pitch - use the new one:
-                cs.confidence = 1;
-            }
-        }
-
-        LE_ASSERT(pd.getNumPeaks() != 0);
-        bool const newPitchIgnored(pitch == cs.lastPitch);
-        if (!newPitchIgnored)
-        {
-            for (std::uint16_t peakIndex(0);; ++peakIndex)
-            {
-                Peak const &peak(*pd.getPeak(peakIndex));
-                if (peak.freq == pitch)
-                {
-                    cs.amplitude = peak.amplitude;
-                    break;
-                }
-                LE_ASSERT(peakIndex < pd.getNumPeaks());
-            }
-        }
-    }
-    else
-    { // No pitch detected for current frame:
-        if (cs.lastPitch && cs.confidence)
-        { // we have a previous pitch - use it but decrease confidence:
-            pitch = cs.lastPitch;
-            cs.confidence = std::max<std::uint8_t>(0, cs.confidence - 1);
-        }
-        else
-            cs.reset();
-    }
-#endif // LE_SW_PURE_ANALYSIS
 
     cs.lastPitch = pitch;
 
@@ -347,12 +293,8 @@ LE_OPTIMIZE_FOR_SPEED_END()
 void PitchDetector::ChannelState::reset()
 {
     lastPitch = 0;
-#ifdef LE_SW_PURE_ANALYSIS
-    amplitude = -std::numeric_limits<float>::infinity();
-    confidence = 0;
-#endif // LE_SW_PURE_ANALYSIS
 }
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(LE)
+} // namespace LE
 //------------------------------------------------------------------------------

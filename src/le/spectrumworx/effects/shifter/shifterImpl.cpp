@@ -13,7 +13,6 @@
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 #include "le/spectrumworx/effects/indexRange.hpp"
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/utility/buffers.hpp"
@@ -38,26 +37,6 @@ namespace Effects
 
 char const Shifter::title[] = "Shifter";
 char const Shifter::description[] = "Shifts spectrum along the frequency axis.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Shifter UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Shifter::ShiftTarget, "Target")
-EFFECT_PARAMETER_NAME(Shifter::Offset, "Offset")
-EFFECT_PARAMETER_NAME(Shifter::Tail, "Tail")
-
-EFFECT_ENUMERATED_PARAMETER_STRINGS(Shifter, Tail,
-    {Leave, "Leave"},
-    {Clear, "Clear"},
-    {Circular, "Circular"})
-
-EFFECT_ENUMERATED_PARAMETER_STRINGS(Shifter, ShiftTarget,
-    {Magnitudes, "Magnitudes"},
-    {Phases, "Phases"},
-    {Both, "Mags&Phases"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

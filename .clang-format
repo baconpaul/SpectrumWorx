@@ -56,6 +56,12 @@ AttributeMacros:
 StatementMacros:
   - LE_DEFAULT_CASE_UNREACHABLE
   - LE_UNREACHABLE_CODE
+# A value-string table is one { Value, "string" } pair per line, and its whole
+# point is that the pairs line up against the enumerators they name -- reflowed
+# into a paragraph it is unreadable and unreviewable.
+WhitespaceSensitiveMacros:
+  - ENUMERATED_PARAMETER_STRINGS
+  - EFFECT_ENUMERATED_PARAMETER_STRINGS
 ---
 Language: ObjC
 BasedOnStyle: LLVM

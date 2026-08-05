@@ -14,7 +14,6 @@
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
-#include "le/parameters/uiElements.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -34,20 +33,6 @@ namespace Effects
 
 char const Denoiser::title[] = "Denoiser";
 char const Denoiser::description[] = "Denoise using noise footprint.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Denoiser UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Denoiser::Intensity, "Amount")
-EFFECT_PARAMETER_NAME(Denoiser::Mode, "Noise footprint")
-
-EFFECT_ENUMERATED_PARAMETER_STRINGS(Denoiser, Mode,
-    {Main, "Main"},
-    {Side, "Side"},
-    {Sum, "Average"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

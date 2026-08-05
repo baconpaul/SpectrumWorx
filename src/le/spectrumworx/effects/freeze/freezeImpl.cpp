@@ -15,7 +15,6 @@
 #include "le/math/math.hpp"
 #include "le/math/conversion.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -35,16 +34,6 @@ namespace Effects
 
 char const Freeze::title[] = "Freeze";
 char const Freeze::description[] = "Time freeze.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Freeze UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Freeze::FreezeTrigger, "Freeze")
-EFFECT_PARAMETER_NAME(Freeze::MeltTrigger, "Melt")
-EFFECT_PARAMETER_NAME(Freeze::TransitionTime, "Transition time")
 
 ////////////////////////////////////////////////////////////////////////////////
 //

@@ -42,9 +42,6 @@ void addModuleToMenuEntry(Menu &menu, std::uint8_t const moduleIndex)
     unsigned int const menuEntryID(moduleIndex);
     char const *const moduleName(Effects::effectName(moduleIndex));
     bool const moduleEnabled(Effects::includedEffects[moduleIndex]);
-#ifdef LE_SW_FULL
-    LE_ASSUME(moduleEnabled == true);
-#endif // LE_SW_FULL
     menu.addItem(menuEntryID, moduleName, juce::Image(), moduleEnabled);
 }
 
@@ -126,7 +123,10 @@ void fillMenu(Menus &menus, std::true_type /*has sub menus*/)
     Utility::forEach<Effects::Groups>(topMenusAdder);
 }
 
-void fillMenu(Menus &menus, std::false_type /*does not have sub menus*/)
+/// \note One of the pair is chosen by hasSubMenus and the other is not compiled
+/// into anything; which one that is is a configuration choice, not a dead
+/// function.
+[[maybe_unused]] void fillMenu(Menus &menus, std::false_type /*does not have sub menus*/)
 {
     FlatMenuAdder const adder = {menus};
     Utility::forEach<Effects::ValidIndices>(adder);

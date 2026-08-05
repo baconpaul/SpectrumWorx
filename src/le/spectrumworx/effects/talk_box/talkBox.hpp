@@ -17,6 +17,7 @@
 #include "le/spectrumworx/effects/synth/synth.hpp"
 #include "le/parameters/boolean/parameter.hpp"
 #include "le/parameters/linear/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -64,6 +65,16 @@ struct TalkBox
     static char const title[];
     static char const description[];
 }; // struct TalkBox
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// TalkBox UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(TalkBox::ExternalCarrier, "External carrier")
+EFFECT_PARAMETER_NAME(TalkBox::BaseFrequency, "Base frequency")
+EFFECT_PARAMETER_NAME(TalkBox::CutOff, "Cutoff")
 
 //------------------------------------------------------------------------------
 } // namespace Effects

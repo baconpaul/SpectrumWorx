@@ -15,6 +15,7 @@
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/linear/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -160,6 +161,16 @@ struct Exploder : PVExploder
 {
     static char const title[];
 };
+
+EFFECT_PARAMETER_NAME(PVImploder::Decay, "Decay")
+EFFECT_PARAMETER_NAME(PVImploder::Gliss, "Glissando")
+EFFECT_PARAMETER_NAME(PVImploder::Threshold, "Limit")
+//EFFECT_PARAMETER_NAME( PVImploder::Gate     , "Gate"      )
+
+EFFECT_PARAMETER_NAME(PVExploder::Growth, "Growth")
+EFFECT_PARAMETER_NAME(PVExploder::Gliss, "Glissando")
+EFFECT_PARAMETER_NAME(PVExploder::Threshold, "Limit")
+EFFECT_PARAMETER_NAME(PVExploder::Gate, "Gate")
 
 //------------------------------------------------------------------------------
 } // namespace Effects

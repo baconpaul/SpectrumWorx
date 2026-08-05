@@ -36,9 +36,6 @@ class LE_NOVTABLE Host2PluginInteropControler
 
     using Parameters = GlobalParameters::Parameters;
 
-#if LE_SW_ENGINE_INPUT_MODE >= 1
-    using InputMode = GlobalParameters::InputMode;
-#endif // LE_SW_ENGINE_INPUT_MODE >= 1
     using MixPercentage = GlobalParameters::MixPercentage;
     using FFTSize = GlobalParameters::FFTSize;
 #if LE_SW_ENGINE_WINDOW_PRESUM

@@ -89,7 +89,7 @@ LE_WEAK_SYMBOL_CONST char const assertionFailureMessageTitle[] = "LE SDK asserti
 
 namespace
 {
-static void printAssertionFailureTitle()
+[[maybe_unused]] static void printAssertionFailureTitle()
 {
 #if defined(__ANDROID__)
 #elif defined(__APPLE__) && !(TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR)
@@ -133,7 +133,7 @@ static void printDebugMessage(wchar_t const *const message)
     ::OutputDebugStringW(message);
     ::fputws(message, stderr);
 }
-#pragma warning(push)
+#pragma warning(pop) // was a second push
 #endif // _WIN32
 
 #ifdef _WIN32

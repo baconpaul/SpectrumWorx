@@ -66,7 +66,8 @@ LE_WEAK_FUNCTION LE_COLD std::uint32_t fftBufferSize(std::uint8_t const a, std::
 } // namespace Detail
 ////////////////////////////////////////////////////////////////////////////////
 } // namespace Engine
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 //------------------------------------------------------------------------------
 
 ChannelData_AmPh::ChannelData_AmPh(FullChannelData_AmPh &data, IndexRange const &workingRange)
@@ -112,7 +113,7 @@ DataRange subRange(DataRange const &range, std::uint16_t const beginIndex,
 }
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 //------------------------------------------------------------------------------
 } // namespace SW
 //------------------------------------------------------------------------------

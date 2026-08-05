@@ -11,13 +11,11 @@
 #ifndef presets_hpp__6021812F_90A0_4BFC_A0EF_6413D7485312
 #define presets_hpp__6021812F_90A0_4BFC_A0EF_6413D7485312
 //------------------------------------------------------------------------------
-#ifndef LE_SW_SDK_BUILD
 #include "configuration/constants.hpp"
 
 #ifndef _MSC_VER
 #include "configuration/versionConfiguration.hpp"
 #endif
-#endif // !LE_SW_SDK_BUILD
 
 #ifndef _MSC_VER // for eager compilers
 #include "le/math/conversion.hpp"
@@ -459,10 +457,11 @@ template <> std::string PresetHandler::makeString<float>(float);
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 class ModuleChainImpl;
 class ModuleProcessorImpl;
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 class AutomatedModuleChain;
 
 class ParametersLoader : private PresetHandler
@@ -470,11 +469,7 @@ class ParametersLoader : private PresetHandler
   public:
     ParametersLoader(Preset const &);
 
-#ifdef LE_SW_SDK_BUILD
-    typedef Engine::ModuleChainImpl ModuleChain;
-#else
     typedef AutomatedModuleChain ModuleChain;
-#endif // LE_SW_SDK_BUILD
 
     /// \note Fills \p newChain rather than returning one, so that the call stays
     /// dependent on a template parameter and clang does not need the chain to be
@@ -640,16 +635,11 @@ class ParametersLoader : private PresetHandler
 
     mutable std::vector<TiXmlElement const *> readParameters_;
 
-#ifdef LE_SW_SDK_BUILD //...mrmlj...ugh...
-    friend class Engine::ModuleProcessorImpl;
-#else
     template <class PresetConsumer>
     friend bool loadPreset(char *inMemoryPreset, bool ignoreExternalSample, std::string *pComment,
                            PresetConsumer);
-#endif
 }; // class ParametersLoader
 
-#ifndef LE_SW_SDK_BUILD
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \class SavedPreset
@@ -761,13 +751,13 @@ class ParametersSaver : private PresetHandler
     /// pre-allocated array's bounds.
     bool moduleChainSaved_{false};
 }; // class ParametersSaver
-#endif // LE_SW_SDK_BUILD
 
 #ifndef _MSC_VER
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 class ModuleNode;
 template <class ActualModule> ActualModule &actualModule(ModuleNode &);
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 namespace GlobalParameters
 {
 struct Parameters;
@@ -843,14 +833,12 @@ LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignor
         //...mrmlj...clang's early template instantiation...AutomatedModuleChain newChain;
         typename std::remove_reference<decltype(loader.targetChain())>::type newChain;
         parametersLoader.loadModuleChain(newChain);
-#ifndef LE_SW_SDK_BUILD
         if (loader.onlySetParameters())
         {
             loader.targetGlobalParameters() = newParameters;
             loader.targetChain() = std::move(newChain);
             return true;
         }
-#endif // LE_SW_SDK_BUILD
 
         {
             auto const automationBlocker(loader.automationBlocker());
@@ -887,7 +875,6 @@ LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignor
     ///                                       (16.12.2009.) (Domagoj Saric)
 } // loadPreset()
 
-#ifndef LE_SW_SDK_BUILD
 class Program;
 
 /// \note The `juce::File` overloads of these two -- and the `loadPreset` that
@@ -901,7 +888,6 @@ class Program;
 /// plus where the user had got to. See DawExtraState.
 std::string savePreset(std::string_view externalSampleFilePath, std::string_view comment,
                        Program const &, DawExtraState const *pDawExtraState = nullptr);
-#endif // !LE_SW_SDK_BUILD
 
 LE_OPTIMIZE_FOR_SIZE_END()
 

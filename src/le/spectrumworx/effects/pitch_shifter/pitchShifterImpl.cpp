@@ -12,7 +12,6 @@
 
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
-#include "le/parameters/uiElements.hpp"
 
 #include <cstdint>
 //------------------------------------------------------------------------------
@@ -36,18 +35,6 @@ char const PitchShifter ::title[] = "Pitch Shifter";
 char const PVPitchShifter::title[] = "Pitch Shifter (pvd)";
 
 char const Detail::PitchShifterBase::description[] = "Pitch shifter.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// PitchShifter UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Detail::PitchShifterBase::SemiTones, "Semitones")
-EFFECT_PARAMETER_NAME(Detail::PitchShifterBase::Cents, "Cents")
-#ifdef LE_PV_TSS_DYNAMIC_THRESHOLD
-EFFECT_PARAMETER_NAME(Detail::PitchShifterBase::TSSSensitivity, "Transient sensitivity")
-#endif // LE_PV_TSS_DYNAMIC_THRESHOLD
 
 ////////////////////////////////////////////////////////////////////////////////
 //

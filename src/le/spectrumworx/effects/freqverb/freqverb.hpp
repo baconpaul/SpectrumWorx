@@ -16,6 +16,7 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -69,6 +70,17 @@ struct Freqverb
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Freqverb UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Freqverb::Time60dB, "Life time")
+EFFECT_PARAMETER_NAME(Freqverb::RoomSize, "Room size")
+EFFECT_PARAMETER_NAME(Freqverb::ReverbPitch, "Pitch")
+EFFECT_PARAMETER_NAME(Freqverb::HFAbsorption, "HF absorb")
 
 //------------------------------------------------------------------------------
 } // namespace Effects

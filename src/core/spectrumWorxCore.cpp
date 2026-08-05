@@ -229,7 +229,7 @@ bool SpectrumWorxCore::ModuleInitialiser::operator()(Module &module,
     /// \note AUs can have their parameters changed while uninitialised.
     ///                                       (19.04.2013.) (Domagoj Saric)
     bool const initialised(storageFactors.complete());
-#if defined(_WIN32) || defined(LE_SW_FMOD)
+#if defined(_WIN32)
     LE_ASSUME(initialised);
 #endif // _WIN32
     /// \note A module accepted into the chain before the engine has been set up
@@ -339,26 +339,6 @@ void SpectrumWorxCore::updateInputModeForIOConfig(
     [[maybe_unused]] std::uint8_t const numberOfMainChannels,
     [[maybe_unused]] std::uint8_t const numberOfSideChannels)
 {
-#if LE_SW_ENGINE_INPUT_MODE >= 1
-    InputMode &inputMode(parameters().get<InputMode>());
-    switch (numberOfMainChannels | numberOfSideChannels << 16)
-    {
-    case 1 | 0 << 16:
-        inputMode = InputMode::Mono;
-        break;
-    case 1 | 1 << 16:
-        inputMode = InputMode::MonoSideChain;
-        break;
-    case 2 | 0 << 16:
-        inputMode = InputMode::Stereo;
-        break;
-    case 2 | 2 << 16:
-        inputMode = InputMode::StereoSideChain;
-        break;
-    default: /*custom*/
-        break;
-    }
-#endif
 }
 
 void SpectrumWorxCore::setReportedNumberOfChannels(std::uint8_t const numberOfMainChannels,
@@ -448,42 +428,6 @@ bool SpectrumWorxCore::updateEngineSetup()
     /// nothing else moved.
     ///                                       (02.08.2026.) (SW port)
 
-#if defined(_DEBUG) && LE_SW_ENGINE_INPUT_MODE >= 1
-    {
-        // Verify that the Engine::Setup and InputMode are synchronized (if a
-        // non-custom InputMode is set).
-        if ((setup.numberOfChannels() <= 2) && (setup.numberOfSideChannels() <= 2))
-        {
-            std::uint8_t numberOfMainChannels;
-            std::uint8_t numberOfSideChannels;
-            switch (parameters.get<InputMode>().getValue())
-            {
-            case InputMode::Mono:
-                numberOfMainChannels = 1;
-                numberOfSideChannels = 0;
-                break;
-            case InputMode::MonoSideChain:
-                numberOfMainChannels = 1;
-                numberOfSideChannels = 1;
-                break;
-            case InputMode::Stereo:
-                numberOfMainChannels = 2;
-                numberOfSideChannels = 0;
-                break;
-            case InputMode::StereoSideChain:
-                numberOfMainChannels = 2;
-                numberOfSideChannels = 2;
-                break;
-                LE_DEFAULT_CASE_UNREACHABLE();
-            }
-            LE_ASSERT_MSG(setup.numberOfChannels() == numberOfMainChannels,
-                          "Engine::Setup and InputMode out of sync");
-            LE_ASSERT_MSG(setup.numberOfSideChannels() == numberOfSideChannels,
-                          "Engine::Setup and InputMode out of sync");
-        }
-    }
-#endif // _DEBUG
-
     StorageFactors storageFactors(Processor::makeFactors(parameters.get<FFTSize>(),
 #if LE_SW_ENGINE_WINDOW_PRESUM
                                                          parameters.get<WindowSizeFactor>(),
@@ -533,26 +477,6 @@ bool SpectrumWorxCore::initialise()
     /// of crashing the whole host if something fails here.
     ///                                       (05.03.2013.) (Domagoj Saric)
     bool success(true);
-#if LE_SW_ENGINE_INPUT_MODE >= 1
-    // Update/create the initial Engine::Setup and shared storage with the
-    // default and/or so far partially set parameters.
-    //...mrmlj...check if channel configuration has already been set up and skip
-    //...mrmlj...the parameters-engine setup synchronization in that case
-    //...mrmlj...a custom io mode might have been set and this would override it
-    //...mrmlj...clean this up...
-    if (!currentStorageFactors().numberOfChannels)
-    {
-        auto const ioChannelsConfig(ioChannels(parameters().get<InputMode>()));
-        success = (setNumberOfChannels(ioChannelsConfig.first, ioChannelsConfig.second) !=
-                   IOChangeResult::Failed);
-    }
-    else
-    {
-        LE_ASSERT(currentStorageFactors().numberOfChannels == engineSetup().numberOfChannels());
-        success = true;
-    }
-    //...mrmlj...AU...LE_ASSERT_MSG( !!buffers(), "Input buffers not initialised." );
-#endif // LE_SW_ENGINE_INPUT_MODE >= 1
     success &= updateEngineSetup();
 
     Math::rngSeed();
@@ -691,36 +615,6 @@ bool SpectrumWorxCore::deferOrApplySpectralSetup()
     return engineIsRunning() ? true : applyPendingSpectralSetup();
 }
 
-#if LE_SW_ENGINE_INPUT_MODE >= 2
-std::pair<std::uint8_t, std::uint8_t>
-SpectrumWorxCore::ioChannels(InputMode::value_type const ioMode)
-{
-    std::uint8_t numberOfInputChannels;
-    std::uint8_t numberOfOutputChannels;
-    switch (ioMode)
-    {
-    case InputMode::Mono:
-        numberOfInputChannels = 1;
-        numberOfOutputChannels = 1;
-        break;
-    case InputMode::MonoSideChain:
-        numberOfInputChannels = 2;
-        numberOfOutputChannels = 1;
-        break;
-    case InputMode::Stereo:
-        numberOfInputChannels = 2;
-        numberOfOutputChannels = 2;
-        break;
-    case InputMode::StereoSideChain:
-        numberOfInputChannels = 4;
-        numberOfOutputChannels = 2;
-        break;
-        LE_DEFAULT_CASE_UNREACHABLE();
-    }
-    return std::make_pair(numberOfInputChannels, numberOfOutputChannels);
-}
-#endif // LE_SW_ENGINE_INPUT_MODE >= 2
-
 bool SpectrumWorxCore::setGlobalParameter(FFTSize &parameter, FFTSize::param_type const newValue)
 {
     parameter.setValue(newValue);
@@ -747,17 +641,6 @@ bool SpectrumWorxCore::setGlobalParameter(WindowFunction &parameter,
     parameter.setValue(newValue);
     return deferOrApplySpectralSetup();
 }
-
-#if LE_SW_ENGINE_INPUT_MODE >= 2
-#pragma warning(push)
-#pragma warning(disable : 4702) // Unreachable code.
-bool SpectrumWorxCore::setGlobalParameter(InputMode const &, InputMode::param_type)
-{
-    LE_UNREACHABLE_CODE(); //...mrmlj...
-    return false;
-}
-#pragma warning(pop)
-#endif // LE_SW_ENGINE_INPUT_MODE >= 2
 
 //------------------------------------------------------------------------------
 } // namespace SW

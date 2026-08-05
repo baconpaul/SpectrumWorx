@@ -263,27 +263,21 @@ void Plugin2HostPassiveInteropController::getParameterName(
 
 namespace
 {
-/// \note How many of Program's global parameters actually reach the host.
+/// \note How many of Program's global parameters actually reach the host: all
+/// of them, and this is the name for that rather than a subtraction.
 ///
-///   InputMode enters the parameter list at LE_SW_ENGINE_INPUT_MODE >= 1
-/// (parameters.hpp:47) but is withheld from the host only at >= 2 -- two
-/// different conditions, and it is the second that governs the count.
-///
-///   numberOfParameters() and getParameterIDs() used to spell this
-/// independently, the former subtracting one for InputMode unconditionally and
-/// the latter only under >= 2. At the configuration this port builds, where
-/// nothing defines LE_SW_ENGINE_INPUT_MODE at all, the parameter is absent from
-/// the list to begin with, so the subtraction removed a real parameter and
+///   It used to subtract InputMode, an I/O-routing parameter that entered the
+/// list at LE_SW_ENGINE_INPUT_MODE >= 1 and was withheld from the host at >= 2
+/// -- two different conditions, and numberOfParameters() and getParameterIDs()
+/// each read a different one. Nothing defined the macro, so the parameter was
+/// absent to begin with, the subtraction removed a real parameter, and
 /// getParameterIDs wrote one ID past the buffer its own caller had sized.
 /// Latent since 2013 and invisible to the 2016 builds, which all set it to 2.
+/// The macro and the parameter are gone as of 04.08.2026 -- CLAP configures I/O
+/// through audio-ports-config, not through an automatable parameter -- so what
+/// is left is the name.
 ///                                           (28.07.2026.) (SW port)
-std::uint16_t constexpr exportedGlobalParameters{
-#if LE_SW_ENGINE_INPUT_MODE >= 2
-    Program::Parameters::static_size - 1 /*InputMode*/
-#else
-    Program::Parameters::static_size
-#endif // LE_SW_ENGINE_INPUT_MODE
-};
+std::uint16_t constexpr exportedGlobalParameters{Program::Parameters::static_size};
 } // anonymous namespace
 
 void Plugin2HostPassiveInteropController::getParameterIDs(
@@ -302,12 +296,7 @@ void Plugin2HostPassiveInteropController::getParameterIDs(
     /// \note AU does not support plugin initiated IO channel configuration
     /// changes so we do not 'export' the InputMode parameter.
     ///                                       (18.03.2013.) (Domagoj Saric)
-#if LE_SW_ENGINE_INPUT_MODE >= 2
-    index_t const inputModeIndex(
-        LE::Parameters::IndexOf<Program::Parameters, GlobalParameters::InputMode>::value);
-#else
     index_t const inputModeIndex(Program::Parameters::static_size); //...mrmlj...
-#endif // LE_SW_ENGINE_INPUT_MODE >= 2
 
     parameterID.binaryValue = 0;
     parameterID.value.type = ParameterID::GlobalParameter;
@@ -441,11 +430,6 @@ AutomatedModuleChain::ModuleCPtr module(Program const *LE_RESTRICT const pProgra
 {
     return pProgram ? pProgram->moduleChain().module(moduleIndex) : nullptr;
 }
-AutomatedModuleChain::ModulePtr module(Program *LE_RESTRICT const pProgram,
-                                       std::uint8_t const moduleIndex)
-{
-    return pProgram ? pProgram->moduleChain().module(moduleIndex) : nullptr;
-}
 } // anonymous namespace
 
 Plugin2HostPassiveInteropController::ParameterLabelGetter::result_type
@@ -492,7 +476,7 @@ Plugin2HostPassiveInteropController::ParameterLabelGetter::operator()(
 char const *Plugin2HostPassiveInteropController::ParameterValueStringGetter::operator()(
     ParameterID::Global const parameterID, Program const *LE_RESTRICT const pProgram) const
 {
-#if defined(_WIN32) && !defined(LE_SW_FMOD)
+#if defined(_WIN32)
     LE_ASSUME(printer.valueSource == Parameters::AutomatedParameterPrinter::Internal);
 #endif // _WIN32 && ! FMOD
     return LE::Parameters::invokeFunctorOnIndexedParameter(
@@ -503,7 +487,7 @@ char const *Plugin2HostPassiveInteropController::ParameterValueStringGetter::ope
 char const *Plugin2HostPassiveInteropController::ParameterValueStringGetter::operator()(
     ParameterID::ModuleChain const parameterID, Program const *LE_RESTRICT const pProgram) const
 {
-#if defined(_WIN32) && !defined(LE_SW_FMOD)
+#if defined(_WIN32)
     LE_ASSUME(printer.valueSource == Parameters::AutomatedParameterPrinter::Internal);
 #endif // _WIN32 && ! FMOD
 
@@ -533,7 +517,7 @@ char const *Plugin2HostPassiveInteropController::ParameterValueStringGetter::ope
 #if 0
 char const * Plugin2HostPassiveInteropController::ParameterValueStringGetter::operator()( ParameterID::Module const parameterID, Program const * LE_RESTRICT const pProgram ) const
 {
-#if defined(_WIN32) && !defined(LE_SW_FMOD)
+#if defined(_WIN32)
     LE_ASSUME( printer_.pValue_ == nullptr );
 #endif // _WIN32 && ! FMOD
 
@@ -547,7 +531,7 @@ char const * Plugin2HostPassiveInteropController::ParameterValueStringGetter::op
 char const *Plugin2HostPassiveInteropController::ParameterValueStringGetter::operator()(
     ParameterID::LFO const parameterID, Program const *LE_RESTRICT const pProgram) const
 {
-#if defined(_WIN32) && !defined(LE_SW_FMOD)
+#if defined(_WIN32)
     LE_ASSUME(printer.valueSource == Parameters::AutomatedParameterPrinter::Internal);
 #endif // _WIN32 && ! FMOD
 
@@ -615,18 +599,6 @@ struct NameGetter
         return LE::Parameters::Name<Parameter>::string_;
     }
 }; // struct NameGetter
-#ifdef LE_SW_FMOD //...mrmlj...temporary quick-fix for short buffers...
-template <>
-NameGetter::result_type NameGetter::operator()<Effects::BaseParameters::StartFrequency>() const
-{
-    return "Start";
-}
-template <>
-NameGetter::result_type NameGetter::operator()<Effects::BaseParameters::StopFrequency>() const
-{
-    return "Stop";
-}
-#endif // LE_SW_FMOD
 } // anonymous namespace
 
 void Plugin2HostPassiveInteropController::ParameterNameGetter::operator()(
@@ -805,13 +777,6 @@ parameterIDFromIndex(Plugins::ParameterIndex const parameterIndex)
         parameterID.value._.lfo.moduleParameterIndex = moduleParameterIndex;
         parameterID.value._.lfo.lfoParameterIndex = lfoParameterIndex;
     }
-
-#if LE_SW_ENGINE_INPUT_MODE >= 2
-    LE_ASSERT_MSG((LE::Parameters::IndexOf<Parameters, GlobalParameters::InputMode>::value ==
-                   parameterIndex) ||
-                      (parameterIndexFromBinaryID(parameterID.binaryValue) == parameterIndex),
-                  "Parameter index<->ID conversion broken.");
-#endif // LE_SW_ENGINE_INPUT_MODE >= 2
 
     return parameterID.binaryValue;
 } // parameterIndex2ID()

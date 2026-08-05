@@ -16,7 +16,6 @@
 #include "le/math/math.hpp"
 #include "le/math/dft/domainConversion.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 
 #include "le/utility/stackBuffer.hpp"
 //------------------------------------------------------------------------------
@@ -45,32 +44,6 @@ namespace Effects
 
 char const Octaver::title[] = "Octaver";
 char const Octaver::description[] = "Adds two octaves.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Octaver UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Octaver::Octave1, "Octave 1");
-EFFECT_PARAMETER_NAME(Octaver::GainOctave1, "Gain 1");
-EFFECT_PARAMETER_NAME(Octaver::Octave2, "Octave 2");
-EFFECT_PARAMETER_NAME(Octaver::GainOctave2, "Gain 2");
-EFFECT_PARAMETER_NAME(Octaver::CutoffFrequency, "Low pass");
-
-EFFECT_ENUMERATED_PARAMETER_STRINGS(Octaver, Octave1,
-    {Down2, "2 down"},
-    {Down1, "1 down"},
-    {Off, "off"},
-    {Up1, "1 up"},
-    {Up2, "2 up"})
-
-EFFECT_ENUMERATED_PARAMETER_STRINGS(Octaver, Octave2,
-    {Down2, "2 down"},
-    {Down1, "1 down"},
-    {Off, "off"},
-    {Up1, "1 up"},
-    {Up2, "2 up"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

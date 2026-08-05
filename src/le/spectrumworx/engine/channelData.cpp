@@ -34,7 +34,8 @@ namespace LE
 namespace SW
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 //------------------------------------------------------------------------------
 
 ChannelData::ChannelData() : amphDataFreshness_(0), dftDataFreshness_(0) {}
@@ -340,7 +341,7 @@ void ChannelData::InPlaceDFTBuffer::setToTimeDomain()
 }
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 //------------------------------------------------------------------------------
 } // namespace SW
 //------------------------------------------------------------------------------

@@ -15,6 +15,7 @@
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/linear/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -113,6 +114,27 @@ struct Atonal : Detail::TonalBase
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Tonal UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Detail::TonalBase::Strength, "Peak strength")
+EFFECT_PARAMETER_NAME(Detail::TonalBase::GlobalThreshold, "Global threshold")
+EFFECT_PARAMETER_NAME(Detail::TonalBase::LocalThreshold, "Local threshold")
+EFFECT_PARAMETER_NAME(Detail::TonalBase::Attenuation, "Attenuation")
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Atonal UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Atonal::Strength, "Peak strength")
+EFFECT_PARAMETER_NAME(Atonal::GlobalThreshold, "Global threshold")
+EFFECT_PARAMETER_NAME(Atonal::Attenuation, "Attenuation")
 
 //------------------------------------------------------------------------------
 } // namespace Effects

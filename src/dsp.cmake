@@ -50,7 +50,6 @@ add_library(sw-dsp STATIC
         le/spectrumworx/presets.cpp
 
         # le/spectrumworx/engine
-        le/spectrumworx/engine/automatableParameters.cpp
         le/spectrumworx/engine/channelBuffers.cpp
         le/spectrumworx/engine/channelData.cpp
         le/spectrumworx/engine/channelDataAmPh.cpp
@@ -58,16 +57,17 @@ add_library(sw-dsp STATIC
         le/spectrumworx/engine/module.cpp
         le/spectrumworx/engine/moduleChainImpl.cpp
         le/spectrumworx/engine/moduleParameters.cpp
-        le/spectrumworx/engine/parameters.cpp
         le/spectrumworx/engine/processor.cpp
         le/spectrumworx/engine/setup.cpp
 
         # le/spectrumworx/effects — shared
-        # \note The two *UIElements.cpp are named for the GUI but hold the
-        # parameter name and enumerated-value strings, and ParameterInfo
-        # carries the name because presets serialise parameters by it.
+        # \note baseParametersUIElements.cpp is one function now. The parameter
+        # names and enumerated-value strings it used to hold are in the headers
+        # that declare the parameters, because a translation unit that builds
+        # the parameter table has to see them -- see UI_NAME in
+        # le/parameters/uiElements.hpp. commonParametersUIElements.cpp went the
+        # same way and had nothing left.
         le/spectrumworx/effects/baseParametersUIElements.cpp
-        le/spectrumworx/effects/commonParametersUIElements.cpp
         le/spectrumworx/effects/configuration/effectNames.cpp
         le/spectrumworx/effects/effects.cpp
         le/spectrumworx/effects/historyBuffer.cpp
@@ -153,9 +153,9 @@ configure_file(
 
 target_include_directories(sw-dsp PUBLIC . "${swGeneratedIncludeDir}")
 
-# The 2016 build force-included this and every header assumes it. Ours only --
-# see cmake/sw-odr-header.cmake for why a target-wide option cannot express that,
-# PUBLIC or PRIVATE.
+# The 2016 build force-included this, and this is also where the warning
+# baseline lands. Ours only -- see cmake/sw-our-sources.cmake for why a
+# target-wide option cannot express that, PUBLIC or PRIVATE.
 sw_force_include_odr_header(sw-dsp)
 
 # The preset parser. PUBLIC because presets.hpp holds a TiXmlDocument by value.
@@ -170,6 +170,35 @@ target_link_libraries(sw-dsp PUBLIC sst-plugininfra::tinyxml)
 # LE::Utility::assertionFailed lives in assertionHandler.cpp; without this the
 # asserts degrade to the CRT's and the DAW never sees them.
 target_compile_definitions(sw-dsp PUBLIC LE_ENABLE_ASSERT_HANDLER)
+
+# Window presum: analyse a window longer than the FFT by folding it down, so that
+# the analysis resolution can exceed the bin count. Off, as it was in 2016.
+#
+# It is an option and a definition rather than a macro nothing defines because
+# the two are not the same claim: `#if LE_SW_ENGINE_WINDOW_PRESUM` against an
+# undefined name silently reads 0 and says nothing about whether that was meant.
+# The engine's half of this is live either way -- channelData.cpp's analysis fold
+# and channelBuffers.cpp's synthesis unfold both run every block with a factor of
+# one -- so what the option adds is the plumbing that lets the factor be anything
+# else, and a WindowSizeFactor global parameter to set it with.
+#
+# **Turning it on has been tried, once, on 04.08.2026, and here is what happens.**
+# It compiles, after one fix -- the parameter's own constructor named its base
+# unqualified and had never been through a compiler. Then 7 cases fail because
+# the parameter table grew a row, which is a decision rather than a fault: adding
+# a global parameter moves parameterTable.txt and every automation lane a host
+# has saved against it. And one case aborts on "Short integer overflow", from a
+# window of fftSize * windowSizeFactor kept in a std::uint16_t: at the maximum
+# FFT size the factor cannot exceed one. See doc/tech/tech_debt.md.
+#
+# The other six of its family are gone rather than configurable: LE_SW_SDK_BUILD,
+# LE_SW_FMOD, LE_SW_FULL, LE_SW_PURE_ANALYSIS, LE_SW_TW_RETUNE_TEST and
+# LE_MELODIFY_SDK_BUILD named an SDK, an audio backend and two SKUs that no
+# longer exist, and LE_SW_ENGINE_INPUT_MODE named a parameter that reconfigured
+# the plugin's I/O -- which is audio-ports-config's job in CLAP.
+option(SW_ENGINE_WINDOW_PRESUM "Analyse a window longer than the FFT (see src/dsp.cmake)" OFF)
+target_compile_definitions(sw-dsp PUBLIC
+        LE_SW_ENGINE_WINDOW_PRESUM=$<BOOL:${SW_ENGINE_WINDOW_PRESUM}>)
 
 # rtsan_support.h, for the RealtimeSanitizer region ScopedAudioThreadEntry opens, and
 # for the RTSAN_DISABLE guards the conceded audio-thread allocations will carry.

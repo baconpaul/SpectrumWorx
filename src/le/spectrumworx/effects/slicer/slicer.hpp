@@ -16,6 +16,7 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/enumerated/parameter.hpp"
 #include "le/parameters/linear/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -65,6 +66,21 @@ struct Slicer
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Slicer UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Slicer::TimeOn, "On time")
+EFFECT_PARAMETER_NAME(Slicer::TimeOff, "Slice time")
+EFFECT_PARAMETER_NAME(Slicer::Mode, "Slice content")
+
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Slicer, Mode,
+    {Hold, "Sample&Hold"},
+    {Silence, "Silence"},
+    {Side, "Side"})
 
 //------------------------------------------------------------------------------
 } // namespace Effects

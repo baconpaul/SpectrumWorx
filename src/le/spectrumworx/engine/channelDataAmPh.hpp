@@ -32,7 +32,8 @@ struct SynthesisChannelState;
 } // namespace Effects
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 //------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -126,7 +127,7 @@ class ChannelData_AmPhStorage : private FullChannelData_AmPh, public ChannelData
 DataRange subRange(DataRange const &, std::uint16_t beginIndex, std::uint16_t endIndex);
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 //------------------------------------------------------------------------------
 } // namespace SW
 //------------------------------------------------------------------------------

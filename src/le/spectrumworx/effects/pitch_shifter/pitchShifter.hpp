@@ -15,6 +15,7 @@
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -91,6 +92,22 @@ struct PVPitchShifter : Detail::PitchShifterBase
 {
     static char const title[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// PitchShifter UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Detail::PitchShifterBase::SemiTones, "Semitones")
+EFFECT_PARAMETER_NAME(Detail::PitchShifterBase::Cents, "Cents")
+/// \note LE_PV_USE_TSS, which is what decides whether the parameter exists at
+/// all. It read LE_PV_TSS_DYNAMIC_THRESHOLD while it lived in the .cpp, so
+/// defining one of the pair without the other produced a parameter nothing
+/// names -- which was a link error then and is a compile error now.
+#ifdef LE_PV_USE_TSS
+EFFECT_PARAMETER_NAME(Detail::PitchShifterBase::TSSSensitivity, "Transient sensitivity")
+#endif // LE_PV_USE_TSS
 
 //------------------------------------------------------------------------------
 } // namespace Effects

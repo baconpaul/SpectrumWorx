@@ -15,7 +15,6 @@
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
-#include "le/parameters/uiElements.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -35,15 +34,6 @@ namespace Effects
 
 char const Quantizer::title[] = "Quantizer";
 char const Quantizer::description[] = "Quantize the spectrum.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Quantizer UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Quantizer::Width, "Width")
-EFFECT_PARAMETER_NAME(Quantizer::Origami, "Origami")
 
 ////////////////////////////////////////////////////////////////////////////////
 //

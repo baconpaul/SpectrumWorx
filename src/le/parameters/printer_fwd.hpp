@@ -20,9 +20,10 @@ namespace LE
 //------------------------------------------------------------------------------
 namespace SW
 {
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 class Setup;
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 } // namespace SW
 //------------------------------------------------------------------------------
 namespace Parameters

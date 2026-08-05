@@ -27,6 +27,84 @@ New entries go at the top of their area.
 
 ## Build and platform
 
+- **Window presum is an option now, and turning it on does not work.**
+  (04.08.2026, from the stage 7 macro pass) `SW_ENGINE_WINDOW_PRESUM`
+  (`src/dsp.cmake`) is the surviving one of the seven macros no live build could
+  define, kept because the technique is real and the engine's half of it is live:
+  `channelData.cpp`'s analysis fold and `channelBuffers.cpp`'s synthesis unfold
+  both run every block, with a factor of one. What the option adds is the
+  plumbing that lets the factor be anything else, and a `WindowSizeFactor` global
+  parameter to set it with.
+
+  It had never been compiled. Turning it on for the first time found:
+
+  - **A parameter whose constructor had never been through a compiler.**
+    `WindowSizeFactor`'s mem-initialiser named `PowerOfTwoParameter` unqualified,
+    which names nothing from `LE::SW::Engine`. Fixed, because a build that does
+    not compile cannot be measured.
+  - **7 cases fail, and they are the right ones.** The parameter table grows a
+    row, so `parameterTable.txt`, `presetCorpus.txt` and `streamingNames.txt` all
+    move. That is the decision this option really is: a global parameter added is
+    every automation lane a host has saved against the old numbering.
+  - **One case aborts: "Short integer overflow."** The window is
+    `fftSize * windowSizeFactor` in a `std::uint16_t`, so at the maximum FFT size
+    the factor cannot exceed one — and a host writing the parameter's maximum is
+    exactly what `[clap][host]`'s range case does. Whoever revives this starts
+    here.
+
+- **The include-what-you-use sweep did not happen, and the obvious tool is wrong
+  about this tree.** (04.08.2026, from stage 7) The mechanical half of that item
+  did land — `LE_IMPL_NAMESPACE_BEGIN` is gone, and with it the 47 files that
+  used a macro without declaring where it came from — but no include was removed
+  on the strength of an analysis. clangd's include-cleaner cannot see through
+  this codebase's macros: it reports `symmetric/parameter.hpp` as unused in
+  `pitchShifter.hpp`, where removing it produces nine errors, because
+  `LE_DEFINE_PARAMETER(SemiTones, SymmetricFloat, …)` names the type inside a
+  macro argument. Every effect header is that shape.
+
+  The other half of the reason is that this platform cannot answer the question
+  that matters. A header macOS gets transitively and Windows does not is
+  invisible from here, and Windows arrives as a build log. This wants the CI
+  matrix (`todo.md`) in front of it.
+
+- **Four GCC 15 fixes have not been compiled by a GCC.** (04.08.2026) A Linux
+  build of `00383f6` reported 469 warnings from four causes, and all four are
+  fixed here: `<ciso646>` deleted from the force-included header (294 `-Wcpp`),
+  `valueOffsetGetter()` rewritten to take the difference between two addresses of
+  a real object instead of dereferencing null (142 `-Wnonnull`, and the source
+  had been calling it UB since 2016), `SpectrumWorxCore::Module` moved above its
+  first unqualified use (29 `-Wchanges-meaning`), and the VST3 SDK's
+  `std::wstring_convert` suppressed on `base-sdk-vst3` (4, not ours). Every one
+  was verified on clang, which is a different compiler saying nothing about a
+  warning it never had. The next Linux log is the check.
+
+- **The warning baseline stops at the MSVC line.** (04.08.2026)
+  `-Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas` is on our own
+  sources on every compiler that takes those spellings, and `-Werror` with them
+  on Apple and wherever CI passes `-DSW_WERROR=ON`. MSVC gets nothing: `/W4` on a
+  codebase nobody here can compile is a few hundred warnings delivered to
+  somebody else's afternoon. It belongs with the CI matrix, where the first run
+  is free.
+
+  `-Wno-unknown-pragmas` covers 288 `#pragma warning(...)` lines — 3772 of the
+  3902 warnings the baseline first produced, all of them MSVC diagnostic control
+  and inert off MSVC by design. It costs the detection of a misspelled pragma,
+  which is worth knowing about because the tree contained one: a
+  `#pragma warning(push)` where a `pop` was meant (`assertionHandler.cpp`).
+  `-Wunknown-pragmas` had not caught it and could not — both spellings are
+  equally unknown to clang. It was found by reading.
+
+- **A source that misses the force-included ODR header now builds.**
+  (04.08.2026) Measured: all 148 of our translation units compile with
+  `-include leConfigurationAndODRHeader.h` removed. That is new, and it is worse
+  rather than better — until `LE_IMPL_NAMESPACE_BEGIN` was written out, a file
+  that missed the header failed to compile, confusingly but loudly. What the
+  header still decides is `NDEBUG`, which decides whether the ~1200 asserts exist
+  and whether `ModuleNode` has a virtual, which decides the layout of every
+  module object. So the failure mode went from a wall of errors to a silent ABI
+  disagreement. `tests/checkODRHeaderScope.cmake` is the only thing standing
+  there, and it only runs under the Ninja and Makefile generators.
+
 - **`RequiredStringStorage<T>` is the contract for every `lexical_cast` buffer
   and nothing had ever checked it.** (02.08.2026, from the warnings pass)
   The three `lexical_cast(value, char *)` overloads take a bare pointer, so when

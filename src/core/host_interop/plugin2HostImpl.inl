@@ -17,7 +17,7 @@
 #include "le/parameters/parametersUtilities.hpp"
 #include "le/parameters/runtimeInformation.hpp"
 #include "le/spectrumworx/engine/moduleParameters.hpp"
-#include "le/spectrumworx/effects/baseParametersUIElements.hpp" //...mrmlj...required only for getParameterProperties()...
+#include "le/spectrumworx/effects/baseParameters.hpp" //...mrmlj...required only for getParameterProperties()...
 
 #include "le/utility/polymorphicDowncast.hpp"
 #include "le/utility/span.hpp"
@@ -322,22 +322,6 @@ bool Plugin2HostPassiveInteropImpl<Impl, Protocol>::getParameterProperties(
 // http://forum.ableton.com/viewtopic.php?t=26856&postdays=0&postorder=asc&start=60
 ////////////////////////////////////////////////////////////////////////////////
 
-#if LE_SW_ENGINE_INPUT_MODE >= 2
-template <class Impl, class Protocol, class Base>
-bool Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::hostTryIOConfigurationChange(
-    std::uint8_t const numberOfMainChannels, std::uint8_t const numberOfSideChannels)
-{
-    return impl().host().reportNewNumberOfIOChannels(numberOfMainChannels, numberOfSideChannels,
-                                                     numberOfMainChannels);
-}
-
-template <class Impl, class Protocol, class Base>
-bool Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::hostSupportsIOConfigurationChanges() const
-{
-    return impl().host().template canDo<Plugins::AcceptIOChanges>();
-}
-#endif // LE_SW_ENGINE_INPUT_MODE
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Plugin2HostInteropImpl<>::latencyChanged()
@@ -449,13 +433,7 @@ template <class Impl, class Protocol, class Base>
 void Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::automatedParameterChanged(
     ParameterID const parameterID, ParameterValueForAutomation const value) const
 {
-    bool const normalised(AutomatedParameter::normalised
-#ifdef LE_SW_FMOD
-                          || ((parameterID.value.type == ParameterID::ModuleParameter) &&
-                              (parameterID.value._.module.moduleParameterIndex >=
-                               Engine::ModuleParameters::numberOfBaseParameters))
-#endif // LE_SW_FMOD
-    );
+    bool const normalised(AutomatedParameter::normalised);
     automatedParameterChanged(parameterID, normalised ? value.normalised : value.fullRange);
 }
 

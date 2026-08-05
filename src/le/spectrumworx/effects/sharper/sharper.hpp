@@ -15,6 +15,7 @@
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/linear/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -59,6 +60,16 @@ struct Sharper
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Sharper UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Sharper::AveragingWidth, "Sharpness")
+EFFECT_PARAMETER_NAME(Sharper::Intensity, "Intensity")
+EFFECT_PARAMETER_NAME(Sharper::Limiter, "Limit")
 
 //------------------------------------------------------------------------------
 } // namespace Effects

@@ -16,6 +16,7 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/enumerated/parameter.hpp"
 #include "le/parameters/linear/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -68,6 +69,21 @@ struct CentroidExtractor
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// CentroidExtractor UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(CentroidExtractor::Mode, "Filter center")
+EFFECT_PARAMETER_NAME(CentroidExtractor::Bandwidth, "Bandwidth")
+EFFECT_PARAMETER_NAME(CentroidExtractor::Attenuation, "Border slope")
+
+EFFECT_ENUMERATED_PARAMETER_STRINGS(CentroidExtractor, Mode,
+    {Centroid, "Centroid"},
+    {Peak, "Peak"},
+    {Dominant, "Dominant"})
 
 //------------------------------------------------------------------------------
 } // namespace Effects

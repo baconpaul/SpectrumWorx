@@ -15,7 +15,6 @@
 #include "le/math/constants.hpp"
 #include "le/math/conversion.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -35,16 +34,6 @@ namespace Effects
 
 char const Wobbler::title[] = "Wobbler";
 char const Wobbler::description[] = "Amplitude modulation.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Wobbler UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Wobbler::Amplitude, "Amplitude")
-EFFECT_PARAMETER_NAME(Wobbler::Period, "Period")
-EFFECT_PARAMETER_NAME(Wobbler::PreGain, "Offset")
 
 ////////////////////////////////////////////////////////////////////////////////
 //

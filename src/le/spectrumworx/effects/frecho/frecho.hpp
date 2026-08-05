@@ -16,6 +16,7 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 
 //------------------------------------------------------------------------------
 namespace LE
@@ -99,6 +100,16 @@ struct Frevcho
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Frecho UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Frecho::Distance, "Distance")
+EFFECT_PARAMETER_NAME(Frecho::Absorption, "Absorption")
+EFFECT_PARAMETER_NAME(Frecho::EchoPitch, "Pitch")
 
 //------------------------------------------------------------------------------
 } // namespace Effects

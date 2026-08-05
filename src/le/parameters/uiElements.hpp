@@ -8,9 +8,16 @@
 ///
 ///  "Placeholders", that is declarations without default implementations, are
 /// used to ensure that the user/programmer provides a proper implementation for
-/// his/hers parameter class (so the error is caught at link time with a missing
-/// symbol error instead of at runtime through wrong behaviour caused by the
-/// usage of a default implementation).
+/// his/hers parameter class (so the error is caught by the compiler instead of
+/// at runtime through wrong behaviour caused by the usage of a default
+/// implementation).
+///
+/// \note "By the compiler" read "at link time" until 08.2026, and that is the
+/// difference this file turns on: a placeholder specialised in a .cpp is a
+/// definition the users of the parameter never see, which is ill-formed with no
+/// diagnostic required and was 283 of the 285 warnings the tree emitted. Every
+/// specialisation of one of these now belongs in the header that declares the
+/// parameter. See UI_NAME.
 ///
 /// Copyright (c) 2009 - 2016. Little Endian Ltd.
 /// SPDX-License-Identifier: GPL-3.0-or-later
@@ -23,7 +30,6 @@
 #include "linear/parameter.hpp"
 
 #include "le/utility/platformSpecifics.hpp"
-#include "le/utility/tchar.hpp"
 
 #include <array>
 #include <cstdint>
@@ -34,9 +40,10 @@ namespace LE
 //------------------------------------------------------------------------------
 namespace SW
 {
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 class Setup;
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 } // namespace SW
 //------------------------------------------------------------------------------
 namespace Parameters
@@ -58,6 +65,10 @@ namespace Parameters
 // minimizes verbosity of both name-fetching and name-defining code.
 //                                            (22.02.2011.) (Domagoj Saric)
 ////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The primary template is deliberately a declaration with no definition:
+/// a parameter nobody has named does not compile where it is used. UI_NAME is
+/// how one is named and where.
 
 template <class Parameter> struct Name
 {
@@ -130,8 +141,9 @@ template <class Parameter> struct DiscreteValues
     static Strings const strings;
 
     /// \note What ParameterInfo carries, beside the nullptr a parameter with no
-    /// value strings gives it.
-    static char const *LE_RESTRICT const *LE_RESTRICT const stringsBegin()
+    /// value strings gives it. constexpr to match NonEnumeratedParameter's, now
+    /// that ENUMERATED_PARAMETER_STRINGS produces a constant.
+    static constexpr char const *LE_RESTRICT const *stringsBegin()
     {
         return strings.data();
     }
@@ -255,9 +267,12 @@ template <class Parameter> struct DisplayValueTransformer
 /// unqualified: the lambda opens a scope the parameter's enumerators are visible
 /// in, which is the job the macro used to do by pasting `parameter::` in front
 /// of each of them.
+///
+/// \note constexpr, and therefore in a header beside the parameter -- see the
+/// note on UI_NAME below, which this shares.
 #define ENUMERATED_PARAMETER_STRINGS(parentNameSpaceOrClass, parameter, ...)                       \
     template <>                                                                                    \
-    DiscreteValues<parentNameSpaceOrClass::parameter>::Strings const                               \
+    constexpr DiscreteValues<parentNameSpaceOrClass::parameter>::Strings                           \
         DiscreteValues<parentNameSpaceOrClass::parameter>::strings{[] {                            \
             using enum parentNameSpaceOrClass::parameter::value_type;                              \
             return Detail::valueStrings<parentNameSpaceOrClass::parameter>({__VA_ARGS__});         \
@@ -268,7 +283,7 @@ template <class Parameter> struct DisplayValueTransformer
     }                                                                                              \
     namespace Parameters                                                                           \
     {                                                                                              \
-    ENUMERATED_PARAMETER_STRINGS(SW::Effects::parentClass, parameter, __VA_ARGS__)                 \
+    ENUMERATED_PARAMETER_STRINGS(SW::Effects::parentClass, parameter, __VA_ARGS__)                                                                   \
     }                                                                                              \
     namespace SW                                                                                   \
     {                                                                                              \
@@ -279,18 +294,37 @@ template <class Parameter> struct DisplayValueTransformer
 ///
 /// \def UI_NAME
 ///
-/// \brief Writes the declaration part of a parameter's name definition.
+/// \brief Names a parameter.
+///
+/// \note **In a header, beside the parameter**, for the reason STREAMING_NAME
+/// gives below: the name is an explicit specialisation, so every translation
+/// unit that instantiates name<Parameter>() has to see it. Until 08.2026 these
+/// were out-of-line definitions in a .cpp, which every such translation unit
+/// used without seeing -- ill-formed, no diagnostic required, and clang says so
+/// 235 times over (-Wundefined-var-template). The five that had been declared in
+/// a header (baseParametersUIElements.hpp) still warned from plugin2Host.cpp,
+/// which does not include it: a declaration only travels if it is somewhere the
+/// parameter's own users already look, and the only such place is the header
+/// that declares the parameter.
+///
+///   constexpr rather than extern, so that it is a definition every translation
+/// unit may hold, and so that name() is a constant expression rather than a
+/// strlen. What checks that a parameter is named at all is now the warning
+/// itself, promoted to an error by the baseline (src/CMakeLists.txt): the
+/// placeholder primary template below has no definition, so naming nothing
+/// fails the build at the point of use rather than at link time.
+///                                           (04.08.2026.) (SW port)
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-#define UI_NAME(parameter) template <> char const Name<parameter>::string_[]
+#define UI_NAME(parameter, name) template <> constexpr char const Name<parameter>::string_[]{name};
 
 #define EFFECT_PARAMETER_NAME(parameter, name)                                                     \
     }                                                                                              \
     }                                                                                              \
     namespace Parameters                                                                           \
     {                                                                                              \
-    UI_NAME(SW::Effects::parameter) = name;                                                        \
+    UI_NAME(SW::Effects::parameter, name)                                                          \
     }                                                                                              \
     namespace SW                                                                                   \
     {                                                                                              \
@@ -304,16 +338,15 @@ template <class Parameter> struct DisplayValueTransformer
 /// \brief Pins the name a parameter is written to a file under, holding it still
 /// while its display name moves.
 ///
-/// \note **In a header, beside the parameter -- never in a .cpp**, which is
-/// where UI_NAME goes and where this does not work. A display name is an extern
-/// array: one definition, found by the linker. This is a class template
-/// specialisation, so every translation unit that instantiates the parameter
-/// table has to see it; one that does not gets the primary template and streams
-/// the parameter under its display name, which is precisely the breakage being
-/// pinned against. Silent, per-translation-unit, and an ODR violation besides.
+/// \note **In a header, beside the parameter -- never in a .cpp.** Every
+/// translation unit that instantiates the parameter table has to see this
+/// specialisation; one that does not gets the primary template and streams the
+/// parameter under its display name, which is precisely the breakage being
+/// pinned against. Silent, per-translation-unit, and ill-formed besides.
 /// tests/parameters/streamingNameTests.cpp catches it -- it reads the same
 /// runtime table the writer does -- but the place not to make the mistake is
-/// here.
+/// here. This was the first of the UIElements to say so and is now the rule for
+/// all of them; UI_NAME has the general argument.
 ///
 /// \note The whole class template is specialised rather than its member: a
 /// member specialisation would leave the in-class default declared as well, and

@@ -15,13 +15,11 @@
 
 #ifndef LE_NO_LFOs
 #include "le/parameters/lfo.hpp"
-#endif // !LE_NO_LFOs
-#ifndef LE_SW_SDK_BUILD
+#endif                           // !LE_NO_LFOs
 #include "le/plugins/plugin.hpp" //...ugh...mrmlj...for Plugins::*AutomatedParameter usage in printer.hpp...clean this up...
 #include "le/parameters/parametersUtilities.hpp"
 #include "le/parameters/printer.hpp" // printers for module parameters
 #include "le/parameters/uiElements.hpp"
-#endif // LE_SW_SDK_BUILD
 #include "le/parameters/parametersUtilities.hpp"
 #include "le/parameters/trigger/tag.hpp"
 #include "le/spectrumworx/effects/effects.hpp"
@@ -154,15 +152,22 @@ typename array_aux<Parameters, Data, std::index_sequence<>>::DataArray constexpr
     Parameters, Data, std::index_sequence<>>::data;
 #endif
 
+/// \note Was `&static_cast<Parameters const *>(nullptr)->get<...>()`, with its
+/// own "...this is actually UB and sooner or later Clang will start
+/// miscompiling this...fix it ASAP..." beside it since 2016. GCC 15 is what
+/// finally said it out loud -- -Wnonnull, once per parameter per effect, 142
+/// times -- and the warning and the correctness fix are the same edit.
+///
+///   A real object and the difference between two of its addresses. It costs one
+/// default-constructed parameter list per parameter, once, during static
+/// initialisation of the offset table that calls this; nothing runs it again.
 template <class Parameters, unsigned index> offset_t valueOffsetGetter()
 {
-    //...mrmlj...this is actually UB and sooner or later Clang will start
-    //...mrmlj...miscompiling this...fix it ASAP...
-    // http://stackoverflow.com/questions/35028438/getting-the-offset-of-a-member-variable-via-casting-a-nullptr
-    auto const address(
-        &(static_cast<Parameters const *>(nullptr)
-              ->template get<typename Parameters::template ParameterAt<index>::type>()));
-    return static_cast<offset_t>(reinterpret_cast<std::size_t>(address));
+    Parameters const parameters;
+    auto const *const base(reinterpret_cast<char const *>(&parameters));
+    auto const *const member(reinterpret_cast<char const *>(
+        &parameters.template get<typename Parameters::template ParameterAt<index>::type>()));
+    return static_cast<offset_t>(member - base);
 }
 template <typename Parameters, index_t... Indices>
 typename array_aux<Parameters, offset_t, std::index_sequence<Indices...>>::DataArray const
@@ -206,10 +211,7 @@ template <> struct ParameterType<Parameters::SymmetricFloatParameterTag>
 
 struct NonEnumeratedParameter
 {
-    static constexpr char const *LE_RESTRICT const *LE_RESTRICT const stringsBegin()
-    {
-        return nullptr;
-    }
+    static constexpr char const *LE_RESTRICT const *stringsBegin() { return nullptr; }
 };
 template <class Parameter, typename Tag> struct EnumeratedValueStrings
 {

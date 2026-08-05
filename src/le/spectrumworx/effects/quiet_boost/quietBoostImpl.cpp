@@ -12,7 +12,6 @@
 
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
-#include "le/parameters/uiElements.hpp"
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 //------------------------------------------------------------------------------
@@ -34,16 +33,6 @@ namespace Effects
 
 char const QuietBoost::title[] = "Quiet Boost";
 char const QuietBoost::description[] = "Amplify low magnitudes.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// QuietBoost UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(QuietBoost::Threshold, "Threshold")
-EFFECT_PARAMETER_NAME(QuietBoost::Ratio, "Ratio")
-EFFECT_PARAMETER_NAME(QuietBoost::NoiseGateThreshold, "Noise threshold")
 
 ////////////////////////////////////////////////////////////////////////////////
 //

@@ -52,3 +52,15 @@ set_target_properties(${SW_CLAPFIRST_TARGET}_all PROPERTIES
 # one key. The only local remedy is to carry a whole copy of their template,
 # which is a fork of a third-party file to change one line. Fix it upstream
 # instead; it matters at notarisation and nowhere before.
+
+# Four -Wdeprecated-declarations from std::wstring_convert, deprecated in C++17
+# and removed in C++26, in the VST3 SDK's own string conversion. Not ours and not
+# editable: the SDK is a CPM fetch into the build tree, wiped on reconfigure. The
+# real fix belongs upstream in the SDK; this keeps four warnings a Linux build log
+# has to be read past from being mistaken for ours.
+#
+# Guarded on the target existing, because SW_FORMATS decides whether the VST3
+# wrapper is built at all.
+if (TARGET base-sdk-vst3 AND NOT MSVC)
+    target_compile_options(base-sdk-vst3 PRIVATE -Wno-deprecated-declarations)
+endif ()

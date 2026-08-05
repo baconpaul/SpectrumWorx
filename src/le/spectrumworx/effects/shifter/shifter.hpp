@@ -16,6 +16,7 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/enumerated/parameter.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -75,6 +76,26 @@ struct Shifter
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Shifter UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Shifter::ShiftTarget, "Target")
+EFFECT_PARAMETER_NAME(Shifter::Offset, "Offset")
+EFFECT_PARAMETER_NAME(Shifter::Tail, "Tail")
+
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Shifter, Tail,
+    {Leave, "Leave"},
+    {Clear, "Clear"},
+    {Circular, "Circular"})
+
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Shifter, ShiftTarget,
+    {Magnitudes, "Magnitudes"},
+    {Phases, "Phases"},
+    {Both, "Mags&Phases"})
 
 //------------------------------------------------------------------------------
 } // namespace Effects

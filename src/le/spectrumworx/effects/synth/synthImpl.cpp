@@ -81,7 +81,6 @@
 #include "le/math/dft/fft.hpp"
 #include "le/math/vector.hpp"
 #include "le/math/windows.hpp"
-#include "le/parameters/uiElements.hpp"
 #include "le/spectrumworx/effects/indexRange.hpp"
 #include "le/spectrumworx/engine/buffers.hpp"
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
@@ -117,17 +116,6 @@ namespace Effects
 
 char const Synth::title[] = "Synth";
 char const Synth::description[] = "Spectrum colour transfer.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Synth UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Synth::Frequency, "Frequency")
-EFFECT_PARAMETER_NAME(Synth::HarmonicSlope, "Slope")
-EFFECT_PARAMETER_NAME(Synth::FlangeIntensity, "Flange amount")
-EFFECT_PARAMETER_NAME(Synth::FlangeOffset, "Flange offset")
 
 ////////////////////////////////////////////////////////////////////////////////
 //

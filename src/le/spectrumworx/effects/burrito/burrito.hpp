@@ -17,6 +17,7 @@
 #include "le/parameters/enumerated/parameter.hpp"
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -68,6 +69,21 @@ struct Burrito
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Burrito UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Burrito::Mode, "Target creation")
+EFFECT_PARAMETER_NAME(Burrito::Range, "Target range")
+EFFECT_PARAMETER_NAME(Burrito::Period, "Range period")
+EFFECT_PARAMETER_NAME(Burrito::SideGain, "Side gain")
+
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Burrito, Mode,
+    {Replace, "Replace"},
+    {Sum, "Sum"})
 
 //------------------------------------------------------------------------------
 } // namespace Effects

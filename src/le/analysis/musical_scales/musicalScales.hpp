@@ -44,25 +44,16 @@ class Scale
     ToneOffsets const &toneOffsets() const { return toneOffsets_; }
 
     std::uint8_t numberOfTones() const { return numberOfTones_; }
-#ifdef LE_SW_SDK_BUILD
-    std::uint8_t numberOfBypassed() const { return numberOfBypassed_; }
-#else
     std::uint8_t numberOfBypassed() const { return 0; }
-#endif // LE_SW_SDK_BUILD
 
   private:
     ToneOffsets::value_type toneOffset(std::uint8_t index) const;
 
   private:
     std::uint8_t numberOfTones_;
-#ifdef LE_SW_SDK_BUILD
-    std::uint8_t numberOfBypassed_;
-#endif // LE_SW_SDK_BUILD
-#ifndef LE_MELODIFY_SDK_BUILD
     std::int8_t targetPitchChangeDirection_;
     float centerTone_;
     mutable float lastPitchScale_;
-#endif // LE_MELODIFY_SDK_BUILD
     ToneOffsets toneOffsets_;
 }; // class Scale
 

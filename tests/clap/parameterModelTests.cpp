@@ -113,14 +113,7 @@ class Fixture
         return largest;
     }
 
-    static std::size_t exportedGlobals()
-    {
-#if LE_SW_ENGINE_INPUT_MODE >= 2
-        return Program::Parameters::static_size - 1; // InputMode is not exported
-#else
-        return Program::Parameters::static_size;
-#endif // LE_SW_ENGINE_INPUT_MODE
-    }
+    static std::size_t exportedGlobals() { return Program::Parameters::static_size; }
 
     std::string name(Plugins::ParameterID const id) const
     {

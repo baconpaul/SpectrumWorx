@@ -16,6 +16,7 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/spectrumworx/effects/commonParameters.hpp"
 #include "le/parameters/linear/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -74,6 +75,16 @@ struct Inserter
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Inserter UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Inserter::Destination, "Destination")
+EFFECT_PARAMETER_NAME(Inserter::Source, "Source")
+EFFECT_PARAMETER_NAME(Inserter::InsertSize, "Size")
 
 //------------------------------------------------------------------------------
 } // namespace Effects

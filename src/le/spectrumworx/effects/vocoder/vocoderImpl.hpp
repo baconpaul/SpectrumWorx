@@ -14,6 +14,7 @@
 #include "vocoder.hpp"
 
 #include "le/spectrumworx/effects/effects.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 
 #include <cstdint>
 //------------------------------------------------------------------------------
@@ -49,6 +50,25 @@ class VocoderImpl : public EffectImpl<Vocoder>
     std::uint16_t cutoff_;
     std::uint16_t filterLength_; // moving average specific
 }; // class VocoderImpl
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Vocoder UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Vocoder ::EnvelopeBorder, "Envelope border")
+EFFECT_PARAMETER_NAME(Vocoder ::NoiseIntensity, "Carrier noise")
+EFFECT_PARAMETER_NAME(VocoderImpl::FilterMethod, "Filter method")
+
+EFFECT_ENUMERATED_PARAMETER_STRINGS(VocoderImpl, FilterMethod,
+    {CepstrumUdoBrick, "Cepstrum - Brick - Udo"},
+    {CepstrumBrick, "Cepstrum - Brick"},
+    {CepstrumHamming, "Cepstrum - Hamming"},
+    {MovingAverage, "Moving average"},
+    {Envelope, "Envelope"},
+    {MelEnvelope, "Mel envelope"},
+    {Passthrough, "Passthrough"})
 
 //------------------------------------------------------------------------------
 } // namespace Effects

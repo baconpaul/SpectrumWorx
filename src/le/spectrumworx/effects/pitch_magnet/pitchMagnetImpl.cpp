@@ -14,7 +14,6 @@
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
-#include "le/parameters/uiElements.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -36,15 +35,6 @@ char const PitchMagnet ::title[] = "Pitch Magnet";
 char const PitchMagnetPVD::title[] = "Pitch Magnet (pvd)";
 
 char const Detail::PitchMagnetBase::description[] = "Force to target pitch.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// PitchMagnet UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Detail::PitchMagnetBase::Target, "Target")
-EFFECT_PARAMETER_NAME(Detail::PitchMagnetBase::Speed, "Strength")
 
 namespace Detail
 {

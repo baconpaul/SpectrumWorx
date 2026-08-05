@@ -74,7 +74,7 @@ class LE_NOVTABLE Plugin2HostPassiveInteropImpl : public Plugin2HostPassiveInter
         result_type operator()(ParameterID::Module const parameterID,
                                Program const *LE_RESTRICT const pProgram) const
         {
-#if defined(_WIN32) && !defined(LE_SW_FMOD)
+#if defined(_WIN32)
             LE_ASSUME(baseGetter.printer.valueSource ==
                       Parameters::AutomatedParameterPrinter::Internal);
 #endif // _WIN32 && ! FMOD
@@ -113,7 +113,7 @@ class LE_NOVTABLE Plugin2HostPassiveInteropImpl : public Plugin2HostPassiveInter
         //...mrmlj...(printing required both in the DSP and UI)...
 
         // http://www.juce.com/forum/topic/juce-module-automatically-handle-plugin-parameters
-#if defined(_WIN32) && !defined(LE_SW_FMOD)
+#if defined(_WIN32)
         LE_ASSUME(pValue == nullptr);
 #endif // _WIN32 && !FMOD
         using AutomatedParameter = typename Plugins::AutomatedParameterFor<Protocol>::type;
@@ -123,7 +123,7 @@ class LE_NOVTABLE Plugin2HostPassiveInteropImpl : public Plugin2HostPassiveInter
                           ? LE::Parameters::AutomatedParameterPrinter::Linear
                           : LE::Parameters::AutomatedParameterPrinter::NormalisedLinear
                     : LE::Parameters::AutomatedParameterPrinter::Internal,
-             text, impl().engineSetup()}};
+             {text, impl().engineSetup()}}};
         char const *const pValueString(invokeFunctorOnIdentifiedParameter(
             parameterID, std::forward<ParameterValueStringGetter const>(getter),
             &impl().program()));
@@ -213,11 +213,6 @@ class LE_NOVTABLE Plugin2HostActiveInteropImpl : public Base
     void presetChangeEnd() const override final { return impl().host().presetChangeEnd(); }
     bool latencyChanged() override final;
 
-#if LE_SW_ENGINE_INPUT_MODE >= 2
-    bool hostTryIOConfigurationChange(std::uint8_t numberOfMainChannels,
-                                      std::uint8_t numberOfSideChannels) override final;
-    bool hostSupportsIOConfigurationChanges() const override final;
-#endif // LE_SW_ENGINE_INPUT_MODE
 }; // class Plugin2HostActiveInteropImpl
 
 #pragma warning(pop)

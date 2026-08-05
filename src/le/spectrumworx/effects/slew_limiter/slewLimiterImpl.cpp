@@ -15,7 +15,6 @@
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -43,20 +42,6 @@ char const SlewLimiter::description[] = "Limit magnitude change speed.";
 /// best results on very small values.
 /// Slew limiter applied to magnitudes produce interesting effects."
 ///                                    (20.12.2009.) (Danijel Domazet)
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// SlewLimiter UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(SlewLimiter::SlewRate, "Slew rate")
-EFFECT_PARAMETER_NAME(SlewLimiter::Direction, "Direction")
-
-EFFECT_ENUMERATED_PARAMETER_STRINGS(SlewLimiter, Direction,
-    {RiseFall, "Rise&Fall"},
-    {Rise, "Rise"},
-    {Fall, "Fall"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

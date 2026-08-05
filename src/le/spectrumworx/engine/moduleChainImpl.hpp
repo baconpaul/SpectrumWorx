@@ -40,7 +40,8 @@ namespace Engine
 {
 struct StorageFactors;
 }
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 //------------------------------------------------------------------------------
 
 class ModuleDSP;
@@ -391,7 +392,7 @@ class ModuleChainImpl : public ModuleChainBase
 }; // class ModuleChainImpl
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 //------------------------------------------------------------------------------
 } // namespace SW
 //------------------------------------------------------------------------------

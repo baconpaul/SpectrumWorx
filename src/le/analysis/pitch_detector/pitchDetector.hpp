@@ -21,11 +21,14 @@ namespace LE
 {
 namespace SW
 {
-LE_IMPL_NAMESPACE_BEGIN(Engine) class Setup;
-LE_IMPL_NAMESPACE_END(Engine)
+namespace Engine
+{
+class Setup;
+} // namespace Engine
 } // namespace SW
 } // namespace LE
-LE_IMPL_NAMESPACE_BEGIN(LE)
+namespace LE
+{
 //------------------------------------------------------------------------------
 //namespace Analysis
 //{
@@ -67,10 +70,6 @@ class PitchDetector
     struct ChannelState : LE::SW::Effects::StaticChannelState
     {
         float lastPitch;
-#ifdef LE_SW_PURE_ANALYSIS
-        float amplitude;
-        std::uint8_t confidence;
-#endif // LE_SW_PURE_ANALYSIS
 
         void reset();
     }; // struct ChannelState
@@ -92,6 +91,6 @@ class PitchDetector
 //------------------------------------------------------------------------------
 //} // namespace Analysis
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(LE)
+} // namespace LE
 //------------------------------------------------------------------------------
 #endif // pitchDetector_hpp

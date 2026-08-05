@@ -17,7 +17,6 @@
 #include "le/math/math.hpp"
 #include "le/math/vector.hpp"
 #include "le/math/windows.hpp"
-#include "le/parameters/uiElements.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -28,14 +27,6 @@ namespace SW
 namespace Effects
 {
 //------------------------------------------------------------------------------
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// BandGain UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Detail::BandGain::Attenuation, "Attenuation")
 
 ////////////////////////////////////////////////////////////////////////////////
 //

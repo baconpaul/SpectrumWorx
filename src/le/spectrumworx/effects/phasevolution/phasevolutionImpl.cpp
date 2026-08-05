@@ -12,7 +12,6 @@
 
 #include "le/math/constants.hpp"
 #include "le/math/math.hpp"
-#include "le/parameters/uiElements.hpp"
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 
@@ -36,14 +35,6 @@ namespace Effects
 
 char const Phasevolution::title[] = "Phasevolution";
 char const Phasevolution::description[] = "Accelerated phase change.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Phasevolution UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Phasevolution::PhasePeriod, "Period")
 
 ////////////////////////////////////////////////////////////////////////////////
 //

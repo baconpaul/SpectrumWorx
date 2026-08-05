@@ -31,13 +31,15 @@ namespace LE
 namespace SW
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Effects)
+namespace Effects
+{
 class IndexRange;
-LE_IMPL_NAMESPACE_END(Effects)
+} // namespace Effects
 using Effects::IndexRange;
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 class ChannelData;
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 //------------------------------------------------------------------------------
 namespace Engine
 {

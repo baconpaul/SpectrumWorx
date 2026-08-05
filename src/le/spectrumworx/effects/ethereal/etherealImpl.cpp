@@ -12,7 +12,6 @@
 
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/math/conversion.hpp"
-#include "le/parameters/uiElements.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -32,19 +31,6 @@ namespace Effects
 
 char const Ethereal::title[] = "Ethereal";
 char const Ethereal::description[] = "Compare and replace.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Ethereal UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Ethereal::Threshold, "Threshold")
-EFFECT_PARAMETER_NAME(Ethereal::Condition, "Swap condition")
-
-EFFECT_ENUMERATED_PARAMETER_STRINGS(Ethereal, Condition,
-    {DiffHigher, "Main - Side > Thr."},
-    {DiffLower, "Main - Side < Thr."})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

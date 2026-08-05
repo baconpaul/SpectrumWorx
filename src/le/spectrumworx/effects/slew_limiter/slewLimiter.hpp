@@ -16,6 +16,7 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/enumerated/parameter.hpp"
 #include "le/parameters/linear/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 
 //------------------------------------------------------------------------------
 namespace LE
@@ -63,6 +64,20 @@ struct SlewLimiter
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// SlewLimiter UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(SlewLimiter::SlewRate, "Slew rate")
+EFFECT_PARAMETER_NAME(SlewLimiter::Direction, "Direction")
+
+EFFECT_ENUMERATED_PARAMETER_STRINGS(SlewLimiter, Direction,
+    {RiseFall, "Rise&Fall"},
+    {Rise, "Rise"},
+    {Fall, "Fall"})
 
 //------------------------------------------------------------------------------
 } // namespace Effects

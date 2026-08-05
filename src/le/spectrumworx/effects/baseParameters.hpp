@@ -21,12 +21,17 @@
 #include "le/parameters/boolean/parameter.hpp"
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
 //------------------------------------------------------------------------------
 namespace SW
 {
+namespace Engine
+{
+class Setup;
+} // namespace Engine
 //------------------------------------------------------------------------------
 
 /// \addtogroup Effects
@@ -76,11 +81,49 @@ LE_DEFINE_PARAMETERS(Bypass, Gain, Wet, StartFrequency, StopFrequency);
 } // namespace BaseParameters
 /// @}
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// BaseParameters UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(BaseParameters::Bypass, "Bypass")
+EFFECT_PARAMETER_NAME(BaseParameters::Gain, "Gain")
+EFFECT_PARAMETER_NAME(BaseParameters::Wet, "Wet")
+EFFECT_PARAMETER_NAME(BaseParameters::StartFrequency, "Start frequency")
+EFFECT_PARAMETER_NAME(BaseParameters::StopFrequency, "Stop frequency")
+
 //------------------------------------------------------------------------------
 } // namespace Effects
 /// @}
 //------------------------------------------------------------------------------
 } // namespace SW
+//------------------------------------------------------------------------------
+namespace Parameters
+{
+//------------------------------------------------------------------------------
+
+/// \note Here, and not in a .cpp beside transform()'s definition, for the reason
+/// UI_NAME gives: a translation unit that builds the parameter table without
+/// seeing this specialisation gets the primary template instead -- the identity
+/// transform and no unit -- and nothing says so. Only transform() is out of
+/// line, because normalisedFrequencyToHz() is the engine's and this is the
+/// parameter layer.
+template <> struct DisplayValueTransformer<SW::Effects::BaseParameters::StartFrequency>
+{
+    static float transform(float const &value, SW::Engine::Setup const &);
+
+    using Suffix = UnitString<" Hz">;
+};
+
+template <>
+struct DisplayValueTransformer<SW::Effects::BaseParameters::StopFrequency>
+    : DisplayValueTransformer<SW::Effects::BaseParameters::StartFrequency>
+{
+};
+
+//------------------------------------------------------------------------------
+} // namespace Parameters
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------

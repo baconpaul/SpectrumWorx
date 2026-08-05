@@ -15,6 +15,7 @@
 //------------------------------------------------------------------------------
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/linear/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -61,6 +62,15 @@ struct SumoPitch
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// SumoPitch UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(SumoPitch::Blend, "Blend amount")
+EFFECT_PARAMETER_NAME(SumoPitch::Speed, "Speed")
 
 //------------------------------------------------------------------------------
 } // namespace Effects

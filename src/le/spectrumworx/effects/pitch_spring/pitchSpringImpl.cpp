@@ -10,7 +10,6 @@
 //------------------------------------------------------------------------------
 #include "pitchSpringImpl.hpp"
 
-#include "le/parameters/uiElements.hpp"
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/utility/platformSpecifics.hpp"
@@ -35,15 +34,6 @@ char const PitchSpring ::title[] = "Pitch Spring";
 char const PitchSpringPVD::title[] = "Pitch Spring (pvd)";
 
 char const Detail::PitchSpringBase::description[] = "Oscillating pitch.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// PitchSpring UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Detail::PitchSpringBase::Depth, "Depth")
-EFFECT_PARAMETER_NAME(Detail::PitchSpringBase::Period, "Period")
 
 namespace Detail
 {

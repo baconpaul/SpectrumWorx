@@ -25,7 +25,8 @@ namespace LE
 namespace SW
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 //------------------------------------------------------------------------------
 
 LE_OPTIMIZE_FOR_SIZE_BEGIN()
@@ -204,17 +205,6 @@ void intrusive_ptr_add_ref(ModuleNode const *LE_RESTRICT const pModuleNode)
     ++pModuleNode->referenceCount_;
 }
 
-#ifdef LE_SW_SDK_BUILD // ambiguous overload resolution (implicitly convertible to both ModuleNode and ModuleBase)
-void intrusive_ptr_add_ref(ModuleDSP const *const pModule)
-{
-    return intrusive_ptr_add_ref(static_cast<ModuleNode const *>(pModule));
-}
-void intrusive_ptr_release(ModuleDSP const *const pModule)
-{
-    return intrusive_ptr_release(static_cast<ModuleNode const *>(pModule));
-}
-#endif // LE_SW_SDK_BUILD
-
 ////////////////////////////////////////////////////////////////////////////////
 // ModuleParameters set/getEffectParameter default implementations
 ////////////////////////////////////////////////////////////////////////////////
@@ -264,107 +254,9 @@ float ModuleParameters::setEffectParameterLive(std::uint8_t const parameterIndex
 }
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Engine)
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
-#if defined(LE_SW_SDK_BUILD) && !(defined(LE_SW_PURE_ANALYSIS) || defined(LE_MELODIFY_SDK_BUILD))
-//------------------------------------------------------------------------------
-#include "le/spectrumworx/effects/configuration/effectTypeNames.hpp"
-//------------------------------------------------------------------------------
-namespace LE
-{
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Engine
-{
-
-std::uint8_t ModuleBase::numberOfEffectSpecificParameters() const
-{
-    return static_cast<ModuleDSP const &>(*this)
-        .ModuleParameters::numberOfEffectSpecificParameters();
-}
-float ModuleBase::getBaseParameter(std::uint8_t const baseParameterIndex) const
-{
-    return static_cast<ModuleDSP const &>(*this).ModuleParameters::getBaseParameter(
-        baseParameterIndex);
-}
-float ModuleBase::setBaseParameter(std::uint8_t const baseParameterIndex, float const value)
-{
-    return static_cast<ModuleDSP &>(*this).ModuleParameters::setBaseParameter(baseParameterIndex,
-                                                                              value);
-}
-float ModuleBase::getEffectParameter(std::uint8_t const effectParameterIndex) const
-{
-    return static_cast<ModuleDSP const &>(*this).ModuleParameters::getEffectParameter(
-        effectParameterIndex);
-}
-float ModuleBase::setEffectParameter(std::uint8_t const effectParameterIndex, float const value)
-{
-    return static_cast<ModuleDSP &>(*this).ModuleParameters::setEffectParameter(
-        effectParameterIndex, value);
-}
-
-float ModuleBase::getParameter(std::uint8_t const parameterIndex) const
-{
-    return (parameterIndex < numberOfBaseParameters)
-               ? getBaseParameter(parameterIndex)
-               : getEffectParameter(
-                     static_cast<ModuleDSP const &>(*this).effectSpecificParameterIndex(
-                         parameterIndex));
-}
-float ModuleBase::setParameter(std::uint8_t const parameterIndex, float const value)
-{
-    return (parameterIndex < numberOfBaseParameters)
-               ? setBaseParameter(parameterIndex, value)
-               : setEffectParameter(
-                     static_cast<ModuleDSP &>(*this).effectSpecificParameterIndex(parameterIndex),
-                     value);
-}
-
-Parameters::LFO &ModuleBase::lfo(std::uint8_t const parameterIndex)
-{
-    auto &impl(static_cast<ModuleDSP &>(*this));
-    static_assert(ModuleParameters::numberOfNonLFOBaseParameters ==
-                      ModuleBase::numberOfNonLFOBaseParameters,
-                  "");
-    LE_ASSERT(parameterIndex > ModuleParameters::numberOfNonLFOBaseParameters);
-    return impl.ModuleParameters::lfo(parameterIndex -
-                                      ModuleParameters::numberOfNonLFOBaseParameters);
-}
-
-Parameters::RuntimeInformation const &
-ModuleBase::parameterInfo(std::uint8_t const parameterIndex) const
-{
-    return static_cast<ModuleDSP const &>(*this).ModuleParameters::parameterInfo(parameterIndex);
-}
-
-char const *ModuleBase::effectName() const
-{
-    return Effects::effectIndex2TypeName(static_cast<ModuleDSP const &>(*this).effectTypeIndex());
-}
-
-ModuleBase::BaseParameters &ModuleBase::baseParameters()
-{
-    return static_cast<ModuleDSP &>(*this).baseParameters();
-}
-
-void intrusive_ptr_add_ref(ModuleBase const *const pModuleBase)
-{
-    intrusive_ptr_add_ref(&node(*static_cast<ModuleDSP const *>(pModuleBase)));
-}
-void intrusive_ptr_release(ModuleBase const *const pModuleBase)
-{
-    intrusive_ptr_release(&node(*static_cast<ModuleDSP const *>(pModuleBase)));
-}
 } // namespace Engine
 //------------------------------------------------------------------------------
 } // namespace SW
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------
-#endif // LE_SW_SDK_BUILD

@@ -22,7 +22,8 @@ namespace Engine
 template <class Data> class MainSide;
 template <class FullRangeData, class SubRangeHolder> class SubRange;
 } // namespace Engine
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 //------------------------------------------------------------------------------
 
 class ChannelData_AmPh;
@@ -41,7 +42,7 @@ struct ChannelData_AmPh2ReIm;
 struct ChannelData_ReIm2AmPh;
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 //------------------------------------------------------------------------------
 } // namespace SW
 //------------------------------------------------------------------------------

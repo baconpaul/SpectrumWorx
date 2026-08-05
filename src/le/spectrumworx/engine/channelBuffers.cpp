@@ -24,7 +24,8 @@ namespace LE
 namespace SW
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 //------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -134,10 +135,8 @@ void ChannelBuffers::moveForwardByHopSize(std::uint16_t const hopSize, bool cons
         shiftBufferToLeft(sideOLA_, inputDataSize(), hopSize);
 
     inputOLAPosition_ -= hopSize;
-#ifndef LE_SW_PURE_ANALYSIS
     outputOLAPosition_ += hopSize;
     LE_ASSERT_MSG(outputOLAPosition_ <= outputOLA_.size(), "Buffer overflow");
-#endif // LE_SW_PURE_ANALYSIS
 }
 
 float *ChannelBuffers::putNewTimeDomainDataToOutput(Math::FFT_float_real_1D const &fft,
@@ -310,7 +309,7 @@ LE_COLD std::uint32_t ChannelBuffers::OutputOLA::requiredStorage(StorageFactors 
 }
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 //------------------------------------------------------------------------------
 } // namespace SW
 //------------------------------------------------------------------------------

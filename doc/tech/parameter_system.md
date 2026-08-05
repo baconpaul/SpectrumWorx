@@ -8,15 +8,16 @@ Written against commit `6e09d15` (post-restructure: `source/` → `src/`,
 [`streaming_format.md`](streaming_format.md), which is what happens to a
 parameter once it reaches a file.
 
-> **Still accurate as of 03.08.2026**, and the only document about this layer.
+> **Still accurate as of 04.08.2026**, and the only document about this layer.
 > The port did not change the parameter system: the skeleton, the addressing and
 > the runtime re-meaning are what they were. Two things it does not know about,
 > both additive — the base value now travels separately from the LFO's output
-> (`threading_model.md` §4), and `tests/parameters/parameterTable.txt` pins the
-> whole 286-row enumeration. The one open item against this layer is the 227
-> `-Wundefined-var-template` in [`todo.md`](todo.md) item 3, which is a missing
-> declaration in `Parameters::Name<>` rather than a flaw in what is described
-> here.
+> (`threading_model.md` §4), and `tests/parameters/data/parameterTable.txt` pins
+> the whole 286-row enumeration.
+>
+> One thing about *where* a parameter's name lives did change, on 04.08.2026, and
+> §9 is it: a name is written beside the parameter it names, in the header, and
+> not in a `.cpp`.
 
 ---
 
@@ -71,25 +72,30 @@ In the default build configuration that is:
 
 | Block | Count | Notes |
 |---|---:|---|
-| Globals | 7 | InputGain, OutputGain, MixPercentage, FFTSize, OverlapFactor, WindowFunction, InputMode |
+| Globals | 6 | InputGain, OutputGain, MixPercentage, FFTSize, OverlapFactor, WindowFunction |
 | Module chain ("which effect is in slot N") | 5 | one per slot |
 | Module parameters | 50 | 5 slots × 10 |
 | LFO parameters | 225 | 5 exported LFO params × 9 non-Bypass module params × 5 slots |
-| **Total** | **287** | |
+| **Total** | **286** | |
 
-Caveats on the numbers, all build-flag dependent:
+Caveats on the numbers:
 
-- Globals are 7 because `LE_SW_ENGINE_INPUT_MODE` defaults to `full` (=2) and
-  `LE_SW_ENGINE_WINDOW_PRESUM` defaults to `false`
-  (`src/le/spectrumworx/engine/configuration.cmake:17-29`,
-  `src/le/spectrumworx/engine/parameters.hpp:29-70`).
+- Globals were 7 until 04.08.2026, the seventh being `InputMode` — a parameter
+  that reconfigured the plugin's own I/O (2 in / 2 out, mono, with or without a
+  side chain), behind `LE_SW_ENGINE_INPUT_MODE`. It never existed in a build this
+  port produced, because nothing defined the macro, and it is gone: CLAP
+  configures I/O through `audio-ports-config` and the plugin has declared a real
+  side-chain port since it was written. The AU path used to exclude it separately
+  (AU has no plugin-initiated I/O change), so every format's list is now the same
+  one.
+- A seventh could come back: `SW_ENGINE_WINDOW_PRESUM` (`src/dsp.cmake`) adds
+  `WindowSizeFactor` and is off, as it was in 2016. Turning it on moves this table
+  and every automation lane a host has saved against it, which is why it is a
+  decision rather than a switch — see `tech_debt.md`.
 - `lfoExportedParameters` is **5** in a normal GUI build and **7** under
   `LE_SW_SEPARATED_DSP_GUI || !LE_SW_GUI` — SyncTypes and Waveform are not
   exported for automation in the GUI build
   (`src/core/host_interop/parameters.hpp:27-36`).
-- The AU path excludes `InputMode` (AU has no plugin-initiated I/O change), so
-  its full static list is 286, not 287
-  (`src/core/host_interop/plugin2Host.cpp:287-294`).
 
 This skeleton never changes at runtime. Everything below is about what the slots
 *mean*.
@@ -285,6 +291,46 @@ breaking presets, and a preset referencing an effect absent from the current
 edition degrades rather than corrupting the chain. The `.swp` format is the
 constraint on the parameter-system refactor, not the index numbering.
 
+### Where a name lives, and why it is the header
+
+A parameter's name is a specialisation of `Parameters::Name<>`, and since
+04.08.2026 it is written **in the header that declares the parameter**, directly
+under it, with `EFFECT_PARAMETER_NAME` (or `UI_NAME` outside `SW::Effects`).
+So does its streaming name, and so do an enumerated parameter's value strings:
+
+```cpp
+struct AhAh
+{
+    LE_DEFINE_PARAMETER( Center, LinearUnsignedInteger, … );
+    …
+};
+
+EFFECT_PARAMETER_NAME( AhAh::Center, "Center frequency" )
+EFFECT_PARAMETER_STREAMING_NAME( AhAh::Center, "Center (LFO me!)" )
+```
+
+They used to be `.cpp` definitions of a declared-but-undefined static member,
+resolved by the linker. The rule that replaced it is not a style preference —
+**a translation unit that instantiates `name<Parameter>()` has to have seen the
+specialisation**, and one that has not is ill-formed with no diagnostic required.
+Clang issues one anyway, and there were 283 of them: every place the parameter
+table is built (`Detail::info<>()`, `moduleImpl.hpp`) against every parameter,
+in every translation unit that reaches one.
+
+Two things follow, and both are what §7 above is about:
+
+- **What used to be a link error is now a compile error.** The primary template
+  is still a declaration with no definition, so a parameter nobody has named
+  fails at the point of use rather than at link time — and it fails in the
+  translation unit that builds the table, which is `factory.cpp`. The warning
+  is what catches it; the baseline in `src/CMakeLists.txt` makes it fatal.
+- **A specialisation written where the users cannot see it is silent, not loud.**
+  A missing *name* is at least an undefined symbol. A missing
+  `DisplayValueTransformer` or `StreamingName` is not: the translation unit gets
+  the primary template, and the parameter quietly streams under the wrong key or
+  prints without its unit. That is the failure `EFFECT_PARAMETER_STREAMING_NAME`
+  was introduced to prevent and `tests/parameters/streamingNameTests.cpp` pins.
+
 ---
 
 ## 8. The edition axis (the build-time one)
@@ -292,7 +338,10 @@ constraint on the parameter-system refactor, not the index numbering.
 `src/core/configuration.cmake:63` → `addSelectedEffects( "${LE_SW_INCLUDED_EFFECTS}" )`,
 implemented at `src/le/spectrumworx/effects/configuration/effectsList.cmake:101-258`.
 It selects which of the ~57 effects get compiled in — full edition
-(`-DLE_SW_FULL`, `:230-231`), cut-down editions, SDK builds.
+(`-DLE_SW_FULL`, `:230-231`), cut-down editions, SDK builds. That file is a
+record rather than a build (its banner says so), and `LE_SW_FULL` itself was
+deleted on 04.08.2026 along with the demo SKU it gated; what survives is
+`Effects::includedEffects[]`, a constexpr table of all `true`.
 
 Two things stop this from making the parameter list static per binary:
 

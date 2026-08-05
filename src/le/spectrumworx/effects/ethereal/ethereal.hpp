@@ -17,6 +17,7 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/enumerated/parameter.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
+#include "le/parameters/uiElements.hpp" // the UIElements below
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -73,6 +74,19 @@ struct Ethereal
     static char const title[];
     static char const description[];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Ethereal UIElements definitions.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_PARAMETER_NAME(Ethereal::Threshold, "Threshold")
+EFFECT_PARAMETER_NAME(Ethereal::Condition, "Swap condition")
+
+EFFECT_ENUMERATED_PARAMETER_STRINGS(Ethereal, Condition,
+    {DiffHigher, "Main - Side > Thr."},
+    {DiffLower, "Main - Side < Thr."})
 
 //------------------------------------------------------------------------------
 } // namespace Effects

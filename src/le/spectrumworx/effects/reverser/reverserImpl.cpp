@@ -11,7 +11,6 @@
 #include "reverserImpl.hpp"
 
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/utility/buffers.hpp"
@@ -34,14 +33,6 @@ namespace Effects
 
 char const Reverser::title[] = "Reverser";
 char const Reverser::description[] = "Play chunks backwards.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Reverser UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Reverser::Length, "Chunk length")
 
 ///////////////////////////////////////////////////////////////////////////////
 //

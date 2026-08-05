@@ -74,7 +74,7 @@ LE_NOINLINE void BaseParameters::setup(Engine::Setup const &engineSetupParam)
     expctRate_ = twoPi_d * pEngineSetup->stepSize<double>() / pEngineSetup->fftSize<double>();
     deviationFactor_ = freqPerBin * pEngineSetup->windowOverlappingFactor<double>() / twoPi_d;
 
-#if defined(_DEBUG) && !defined(__clang__) && !defined(LE_SW_SDK_BUILD) &&                         \
+#if defined(_DEBUG) && !defined(__clang__) &&                                                    \
     0 //...mrmlj...started failing even on msvc10...
     float const inverseDeviationFactor(1 / deviationFactor_);
     float const inverseInverseDeviationFactor(1 / inverseDeviationFactor);
@@ -295,7 +295,9 @@ void LE_NOINLINE PitchShifter::process(ChannelState &channelState,
 
 namespace
 {
-void verifyDCPhase([[maybe_unused]] float const phase)
+/// \note Its four call sites are commented out and have been since 2012; it is
+/// the check you uncomment when the phase vocoder is misbehaving.
+[[maybe_unused]] void verifyDCPhase([[maybe_unused]] float const phase)
 {
     // Implementation note:
     //   Valid phases for the DC bin are 0, Pi and - Pi.
@@ -357,7 +359,7 @@ float LE_FORCEINLINE mapToPiInterval(float const phase)
 
 #endif // princarg implementation
 
-#if defined(_DEBUG) && !(defined(LE_SW_SDK_BUILD) && !defined(__MSVC_RUNTIME_CHECKS))
+#if defined(_DEBUG)
     //...mrmlj...temporarily disabled as it seems to fail in iOS builds...
     LE_ASSERT_MSG(
         /// \note Reducing the accumulated synthesis phase for only a subset

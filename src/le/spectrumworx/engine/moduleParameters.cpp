@@ -33,7 +33,7 @@
 /// the other -- after the stage 7.0 parameter table snapshot noticed the unit
 /// appear when stage 8 switched the macro off.
 ///                                           (31.07.2026.) (SW port)
-#include "le/spectrumworx/effects/baseParametersUIElements.hpp"
+#include "le/spectrumworx/effects/baseParameters.hpp"
 
 #ifndef LE_NO_PRESETS
 #include "le/spectrumworx/presets.hpp"
@@ -46,7 +46,8 @@ namespace LE
 namespace SW
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 //------------------------------------------------------------------------------
 
 using LFO = Parameters::LFOImpl;
@@ -387,7 +388,6 @@ LE_COLD void ModuleParameters::loadPresetParameters(ParametersLoader const &para
     }
 }
 
-#ifndef LE_SW_SDK_BUILD
 LE_COLD void ModuleParameters::savePresetParameters(ParametersSaver const &parameterSaver) const
 {
     ParametersSaver &saver(const_cast<ParametersSaver &>(parameterSaver)); //...mrmlj...
@@ -427,13 +427,12 @@ LE_COLD void ModuleParameters::savePresetParameters(ParametersSaver const &param
         //}
     }
 }
-#endif // LE_SW_SDK_BUILD
 #endif // LE_NO_PRESETS
 
 LE_OPTIMIZE_FOR_SIZE_END()
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 //------------------------------------------------------------------------------
 } // namespace SW
 //------------------------------------------------------------------------------

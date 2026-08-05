@@ -23,7 +23,8 @@
 namespace LE
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Math)
+namespace Math
+{
 //------------------------------------------------------------------------------
 
 unsigned int alignIndex(unsigned int index);
@@ -258,7 +259,7 @@ LE_HOT void convertSamples(Sample const *LE_RESTRICT const pInput,
 LE_OPTIMIZE_FOR_SPEED_END()
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Math)
+} // namespace Math
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------

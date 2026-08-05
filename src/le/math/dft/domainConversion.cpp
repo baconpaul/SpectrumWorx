@@ -17,7 +17,8 @@
 namespace LE
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Math)
+namespace Math
+{
 //------------------------------------------------------------------------------
 
 void reim2AmPh(float const *const reals, float const *const imags, // input
@@ -39,7 +40,7 @@ void amph2ReIm(float const *const amplitudes, float const *const phases, // inpu
 }
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Math)
+} // namespace Math
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------

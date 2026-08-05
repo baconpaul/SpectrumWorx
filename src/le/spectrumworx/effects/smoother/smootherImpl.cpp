@@ -12,7 +12,6 @@
 
 #include "le/math/math.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/utility/buffers.hpp"
@@ -37,14 +36,6 @@ namespace Effects
 
 char const Smoother::title[] = "Smoother";
 char const Smoother::description[] = "Smooth the spectrum.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Smoother UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Smoother::AveragingWidth, "Smoothness")
 
 ///////////////////////////////////////////////////////////////////////////////
 //

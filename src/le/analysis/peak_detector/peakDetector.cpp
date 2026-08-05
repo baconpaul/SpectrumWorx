@@ -22,7 +22,8 @@
 #include <algorithm>
 #include <cmath>
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(LE)
+namespace LE
+{
 //------------------------------------------------------------------------------
 // https://ccrma.stanford.edu/~jos/parshl/Peak_Detection_Steps_3.html
 // http://hci.rwth-aachen.de/materials/publications/lee2006a.pdf (under
@@ -390,5 +391,5 @@ void PeakDetector::attenuateNonPeaks(float *const amplitudes, std::uint16_t cons
 }
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(LE)
+} // namespace LE
 //------------------------------------------------------------------------------

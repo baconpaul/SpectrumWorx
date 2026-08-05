@@ -19,9 +19,7 @@
 
 #include <array>
 #include <cstring>
-#ifndef LE_MELODIFY_SDK_BUILD
 #include <numeric>
-#endif //LE_MELODIFY_SDK_BUILD
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -32,11 +30,9 @@ namespace Music
 
 Scale::Scale()
 {
-#ifndef LE_MELODIFY_SDK_BUILD
     lastPitchScale_ = 1;
     centerTone_ = -1;
     targetPitchChangeDirection_ = 0;
-#endif // LE_MELODIFY_SDK_BUILD
 }
 
 void Scale::tonesUpdated(std::uint8_t const snappedTo, std::uint8_t const bypassed)
@@ -48,11 +44,7 @@ void Scale::tonesUpdated(std::uint8_t const snappedTo, std::uint8_t const bypass
 #endif // NDEBUG
 
     numberOfTones_ = snappedTo;
-#ifdef LE_SW_SDK_BUILD
-    numberOfBypassed_ = bypassed;
-#else
     LE_ASSUME(bypassed == 0);
-#endif // LE_SW_SDK_BUILD
 
 #if 0
     if ( snappedTo == 0 )
@@ -62,7 +54,6 @@ void Scale::tonesUpdated(std::uint8_t const snappedTo, std::uint8_t const bypass
     }
     else
 #endif // 0
-#ifndef LE_MELODIFY_SDK_BUILD
     {
         if (snappedTo)
         {
@@ -87,7 +78,6 @@ void Scale::tonesUpdated(std::uint8_t const snappedTo, std::uint8_t const bypass
             targetPitchChangeDirection_ = 0;
         }
     }
-#endif // LE_SW_SDK_BUILD
 }
 
 LE_OPTIMIZE_FOR_SPEED_BEGIN()
@@ -103,11 +93,7 @@ float LE_HOT Scale::snap2Scale(float const freq, std::uint8_t const keyIndex) co
         bool operator<(PitchScaleRatio const &other) const { return ratio < other.ratio; }
     };
 
-#ifdef LE_MELODIFY_SDK_BUILD
-    float const pitchScaleComparisonSource(1);
-#else
     float const pitchScaleComparisonSource(lastPitchScale_);
-#endif // LE_MELODIFY_SDK_BUILD
 
     std::uint8_t const totalTones(numberOfTones() + numberOfBypassed());
     LE_ASSUME(totalTones < 12);
@@ -136,9 +122,7 @@ float LE_HOT Scale::snap2Scale(float const freq, std::uint8_t const keyIndex) co
         float const lowerRatio(pitchScaleComparisonSource / lowerPitchScale);
         float const upperRatio(upperPitchScale / pitchScaleComparisonSource);
         if (
-#ifndef LE_MELODIFY_SDK_BUILD
             (targetPitchChangeDirection_ > 0) ||
-#endif // LE_MELODIFY_SDK_BUILD
             (upperRatio < lowerRatio))
         {
             pitchScaleDeltas[n].ratio = upperRatio;
@@ -155,25 +139,11 @@ float LE_HOT Scale::snap2Scale(float const freq, std::uint8_t const keyIndex) co
     auto const &minimumRatio(
         *std::min_element(pitchScaleDeltas.begin(), pitchScaleDeltas.begin() + totalTones));
 
-#ifdef LE_SW_SDK_BUILD
-    auto const nearestScaleToneIndex(
-        static_cast<std::uint8_t>(&minimumRatio - &pitchScaleDeltas.front()));
-    if (nearestScaleToneIndex >= numberOfTones())
-    { // bypassed tone:
-#ifndef LE_MELODIFY_SDK_BUILD
-        lastPitchScale_ = 1;
-#endif // LE_MELODIFY_SDK_BUILD
-        return freq;
-    }
-#endif // LE_SW_SDK_BUILD
-
     float const newPitchScale(minimumRatio.inverted
                                   ? pitchScaleComparisonSource / minimumRatio.ratio
                                   : pitchScaleComparisonSource * minimumRatio.ratio);
 
-#ifndef LE_MELODIFY_SDK_BUILD
     lastPitchScale_ = newPitchScale;
-#endif // LE_MELODIFY_SDK_BUILD
     return newPitchScale * freq;
 }
 

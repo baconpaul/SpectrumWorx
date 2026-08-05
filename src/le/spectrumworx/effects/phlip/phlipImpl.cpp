@@ -13,7 +13,6 @@
 #include "le/spectrumworx/effects/indexRange.hpp"
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -33,19 +32,6 @@ namespace Effects
 
 char const Phlip::title[] = "Phlip";
 char const Phlip::description[] = "Phase flip.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Phlip UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Phlip::Mode, "Target harmonics")
-
-EFFECT_ENUMERATED_PARAMETER_STRINGS(Phlip, Mode,
-    {All, "All"},
-    {Even, "Even"},
-    {Odd, "Odd"})
 
 ////////////////////////////////////////////////////////////////////////////////
 //

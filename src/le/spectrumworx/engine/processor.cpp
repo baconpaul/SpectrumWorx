@@ -37,7 +37,8 @@ namespace LE
 namespace SW
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 //------------------------------------------------------------------------------
 
 void Processor::preProcess() { modules().preProcessAll(lfoTimer(), engineSetup()); }
@@ -73,15 +74,11 @@ class Processor::ProcessParameters
         return *ppMainChannels_;
     }
     float const *sideChannel() const { return *ppSideChannels_; }
-#ifdef LE_SW_PURE_ANALYSIS
-    float *output() const { return nullptr; }
-#else
     float *output() const
     {
         LE_ASSERT(pOutput_);
         return *pOutput_;
     }
-#endif // LE_SW_PURE_ANALYSIS
     ChannelBuffers &channelBuffers() const { return channelBuffers_.front(); }
 
     bool haveSideChannel() const { return sideChannel() != nullptr; }
@@ -134,7 +131,7 @@ void Processor::process /// \throws nothing
                   "WOLA parameters not setup.");
 
     /// \note A Math::FPUDisableDenormalsGuard stood here under
-    /// #ifdef LE_SW_SDK_BUILD, which nothing defines, so it never ran. The guard
+    /// #ifdef LE_SW_SDK_BUILD, which nothing defined, so it never ran. The guard
     /// is one sst::plugininfra FPUStateGuard at the top of
     /// SpectrumWorxCLAP::process() now -- the outermost point of the audio
     /// callback, which is the right scope for it and the only one all four
@@ -206,13 +203,6 @@ void Processor::process /// \throws nothing
 {
     auto const numberOfChannels(engineSetup().numberOfChannels());
 
-#ifdef LE_SW_PURE_ANALYSIS
-#if !(defined(__clang__) && (defined(__arm__) || defined(__aarch64__)))
-    LE_ASSUME(interleavedSideInputs == nullptr);
-#endif // crashy clang 3.8 (ndk11c)..!?
-    LE_ASSUME(interleavedOutputs == nullptr);
-#endif // LE_SW_PURE_ANALYSIS
-
     LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow,
                           LE::Utility::makeSpan(interleavedMainInputs, samples * numberOfChannels),
                           "main input");
@@ -226,7 +216,7 @@ void Processor::process /// \throws nothing
                   "WOLA parameters not setup.");
 
     /// \note A Math::FPUDisableDenormalsGuard stood here under
-    /// #ifdef LE_SW_SDK_BUILD, which nothing defines, so it never ran. The guard
+    /// #ifdef LE_SW_SDK_BUILD, which nothing defined, so it never ran. The guard
     /// is one sst::plugininfra FPUStateGuard at the top of
     /// SpectrumWorxCLAP::process() now -- the outermost point of the audio
     /// callback, which is the right scope for it and the only one all four
@@ -239,10 +229,6 @@ void Processor::process /// \throws nothing
     float *LE_RESTRICT const *LE_RESTRICT outputs;
 
     std::uint32_t processBlockSize;
-
-#ifdef LE_MELODIFY_SDK_BUILD
-    LE_ASSUME(interleavedSideInputs);
-#endif // LE_MELODIFY_SDK_BUILD
 
     if (numberOfChannels == 1)
     {
@@ -266,9 +252,6 @@ void Processor::process /// \throws nothing
         {
             sideInputs = nullptr;
         }
-#ifdef LE_SW_PURE_ANALYSIS
-        outputs = nullptr;
-#endif // LE_SW_PURE_ANALYSIS
     }
 
     LE_DISABLE_LOOP_VECTORIZATION()
@@ -298,16 +281,12 @@ void Processor::process /// \throws nothing
 
         if (numberOfChannels != 1)
         {
-#ifndef LE_SW_PURE_ANALYSIS
             Math::interleave(outputs, interleavedOutputs, processBlockSize, numberOfChannels);
-#endif // LE_SW_PURE_ANALYSIS
 
             interleavedMainInputs += processBlockSize * numberOfChannels;
             if (interleavedSideInputs)
                 interleavedSideInputs += processBlockSize * numberOfChannels;
-#ifndef LE_SW_PURE_ANALYSIS
             interleavedOutputs += processBlockSize * numberOfChannels;
-#endif // LE_SW_PURE_ANALYSIS
 
             samples -= processBlockSize;
         }
@@ -328,7 +307,6 @@ void Processor::processSingleChannel(ProcessParameters const &processParameters)
     auto const windowSize(engineSetup().windowSize<std::uint16_t>());
     LE_ASSERT(windowSize == static_cast<std::uint16_t>(analysisWindow().size()));
 
-#ifndef LE_SW_PURE_ANALYSIS
     // Implementation note:
     //   ChannelBuffers::readyOutputDataSize() does not take into account the
     // samples that are not yet ready/'fully complete' (have not gone through
@@ -340,7 +318,6 @@ void Processor::processSingleChannel(ProcessParameters const &processParameters)
     // ChannelBuffers::outputOLAPosition_ (readyOutputDataSize()).
     //                                        (11.02.2010.) (Domagoj Saric)
     std::uint16_t const incompleteOutputDataSizeFromPreviousSteps(windowSize - stepSize);
-#endif // !LE_SW_PURE_ANALYSIS
 
     float const *LE_RESTRICT pCompleteNewInput(processParameters.mainChannel());
     float const *LE_RESTRICT pCompleteNewSideChannel(processParameters.sideChannel());
@@ -348,12 +325,6 @@ void Processor::processSingleChannel(ProcessParameters const &processParameters)
     bool const useSideChannel(processParameters.haveSideChannel());
     ChannelBuffers &channelBuffers(processParameters.channelBuffers());
     float *LE_RESTRICT pOutput(processParameters.output());
-
-#ifdef LE_SW_PURE_ANALYSIS
-    LE_ASSUME(useSideChannel == false);
-    LE_ASSUME(pCompleteNewSideChannel == nullptr);
-    LE_ASSUME(pOutput == nullptr);
-#endif // LE_SW_PURE_ANALYSIS
 
     using namespace Math;
 
@@ -416,7 +387,6 @@ void Processor::processSingleChannel(ProcessParameters const &processParameters)
                 });
             }
 
-#ifndef LE_SW_PURE_ANALYSIS
             // The IFFT+Window+Overlap-Add phase:
             //  Get the time-domain results, window them and add with/to the
             // output FIFO buffer at the current position.
@@ -440,12 +410,10 @@ void Processor::processSingleChannel(ProcessParameters const &processParameters)
                 multiply(channelBuffers.inputBuffer(), inputScaling, stepSize);
                 add(channelBuffers.inputBuffer(), pOutput, stepSize);
             }
-#endif // LE_SW_PURE_ANALYSIS
 
             channelBuffers.moveForwardByHopSize(stepSize, useSideChannel);
         } // if ( channelBuffers.inputDataSize() == windowSize )
 
-#ifndef LE_SW_PURE_ANALYSIS
         std::uint16_t const availableOutputData(channelBuffers.readyOutputDataSize());
         std::uint16_t const sizeToProduce(sizeToConsume);
         if (sizeToProduce > availableOutputData) [[unlikely]]
@@ -468,7 +436,6 @@ void Processor::processSingleChannel(ProcessParameters const &processParameters)
                               ReadOnlyDataRange(pOutput, pOutput + amountToExtract), "output");
 
         pOutput += amountToExtract;
-#endif // LE_SW_PURE_ANALYSIS
     } // while ( inputSamples )
 }
 
@@ -718,8 +685,7 @@ void LE_COLD Processor::calculateWindowAndWOLAGain()
 
         engineSetup().setWOLAGainAndRipple(wolaGain, variation);
 
-#if !(defined(LE_SW_SDK_BUILD) && !defined(__MSVC_RUNTIME_CHECKS)) &&                              \
-    0 //...mrmlj...can be noisy/not needed that much anymore...
+#if 0 //...mrmlj...can be noisy/not needed that much anymore...
         LE_TRACE("\tWindow ID: %u, window overlap factor: %u, gain: %f, variation: %f%%.",
                  engineSetup().windowFunction(), windowSize / stepSize, wolaGain, variation * 100);
 #endif // _DEBUG
@@ -1029,7 +995,7 @@ ModuleChainImpl const &Processor::modules() const
 }
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Engine)
+} // namespace Engine
 //------------------------------------------------------------------------------
 } // namespace SW
 //------------------------------------------------------------------------------

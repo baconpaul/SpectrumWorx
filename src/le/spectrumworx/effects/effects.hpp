@@ -34,12 +34,14 @@ struct Tag;
 namespace SW
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Engine)
+namespace Engine
+{
 class Setup;
-LE_IMPL_NAMESPACE_END(Engine)
-LE_IMPL_NAMESPACE_BEGIN(Effects)
+} // namespace Engine
+namespace Effects
+{
 class IndexRange;
-LE_IMPL_NAMESPACE_END(Effects)
+} // namespace Effects
 //------------------------------------------------------------------------------
 namespace Effects
 {

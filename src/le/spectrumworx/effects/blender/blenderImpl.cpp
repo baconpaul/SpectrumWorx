@@ -14,7 +14,6 @@
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/math/conversion.hpp"
 #include "le/math/vector.hpp"
-#include "le/parameters/uiElements.hpp"
 //------------------------------------------------------------------------------
 namespace LE
 {
@@ -34,14 +33,6 @@ namespace Effects
 
 char const Blender::title[] = "Blender";
 char const Blender::description[] = "Linear blend.";
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Blender UIElements definitions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-EFFECT_PARAMETER_NAME(Blender::Amount, "Amount")
 
 ////////////////////////////////////////////////////////////////////////////////
 //

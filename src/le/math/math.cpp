@@ -36,7 +36,8 @@
 namespace LE
 {
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_BEGIN(Math)
+namespace Math
+{
 //------------------------------------------------------------------------------
 #ifdef _MSC_VER
 #pragma runtime_checks("", off)
@@ -352,7 +353,7 @@ bool nearEqual(float const left, float const right)
     /// \todo Reinvestigate this number and choose and document a meaningful
     /// value for our purposes.
     ///                                       (06.12.2010.) (Domagoj Saric)
-    unsigned int const maximumDifferenceInULPs(3000);
+    int const maximumDifferenceInULPs(3000);
     return Math::abs(lexicographicallyOrderedLeft - lexicographicallyOrderedRight) <
            maximumDifferenceInULPs;
 }
@@ -373,7 +374,7 @@ bool nearEqual(float const left, unsigned int const right)
     /// \todo Reinvestigate this number and choose and document a meaningful
     /// value for our purposes.
     ///                                       (06.12.2010.) (Domagoj Saric)
-    unsigned int const maximumDifferenceInULPs(3000);
+    int const maximumDifferenceInULPs(3000);
     return Math::abs(lexicographicallyOrderedLeft - lexicographicallyOrderedRight) <
            maximumDifferenceInULPs;
 }
@@ -901,7 +902,7 @@ FPUExceptionsDisabler::FPUExceptionsDisabler()
 LE_OPTIMIZE_FOR_SPEED_END()
 
 //------------------------------------------------------------------------------
-LE_IMPL_NAMESPACE_END(Math)
+} // namespace Math
 //------------------------------------------------------------------------------
 } // namespace LE
 //------------------------------------------------------------------------------

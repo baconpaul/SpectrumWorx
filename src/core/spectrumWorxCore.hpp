@@ -49,6 +49,13 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
     class InputBuffers;
 
   public:
+    /// \note Above installModuleInSlot() rather than beside ModuleInitialiser,
+    /// which is where it stood. `Module` is used unqualified two hundred lines
+    /// before that, so the name meant ::LE::SW::Module there and this typedef
+    /// afterwards -- one name, two meanings, in one class. GCC 15 says so
+    /// (-Wchanges-meaning), twenty-nine times.
+    typedef SW::Module Module;
+
     // Plugin required traits.
     /// \note Currently changing the order of reported parameters (or major
     /// groups of parameters) requires the manual updating of the following
@@ -266,8 +273,6 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
         return program();
     } //...mrmlj...for lack of implicit conversion to Program...
 
-    typedef SW::Module Module;
-
 #ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable : 4510) // Default constructor could not be generated.
@@ -322,11 +327,6 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
     void clearSideChannelData();
     void clearSideChannelDataIfNoSideChannel();
 
-#if LE_SW_ENGINE_INPUT_MODE >= 2
-    static std::pair<std::uint8_t, std::uint8_t>
-        ioChannels(GlobalParameters::InputMode::value_type);
-#endif // LE_SW_ENGINE_INPUT_MODE >= 2
-
     /* </IO configuration> */
 
   protected:
@@ -346,14 +346,8 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
     {
         Parameter &parameter(swImpl.parameters().template get<Parameter>());
         typename Parameter::value_type const oldValue(parameter);
-#if LE_SW_ENGINE_INPUT_MODE >= 2
-        if (std::is_same<Parameter, InputMode>::value)
-        { /*...IO mode can be "custom" which cannot be represented with the InputMode enum...*/
-        }
-        else
-#endif // LE_SW_ENGINE_INPUT_MODE >= 2
-            if (newValue == oldValue)
-                return true;
+        if (newValue == oldValue)
+            return true;
         bool const result(swImpl.setGlobalParameter(parameter, newValue));
         LE_ASSERT_MSG(
             (result && (parameter.getValue() == newValue)) ||
@@ -366,9 +360,6 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
     bool setGlobalParameter(FFTSize &, FFTSize ::param_type newValue);
     bool setGlobalParameter(OverlapFactor &, OverlapFactor ::param_type newValue);
     bool setGlobalParameter(WindowFunction &, WindowFunction::param_type newValue);
-#if LE_SW_ENGINE_INPUT_MODE >= 2
-    static bool setGlobalParameter(InputMode const &, InputMode::param_type);
-#endif // LE_SW_ENGINE_INPUT_MODE >= 2
 
   protected:
     void updateForWindowChange(unsigned int window);

@@ -1196,9 +1196,6 @@ template <> void SpectrumWorxEditor::updateGlobalParameterWidget<WindowSizeFacto
     updateForEngineSetupChanges();
 }
 #endif // LE_SW_ENGINE_WINDOW_PRESUM
-#if LE_SW_ENGINE_INPUT_MODE >= 2
-template <> void SpectrumWorxEditor::updateGlobalParameterWidget<InputMode>() { updateSettings(); }
-#endif // LE_SW_ENGINE_INPUT_MODE >= 2
 template <> void SpectrumWorxEditor::updateGlobalParameterWidget<InputGain>() { updateMainKnobs(); }
 template <> void SpectrumWorxEditor::updateGlobalParameterWidget<OutputGain>()
 {
@@ -1215,12 +1212,10 @@ void SpectrumWorxEditor::updateForEngineSetupChanges()
     if (sharedModuleControlsActive())
         sharedModuleControls().updateForEngineSetupChanges(engineSetup);
     moduleChain().forEach<Module>([&](Module &module) {
-#ifndef LE_SW_FMOD
         //...mrmlj...when switching programs...
         auto *const pRegion(regionFor(module));
         LE_ASSERT(pRegion);
         if (pRegion)
-#endif // LE_SW_FMOD
             pRegion->updateForEngineSetupChanges(engineSetup);
     });
 }
@@ -2118,10 +2113,6 @@ void SpectrumWorxEditor::LFODisplay::automatedParameterChanged(std::uint8_t cons
 
     ParameterID::LFO const lfoParameterID = {lfoParameterIndex, moduleParameterIndex,
                                              moduleIndex()};
-#ifdef LE_SW_FMOD
-    Host2PluginInteropControler::AutomationBlocker const automationBlocker(
-        const_cast<SpectrumWorxEditor &>(editor()).moduleChainOwner());
-#endif // LE_SW_FMOD
     editor().host().automatedParameterChanged(lfoParameterID, parameterValue);
 }
 
@@ -2184,13 +2175,9 @@ double SpectrumWorxEditor::LFODisplay::Period::snapValue(double const attemptedV
 
 double SpectrumWorxEditor::LFODisplay::Period::milliseconds() const
 {
-#ifdef LE_SW_FMOD
-    return 1000;
-#else
     float const basePeriod(parent().editor().effect().lfoTimer().basePeriod());
     double const periodInMilliseconds(this->getValue() * basePeriod * 1000);
     return periodInMilliseconds;
-#endif // LE_SW_FMOD
 }
 
 SpectrumWorxEditor::LFODisplay const &SpectrumWorxEditor::LFODisplay::Period::parent() const
@@ -2319,19 +2306,12 @@ SpectrumWorxEditor::Settings::Settings() /// \throws std::bad_alloc Out of memor
 /// licence manager in stage 0 and the initialiser did not, so nothing has
 /// compiled this constructor since. It was also the only unconditional entry
 /// after this point, which is why every conditional one above it could end in a
-/// comma. Leading commas instead, so that all four combinations of
-/// LE_SW_ENGINE_WINDOW_PRESUM and LE_SW_ENGINE_INPUT_MODE are well formed.
+/// comma. Leading commas instead, so that both settings of
+/// LE_SW_ENGINE_WINDOW_PRESUM are well formed.
 ///                                       (28.07.2026.) (SW port)
 #if LE_SW_ENGINE_WINDOW_PRESUM
       ,
       windowSizeFactor_(enginePage_, xMargin, yMargin + yStep * 3, (Engine ::WindowSizeFactor *)(0))
-#if LE_SW_ENGINE_INPUT_MODE >= 1
-      ,
-      inputMode_(enginePage_, xMargin, yMargin + yStep * 4, (GlobalParameters::InputMode *)(0))
-#endif // LE_SW_ENGINE_INPUT_MODE
-#elif LE_SW_ENGINE_INPUT_MODE >= 1
-      ,
-      inputMode_(enginePage_, xMargin, yMargin + yStep * 3, (GlobalParameters::InputMode *)(0))
 #endif // LE_SW_ENGINE_WINDOW_PRESUM
 {
     /// \note The height was editor().getHeight() -- 376 -- while what this
@@ -2344,14 +2324,6 @@ SpectrumWorxEditor::Settings::Settings() /// \throws std::bad_alloc Out of memor
                   resourceBitmap<SettingsEngineOn>().getHeight() +
                       resourceBitmap<SettingsEngineBg>().getHeight());
 
-#if LE_SW_ENGINE_INPUT_MODE >= 2 && defined(__APPLE__)
-    inputMode_->setEnabled(!editor().effect().completelyDisableIOChanges());
-#elif LE_SW_ENGINE_INPUT_MODE == 1
-    inputMode_->setEnabled(false);
-#endif // LE_SW_ENGINE_INPUT_MODE
-#if defined(LE_SW_FMOD)
-    windowFunction_->setEnabled(false);
-#endif
 #if LE_SW_ENGINE_WINDOW_PRESUM
     windowSizeFactor_->setEnabled(false);
 #endif // LE_SW_ENGINE_WINDOW_PRESUM
@@ -2420,7 +2392,6 @@ void SpectrumWorxEditor::Settings::comboBoxValueChanged(ComboBox const &comboBox
     unsigned int const value(comboBox.getValue());
 
     using namespace GlobalParameters;
-    typedef GlobalParameters::Parameters Parameters;
 
     if (&comboBox == &settings.fftSize_)
     {
@@ -2444,17 +2415,6 @@ void SpectrumWorxEditor::Settings::comboBoxValueChanged(ComboBox const &comboBox
             static_cast<WindowSizeFactor::value_type>(value), true));
     }
 #endif // LE_SW_ENGINE_WINDOW_PRESUM
-#if LE_SW_ENGINE_INPUT_MODE >= 2
-    else if (&comboBox == &settings.inputMode_)
-    {
-        LE_ASSUME(!editor.effect().completelyDisableIOChanges());
-        /*LE_VERIFY*/ (editor.globalParameterChanged<InputMode>(
-            static_cast<InputMode::value_type>(value), true));
-        settings.updateLoadLastSessionOnStartup();
-        settings.inputMode_->setValue(
-            editor.program().parameters().template get<InputMode>().getValue());
-    }
-#endif // LE_SW_ENGINE_INPUT_MODE
     else if (&comboBox == &settings.interfacePage_.mouseOverComboBox())
     {
         Theme::singleton().settings().moduleUIMouseOverReaction =
@@ -2505,19 +2465,6 @@ void SpectrumWorxEditor::Settings::updateEnginePage()
 #if LE_SW_ENGINE_WINDOW_PRESUM
     windowSizeFactor_->setValue(parameters.get<Engine::WindowSizeFactor>());
 #endif // LE_SW_ENGINE_WINDOW_PRESUM
-#if LE_SW_ENGINE_INPUT_MODE >= 1
-    unsigned int const customInputMode(SpectrumWorxCore::InputMode::maximum() + 1);
-    unsigned int const inputModeValue(
-        (engineSetup.numberOfChannels() > 2)
-            ? customInputMode
-            : parameters.get<SpectrumWorxCore::InputMode>().getValue());
-    if ((inputModeValue == customInputMode) &&
-        (inputMode_->numberOfItems() == SpectrumWorxCore::InputMode::numberOfDiscreteValues))
-    {
-        inputMode_->addItem(customInputMode, "<custom>", juce::Image(), false);
-    }
-    inputMode_->setValue(inputModeValue);
-#endif // LE_SW_ENGINE_INPUT_MODE
     enginePage_.setNewQualityFactor(engineSetup.wolaRippleFactor());
 }
 
