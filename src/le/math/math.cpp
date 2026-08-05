@@ -71,6 +71,16 @@ std::uint8_t abs(bool const value)
     return static_cast<std::uint8_t>(value);
 }
 
+/// \note Every float-as-integer read in this file goes through std::bit_cast.
+/// They were `reinterpret_cast<int const &>( aFloat )`, which is not a
+/// reinterpretation of the bits but a read of a float through an int lvalue --
+/// a strict aliasing violation, so the compiler is entitled to assume it never
+/// happens and to reorder the read against the write that produced the value.
+/// GCC 15 says so at -O3 (`-Wstrict-aliasing`, seven of these); Apple Clang's
+/// -O3 does not, which is how they survived. std::bit_cast is the C++20
+/// spelling of what all of them meant, it is defined, and it compiles to the
+/// same instruction.
+///                                           (05.08.2026.) (SW port)
 bool isGreater(float const *LE_RESTRICT const pLeft, float const *LE_RESTRICT const pRight)
 {
     /// \note The integer version is better for in-memory operands.
@@ -78,8 +88,8 @@ bool isGreater(float const *LE_RESTRICT const pLeft, float const *LE_RESTRICT co
     LE_ASSUME(pLeft);
     LE_ASSUME(pRight);
 
-    int leftBits(reinterpret_cast<int const &>(*pLeft));
-    int rightBits(reinterpret_cast<int const &>(*pRight));
+    int leftBits(std::bit_cast<int>(*pLeft));
+    int rightBits(std::bit_cast<int>(*pRight));
 
     int const leftSign(leftBits >> 31);
     leftBits = (leftBits ^ leftSign) + (leftSign & 0x80000001);
@@ -108,8 +118,7 @@ bool isGreater(float const *LE_RESTRICT const pLeft, float const *LE_RESTRICT co
     ///                                   (13.01.2012.) (Domagoj Saric)
     LE_ASSUME(pLeft);
     LE_ASSUME(pRight);
-    auto const result(reinterpret_cast<int const &>(*pLeft) >
-                      reinterpret_cast<int const &>(*pRight));
+    auto const result(std::bit_cast<int>(*pLeft) > std::bit_cast<int>(*pRight));
     LE_ASSERT_MSG((result == (*pLeft > *pRight)) || !std::isfinite(*pLeft) ||
                       !std::isfinite(*pRight),
                   "Unexpected result");
@@ -118,8 +127,7 @@ bool isGreater(float const *LE_RESTRICT const pLeft, float const *LE_RESTRICT co
 
 bool isGreater(double const *LE_RESTRICT const pLeft, double const *LE_RESTRICT const pRight)
 {
-    auto const result(reinterpret_cast<long long const &>(*pLeft) >
-                      reinterpret_cast<long long const &>(*pRight));
+    auto const result(std::bit_cast<long long>(*pLeft) > std::bit_cast<long long>(*pRight));
     LE_ASSERT_MSG(result == (*pLeft > *pRight), "Unexpected result");
     return result;
 }
@@ -159,7 +167,7 @@ float modulo(float const dividend, float const divisor)
 bool isZero(float const &value)
 {
     LE_ASSERT_MSG(std::isfinite(value), "Invalid input");
-    unsigned int const &valueBits(reinterpret_cast<unsigned int const &>(value));
+    auto const valueBits(std::bit_cast<unsigned int>(value));
     return valueBits == 0;
 }
 } // namespace PositiveFloats
@@ -306,9 +314,7 @@ bool equal(float const &left, float const &right)
 #endif // __clang__
 
 #if defined(_MSC_VER)
-    unsigned int const &leftBits(reinterpret_cast<unsigned int const &>(left));
-    unsigned int const &rightBits(reinterpret_cast<unsigned int const &>(right));
-    return leftBits == rightBits;
+    return std::bit_cast<unsigned int>(left) == std::bit_cast<unsigned int>(right);
 #else
     return left == right;
 #endif
@@ -327,10 +333,7 @@ bool equal(float const &left, unsigned int const right)
 
     float const rightFloat(convert<float>(right));
 
-    unsigned int const &leftBits(reinterpret_cast<unsigned int const &>(left));
-    unsigned int const &rightBits(reinterpret_cast<unsigned int const &>(rightFloat));
-
-    return leftBits == rightBits;
+    return std::bit_cast<unsigned int>(left) == std::bit_cast<unsigned int>(rightFloat);
 }
 
 bool nearEqual(float const left, float const right)
@@ -339,8 +342,8 @@ bool nearEqual(float const left, float const right)
     //   See the previously listed float comparison related links.
     //                                        (05.01.2011.) (Domagoj Saric)
 
-    int const leftBits(reinterpret_cast<int const &>(left));
-    int const rightBits(reinterpret_cast<int const &>(right));
+    int const leftBits(std::bit_cast<int>(left));
+    int const rightBits(std::bit_cast<int>(right));
 
     int const lexicographicallyOrderedLeftArray[2] = {leftBits,
                                                       static_cast<int>(0x80000000 - leftBits)};
@@ -362,8 +365,8 @@ bool nearEqual(float const left, unsigned int const right)
 {
     float const rightFloat(convert<float>(right));
 
-    int const leftBits(reinterpret_cast<int const &>(left));
-    int const rightBits(reinterpret_cast<int const &>(rightFloat));
+    int const leftBits(std::bit_cast<int>(left));
+    int const rightBits(std::bit_cast<int>(rightFloat));
 
     int const lexicographicallyOrderedLeftArray[2] = {leftBits,
                                                       static_cast<int>(0x80000000 - leftBits)};
@@ -382,8 +385,8 @@ bool nearEqual(float const left, unsigned int const right)
 bool isZero(float const &value)
 {
     //...mrmlj...avoid going to the SIMD unit...
-    int const &valueAbsoluteBits(reinterpret_cast<int const &>(value) & 0x7FFFFFFF);
-    float const &positive(reinterpret_cast<float const &>(valueAbsoluteBits));
+    auto const valueAbsoluteBits(std::bit_cast<unsigned int>(value) & 0x7FFFFFFFu);
+    auto const positive(std::bit_cast<float>(valueAbsoluteBits));
     return PositiveFloats::isZero(positive);
 }
 
@@ -393,7 +396,7 @@ bool isNegative(float const value)
 #ifdef BOOST_SIMD_HAS_SSE2_SUPPORT
     auto const result(isNegative(_mm_cvtsi128_si32(_mm_castps_si128(_mm_set_ss(value)))));
 #else
-    auto const result(isNegative(reinterpret_cast<int const &>(value)));
+    auto const result(isNegative(std::bit_cast<int>(value)));
 #endif // BOOST_SIMD_HAS_SSE2_SUPPORT
     LE_ASSERT_MSG((result == (value < 0)) || (value == -0.0f), "Unexpected result");
     return result;
@@ -402,10 +405,9 @@ bool isNegative(float const value)
 bool isNegative(int const value)
 {
     std::uint8_t const valueNumberOfBits(sizeof(value) * 8);
-    std::uint8_t const valueSign(reinterpret_cast<unsigned int const &>(value) >>
-                                 (valueNumberOfBits - 1));
+    std::uint8_t const valueSign(std::bit_cast<unsigned int>(value) >> (valueNumberOfBits - 1));
     LE_ASSERT_MSG(valueSign == (value < 0), "Unexpected result");
-    return reinterpret_cast<bool const &>(valueSign);
+    return valueSign != 0;
 }
 
 bool isNegative(unsigned int /*value*/) { return false; }
@@ -453,7 +455,7 @@ unsigned int ceil(float const value)
     // http://stackoverflow.com/questions/466204/rounding-off-to-nearest-power-of-2
     // http://www.gamedev.net/community/forums/topic.asp?topic_id=229831
 
-    unsigned int const &valueBits(reinterpret_cast<unsigned int const &>(value));
+    auto const valueBits(std::bit_cast<unsigned int>(value));
     unsigned int const notPowerOfTwo((valueBits << 9) != 0);
     unsigned int const exponent(
         (valueBits >> 23) // remove fractional part of the floating point number

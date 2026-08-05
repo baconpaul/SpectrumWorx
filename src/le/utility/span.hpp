@@ -43,8 +43,17 @@ template <class T> class Span
   public:
     using element_type = T;
     using value_type = std::remove_cv_t<T>;
-    using iterator = T *LE_RESTRICT;
-    using const_iterator = T const *LE_RESTRICT;
+    /// \note These were `T *LE_RESTRICT`, and begin() and end() return them --
+    /// which is a top level qualifier on a return type, and those are ignored.
+    /// GCC 15 says so, 813 times across a build, and it is right: a restrict
+    /// promise attaches to a *declaration*, so the only place the qualifier
+    /// here ever took effect was the one variable declared with the alias
+    /// (processor.cpp's WOLA walk, which now spells it out). It was also a
+    /// promise Span cannot keep: begin() and end() of the same span are two
+    /// pointers to the same array, and so are any two copies of a span.
+    ///                                       (05.08.2026.) (SW port)
+    using iterator = T *;
+    using const_iterator = T const *;
     using pointer = T *;
     using reference = T &;
     using size_type = std::size_t;

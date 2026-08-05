@@ -252,14 +252,17 @@ LE_COLD void ModuleChainBase::remove(Node &node)
 #endif // NDEBUG
 }
 
+/// \note Without the `LE_ASSUME( &module )` both of these opened with: the
+/// address of a reference is not null by the language's own rules, so the
+/// assumption told the optimiser nothing and GCC 15 reported it as a nonnull
+/// argument compared to NULL.
+///                                           (05.08.2026.) (SW port)
 LE_COLD ModuleChainBase::iterator ModuleChainBase::iterator_to(Node &module)
 {
-    LE_ASSUME(&module);
     return iterator(&module);
 }
 LE_COLD ModuleChainBase::const_iterator ModuleChainBase::iterator_to(Node const &module)
 {
-    LE_ASSUME(&module);
     return const_iterator(&module);
 }
 

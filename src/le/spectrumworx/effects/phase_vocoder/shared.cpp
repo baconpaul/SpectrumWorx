@@ -327,8 +327,14 @@ float LE_FORCEINLINE mapToPiInterval(float const phase)
     // http://www.mathworks.com/help/toolbox/dsp/ref/dsp.phaseunwrapperclass.html
 
     using namespace Math;
-    using Math::Constants::pi;
     using Math::Constants::twoPi;
+    /// \note `using Math::Constants::pi` stood here beside twoPi. Only the
+    /// assertion at the bottom and the three disabled princarg versions use it,
+    /// so in a build where _DEBUG is not defined -- every build off MSVC -- it
+    /// named something nothing referred to, which GCC 15 reports at -O3. It is
+    /// declared where it is used instead; a version switch below wants it back
+    /// up here.
+    ///                                       (05.08.2026.) (SW port)
 
 #if 0 // version 1 (slower)
 
@@ -360,6 +366,7 @@ float LE_FORCEINLINE mapToPiInterval(float const phase)
 #endif // princarg implementation
 
 #if defined(_DEBUG)
+    using Math::Constants::pi;
     //...mrmlj...temporarily disabled as it seems to fail in iOS builds...
     LE_ASSERT_MSG(
         /// \note Reducing the accumulated synthesis phase for only a subset

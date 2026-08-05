@@ -28,7 +28,13 @@ TEST_CASE("Span is a begin/end pointer pair", "[span]")
     // SharedStorageBuffer::operator Span<T const> const &.
     static_assert(sizeof(Span<float>) == 2 * sizeof(void *));
     static_assert(sizeof(Span<float>) == sizeof(Span<float const>));
-    static_assert(std::is_same_v<Span<float>::iterator, float *LE_RESTRICT>);
+    // A plain pointer, and the exact type begin() returns. The alias used to be
+    // `float *LE_RESTRICT`, which no accessor could return: a top level
+    // qualifier on a return type is dropped, so the two differed everywhere the
+    // alias was used.
+    static_assert(std::is_same_v<Span<float>::iterator, float *>);
+    static_assert(std::is_same_v<decltype(std::declval<Span<float> const &>().begin()),
+                                 Span<float>::iterator>);
 
     float array[4]{1, 2, 3, 4};
     Span<float> const span(array);

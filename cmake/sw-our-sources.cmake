@@ -82,7 +82,16 @@ endif ()
 # moment it is introduced rather than in a log a week later. Off elsewhere: a new
 # compiler version turning up a new warning should not stop somebody's work on a
 # platform they did not write it for. CI passes -DSW_WERROR=ON for all of them.
-if (APPLE AND NOT MSVC)
+#
+# Linux joined macOS on 05.08.2026, once GCC 15.2 built the tree clean: the 849
+# warnings it had to say over the Apple Clang baseline were five causes in our
+# own code -- restrict and const qualifiers on return types, which are ignored
+# there; `LE_ASSUME( &reference )`, which asserts what the language guarantees;
+# an unnamed enum meeting an effect index in a conditional; an FFT bin count
+# counted in int and compared against a std::size_t; and a knob paint() helper
+# hiding the virtual it overloads. Each was worth the edit on its own, which is
+# the test of whether a warning belongs in the baseline.
+if ((APPLE OR LINUX) AND NOT MSVC)
     set(swWerrorDefault ON)
 else ()
     set(swWerrorDefault OFF)

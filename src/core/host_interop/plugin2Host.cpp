@@ -418,7 +418,7 @@ namespace
 {
 struct UnitGetter
 {
-    typedef char const *LE_RESTRICT result_type;
+    typedef char const *result_type;
     template <class Parameter> result_type operator()() const
     {
         return LE::Parameters::DisplayValueTransformer<Parameter>::Suffix::c_str();

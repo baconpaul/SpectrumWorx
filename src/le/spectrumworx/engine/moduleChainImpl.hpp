@@ -155,10 +155,21 @@ class ModuleChainBase :
         {
             LE_ASSUME(this->get());
         }
-        chain_const_iterator &operator++(int)
+        /// \note Returns the old position by value, as post-increment is
+        /// defined to. It used to advance and then hand back
+        /// `reinterpret_cast<chain_const_iterator &>( currentNode->previous_ )`
+        /// -- a reference to the *node's* back link, read through an unrelated
+        /// type. That is a strict aliasing violation (GCC 15 says so at -O3),
+        /// and it handed the caller a writable alias of a live list link. It
+        /// reached the right node only because the node it had just moved to
+        /// points back at the one it came from. The copy costs one reference
+        /// count round trip on a pointer the caller already holds.
+        ///                                   (05.08.2026.) (SW port)
+        chain_const_iterator operator++(int)
         {
+            chain_const_iterator const previousPosition(*this);
             ++(*this);
-            return reinterpret_cast<chain_const_iterator &>(this->get()->previous_);
+            return previousPosition;
         }
         chain_const_iterator &operator++()
         {
@@ -218,19 +229,29 @@ class ModuleChainBase :
         {
         }
 
+        /// \note These three assign through the base the iterator actually has
+        /// -- `IntrusivePtr<Node const>` -- rather than through a
+        /// `smart_ptr_t &` (`IntrusivePtr<Node> &`) the object never contained.
+        /// The conversion operator that produced the latter reinterpret_cast a
+        /// reference to one class type as a reference to another, which is a
+        /// strict aliasing violation GCC 15 reports at -O3, and it went with
+        /// this. What is stored is a pointer either way; the constness of the
+        /// pointee is what chain_iterator adds back, in get() and operator*().
+        ///                                   (05.08.2026.) (SW port)
         chain_iterator &operator=(pointer const pOther)
         {
-            static_cast<smart_ptr_t &>(*this) = pOther;
+            static_cast<chain_const_iterator::smart_ptr_t &>(*this) = pOther;
             return *this;
         }
         chain_iterator &operator=(smart_ptr_t const &pOther)
         {
-            static_cast<smart_ptr_t &>(*this) = pOther;
+            static_cast<chain_const_iterator::smart_ptr_t &>(*this) = pOther;
             return *this;
         }
         chain_iterator &operator=(chain_iterator const &pOther)
         {
-            static_cast<smart_ptr_t &>(*this) = static_cast<smart_ptr_t const &>(pOther);
+            static_cast<chain_const_iterator::smart_ptr_t &>(*this) =
+                static_cast<chain_const_iterator::smart_ptr_t const &>(pOther);
             return *this;
         }
 
@@ -242,10 +263,11 @@ class ModuleChainBase :
         {
             return static_cast<chain_iterator &>(chain_const_iterator::operator++());
         }
-        chain_iterator &operator++(int)
+        chain_iterator operator++(int)
         {
+            chain_iterator const previousPosition(*this);
             ++(*this);
-            return reinterpret_cast<chain_iterator &>(this->get()->previous_);
+            return previousPosition;
         }
 
         reference operator*() const
@@ -253,16 +275,6 @@ class ModuleChainBase :
             return const_cast<reference>(chain_const_iterator::operator*());
         }
         pointer operator->() const { return &this->operator*(); }
-
-        operator smart_ptr_t &()
-        {
-            return reinterpret_cast<smart_ptr_t &>(
-                static_cast<chain_const_iterator::smart_ptr_t &>(*this));
-        }
-        operator smart_ptr_t const &() const
-        {
-            return const_cast<chain_iterator &>(*this).operator smart_ptr_t &();
-        }
 
         Node *get() const { return const_cast<Node *>(chain_const_iterator::get()); }
     }; // class chain_iterator

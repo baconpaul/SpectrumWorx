@@ -76,7 +76,12 @@ template <class ModuleInterface> struct ModuleSizeGetter
 
 template <class ModuleInterface> struct ModuleConstructor
 {
-    using result_type = ModuleInterface *LE_RESTRICT;
+    /// \note Was `ModuleInterface *LE_RESTRICT`, and this is the return type of
+    /// the two operator()s below -- where the qualifier is ignored, and warned
+    /// about, once per effect. The one variable it also declared holds the
+    /// result of a placement new that is returned on the next line.
+    ///                                       (05.08.2026.) (SW port)
+    using result_type = ModuleInterface *;
 
     template <class EffectIndex> result_type operator()(EffectIndex)
     {

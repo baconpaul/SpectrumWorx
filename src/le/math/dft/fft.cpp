@@ -305,16 +305,18 @@ void FFT_float_real_1D::inverseTransform(float *LE_RESTRICT const data /*in DFT 
 #endif // LE_ACC_FFT
 }
 
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable : 4389) // Signed/unsigned mismatch
-#endif                          // _MSC_VER
+/// \note The two assertions below compared a span's std::size_t against
+/// `(size() / 2) + 1`, which is an int -- the signed/unsigned mismatch a
+/// `#pragma warning( disable : 4389 )` used to bracket these two functions for
+/// MSVC and which GCC reports as -Wsign-compare. Saying which type the bin
+/// count is counted in removes the mismatch, and with it the pragma.
+///                                           (05.08.2026.) (SW port)
 void FFT_float_real_1D::transform(float *const timeDomainData, DataRange const &imaginarySubRange,
                                   bool const doFFTShift) const
 {
     if (doFFTShift)
         fftshift(timeDomainData);
-    LE_ASSERT(imaginarySubRange.size() == (size() / 2) + 1);
+    LE_ASSERT(imaginarySubRange.size() == static_cast<std::size_t>(size() / 2) + 1);
     transform(timeDomainData, imaginarySubRange.begin(), size());
 }
 
@@ -322,14 +324,11 @@ void FFT_float_real_1D::inverseTransform(float *const dftData,
                                          ReadOnlyDataRange const &imaginarySubRange,
                                          bool const doFFTShift) const
 {
-    LE_ASSERT(imaginarySubRange.size() == (size() / 2) + 1);
+    LE_ASSERT(imaginarySubRange.size() == static_cast<std::size_t>(size() / 2) + 1);
     inverseTransform(dftData, imaginarySubRange.begin(), size());
     if (doFFTShift)
         fftshift(dftData);
 }
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif // _MSC_VER
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Complex DFT

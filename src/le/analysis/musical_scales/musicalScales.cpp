@@ -95,7 +95,16 @@ float LE_HOT Scale::snap2Scale(float const freq, std::uint8_t const keyIndex) co
 
     float const pitchScaleComparisonSource(lastPitchScale_);
 
+    /// \note The lower bound is a precondition this had been relying on without
+    /// saying: with no tones the min_element() below runs over an empty range
+    /// and reads pitchScaleDeltas[ 0 ], which nothing wrote. Its one caller
+    /// (tuneWorxImpl.cpp) returns before it when numberOfTones() is zero, from
+    /// another translation unit, so only a -O3 build sees the question -- GCC 15
+    /// asks it as -Wmaybe-uninitialized. Stating it here answers the compiler
+    /// and gives a checked build an assert if a second caller ever forgets.
+    ///                                       (05.08.2026.) (SW port)
     std::uint8_t const totalTones(numberOfTones() + numberOfBypassed());
+    LE_ASSUME(totalTones > 0);
     LE_ASSUME(totalTones < 12);
     std::array<PitchScaleRatio, 12> pitchScaleDeltas;
     for (std::uint8_t n(0); n < totalTones; ++n)

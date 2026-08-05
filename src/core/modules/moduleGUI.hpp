@@ -58,9 +58,13 @@ class LE_NOVTABLE ModuleGUI : public GUI::ModuleUI,
                              float parameterValue) override final;
 
   public:
+    /// \note The `LE_ASSUME( &moduleUI )` this opened with is gone for the
+    /// reason given in moduleControl.cpp: the address of a reference cannot be
+    /// null, so it was an assumption about nothing -- and one that would warn,
+    /// fatally under -Werror, the day this inline function got called.
+    ///                                       (05.08.2026.) (SW port)
     static ModuleGUI &fromGUI(GUI::ModuleUI &moduleUI)
     {
-        LE_ASSUME(&moduleUI);
         return static_cast<ModuleGUI &>(moduleUI);
     }
 

@@ -56,10 +56,15 @@ LE_DEFINE_PARAMETER(ModuleChainParameter, Parameters::LinearSignedInteger,
 class AutomatedModuleChain final : public Engine::ModuleChainImpl
 {
   public:
-    enum
-    {
-        noModule = SW::noModule
-    };
+    /// \note A typed constant rather than the unnamed enum it was. The enum
+    /// made `slotIsFull ? module.effectTypeIndex() : noModule` -- the shape
+    /// both of the conditionals below have -- mix an enumerated and a
+    /// non-enumerated type, which is what -Wextra reports and what an effect
+    /// index compared against this constant should never have been. It is the
+    /// module chain parameter's own value type, which is what the two
+    /// conditionals produce and what every caller of these already holds.
+    ///                                       (05.08.2026.) (SW port)
+    static std::int8_t constexpr noModule = SW::noModule;
 
     //...mrmlj...GUI only chains don't hold ModuleDSPs...
     //using ModulePtr  = Engine::ModuleChainImpl::      pointer;
@@ -117,8 +122,9 @@ class AutomatedModuleChain final : public Engine::ModuleChainImpl
         auto const pCurrentModuleNode(ModuleChainImpl::module(moduleIndex));
         auto const pCurrentModule(
             !isEnd(pCurrentModuleNode) ? &actualModule<Module>(*pCurrentModuleNode) : nullptr);
-        auto const currentEffect(!isEnd(pCurrentModuleNode) ? pCurrentModule->effectTypeIndex()
-                                                            : noModule);
+        std::int8_t const currentEffect(
+            !isEnd(pCurrentModuleNode) ? static_cast<std::int8_t>(pCurrentModule->effectTypeIndex())
+                                       : noModule);
         if (currentEffect == newValue)
         {
             LE_TRACE("\tSW Trying to insert an already existing module in the same slot.");

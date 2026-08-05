@@ -186,7 +186,7 @@ void ModuleKnob::paint(juce::Graphics &graphics)
     unsigned int const imageHeight(imageWidth);
 
     if (!control().isLFOEnabled() || shouldUpdateLFOControl(control()))
-        Knob::paint(*pImageStrip_, marginForGlow, marginForGlow, graphics);
+        Knob::paintFilmStrip(*pImageStrip_, marginForGlow, marginForGlow, graphics);
     else
         paintImage(graphics, resourceBitmap<ModuleKnobLFOed>(), marginForGlow, marginForGlow);
     if (this->hasDirectFocus())

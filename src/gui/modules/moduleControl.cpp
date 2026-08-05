@@ -209,23 +209,26 @@ namespace
 class LE_NOVTABLE ControlWidgetBridge : public ModuleControlBase, public WidgetBase<>
 {
   public:
+    /// \note The four `LE_ASSUME( &reference )`s that stood here are gone. They
+    /// told the optimiser that the address of a reference is not null, which is
+    /// something the language already guarantees and GCC 15 duly reports as a
+    /// nonnull argument compared to NULL. The dynamic_cast assertions below are
+    /// the checks that do say something -- that this really is the other half
+    /// of the same object -- and they stay.
+    ///                                       (05.08.2026.) (SW port)
     static ModuleControlBase &asControl(juce::Component &widget)
     {
-        LE_ASSUME(&widget);
         ModuleControlBase &control(static_cast<ControlWidgetBridge &>(widget));
         LE_ASSERT_MSG(&control == dynamic_cast<ModuleControlBase *>(&widget),
                       "Widget is not a module control.");
-        LE_ASSUME(&control);
         return control;
     }
 
     static juce::Component &asWidget(ModuleControlBase &control)
     {
-        LE_ASSUME(&control);
         juce::Component &widget(static_cast<ControlWidgetBridge &>(control));
         LE_ASSERT_MSG(&widget == dynamic_cast<juce::Component *>(&control),
                       "Module control detached from its widget.");
-        LE_ASSUME(&widget);
         return widget;
     }
 

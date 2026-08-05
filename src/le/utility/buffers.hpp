@@ -74,8 +74,12 @@ class AlignedBuffer
   public:
     typedef Element value_type;
 
-    typedef Element *LE_RESTRICT iterator;
-    typedef Element const *LE_RESTRICT const_iterator;
+    /// \note Plain pointers for the reason given in span.hpp: begin() and end()
+    /// return these, and a top level restrict on a return type is ignored --
+    /// nothing in the tree declares a variable with either alias.
+    ///                                       (05.08.2026.) (SW port)
+    typedef Element *iterator;
+    typedef Element const *const_iterator;
     typedef Element &reference;
     typedef Element const &const_reference;
 

@@ -651,7 +651,12 @@ void LE_COLD Processor::calculateWindowAndWOLAGain()
     // satisfied (the gain variation is sufficiently small).
     LE_ALIGNED_SCOPED_STACK_BUFFER(wolaBuffer, real_t, windowSize);
     Math::clear(wolaBuffer);
-    for (DataRange::iterator pBufferPosition(wolaBuffer.begin());; pBufferPosition += stepSize)
+    /// \note LE_RESTRICT spelled out rather than carried in by
+    /// DataRange::iterator: it is the declaration that makes the promise, and
+    /// this walk of a freshly made stack buffer is the one place in the tree
+    /// that was making it through the alias.
+    ///                                       (05.08.2026.) (SW port)
+    for (auto *LE_RESTRICT pBufferPosition(wolaBuffer.begin());; pBufferPosition += stepSize)
     {
         auto const bufferSpaceLeft(static_cast<std::uint16_t>(wolaBuffer.end() - pBufferPosition));
         Math::addProduct(&analysisWindow_[0], &synthesisWindow_[0], pBufferPosition,

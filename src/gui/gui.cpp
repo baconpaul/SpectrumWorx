@@ -1010,8 +1010,8 @@ void LE_NOINLINE Knob::setValue(param_type const newValue)
     juce::Slider::setValue(static_cast<value_type>(newValue), juce::dontSendNotification);
 }
 
-void Knob::paint(juce::Image const &filmStrip, unsigned int const xMargin,
-                 unsigned int const yMargin, juce::Graphics &graphics)
+void Knob::paintFilmStrip(juce::Image const &filmStrip, unsigned int const xMargin,
+                          unsigned int const yMargin, juce::Graphics &graphics)
 {
     LE_ASSERT(filmStrip.getWidth() == filmStrip.getHeight() / signed(numberOfKnobSubbitmaps));
 
@@ -1077,7 +1077,7 @@ struct ParameterPrinter
 
 void EditorKnob::paint(juce::Graphics &graphics)
 {
-    Knob::paint(resourceBitmap<EditorKnobStrip>(), 0, 0, graphics);
+    Knob::paintFilmStrip(resourceBitmap<EditorKnobStrip>(), 0, 0, graphics);
 
     // For main knobs we display the value within the knob itself.
     LE_ASSERT(resourceBitmap<EditorKnobStrip>().getWidth() == 55);

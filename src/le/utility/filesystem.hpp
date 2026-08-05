@@ -207,7 +207,10 @@ class File::MemoryMapping : public std::pair<char const *, char const *>
 
     std::uint32_t size() const { return static_cast<std::uint32_t>(end() - begin()); }
 
-    value_type operator[](std::uint32_t const index) const
+    /// \note `char`, not `value_type`: the latter is `char const`, and const on
+    /// a by value return is ignored -- the byte is a copy either way.
+    ///                                       (05.08.2026.) (SW port)
+    char operator[](std::uint32_t const index) const
     {
         assert(index < size());
         return begin()[index];

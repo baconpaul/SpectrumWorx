@@ -23,9 +23,10 @@ ModuleChainParameter
 AutomatedModuleChain::getParameterForIndex(std::uint8_t const moduleIndex) const
 {
     auto const pModule(ModuleChainImpl::module(moduleIndex));
-    return ModuleChainParameter(!isEnd(pModule)
-                                    ? Engine::actualModule<Module const>(*pModule).effectTypeIndex()
-                                    : noModule);
+    return ModuleChainParameter(
+        !isEnd(pModule) ? static_cast<std::int8_t>(
+                              Engine::actualModule<Module const>(*pModule).effectTypeIndex())
+                        : noModule);
 }
 
 AutomatedModuleChain::ModulePtr AutomatedModuleChain::module(std::uint8_t const index)

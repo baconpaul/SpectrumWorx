@@ -781,15 +781,16 @@ class LE_NOVTABLE Knob : public WidgetBase<juce::Slider>
     /// See the note in the Knob constructor.
 
   protected:
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Woverloaded-virtual"
-#endif // __clang__
-    void paint(juce::Image const &filmStrip, unsigned int xMargin, unsigned int yMargin,
-               juce::Graphics &);
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif // __clang__
+    /// \note Named paintFilmStrip() rather than being a second paint(). As
+    /// paint() it hid juce::Slider::paint( Graphics & ) -- the virtual JUCE
+    /// calls -- from every derived knob, which both compilers report and which
+    /// a `#pragma clang diagnostic ignored "-Woverloaded-virtual"` used to
+    /// silence on one of them. The two do different things to different
+    /// arguments, and the derived knobs already had to qualify the call to say
+    /// which they meant; the name now says it for them.
+    ///                                       (05.08.2026.) (SW port)
+    void paintFilmStrip(juce::Image const &filmStrip, unsigned int xMargin, unsigned int yMargin,
+                        juce::Graphics &);
 
   protected: // juce::Component overrides
     void startedDragging() noexcept override;

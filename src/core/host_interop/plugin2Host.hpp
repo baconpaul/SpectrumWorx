@@ -192,7 +192,12 @@ class LE_NOVTABLE Plugin2HostPassiveInteropController
 
 struct Plugin2HostPassiveInteropController::ParameterLabelGetter
 {
-    using result_type = char const *LE_RESTRICT const;
+    /// \note Was `char const *LE_RESTRICT const`, a return type carrying two
+    /// top level qualifiers that a return type cannot carry -- both ignored,
+    /// and warned about once per overload per translation unit. Spelled as the
+    /// sibling getter below already spells it.
+    ///                                       (05.08.2026.) (SW port)
+    using result_type = char const *;
 
     result_type operator()(ParameterID::Global, Program const *) const;
     result_type operator()(ParameterID::ModuleChain, Program const *) const { return nullptr; }
