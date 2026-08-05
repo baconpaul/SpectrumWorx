@@ -17,7 +17,7 @@ they were scoped to do.
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone — macOS arm64. Linux built on 04.08.2026 under GCC 15, as a log rather than here; its 469 warnings are fixed and **the fixes have not been compiled by a GCC**. Windows arrives as logs. |
 | Runs | Standalone, with audio, with the real editor, with presets. It deadlocked in Logic and in Bitwig on the 2016 threading model; **that model has been replaced and nobody has reloaded it in either host** — item 1. |
-| Tests | **277/277** as of 05.08.2026, in both build trees. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`. Goldens run in Release only. |
+| Tests | **280/280** as of 05.08.2026, in both build trees. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`. Goldens run in Release only. |
 | Validators | `auval` 10 runs of 10. `vst3-validator` 47/47. `clap-cpp-validator` 21/21, one warning (`scan-time`, below). |
 | CI | **None.** There is no `.github/`. |
 | Warnings | **Two**, both deliberate `#pragma message` build banners. Our own sources compile under `-Wall -Wextra -Werror`, on Apple by default and elsewhere with `-DSW_WERROR=ON`. MSVC has no baseline yet — item 2. |
@@ -45,10 +45,15 @@ suspects:
 
 1. Loading a preset **while audio runs**.
 2. Changing the FFT size from the host's generic panel **while audio runs**.
-3. Putting an effect in a slot from the host's panel rather than the editor.
-4. Saving and reloading a session.
-5. Opening and closing the editor with two instances on two tracks.
-6. Reaper, in addition to Logic and Bitwig.
+3. **Loading an external audio file and hearing it.** Never worked in this port
+   until 05.08.2026 — `activate()` asked the engine for no side channels, so the
+   guard on the sample path was `0 >= 2` and a loaded file was silently ignored
+   in every format. Fixed and covered by `sampleFeedTests.cpp`, and *no human
+   has heard it*, which is what this row is for.
+4. Putting an effect in a slot from the host's panel rather than the editor.
+5. Saving and reloading a session.
+6. Opening and closing the editor with two instances on two tracks.
+7. Reaper, in addition to Logic and Bitwig.
 
 **If either host still hangs, take both backtraces before anything else** — one
 from each side. That ask expired once already: the redesign landed without them,
@@ -165,7 +170,6 @@ because `Triggered` is its default and nothing has pressed Grab IR.
 
 | Hole | Why it matters |
 |---|---|
-| **A loaded sample never reaches the DSP** | `sampleTests.cpp` proves all seventeen decode; nothing proves `runEngine()` then feeds one to the engine in place of the port. The reach problem is solved — `stateTests.cpp` loads a sample through `plugin_data` — so what is left is the block itself. |
 | **`lfoImpl.cpp` has no direct test** | Only LFO 0 of module 0 targeting Gain is ever exercised. Waveform shapes, sync types, `PeriodScale` snapping, `LowerBound > UpperBound`, an LFO on an enumerated target, several at once — none. A value-table golden fits the existing pattern. Related: nothing in the suite drives a meter other than 4/4, which `tech_debt.md` records as an unmeasured half of a landed fix. |
 | **1 of 18 preset banks is ever drawn** | The effect sweep went from 1 of 57 to 57 of 57 and immediately found a page that had been rendering no module at all. The banks are the same shape of cheap breadth and have not had it. |
 

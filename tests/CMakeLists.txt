@@ -62,6 +62,7 @@ add_executable(sw-plugin-tests
         clap/stateTests.cpp
         # Drives a real clap_plugin through its C entry point.
         core/threadCheckTests.cpp
+        external_audio/sampleFeedTests.cpp
         external_audio/sampleTests.cpp
         goldens/engineHarness.cpp # the CLAP cases drive an instantiable core
         # The parameter table is the host-facing enumeration, which lives in

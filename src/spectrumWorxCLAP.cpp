@@ -136,9 +136,8 @@ std::optional<std::vector<char>> readWholeStream(clap_istream const *const strea
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-float const *sampleChunk(Sample::ChannelData const &channelData,
-                                     std::uint32_t &position, std::uint32_t chunkSize,
-                                     float *LE_RESTRICT const workBuffer)
+float const *sampleChunk(Sample::ChannelData const &channelData, std::uint32_t &position,
+                         std::uint32_t chunkSize, float *LE_RESTRICT const workBuffer)
 {
     auto const dataSize(static_cast<std::uint32_t>(channelData.size()));
     LE_ASSERT(position <= dataSize);
@@ -234,9 +233,28 @@ bool SpectrumWorxCLAP::activate(double const sampleRate, std::uint32_t,
 
     sampleRate_ = sampleRate;
 
-    // Stereo in, stereo out. Anything else waits for 5.7 and the input-mode
-    // parameter; the engine supports far more, the port list above does not.
-    setNumberOfChannels(2, 2);
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Stereo main *and* stereo side, which is what four inputs against
+    /// two outputs spells: the arguments are the **input** and **output** counts
+    /// and the engine takes the side channels to be the difference
+    /// (`SpectrumWorxCore::setNumberOfChannels`). Anything else waits for 5.7
+    /// and the input-mode parameter; the engine supports far more, the port list
+    /// above does not.
+    ///
+    /// \note This read `setNumberOfChannels( 2, 2 )` until 05.08.2026 -- two in,
+    /// two out, and therefore **no side channels at all**. Nothing noticed,
+    /// because an effect reads whichever pointer `process()` was handed and that
+    /// comes from the host's port rather than from these buffers. What did not
+    /// work was the one thing that needs them: `runEngine()` guards the external
+    /// audio file on `buffers().numberOfSideChannels() >= channels`, which was
+    /// `0 >= 2`, so **a loaded sample never reached the DSP in any format**.
+    /// `setNewSample()`'s own note already said activate() "asks for two main
+    /// and two side channels outright"; it now does.
+    ///                                       (05.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    setNumberOfChannels(4, 2);
     setSampleRate(static_cast<float>(sampleRate));
 
     // The host promises never to exceed maxFrames, and SpectrumWorxCore asserts
