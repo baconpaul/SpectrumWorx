@@ -92,10 +92,6 @@
 #define LE_DISABLE_LOOP_VECTORIZATION() __pragma(loop(no_vector))
 #define LE_DISABLE_LOOP_UNROLLING()
 
-#ifdef _CPPUNWIND
-#define LE_EXCEPTION_ON
-#endif // _CPPUNWIND
-
 #if _MSC_VER < 1900
 #define LE_ARR_SZ(x) (sizeof(x) / sizeof(x.front()))
 #endif
@@ -245,11 +241,6 @@
 #define LE_DISABLE_LOOP_VECTORIZATION()                                                            \
     _Pragma("clang loop vectorize( disable ) interleave( disable )")
 #define LE_DISABLE_LOOP_UNROLLING() _Pragma("clang loop unroll( disable )")
-
-// http://llvm.org/releases/3.6.0/tools/clang/docs/ReleaseNotes.html#the-exceptions-macro
-#if defined(__EXCEPTIONS) && !(defined(__clang__) && !__has_feature(cxx_exceptions))
-#define LE_EXCEPTION_ON
-#endif // __EXCEPTIONS
 
 #else
 
