@@ -314,6 +314,10 @@ int render(juce::String const &pageName, juce::File const &output)
 // What START_JUCE_APPLICATION expands to, opened up so that --render can run
 // before any of it: JUCEApplicationBase::main() creates an NSApplication on
 // macOS, which offscreen rendering neither needs nor should require.
+//
+// \note Naming the overload rather than letting the macro pick it is why this
+// tool defines _CONSOLE on Windows -- JUCE compiles this one only for a console
+// subsystem binary, and offers WinMain otherwise. See tools/show-ui/CMakeLists.txt.
 juce::JUCEApplicationBase *juce_CreateApplication();
 juce::JUCEApplicationBase *juce_CreateApplication() { return new ShowUIApplication(); }
 
