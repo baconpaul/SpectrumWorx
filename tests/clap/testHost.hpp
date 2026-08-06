@@ -51,6 +51,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 //------------------------------------------------------------------------------
 namespace SWTest
@@ -110,10 +111,14 @@ class TestHost
         /// With it they land in misbehaviours() and a case can require there were
         /// none.
         bool log{false};
+        /// \note All five of `clap_host_gui`'s entry points or none: clap-helpers
+        /// calls a partially implemented one host misbehaviour and then refuses
+        /// the extension outright (host-proxy.hxx:449-459).
+        bool gui{false};
     }; // struct Offers
 
     /// A host with everything, which is what a DAW is.
-    static Offers everything() { return {true, true, true, true}; }
+    static Offers everything() { return {true, true, true, true, true}; }
 
     explicit TestHost(Offers const offers)
         : offers_(offers), mainThread_(std::this_thread::get_id()),
@@ -133,6 +138,16 @@ class TestHost
                        }},
           log_{[](clap_host const *const pHost, clap_log_severity const severity,
                   char const *const message) { self(pHost).logged(severity, message); }},
+          // resize_hints_changed, request_resize, request_show, request_hide, closed.
+          gui_{[](clap_host const *) {},
+               [](clap_host const *const pHost, std::uint32_t const width,
+                  std::uint32_t const height) {
+                   auto &host(self(pHost));
+                   host.resizeRequests.emplace_back(width, height);
+                   return host.grantResizes;
+               },
+               [](clap_host const *) { return true; }, [](clap_host const *) { return true; },
+               [](clap_host const *, bool) {}},
           host_{CLAP_VERSION, this, "sw-tests", "SpectrumWorx", "", "0", &getExtension,
                 // request_restart, request_process, request_callback -- in that
                 // order; the last is the one a deferred rescan asks for.
@@ -160,6 +175,20 @@ class TestHost
     /// How often the plugin asked which thread it was on, which is the evidence
     /// that it asks at all rather than always taking the deferral.
     unsigned threadChecks{0};
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Every window size the plugin asked for, in order.
+    ///
+    /// \note And whether this host grants them, which is not a detail: a
+    /// `request_resize` is a request, and a host with a fixed-width plugin pane
+    /// really does answer no. `grantResizes = false` is that host, and what the
+    /// editor does about it is the point of testing against one.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> resizeRequests;
+    bool grantResizes{true};
 
     ////////////////////////////////////////////////////////////////////////////
     // What it heard
@@ -293,6 +322,8 @@ class TestHost
             return &host.threadCheck_;
         if (host.offers_.log && (std::strcmp(id, CLAP_EXT_LOG) == 0))
             return &host.log_;
+        if (host.offers_.gui && (std::strcmp(id, CLAP_EXT_GUI) == 0))
+            return &host.gui_;
         return nullptr;
     }
 
@@ -331,6 +362,7 @@ class TestHost
     clap_host_state state_;
     clap_host_thread_check threadCheck_;
     clap_host_log log_;
+    clap_host_gui gui_;
     clap_host host_;
 }; // class TestHost
 

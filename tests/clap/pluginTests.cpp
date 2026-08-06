@@ -1234,6 +1234,118 @@ TEST_CASE("A full rack with LFOs running and an editor open processes cleanly", 
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+//
+// The editor's window
+// -------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+///   The preset browser and the settings panel used to be drawn over the module
+/// strips, because a 563 x 376 editor has nowhere else to put them. They get a
+/// column of their own now, and the only way a plugin can have one is to ask the
+/// host for it -- `clap_host_gui::request_resize`.
+///
+/// \note So this is the case that goes all the way through: an editor built the
+/// way the shim builds it, over a real SpectrumWorxCLAP, over a host that answers
+/// `clap.gui`. `tests/gui/overlayPanelTests.cpp` has what the editor does with
+/// the answer; what nothing there can see is whether the request reaches a
+/// `clap_host_gui` at all, because its harness *is* the thing being asked.
+///
+/// \note All three ask for `expandContract` rather than taking the default, which
+/// is `alwaysVisible` and takes its column in the constructor -- so the shipping
+/// arrangement asks the host for nothing after the first `guiGetSize`, and these
+/// would have nothing to measure.
+///                                           (06.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("Opening a panel asks the host for a wider window", "[clap][gui]")
+{
+    using Editor = LE::SW::GUI::SpectrumWorxEditor;
+
+    Entry const entry;
+    TestHost host{{.threadCheck = true, .log = true, .gui = true}};
+    ActivePlugin plugin(48000, 512, host);
+
+    juce::ScopedJuceInitialiser_GUI const juceIsUp;
+    auto editor(
+        std::make_unique<Editor>(editorHostOf(*plugin), Editor::PanelPlacement::expandContract));
+
+    // Nothing asked for by existing: the editor opens at the size the shim reads
+    // off it, and `guiGetSize` is how the host learns that one.
+    REQUIRE(host.resizeRequests.empty());
+    REQUIRE(editor->getWidth() == Editor::estimatedWidth);
+
+    editor->showPresetBrowser(true);
+    REQUIRE(host.resizeRequests.size() == 1);
+    CHECK(host.resizeRequests.back() ==
+          std::pair<std::uint32_t, std::uint32_t>{Editor::expandedWidth, Editor::estimatedHeight});
+    CHECK(editor->getWidth() == Editor::expandedWidth);
+
+    editor->showPresetBrowser(false);
+    REQUIRE(host.resizeRequests.size() == 2);
+    CHECK(host.resizeRequests.back() ==
+          std::pair<std::uint32_t, std::uint32_t>{Editor::estimatedWidth, Editor::estimatedHeight});
+    CHECK(editor->getWidth() == Editor::estimatedWidth);
+
+    editor.reset();
+
+    /// \note `request_resize` is `[main-thread]` and clap-helpers checks it the
+    /// moment a host answers the thread check, so this is also what says the
+    /// editor asks from where it is allowed to.
+    CHECK(host.misbehaviours().empty());
+}
+
+TEST_CASE("A host with no clap.gui still gets an editor", "[clap][gui]")
+{
+    /// \note The extension is optional, and a plugin may not assume it. Without
+    /// it `requestEditorSize` answers no without calling anything, and the editor
+    /// lays its panel over the module strips -- which is stage 6.4's arrangement,
+    /// so what a host that withholds `clap.gui` gets is the editor as it shipped.
+    using Editor = LE::SW::GUI::SpectrumWorxEditor;
+
+    Entry const entry;
+    TestHost host{{.threadCheck = true, .log = true}};
+    ActivePlugin plugin(48000, 512, host);
+
+    juce::ScopedJuceInitialiser_GUI const juceIsUp;
+    auto editor(
+        std::make_unique<Editor>(editorHostOf(*plugin), Editor::PanelPlacement::expandContract));
+
+    editor->showPresetBrowser(true);
+    CHECK(host.resizeRequests.empty());
+    CHECK_FALSE(editor->panelHasOwnColumn());
+    CHECK(editor->getWidth() == Editor::estimatedWidth);
+
+    editor.reset();
+    CHECK(host.misbehaviours().empty());
+}
+
+TEST_CASE("A host that refuses leaves the editor the size it was", "[clap][gui]")
+{
+    using Editor = LE::SW::GUI::SpectrumWorxEditor;
+
+    Entry const entry;
+    TestHost host{{.threadCheck = true, .log = true, .gui = true}};
+    host.grantResizes = false;
+    ActivePlugin plugin(48000, 512, host);
+
+    juce::ScopedJuceInitialiser_GUI const juceIsUp;
+    auto editor(
+        std::make_unique<Editor>(editorHostOf(*plugin), Editor::PanelPlacement::expandContract));
+
+    editor->showPresetBrowser(true);
+    // It asked once and took no for an answer, rather than drawing itself wider
+    // than the window it is in.
+    CHECK(host.resizeRequests.size() == 1);
+    CHECK_FALSE(editor->panelHasOwnColumn());
+    CHECK(editor->getWidth() == Editor::estimatedWidth);
+
+    editor.reset();
+    CHECK(host.misbehaviours().empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////
 ///
 /// \note Two instances, two real audio threads, one message thread -- the
 /// arrangement the two-instance deadlock was reported in, and the one every case

@@ -7,6 +7,11 @@
 /// over it, that each of the settings tabs paints a *page* and not just a tab
 /// bar, and that the two are mutually exclusive.
 ///
+///   And where that rectangle is, which is SpectrumWorxEditor::PanelPlacement's
+/// question: over the module strips, in a column the editor asks its host for, or
+/// in one it never gives back. The cases below the panel-placement section pin
+/// the first, because what they measure is the overlay rectangle.
+///
 ///   Written against the bug 6.4 found by looking at a picture. Clicking the
 /// SpectrumWorx logo asked the settings panel for tab 3 of three; JUCE clamps an
 /// out-of-range index to -1, so the panel opened with no page in it. As a
@@ -33,6 +38,7 @@
 /// node to it, and this is the header with the complete type.
 #include "core/modules/moduleDSPAndGUI.hpp"
 
+#include "gui/modules/moduleUI.hpp"
 #include "le/spectrumworx/factoryPresets.hpp"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -50,10 +56,45 @@ using namespace LE::SW;
 
 using Editor = GUI::SpectrumWorxEditor;
 
-/// The rectangle both panels are given by SpectrumWorxEditor::openOverlay().
+/// The rectangle a panel is given when it is laid over the module strips.
 juce::Rectangle<int> overlayRectangle()
 {
     return {Editor::overlayX, Editor::overlayY, Editor::overlayWidth, Editor::overlayHeight};
+}
+
+/// The rectangle it is given when the editor has grown a column for it.
+juce::Rectangle<int> panelColumnRectangle()
+{
+    return {Editor::panelColumnX, Editor::overlayY, Editor::overlayWidth, Editor::overlayHeight};
+}
+
+/// The editor as it was before any of this: 563 x 376, panels over the strips.
+juce::Rectangle<int> unexpandedEditor()
+{
+    return {0, 0, Editor::estimatedWidth, Editor::estimatedHeight};
+}
+
+/// \brief The five module slots -- what an overlay covers and a column does not.
+///
+/// \note Wider than overlayRectangle(), and that is the point: an overlay hides
+/// slots 3 to 5, so a case that only compared its own rectangle would pass while
+/// the panel ate the first two. This is the region the whole change is about.
+juce::Rectangle<int> moduleRack()
+{
+    return {GUI::ModuleUI::horizontalOffset, GUI::ModuleUI::verticalOffset,
+            SW::Constants::maxNumberOfModules * (GUI::ModuleUI::width + GUI::ModuleUI::distance),
+            GUI::ModuleUI::height};
+}
+
+/// \brief An editor whose panels go over the module strips.
+///
+/// \note Said rather than assumed. The default placement grows the editor, so a
+/// case that means to measure the overlay rectangle has to ask for the overlay --
+/// left alone these would be comparing a 563 px render with a 764 px one.
+Editor &overlayEditor(SWTest::Instance &instance)
+{
+    instance.openEditor(Editor::PanelPlacement::overlay);
+    return instance.editor();
 }
 
 /// \brief The editor as an image, which is what `--render` does and what a user
@@ -66,11 +107,15 @@ juce::Image rendered(Editor &editor)
     return image;
 }
 
-/// What fraction of \p area two renders disagree about.
+/// \brief What fraction of \p area two renders disagree about.
+///
+/// \note The two need not be the same size, only both big enough to hold \p area:
+/// the placement cases compare the left 563 px of a grown editor against the
+/// editor it grew from, which is the whole question those cases ask.
 double differenceOver(juce::Image const &left, juce::Image const &right,
                       juce::Rectangle<int> const &area)
 {
-    REQUIRE(left.getBounds() == right.getBounds());
+    REQUIRE(right.getBounds().contains(area));
     REQUIRE(left.getBounds().contains(area));
 
     juce::Image::BitmapData const leftPixels(left, juce::Image::BitmapData::readOnly);
@@ -149,8 +194,7 @@ TEST_CASE("Opening the preset browser paints over the overlay rectangle", "[gui]
 {
     SWTest::HostSideJuce const juce;
     SWTest::Instance instance;
-    instance.openEditor();
-    auto &editor(instance.editor());
+    auto &editor(overlayEditor(instance));
 
     auto const closed(rendered(editor));
 
@@ -179,8 +223,7 @@ TEST_CASE("Every settings tab paints a page and not just a tab bar", "[gui][over
     ////////////////////////////////////////////////////////////////////////////
     SWTest::HostSideJuce const juce;
     SWTest::Instance instance;
-    instance.openEditor();
-    auto &editor(instance.editor());
+    auto &editor(overlayEditor(instance));
 
     auto const closed(rendered(editor));
 
@@ -221,8 +264,7 @@ TEST_CASE("Clicking the logo opens the About page, not an empty panel", "[gui][o
     SWTest::Instance instance;
 
     // What the About page looks like, opened the way the settings button opens it.
-    instance.openEditor();
-    auto const closed(rendered(instance.editor()));
+    auto const closed(rendered(overlayEditor(instance)));
     instance.editor().showSettings(Editor::aboutPageIndex);
     auto const aboutPage(rendered(instance.editor()));
 
@@ -230,8 +272,7 @@ TEST_CASE("Clicking the logo opens the About page, not an empty panel", "[gui][o
     /// `showSettings()` is what the button's handler calls *after* deciding to
     /// open, so it is not a toggle and calling it again leaves the panel up.
     instance.closeEditor();
-    instance.openEditor();
-    auto &editor(instance.editor());
+    auto &editor(overlayEditor(instance));
     REQUIRE(differenceOver(closed, rendered(editor), overlayRectangle()) == 0);
 
     /// \note (37, 321) is the middle of the logo's hit area, which
@@ -252,14 +293,13 @@ TEST_CASE("Clicking the logo opens the About page, not an empty panel", "[gui][o
 
 TEST_CASE("The two panels are mutually exclusive and land in the same place", "[gui][overlay]")
 {
-    // `openOverlay()` asserts the invariant; this is what it looks like on
-    // screen. Both panels are given one 191 x 363 rectangle because the editor is
-    // 563 x 376 and fixed, with no free column -- so "open the other one" has to
-    // mean "and shut this one", or they draw on top of each other.
+    // `showPanel()` asserts the invariant; this is what it looks like on screen.
+    // There is one 191 x 363 rectangle whatever the placement -- so "open the
+    // other one" has to mean "and shut this one", or they draw on top of each
+    // other.
     SWTest::HostSideJuce const juce;
     SWTest::Instance instance;
-    instance.openEditor();
-    auto &editor(instance.editor());
+    auto &editor(overlayEditor(instance));
 
     editor.showSettings(Editor::interfacePageIndex);
     auto const settingsAlone(rendered(editor));
@@ -298,6 +338,228 @@ TEST_CASE("The two panels are mutually exclusive and land in the same place", "[
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+// Panel placement
+// ---------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+///   The overlay is the arrangement stage 6.4 could ship: a fixed-size editor has
+/// exactly one panel-sized rectangle in it, and it is the one the module strips
+/// are drawn in. Which means opening the preset browser hides the rack the user
+/// is working on -- correct, and not what anyone wants while an effect is live.
+///
+///   So the editor asks its host for the space instead. `expandContract` takes a
+/// column while a panel is up and gives it back; `alwaysVisible` never gives it
+/// back and rests on the preset browser. Both come down to one question a picture
+/// can answer -- **is anything under the panel different** -- and that is what
+/// these ask, over `moduleRack()`: the five slots, not just the rectangle a panel
+/// used to land in. The rest of the old editor is not held to it, because the
+/// button that opened the panel legitimately lights up.
+///
+/// \note The refusal case is not an afterthought. `request_resize` is the host's
+/// to decline and some will, so `expandContract` against a host that says no has
+/// to *be* the overlay rather than an editor drawn wider than its window. That is
+/// the case with the least chance of ever being exercised by hand.
+///                                           (06.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("What a plugin opens with is the column, with presets in it", "[gui][overlay]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The shipping arrangement, named as such. Everything else here picks
+    /// a placement, so nothing else would notice the default changing -- and the
+    /// default is what every user sees on the first open.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    SWTest::HostSideJuce const juce;
+    SWTest::Instance instance;
+    instance.openEditor();
+    auto &editor(instance.editor());
+
+    CHECK(editor.panelPlacement() == Editor::PanelPlacement::alwaysVisible);
+    CHECK(editor.panelHasOwnColumn());
+    CHECK(editor.getWidth() == Editor::expandedWidth);
+
+    // The browser is in the column, and the rack is not under it -- said against
+    // an editor with no panel up at all, which is the rack undisturbed.
+    auto const opened(rendered(editor));
+    CHECK(drawnFractionOver(opened, panelColumnRectangle()) > 0);
+
+    SWTest::Instance bare;
+    CHECK(differenceOver(opened, rendered(overlayEditor(bare)), moduleRack()) == 0);
+
+    /// \note And the same picture as asking for the browser by hand, which is
+    /// what says the resting panel is the browser rather than something that
+    /// merely fills the space.
+    editor.showSettings(Editor::interfacePageIndex);
+    REQUIRE(differenceOver(opened, rendered(editor), panelColumnRectangle()) > 0);
+    editor.showPresetBrowser(true);
+    CHECK(differenceOver(opened, rendered(editor), panelColumnRectangle()) == 0);
+
+    // Nothing was ever asked of the host: the column is taken at construction.
+    CHECK(instance.requestedSizes.empty());
+}
+
+TEST_CASE("A panel gets a column of its own rather than the module strips", "[gui][overlay]")
+{
+    SWTest::HostSideJuce const juce;
+    SWTest::Instance instance;
+    instance.openEditor(Editor::PanelPlacement::expandContract);
+    auto &editor(instance.editor());
+
+    REQUIRE(editor.getWidth() == Editor::estimatedWidth);
+    REQUIRE_FALSE(editor.panelHasOwnColumn());
+
+    auto const closed(rendered(editor));
+
+    editor.showPresetBrowser(true);
+    auto const open(rendered(editor));
+
+    // The editor grew, and asked its host to grow with it.
+    CHECK(editor.panelHasOwnColumn());
+    CHECK(editor.getWidth() == Editor::expandedWidth);
+    REQUIRE(instance.requestedSizes.size() == 1);
+    CHECK(instance.requestedSizes.back() ==
+          juce::Point<int>(Editor::expandedWidth, Editor::estimatedHeight));
+
+    // The browser is in the new column...
+    CHECK(drawnFractionOver(open, panelColumnRectangle()) > 0);
+    CHECK(differenceOver(closed, open, overlayRectangle()) == 0);
+    // ...and the rack the user was working on is untouched, which is the point.
+    CHECK(differenceOver(closed, open, moduleRack()) == 0);
+
+    // Shutting it gives the space back and asks for that too.
+    editor.showPresetBrowser(false);
+    CHECK_FALSE(editor.panelHasOwnColumn());
+    CHECK(editor.getWidth() == Editor::estimatedWidth);
+    REQUIRE(instance.requestedSizes.size() == 2);
+    CHECK(instance.requestedSizes.back() ==
+          juce::Point<int>(Editor::estimatedWidth, Editor::estimatedHeight));
+    // ...and now the *whole* editor is back to where it started, buttons included.
+    CHECK(differenceOver(closed, rendered(editor), unexpandedEditor()) == 0);
+}
+
+TEST_CASE("Swapping panels in the column asks the host for nothing", "[gui][overlay]")
+{
+    /// \note The two share one rectangle wherever it is, so going from one to the
+    /// other is not a resize -- and a `request_resize` per swap would be a window
+    /// flickering its width for no reason a user could see. `setPanelColumnVisible`
+    /// returning early on "already there" is what this is.
+    SWTest::HostSideJuce const juce;
+    SWTest::Instance instance;
+    instance.openEditor(Editor::PanelPlacement::expandContract);
+    auto &editor(instance.editor());
+
+    editor.showPresetBrowser(true);
+    REQUIRE(instance.requestedSizes.size() == 1);
+
+    editor.showSettings(Editor::interfacePageIndex);
+    CHECK(instance.requestedSizes.size() == 1);
+    CHECK(editor.getWidth() == Editor::expandedWidth);
+
+    editor.showPresetBrowser(true);
+    CHECK(instance.requestedSizes.size() == 1);
+    CHECK(editor.getWidth() == Editor::expandedWidth);
+}
+
+TEST_CASE("A host that refuses the resize gets the overlay", "[gui][overlay]")
+{
+    SWTest::HostSideJuce const juce;
+    SWTest::Instance instance;
+    instance.grantResizes = false;
+    instance.openEditor(Editor::PanelPlacement::expandContract);
+    auto &editor(instance.editor());
+
+    auto const closed(rendered(editor));
+
+    editor.showPresetBrowser(true);
+    auto const open(rendered(editor));
+
+    // It asked, was told no, and stayed the size it was...
+    CHECK(instance.requestedSizes.size() == 1);
+    CHECK_FALSE(editor.panelHasOwnColumn());
+    CHECK(editor.getWidth() == Editor::estimatedWidth);
+
+    // ...with the panel over the module strips, which is overlay placement.
+    CHECK(differenceOver(closed, open, overlayRectangle()) > leastOfTheRectangleAPanelCovers);
+    CHECK(drawnFractionOver(open, overlayRectangle()) > 0);
+
+    editor.showPresetBrowser(false);
+    CHECK(differenceOver(closed, rendered(editor), unexpandedEditor()) == 0);
+}
+
+TEST_CASE("The always-visible column never empties", "[gui][overlay]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The width is taken in the constructor and not through
+    /// requestEditorSize(), so this case is also what says that: the shim builds
+    /// the editor inside `guiCreate()` and answers `guiGetSize()` out of it, so
+    /// an editor that asked afterwards would open at 563 and jump.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    SWTest::HostSideJuce const juce;
+    SWTest::Instance instance;
+    instance.openEditor(Editor::PanelPlacement::alwaysVisible);
+    auto &editor(instance.editor());
+
+    CHECK(editor.panelHasOwnColumn());
+    CHECK(editor.getWidth() == Editor::expandedWidth);
+
+    auto const resting(rendered(editor));
+    CHECK(drawnFractionOver(resting, panelColumnRectangle()) > 0);
+
+    /// \note Against a second editor *switched* into alwaysVisible rather than
+    /// built that way, because those are two different paths to the same picture
+    /// -- the constructor's and panelPlacement()'s -- and only the first is the
+    /// one a plugin takes.
+    SWTest::Instance switched;
+    switched.openEditor(Editor::PanelPlacement::overlay);
+    switched.editor().panelPlacement(Editor::PanelPlacement::alwaysVisible);
+    REQUIRE(switched.editor().getWidth() == Editor::expandedWidth);
+    CHECK(differenceOver(resting, rendered(switched.editor()), panelColumnRectangle()) == 0);
+
+    // Going to the settings and shutting them again comes back to the browser
+    // rather than to a hole, and the editor never changes width doing it.
+    editor.showSettings(Editor::interfacePageIndex);
+    CHECK(editor.getWidth() == Editor::expandedWidth);
+    CHECK(differenceOver(resting, rendered(editor), panelColumnRectangle()) > 0);
+
+    editor.showPresetBrowser(false);
+    CHECK(editor.getWidth() == Editor::expandedWidth);
+    CHECK(differenceOver(resting, rendered(editor), panelColumnRectangle()) == 0);
+
+    // Nothing was ever asked of the host: the column was taken at construction.
+    CHECK(instance.requestedSizes.empty());
+}
+
+TEST_CASE("Changing placement moves the panel that is already up", "[gui][overlay]")
+{
+    SWTest::HostSideJuce const juce;
+    SWTest::Instance instance;
+    auto &editor(overlayEditor(instance));
+
+    editor.showSettings(Editor::interfacePageIndex);
+    auto const asOverlay(rendered(editor));
+    REQUIRE(editor.getWidth() == Editor::estimatedWidth);
+    REQUIRE(drawnFractionOver(asOverlay, overlayRectangle()) > 0);
+
+    editor.panelPlacement(Editor::PanelPlacement::expandContract);
+    auto const inColumn(rendered(editor));
+    CHECK(editor.getWidth() == Editor::expandedWidth);
+    // The panel went with it: the strips are back and the column has the panel.
+    CHECK(differenceOver(asOverlay, inColumn, overlayRectangle()) > 0);
+    CHECK(drawnFractionOver(inColumn, panelColumnRectangle()) > 0);
+
+    editor.panelPlacement(Editor::PanelPlacement::overlay);
+    CHECK(editor.getWidth() == Editor::estimatedWidth);
+    CHECK(differenceOver(asOverlay, rendered(editor), unexpandedEditor()) == 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
 // The banks
 // ---------
 //
@@ -326,8 +588,7 @@ TEST_CASE("Every factory bank draws, and draws something of its own", "[gui][ove
 {
     SWTest::HostSideJuce const juce;
     SWTest::Instance instance;
-    instance.openEditor();
-    auto &editor(instance.editor());
+    auto &editor(overlayEditor(instance));
 
     auto const closed(rendered(editor));
 
@@ -384,8 +645,7 @@ TEST_CASE("A bank that is not there leaves the browser drawable", "[gui][overlay
     /// been renamed under. What it must not do is leave the panel unpaintable.
     SWTest::HostSideJuce const juce;
     SWTest::Instance instance;
-    instance.openEditor();
-    auto &editor(instance.editor());
+    auto &editor(overlayEditor(instance));
 
     auto const closed(rendered(editor));
 
