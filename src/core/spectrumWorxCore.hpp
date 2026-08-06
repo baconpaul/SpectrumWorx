@@ -322,10 +322,20 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
     bool setNumberOfChannelsImpl(std::uint8_t numberOfMainChannels,
                                  std::uint8_t numberOfSideChannels);
 
-    bool haveSideChannel() const;
-
+    /// \note There is no `clearSideChannelDataIfNoSideChannel()` beside this,
+    /// and there was one until 06.08.2026: declared, defined, and called by
+    /// nothing. It named the invariant `ChannelData`'s header describes -- that
+    /// `setNewTimeDomainData()` will not clear the side spectrum when handed a
+    /// null side channel, so somebody above it has to when the side data
+    /// "disappears" -- and then left the naming as its whole contribution.
+    /// `haveSideChannel()` went with it, having had no other caller.
+    ///
+    ///   What actually honours the invariant is this function, from
+    /// `SpectrumWorxCLAP` on both paths that can retire a sample, and from
+    /// `Processor::changeWOLAParameters()` when the buffers are resized. A
+    /// helper that wrapped it in a test nobody performed was not a third.
+    ///                                       (06.08.2026.) (SW port)
     void clearSideChannelData();
-    void clearSideChannelDataIfNoSideChannel();
 
     /* </IO configuration> */
 
