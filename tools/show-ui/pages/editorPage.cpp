@@ -24,7 +24,11 @@
 #include "../page.hpp"
 
 #include "core/host_interop/plugin2Host.hpp"
+#include "core/host_interop/programWrite.hpp"
 #include "core/modules/moduleDSPAndGUI.hpp"
+#include "core/threading/publish.hpp"
+
+#include "le/plugins/clap/tag.hpp"
 #include "core/spectrumWorxCore.hpp"
 #include "gui/editor/editorHost.hpp"
 #include "core/automatedModuleChain.hpp"
@@ -99,6 +103,32 @@ class HarnessHost final : public GUI::EditorHost
 
     SpectrumWorxCore &core() override { return engine_; }
     Plugin2HostInteropControler &automation() override { return notifications_; }
+
+    /// \note One Program, because this harness never activates anything: with
+    /// nothing processing the main thread owns the engine outright, which is what
+    /// the second copy exists to avoid needing. \see EditorHost::programMain().
+    Program &programMain() override { return engine_.program(); }
+
+    void editParameter(ParameterID const parameterID, float const value) const override
+    {
+        setParameterIn<LE::Plugins::Protocol::CLAP>(const_cast<HarnessEngine &>(engine_).program(),
+                                                    parameterID, value);
+        toEngine_.push(Threading::setBaseParameter(parameterID.binaryValue, value));
+    }
+
+    bool editSlot(std::uint8_t const slot, std::int8_t const effectIndex) override
+    {
+        auto *const pModule(Threading::createModuleForSlot(engine_, effectIndex, slot));
+        if ((effectIndex != AutomatedModuleChain::noModule) && !pModule)
+            return false;
+        Threading::publishSlot(engine_, toEngine_, slot, effectIndex, pModule);
+        return true;
+    }
+
+    void editModuleMove(std::uint8_t const from, std::uint8_t const to) override
+    {
+        Threading::publishModuleMove(engine_, toEngine_, from, to);
+    }
 
     /// \note Real, and nobody drains them: this harness renders a still image, so
     /// whatever the editor asks the engine for stays in the queue.

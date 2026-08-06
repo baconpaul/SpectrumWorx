@@ -27,6 +27,7 @@
 #include "core/host_interop/host2PluginImpl.inl"
 #include "core/host_interop/plugin2HostImpl.inl"
 #include "core/host_interop/programWrite.hpp"
+#include "core/threading/publish.hpp"
 
 #include "core/threading/threadCheck.hpp"
 
@@ -1236,7 +1237,51 @@ void SpectrumWorxCLAP::drainEngineEvents()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+//
 // Edits made in the editor
+// ------------------------
+//
+//   Three entry points, and each does the same two things: applies the change to
+// the Program this thread owns, and queues it for the engine. The editor used to
+// do only the second -- `toEngine().push()` at four sites and
+// `Threading::publish{Slot,ModuleMove}()` at two more -- which was right while
+// the engine's Program was the only one there was.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxCLAP::editParameter(ParameterID const parameterID, float const value) const
+{
+    auto &plugin(const_cast<SpectrumWorxCLAP &>(*this));
+    setParameterIn<Protocol>(plugin.programMain_, parameterID, value);
+    toEngine_.push(Threading::setBaseParameter(parameterID.binaryValue, value));
+}
+
+/// \note Two modules built for one slot change, and they are not
+/// interchangeable: the engine's is sized against the current spectral setup by
+/// `createModuleForSlot()`, and this thread's carries parameters and no storage.
+/// \see ParametersOnlyModuleInitialiser.
+bool SpectrumWorxCLAP::editSlot(std::uint8_t const slot, std::int8_t const effectIndex)
+{
+    /// \note Building it is still synchronous and still this thread's, so an
+    /// effect this build does not have is still a failure the caller can be told
+    /// about here. Only the *installing* is deferred.
+    auto *const pModule(Threading::createModuleForSlot(*this, effectIndex, slot));
+    if ((effectIndex != AutomatedModuleChain::noModule) && !pModule)
+        return false;
+
+    programMain_.moduleChain().setParameter(slot, effectIndex, ParametersOnlyModuleInitialiser{});
+    Threading::publishSlot(*this, toEngine_, slot, effectIndex, pModule);
+    return true;
+}
+
+void SpectrumWorxCLAP::editModuleMove(std::uint8_t const from, std::uint8_t const to)
+{
+    programMain_.moduleChain().moveModule(from, to);
+    Threading::publishModuleMove(*this, toEngine_, from, to);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// On their way to the host
 ////////////////////////////////////////////////////////////////////////////////
 
 /// \note The push/pop pair that stood here is `Threading::SPSCQueue` now, which

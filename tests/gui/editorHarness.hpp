@@ -26,6 +26,10 @@
 #include "goldens/engineHarness.hpp"
 
 #include "core/host_interop/plugin2Host.hpp"
+#include "core/host_interop/programWrite.hpp"
+#include "core/threading/publish.hpp"
+
+#include "le/plugins/clap/tag.hpp"
 
 #include "gui/editor/editorHost.hpp"
 #include "gui/editor/spectrumWorxEditor.hpp"
@@ -89,6 +93,44 @@ class Instance final : public GUI::EditorHost
 
     SpectrumWorxCore &core() override { return engine_; }
     Plugin2HostInteropControler &automation() override { return notifications_; }
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The engine's own Program, which here is also the main thread's.
+    ///
+    /// \note Nothing is ever activated in this harness, so `engineIsRunning()` is
+    /// false and this thread owns the engine outright --
+    /// `currentThreadMayMutateEngineState()` says so. One Program is therefore
+    /// the honest arrangement rather than a shortcut: the second copy exists to
+    /// keep the main thread off state an audio thread owns, and there is no audio
+    /// thread here.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    Program &programMain() override { return engine_.program(); }
+
+    Program &mutableProgram() const { return const_cast<Engine &>(engine_).program(); }
+
+    /// \note Applied outright, for the same reason: with nothing processing,
+    /// `Threading::publish*()` would apply them here anyway.
+    void editParameter(ParameterID const parameterID, float const value) const override
+    {
+        setParameterIn<LE::Plugins::Protocol::CLAP>(mutableProgram(), parameterID, value);
+        toEngine_.push(Threading::setBaseParameter(parameterID.binaryValue, value));
+    }
+
+    bool editSlot(std::uint8_t const slot, std::int8_t const effectIndex) override
+    {
+        auto *const pModule(Threading::createModuleForSlot(engine_, effectIndex, slot));
+        if ((effectIndex != AutomatedModuleChain::noModule) && !pModule)
+            return false;
+        Threading::publishSlot(engine_, toEngine_, slot, effectIndex, pModule);
+        return true;
+    }
+
+    void editModuleMove(std::uint8_t const from, std::uint8_t const to) override
+    {
+        Threading::publishModuleMove(engine_, toEngine_, from, to);
+    }
 
     /// \note Real ones, and nobody drains them: what the editor asks for goes
     /// into the queue and stays there. These cases are about the interface side,
