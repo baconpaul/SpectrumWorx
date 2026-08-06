@@ -227,6 +227,15 @@ class SpectrumWorxCLAP final
     SpectrumWorxCore &core() override { return *this; }
     Plugin2HostInteropControler &automation() override { return *this; }
 
+    /// \note `SpectrumWorxCore::program()` is the engine's and is not virtual, so
+    /// this deliberately does not overload it -- the two are different objects
+    /// with different owners and a name that says which.
+    Program &programMain() override { return programMain_; }
+
+    void editParameter(ParameterID, float value) const override;
+    bool editSlot(std::uint8_t slot, std::int8_t effectIndex) override;
+    void editModuleMove(std::uint8_t from, std::uint8_t to) override;
+
     void editorOpened(GUI::SpectrumWorxEditor &) override;
     void editorClosed() override;
 

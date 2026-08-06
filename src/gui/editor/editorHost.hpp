@@ -42,8 +42,10 @@ namespace SW
 {
 //------------------------------------------------------------------------------
 
+class Program;
 class SpectrumWorxCore;
 class Plugin2HostInteropControler;
+union ParameterID;
 
 namespace GUI
 {
@@ -62,7 +64,46 @@ class LE_NOVTABLE EditorHost
   public:
     /// The engine. Parameters, the module chain, the setup and the process lock
     /// all come from here.
+    ///
+    /// \note And the audio thread's, for as long as the plugin is activated. What
+    /// the editor reads is `programMain()`; what is still legitimately taken from
+    /// here is the engine's own -- the spectral setup and the LFO clock.
     virtual SpectrumWorxCore &core() = 0;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The Program the main thread owns, which is the one the editor
+    /// draws and edits. `[main-thread]`
+    ///
+    /// \note Not `core().program()`, which belongs to the audio thread while the
+    /// plugin is activated -- §2 rule 1. The editor walks this state constantly
+    /// (`resyncModuleRack()`, `getIndexForModule()`, every strip holding a module
+    /// out of it), and the module chain is a circular intrusive list the engine
+    /// splices in `drainCommands()`. A walk that overlaps a splice crosses into
+    /// another chain's root, which `isEnd()` does not recognise as an end.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    virtual Program &programMain() = 0;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief An edit, both halves of it: applied to the Program this thread owns
+    /// and queued for the engine. `[main-thread]`
+    ///
+    /// \note One call rather than two, because leaving them to the caller is what
+    /// lets them come apart -- a bare `toEngine().push()` moves the engine and not
+    /// the copy `paramsValue` answers from.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    virtual void editParameter(ParameterID, float value) const = 0;
+
+    /// \brief Puts \p effectIndex in \p slot, in both copies. `[main-thread]`
+    /// \return false when the effect is not in this build, which is the one
+    /// failure a caller can still be told about synchronously.
+    virtual bool editSlot(std::uint8_t slot, std::int8_t effectIndex) = 0;
+
+    /// \brief Moves the module in \p from to \p to, in both copies. `[main-thread]`
+    virtual void editModuleMove(std::uint8_t from, std::uint8_t to) = 0;
 
     /// The other direction: telling the host that the user moved something.
     /// Gestures, automation notifications and module chain changes.

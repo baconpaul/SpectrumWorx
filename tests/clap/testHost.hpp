@@ -710,6 +710,21 @@ class ActivePlugin
 
     ////////////////////////////////////////////////////////////////////////////
     ///
+    /// \brief `clap_plugin::on_main_thread`, which a host calls after the plugin
+    /// asks through `request_callback`.
+    ///
+    /// \note Nothing here answers that request on its own -- `TestHost` counts it
+    /// and `nullHost()` drops it -- so a case that needs the *main thread's* copy
+    /// of the model brought level has to say when. That is where a host parameter
+    /// write, applied to the engine on the audio thread, is echoed into
+    /// `programMain_`; until it runs, the two are legitimately one drain apart.
+    ///                                       (06.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    void pumpMainThread() const { pPlugin_->on_main_thread(pPlugin_); }
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
     /// \brief reset() as a host calls it: `[audio-thread & active]`, and
     /// **between blocks rather than under one**.
     ///

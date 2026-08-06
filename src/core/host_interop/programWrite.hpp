@@ -29,6 +29,10 @@
 //------------------------------------------------------------------------------
 #include "core/automatedModuleChain.hpp"
 #include "core/modules/automatedModule.hpp"
+/// \note The definitions, not just the declarations: this header instantiates
+/// `setAutomatedParameter` and `setAutomatedLFOParameter`, and a translation unit
+/// that includes only the interface links against neither.
+#include "core/modules/automatedModuleImpl.inl"
 #include "core/modules/moduleDSPAndGUI.hpp"
 #include "core/parameterID.hpp"
 

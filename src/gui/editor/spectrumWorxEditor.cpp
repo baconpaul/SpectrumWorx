@@ -310,10 +310,13 @@ Engine::Setup const &SpectrumWorxEditor::engineSetup() const
     return effect().uncheckedEngineSetup();
 }
 
-AutomatedModuleChain &SpectrumWorxEditor::moduleChain() { return effect().moduleChain(); }
+/// \note The main thread's chain, not the engine's. The editor walks this
+/// constantly and the engine splices its own copy inside `process()`; see the
+/// note on `EditorHost::programMain()`.
+AutomatedModuleChain &SpectrumWorxEditor::moduleChain() { return program().moduleChain(); }
 AutomatedModuleChain const &SpectrumWorxEditor::moduleChain() const
 {
-    return effect().moduleChain();
+    return program().moduleChain();
 }
 
 SpectrumWorxCore &SpectrumWorxEditor::effect() { return editorHost_.core(); }
@@ -328,8 +331,11 @@ SpectrumWorxEditor::Host const &SpectrumWorxEditor::host() const
     return const_cast<SpectrumWorxEditor &>(*this).host();
 }
 
-Program &SpectrumWorxEditor::program() { return effect().program(); }
-Program const &SpectrumWorxEditor::program() const { return effect().program(); }
+Program &SpectrumWorxEditor::program() { return editorHost_.programMain(); }
+Program const &SpectrumWorxEditor::program() const
+{
+    return const_cast<SpectrumWorxEditor &>(*this).program();
+}
 
 void SpectrumWorxEditor::togglePresetBrowser(juce::Button const &button)
 {
@@ -685,8 +691,7 @@ void SpectrumWorxEditor::moduleDragEnd(ModuleUI &moduleUI, juce::MouseEvent cons
             pRegion->moveToSlot(static_cast<std::uint8_t>(slot + step));
     }
 
-    Threading::publishModuleMove(moduleChainOwner(), editorHost().toEngine(), sourceIndex,
-                                 targetIndex);
+    editorHost().editModuleMove(sourceIndex, targetIndex);
 
     host().gestureBegin("Drag module");
     for (std::uint8_t slot(std::min(sourceIndex, targetIndex));
@@ -976,17 +981,9 @@ bool SpectrumWorxEditor::setModuleInSlot(std::uint8_t const slotIndex,
                                          std::int8_t const effectIndex)
 {
     LE_ASSERT(isThisTheGUIThread());
-    auto &core(moduleChainOwner());
-
-    /// \note Building it is still synchronous and still this thread's, so an
-    /// effect this build does not have is still a failure the caller can be told
-    /// about here. Only the *installing* is deferred.
-    auto *const pModule(Threading::createModuleForSlot(core, effectIndex, slotIndex));
-    if ((effectIndex != AutomatedModuleChain::noModule) && !pModule)
-        return false;
-
-    Threading::publishSlot(core, editorHost().toEngine(), slotIndex, effectIndex, pModule);
-    return true;
+    /// \note Both copies, and the module building that goes with each, belong to
+    /// the host now -- it is the one that owns them. \see EditorHost::editSlot().
+    return editorHost().editSlot(slotIndex, effectIndex);
 }
 
 void SpectrumWorxEditor::addUserAddedModule(std::uint8_t const effectIndex)
@@ -1355,7 +1352,7 @@ void SpectrumWorxEditor::updateSettings()
 
 void SpectrumWorxEditor::updateMainKnobs()
 {
-    auto const &parameters(effect().parameters());
+    auto const &parameters(program().parameters());
     using namespace GlobalParameters;
     in_.setValue(parameters.get<InputGain>());
     out_.setValue(parameters.get<OutputGain>());
@@ -1718,7 +1715,7 @@ void SpectrumWorxEditor::queueGlobalParameter(std::uint8_t const index, float co
     parameterID.value.type = ParameterID::GlobalParameter;
     parameterID.value._.global = {ParameterID::Zero, ParameterID::Zero, index};
 
-    editorHost().toEngine().push(Threading::setBaseParameter(parameterID.binaryValue, value));
+    editorHost().editParameter(parameterID, value);
 }
 
 void SpectrumWorxEditor::updateModuleParameterAndNotifyHost(ModuleUI &moduleUI,
@@ -1732,8 +1729,7 @@ void SpectrumWorxEditor::updateModuleParameterAndNotifyHost(ModuleUI &moduleUI,
     parameterID.value.type = ParameterID::ModuleParameter;
     parameterID.value._.module = {ParameterID::Zero, moduleParameterIndex, moduleIndex};
 
-    editorHost().toEngine().push(
-        Threading::setBaseParameter(parameterID.binaryValue, parameterValue));
+    editorHost().editParameter(parameterID, parameterValue);
 
     /// \note Straight to the host rather than waiting for the engine to confirm.
     /// `automatedParameterChanged` queues too -- into the ring the host collects
@@ -2333,8 +2329,7 @@ void SpectrumWorxEditor::LFODisplay::queueLFOParameter(std::uint8_t const lfoPar
     parameterID.value.type = ParameterID::LFOParameter;
     parameterID.value._.lfo = {lfoParameterIndex, moduleParameterIndex, moduleIndex()};
 
-    editor().editorHost().toEngine().push(
-        Threading::setBaseParameter(parameterID.binaryValue, value));
+    editor().editorHost().editParameter(parameterID, value);
 }
 
 void SpectrumWorxEditor::LFODisplay::verifyGUIAndLFOConsistency() const

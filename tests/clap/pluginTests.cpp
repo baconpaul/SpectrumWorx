@@ -1228,6 +1228,13 @@ TEST_CASE("A full rack with LFOs running and an editor open processes cleanly", 
         REQUIRE(std::isfinite(peak(rightOut)));
     }
 
+    /// \note The slots were filled by *host* parameter events, so the engine
+    /// applied them on the audio thread and echoed them to the main thread; this
+    /// is the host running the callback that lands them in the Program the editor
+    /// draws from. Without it the rack is legitimately empty -- the two copies are
+    /// one drain apart, which is the model rather than a fault.
+    plugin.pumpMainThread();
+
     // The rack is what was asked for, and the sweeps reached the interface.
     CHECK(editor->moduleChain().size() == slots);
 
