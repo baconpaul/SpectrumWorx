@@ -81,8 +81,11 @@ class SpectrumWorxEditor final : private SkinLifetime,
                                  private juce::Timer
 {
   public:
-    static unsigned short const estimatedWidth = 563;
-    static unsigned short const estimatedHeight = 376;
+    /// \note constexpr rather than `static ... const`: these are compared against
+    /// and passed by reference outside this class, and an in-class initialiser
+    /// with no out-of-line definition is not something that can be odr-used.
+    static constexpr unsigned short estimatedWidth{563};
+    static constexpr unsigned short estimatedHeight{376};
 
   public: //...mrmlj...VST 2.4 editor dummy implementation...
     static bool setKnobMode(int) { return false; }
@@ -93,7 +96,52 @@ class SpectrumWorxEditor final : private SkinLifetime,
     static void idle() {}
 
   public:
-    explicit SpectrumWorxEditor(EditorHost &);
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief What opening the preset browser or the settings panel does to the
+    /// editor.
+    ///
+    ///   Both panels are 191 x 363 and the editor's artwork is 563 x 376. Its
+    /// left column is 213 px wide and every pixel of it is spoken for -- the
+    /// in/out/mix knobs, the module-info and LFO column, and the two buttons that
+    /// open these panels, which a panel must not cover or there is no way to shut
+    /// it again. So a panel either covers the module strips or the editor grows a
+    /// column for it, and this says which. Only one panel is ever open either
+    /// way: there is one panel-sized rectangle, wherever it is. \see overlayX and
+    /// panelColumnX below for the two places it can be.
+    ///                                       (06.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    enum class PanelPlacement : std::uint8_t
+    {
+        /// Over the module strips, in an editor that never changes size. Stage
+        /// 6.4's shape: what every host can do, and what a live rack vanishes
+        /// behind.
+        overlay,
+
+        /// The editor asks its host for a wider window while a panel is up and
+        /// gives the space back when it shuts, so nothing is covered. Needs a
+        /// host that honours `clap_host_gui::request_resize`; one that refuses
+        /// leaves the panel over the strips, as `overlay`.
+        expandContract,
+
+        /// The column is always there and always holds a panel -- the preset
+        /// browser when the user has asked for nothing else, so that the plugin
+        /// opens on the thing they most often came for. \see openRestingPanel().
+        alwaysVisible
+    }; // enum class PanelPlacement
+
+    /// \note A per-editor property rather than a build-time constant: this is the
+    /// sort of thing that ends up on the settings panel's interface page, and a
+    /// test has to be able to drive all three arrangements against one build.
+    static constexpr PanelPlacement defaultPanelPlacement{PanelPlacement::alwaysVisible};
+
+  public:
+    /// \note The placement is a constructor argument and not only a setter
+    /// because `alwaysVisible` has to be in force before the shim reads the
+    /// editor's size -- see the constructor.
+    explicit SpectrumWorxEditor(EditorHost &, PanelPlacement = defaultPanelPlacement);
     ~SpectrumWorxEditor();
 
   public:
@@ -359,31 +407,60 @@ class SpectrumWorxEditor final : private SkinLifetime,
   public: //...mrmlj...needed at end of preset loading...
     void setLastModulePosition(std::uint8_t slotIndex);
 
-    /// \brief Where the preset browser and the settings panel go.
-    ///
-    /// \note Both are 191 x 363 and there is exactly one place in a 563 x 376
-    /// editor that will take one: over the module strips, right edge flush with
-    /// theirs. The left column is 213 px wide and every pixel of it is spoken
-    /// for -- the in/out/mix knobs, the module-info and LFO column, and the two
-    /// buttons that open these panels, which an overlay must not cover or there
-    /// is no way to shut it again. So the panels share one rectangle and only
-    /// one of them is ever open. Stage 6.4; the alternative was to grow the
-    /// editor while a panel is up, which needs a host that honours a resize
-    /// request and 6.6 ships non-resizable.
-    ///                                       (01.08.2026.) (SW port)
+    /// \see PanelPlacement, declared above the constructor that takes one.
+    PanelPlacement panelPlacement() const { return panelPlacement_; }
+    void panelPlacement(PanelPlacement);
+
+    /// \brief Whether the panel has a column of its own rather than the module
+    /// strips' rectangle: `alwaysVisible`, or `expandContract` with a panel up
+    /// and a host that agreed to the resize.
+    bool panelHasOwnColumn() const { return panelHasOwnColumn_; }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Where a panel goes, in either arrangement.
+    ////////////////////////////////////////////////////////////////////////////
+
     /// \note overlayX is the module strips' right edge less overlayWidth, and
     /// the .cpp static_asserts it against ModuleUI's own constants rather than
     /// this header taking a dependency on moduleUI.hpp for three numbers.
-    static unsigned short const overlayWidth = 191;
-    static unsigned short const overlayHeight = 363;
-    static unsigned short const overlayX = 362;
-    static unsigned short const overlayY = (estimatedHeight - overlayHeight) / 2;
+    static constexpr unsigned short overlayWidth{191};
+    static constexpr unsigned short overlayHeight{363};
+    static constexpr unsigned short overlayX{362};
+    static constexpr unsigned short overlayY{(estimatedHeight - overlayHeight) / 2};
+
+    /// The skin's right margin, the module strips ending at overlayX + overlayWidth.
+    static constexpr unsigned short panelMargin{estimatedWidth - (overlayX + overlayWidth)};
+
+    /// \brief The editor with a column of its own for the panel, and where the
+    /// panel goes in it: the same margin either side as the strips have.
+    static constexpr unsigned short expandedWidth{estimatedWidth + panelMargin + overlayWidth};
+    static constexpr unsigned short panelColumnX{estimatedWidth};
 
   private:
     void newSampleFileSelected(juce::File const &);
 
-    /// \brief Parents \p panel to the editor at the overlay rectangle, on top.
-    void openOverlay(juce::Component &panel);
+    /// \brief Parents \p panel to the editor, on top, wherever the placement puts
+    /// it.
+    void showPanel(juce::Component &panel);
+
+    /// Whichever of the two panels is up, or nullptr.
+    juce::Component *currentPanel();
+
+    /// \brief Puts whichever panel is up where the placement says, and gives the
+    /// editor the width that needs. The one place the three modes differ.
+    void layOutPanels();
+
+    /// \brief Grows the editor by a panel column or gives it back, asking the
+    /// host to follow. \return whether the panel gets a column of its own.
+    bool setPanelColumnVisible(bool wanted);
+
+    /// \brief Drops both panels and un-toggles both buttons -- and, in
+    /// `alwaysVisible`, opens the resting one in their place.
+    void hidePanels();
+
+    /// \brief What `alwaysVisible` leaves in the column when the user has asked
+    /// for nothing: the preset browser. \see the definition.
+    void openRestingPanel();
 
     void updateSettings();
 
@@ -847,6 +924,14 @@ class SpectrumWorxEditor final : private SkinLifetime,
     /// \note First member, and a reference: everything below is built in the
     /// constructor body and reaches through it.
     EditorHost &editorHost_;
+
+    /// \note Second, because the constructor reads it: an alwaysVisible editor
+    /// takes its column before anything below is built. panelHasOwnColumn_ is not
+    /// derivable from it -- `expandContract` with no panel up and `expandContract`
+    /// against a host that refused the resize are both "no column", and only the
+    /// second says so.
+    PanelPlacement panelPlacement_;
+    bool panelHasOwnColumn_{false};
 
     std::uint8_t nextAvailableModuleSlot_;
 

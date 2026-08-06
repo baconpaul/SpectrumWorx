@@ -106,8 +106,8 @@ unsigned int const sampleNameVerticalOffset = 306;
 #pragma warning(push)
 #pragma warning(disable : 4355) // 'this' used in base member initializer list.
 
-SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost)
-    : editorHost_(editorHost), nextAvailableModuleSlot_(0),
+SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost, PanelPlacement const placement)
+    : editorHost_(editorHost), panelPlacement_(placement), nextAvailableModuleSlot_(0),
 
       in_(*this, 18, 37), out_(*this, 18, 110), mix_(*this, 18, 185),
 
@@ -175,6 +175,24 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost)
 #endif // LE_NO_PRESETS
 
     resyncModuleRack();
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The column, taken here rather than through requestEditorSize(),
+    /// because at this point there is no window to resize: the shim builds this
+    /// editor inside `guiCreate()` and then answers `guiGetSize()` out of the
+    /// holder, which it sizes from *this* component. So an alwaysVisible editor
+    /// has to already be the width it wants, and the host is told once, the way
+    /// it is told 563 x 376 otherwise.
+    ///                                       (06.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    if (panelPlacement_ == PanelPlacement::alwaysVisible)
+    {
+        panelHasOwnColumn_ = true;
+        setSize(expandedWidth, estimatedHeight);
+        openRestingPanel();
+    }
 
     setOpaque(true);
     setVisible();
@@ -322,20 +340,22 @@ void SpectrumWorxEditor::togglePresetBrowser(juce::Button const &button)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-// SpectrumWorxEditor::openOverlay()
-// ---------------------------------
+// SpectrumWorxEditor::showPanel()
+// -------------------------------
 //
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \note The whole of what stage 6.4 replaced ~500 lines of OwnedWindowBase
 /// with. The panel is an ordinary child; the only thing that needed saying is
-/// where it goes and that it goes on top -- gradient_ raises itself to always-
-/// on-top for a module drag, and a stale one would otherwise paint through this.
-///                                           (01.08.2026.) (SW port)
+/// that it goes on top -- gradient_ raises itself to always-on-top for a module
+/// drag, and a stale one would otherwise paint through this. *Where* it goes is
+/// layOutPanels()' answer and not this function's, because the placement can
+/// change under a panel that is already up.
+///                                           (01.08.2026, amended 06.08.2026.) (SW port)
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-void SpectrumWorxEditor::openOverlay(juce::Component &panel)
+void SpectrumWorxEditor::showPanel(juce::Component &panel)
 {
     static_assert(overlayX == ModuleUI::horizontalOffset +
                                   SW::Constants::maxNumberOfModules *
@@ -347,8 +367,8 @@ void SpectrumWorxEditor::openOverlay(juce::Component &panel)
     LE_ASSERT(panel.getHeight() == overlayHeight);
 
     /// \note The whole of the "one rectangle, one panel" rule, in the one place
-    /// both callers pass through. Both toggle buttons feed this, and a host or a
-    /// harness can reach showSettings()/showPresetBrowser() without touching
+    /// every caller passes through. Both toggle buttons feed this, and a host or
+    /// a harness can reach showSettings()/showPresetBrowser() without touching
     /// either button, so the invariant belongs here rather than in the handlers.
 #ifndef LE_NO_PRESETS
     LE_ASSERT_MSG(!(settings_.has_value() && presetBrowser_.has_value()),
@@ -356,26 +376,180 @@ void SpectrumWorxEditor::openOverlay(juce::Component &panel)
 #endif // !LE_NO_PRESETS
     LE_ASSERT(!panel.getParentComponent());
 
-    panel.setTopLeftPosition(overlayX, overlayY);
     addAndMakeVisible(panel);
     panel.toFront(false);
+    layOutPanels();
+}
+
+juce::Component *SpectrumWorxEditor::currentPanel()
+{
+    if (settings_.has_value())
+        return &*settings_;
+#ifndef LE_NO_PRESETS
+    if (presetBrowser_.has_value())
+        return &*presetBrowser_;
+#endif // !LE_NO_PRESETS
+    return nullptr;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// SpectrumWorxEditor::layOutPanels()
+// ----------------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+///   Where the three placements are the three placements, and the only code that
+/// reads panelPlacement_. Everything that opens or shuts a panel ends here, so
+/// there is one answer to "how wide is the editor and where is the panel" rather
+/// than one per entry point.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxEditor::layOutPanels()
+{
+    auto *const pPanel(currentPanel());
+
+    /// \note alwaysVisible keeps the column whether or not anything is in it: it
+    /// is what the resting panel is opened *into*, and holding it means the
+    /// editor does not flicker a width between one panel closing and the next
+    /// opening.
+    bool const wantColumn((panelPlacement_ == PanelPlacement::alwaysVisible) ||
+                          ((panelPlacement_ == PanelPlacement::expandContract) && pPanel));
+
+    auto const ownColumn(setPanelColumnVisible(wantColumn));
+    if (pPanel)
+        pPanel->setTopLeftPosition(ownColumn ? panelColumnX : overlayX, overlayY);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// SpectrumWorxEditor::setPanelColumnVisible()
+// -------------------------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The host is asked first and the editor follows its answer, because the
+/// window is the host's and this is a request. One that refuses to *grow* leaves
+/// everything as it was and the panel goes over the module strips, which is
+/// exactly overlay placement -- so a host with no `clap.gui` at all gets the
+/// stage 6.4 editor and nothing worse. One that refuses to *shrink* has already
+/// been handed the space back and the worst of that is a margin, so the editor
+/// contracts either way.
+///                                           (06.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+bool SpectrumWorxEditor::setPanelColumnVisible(bool const wanted)
+{
+    if (wanted == panelHasOwnColumn_)
+        return panelHasOwnColumn_;
+
+    unsigned short const width(wanted ? expandedWidth : estimatedWidth);
+    bool const granted(editorHost_.requestEditorSize(width, estimatedHeight));
+    if (wanted && !granted)
+        return false;
+
+    panelHasOwnColumn_ = wanted;
+    setSize(width, estimatedHeight);
+    return wanted;
+}
+
+void SpectrumWorxEditor::panelPlacement(PanelPlacement const placement)
+{
+    if (placement == panelPlacement_)
+        return;
+
+    panelPlacement_ = placement;
+
+    /// \note Leaving alwaysVisible drops the resting panel, because nothing the
+    /// user asked for is in it -- a panel they *did* ask for stays up and moves.
+    if ((placement != PanelPlacement::alwaysVisible) && settings_.has_value() &&
+        !settingsButton_.getToggleState())
+        settings_ = std::nullopt;
+
+    if ((placement == PanelPlacement::alwaysVisible) && !currentPanel())
+    {
+        openRestingPanel();
+        return;
+    }
+    layOutPanels();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// SpectrumWorxEditor::openRestingPanel()
+// --------------------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+///   The preset browser, and its button lit like any other way of opening it.
+///
+/// \note In `alwaysVisible` the column cannot be empty, so the two buttons stop
+/// being independent toggles and become a two-way selector: pressing the lit one
+/// lands back here. Which is why this goes through showPresetBrowser() rather
+/// than building the panel itself -- there is one way to put the browser up, and
+/// the button state and the layout follow from it either way.
+///
+/// \note The About page is the fallback and not the resting state. It was the
+/// resting state briefly, on the reasoning that it is the one panel with nothing
+/// in it to get wrong; the browser is what a user opens the plugin for.
+///                                           (06.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxEditor::openRestingPanel()
+{
+    LE_ASSERT(panelPlacement_ == PanelPlacement::alwaysVisible);
+    LE_ASSERT(!currentPanel());
+
+#ifndef LE_NO_PRESETS
+    showPresetBrowser(true);
+#else
+    /// \note A build with no browser still may not leave the column empty.
+    showSettings(aboutPageIndex);
+#endif // !LE_NO_PRESETS
+}
+
+void SpectrumWorxEditor::hidePanels()
+{
+    settings_ = std::nullopt;
+    settingsButton_.setToggleState(false, juce::dontSendNotification);
+#ifndef LE_NO_PRESETS
+    presetBrowser_ = std::nullopt;
+    preset_.setToggleState(false, juce::dontSendNotification);
+#endif // !LE_NO_PRESETS
+
+    if (panelPlacement_ == PanelPlacement::alwaysVisible)
+        openRestingPanel();
+    else
+        layOutPanels();
 }
 
 /// \note The two panels share one rectangle, so opening either shuts the other
 /// and un-toggles its button.
+///
+/// \note Only *builds* a browser when there is none, as showSettings() does. It
+/// used to rebuild unconditionally, which was invisible while the only way here
+/// was a button that had just been off -- and is not, now that `alwaysVisible`
+/// rests on an open browser: pressing PRESETS would have thrown away whichever
+/// bank the user was in and dropped them back at the root.
 void SpectrumWorxEditor::showPresetBrowser(bool const show)
 {
-    if (show)
+    if (!show)
+    {
+        hidePanels();
+        return;
+    }
+
+    if (!presetBrowser_.has_value())
     {
         settings_ = std::nullopt;
         settingsButton_.setToggleState(false, juce::dontSendNotification);
         presetBrowser_.emplace();
-        openOverlay(*presetBrowser_);
+        showPanel(*presetBrowser_);
     }
-    else
-    {
-        presetBrowser_ = std::nullopt;
-    }
+    preset_.setToggleState(true, juce::dontSendNotification);
 }
 
 void SpectrumWorxEditor::showFactoryBank(juce::String const &bank)
@@ -579,7 +753,25 @@ void drawMainAreaText(juce::Graphics &graphics, EditorMainAreaText const &text)
 
 void SpectrumWorxEditor::paint(juce::Graphics &graphics)
 {
-    GUI::paintImage(graphics, resourceBitmap<EditorBackground>());
+    auto const &background(resourceBitmap<EditorBackground>());
+    GUI::paintImage(graphics, background);
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The skin is 563 px wide and an editor with a panel column is not,
+    /// so the column is the bitmap's last pixel column stretched across it.
+    /// That column is the skin's outer surround -- flat, top to bottom, because
+    /// the rounded rectangle holding the module strips ends ten pixels before
+    /// it -- so stretching it is what "the panel sits on the same chrome" looks
+    /// like, and it stays right for a skin that changes the colour. The
+    /// alternative was a constant here that a new skin would silently disagree
+    /// with. This component is opaque, so something has to cover it.
+    ///                                       (06.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    if (auto const extra(getWidth() - background.getWidth()); extra > 0)
+        graphics.drawImage(background, background.getWidth(), 0, extra, getHeight(),
+                           background.getWidth() - 1, 0, 1, background.getHeight());
 
     juce::Font const &moduleNameFont(Theme::singleton().blueFont());
     juce::Font const &sampleNameFont(DrawableText::defaultFont());
@@ -609,7 +801,7 @@ void SpectrumWorxEditor::buttonClicked(juce::Button *const pButton)
         else
         {
             LE_ASSERT(settings_);
-            settings_ = std::nullopt;
+            hidePanels();
         }
     }
 #ifndef LE_NO_PRESETS
@@ -1137,6 +1329,9 @@ void SpectrumWorxEditor::mouseDown(juce::MouseEvent const &event)
     }
 }
 
+/// \note `settings_` may already be up without the user having opened it -- it is
+/// what alwaysVisible rests on -- so this only builds a panel when there is none,
+/// and lights the button either way.
 void SpectrumWorxEditor::showSettings(unsigned int const pageIndexToActivate)
 {
     if (!settings_.has_value())
@@ -1146,7 +1341,7 @@ void SpectrumWorxEditor::showSettings(unsigned int const pageIndexToActivate)
         preset_.setToggleState(false, juce::dontSendNotification);
 #endif // !LE_NO_PRESETS
         settings_.emplace();
-        openOverlay(*settings_);
+        showPanel(*settings_);
     }
     settings_->setCurrentTabIndex(pageIndexToActivate, false);
     settingsButton_.setToggleState(true, juce::dontSendNotification);

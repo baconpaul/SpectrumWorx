@@ -98,6 +98,24 @@ class LE_NOVTABLE EditorHost
     virtual void editorClosed() = 0;
 
     ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Asks whoever owns the window to make it \p width x \p height.
+    /// `[main-thread]`
+    ///
+    /// \return whether it will be. A refusal is not a failure and must not be
+    /// treated as one: the editor lays its panel out over the module strips
+    /// instead. \see SpectrumWorxEditor::PanelPlacement.
+    ///
+    /// \note `clap_host_gui::request_resize`, which is the only way a plugin can
+    /// change the size of a window it does not own -- and the reason this is on
+    /// the interface rather than something the editor does for itself. Nothing
+    /// here says the editor may be dragged bigger: `can_resize` stays false and
+    /// this is a request for one particular size.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    virtual bool requestEditorSize(int width, int height) = 0;
+
+    ////////////////////////////////////////////////////////////////////////////
     // The side channel's sample: the external audio file that feeds it in place
     // of the host's side chain port.
     //

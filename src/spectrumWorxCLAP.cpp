@@ -1506,6 +1506,57 @@ void SpectrumWorxCLAP::editorClosed() { pEditor_ = nullptr; }
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+// SpectrumWorxCLAP::requestEditorSize()
+// -------------------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+///   What the editor calls when it wants a column for its preset browser or its
+/// settings panel, and again when it gives one back.
+///
+/// \note This is not `can_resize`, which stays false: the user may not drag the
+/// window, and there is nothing here for `adjust_size` to negotiate. Both facts
+/// are the shim's and unchanged -- a plugin may ask for one particular size
+/// whether or not its editor is resizable (ext/gui.h:35-45).
+///
+/// \note A host that offers no `clap.gui`, or one that says no, gets a false
+/// back and the editor lays the panel over the module strips instead. That is
+/// the only handling this needs: nothing here is a failure worth telling the
+/// user about, and a warning about a mechanism working as specified is noise.
+///                                           (06.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+bool SpectrumWorxCLAP::requestEditorSize(int const width, int const height)
+{
+    LE_ASSERT(Threading::isMainThread() || !Threading::isAudioThread());
+
+    if (!_host.canUseGui())
+        return false;
+
+    auto const requestedWidth(static_cast<std::uint32_t>(width));
+    auto const requestedHeight(static_cast<std::uint32_t>(height));
+    if (!_host.guiRequestResize(requestedWidth, requestedHeight))
+        return false;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note And the shim is told as well, because a host that has accepted
+    /// "doesn't have to call set_size()" (ext/gui.h:221). The two clap-wrapper
+    /// formats do -- VST3 goes back round through `IPlugFrame::resizeView` --
+    /// so this is for the host that does not: without it the JUCE side keeps the
+    /// old window size and the new column is clipped away by the holder. Both
+    /// paths land on the same `desktop()->setSize()`, so a host that does call
+    /// it is a second write of the size it already is.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    if (clapJuceShim_ && clapJuceShim_->isEditorAttached())
+        clapJuceShim_->guiSetSize(requestedWidth, requestedHeight);
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
 // SpectrumWorxCLAP::setNewSample()
 // --------------------------------
 //

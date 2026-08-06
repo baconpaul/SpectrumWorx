@@ -37,6 +37,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <memory>
 //------------------------------------------------------------------------------
 namespace
@@ -107,6 +108,11 @@ class HarnessHost final : public GUI::EditorHost
     void editorOpened(GUI::SpectrumWorxEditor &) override {}
     void editorClosed() override {}
 
+    /// \note Granted, as a host that honours `request_resize` does, so that this
+    /// page renders the arrangement a user gets rather than the fallback. The
+    /// page follows the editor's size; there is no window under either.
+    bool requestEditorSize(int, int) override { return true; }
+
     /// \note The external audio file, declined: the harness has no engine to
     /// feed one to and renders a still image, so the sample area draws its empty
     /// state. Loading one is what sampleTests.cpp covers.
@@ -143,7 +149,7 @@ class EditorPage final : public juce::Component
         /// own ReferenceCountedGUIInitializationGuard makes Theme the default
         /// LookAndFeel (gui.cpp), and a second reference to it outlives that
         /// guard -- which JUCE asserts on when the singleton goes.
-        editor_ = std::make_unique<GUI::SpectrumWorxEditor>(host_);
+        editor_ = std::make_unique<GUI::SpectrumWorxEditor>(host_, panelPlacement());
         addAndMakeVisible(*editor_);
         setSize(editor_->getWidth(), editor_->getHeight());
 
@@ -192,7 +198,46 @@ class EditorPage final : public juce::Component
 
     void resized() override { editor_->setTopLeftPosition(0, 0); }
 
+    /// \note The page is whatever size the editor is, and the editor changes
+    /// size: opening a panel asks its host for a column and takes one here,
+    /// because this harness grants every request. Without this the render is
+    /// cropped to 563 px and the column -- the thing the page exists to show --
+    /// is the part that falls off.
+    void childBoundsChanged(juce::Component *const pChild) override
+    {
+        if (pChild == editor_.get())
+            setSize(editor_->getWidth(), editor_->getHeight());
+    }
+
   private:
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief SW_SHOW_UI_PANEL_PLACEMENT, which is the whole reason a still image
+    /// is worth anything here: the three arrangements are three pictures, and
+    /// which of them is right is a question for an eye and not a test.
+    ///
+    /// \note At construction rather than through the setter, because that is what
+    /// a plugin does and because `alwaysVisible` takes its column there.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    static GUI::SpectrumWorxEditor::PanelPlacement panelPlacement()
+    {
+        using Placement = GUI::SpectrumWorxEditor::PanelPlacement;
+
+        auto const *const requested(std::getenv("SW_SHOW_UI_PANEL_PLACEMENT"));
+        if (!requested)
+            return GUI::SpectrumWorxEditor::defaultPanelPlacement;
+
+        std::fprintf(stderr, "sw-show-ui: panel placement %s\n", requested);
+        if (std::strcmp(requested, "overlay") == 0)
+            return Placement::overlay;
+        if (std::strcmp(requested, "always-visible") == 0)
+            return Placement::alwaysVisible;
+        LE_ASSERT_MSG(std::strcmp(requested, "expand-contract") == 0,
+                      "SW_SHOW_UI_PANEL_PLACEMENT: overlay, expand-contract or always-visible.");
+        return Placement::expandContract;
+    }
+
     void loadFactoryPreset(juce::String const &bank, juce::String const &preset)
     {
         std::fprintf(stderr, "sw-show-ui: loading %s / %s\n", bank.toRawUTF8(), preset.toRawUTF8());

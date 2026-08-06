@@ -61,6 +61,8 @@ using namespace LE::SW;
 ///                                           (03.08.2026.) (SW port)
 using SWTest::HostSideJuce;
 using SWTest::Instance;
+
+using Editor = GUI::SpectrumWorxEditor;
 } // anonymous namespace
 
 TEST_CASE("Closing one editor leaves JUCE standing for the other", "[gui][two-instances]")
@@ -70,8 +72,12 @@ TEST_CASE("Closing one editor leaves JUCE standing for the other", "[gui][two-in
 
     Instance a, b;
 
-    a.openEditor();
-    b.openEditor();
+    /// \note Overlay placement, which is not the default: this case is about
+    /// JUCE's lifetime and wants a known editor size to check the survivor
+    /// against. The default builds a preset browser into every editor, which is
+    /// a second thing to go wrong in a case about the first.
+    a.openEditor(Editor::PanelPlacement::overlay);
+    b.openEditor(Editor::PanelPlacement::overlay);
     CHECK(GUI::Theme::haveSingleton());
 
     a.closeEditor();

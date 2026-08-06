@@ -36,6 +36,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <memory>
+#include <vector>
 //------------------------------------------------------------------------------
 namespace SWTest
 {
@@ -73,7 +74,12 @@ class Instance final : public GUI::EditorHost
         REQUIRE(engine_.initialise());
     }
 
-    void openEditor() { pEditor_ = std::make_unique<GUI::SpectrumWorxEditor>(*this); }
+    using PanelPlacement = GUI::SpectrumWorxEditor::PanelPlacement;
+
+    void openEditor(PanelPlacement const placement = GUI::SpectrumWorxEditor::defaultPanelPlacement)
+    {
+        pEditor_ = std::make_unique<GUI::SpectrumWorxEditor>(*this, placement);
+    }
     void closeEditor() { pEditor_.reset(); }
     GUI::SpectrumWorxEditor &editor() const
     {
@@ -92,6 +98,27 @@ class Instance final : public GUI::EditorHost
 
     void editorOpened(GUI::SpectrumWorxEditor &) override {}
     void editorClosed() override {}
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief `clap_host_gui::request_resize`, recorded and answered.
+    ///
+    /// \note Answering *no* is the interesting host and not a broken one -- the
+    /// extension is optional and a host may refuse any particular size -- so
+    /// `grantResizes` is what a case sets to get the fallback, and the recorded
+    /// sizes are what says the editor asked at all rather than just resizing
+    /// itself behind a window that did not move.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    bool requestEditorSize(int const width, int const height) override
+    {
+        requestedSizes.emplace_back(width, height);
+        return grantResizes;
+    }
+
+    std::vector<juce::Point<int>> requestedSizes;
+    bool grantResizes{true};
 
     juce::File currentSampleFile() const override { return {}; }
     void setNewSample(juce::File const &) override {}

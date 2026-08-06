@@ -230,6 +230,8 @@ class SpectrumWorxCLAP final
     void editorOpened(GUI::SpectrumWorxEditor &) override;
     void editorClosed() override;
 
+    bool requestEditorSize(int width, int height) override;
+
     ////////////////////////////////////////////////////////////////////////////
     // The external audio file the side channel can be fed from.
     //
