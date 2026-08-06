@@ -20,8 +20,8 @@ cannot be held to a number off the machine that minted their fixtures.
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone, on every push: macOS universal, Windows x64 under MSVC 19.51, Linux x64 under GCC 12.4, and again in an Ubuntu 20 / GCC 11 container for the glibc a released binary needs. |
 | Runs | Standalone, with audio, with the real editor, with presets. **Loaded in Bitwig on 06.08.2026 and it crashed** — changing presets with audio running, in `paramsInfo`; not the old deadlock but the same class of fault, and item 1 owns it. Logic and Reaper still unvisited — item 2. |
-| Tests | **four red** as of 06.08.2026, all listed under item 1 and all of the same shape — a harness writing through one path and reading through the other. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`, plus 66 `sw-show-ui` renders. Goldens run in Release only. |
-| Validators | `auval` 10 runs of 10. `vst3-validator` 47/47. `clap-cpp-validator` 21/21, one warning (`scan-time`, below). All three by hand on this machine as of 05.08.2026; CI runs none of them. |
+| Tests | **Green on 06.08.2026** — 102 plugin cases and 140 dsp cases, Debug and Release, the four that were red now fixed and one added for the `stateSave` echo. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`, plus 66 `sw-show-ui` renders. Goldens run in Release only. |
+| Validators | `auval` 10 runs of 10. `vst3-validator` 47/47. **`clap-cpp-validator` 21 of 22** — `state-reproducibility-flush` fails, and it is a regression: it passes at `ce011db~1`. Item 1 owns it. One warning (`scan-time`, below). All three by hand on this machine as of 06.08.2026; CI runs none of them. |
 | CI | `.github/workflows/build-plugin.yml`. **Green on 06.08.2026** — ten jobs (gates, five test legs, four builds) over three platforms, run `31112026299`. Windows Debug is the sixth test leg and is excluded; `tech_debt.md` says why. |
 | Warnings | **Two**, both deliberate `#pragma message` build banners. Our own sources compile under `-Wall -Wextra -Werror` on Apple Clang, GCC 12.4 and GCC 11 — CI passes `-DSW_WERROR=ON` to every leg. MSVC gets nothing and compiles warning-blind — `tech_debt.md`. |
 | Sanitizers | **tsan clean over both binaries as of 06.08.2026** — zero reports across 101 plugin cases and 106 dsp cases, including the case that reproduced the preset-swap race. The earlier clean run, on 02.08.2026, is what that race shows the limit of: nothing then drove a host reading parameters against a running engine, so tsan had nothing to see. `reset()` and `paramsFlush()` entered the realtime region on 03.08.2026 and **have not been run under rtsan since** — item 2. |
@@ -81,31 +81,54 @@ gives the copies a *shape* to keep level and not just values.
   raise it and no callback due before a host asks for the state, so the main
   thread's Program would still be empty when `stateSave` read it.
 
-**Left** — four cases, all the same shape: a harness that writes through one path
-and reads through the other.
+- `stateSave` drains the echo before it reads. A value the host wrote in
+  `process()` is applied to the engine there and echoed over `ToUI`; nothing
+  obliges a host to run the callback that drains it before asking for the state,
+  so a session saved just after automation moved a knob stored the value from
+  before the move. Found by `clap-cpp-validator`, covered by a case of its own.
+
+**The four red cases were all harness faults, and all four are fixed.** Each was
+settled by finding which of the two paths the harness wrote through and which it
+read back:
 
 | | |
 |---|---|
-| `pluginTests.cpp:711` | A host with state and no thread check survives a parameter write |
-| `pluginTests.cpp:955` | An edit made in the interface reaches the engine through the queue |
-| `stateTests.cpp:379` | A session restores before the plugin has a sample rate |
-| `stateTests.cpp:553` | A state stream is read whatever size the pieces arrive in |
+| `stateTests.cpp` ×2 | `driveIntoAState()` wrote `implementation().program()` — the engine's copy — while `stateSave` reads the main thread's. It goes through `EditorHost` now, which is what a user moving a control goes through and the only entry point that moves both. |
+| `pluginTests.cpp:711` | The blanket `pumpMainThread()` added after all 27 raw `params.flush()` sites was wrong in this one: pumping *is* `on_main_thread`, and the case exists to measure the deferral's absence. |
+| `pluginTests.cpp:955` | A bare `toEngine().push()` moves the engine only; the case then read back through the host, which answers from `programMain_`. It uses `editParameter()` now — one call, both halves. |
 
-The 27 raw `params.flush( &*plugin, … )` sites were fixed by pumping the main
-thread after each, and `ActivePlugin::flush()` now does it too — a host runs the
-callback it was asked for, and a case that flushes a value and reads it back
-depends on that. These four use different harnesses: `stateTests.cpp`'s
-`Plugin`/`InStream` pair, and the `[protocol]` case reads engine state directly
-through `implementation().program()`. Each needs the same treatment — pump, or
-read the copy that matches the path it wrote through. **None of them is believed
-to be a product fault and none of them has been shown not to be**, which is the
-first thing to settle.
+> **Two green cases were measuring nothing.** The 303-preset case had been
+> asserting against a stale engine chain — it never renders, so the swap
+> `publishChain()` queued was never drained, and all 303 presets read the five
+> modules the priming left behind. And `stateTests.cpp`'s "A session's parameters
+> come back through a second plugin instance" was comparing one set of defaults
+> against another, because the state it saved was of a plugin nothing had
+> touched. Both check real values now. Worth remembering as the shape of the
+> mistake: a green case measuring the wrong object.
 
-> **The 303-preset case had been asserting against a stale engine chain.** It
-> never renders, so the swap `publishChain()` queued was never drained, and all
-> 303 presets read the five modules the priming left behind. It flushes now and
-> checks the two copies agree. Worth remembering as the shape of the mistake:
-> a green case measuring the wrong object.
+**Still red, and a genuine regression** — `clap-cpp-validator`'s
+`state-reproducibility-flush`, which passes at `ce011db~1` and fails at HEAD.
+Same length both times, 1782 bytes; the whole diff is the `sync` attribute of
+every module parameter, 0 from the instance driven through `flush()` and 1 from
+the one driven through `process()`.
+
+`LFOImpl::SyncTypes::default_()` answers `hasTempoInformation() ? Quarter : Free`
+— a parameter default that reads process-global mutable state, untouched since
+2011 and untouched by this work. What the split changed is *when* the main
+thread's module is built: the engine's is created while the slot event is
+handled, `programMain_`'s when the echo is drained, and the transport becomes
+known in between. Two constructions, two answers, and the copy that gets saved is
+the later one.
+
+The user's own sync edits are safe — `LFODisplay` writes both copies and queues
+the engine leg — so this is the *default* on a freshly filled slot, not lost
+data. Two ways out, and the choice is a real one:
+
+- make the default deterministic, which costs the 2011 nicety of a new LFO
+  arriving tempo-synced when the host has a tempo; or
+- have the slot echo carry the module's unexported LFO values, so the main copy
+  adopts the engine's rather than deriving its own — correct, and a protocol
+  change with per-LFO fan-out.
 
 ### 2 — Drive it in a DAW
 

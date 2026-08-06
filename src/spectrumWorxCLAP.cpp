@@ -1574,6 +1574,27 @@ void SpectrumWorxCLAP::markCurrentProgramAsModified() const
 
 bool SpectrumWorxCLAP::stateSave(clap_ostream const *const stream) noexcept
 {
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The echo first, because this is the main thread and a host may ask
+    /// for the state before the callback the plugin requested has run.
+    ///
+    ///   A parameter the host wrote during `process()` is applied to the engine
+    /// there and echoed over `ToUI`; `onMainThread()` is what normally drains it
+    /// into `programMain_`, and nothing obliges a host to run that between the
+    /// block and the save. `paramsFlush()` already makes the same argument for an
+    /// *inactive* plugin and drains its own echo; this is the active half of it,
+    /// and without it a session saved right after automation moved something
+    /// stores the value from before the move.
+    ///
+    ///   Found by `clap-cpp-validator`'s `state-reproducibility-flush`, which
+    /// sets the same parameters on two instances -- one through `flush()`, one
+    /// through `process()` -- and compares the two state files. They differed.
+    ///                                       (06.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    drainEngineEvents();
+
     /// \note `withDawExtraState`, which a `.swp` does not get. The block is
     /// empty today -- see installDawExtraStateHooks() -- and written anyway, so
     /// that "a session is a preset plus somewhere to put the rest" is a property

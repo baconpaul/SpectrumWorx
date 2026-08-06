@@ -434,21 +434,24 @@ class SpectrumWorxCLAP final
     /// the audio thread is applied there and echoed back over `ToUI`. Neither
     /// thread reads the other's copy.
     ///
-    /// \note **Not yet read.** The `ToUI` half is wired -- a host parameter event
-    /// lands here as well as in the engine -- and the four callers still read
-    /// `program()`, each with a `\todo` saying so. What is missing is the other
-    /// three routes that change this state, and until every one of them feeds
-    /// this copy, reading it would answer the host from a Program that only knows
+    /// \note All four routes that change this state feed it, which is what had to
+    /// be true before `paramsInfo`, `paramsValue`, `paramsValueToText` and
+    /// `stateSave` could answer from it rather than from a Program that only knew
     /// about automation:
     ///
-    ///   - an edit made in the editor, which pushes `SetBaseParameter` and
-    ///     nothing else (`SpectrumWorxEditor::queueGlobalParameter` and
-    ///     `updateModuleParameterAndNotifyHost`);
-    ///   - a slot filled or a module moved from the editor, which reaches
-    ///     `Threading::publish{Slot,ModuleMove}()` directly;
-    ///   - a preset or a session, whose `Loader` targets `core().program()` and
-    ///     publishes one chain -- this copy needs its own, which means cloning a
-    ///     chain module by module through the automated parameter interface.
+    ///   - a host parameter event, over the `ToUI` echo;
+    ///   - an edit made in the editor, over `EditorHost::editParameter()`, which
+    ///     applies here and queues the engine's leg in one call;
+    ///   - a slot filled or a module moved, over `editSlot()`/`editModuleMove()`;
+    ///   - a preset or a session, whose main-thread half is a first pass of
+    ///     `SW::loadPreset` with `onlySetParameters()` -- see
+    ///     `presetLoading.cpp`'s `Loader::mainThreadCopy`.
+    ///
+    /// \note One thing the two copies still disagree about, and it is filed under
+    /// item 1 of doc/tech/todo.md: a module built here is built at a different
+    /// *moment* than the engine's, and `LFOImpl::SyncTypes::default_()` reads
+    /// process-global tempo state, so a slot filled either side of the transport
+    /// becoming known defaults its LFOs differently.
     ///
     /// \note Its modules carry parameters and no spectral storage -- see
     /// `ParametersOnlyModuleInitialiser`. Nothing asks this one for a spectrum.

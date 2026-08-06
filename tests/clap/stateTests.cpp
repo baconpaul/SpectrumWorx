@@ -26,6 +26,8 @@
 #include "swClapEntryImpl.hpp"
 
 #include "core/automatedModuleChain.hpp"
+#include "core/parameterID.hpp"
+#include "le/parameters/parametersUtilities.hpp"
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
 #include "le/spectrumworx/presetFile.hpp"
 
@@ -35,6 +37,11 @@
 /// later, in a process with no message thread, and leaks an AsyncUpdater for
 /// each. See the note on the class.
 #include "presets/presetHarness.hpp"
+
+/// \note For `ActivePlugin` and `OneParameterEvent` -- the local `Plugin` below
+/// never runs a block, and one case here has to write a parameter the way the
+/// audio thread does.
+#include "testHost.hpp"
 
 #include <clap/clap.h>
 
@@ -180,6 +187,16 @@ clap_host const &nullHost()
     return host;
 }
 
+/// `clap_plugin_state` off any plugin, for the cases that drive `SWTest`'s
+/// harness rather than the local one. \see Plugin::state()
+clap_plugin_state const &stateOf(clap_plugin const &plugin)
+{
+    auto const *const pState(
+        static_cast<clap_plugin_state const *>(plugin.get_extension(&plugin, CLAP_EXT_STATE)));
+    REQUIRE(pState != nullptr);
+    return *pState;
+}
+
 clap_plugin_factory const &factory()
 {
     auto const *const pFactory(static_cast<clap_plugin_factory const *>(
@@ -300,31 +317,65 @@ class Plugin
     bool active_{false};
 }; // class Plugin
 
+/// A module parameter, by the slot holding it and its index within the module.
+LE::SW::ParameterID moduleParameterID(std::uint8_t const slot, std::uint8_t const parameterIndex)
+{
+    LE::SW::ParameterID parameterID;
+    parameterID.value.type = LE::SW::ParameterID::ModuleParameter;
+    parameterID.value._.module.moduleIndex = slot;
+    parameterID.value._.module.moduleParameterIndex = parameterIndex;
+    return parameterID;
+}
+
+/// A global parameter, by its index in `GlobalParameters::Parameters`.
+LE::SW::ParameterID globalParameterID(std::uint8_t const index)
+{
+    LE::SW::ParameterID parameterID;
+    parameterID.value.type = LE::SW::ParameterID::GlobalParameter;
+    parameterID.value._.global.index = index;
+    return parameterID;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
 /// \brief Fills three slots and moves a handful of parameters off their
 /// defaults, so that a round trip has something to lose.
+///
+/// \note Through `EditorHost`, which is what a user moving a control goes
+/// through and the only entry point that moves *both* Programs. This wrote
+/// `implementation().program()` -- the engine's copy -- directly, and `stateSave`
+/// reads the main thread's: every case built on this was saving a plugin nobody
+/// had touched. The three that checked a module chain failed on it; the fourth,
+/// "A session's parameters come back through a second plugin instance", passed
+/// while comparing one set of defaults against another.
+///
+///   The same shape as the 303-preset case in doc/tech/todo.md item 1: a harness
+/// writing through one path and reading through the other, which a green result
+/// hides for as long as both ends agree about nothing.
+///                                           (06.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
 void driveIntoAState(Plugin const &plugin)
 {
-    auto &implementation(plugin.implementation());
-    auto &chain(implementation.program().moduleChain());
+    auto &host(plugin.editorHost());
 
     for (std::uint8_t slot(0); slot < 3; ++slot)
-        REQUIRE(chain
-                    .setParameter(slot, static_cast<std::int8_t>(slot + 2),
-                                  implementation.moduleInitialiser())
-                    .second == static_cast<std::int8_t>(slot + 2));
+        REQUIRE(host.editSlot(slot, static_cast<std::int8_t>(slot + 2)));
 
     /// Every module's Gain and Wet, and the global input gain: enough that a
     /// dropped attribute anywhere in the document shows up.
-    std::uint8_t index(0);
-    chain.forEach<LE::SW::Engine::ModuleParameters>(
-        [&](LE::SW::Engine::ModuleParameters const &constModule) {
-            auto &module(const_cast<LE::SW::Engine::ModuleParameters &>(constModule));
-            module.setBaseParameter(1 /*Gain*/, -3.0f - float(index));
-            module.setBaseParameter(2 /*Wet*/, 90.0f - float(index));
-            ++index;
-        });
+    ///
+    /// \note Native units, CLAP being a `FullRangeAutomatedParameter` protocol.
+    for (std::uint8_t slot(0); slot < 3; ++slot)
+    {
+        host.editParameter(moduleParameterID(slot, 1 /*Gain*/), -3.0f - float(slot));
+        host.editParameter(moduleParameterID(slot, 2 /*Wet*/), 90.0f - float(slot));
+    }
 
-    implementation.program().parameters().get<LE::SW::GlobalParameters::InputGain>().setValue(
+    host.editParameter(
+        globalParameterID(LE::Parameters::IndexOf<LE::SW::GlobalParameters::Parameters,
+                                                  LE::SW::GlobalParameters::InputGain>::value),
         0.75f);
 }
 
@@ -571,6 +622,61 @@ TEST_CASE("A state stream is read whatever size the pieces arrive in", "[clap][s
     restored.implementation().program().moduleChain().forEach<LE::SW::Engine::ModuleParameters>(
         [&](LE::SW::Engine::ModuleParameters const &) { ++modules; });
     CHECK(modules == 3);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief A host may save between a block and the callback the plugin asked for.
+///
+/// \note `clap-cpp-validator`'s `state-reproducibility-flush`, which is where
+/// this was found: it sets the same parameters on two instances, one through
+/// `flush()` and one through `process()`, and compares the state files. They
+/// differed at the same length -- 1782 bytes against 1782 -- because a value the
+/// host wrote in `process()` is echoed to the main thread over `ToUI` and only
+/// `onMainThread()` drained it. Nothing in CLAP obliges a host to run that
+/// callback before asking for state, so a session saved just after automation
+/// moved a knob stored the value from before the move.
+///
+///   `paramsFlush()` already makes this argument for an inactive plugin and
+/// drains its own echo; `stateSave()` is the active half of it.
+///                                           (06.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A parameter written during process() is in a state saved before the callback",
+          "[clap][state]")
+{
+    Entry const entry;
+
+    constexpr std::uint8_t inputGainIndex(
+        LE::Parameters::IndexOf<LE::SW::GlobalParameters::Parameters,
+                                LE::SW::GlobalParameters::InputGain>::value);
+    auto const target(SWTest::parameterID(SWTest::globalType, inputGainIndex));
+    constexpr double wanted{0.6};
+
+    // Told through flush(), which brings the main thread's copy level itself.
+    OutStream viaFlush;
+    {
+        SWTest::ActivePlugin plugin(sampleRate, blockSize);
+        SWTest::OneParameterEvent const event(target, wanted);
+        plugin.flush(&*event);
+        REQUIRE(stateOf(*plugin).save(&*plugin, &viaFlush));
+    }
+
+    // And told through process(), with no on_main_thread() after it -- which is
+    // the whole of the case. A host is allowed to save right here.
+    OutStream viaProcess;
+    {
+        SWTest::ActivePlugin plugin(sampleRate, blockSize);
+        SWTest::OneParameterEvent const event(target, wanted);
+        std::vector<float> leftIn(blockSize, 0.0f), rightIn(blockSize, 0.0f);
+        std::vector<float> leftOut(blockSize), rightOut(blockSize);
+        plugin.process(leftIn, rightIn, leftOut, rightOut, nullptr, &*event);
+        REQUIRE(stateOf(*plugin).save(&*plugin, &viaProcess));
+    }
+
+    REQUIRE_FALSE(viaFlush.data().empty());
+    CHECK(viaFlush.data() == viaProcess.data());
 }
 
 TEST_CASE("A save whose stream fails is reported as a failure", "[clap][state]")

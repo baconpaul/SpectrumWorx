@@ -725,9 +725,15 @@ TEST_CASE("A host with state and no thread check survives a parameter write", "[
     auto const &params(parameters(*plugin));
 
     // From the main thread's side: params.flush() outside process().
+    //
+    /// \note And no `pumpMainThread()` after it, unlike every other raw
+    /// `params.flush()` here. Pumping *is* `on_main_thread`, which is the thing
+    /// this case measures the absence of -- one added here would discharge the
+    /// deferral before the check below asks whether it is still pending, and the
+    /// case would pass while proving nothing.
+    ///                                       (06.08.2026.) (SW port)
     OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
     params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
-    plugin.pumpMainThread();
 
     // And from the audio thread's: the same write, delivered in process().
     std::vector<float> leftIn(512, 0.0f), rightIn(512, 0.0f);
@@ -974,8 +980,14 @@ TEST_CASE("An edit made in the interface reaches the engine through the queue", 
     auto const wanted(info.minimum + ((info.maximum - info.minimum) * 0.25f));
     REQUIRE(wanted != before);
 
-    editorHostOf(*plugin).toEngine().push(
-        LE::SW::Threading::setBaseParameter(modulatedParameterID(0, 0), wanted));
+    /// \note `editParameter()`, not a bare `toEngine().push()`. The push alone is
+    /// what the editor used to do and it moves the engine only; the host reads
+    /// `programMain_`, so the last assertion here was asking one copy about a
+    /// write made to the other. One call is the whole edit -- see the note on
+    /// `EditorHost::editParameter`.
+    ///                                       (06.08.2026.) (SW port)
+    editorHostOf(*plugin).editParameter(
+        LE::SW::ParameterID{LE::Plugins::ParameterID{modulatedParameterID(0, 0)}}, wanted);
 
     // Nothing yet: the engine belongs to the audio thread, and no block or flush
     // has run. That is the point -- a queue that applied itself on push would be
