@@ -547,8 +547,32 @@ TEST_CASE("Side-chain fixtures", "[golden][side-chain]")
     /// what `goldenTests.cpp` says its own nine amount to. When a second
     /// platform runs this, the drift report is what decides the split.
     ///
+    /// \note **Measured, 06.08.2026.** A Linux/x86_64 runner read this file for
+    /// the first time against the macOS/arm64 fixtures, and thirteen of the
+    /// fifteen sat inside `amplified()`. Two did not, and both are comparators
+    /// rather than arithmetic:
+    ///
+    ///   - Ethereal replaces a bin's amplitude *and* its phase on
+    ///     `side < main * threshold`, so a flipped bin does not move a value, it
+    ///     substitutes a different one. Peak out by 0.88 and 0.90.
+    ///   - Vaxateer chains two strict `>` comparisons, and its threshold is
+    ///     `rmsGain_ * Math::rms( amps )` -- a reduction over the whole
+    ///     spectrum, whose summation order a different vector width changes. So
+    ///     the threshold moves as well as the bins measured against it. Peak out
+    ///     by 0.78, dc by 0.013 of rms.
+    ///
+    ///   Neither is a bound that could be widened and still fail on silence, so
+    /// they get `sameBuildOnly()` and keep the hash. The other thirteen keep the
+    /// wide bound, which none of them has yet needed all of.
+    ///                                       (06.08.2026.) (SW port)
+    ///
     ////////////////////////////////////////////////////////////////////////////
-    auto const tolerances(SWTest::Tolerances::amplified());
+    auto const tolerancesFor([](std::string const &key) {
+        auto const effect(std::string_view(key).substr(0, key.find('/')));
+        return ((effect == "Ethereal") || (effect == "Vaxateer"))
+                   ? SWTest::Tolerances::sameBuildOnly()
+                   : SWTest::Tolerances::amplified();
+    });
 
     std::vector<std::string> failures;
     for (auto const &fixture : fixtures)
@@ -559,7 +583,8 @@ TEST_CASE("Side-chain fixtures", "[golden][side-chain]")
             failures.push_back(fixture.key + ": no golden");
             continue;
         }
-        auto const result(SWTest::compare(entry->second, fixture.digest, sameBuild, tolerances));
+        auto const result(
+            SWTest::compare(entry->second, fixture.digest, sameBuild, tolerancesFor(fixture.key)));
         if (!result.matches)
             failures.push_back(fixture.key + ": " + result.explanation);
     }
