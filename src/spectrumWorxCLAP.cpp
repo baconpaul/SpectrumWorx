@@ -1093,10 +1093,16 @@ void SpectrumWorxCLAP::retire(Threading::ToUI::Retired const what, void *const p
                   "The retire queue is full; something will be leaked.");
 }
 
+/// \note And marks the state dirty, which `presetChangeEnd()` used to do for
+/// itself before the chain it was announcing had been installed. Every route
+/// that gets here is a structural change a session has to remember -- a preset,
+/// a slot, a move -- and only the parameter-event route was telling the host so,
+/// through `setParameter()`.
 void SpectrumWorxCLAP::chainChanged()
 {
     toUI_.push(Threading::chainChanged());
     requestRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT | CLAP_PARAM_RESCAN_VALUES);
+    markCurrentProgramAsModified();
 }
 
 void SpectrumWorxCLAP::publishModulatedValues()
@@ -1323,9 +1329,30 @@ void SpectrumWorxCLAP::HostProxy::presetChangeEnd() const
 {
     auto &plugin(const_cast<SpectrumWorxCLAP &>(plugin_));
 
-    if (plugin_._host.canUseParams())
-        plugin._host.paramsRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_VALUES |
-                                  CLAP_PARAM_RESCAN_TEXT);
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Only when the chain is already in, which with audio running it is
+    /// not. `Threading::publishChain()` installs it here and now when nothing is
+    /// processing and *queues* it otherwise -- so this used to point the host at
+    /// a parameter list still sitting in the command ring, and then invite it to
+    /// go and read one: Bitwig calls `params.value_to_text` synchronously from
+    /// inside `state.mark_dirty`, and the audio thread splices the chain in the
+    /// same moment.
+    ///
+    ///   The engine says so itself when it installs one -- `drainCommands()`'s
+    /// SwapChain case calls `chainChanged()` -- so the notification is raised
+    /// from the side that knows it has happened, rather than from the side that
+    /// only knows it has asked.
+    ///                                       (06.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    if (!plugin.engineIsRunning())
+    {
+        if (plugin_._host.canUseParams())
+            plugin._host.paramsRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_VALUES |
+                                      CLAP_PARAM_RESCAN_TEXT);
+        plugin_.markCurrentProgramAsModified();
+    }
 
     /// \note A preset that changes the FFT size sets the parameter on this
     /// thread and leaves the setup where it is; this is what then asks the host
@@ -1338,8 +1365,6 @@ void SpectrumWorxCLAP::HostProxy::presetChangeEnd() const
         plugin.restartRequested_ = true;
         plugin._host.requestRestart();
     }
-
-    plugin_.markCurrentProgramAsModified();
 }
 
 bool SpectrumWorxCLAP::HostProxy::reportNewLatencyInSamples(unsigned int const latency) const
