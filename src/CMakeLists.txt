@@ -14,6 +14,7 @@
 # class now reaches". It does not: a module's strip belongs to the editor now and
 # sw-dsp links no JUCE at all -- see the note over sw::assets in dsp.cmake, and
 # checkNoJuceInDSP.cmake, which fails the build if it comes back.
+include(${CMAKE_CURRENT_SOURCE_DIR}/buildStamp.cmake) # sw-gui links it
 include(${CMAKE_CURRENT_SOURCE_DIR}/gui.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/dsp.cmake)
 

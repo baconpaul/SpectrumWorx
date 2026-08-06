@@ -85,7 +85,24 @@ class SpectrumWorxEditor final : private SkinLifetime,
     /// and passed by reference outside this class, and an in-class initialiser
     /// with no out-of-line definition is not something that can be odr-used.
     static constexpr unsigned short estimatedWidth{563};
-    static constexpr unsigned short estimatedHeight{376};
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The skin bitmap's height, and the strip under it.
+    ///
+    ///   The artwork is 563 x 376 and every offset in this editor is a pixel
+    /// position in it, so it stays exactly what it was. What the editor gained is
+    /// a bar below the artwork carrying the build date, time and commit -- see
+    /// paintBuildStamp() -- which is why the two are separate constants and why
+    /// anything measuring the *skin* (overlayY below) has to name artworkHeight
+    /// and not the editor's height.
+    ///                                       (06.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    static constexpr unsigned short artworkHeight{376};
+    static constexpr unsigned short buildStampHeight{20};
+
+    static constexpr unsigned short estimatedHeight{artworkHeight + buildStampHeight};
 
   public: //...mrmlj...VST 2.4 editor dummy implementation...
     static bool setKnobMode(int) { return false; }
@@ -426,7 +443,9 @@ class SpectrumWorxEditor final : private SkinLifetime,
     static constexpr unsigned short overlayWidth{191};
     static constexpr unsigned short overlayHeight{363};
     static constexpr unsigned short overlayX{362};
-    static constexpr unsigned short overlayY{(estimatedHeight - overlayHeight) / 2};
+    /// artworkHeight, not estimatedHeight: a panel is centred in the skin, and
+    /// the build-stamp bar is below the skin.
+    static constexpr unsigned short overlayY{(artworkHeight - overlayHeight) / 2};
 
     /// The skin's right margin, the module strips ending at overlayX + overlayWidth.
     static constexpr unsigned short panelMargin{estimatedWidth - (overlayX + overlayWidth)};
@@ -465,6 +484,26 @@ class SpectrumWorxEditor final : private SkinLifetime,
     void updateSettings();
 
     void updateMainKnobs();
+
+  public:
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The one line drawn in the build-stamp bar: when this binary was
+    /// built and from what commit.
+    ///
+    /// \note Public because it is the only thing a test can hold the bar to. That
+    /// the bar was *painted* is a question about pixels and is asked that way;
+    /// that what it says is the stamp and not, say, last configure's date, is a
+    /// question about this string.
+    ///                                       (06.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    static juce::String buildStampText();
+
+  private:
+    /// \brief Fills the buildStampHeight strip under the artwork and writes
+    /// buildStampText() into it. \see artworkHeight.
+    void paintBuildStamp(juce::Graphics &) const;
 
   private: // JUCE Component overrides.
     void mouseDown(juce::MouseEvent const &) override;

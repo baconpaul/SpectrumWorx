@@ -12,6 +12,7 @@
 
 #include "external_audio/sample.hpp"
 
+#include "configuration/buildStamp.hpp"
 #include "core/automatedModuleChain.hpp"
 #include "core/host_interop/plugin2Host.hpp"
 #include "core/modules/moduleDSPAndGUI.hpp"
@@ -155,6 +156,10 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost, PanelPlacement co
     // http://lists.steinberg.net:8100/Lists/vst-plugins/Message/17785.html
     // http://www.u-he.com/vstsource
     setSizeFromImage(*this, resourceBitmap<EditorBackground>());
+    LE_ASSERT_MSG(getWidth() == estimatedWidth && getHeight() == artworkHeight,
+                  "the skin and the editor's constants disagree");
+    // ...and the strip under the skin that says when this binary was built.
+    setSize(getWidth(), getHeight() + buildStampHeight);
 
     gradient_.setInvisible();
     gradient_.setSize(ModuleUI::width, ModuleUI::height);
@@ -774,8 +779,12 @@ void SpectrumWorxEditor::paint(juce::Graphics &graphics)
     ///                                       (06.08.2026.) (SW port)
     ///
     ////////////////////////////////////////////////////////////////////////////
+
+    /// \note background.getHeight() rather than getHeight(): the editor is taller
+    /// than its artwork by the build-stamp bar, and that bar runs the full width
+    /// in one piece.
     if (auto const extra(getWidth() - background.getWidth()); extra > 0)
-        graphics.drawImage(background, background.getWidth(), 0, extra, getHeight(),
+        graphics.drawImage(background, background.getWidth(), 0, extra, background.getHeight(),
                            background.getWidth() - 1, 0, 1, background.getHeight());
 
     juce::Font const &moduleNameFont(Theme::singleton().blueFont());
@@ -793,6 +802,39 @@ void SpectrumWorxEditor::paint(juce::Graphics &graphics)
 
     for (auto const &text : mainAreaTexts)
         drawMainAreaText(graphics, text);
+
+    paintBuildStamp(graphics);
+}
+
+juce::String SpectrumWorxEditor::buildStampText()
+{
+    return juce::String(BuildStamp::date) + "  " + BuildStamp::time + "  " + BuildStamp::commit;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Painted rather than a juce::Label, and painted from the editor rather
+/// than by a child component, because it has no behaviour at all: it never
+/// changes for the life of the process, takes no mouse, and must not be able to
+/// take focus away from a knob. Everything a child would add here is a thing
+/// that can go wrong.
+///                                           (06.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxEditor::paintBuildStamp(juce::Graphics &graphics) const
+{
+    juce::Rectangle<int> const bar(0, artworkHeight, getWidth(), buildStampHeight);
+
+    graphics.setColour(juce::Colours::black);
+    graphics.fillRect(bar);
+
+    /// \note The skin's own accent, at the smallest size its font stays legible
+    /// at. This is a developer's readout on a user's window, so it should be
+    /// readable when looked for and quiet when not.
+    graphics.setColour(Theme::blueColour());
+    graphics.setFont(juce::Font(juce::FontOptions(regularTypeface()).withHeight(11.0f)));
+    graphics.drawText(buildStampText(), bar.reduced(8, 0), juce::Justification::centredLeft);
 }
 
 void SpectrumWorxEditor::buttonClicked(juce::Button *const pButton)

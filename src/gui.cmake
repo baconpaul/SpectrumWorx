@@ -88,3 +88,8 @@ add_library(sw-gui STATIC
 sw_force_include_odr_header(sw-gui)
 
 target_link_libraries(sw-gui PUBLIC sw-gui-widgets)
+
+# The date, time and commit the editor draws along its bottom edge. PRIVATE: the
+# strings are named by spectrumWorxEditor.cpp and by nothing above it.
+# \see src/buildStamp.cmake.
+target_link_libraries(sw-gui PRIVATE sw-build-stamp)
