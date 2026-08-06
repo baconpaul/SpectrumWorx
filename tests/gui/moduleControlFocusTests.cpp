@@ -100,6 +100,17 @@ bool aWindowCanBeMade()
 #endif // JUCE_LINUX || JUCE_BSD
 }
 
+/// \brief What a case says when it cannot run, of which there are two: no window
+/// to put on a screen, and a window the screen will not give the keyboard to.
+/// Shared, because both cases below can hit either and a skip should say which.
+constexpr char noWindow[]{
+    "No window manager: JUCE cannot put a component on the desktop here, and these cases need a "
+    "real window to drive the keyboard with."};
+constexpr char keyboardRefused[]{
+    "The window server did not hand this window the keyboard -- a locked screen, an unattended "
+    "session, or focus-stealing prevention. These cases can only test what focus does if they "
+    "are given it."};
+
 /// \brief The editor, on the desktop, so that JUCE will hand out keyboard focus.
 ///
 /// \note `Component::grabKeyboardFocusInternal` returns early on `!isShowing()`,
@@ -127,7 +138,38 @@ class DesktopEditor
 
     GUI::SpectrumWorxEditor &editor() const { return instance_.editor(); }
 
-    bool usable() const { return editor().isShowing(); }
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Whether this window was actually given the keyboard.
+    ///
+    /// \note It asks, rather than inspecting, and the difference is the whole
+    /// point. This read `isShowing()`, which answers "is there a window on a
+    /// screen" -- but `Component::takeKeyboardFocus` wants more than that:
+    ///
+    ///     peer->grabFocus();
+    ///     if (! peer->isFocused() || currentlyFocusedComponent == this)
+    ///         return;                       // focus silently NOT taken
+    ///
+    /// -- and whether the peer ends up focused is the window manager's to
+    /// decide. A locked screen is the case that found this: the window is made,
+    /// mapped and showing, `isShowing()` is true, and the lock screen keeps the
+    /// keyboard, so every `hasKeyboardFocus()` below is false and the cases fail
+    /// on a machine that is working correctly. Focus-stealing prevention and an
+    /// unattended session do the same thing.
+    ///
+    ///   So the question is put the way the cases put it -- grab, then look --
+    /// and a no is a skip rather than a failure. The grab is not a side effect
+    /// worth hiding from: every case here starts by taking focus anyway.
+    ///                                       (06.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    bool tookTheKeyboard() const
+    {
+        if (!editor().isShowing())
+            return false;
+        editor().grabKeyboardFocus();
+        return editor().hasKeyboardFocus(true);
+    }
 
   private:
     SWTest::Instance &instance_;
@@ -191,16 +233,12 @@ TEST_CASE("Dragging a knob the LFO owns moves nothing and deselects nothing", "[
     SWTest::HostSideJuce const juceIsUp;
 
     if (!aWindowCanBeMade())
-        SKIP("No window manager: JUCE cannot put a component on the desktop here, and these "
-             "cases need a real window to drive the keyboard with.");
+        SKIP(noWindow);
 
     SWTest::Instance instance;
     DesktopEditor const window(instance);
-    if (!window.usable())
-    {
-        WARN("No window server: keyboard focus cannot be driven here.");
-        return;
-    }
+    if (!window.tookTheKeyboard())
+        SKIP(keyboardRefused);
 
     auto &editor(window.editor());
     editor.addUserAddedModule(0);
@@ -256,12 +294,12 @@ TEST_CASE("An LFO switches every gesture that would move the knob under it", "[g
     SWTest::HostSideJuce const juceIsUp;
 
     if (!aWindowCanBeMade())
-        SKIP("No window manager: JUCE cannot put a component on the desktop here, and these "
-             "cases need a real window to drive the keyboard with.");
+        SKIP(noWindow);
 
     SWTest::Instance instance;
     DesktopEditor const window(instance);
-    REQUIRE(window.usable());
+    if (!window.tookTheKeyboard())
+        SKIP(keyboardRefused);
 
     auto &editor(window.editor());
     editor.addUserAddedModule(0);
