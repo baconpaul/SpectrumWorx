@@ -80,10 +80,27 @@ struct Loader
     /// The preset browser's "ignore external samples" box.
     bool ignoreSampleFile;
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Whether this pass is filling the main thread's Program rather than
+    /// the engine's.
+    ///
+    /// \note Which is exactly what `onlySetParameters()` already meant, and the
+    /// reason that branch is back rather than replaced. It was written for VST
+    /// 2.4's 128 programs -- "this program is not live, so move the numbers and
+    /// leave the engine alone" -- and the port retired it as a case that could no
+    /// longer arise. It arises again for a different reason: there are two copies
+    /// of one program now, and the main thread's is filled by a pass that
+    /// reconfigures nothing, publishes nothing and loads no sample.
+    ///                                       (06.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    bool mainThreadCopy;
+
     /// The chain reaches for this typedef; see presets.hpp's loadPreset().
     using Module = SpectrumWorxCore::Module;
 
-    Program &program() const { return host.core().program(); }
+    Program &program() const { return mainThreadCopy ? host.programMain() : host.core().program(); }
     GlobalParameters::Parameters &targetGlobalParameters() const { return program().parameters(); }
     AutomatedModuleChain &targetChain() const { return program().moduleChain(); }
 
@@ -109,7 +126,7 @@ struct Loader
         return host.core().moduleInitialiser();
     }
 
-    static bool onlySetParameters() { return false; }
+    bool onlySetParameters() const { return mainThreadCopy; }
 
     ////////////////////////////////////////////////////////////////////////////
     // The external audio file the preset names, if it names one.
@@ -182,18 +199,30 @@ struct Consumer
 {
     EditorHost &host;
     SpectrumWorxEditor *pEditor;
+    /// \see Loader::mainThreadCopy
+    bool mainThreadCopy;
 
     using Module = Loader::Module;
 
     Loader presetLoader(bool const ignoreExternalSample) const
     {
-        return {host, pEditor, ignoreExternalSample};
+        return {host, pEditor, ignoreExternalSample, mainThreadCopy};
     }
 
-    Program &program() const { return host.core().program(); }
+    Program &program() const { return mainThreadCopy ? host.programMain() : host.core().program(); }
 
-    void notifyHostAboutPresetChangeBegin() const { host.automation().presetChangeBegin(); }
-    void notifyHostAboutPresetChangeEnd() const { host.automation().presetChangeEnd(); }
+    /// \note Silent on the main-thread pass: the host is told once, about the
+    /// load as a whole, by the pass that reaches the engine.
+    void notifyHostAboutPresetChangeBegin() const
+    {
+        if (!mainThreadCopy)
+            host.automation().presetChangeBegin();
+    }
+    void notifyHostAboutPresetChangeEnd() const
+    {
+        if (!mainThreadCopy)
+            host.automation().presetChangeEnd();
+    }
 }; // struct Consumer
 
 //------------------------------------------------------------------------------
@@ -260,10 +289,38 @@ bool loadPreset(EditorHost &host, SpectrumWorxEditor *const pEditor, char *const
                 bool const ignoreExternalSample, juce::String *const comment,
                 char const *const presetName, DawExtraState const *const pDawExtraState)
 {
-    Consumer const consumer{host, pEditor};
+    Consumer const consumer{host, pEditor, false};
 
     // Whatever a previous load left uncollected is not this load's.
     takePresetLoadReport();
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The main thread's copy first, in a pass of its own.
+    ///
+    /// \note Two passes over one file rather than one pass and a clone, because
+    /// the parser is the only thing that knows how to turn a preset into a
+    /// chain: cloning would have to copy every module's parameters through the
+    /// automated interface, which cannot reach the two an LFO does not export
+    /// and quantises everything it can reach. A second parse is exact by
+    /// construction and costs a parse of a file that was just read off disk.
+    ///
+    ///   `ParametersLoader` cannot be rewound -- `loadModuleChain()` asserts it
+    /// has not already switched to module parameters -- so each pass builds its
+    /// own over the same buffer.
+    ///
+    /// \note This one's report is dropped. It sees exactly the problems the pass
+    /// below sees, and counting them twice would double every number a user is
+    /// shown; `presetReportTests.cpp` is what watches those totals.
+    ///                                       (06.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    {
+        Consumer const mainThreadCopy{host, pEditor, true};
+        SW::loadPreset(inMemoryPreset, true /*a sample is the engine's*/, nullptr, mainThreadCopy,
+                       pDawExtraState);
+        takePresetLoadReport();
+    }
 
     /// \note The format layer speaks `std::string` -- it is below JUCE now, and
     /// a preset's comment is UTF-8 bytes whatever the interface's string type is.

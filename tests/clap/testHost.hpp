@@ -703,9 +703,22 @@ class ActivePlugin
         auto const *const pParams(static_cast<clap_plugin_params const *>(
             pPlugin_->get_extension(pPlugin_, CLAP_EXT_PARAMS)));
         REQUIRE(pParams != nullptr);
-        auto const audioThread(scopedAudioCallback());
-        pParams->flush(pPlugin_, events ? events : &noInputEvents(),
-                       out ? out : &discardedOutputEvents());
+        {
+            auto const audioThread(scopedAudioCallback());
+            pParams->flush(pPlugin_, events ? events : &noInputEvents(),
+                           out ? out : &discardedOutputEvents());
+        }
+
+        /// \note And then the callback the plugin asked for, because a real host
+        /// runs one. A parameter delivered here is applied to the engine on this
+        /// thread-in-the-audio-role and echoed to the main thread; until the
+        /// echo is drained the main thread's Program -- which is what
+        /// `paramsValue` and `paramsInfo` answer from -- is one drain behind.
+        /// Every case that flushes a value and then reads it back depends on
+        /// this, and none of them had a reason to say so before there were two
+        /// copies to keep level.
+        ///                                   (06.08.2026.) (SW port)
+        pumpMainThread();
     }
 
     ////////////////////////////////////////////////////////////////////////////

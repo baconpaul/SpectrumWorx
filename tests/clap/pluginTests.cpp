@@ -151,9 +151,11 @@ std::size_t distinctModulatedValues(ActivePlugin &plugin, clap_plugin_params con
     OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0),
                                         0 /*the first effect in the list*/);
     params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+    plugin.pumpMainThread();
 
     OneParameterEvent const enable(lfoParameterID(0, 0, lfoEnabled), 1);
     params.flush(&*plugin, &*enable, &discardedOutputEvents());
+    plugin.pumpMainThread();
 
     /// \note LFO 0 drives module parameter 1, which is Gain -- the first base
     /// parameter after Bypass, and one every effect has whatever is in the slot.
@@ -184,9 +186,11 @@ std::size_t distinctHostVisibleValues(ActivePlugin &plugin, clap_plugin_params c
 {
     OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
     params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+    plugin.pumpMainThread();
 
     OneParameterEvent const enable(lfoParameterID(0, 0, lfoEnabled), 1);
     params.flush(&*plugin, &*enable, &discardedOutputEvents());
+    plugin.pumpMainThread();
 
     auto const target(modulatedParameterID(0, 0));
 
@@ -319,6 +323,7 @@ TEST_CASE("What a host puts on the side chain port reaches the engine", "[clap][
 
         OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), colorifer);
         parameters(*plugin).flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+        plugin.pumpMainThread();
 
         std::vector<float> leftIn(blockSize), rightIn(blockSize);
         std::vector<float> sideLeft(blockSize), sideRight(blockSize);
@@ -533,6 +538,7 @@ TEST_CASE("Filling a module slot renames its parameters without adding any", "[c
     OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0),
                                         0 /*the first effect in the list*/);
     params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+    plugin.pumpMainThread();
 
     auto const after(allParameterInfo(*plugin, params));
 
@@ -582,6 +588,7 @@ TEST_CASE("Every parameter accepts the bounds it advertises", "[clap]")
     {
         OneParameterEvent const fill(selector.id, effect);
         params.flush(&*plugin, &*fill, &discardedOutputEvents());
+        plugin.pumpMainThread();
 
         for (auto const &info : allParameterInfo(*plugin, params))
         {
@@ -594,6 +601,7 @@ TEST_CASE("Every parameter accepts the bounds it advertises", "[clap]")
                 CAPTURE(effect, info.id, info.name, value);
                 OneParameterEvent const edit(info.id, value);
                 params.flush(&*plugin, &*edit, &discardedOutputEvents());
+                plugin.pumpMainThread();
 
                 double read{0};
                 REQUIRE(params.get_value(&*plugin, info.id, &read));
@@ -676,6 +684,7 @@ TEST_CASE("Filling a slot makes the host re-read the descriptions", "[clap]")
 
     OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
     params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+    plugin.pumpMainThread();
 
     // Deferred, because a rescan is main-thread-only and flush() is not: the
     // plugin asks for a callback and does it there.
@@ -718,6 +727,7 @@ TEST_CASE("A host with state and no thread check survives a parameter write", "[
     // From the main thread's side: params.flush() outside process().
     OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
     params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+    plugin.pumpMainThread();
 
     // And from the audio thread's: the same write, delivered in process().
     std::vector<float> leftIn(512, 0.0f), rightIn(512, 0.0f);
@@ -768,6 +778,7 @@ TEST_CASE("A module parameter's range and step flag survive an effect swap", "[c
     {
         OneParameterEvent const swap(selector.id, effect);
         params.flush(&*plugin, &*swap, &discardedOutputEvents());
+        plugin.pumpMainThread();
 
         auto const filled(allParameterInfo(*plugin, params));
         REQUIRE(filled.size() == empty.size());
@@ -802,6 +813,7 @@ TEST_CASE("A normalised parameter round-trips through the host edge", "[clap]")
 
     OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
     params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+    plugin.pumpMainThread();
 
     /// \note Every module parameter the effect in slot 1 owns, not just the
     /// first: some of them are discrete underneath -- a bool, an enumeration --
@@ -821,6 +833,7 @@ TEST_CASE("A normalised parameter round-trips through the host edge", "[clap]")
         constexpr double wanted{0.25};
         OneParameterEvent const edit(info.id, wanted);
         params.flush(&*plugin, &*edit, &discardedOutputEvents());
+        plugin.pumpMainThread();
 
         double read{-1};
         REQUIRE(params.get_value(&*plugin, info.id, &read));
@@ -829,6 +842,7 @@ TEST_CASE("A normalised parameter round-trips through the host edge", "[clap]")
 
         OneParameterEvent const again(info.id, read);
         params.flush(&*plugin, &*again, &discardedOutputEvents());
+        plugin.pumpMainThread();
 
         double reread{-1};
         REQUIRE(params.get_value(&*plugin, info.id, &reread));
@@ -863,6 +877,7 @@ TEST_CASE("A normalised parameter still reads in the effect's own units", "[clap
 
     OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
     params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+    plugin.pumpMainThread();
 
     std::uint32_t checked{0}, differedFromTheEdge{0};
     for (auto const &info : allParameterInfo(*plugin, params))
@@ -952,6 +967,7 @@ TEST_CASE("An edit made in the interface reaches the engine through the queue", 
 
     OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
     params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+    plugin.pumpMainThread();
 
     auto const &info(moduleParameterInfo(*plugin, 0, gainIndex));
     auto const before(liveModuleParameter(*plugin, 0, gainIndex));
@@ -969,6 +985,7 @@ TEST_CASE("An edit made in the interface reaches the engine through the queue", 
     // ...and a flush is what applies it. A host reaches this through
     // clap_host_params::request_flush, which the editor asks for after every edit.
     params.flush(&*plugin, &noInputEvents(), &discardedOutputEvents());
+    plugin.pumpMainThread();
     CHECK_THAT(liveModuleParameter(*plugin, 0, gainIndex),
                Catch::Matchers::WithinAbs(wanted, 1e-3));
 
@@ -996,6 +1013,7 @@ TEST_CASE("What the LFOs did reaches the interface through the mailbox", "[clap]
 
     OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
     params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+    plugin.pumpMainThread();
 
     auto const &mailbox(editorHostOf(*plugin).modulatedValues());
     auto const target(LE::SW::parameterIndexFromBinaryID(modulatedParameterID(0, 0)));
@@ -1014,6 +1032,7 @@ TEST_CASE("What the LFOs did reaches the interface through the mailbox", "[clap]
 
     OneParameterEvent const enable(lfoParameterID(0, 0, lfoEnabled), 1);
     params.flush(&*plugin, &*enable, &discardedOutputEvents());
+    plugin.pumpMainThread();
 
     std::set<float> published;
     for (unsigned block(0); block < 160; ++block)
@@ -1125,9 +1144,11 @@ TEST_CASE("A playing transport drives the LFO from song position", "[clap][lfo]"
 
     OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
     params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+    plugin.pumpMainThread();
 
     OneParameterEvent const enable(lfoParameterID(0, 0, lfoEnabled), 1);
     params.flush(&*plugin, &*enable, &discardedOutputEvents());
+    plugin.pumpMainThread();
 
     std::vector<float> leftIn(blockSize, 0.0f), rightIn(blockSize, 0.0f);
     std::vector<float> leftOut(blockSize), rightOut(blockSize);
@@ -1193,9 +1214,11 @@ TEST_CASE("A full rack with LFOs running and an editor open processes cleanly", 
     {
         OneParameterEvent const fill(parameterID(moduleChainType, slot), slot / 64.0);
         params.flush(&*plugin, &*fill, &discardedOutputEvents());
+        plugin.pumpMainThread();
 
         OneParameterEvent const enable(lfoParameterID(slot, 0, lfoEnabled), 1);
         params.flush(&*plugin, &*enable, &discardedOutputEvents());
+        plugin.pumpMainThread();
     }
 
     /// \note The editor, built the way the shim builds it. Its presence is the
@@ -1386,8 +1409,10 @@ TEST_CASE("Two instances process while their editors come and go", "[clap][threa
         auto const &params(parameters(**pPlugin));
         OneParameterEvent const fill(parameterID(moduleChainType, 0), 0);
         params.flush(&**pPlugin, &*fill, &discardedOutputEvents());
+        (*pPlugin).pumpMainThread();
         OneParameterEvent const enable(lfoParameterID(0, 0, lfoEnabled), 1);
         params.flush(&**pPlugin, &*enable, &discardedOutputEvents());
+        (*pPlugin).pumpMainThread();
     }
 
     std::atomic<bool> stop{false};
@@ -1507,8 +1532,10 @@ TEST_CASE("Loading preset after preset with the editor open", "[clap][presets][g
         {
             OneParameterEvent const fill(parameterID(moduleChainType, slot), slot / 64.0);
             params.flush(&*plugin, &*fill, &discardedOutputEvents());
+            plugin.pumpMainThread();
             OneParameterEvent const enable(lfoParameterID(slot, 0, lfoEnabled), 1);
             params.flush(&*plugin, &*enable, &discardedOutputEvents());
+            plugin.pumpMainThread();
         }
 
         std::vector<float> leftIn(blockSize, 0.0f), rightIn(blockSize, 0.0f);
@@ -1551,6 +1578,26 @@ TEST_CASE("Loading preset after preset with the editor open", "[clap][presets][g
         /// loop to turn, and what the rack looks like between the load and the
         /// resync is exactly where the strips and the chain disagree.
         editor->resyncModuleRack();
+
+        ////////////////////////////////////////////////////////////////////////
+        ///
+        /// \note The engine's half of the load, which nothing here was doing.
+        /// `publishChain()` queues the new chain while the plugin is active and
+        /// this case never renders a block -- so before the main thread had a
+        /// Program of its own, every assertion below was made against whatever
+        /// chain the *priming* left in the engine, not against the preset. It
+        /// read five modules for all 303 of them.
+        ///
+        ///   `flush()` drains the command ring the same way `process()` does and
+        /// renders nothing, which is what this case needs: rendering real spectra
+        /// in a checked build aborts on the negative-amplitude verification.
+        ///                                   (06.08.2026.) (SW port)
+        ///
+        ////////////////////////////////////////////////////////////////////////
+        plugin.flush();
+
+        // And the two copies agree about what the preset asked for.
+        CHECK(editor->moduleChain().size() == host.core().moduleChain().size());
 
         // The rack is a function of the chain, whatever the preset asked for.
         auto const modules(editor->moduleChain().size());
