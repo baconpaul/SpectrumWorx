@@ -58,6 +58,22 @@ constexpr clap_id mainInputPort{0};
 constexpr clap_id sideChainInputPort{1};
 constexpr clap_id mainOutputPort{2};
 
+/// \brief Assigns a parameter its own-units value, with no automation edge in
+/// between. \see ToEngine::SetUnexportedLFOParameter, which is its only user:
+/// what travels there is what the interface already stored, not an automation
+/// value, because the parameter it names is not automatable.
+struct RawParameterSetter
+{
+    using result_type = void;
+
+    float value;
+
+    template <class Parameter> result_type operator()(Parameter &parameter) const
+    {
+        parameter.setValue(static_cast<typename Parameter::value_type>(value));
+    }
+}; // struct RawParameterSetter
+
 /// \note `stateMagic`, the four bytes `SWX1`, stood here in front of a
 /// `(uint32 id, double value)` array. Dropped with the blob it introduced rather
 /// than kept as a fallback: nothing has shipped, so the only sessions holding
@@ -1080,6 +1096,27 @@ void SpectrumWorxCLAP::drainCommands()
             /// \note The same object back, now holding what used to be live.
             retire(Threading::ToUI::Retired::Chain, pIncoming);
             chainChanged();
+            break;
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        ///
+        /// \note The one edit the interface cannot address by `ParameterID`, so
+        /// it names an index instead and this dispatches on it -- the same
+        /// `invokeFunctorOnIndexedParameter` the global parameters go through.
+        /// Before this the interface wrote the LFO itself, from the message
+        /// thread, on a module the audio thread reads every block.
+        ///                                   (06.08.2026.) (SW port)
+        ///
+        ////////////////////////////////////////////////////////////////////////
+        case Threading::ToEngine::Kind::SetUnexportedLFOParameter:
+        {
+            auto const &edit(command.setUnexportedLFOParameter);
+            auto const pModule(moduleChain().moduleAs<Module>(edit.moduleIndex));
+            if (pModule && (edit.moduleParameterIndex < pModule->numberOfLFOControledParameters()))
+                LE::Parameters::invokeFunctorOnIndexedParameter(
+                    pModule->lfo(edit.moduleParameterIndex).parameters(), edit.lfoParameterIndex,
+                    RawParameterSetter{edit.value});
             break;
         }
 

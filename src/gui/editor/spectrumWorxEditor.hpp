@@ -753,7 +753,12 @@ class SpectrumWorxEditor final : private SkinLifetime,
             //...mrmlj...fmod/separated DSP-GUI...
             if (parameterIndex >= ParameterCounts::lfoExportedParameters)
             {
+                /// \note Both copies, as everywhere else -- `lfo()` is the main
+                /// thread's own module now. The queue leg is what stops this
+                /// being a change the user makes and never hears; the host is
+                /// told nothing because there is no ParameterID to tell it about.
                 lfo().parameters().set<LFOParameter>(parameterValue);
+                queueUnexportedLFOParameter(parameterIndex, internalValue);
                 return;
             }
 
@@ -764,6 +769,10 @@ class SpectrumWorxEditor final : private SkinLifetime,
         /// \brief The queued half of the above, non-template so that this header
         /// does not need the protocol.
         void queueLFOParameter(std::uint8_t lfoParameterIndex, float value) const;
+
+        /// \brief The same for the two an LFO does not export, which have no
+        /// ParameterID and so travel by index. \see ToEngine::SetUnexportedLFOParameter
+        void queueUnexportedLFOParameter(std::uint8_t lfoParameterIndex, float value) const;
 
         void verifyGUIAndLFOConsistency() const;
 
