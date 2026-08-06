@@ -66,22 +66,47 @@ gives the copies a *shape* to keep level and not just values.
   from it, and `EditorHost::edit{Parameter,Slot,ModuleMove}` apply to both
   copies.
 
-**Left**, and in this order:
+- An LFO's Waveform and SyncTypes reach the engine again, over a `ToEngine` case
+  addressed by index — which also closes the `tech_debt.md` item they were
+  filed under since 04.08.2026.
+- A preset or session load fills both copies. `SW::loadPreset`'s
+  `loader.onlySetParameters()` branch *is* the main-thread half — assign the
+  global parameters, move a chain in, reconfigure nothing — so `GUI::loadPreset`
+  runs it as a first pass over the same buffer and drops its report. Two parses
+  rather than one parse and a clone, because the parser is the only thing that
+  turns a preset into a chain exactly: a clone would go through the automated
+  interface, which cannot reach the two parameters an LFO does not export.
+- The four host-facing reads answer from `programMain_`, and the reproduction
+  passes.
+- `paramsFlush` drains the echo itself when inactive: there is no audio thread to
+  raise it and no callback due before a host asks for the state, so the main
+  thread's Program would still be empty when `stateSave` read it.
 
-1. **An LFO's Waveform and SyncTypes no longer reach the engine.** A regression
-   this branch introduced, and the one thing on it that is worse than what it
-   replaced — see `tech_debt.md`. Needs a `ToEngine` case addressed by index.
-2. **A preset or session load fills only the engine's copy.** `SW::loadPreset`
-   already has the shape: the `loader.onlySetParameters()` branch assigns the
-   global parameters and moves a chain in while touching no engine, which is
-   exactly the main-thread half. It was written for VST 2.4's 128 programs and
-   `Loader::onlySetParameters()` currently returns a constant `false`. Check
-   whether the parse is destructive before running it twice, and discard the
-   first pass's `PresetLoadReport` so the counts do not double.
-3. **Point the four host-facing reads at `programMain_`** — each carries a
-   `\todo`. Then the reproduction goes green and the crash is closed.
-4. Sweep the tests that push to `toEngine()` directly, which now bypass the main
-   copy and no longer prove what they claim.
+**Left** — four cases, all the same shape: a harness that writes through one path
+and reads through the other.
+
+| | |
+|---|---|
+| `pluginTests.cpp:711` | A host with state and no thread check survives a parameter write |
+| `pluginTests.cpp:955` | An edit made in the interface reaches the engine through the queue |
+| `stateTests.cpp:379` | A session restores before the plugin has a sample rate |
+| `stateTests.cpp:553` | A state stream is read whatever size the pieces arrive in |
+
+The 27 raw `params.flush( &*plugin, … )` sites were fixed by pumping the main
+thread after each, and `ActivePlugin::flush()` now does it too — a host runs the
+callback it was asked for, and a case that flushes a value and reads it back
+depends on that. These four use different harnesses: `stateTests.cpp`'s
+`Plugin`/`InStream` pair, and the `[protocol]` case reads engine state directly
+through `implementation().program()`. Each needs the same treatment — pump, or
+read the copy that matches the path it wrote through. **None of them is believed
+to be a product fault and none of them has been shown not to be**, which is the
+first thing to settle.
+
+> **The 303-preset case had been asserting against a stale engine chain.** It
+> never renders, so the swap `publishChain()` queued was never drained, and all
+> 303 presets read the five modules the priming left behind. It flushes now and
+> checks the two copies agree. Worth remembering as the shape of the mistake:
+> a green case measuring the wrong object.
 
 ### 2 — Drive it in a DAW
 
