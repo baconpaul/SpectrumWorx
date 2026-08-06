@@ -379,7 +379,10 @@ class SpectrumWorxCLAP final
     /// \return whether the slot's effect actually owns this parameter. When it
     /// does not, \p ranges is filled with the maximal description instead, so
     /// there is always a usable scale.
-    bool liveRanges(ParameterID, Plugins::ParameterInformation<Protocol> &) const;
+    /// \param program whichever copy the calling thread owns -- `programMain_`
+    /// for the three `[main-thread]` callers and the engine's for `handleEvent()`,
+    /// which runs under `process()`.
+    static bool liveRanges(ParameterID, Plugins::ParameterInformation<Protocol> &, Program const &);
 
     /// Advances the engine's LFO timer for this block: from the host's transport
     /// while it is playing, from the block length otherwise. See the definition.
@@ -401,6 +404,50 @@ class SpectrumWorxCLAP final
 
     /// The engine's own; SpectrumWorxCore only holds a pointer.
     Program program_;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The main thread's copy of the same state, and what every
+    /// `[main-thread]` call reads.
+    ///
+    /// \note §2 rule 2, which the model claimed and did not have. `paramsInfo`,
+    /// `paramsValue`, `paramsValueToText` and `stateSave` are all `[main-thread]`
+    /// and all used to resolve a slot by walking `program().moduleChain()` --
+    /// which rule 1 gives to the audio thread for as long as the plugin is
+    /// activated. A host reading the list while the engine installed a preset's
+    /// chain therefore walked a circular list mid-splice: the walk crosses into
+    /// another chain's root, `isEnd()` has only its own root to compare against
+    /// and does not recognise it, and the root node is downcast as a module.
+    ///
+    ///   The two are kept level in both directions and by the transports that
+    /// already existed: an edit made here is applied here and queued to the
+    /// engine over `ToEngine`, and one that arrives as a host parameter event on
+    /// the audio thread is applied there and echoed back over `ToUI`. Neither
+    /// thread reads the other's copy.
+    ///
+    /// \note **Not yet read.** The `ToUI` half is wired -- a host parameter event
+    /// lands here as well as in the engine -- and the four callers still read
+    /// `program()`, each with a `\todo` saying so. What is missing is the other
+    /// three routes that change this state, and until every one of them feeds
+    /// this copy, reading it would answer the host from a Program that only knows
+    /// about automation:
+    ///
+    ///   - an edit made in the editor, which pushes `SetBaseParameter` and
+    ///     nothing else (`SpectrumWorxEditor::queueGlobalParameter` and
+    ///     `updateModuleParameterAndNotifyHost`);
+    ///   - a slot filled or a module moved from the editor, which reaches
+    ///     `Threading::publish{Slot,ModuleMove}()` directly;
+    ///   - a preset or a session, whose `Loader` targets `core().program()` and
+    ///     publishes one chain -- this copy needs its own, which means cloning a
+    ///     chain module by module through the automated parameter interface.
+    ///
+    /// \note Its modules carry parameters and no spectral storage -- see
+    /// `ParametersOnlyModuleInitialiser`. Nothing asks this one for a spectrum.
+    ///                                       (06.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    Program programMain_;
 
     std::unique_ptr<sst::clap_juce_shim::ClapJuceShim> clapJuceShim_;
 

@@ -251,9 +251,16 @@ template <class Impl, class Protocol>
 Plugins::AutomatedParameterValue
 Plugin2HostPassiveInteropImpl<Impl, Protocol>::getParameter(ParameterID const parameterID) const
 {
+    return getParameter(parameterID, impl().program());
+}
+
+template <class Impl, class Protocol>
+Plugins::AutomatedParameterValue
+Plugin2HostPassiveInteropImpl<Impl, Protocol>::getParameter(ParameterID const parameterID,
+                                                            Program const &program)
+{
     return invokeFunctorOnIdentifiedParameter(
-        parameterID, ParameterGetter<typename Impl::Module, AutomatedParameter>(),
-        &impl().program());
+        parameterID, ParameterGetter<typename Impl::Module, AutomatedParameter>(), &program);
 }
 
 template <class Impl, class Protocol>

@@ -49,7 +49,10 @@ class LE_NOVTABLE Plugin2HostPassiveInteropImpl : public Plugin2HostPassiveInter
 
     using AutomatedParameter = typename Plugins::AutomatedParameterFor<Protocol>::type;
 
+    /// \note The engine's Program, and so the audio thread's to read. \see the
+    /// overload, which every `[main-thread]` caller uses.
     Plugins::AutomatedParameterValue getParameter(ParameterID) const;
+    static Plugins::AutomatedParameterValue getParameter(ParameterID, Program const &);
 
     static bool getParameterProperties(ParameterID, Plugins::ParameterInformation<Protocol> &,
                                        Program const *);
@@ -106,8 +109,18 @@ class LE_NOVTABLE Plugin2HostPassiveInteropImpl : public Plugin2HostPassiveInter
     }; // struct ParameterValueStringGetter
 #pragma warning(pop)
 
+    /// \note The engine's own Program, which is only the right one to read on the
+    /// thread that owns it. Every `[main-thread]` caller passes its own; see the
+    /// overload below and doc/tech/threading_model.md §2 rule 2.
     void getParameterDisplay(ParameterID const parameterID, LE::Utility::Span<char> const text,
                              Plugins::AutomatedParameterValue const *LE_RESTRICT const pValue) const
+    {
+        getParameterDisplay(parameterID, text, pValue, impl().program());
+    }
+
+    void getParameterDisplay(ParameterID const parameterID, LE::Utility::Span<char> const text,
+                             Plugins::AutomatedParameterValue const *LE_RESTRICT const pValue,
+                             Program const &program) const
     {
         //...mrmlj...duplicated in SpectrumWorxEditorFMOD as a quick-hack around fmod ugliness
         //...mrmlj...(printing required both in the DSP and UI)...
@@ -125,8 +138,7 @@ class LE_NOVTABLE Plugin2HostPassiveInteropImpl : public Plugin2HostPassiveInter
                     : LE::Parameters::AutomatedParameterPrinter::Internal,
              {text, impl().engineSetup()}}};
         char const *const pValueString(invokeFunctorOnIdentifiedParameter(
-            parameterID, std::forward<ParameterValueStringGetter const>(getter),
-            &impl().program()));
+            parameterID, std::forward<ParameterValueStringGetter const>(getter), &program));
         copyToBuffer(pValueString, text);
     }
 
