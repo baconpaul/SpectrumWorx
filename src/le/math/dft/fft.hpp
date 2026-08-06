@@ -19,7 +19,18 @@
 /// material only. The two are held to the same layout and the same
 /// normalisation — see the notes over the transform pair in fft.cpp.
 ///                                           (29.07.2026.) (SW port)
-#if defined(__APPLE__)
+///
+/// \note `-DSW_FORCE_PFFFT=ON` builds the pffft branch on Apple too. It exists
+/// for one question, and answered it: when a golden drifts between this machine
+/// and another platform, is that the FFT backend or the platform? Nothing else
+/// can separate the two, because every non-Apple build changes both at once.
+/// Asked of the 05.08.2026 Windows drift, it said "the platform" — 463 of 464
+/// fixtures held across backends on one machine where 455 held across the
+/// platform boundary, and the eight Ethereal fixtures that fail on Windows all
+/// pass here. Not a shipping configuration: the goldens are minted against
+/// Accelerate on Apple and this renders them differently on purpose.
+///                                           (05.08.2026.) (SW port)
+#if defined(__APPLE__) && !defined(SW_FORCE_PFFFT)
 #define LE_ACC_FFT
 #else
 #define LE_PFFFT

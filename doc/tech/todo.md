@@ -125,16 +125,25 @@ were variables kept only to feed an assert.
 
 **What is still open.**
 
-- **Four Linux segfaults, all in one place.** `show-ui-renders-editor-settings`,
-  and the three `sw-plugin-tests` cases that open the settings or About overlay.
-  It is not the display: 65 of the 66 `show-ui` renders pass under `xvfb-run`,
-  the 57 per-effect module UIs among them. One component crashes and the rest of
-  the editor draws.
-- **Two LFO knob-gesture cases fail on Linux** — `#235` and `#250` — and are
-  failures rather than crashes, so they have an assertion to read.
-- **The two build gates fail on Linux** — `odr-header-stays-in-our-sources` and
-  `engine-links-no-juce`. Nothing to do with the GUI; both print a
-  `FATAL_ERROR` saying what they found, and neither has been read yet.
+- **Ethereal's eight golden fixtures fail on Windows, and it is not the FFT
+  backend.** Peaks of 80.9 and 13.6 against 0.5 and 0.46 — not drift, a
+  different render. `-DSW_FORCE_PFFFT=ON` is what settled the cause: it puts the
+  pffft branch on Apple, so the backend can be changed without changing the
+  platform, and across that boundary **463 of 464 fixtures hold and all eight
+  Ethereal ones pass**, where across the platform boundary 455 hold. So the
+  variable is Windows, not Accelerate-versus-pffft.
+
+  Ethereal is "compare and replace": its whole output is `side < main *
+  threshold` per bin, and it is the only effect that turns a comparison
+  straight into its output, so it magnifies whatever the real difference is. It
+  is not a chaotic-sensitivity story — the same magnification is present in the
+  pffft-on-Apple run and produces nothing. `mode_.unpack()` is a plain switch
+  and `dB2NormalisedLinear` is `std::pow(10, dB/20)`; neither is a suspect.
+  Nothing else has been ruled out.
+- **`Talking_Wind/sweep/2048/8` is over the rms bound by a hair** — 0.0001198
+  against 0.0001 — and does it against *both* pffft builds, so it is a real
+  backend difference and the tolerance is calibrated a shade too tightly for it.
+  One fixture, one number, and it needs a decision rather than an investigation.
 - **MSVC has no warning baseline at all**, deliberately — see `tech_debt.md`.
   `SW_WERROR` is a no-op there by construction (`sw-our-sources.cmake`), so
   Windows compiles warning-blind, and `/W4 /WX` is still a decision rather than
