@@ -224,23 +224,39 @@ New entries go at the top of their area.
 
 ## Threading
 
-- **An LFO's Waveform and SyncTypes are still written straight into the engine
-  from the message thread.** (04.08.2026, found rereading the source against
-  `threading_model.md`) Every other edit crosses as a `SetBaseParameter`
-  command, but these two are past `ParameterCounts::lfoExportedParameters`, so
-  they have no `ParameterID` and no route through the queue:
-  `SpectrumWorxEditor::…::updateParameterAndNotifyHost` (`spectrumWorxEditor.hpp:676-680`)
-  branches on the index and calls `lfo().parameters().set<LFOParameter>()`
-  directly. The audio thread reads that LFO every block. It is the last
-  unsynchronised write from the interface into engine state, and the redesign
-  recorded it as something a later stage would take — no stage did.
+- **An LFO's Waveform and SyncTypes do not reach the engine at all.**
+  (06.08.2026 — was "written straight into the engine from the message thread",
+  04.08.2026) Every other edit crosses as a `SetBaseParameter` command, but these
+  two are past `ParameterCounts::lfoExportedParameters`, so they have no
+  `ParameterID` and no route through the queue:
+  `SpectrumWorxEditor::…::updateParameterAndNotifyHost`
+  (`spectrumWorxEditor.hpp:754`) branches on the index and calls
+  `lfo().parameters().set<LFOParameter>()` directly on the module its strip
+  holds.
 
-  Neither value is a smooth control (a waveform choice and a sync mode, both
-  changed by a menu click), so nothing has been heard, and both are single
-  `float`s written with a plain store. Closing it means either a `ToEngine` case
-  that carries an LFO sub-parameter by index rather than by `ParameterID`, or
-  exporting the two — which would move `parameterTable.txt` and is a decision
-  about what a host should see rather than a threading fix.
+  **This changed shape when the editor was bound to `programMain_`.** The strip's
+  module used to be the engine's, so the write was unsynchronised but did at
+  least land; it is now the main thread's own, so the write is perfectly safe and
+  the audio thread never sees it. A waveform or sync-mode change made in the
+  interface is silently inaudible. That is worse than what it replaced and it is
+  the immediate next thing to fix on this branch.
+
+  Closing it means a `ToEngine` case carrying an LFO sub-parameter by
+  `(moduleIndex, moduleParameterIndex, lfoParameterIndex)` rather than by
+  `ParameterID`, dispatched on the engine side through
+  `invokeFunctorOnIndexedParameter<LFO::Parameters>` the way the global
+  parameters already are. The alternative — exporting the two — would move
+  `parameterTable.txt` and is a decision about what a host should see rather than
+  a threading fix.
+
+- **The main thread's `Program` is only half fed.** (06.08.2026, branch
+  `main-program-copy`) `programMain_` exists and the editor and host-automation
+  routes keep it level, but a preset or session load still fills only the
+  engine's copy, so the four host-facing reads in `spectrumWorxCLAP.cpp` still
+  answer from `program()` and still walk a chain the audio thread splices — each
+  carries a `\todo`. `todo.md` item 1 owns finishing it; the shape it needs is in
+  `SW::loadPreset`'s existing `loader.onlySetParameters()` branch, which assigns
+  the global parameters and moves a chain in while touching no engine.
 
 - **A host writing a slot selector allocates on the audio thread.** (02.08.2026)
   The one exception to "modules are built on the main thread"

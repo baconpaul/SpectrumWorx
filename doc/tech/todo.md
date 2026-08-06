@@ -19,12 +19,12 @@ cannot be held to a number off the machine that minted their fixtures.
 | | |
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone, on every push: macOS universal, Windows x64 under MSVC 19.51, Linux x64 under GCC 12.4, and again in an Ubuntu 20 / GCC 11 container for the glibc a released binary needs. |
-| Runs | Standalone, with audio, with the real editor, with presets. It deadlocked in Logic and in Bitwig on the 2016 threading model; **that model has been replaced and nobody has reloaded it in either host** — item 1. |
-| Tests | **308/308** as of 06.08.2026, across five CI legs. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`, plus 66 `sw-show-ui` renders. Goldens run in Release only. |
+| Runs | Standalone, with audio, with the real editor, with presets. **Loaded in Bitwig on 06.08.2026 and it crashed** — changing presets with audio running, in `paramsInfo`; not the old deadlock but the same class of fault, and item 1 owns it. Logic and Reaper still unvisited — item 2. |
+| Tests | **309, one of them red** as of 06.08.2026, across five CI legs. The red one is item 1's reproduction and is meant to be, until the reads move over. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`, plus 66 `sw-show-ui` renders. Goldens run in Release only. |
 | Validators | `auval` 10 runs of 10. `vst3-validator` 47/47. `clap-cpp-validator` 21/21, one warning (`scan-time`, below). All three by hand on this machine as of 05.08.2026; CI runs none of them. |
 | CI | `.github/workflows/build-plugin.yml`. **Green on 06.08.2026** — ten jobs (gates, five test legs, four builds) over three platforms, run `31112026299`. Windows Debug is the sixth test leg and is excluded; `tech_debt.md` says why. |
 | Warnings | **Two**, both deliberate `#pragma message` build banners. Our own sources compile under `-Wall -Wextra -Werror` on Apple Clang, GCC 12.4 and GCC 11 — CI passes `-DSW_WERROR=ON` to every leg. MSVC gets nothing and compiles warning-blind — `tech_debt.md`. |
-| Sanitizers | rtsan and tsan clean over both test binaries, against the model as it stood on 02.08.2026. `reset()` and `paramsFlush()` entered the realtime region on 03.08.2026 and **have not been run under rtsan since** — item 1. |
+| Sanitizers | rtsan and tsan clean over both test binaries, against the model as it stood on 02.08.2026 — and that clean run is what tsan reporting the preset-swap race on 06.08.2026 shows the limit of: nothing drove a host reading parameters against a running engine. `reset()` and `paramsFlush()` entered the realtime region on 03.08.2026 and **have not been run under rtsan since** — item 2. |
 
 ---
 
@@ -32,10 +32,58 @@ cannot be held to a number off the machine that minted their fixtures.
 
 | # | What | Size |
 |---|---|---|
-| 1 | **Drive it in a DAW** and settle whether the deadlocks are gone | 1–2 days |
-| 2 | **Ship** — README, manual, notarisation | 1–2 weeks |
+| 1 | **Give the main thread its own `Program`** — finish `main-program-copy` | 1 day |
+| 2 | **Drive it in a DAW** and settle whether the deadlocks are gone | 1–2 days |
+| 3 | **Ship** — README, manual, notarisation | 1–2 weeks |
 
-### 1 — Drive it in a DAW
+### 1 — Give the main thread its own `Program`
+
+**The DAW pass has already answered its first question, and the answer was a
+crash.** Changing presets in Bitwig with audio running aborted in
+`ParameterInfoGetter`, reached from `paramsInfo` — the host reads the whole
+parameter list synchronously from inside `state.mark_dirty`, and the main thread
+walks `program().moduleChain()` while the audio thread splices it in
+`drainCommands()`. `isEnd()` compares against its own root, so a walk that
+crosses into another chain's root does not stop, and the root node is downcast as
+a module.
+
+This is §2 rule 2 — *"the main thread owns a full copy of that state"* — which
+the model has claimed since the redesign and did not have. It rhymes exactly with
+the `patch-to-main` rework done on the SideQuest plugins: two copies of the
+model, communicating only by queues. The difference is the module chain, which
+gives the copies a *shape* to keep level and not just values.
+
+**Landed** on `main-program-copy`:
+
+- `pluginTests.cpp`'s "A host reads the parameter list while the engine installs
+  a chain" — the reproduction, which fires on the first run and is also clean
+  under tsan once this is done.
+- `presetChangeEnd()` no longer announces a chain that is still in the command
+  ring; `chainChanged()` does it when the engine has installed one.
+- `programMain_`, `programWrite.hpp`, and the `ToUI` echo that keeps it level
+  with host automation.
+- The editor bound to `programMain_` — `program()` and `moduleChain()` answer
+  from it, and `EditorHost::edit{Parameter,Slot,ModuleMove}` apply to both
+  copies.
+
+**Left**, and in this order:
+
+1. **An LFO's Waveform and SyncTypes no longer reach the engine.** A regression
+   this branch introduced, and the one thing on it that is worse than what it
+   replaced — see `tech_debt.md`. Needs a `ToEngine` case addressed by index.
+2. **A preset or session load fills only the engine's copy.** `SW::loadPreset`
+   already has the shape: the `loader.onlySetParameters()` branch assigns the
+   global parameters and moves a chain in while touching no engine, which is
+   exactly the main-thread half. It was written for VST 2.4's 128 programs and
+   `Loader::onlySetParameters()` currently returns a constant `false`. Check
+   whether the parse is destructive before running it twice, and discard the
+   first pass's `PresetLoadReport` so the counts do not double.
+3. **Point the four host-facing reads at `programMain_`** — each carries a
+   `\todo`. Then the reproduction goes green and the crash is closed.
+4. Sweep the tests that push to `toEngine()` directly, which now bypass the main
+   copy and no longer prove what they claim.
+
+### 2 — Drive it in a DAW
 
 **The only thing that can confirm the threading redesign.** SpectrumWorx
 deadlocked in Logic and in Bitwig in certain situations; every part of the cycle
@@ -105,7 +153,7 @@ survivor:
 already-fetched SDK, so `cmake --build <dir> --target vst3_validator` is all it
 takes and the binary lands in `<dir>/validator-build/bin/Debug/validator`.
 
-### 2 — Ship
+### 3 — Ship
 
 **`README.md` still says the code does not compile.** A licence section has been
 added to it since; everything above that is the 2016 text — "The code does not
