@@ -20,6 +20,14 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+# A script run with `cmake -P` starts with no policies set, whatever the project
+# that registered it asked for -- and `IN_LIST` below is CMP0057, which is an
+# error rather than an operator until something sets it. CMake 4 has the policy
+# removed and always behaves NEW, so this passed on a 4.x developer machine and
+# failed on the 3.x that CI ships. The version is the project's own.
+#                                           (05.08.2026.) (SW port)
+cmake_minimum_required(VERSION 3.28)
+
 set(compileCommands "${BUILD_DIR}/compile_commands.json")
 
 if (NOT EXISTS "${compileCommands}")
