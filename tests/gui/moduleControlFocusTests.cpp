@@ -49,10 +49,10 @@
 ////////////////////////////////////////////////////////////////////////////////
 extern "C"
 {
-struct _XDisplay;
-_XDisplay *XOpenDisplay(char const *displayName);
-unsigned long XInternAtom(_XDisplay *display, char const *name, int onlyIfExists);
-int XCloseDisplay(_XDisplay *display);
+    struct _XDisplay;
+    _XDisplay *XOpenDisplay(char const *displayName);
+    unsigned long XInternAtom(_XDisplay *display, char const *name, int onlyIfExists);
+    int XCloseDisplay(_XDisplay *display);
 } // extern "C"
 #endif // JUCE_LINUX || JUCE_BSD
 //------------------------------------------------------------------------------
