@@ -493,10 +493,7 @@ bool SpectrumWorxCLAP::paramsInfo(std::uint32_t const index,
     getParameterRanges(parameterID, fixed, nullptr);
 
     Plugins::ParameterInformation<Protocol> live;
-    /// \todo `&programMain_`, once every route that changes it feeds it. The
-    /// engine's copy is what the audio thread splices; reading it here is the
-    /// crash. See the note on programMain_.
-    getParameterProperties(parameterID, live, &program());
+    getParameterProperties(parameterID, live, &programMain_);
 
     std::memset(info, 0, sizeof(*info));
     info->id = id.value;
@@ -611,14 +608,13 @@ bool SpectrumWorxCLAP::paramsValue(clap_id const id, double *const value) noexce
     /// It reads as that advertised default instead -- `ranges` is the maximal
     /// description by then, the same one paramsInfo used, so the two agree by
     /// construction. A host checks exactly this at init (param-default-values).
-    /// \todo `programMain_` for both, once it is fed. \see paramsInfo().
-    if (!liveRanges(parameterID, ranges, program()))
+    if (!liveRanges(parameterID, ranges, programMain_))
     {
         *value = CLAPEdge::defaultToHost(parameterID, ranges);
         return true;
     }
 
-    *value = CLAPEdge::toHost(parameterID, ranges, getParameter(parameterID, program()));
+    *value = CLAPEdge::toHost(parameterID, ranges, getParameter(parameterID, programMain_));
     return true;
 }
 
@@ -657,12 +653,11 @@ bool SpectrumWorxCLAP::paramsValueToText(clap_id const id, double const value, c
     /// parameter, so a dynamic range has an owner to ask. That is the same
     /// machinery paramsTextToValue needs below, and worth doing once for both.
     ///                                       (30.07.2026.) (SW port)
-    /// \todo `programMain_` for both, once it is fed. \see paramsInfo().
     std::array<char, 128> text{};
-    getParameterDisplay(parameterID, {text.data(), text.size()}, nullptr, program());
+    getParameterDisplay(parameterID, {text.data(), text.size()}, nullptr, programMain_);
 
     std::array<char, 32> unit{};
-    getParameterLabel(parameterID, {unit.data(), unit.size()}, &program());
+    getParameterLabel(parameterID, {unit.data(), unit.size()}, &programMain_);
 
     std::snprintf(display, size, "%s%s", text.data(), unit.data());
     return true;
@@ -788,6 +783,22 @@ void SpectrumWorxCLAP::paramsFlush(clap_input_events const *const in,
 
     if (effectChanged)
         chainChanged();
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note And on an *inactive* plugin, the echo those events just raised is
+    /// drained here, because this is the main thread and nothing else is coming.
+    /// While active the audio thread raises it and `onMainThread()` drains it,
+    /// which is the ordinary path; while inactive there is no audio thread, no
+    /// `process()` and -- for a host that restores a session and never opens a
+    /// window -- no reason for the callback to run before `stateSave()` is asked
+    /// for the state. The main thread's Program would then still be empty, and
+    /// saving it would save nothing. `stateTests.cpp` walks exactly that.
+    ///                                       (06.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    if (!isActive())
+        drainEngineEvents();
 
     flushUIEdits(out);
 }
@@ -1568,10 +1579,10 @@ bool SpectrumWorxCLAP::stateSave(clap_ostream const *const stream) noexcept
     /// that "a session is a preset plus somewhere to put the rest" is a property
     /// of the bytes rather than a plan.
     auto const dawExtraState(sessionState());
-    /// \todo `programMain_`, once it is fed: a host saves a session while the
-    /// audio thread is running, and walking the engine's chain to do it is the
-    /// same read that crashed `paramsInfo`. \see the note on programMain_.
-    auto const state(savePreset(currentSampleFile(), juce::String(), program_, &dawExtraState));
+    /// \note `programMain_`, this being `[main-thread]`: a host saves a session
+    /// while the audio thread is running, and walking the engine's chain to do it
+    /// is the same read that crashed `paramsInfo`.
+    auto const state(savePreset(currentSampleFile(), juce::String(), programMain_, &dawExtraState));
 
     /// \note The terminator goes into the stream, because loadFrom() parses a
     /// C string and a host is free to hand back exactly what it was given with
