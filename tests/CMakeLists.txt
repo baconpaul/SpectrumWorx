@@ -96,6 +96,17 @@ target_link_libraries(sw-plugin-tests PRIVATE sw-impl Catch2::Catch2WithMain)
 # than the C vtable, to reach what a host cannot name.
 target_link_libraries(sw-plugin-tests PRIVATE clap-helpers clap-wrapper-extensions)
 
+# X11 itself, and only here. JUCE reaches libX11 through dlopen() and a symbol
+# table, so nothing it exports puts the library on a consumer's link line --
+# but gui/moduleControlFocusTests.cpp has to ask the server one question
+# *before* JUCE is allowed near it (whether a window manager is running; see the
+# note on aWindowCanBeMade()), and that call has to resolve at link time. The
+# headers are not wanted, only the three symbols, so this is the library alone.
+if (UNIX AND NOT APPLE)
+    find_package(X11 REQUIRED)
+    target_link_libraries(sw-plugin-tests PRIVATE ${X11_LIBRARIES})
+endif ()
+
 ################################################################################
 # What both need
 ################################################################################

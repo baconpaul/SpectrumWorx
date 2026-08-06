@@ -35,10 +35,70 @@
 
 #include <catch2/catch_test_macros.hpp>
 //------------------------------------------------------------------------------
+#if JUCE_LINUX || JUCE_BSD
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Declared rather than included. <X11/Xlib.h> reaches a consumer of
+/// juce_gui_basics only behind JUCE_GUI_BASICS_INCLUDE_XHEADERS, and turning
+/// that on here would put X11's macros -- None, Status, Bool, Success, Complex
+/// -- into a translation unit that also compiles Catch2 and our own headers.
+/// Three functions and one opaque type is the whole of what aWindowCanBeMade()
+/// below needs, and libX11 is already on this target's link line through JUCE.
+///                                           (05.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+extern "C"
+{
+struct _XDisplay;
+_XDisplay *XOpenDisplay(char const *displayName);
+unsigned long XInternAtom(_XDisplay *display, char const *name, int onlyIfExists);
+int XCloseDisplay(_XDisplay *display);
+} // extern "C"
+#endif // JUCE_LINUX || JUCE_BSD
+//------------------------------------------------------------------------------
 namespace
 {
 using namespace LE;
 using namespace LE::SW;
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Whether a desktop window can be made here at all.
+///
+/// \note X11 only, and it is not the same question as "is there a display".
+/// `xvfb-run` gives a window server and no *window manager*, and JUCE cannot
+/// make a window on one: `XWindowSystem::createWindow` writes the WM_PROTOCOLS
+/// property unguarded --
+///
+///     xchangeProperty( windowH, atoms.protocols, XA_ATOM, 32, atoms.protocolList, 2 );
+///
+/// -- and `atoms.protocols` is `getIfExists( display, "WM_PROTOCOLS" )`, an atom
+/// that only a window manager ever interns. With none running it is None, the
+/// property written is 0, and the server answers BadAtom -- on which Xlib's
+/// default handler calls `exit( 1 )`, killing the case where it stands. The
+/// leak-detector output that follows in a CI log is that exit, not a second bug.
+///
+///   So the atom is asked for the way JUCE asks for it, and its absence is the
+/// signal. macOS and Windows have no such hole and run these cases normally.
+///                                           (05.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+bool aWindowCanBeMade()
+{
+#if JUCE_LINUX || JUCE_BSD
+    /// \note Our own connection rather than JUCE's, which is not open yet the
+    /// first time this is asked. Atoms belong to the server rather than to a
+    /// connection, so the answer is the one JUCE will get.
+    auto *const pDisplay(XOpenDisplay(nullptr));
+    if (!pDisplay)
+        return false; // No window server either.
+    auto const protocols(XInternAtom(pDisplay, "WM_PROTOCOLS", 1 /* only if it exists */));
+    XCloseDisplay(pDisplay);
+    return protocols != 0; // ...which is None.
+#else
+    return true;
+#endif // JUCE_LINUX || JUCE_BSD
+}
 
 /// \brief The editor, on the desktop, so that JUCE will hand out keyboard focus.
 ///
@@ -130,6 +190,10 @@ TEST_CASE("Dragging a knob the LFO owns moves nothing and deselects nothing", "[
 {
     SWTest::HostSideJuce const juceIsUp;
 
+    if (!aWindowCanBeMade())
+        SKIP("No window manager: JUCE cannot put a component on the desktop here, and these "
+             "cases need a real window to drive the keyboard with.");
+
     SWTest::Instance instance;
     DesktopEditor const window(instance);
     if (!window.usable())
@@ -190,6 +254,10 @@ TEST_CASE("An LFO switches every gesture that would move the knob under it", "[g
     // without a real mouse is that the three gestures agree with each other: the
     // drag joined the wheel and the double click, which is the whole change.
     SWTest::HostSideJuce const juceIsUp;
+
+    if (!aWindowCanBeMade())
+        SKIP("No window manager: JUCE cannot put a component on the desktop here, and these "
+             "cases need a real window to drive the keyboard with.");
 
     SWTest::Instance instance;
     DesktopEditor const window(instance);
