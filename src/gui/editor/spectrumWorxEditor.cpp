@@ -1669,6 +1669,8 @@ void SpectrumWorxEditor::resyncModuleRack()
 
 void SpectrumWorxEditor::refreshModuleRackAsync()
 {
+    ++rackResyncRequests_; // \see rackResyncRequests()
+
     postMessageToComponent(*this, [](SpectrumWorxEditor &editor) {
         editor.resyncModuleRack();
         return true;

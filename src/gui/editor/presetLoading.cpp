@@ -336,6 +336,40 @@ bool loadPreset(EditorHost &host, SpectrumWorxEditor *const pEditor, char *const
         copyPresetName(presetName, consumer.program().name());
     consumer.notifyHostAboutPresetChangeEnd();
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note And the rack follows the chain, said from here rather than left to
+    /// the engine's echo.
+    ///
+    ///   The main-thread pass above replaced `programMain_`'s chain outright --
+    /// `onlySetParameters()`, presets.hpp -- so by this line the editor's own
+    /// chain *is* the preset's and every strip on screen belongs to the one
+    /// before it. The engine's copy is a different matter: `publishChain()`
+    /// queues it while audio is running, and the resync used to arrive only when
+    /// the audio thread got round to installing it and echoed `ChainChanged`
+    /// back. A host that is not calling `process()` never closes that loop, and
+    /// the picture stays on the previous preset until something makes a block of
+    /// audio happen.
+    ///
+    ///   Reported against the AudioUnit in Logic with the transport stopped, and
+    /// not reproducible with the CLAP in Bitwig, whose engine runs regardless.
+    /// The echo still arrives and still resyncs; it is a second, idempotent
+    /// recomputation rather than the only one.
+    ///
+    /// \note Unconditional rather than gated on `succeeded`: a load that failed
+    /// partway has still replaced this thread's chain, and a rack left pointing
+    /// at the previous one is the worse of the two outcomes.
+    ///
+    /// \note Asynchronous, and it has to be -- the browser calls this from inside
+    /// its list-box callback and goes on to touch its own widgets afterwards
+    /// (PresetBrowser::presetSelectionChanged), while a resync destroys strips
+    /// and moves the keyboard focus. \see refreshModuleRackAsync().
+    ///                                       (06.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    if (pEditor)
+        pEditor->refreshModuleRackAsync();
+
     /// \note Only with a window open. With none this is a session being restored,
     /// which nobody asked for and which may not even have a message thread yet.
     if (pEditor)

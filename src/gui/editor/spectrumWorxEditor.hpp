@@ -383,6 +383,23 @@ class SpectrumWorxEditor final : private SkinLifetime,
     /// for why it cannot always be immediate.
     void refreshModuleRackAsync();
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief How many times refreshModuleRackAsync() has been called.
+    ///
+    /// \note For tests, and it is the only seam that will do. What the counter
+    /// pins is that something *told* the rack to follow the chain -- which is a
+    /// different question from what resyncModuleRack() then does with it, and the
+    /// only one a headless run can ask: the refresh travels as a
+    /// `juce::MessageManager::MessageBase`, and there is no message loop here to
+    /// deliver it. Every case below therefore runs the resync by hand, which
+    /// means none of them can tell "asked and not delivered" from "never asked".
+    /// That distinction is exactly the bug this exists for.
+    ///                                       (06.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    std::uint32_t rackResyncRequests() const { return rackResyncRequests_; }
+
     /// \brief Draws whatever the LFOs have done since the last sweep.
     ///
     /// \note What `timerCallback()` is, at `modulationRefreshHz`. Public so a
@@ -399,6 +416,9 @@ class SpectrumWorxEditor final : private SkinLifetime,
     /// \brief Disables the LFO display and posts its destruction. Shared by
     /// moduleControlDectivated() and detachFrom().
     void retireLFODisplay();
+
+    /// \see rackResyncRequests().
+    std::uint32_t rackResyncRequests_{0};
 
     /// \brief The slot addUserAddedModule() wants focused once its strip exists,
     /// or noSlotAwaitingFocus. \see addUserAddedModule().

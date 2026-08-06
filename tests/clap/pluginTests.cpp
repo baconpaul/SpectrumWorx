@@ -1486,6 +1486,93 @@ TEST_CASE("Two instances process while their editors come and go", "[clap][threa
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
+/// \brief A preset load has to reach the interface without the audio thread's
+/// help.
+///
+///   Reported against the AudioUnit in Logic: with the transport stopped,
+/// picking a preset in the browser left the old strips on screen. The same build
+/// as a CLAP in Bitwig was fine, which is the clue -- Bitwig's engine runs
+/// whether or not anything is playing, and Logic stops calling an AU's render
+/// callback on a track that is neither playing nor monitored.
+///
+///   That is enough to describe the whole fault. `GUI::loadPreset` fills the main
+/// thread's Program itself and *queues* the engine's copy, and nothing then told
+/// the editor. The one thing that ever did was the chain's echo coming back the
+/// other way: `drainCommands()` installs the queued chain, calls `chainChanged()`,
+/// and `drainEngineEvents()` resyncs the rack when it sees it -- a round trip
+/// through a thread that, in this host, was not running. So the rack showed the
+/// previous preset until something made a block of audio happen.
+///
+/// \note What the case pins is the *trigger*, not the resync. Every other case
+/// here runs `resyncModuleRack()` by hand because a headless build has no message
+/// loop, and doing so would hide exactly this bug: the rack would come out right
+/// either way. \see SpectrumWorxEditor::rackResyncRequests().
+///                                           (06.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A preset reaches the rack with no audio thread running", "[clap][presets][gui]")
+{
+    using Editor = LE::SW::GUI::SpectrumWorxEditor;
+
+    Entry const entry;
+    juce::ScopedJuceInitialiser_GUI const juceIsUp;
+
+    /// \note Active, which is the whole point: an *inactive* plugin installs a
+    /// published chain on the calling thread (`Threading::publishChain`) and the
+    /// interface would follow it for free. Logic's plugin is activated and simply
+    /// never rendered.
+    ActivePlugin plugin(48000, 512);
+    auto &host(editorHostOf(*plugin));
+    auto editor(std::make_unique<Editor>(host, Editor::PanelPlacement::overlay));
+
+    // Something on screen first, so that "the rack never changed" and "the rack
+    // was empty all along" are not the same picture.
+    editor->addUserAddedModule(0);
+    editor->resyncModuleRack();
+    REQUIRE(editor->moduleChain().size() == 1);
+    REQUIRE(editor->regionInSlot(0) != nullptr);
+
+    /// \note Three modules, named rather than swept: what makes a stale rack
+    /// visible is that the preset's module *count* differs from what is on
+    /// screen, and a case that took whatever preset came first could not promise
+    /// that. A rename breaks this loudly, which is the right failure.
+    std::filesystem::path const presetFile(std::filesystem::path(SW_PRESET_DATA_DIR) / "Voices" /
+                                           "LE Robokid.swp");
+    REQUIRE(std::filesystem::is_regular_file(presetFile));
+    auto presetData(LE::SW::readPresetFile(presetFile));
+    REQUIRE(presetData);
+
+    auto const requestsBefore(editor->rackResyncRequests());
+
+    REQUIRE(LE::SW::GUI::loadPreset(host, editor.get(), presetData.get(),
+                                    true /*ignore external samples*/, nullptr, "LE Robokid"));
+
+    // The main thread's chain is the preset's the moment the load returns...
+    auto const modules(editor->moduleChain().size());
+    REQUIRE(modules == 3);
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// ...and the editor has been told to follow it. No `process()` and no
+    /// `flush()` anywhere in this case: the engine's own chain is still sitting
+    /// in the command ring, and it is allowed to be. What must not depend on it
+    /// is the picture.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    CHECK(editor->rackResyncRequests() > requestsBefore);
+
+    // And the resync, run by hand as everything headless must, is the preset's.
+    editor->resyncModuleRack();
+    for (std::uint8_t slot(0); slot < modules; ++slot)
+        REQUIRE(editor->regionInSlot(slot) != nullptr);
+    CHECK(editor->regionInSlot(static_cast<std::uint8_t>(modules)) == nullptr);
+
+    editor.reset();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
 /// \note Loading preset after preset with the window open, which is what a user
 /// does with the browser and what nothing headless did. Every preset case before
 /// this one loads into a *fresh* engine with no editor -- so it never saw a rack

@@ -243,11 +243,25 @@ exception is a *host* writing a slot selector: that arrives as a parameter event
 inside `process()`, and deferring it would mean a round trip to the main thread
 and back — so it still allocates. Recorded in `tech_debt.md`.
 
-**The rack is a function of the chain.** `resyncModuleRack()` drops strips whose
-module has gone, builds strips for modules that have none, and puts every one of
-them where the chain says. It is a recomputation rather than a diff, because
-between a click and the engine applying it the rack is what the user asked for
-and the chain is what is playing. `ToUI::ChainChanged` drives it, coalesced.
+**The rack is a function of the main thread's chain.** `resyncModuleRack()` drops
+strips whose module has gone, builds strips for modules that have none, and puts
+every one of them where `programMain_`'s chain says. It is a recomputation rather
+than a diff, because between a click and the engine applying it the rack is what
+the user asked for and the engine's chain is what is playing.
+
+Two things ask for it, and both have to. **Whatever changed the main thread's
+chain says so** — `addUserAddedModule()`, `moduleAdded()`/`moduleRemoved()` and
+`GUI::loadPreset()` each call `refreshModuleRackAsync()`. **And the engine's echo
+says so**, `ToUI::ChainChanged`, coalesced, for the changes that originate on the
+audio thread — a host writing a slot selector inside `process()`.
+
+The first is not redundant. A preset load fills `programMain_` outright and only
+*queues* the engine's copy, so waiting for the echo makes the picture depend on
+the host calling `process()` — which Logic does not do for an AudioUnit on a
+track that is neither playing nor monitored. That was a live bug: the browser
+changed the preset and the strips stayed on the previous one until something made
+a block of audio happen. Pinned by *"A preset reaches the rack with no audio
+thread running"* (`tests/clap/pluginTests.cpp`), which never calls `process()`.
 
 **The sample is a pointer.** `SpectrumWorxCLAP` holds `Sample *pSample_`,
 swapped by `SwapSample`, plus its own `sampleFile_`/`decodedSampleRate_` so that
@@ -327,7 +341,7 @@ The inventory the model is measured by.
 | The module chain | `ToEngine::{SetSlot,MoveModule,SwapChain}` + `ToUI::Retire`; built on the main thread, linked on the audio thread | ✅ |
 | `Engine::Setup` and the spectral storage | `spectralSetupPending_` + `clap_host::request_restart()`, applied in `deactivate()` | ✅ |
 | The `Sample` | `ToEngine::SwapSample` + `ToUI::Retire`; the main thread keeps the file name and the decoded rate | ✅ |
-| The module rack | recomputed from the chain on `ToUI::ChainChanged` | ✅ |
+| The module rack | recomputed from `programMain_`'s chain, by whatever changed it and by `ToUI::ChainChanged` | ✅ |
 | Editor selection and active control | `SpectrumWorxEditor::{pSelectedModule_,pActiveControl_}`, per editor | ✅ |
 | `PopupMenu::menuActive_` | a member, per menu and therefore per editor | ✅ |
 | **`LFOImpl::Timer`'s tempo** | three process-wide statics, `std::atomic` — no longer a race, still shared between instances | `tech_debt.md` |
