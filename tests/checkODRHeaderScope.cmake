@@ -16,6 +16,11 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+# See the note in checkNoJuceInDSP.cmake: `cmake -P` sets no policies, and the
+# `IN_LIST` below needs CMP0057.
+#                                           (05.08.2026.) (SW port)
+cmake_minimum_required(VERSION 3.28)
+
 set(compileCommands "${BUILD_DIR}/compile_commands.json")
 
 if (NOT EXISTS "${compileCommands}")
