@@ -24,6 +24,7 @@
 /// "does an enabled LFO modulate anything" has to look at the engine, and reaches
 /// it through `clap_plugin::plugin_data` as processLockTests.cpp does.
 #include "core/modules/moduleDSPAndGUI.hpp"
+#include "core/threading/publish.hpp"
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
 #include "gui/editor/presetLoading.hpp"
 #include "le/parameters/lfoImpl.hpp"
@@ -1588,4 +1589,112 @@ TEST_CASE("Loading preset after preset with the editor open", "[clap][presets][g
     REQUIRE(loaded > 300);
 
     editor.reset();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The case above loads preset after preset on the thread that also runs
+/// the audio, so the chain is never installed while anything else is looking at
+/// it. This is the same loop with a real audio thread underneath, which is what
+/// a user browsing presets with the transport rolling actually has.
+///
+///   Reported as a crash in `ParameterInfoGetter<CLAP>::operator()(LFO, Program
+/// const *)`, reached from `paramsInfo` -- Bitwig calls `params.value_to_text`
+/// synchronously from inside `state.mark_dirty`, and `presetChangeEnd()` marks
+/// dirty the instant `publishChain()` has *queued* the swap. So the host walks
+/// the parameter list on the main thread in the same moment the audio thread
+/// splices the chain out from under it. In a checked build it lands earlier and
+/// says so plainly: `other.referenceCount_ == 3` in `moveAssign()`, the root node
+/// counting one reference more than the swap can account for, because the walk
+/// on the other thread is holding it.
+///
+///   Nothing here is specific to presets or to Bitwig. `paramsInfo`,
+/// `paramsValue`, `paramsValueToText` and `stateSave` are all `[main-thread]` and
+/// all resolve a slot by walking `program().moduleChain()`, which §2 rule 1 says
+/// belongs to the audio thread while the plugin is activated. A preset is simply
+/// the mutation with the widest window.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A host reads the parameter list while the engine installs a chain",
+          "[clap][threading][presets]")
+{
+    constexpr float sampleRate{48000};
+    constexpr std::uint32_t blockSize{64};
+    constexpr unsigned int rounds{200};
+
+    Entry const entry;
+
+    ActivePlugin plugin(sampleRate, blockSize);
+    auto &host(editorHostOf(*plugin));
+    auto const &params(parameters(*plugin));
+    auto const parameterCount(params.count(&*plugin));
+    REQUIRE(parameterCount > 0);
+
+    std::atomic<bool> stop{false};
+    std::atomic<unsigned int> blocksRun{0};
+
+    /// \note No `REQUIRE` on this thread -- Catch2's assertion machinery is not
+    /// thread safe. \see ActivePlugin::processStatus
+    std::thread audio([&] {
+        std::vector<float> leftIn(blockSize, 0.0f), rightIn(blockSize, 0.0f);
+        std::vector<float> leftOut(blockSize), rightOut(blockSize);
+        while (!stop.load(std::memory_order_acquire))
+        {
+            plugin.processStatus(leftIn, rightIn, leftOut, rightOut);
+            blocksRun.fetch_add(1, std::memory_order_acq_rel);
+        }
+    });
+
+    // Not one description read before the audio thread is really running.
+    while (blocksRun.load(std::memory_order_acquire) == 0)
+    {
+    }
+
+    bool everyDescriptionRead{true};
+    bool everyRangeOrdered{true};
+
+    for (unsigned int round(0); round < rounds; ++round)
+    {
+        ////////////////////////////////////////////////////////////////////////
+        /// \note What a preset load ends in. `GUI::loadPreset` builds a chain
+        /// nothing else can see and hands it to `Threading::publishChain()`,
+        /// which with audio running queues it for the audio thread; the file
+        /// parsing in front of that is not what this case is about.
+        ////////////////////////////////////////////////////////////////////////
+        LE::SW::AutomatedModuleChain replacement;
+        for (std::uint8_t slot(0); slot < 1 + (round % 4); ++slot)
+        {
+            auto *const pModule(LE::SW::Threading::createModuleForSlot(
+                host.core(), static_cast<std::int8_t>((round + slot) % 4), slot));
+            REQUIRE(pModule != nullptr);
+            replacement.push_back(LE::SW::Engine::node(*pModule));
+            intrusive_ptr_release(&LE::SW::Engine::node(*pModule)); // the chain owns it now
+        }
+        LE::SW::Threading::publishChain(host.core(), host.toEngine(), replacement);
+
+        // And what the host does the moment it is told the list may have moved.
+        for (std::uint32_t index(0); index < parameterCount; ++index)
+        {
+            clap_param_info info{};
+            if (!params.get_info(&*plugin, index, &info))
+            {
+                everyDescriptionRead = false;
+                continue;
+            }
+            everyRangeOrdered = everyRangeOrdered && (info.min_value <= info.max_value);
+
+            double value{};
+            params.get_value(&*plugin, info.id, &value);
+            std::array<char, 256> text{};
+            params.value_to_text(&*plugin, info.id, value, text.data(),
+                                 static_cast<std::uint32_t>(text.size()));
+        }
+    }
+
+    stop.store(true, std::memory_order_release);
+    audio.join();
+
+    CHECK(everyDescriptionRead);
+    CHECK(everyRangeOrdered);
 }
