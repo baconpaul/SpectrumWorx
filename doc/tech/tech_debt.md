@@ -224,7 +224,16 @@ New entries go at the top of their area.
 
 ## Threading
 
-- **An LFO's Waveform and SyncTypes do not reach the engine at all.**
+- ~~**An LFO's Waveform and SyncTypes**~~ — **closed 06.08.2026.** They travel as
+  a `ToEngine::SetUnexportedLFOParameter`, addressed by
+  `(moduleIndex, moduleParameterIndex, lfoParameterIndex)` because they have no
+  `ParameterID` to be addressed by, and are applied on the engine side through
+  the same `invokeFunctorOnIndexedParameter` the global parameters go through.
+  Kept here for one release as the record of a debt that changed shape twice
+  before it closed — it was an unsynchronised write into engine state, then
+  briefly a perfectly safe write nothing could hear:
+
+  **An LFO's Waveform and SyncTypes do not reach the engine at all.**
   (06.08.2026 — was "written straight into the engine from the message thread",
   04.08.2026) Every other edit crosses as a `SetBaseParameter` command, but these
   two are past `ParameterCounts::lfoExportedParameters`, so they have no

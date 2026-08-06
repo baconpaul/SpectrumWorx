@@ -20,11 +20,11 @@ cannot be held to a number off the machine that minted their fixtures.
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone, on every push: macOS universal, Windows x64 under MSVC 19.51, Linux x64 under GCC 12.4, and again in an Ubuntu 20 / GCC 11 container for the glibc a released binary needs. |
 | Runs | Standalone, with audio, with the real editor, with presets. **Loaded in Bitwig on 06.08.2026 and it crashed** — changing presets with audio running, in `paramsInfo`; not the old deadlock but the same class of fault, and item 1 owns it. Logic and Reaper still unvisited — item 2. |
-| Tests | **309, one of them red** as of 06.08.2026, across five CI legs. The red one is item 1's reproduction and is meant to be, until the reads move over. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`, plus 66 `sw-show-ui` renders. Goldens run in Release only. |
+| Tests | **four red** as of 06.08.2026, all listed under item 1 and all of the same shape — a harness writing through one path and reading through the other. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`, plus 66 `sw-show-ui` renders. Goldens run in Release only. |
 | Validators | `auval` 10 runs of 10. `vst3-validator` 47/47. `clap-cpp-validator` 21/21, one warning (`scan-time`, below). All three by hand on this machine as of 05.08.2026; CI runs none of them. |
 | CI | `.github/workflows/build-plugin.yml`. **Green on 06.08.2026** — ten jobs (gates, five test legs, four builds) over three platforms, run `31112026299`. Windows Debug is the sixth test leg and is excluded; `tech_debt.md` says why. |
 | Warnings | **Two**, both deliberate `#pragma message` build banners. Our own sources compile under `-Wall -Wextra -Werror` on Apple Clang, GCC 12.4 and GCC 11 — CI passes `-DSW_WERROR=ON` to every leg. MSVC gets nothing and compiles warning-blind — `tech_debt.md`. |
-| Sanitizers | rtsan and tsan clean over both test binaries, against the model as it stood on 02.08.2026 — and that clean run is what tsan reporting the preset-swap race on 06.08.2026 shows the limit of: nothing drove a host reading parameters against a running engine. `reset()` and `paramsFlush()` entered the realtime region on 03.08.2026 and **have not been run under rtsan since** — item 2. |
+| Sanitizers | **tsan clean over both binaries as of 06.08.2026** — zero reports across 101 plugin cases and 106 dsp cases, including the case that reproduced the preset-swap race. The earlier clean run, on 02.08.2026, is what that race shows the limit of: nothing then drove a host reading parameters against a running engine, so tsan had nothing to see. `reset()` and `paramsFlush()` entered the realtime region on 03.08.2026 and **have not been run under rtsan since** — item 2. |
 
 ---
 
@@ -38,8 +38,8 @@ cannot be held to a number off the machine that minted their fixtures.
 
 ### 1 — Give the main thread its own `Program`
 
-**The DAW pass has already answered its first question, and the answer was a
-crash.** Changing presets in Bitwig with audio running aborted in
+**The DAW pass answered its first question with a crash, and the crash is
+fixed.** Changing presets in Bitwig with audio running aborted in
 `ParameterInfoGetter`, reached from `paramsInfo` — the host reads the whole
 parameter list synchronously from inside `state.mark_dirty`, and the main thread
 walks `program().moduleChain()` while the audio thread splices it in
@@ -56,8 +56,8 @@ gives the copies a *shape* to keep level and not just values.
 **Landed** on `main-program-copy`:
 
 - `pluginTests.cpp`'s "A host reads the parameter list while the engine installs
-  a chain" — the reproduction, which fires on the first run and is also clean
-  under tsan once this is done.
+  a chain" — the reproduction. It aborted on the first run before the fix and
+  passes with no tsan report after it.
 - `presetChangeEnd()` no longer announces a chain that is still in the command
   ring; `chainChanged()` does it when the engine has installed one.
 - `programMain_`, `programWrite.hpp`, and the `ToUI` echo that keeps it level
@@ -65,7 +65,6 @@ gives the copies a *shape* to keep level and not just values.
 - The editor bound to `programMain_` — `program()` and `moduleChain()` answer
   from it, and `EditorHost::edit{Parameter,Slot,ModuleMove}` apply to both
   copies.
-
 - An LFO's Waveform and SyncTypes reach the engine again, over a `ToEngine` case
   addressed by index — which also closes the `tech_debt.md` item they were
   filed under since 04.08.2026.
