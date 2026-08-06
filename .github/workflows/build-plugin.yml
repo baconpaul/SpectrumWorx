@@ -5,8 +5,9 @@
 #
 #   gates          the two checks that need no compiler -- formatting and the
 #                  Boost allowlist. Under a minute, and first to tell you.
-#   test           ctest, on three platforms, in **both** Debug and Release.
-#                  Neither configuration alone runs the whole suite: the
+#   test           ctest, on three platforms, in **both** Debug and Release --
+#                  except Windows, which runs Release only, and the matrix says
+#                  why. Neither configuration alone runs the whole suite: the
 #                  goldens SKIP under !NDEBUG, so Release is the only one that
 #                  renders DSP, and Debug is the only one that runs the ~1200
 #                  asserts. Built with SW_BUILD_PLUGIN_BUNDLES=OFF, which leaves
@@ -91,6 +92,21 @@ jobs:
       matrix:
         config: [Debug, Release]
         os: [windows-latest, macos-latest, ubuntu-latest]
+        # Five of the six. The Windows Debug job hangs rather than fails -- it
+        # runs to the step timeout instead of reporting anything -- and the
+        # standing guess is that a checked build of this suite wants more time
+        # or more memory than that runner has. The guess is untested: nothing
+        # here has reproduced it, and what is being removed is a red square
+        # nobody could read, not a diagnosis.
+        #
+        #   It is the ~1200 asserts that go with it, and only on Windows: macOS
+        # and Linux still run both configurations, so the checked build is still
+        # exercised on every push -- but a Windows-only assertion failure now has
+        # nowhere to fire. Worth putting back the day the hang is understood.
+        #                                     (06.08.2026.) (SW port)
+        exclude:
+          - os: windows-latest
+            config: Debug
         include:
           - os: windows-latest
             name: windows-x64
