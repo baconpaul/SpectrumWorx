@@ -2332,6 +2332,17 @@ void SpectrumWorxEditor::LFODisplay::queueLFOParameter(std::uint8_t const lfoPar
     editor().editorHost().editParameter(parameterID, value);
 }
 
+void SpectrumWorxEditor::LFODisplay::queueUnexportedLFOParameter(
+    std::uint8_t const lfoParameterIndex, float const value) const
+{
+    auto const moduleParameterIndex(control().moduleParameterIndex());
+    if (moduleParameterIndex >= (SW::Constants::maxNumberOfParametersPerModule - 1))
+        return;
+
+    editor().editorHost().toEngine().push(Threading::setUnexportedLFOParameter(
+        moduleIndex(), moduleParameterIndex, lfoParameterIndex, value));
+}
+
 void SpectrumWorxEditor::LFODisplay::verifyGUIAndLFOConsistency() const
 {
 #ifndef NDEBUG

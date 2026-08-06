@@ -65,7 +65,12 @@ struct ToEngine
         /// destroyed under the callback.
         SwapChain,
         /// Likewise a decoded Sample.
-        SwapSample
+        SwapSample,
+        /// An LFO sub-parameter that has no `ParameterID` -- Waveform and
+        /// SyncTypes, both past `ParameterCounts::lfoExportedParameters`.
+        /// Addressed by index because there is no identifier to address it by;
+        /// everything else the interface sends is a `SetBaseParameter`.
+        SetUnexportedLFOParameter
     };
 
     Kind kind{Kind::None};
@@ -107,6 +112,16 @@ struct ToEngine
         {
             void *pSample;
         } swapSample;
+
+        /// \note The value in the parameter's own units, as a float, which is
+        /// what the interface already converts to before it stores one.
+        struct
+        {
+            float value;
+            std::uint8_t moduleIndex;
+            std::uint8_t moduleParameterIndex;
+            std::uint8_t lfoParameterIndex;
+        } setUnexportedLFOParameter;
     };
 }; // struct ToEngine
 
@@ -231,6 +246,17 @@ inline ToEngine swapSample(void *const pSample)
     ToEngine message{};
     message.kind = ToEngine::Kind::SwapSample;
     message.swapSample = {pSample};
+    return message;
+}
+
+inline ToEngine setUnexportedLFOParameter(std::uint8_t const moduleIndex,
+                                          std::uint8_t const moduleParameterIndex,
+                                          std::uint8_t const lfoParameterIndex, float const value)
+{
+    ToEngine message{};
+    message.kind = ToEngine::Kind::SetUnexportedLFOParameter;
+    message.setUnexportedLFOParameter = {value, moduleIndex, moduleParameterIndex,
+                                         lfoParameterIndex};
     return message;
 }
 
