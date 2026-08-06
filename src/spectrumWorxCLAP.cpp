@@ -26,6 +26,7 @@
 #include "core/host_interop/clapParameterEdge.hpp"
 #include "core/host_interop/host2PluginImpl.inl"
 #include "core/host_interop/plugin2HostImpl.inl"
+#include "core/host_interop/programWrite.hpp"
 
 #include "core/threading/threadCheck.hpp"
 
@@ -475,6 +476,9 @@ bool SpectrumWorxCLAP::paramsInfo(std::uint32_t const index,
     getParameterRanges(parameterID, fixed, nullptr);
 
     Plugins::ParameterInformation<Protocol> live;
+    /// \todo `&programMain_`, once every route that changes it feeds it. The
+    /// engine's copy is what the audio thread splices; reading it here is the
+    /// crash. See the note on programMain_.
     getParameterProperties(parameterID, live, &program());
 
     std::memset(info, 0, sizeof(*info));
@@ -557,10 +561,15 @@ void SpectrumWorxCLAP::modulePathFor(ParameterID const parameterID,
 /// thread and the UI thread -- and one shared scratch description between them
 /// would be a race. It costs a clear() and a dispatch; neither allocates nor
 /// formats a string, which is what getParameterRanges() is for.
+///
+/// \note And the Program comes from the caller for the same reason the scratch
+/// does: the two main-thread callers and the one under `process()` are reading
+/// two different copies of it, each on the thread that owns it.
 bool SpectrumWorxCLAP::liveRanges(ParameterID const parameterID,
-                                  Plugins::ParameterInformation<Protocol> &ranges) const
+                                  Plugins::ParameterInformation<Protocol> &ranges,
+                                  Program const &program)
 {
-    getParameterRanges(parameterID, ranges, &program());
+    getParameterRanges(parameterID, ranges, &program);
     if (CLAPEdge::isPresent(ranges))
         return true;
 
@@ -585,13 +594,14 @@ bool SpectrumWorxCLAP::paramsValue(clap_id const id, double *const value) noexce
     /// It reads as that advertised default instead -- `ranges` is the maximal
     /// description by then, the same one paramsInfo used, so the two agree by
     /// construction. A host checks exactly this at init (param-default-values).
-    if (!liveRanges(parameterID, ranges))
+    /// \todo `programMain_` for both, once it is fed. \see paramsInfo().
+    if (!liveRanges(parameterID, ranges, program()))
     {
         *value = CLAPEdge::defaultToHost(parameterID, ranges);
         return true;
     }
 
-    *value = CLAPEdge::toHost(parameterID, ranges, getParameter(parameterID));
+    *value = CLAPEdge::toHost(parameterID, ranges, getParameter(parameterID, program()));
     return true;
 }
 
@@ -630,8 +640,9 @@ bool SpectrumWorxCLAP::paramsValueToText(clap_id const id, double const value, c
     /// parameter, so a dynamic range has an owner to ask. That is the same
     /// machinery paramsTextToValue needs below, and worth doing once for both.
     ///                                       (30.07.2026.) (SW port)
+    /// \todo `programMain_` for both, once it is fed. \see paramsInfo().
     std::array<char, 128> text{};
-    getParameterDisplay(parameterID, {text.data(), text.size()}, nullptr);
+    getParameterDisplay(parameterID, {text.data(), text.size()}, nullptr, program());
 
     std::array<char, 32> unit{};
     getParameterLabel(parameterID, {unit.data(), unit.size()}, &program());
@@ -687,20 +698,35 @@ bool SpectrumWorxCLAP::handleEvent(clap_event_header const *const header)
     /// effect's own default -- which is what paramsValue() reports for it in the
     /// meantime.
     ///                                       (29.07.2026.) (SW port)
-    if (!liveRanges(parameterID, ranges))
+    /// \note The engine's Program, this being `[audio-thread]` -- the three
+    /// `[main-thread]` callers of liveRanges() read `programMain_`.
+    if (!liveRanges(parameterID, ranges, program()))
         return false;
 
     auto const value(CLAPEdge::fromHost(parameterID, ranges, event->value));
-    setParameter(parameterID, value);
+    auto const applied(setParameter(parameterID, value));
 
-    /// \note And tell the interface, if there is one. A module used to do this
-    /// itself, from inside the setter, by writing a `juce::Slider` on whatever
-    /// thread the write arrived on -- which for a host automation event is this
-    /// one. It is a message now, drained on the main thread.
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note And the main thread's copy of the same state. A module used to write
+    /// a `juce::Slider` from inside the setter, on whatever thread the write
+    /// arrived on -- which for a host automation event is this one. It is a
+    /// message now, drained on the main thread.
+    ///
+    ///   Not gated on there being an editor, which it was while this was only a
+    /// notification. It is how `programMain_` learns what the host did, and
+    /// `paramsValue` and `stateSave` read that with the window shut.
+    ///
+    ///   Only when the engine took it, though: `setParameter` declines a slot
+    /// selector that would leave a hole in the rack, and a copy that applied what
+    /// the engine refused is a copy that disagrees with it.
     ///
     ///   `request_callback` is already asked for by `markCurrentProgramAsModified()`
     /// on this same path, so the drain happens without a second request.
-    if (pEditor_)
+    ///                                       (06.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    if (applied == Plugins::ErrorCode<Protocol>::Success)
         toUI_.push(Threading::baseParameterChanged(parameterID.binaryValue, value));
 
     /// \note Only a module-chain parameter changes what the *other* parameters
@@ -1152,12 +1178,24 @@ void SpectrumWorxCLAP::drainEngineEvents()
         case Threading::ToUI::Kind::None:
             break;
 
+        ////////////////////////////////////////////////////////////////////////
+        ///
+        /// \note The copy first and the interface second, in that order and both
+        /// unconditionally. What the host wrote to the engine has to land in
+        /// `programMain_` whether or not anybody is looking at it -- `paramsValue`
+        /// and `stateSave` are answered from it with the window shut -- and a
+        /// strip that then redraws is reading a copy that already agrees.
+        ///
+        ////////////////////////////////////////////////////////////////////////
         case Threading::ToUI::Kind::BaseParameterChanged:
+        {
+            ParameterID const parameterID{
+                Plugins::ParameterID{event.baseParameterChanged.parameterID}};
+            setParameterIn<Protocol>(programMain_, parameterID, event.baseParameterChanged.value);
             if (pEditor_)
-                pEditor_->parameterChangedElsewhere(
-                    ParameterID{Plugins::ParameterID{event.baseParameterChanged.parameterID}},
-                    event.baseParameterChanged.value);
+                pEditor_->parameterChangedElsewhere(parameterID, event.baseParameterChanged.value);
             break;
+        }
 
         case Threading::ToUI::Kind::ChainChanged:
             /// \note Coalesced: a preset that swaps the chain and then fills a
@@ -1261,7 +1299,9 @@ void SpectrumWorxCLAP::HostProxy::automatedParameterChanged(
 {
     ParameterID const parameterID{parameter};
     Plugins::ParameterInformation<Protocol> ranges;
-    plugin_.liveRanges(parameterID, ranges);
+    /// \note The main thread's copy: this is the editor's own edit on its way out,
+    /// and the editor runs there.
+    liveRanges(parameterID, ranges, plugin_.programMain_);
 
     plugin_.uiEdits_.push({parameter.value,
                            static_cast<Plugins::AutomatedParameterValue>(
@@ -1446,6 +1486,9 @@ bool SpectrumWorxCLAP::stateSave(clap_ostream const *const stream) noexcept
     /// that "a session is a preset plus somewhere to put the rest" is a property
     /// of the bytes rather than a plan.
     auto const dawExtraState(sessionState());
+    /// \todo `programMain_`, once it is fed: a host saves a session while the
+    /// audio thread is running, and walking the engine's chain to do it is the
+    /// same read that crashed `paramsInfo`. \see the note on programMain_.
     auto const state(savePreset(currentSampleFile(), juce::String(), program_, &dawExtraState));
 
     /// \note The terminator goes into the stream, because loadFrom() parses a
