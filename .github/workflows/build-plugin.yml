@@ -35,6 +35,9 @@ on:
     tags:
       - 'v**'
   pull_request:
+  # A run that was never created cannot be re-run, so an outage that swallows
+  # a merge leaves no way back to it. This is that way.
+  workflow_dispatch:
 
 # A second push to the same branch makes the first one's answer irrelevant.
 concurrency:
