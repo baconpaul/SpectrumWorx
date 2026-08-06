@@ -1481,9 +1481,9 @@ void SpectrumWorxCLAP::HostProxy::presetChangeEnd() const
     ////////////////////////////////////////////////////////////////////////////
     if (!plugin.engineIsRunning())
     {
-        if (plugin_._host.canUseParams())
-            plugin._host.paramsRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_VALUES |
-                                      CLAP_PARAM_RESCAN_TEXT);
+        // Deferred, and coalescing, for the reason stateLoad() gives.
+        plugin.requestRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_VALUES |
+                             CLAP_PARAM_RESCAN_TEXT);
         plugin_.markCurrentProgramAsModified();
     }
 
@@ -1630,10 +1630,16 @@ bool SpectrumWorxCLAP::stateLoad(clap_istream const *const stream) noexcept
                          nullptr, &dawExtraState))
         return false;
 
-    // Already on the main thread here.
-    if (_host.canUseParams())
-        _host.paramsRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT |
-                           CLAP_PARAM_RESCAN_VALUES);
+    /// \note Deferred through `requestRescan()` rather than announced here, even
+    /// though this is already the main thread and could call straight through.
+    /// `GUI::loadPreset()` above ends in `chainChanged()`, which asks for the same
+    /// rescan, so a preset load used to ask the host twice within a few
+    /// microseconds -- and a host acts on each one. The AU wrapper's answer is to
+    /// rebuild its whole parameter tree on a queue of its own while clearing the
+    /// structures that tree is being built from, so the second ask lands inside
+    /// the first rebuild. `pendingRescan_` collapses the pair into one.
+    ///                                       (06.08.2026.) (SW port)
+    requestRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT | CLAP_PARAM_RESCAN_VALUES);
     return true;
 }
 
