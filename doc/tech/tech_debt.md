@@ -27,6 +27,21 @@ New entries go at the top of their area.
 
 ## Build and platform
 
+- **Windows Debug is out of the test matrix, and the reason is a guess.**
+  (06.08.2026, from the CI item) The job did not fail — it hung, running to the
+  step timeout and reporting nothing, so what was removed is a red square nobody
+  could read rather than a diagnosis. The standing explanation is that a checked
+  build of this suite wants more time or more memory than that runner has, and
+  **nothing has reproduced it**: no Windows machine here can, which is the same
+  reason the MSVC warning baseline is where it is.
+
+  What goes with it is the ~1200 asserts, on Windows only. macOS and Linux still
+  run both configurations, so a checked build is exercised on every push — but a
+  Windows-*specific* assertion failure now has nowhere to fire, and MSVC is the
+  compiler most likely to have one, being the one whose warnings nobody reads.
+  The exclusion carries the cost in a comment (`build-plugin.yml:96-109`) so that
+  putting it back is a decision somebody makes rather than one that gets lost.
+
 - **The factory samples decode to different lengths on different macOS
   versions.** (05.08.2026) `MW-Metallica1.mp3` holds, by `afinfo`, "21454 valid
   frames + 576 priming + 1010 remainder = 23040" at 44.1 kHz. At 48 kHz it
@@ -77,29 +92,45 @@ New entries go at the top of their area.
   `LE_DEFINE_PARAMETER(SemiTones, SymmetricFloat, …)` names the type inside a
   macro argument. Every effect header is that shape.
 
-  The other half of the reason is that this platform cannot answer the question
-  that matters. A header macOS gets transitively and Windows does not is
-  invisible from here, and Windows arrives as a build log. This wants the CI
-  matrix (`todo.md`) in front of it.
+  The other half of the reason was that this platform could not answer the
+  question that matters — a header macOS gets transitively and Windows does not is
+  invisible from here. That half is gone as of 06.08.2026: the matrix compiles
+  every commit on MSVC and on two GCCs, so a removed include that only Windows
+  needed now fails a job rather than somebody's afternoon. What is left is the
+  sweep itself, and a tool that can see through `LE_DEFINE_PARAMETER`.
 
-- **Four GCC 15 fixes have not been compiled by a GCC.** (04.08.2026) A Linux
-  build of `00383f6` reported 469 warnings from four causes, and all four are
-  fixed here: `<ciso646>` deleted from the force-included header (294 `-Wcpp`),
-  `valueOffsetGetter()` rewritten to take the difference between two addresses of
-  a real object instead of dereferencing null (142 `-Wnonnull`, and the source
-  had been calling it UB since 2016), `SpectrumWorxCore::Module` moved above its
-  first unqualified use (29 `-Wchanges-meaning`), and the VST3 SDK's
-  `std::wstring_convert` suppressed on `base-sdk-vst3` (4, not ours). Every one
-  was verified on clang, which is a different compiler saying nothing about a
-  warning it never had. The next Linux log is the check.
+- **Four GCC 15 fixes are compiled by two GCCs, neither of which is a GCC 15.**
+  (04.08.2026, measured again 06.08.2026) A Linux build of `00383f6` reported 469
+  warnings from four causes, and all four are fixed here: `<ciso646>` deleted from
+  the force-included header (294 `-Wcpp`), `valueOffsetGetter()` rewritten to take
+  the difference between two addresses of a real object instead of dereferencing
+  null (142 `-Wnonnull`, and the source had been calling it UB since 2016),
+  `SpectrumWorxCore::Module` moved above its first unqualified use (29
+  `-Wchanges-meaning`), and the VST3 SDK's `std::wstring_convert` suppressed on
+  `base-sdk-vst3` (4, not ours).
 
-- **The warning baseline stops at the MSVC line.** (04.08.2026)
-  `-Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas` is on our own
-  sources on every compiler that takes those spellings, and `-Werror` with them
-  on Apple and wherever CI passes `-DSW_WERROR=ON`. MSVC gets nothing: `/W4` on a
-  codebase nobody here can compile is a few hundred warnings delivered to
-  somebody else's afternoon. It belongs with the CI matrix, where the first run
-  is free.
+  CI closes most of this: `ubuntu-latest` is GCC 12.4 and the release container is
+  GCC 11, and both compile our sources under `-Wall -Wextra -Werror` on every
+  push. What neither of them is is the compiler that produced the 469 — the two
+  bulk causes are diagnostics both of those GCCs have, but `-Wchanges-meaning` is
+  a newer one, so that fix is still checked by reading. `build-gcc/` here is
+  configured for Homebrew's `g++-15` and is the local way to ask.
+
+- **The warning baseline stops at the MSVC line.** (04.08.2026, still true
+  06.08.2026) `-Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas` is on our
+  own sources on every compiler that takes those spellings, and `-Werror` with
+  them on Apple and wherever CI passes `-DSW_WERROR=ON` — which is now every leg,
+  so Apple Clang, GCC 12.4 and GCC 11 are all held to it. MSVC gets nothing:
+  `SW_WERROR` is a no-op there by construction (`sw-our-sources.cmake:75`), so the
+  one platform in the matrix that compiles warning-blind is the one nobody here
+  can run a compiler for.
+
+  The reason not to has expired. `/W4 /WX` was "a few hundred warnings delivered
+  to somebody else's afternoon" when Windows arrived as a build log; the matrix
+  now runs MSVC 19.51 on every push, so turning it on is a line in
+  `sw-our-sources.cmake` and one red square that lists them. It is still a
+  decision — the count is unknown and could be large — but it is no longer a
+  decision that costs anybody a day to *learn the size of*.
 
   `-Wno-unknown-pragmas` covers 288 `#pragma warning(...)` lines — 3772 of the
   3902 warnings the baseline first produced, all of them MSVC diagnostic control
@@ -175,13 +206,21 @@ New entries go at the top of their area.
     platform's — encoder delay is exactly where MP3 decoders disagree — which is
     what would actually happen.
 
-- **`build-asan/` exists and is configured from an older CMake.** (01.08.2026)
-  It registers three of the nine GUI tests, so a sanitiser run over it is quietly
-  a third of the coverage a normal run has. Superseded in principle by
-  `SW_SANITIZER` — one cache variable rather than a pair of blessed build
-  directories, `threading_model.md` §8 — but nothing owns the directory itself
-  being stale, and a stale build directory is exactly the kind of thing that gets
-  trusted.
+- **The build directories in this tree are stale, and a stale one is exactly the
+  kind of thing that gets trusted.** (01.08.2026, measured again 06.08.2026)
+  `build-asan/` was the first: configured from an older CMake, it registers three
+  of the nine GUI tests, so a sanitiser run over it is quietly a third of the
+  coverage a normal run has. Superseded in principle by `SW_SANITIZER` — one cache
+  variable rather than a pair of blessed build directories,
+  `threading_model.md` §8 — but nothing owns the directory itself.
+
+  It is not one directory any more. `build/` and `build-release/` both list **291
+  tests** where CI runs **308**, which is the seventeen `sw-show-ui` renders that
+  had stopped being registered plus what has landed since — so both of the trees
+  a local `ctest` is normally pointed at would report a green suite that is
+  missing cases. The counting rule that follows: **CI is the authority for how
+  many tests there are**, and a local number means the directory it came from was
+  reconfigured first.
 
 ## Threading
 
@@ -446,7 +485,7 @@ New entries go at the top of their area.
   why none of them is in a plan.
 
 - **The goldens skip in a checked build because `Smoother` asserts.**
-  (01.08.2026, from `goldenTests.cpp:287`) `Math::symmetricMovingAverage` carries
+  (01.08.2026, from `goldenTests.cpp:331`) `Math::symmetricMovingAverage` carries
   a running sum across thousands of bins and over pink noise the accumulated
   rounding drifts a hair below zero, so `Smoother` hands `amph2DFT()` a negative
   "amplitude". Benign in the output, real as a numerical weakness. The
@@ -495,6 +534,40 @@ New entries go at the top of their area.
   the fifteen, and the answer is a parameter rather than a fix.
 
 ## Tests
+
+- **Three effects now carry no numeric contract at all off the machine that
+  minted the fixtures.** (06.08.2026, from the CI item) Ethereal, Vaxateer and
+  Merger take `SWTest::Tolerances::sameBuildOnly()` — infinities on all four
+  bounds — in both `goldenTests.cpp` and `sideChainTests.cpp`. What still holds
+  them anywhere is the non-finite count and `Digest::peak == 0`; what holds them
+  numerically is the bit-exact hash, and only on the machine that wrote the file.
+
+  The mechanism is sound and is written up at both call sites: all three branch
+  per bin on a comparison **between two computed spectra** and then substitute
+  the side channel's value for the main one, so a flipped bin does not move a
+  value, it swaps in a different one — and where the phase goes with it,
+  neighbouring bins line up and the peak moves far more than the rms. Measured
+  macOS/arm64 against Linux/x86_64, Ethereal reaches a relative peak of 0.99 and
+  111 dB in a band, which no bound could admit and stay a test.
+
+  Two things are debt rather than design:
+
+  - **Merger was exempted by reading, not by measurement.** It is inside
+    `amplified()` on macOS/arm64 and on Linux/x86_64 and was put outside it
+    because *Windows* failed on it — so two platforms lose cover they had, to
+    describe a third. The alternative was waiting for a fourth runner to name
+    the next one.
+  - **The list was built one runner at a time and gave two answers on one
+    architecture.** Linux/x86_64 named Ethereal and Vaxateer; Windows/x86_64 —
+    same architecture, same pffft, GCC against MSVC — left those alone and named
+    Merger. A list assembled that way is a description of which machines have
+    run, not of which effects are sensitive.
+
+  What would restore real cover is a behavioural case per effect, the way
+  `amplifyingEffectsTests.cpp` answered the nine it covers. Nothing owns
+  that. And renders that disagree by 99 % between two architectures are worth a
+  look on their own account: this entry says only that a fixture cannot referee
+  them.
 
 - **25 golden fixtures render silence, and none of it is about external audio.**
   (05.08.2026, from `silentDefaultsTests.cpp`) A silent render hashes identically

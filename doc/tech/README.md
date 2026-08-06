@@ -17,7 +17,7 @@ got where it is; that is in [`old/`](old/).
 
 | | What it is |
 |---|---|
-| [`todo.md`](todo.md) | **The work queue.** Four ordered items and a page of smaller things. An item that closes comes out of the file. |
+| [`todo.md`](todo.md) | **The work queue.** Two ordered items and a page of smaller things. An item that closes comes out of the file. |
 | [`tech_debt.md`](tech_debt.md) | What finished work left behind — the half-fix, the correct-but-unsatisfying answer, the finding with no owner. An entry that is remediated comes out too. |
 
 The line between them: `todo.md` is work somebody will sit down and do;
