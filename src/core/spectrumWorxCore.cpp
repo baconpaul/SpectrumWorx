@@ -497,14 +497,6 @@ void SpectrumWorxCore::clearSideChannelData()
     Engine::Processor::clearSideChannelData();
 }
 
-void SpectrumWorxCore::clearSideChannelDataIfNoSideChannel()
-{
-    if (!haveSideChannel())
-        clearSideChannelData();
-}
-
-bool SpectrumWorxCore::haveSideChannel() const { return engineSetup().hasSideChannel(); }
-
 void SpectrumWorxCore::resetChannelBuffers()
 {
     LE_ASSERT(currentThreadMayMutateEngineState());
