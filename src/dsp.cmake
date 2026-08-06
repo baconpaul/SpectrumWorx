@@ -292,6 +292,17 @@ target_link_libraries(sw-io PUBLIC juce::juce_audio_formats)
 if (APPLE)
     # le/math/vector.cpp and le/math/dft/fft.cpp are vDSP/vForce on Apple.
     target_link_libraries(sw-dsp PUBLIC "-framework Accelerate")
+    # A diagnostic, not a configuration: `-DSW_FORCE_PFFFT=ON` puts the pffft
+    # branch on Apple as well, so that a golden drifting between this machine
+    # and another platform can be asked which of the two variables did it. Every
+    # non-Apple build changes the backend and the platform together, and this is
+    # the only way to change one. See the note in le/math/dft/fft.hpp.
+    #
+    # PUBLIC because fft.hpp is what reads it, and the tests include it.
+    if (SW_FORCE_PFFFT)
+        target_compile_definitions(sw-dsp PUBLIC SW_FORCE_PFFFT)
+        target_link_libraries(sw-dsp PRIVATE pffft)
+    endif()
 else()
     # ...and pffft everywhere else, per le/math/dft/fft.hpp's LE_PFFFT. PRIVATE:
     # fft.hpp forward declares pffft::PFFFT_Setup rather than including pffft.h,
