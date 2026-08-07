@@ -380,18 +380,19 @@ Plugin2HostPassiveInteropController::numberOfParameters(Program const *LE_RESTRI
             [&numberOfParameters](Engine::ModuleParameters const &module) {
                 std::uint8_t const numberOfModuleParameters(module.numberOfParameters());
                 /// \note std::uint16_t, and not the std::uint8_t this was
-                /// written with. lfoExportedParameters is 7 in a build without
-                /// the GUI (parameters.hpp:28) against 5 with it, and the
-                /// effects with the most parameters -- Armonizer and Tune Worx
-                /// -- have enough that (parameters - 1) * 7 passes 255 and wraps
-                /// to 256 less than the truth. numberOfParameters() then
-                /// under-reports by exactly 256, and getParameterIDs, which
-                /// counts the same thing in wider arithmetic, writes 256 IDs
-                /// past the buffer the host sized from it.
+                /// written with. lfoExportedParameters used to be 7 in a build
+                /// without the GUI against 5 with it, and the effects with the
+                /// most parameters -- Armonizer and Tune Worx -- have enough
+                /// that (parameters - 1) * 7 passes 255 and wraps to 256 less
+                /// than the truth. numberOfParameters() then under-reports by
+                /// exactly 256, and getParameterIDs, which counts the same thing
+                /// in wider arithmetic, writes 256 IDs past the buffer the host
+                /// sized from it.
                 ///
-                ///   The 2016 plugins never hit it: they all built with the GUI,
-                /// where the multiplier is 5 and no effect has enough
-                /// parameters to overflow.
+                ///   The multiplier is unconditionally 5 now, which no effect
+                /// overflows, so this is the narrow type's last line of defence
+                /// rather than a live bug -- and it is why raising the count is
+                /// not the local change it looks like.
                 ///                               (28.07.2026.) (SW port)
                 std::uint16_t const numberOfModuleLFOParameters(
                     (numberOfModuleParameters - 1 /*Bypass*/) *
