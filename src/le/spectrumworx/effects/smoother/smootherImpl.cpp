@@ -57,7 +57,7 @@ void SmootherImpl::process(Engine::ChannelData_AmPh data, Engine::Setup const &)
     unsigned int filterLenHalf(filterLenHalf_);
     if (filterLenHalf == 0)
         return;
-    LE_ALIGNED_SCOPED_STACK_BUFFER(workBuffer, Engine::real_t, data.size());
+    LE_ALIGNED_STACK_BUFFER(workBuffer, Engine::real_t, data.size());
     //...mrmlj...
     unsigned int const dataSize(static_cast<unsigned int>(workBuffer.size()));
     if (dataSize < 4)

@@ -80,16 +80,6 @@ using EnumeratedParameter = Parameter<Detail::EnumeratedParameterTraits<numberOf
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifdef _MSC_VER
-#define LE_ENUMERATED_PARAMETER_WARNING_BEGIN() __pragma(warning(push))
-__pragma(warning(disable : 4480)) /* Nonstandard extension*/
-
-#define LE_ENUMERATED_PARAMETER_WARNING_END() __pragma(warning(pop))
-#else
-#define LE_ENUMERATED_PARAMETER_WARNING_BEGIN()
-#define LE_ENUMERATED_PARAMETER_WARNING_END()
-#endif // _MSC_VER
-
 // Implementation note:
 //   The value list was a Boost.PP sequence, ( Replace )( Sum ), for two reasons:
 // BOOST_PP_SEQ_ENUM turned it into enumerators and BOOST_PP_SEQ_SIZE counted
@@ -114,12 +104,10 @@ __pragma(warning(disable : 4480)) /* Nonstandard extension*/
         parameterName(type::param_type const initialValue = Base::default_()) : Base(initialValue) \
         {                                                                                          \
         }                                                                                          \
-        LE_ENUMERATED_PARAMETER_WARNING_BEGIN()                                                    \
         enum value_type : std::uint8_t                                                             \
         {                                                                                          \
             __VA_ARGS__                                                                            \
         };                                                                                         \
-        LE_ENUMERATED_PARAMETER_WARNING_END()                                                      \
         operator value_type() const { return static_cast<value_type>(Base::getValue()); }          \
     }
 

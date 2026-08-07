@@ -207,13 +207,17 @@ class LogRC : private RC
 
     void skipSamplesForward(std::uint16_t samplesToSkip) const
     {
-        while (LE_UNLIKELY(samplesToSkip--))
+        while (samplesToSkip--) [[unlikely]]
+        {
             processForward(0);
+        }
     }
     void skipSamplesBackward(std::uint16_t samplesToSkip) const
     {
-        while (LE_UNLIKELY(samplesToSkip--))
+        while (samplesToSkip--) [[unlikely]]
+        {
             processBackward(0);
+        }
     }
 
   private:
@@ -247,7 +251,7 @@ LE_HOT void VocoderImpl::process(Engine::MainSideChannelData_AmPh data,
     if (filterMethod() == FilterMethod::MovingAverage)
     {
         //...mrmlj...probably still broken 'reduced range' operation...
-        LE_ALIGNED_SCOPED_STACK_BUFFER(workBuffer, Engine::real_t, fullNumberOfBins);
+        LE_ALIGNED_STACK_BUFFER(workBuffer, Engine::real_t, fullNumberOfBins);
         lowPassSpectrum_movingAverage(envelope, workBuffer, setup);
 #ifndef NDEBUG //...mrmlj...?...clear out negative values to avoid assertion failures.
         for (auto &amp : envelope)
@@ -320,7 +324,7 @@ LE_HOT void VocoderImpl::process(Engine::MainSideChannelData_AmPh data,
 #endif // NDEBUG
     }
 
-    if (LE_LIKELY(skippedLeadingBins == 0 && data.endBin() > 1))
+    if (skippedLeadingBins == 0 && data.endBin() > 1) [[likely]]
     {
         /// \note Avoid passing the DC through. This primitive approach is far
         /// from ideal as the DC component can leak into the neighbouring bins
@@ -331,7 +335,7 @@ LE_HOT void VocoderImpl::process(Engine::MainSideChannelData_AmPh data,
         envelope[1] /= 2;
     }
 
-    if (LE_UNLIKELY(parameters().get<NoiseIntensity>()))
+    if (parameters().get<NoiseIntensity>()) [[unlikely]]
     {
         /// \note Modifying the carrier directly is easier and faster but does
         /// not play nice with downstream effects that also use the side chain.

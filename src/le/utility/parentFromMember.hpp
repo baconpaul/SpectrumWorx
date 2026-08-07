@@ -37,11 +37,14 @@ namespace LE::Utility
 
 template <class T> struct DummyStorage
 {
+    using Storage = typename std::aligned_storage<sizeof(T), std::alignment_of<T>::value>::type;
     DummyStorage() {}
     DummyStorage(DummyStorage const &);
-    typename std::aligned_storage<sizeof(T),
-                                  std::alignment_of<T>::value>::type
-    LE_MSVC_SPECIFIC(const) storage_; //...mrmlj...GCC...
+#ifdef __GNUC__
+    Storage storage_; // const on MSVC only: GCC/Clang reject an uninitialised const member
+#else
+    Storage const storage_;
+#endif
     T const &impersonate() const { return reinterpret_cast<T const &>(storage_); }
 };
 

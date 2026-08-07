@@ -396,38 +396,6 @@ void postOrExecuteMessage(GUIHolder &guiHolder, Functor &&functor)
     postMessage(/*std::forward<GUIHolder>*/ (guiHolder), std::move(functor));
 }
 
-#if 0 //...mrmlj...does not work with the latest juce...cleanup...
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \class AsyncRepainter
-/// \internal
-/// \brief Helper for creating asynchronous/'on-GUI-thread' repainting widgets.
-///...mrmlj...thoroughly document...
-////////////////////////////////////////////////////////////////////////////////
-
-// http://lachand.free.fr/cocoa/Threads.html
-// https://developer.apple.com/library/mac/documentation/Cocoa/Conceptual/Multithreading/Introduction/Introduction.html
-// http://www.cocoawithlove.com/2009/08/safe-threaded-design-and-inter-thread.html
-
-class LE_NOVTABLE AsyncRepainter : public juce::Component
-{
-public:
-    static void repaint( juce::Component &, int x, int y, int w, int h );
-
-#define LE_IMPLEMENT_ASYNC_REPAINT                                                                 \
-  private:                                                                                         \
-    void internalRepaint(int const x, int const y, int const w, int const h) noexcept override     \
-    {                                                                                              \
-        AsyncRepainter::repaint(*this, x, y, w, h);                                                \
-    }
-
-private:
-    AsyncRepainter();
-};
-#else
-#define LE_IMPLEMENT_ASYNC_REPAINT
-#endif
-
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \class DrawableText
@@ -509,8 +477,6 @@ class BitmapButton : public WidgetBase<juce::Button>
     }
 
   private:
-    LE_IMPLEMENT_ASYNC_REPAINT
-
     Artwork const *pOn_{nullptr};
     Artwork const *pOff_{nullptr};
     juce::Colour overOverlay_;
@@ -698,8 +664,6 @@ class LE_NOVTABLE ComboBox : public WidgetBase<>, public PopupMenuWithSelection
   protected: // juce::Component overrides
     void paint(juce::Graphics &) override;
 
-    LE_IMPLEMENT_ASYNC_REPAINT
-
   private:
     Artwork const &normalBackground_;
     Artwork const &selectedBackground_;
@@ -816,8 +780,6 @@ class LE_NOVTABLE Knob : public WidgetBase<juce::Slider>
     /// it costs nothing to exist: LE_ASSERT compiles away on its own.
     ///                                       (28.07.2026.) (SW port)
     void stoppedDragging() noexcept override;
-
-    LE_IMPLEMENT_ASYNC_REPAINT
 
   private:
     using juce::Slider::getMaxValueObject;

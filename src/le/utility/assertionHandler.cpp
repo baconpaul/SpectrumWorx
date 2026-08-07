@@ -267,8 +267,8 @@ static LE_NOINLINE void assertionFailedMsgAux([[maybe_unused]] char const *const
 ///                                           (28.07.2026.) (SW port)
 namespace LE::Utility
 {
-LE_WEAK_FUNCTION void assertionFailed(char const *const expression, char const *const message,
-                                      std::source_location const &location)
+void assertionFailed(char const *const expression, char const *const message,
+                     std::source_location const &location)
 {
 #ifdef LE_PUBLIC_BUILD // not to leak too much information to beta testers...
     assertionFailedMsgAux(nullptr, message, nullptr, nullptr, location.line());

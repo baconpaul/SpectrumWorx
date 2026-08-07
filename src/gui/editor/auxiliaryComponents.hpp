@@ -94,8 +94,6 @@ class SharedModuleControls : public WidgetBase<>
 
         void paint(juce::Graphics &) override;
 
-        LE_IMPLEMENT_ASYNC_REPAINT
-
       private:
         void reportActiveControl();
         void reportInactiveControl();

@@ -190,7 +190,7 @@ double normalisedLinear2Percentage(double normalisedFloatValue);
 
 template <typename T> float percentage2NormalisedLinear(T const percentage)
 {
-    return LE_MSVC_SPECIFIC(convert<float>)(percentage) / 100.0f;
+    return percentage / 100.0f;
 }
 
 float semitone2Interval12TET(float semitones);

@@ -325,8 +325,8 @@ lfo_value_t diracUpsideDown(lfo_value_t /*position*/, LFOState &, bool const new
 }
 
 /// \note Was two typedefs: a `decltype( &sine )` arm working around a Clang 3.5
-/// crash, and an arm that appended `LE_MSVC_SPECIFIC( throw() )` -- a 2005-era
-/// hint that let MSVC omit unwind setup for the call.
+/// crash, and an arm that appended an MSVC-only `throw()` -- a 2005-era hint
+/// that let MSVC omit unwind setup for the call.
 ///
 ///   `throw()` became a synonym for `noexcept` in C++17 and was removed from the
 /// language in C++20, and none of the waveform functions is noexcept. So on MSVC
@@ -340,7 +340,6 @@ lfo_value_t diracUpsideDown(lfo_value_t /*position*/, LFOState &, bool const new
 typedef lfo_value_t (*GetWaveformAmplitudeForPosition)(lfo_value_t position, LFOState &,
                                                        bool newPeriodBegun);
 
-LE_MSVC_SPECIFIC(LE_WEAK_SYMBOL_CONST)
 GetWaveformAmplitudeForPosition const lfoFunctions[] = {
     &sine,       &triangle,    &sawtooth,     &reverseSawtooth, &square,         &exponent,
     &randomHold, &randomSlide, &randomWhacko, &dirac,           &diracUpsideDown};

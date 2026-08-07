@@ -194,7 +194,6 @@ void PeakDetector::findPeaksAndEstimateFrequency(float const *const amplitudes,
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-
 namespace
 {
 void calculateTrueFrequency(Peak &peak, float const bins, std::uint32_t const fs,
@@ -233,7 +232,7 @@ void LE_HOT PeakDetector::findPeaksImpl(float const *LE_RESTRICT const amplitude
     maxGlobal_ = maxGlobal;
 
     // Convert to dB, with reference level being the maximum in this frame.
-    LE_ALIGNED_SCOPED_STACK_BUFFER(ampsdB, SW::Engine::real_t, numBins);
+    LE_ALIGNED_STACK_BUFFER(ampsdB, SW::Engine::real_t, numBins);
     //...mrmlj...ugly msvc12 codegen...std::transform( amplitudes, amplitudes + numBins, ampsdB.begin(), [=]( float const & amp ) { return normalisedLinear2dB( amp / maxGlobal ); } );
     for (std::uint16_t i(0); i < numBins; ++i)
     {
@@ -364,7 +363,6 @@ void LE_HOT attenuateBins(float *LE_RESTRICT const pAmplitudes, bool *LE_RESTRIC
     }
 }
 } // anonymous namespace
-
 
 void PeakDetector::attenuatePeaks(float *const amplitudes, std::uint16_t const startBin,
                                   std::uint16_t const stopInclusive, float const factor)

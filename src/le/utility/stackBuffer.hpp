@@ -4,8 +4,9 @@
 /// ---------------------
 ///
 ///   Short lived, automatically sized scratch buffers, allocated on the stack.
-/// Replaces boost/simd/preprocessor/stack_buffer.hpp, whose three macros these
-/// mirror one for one.
+/// Replaces boost/simd/preprocessor/stack_buffer.hpp. Its third macro, the
+/// "scoped" aligned buffer, destroyed its elements at scope exit; every element
+/// type here is trivially destructible, so it has no counterpart.
 ///
 ///   Note that alloca() allocates in the *enclosing function's* frame, not the
 /// enclosing block's: a buffer taken inside a loop is not released until the
@@ -66,11 +67,6 @@ inline void *alignToVector(void *const pStorage) noexcept
             sizeof(T) * name##Count_ + ::LE::Utility::Constants::vectorAlignment - 1))),           \
             name##Count_                                                                           \
     }
-
-/// \brief As LE_ALIGNED_STACK_BUFFER. The NT2 macro this replaces destroyed its
-/// elements at scope exit; every element type here is trivially destructible, so
-/// the distinction has no effect and the name is kept only for the call sites.
-#define LE_ALIGNED_SCOPED_STACK_BUFFER(name, T, count) LE_ALIGNED_STACK_BUFFER(name, T, count)
 
 //------------------------------------------------------------------------------
 #endif // stackBuffer_hpp

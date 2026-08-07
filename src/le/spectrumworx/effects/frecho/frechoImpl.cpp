@@ -121,8 +121,8 @@ void FrechoImpl::doProcess(ChannelState &cs, Engine::ChannelData_ReIm &target,
     if (!ps_.skipProcessing())
     {
         unsigned int const fftSize(engineSetup.fftSize<unsigned int>());
-        LE_ALIGNED_SCOPED_STACK_BUFFER(pitchShiftedEchoStorage, char,
-                                       Engine::ChannelData_AmPhStorage::requiredStorage(fftSize));
+        LE_ALIGNED_STACK_BUFFER(pitchShiftedEchoStorage, char,
+                                Engine::ChannelData_AmPhStorage::requiredStorage(fftSize));
         Engine::ChannelData_AmPhStorage pitchShiftedEcho(fftSize, target.beginBin(),
                                                          target.endBin(), pitchShiftedEchoStorage);
 

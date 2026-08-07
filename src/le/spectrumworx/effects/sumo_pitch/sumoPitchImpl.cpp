@@ -109,7 +109,7 @@ void SumoPitchImpl::process(ChannelState &cs, Engine::ChannelData_AmPh2ReIm data
         limitPitchScale(pitchScaleSide, cs.prevPitchScaleSideSemitones, pitchChangeLimitSemitones_);
     }
 
-    LE_ALIGNED_SCOPED_STACK_BUFFER(
+    LE_ALIGNED_STACK_BUFFER(
         workBufferStorage, char,
         Engine::ChannelData_AmPhStorage::requiredStorage(engineSetup.fftSize<unsigned int>()));
     Engine::ChannelData_AmPhStorage psWorkBuffer(engineSetup.fftSize<unsigned int>(),

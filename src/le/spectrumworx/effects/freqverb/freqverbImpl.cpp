@@ -146,7 +146,7 @@ LE_HOT void FreqverbImpl::process(ChannelState &cs, Engine::ChannelData_ReIm dat
     }
 
     {
-        LE_ALIGNED_SCOPED_STACK_BUFFER(
+        LE_ALIGNED_STACK_BUFFER(
             data2Storage, char,
             Engine::ChannelData_AmPhStorage::requiredStorage(engineSetup.fftSize<std::uint16_t>()));
         Engine::ChannelData_AmPhStorage data2(engineSetup.fftSize<std::uint16_t>(), 0, noEchoBin_,

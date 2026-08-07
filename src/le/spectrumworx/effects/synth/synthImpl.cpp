@@ -112,7 +112,6 @@ char const Synth::description[] = "Spectrum colour transfer.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-
 namespace
 {
 // http://en.wikipedia.org/wiki/Cent_%28music%29
@@ -188,9 +187,9 @@ LE_COLD void SynthImpl::setup(IndexRange const &workingRange, Engine::Setup cons
         auto const sr(engineSetup.sampleRate<double>());
         auto const numberOfBins(engineSetup.numberOfBins());
 
-        LE_ALIGNED_SCOPED_STACK_BUFFER(freqCoefficients, Engine::real_t,
-                                       lastFFTSize_ + 2 +
-                                           16 /*for alignment padding between real and imag*/);
+        LE_ALIGNED_STACK_BUFFER(freqCoefficients, Engine::real_t,
+                                lastFFTSize_ + 2 +
+                                    16 /*for alignment padding between real and imag*/);
         LE_DISABLE_LOOP_UNROLLING()
         for (std::uint16_t bin(0); bin < lastFFTSize_; ++bin)
             freqCoefficients[bin] = std::sin(omega * bin / sr);
@@ -208,8 +207,8 @@ LE_COLD void SynthImpl::setup(IndexRange const &workingRange, Engine::Setup cons
         auto const pImags(static_cast<float *>(Math::align(&freqCoefficients[numberOfBins])));
         fft.transform(pTimeDomain, DataRange(pImags, pImags + numberOfBins), true);
 
-        LE_ALIGNED_SCOPED_STACK_BUFFER(amps, Engine::real_t, numberOfBins);
-        LE_ALIGNED_SCOPED_STACK_BUFFER(phases, Engine::real_t, numberOfBins);
+        LE_ALIGNED_STACK_BUFFER(amps, Engine::real_t, numberOfBins);
+        LE_ALIGNED_STACK_BUFFER(phases, Engine::real_t, numberOfBins);
         auto const pAmps(amps.begin());
         auto const pPhases(phases.begin());
         Math::reim2AmPh(pReals, pImags, pAmps, pPhases, numberOfBins);
@@ -257,8 +256,6 @@ SynthImpl::ChannelState::requiredStorage(Engine::StorageFactors const &factors)
            static_cast<std::uint8_t>(Phases().size());
 }
 
-
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // SynthImpl::process()
@@ -291,7 +288,7 @@ LE_FORCEINLINE LE_HOT float mapTo2PiInterval(float const phase)
 LE_HOT void SynthImpl::process(SynthImpl::ChannelState &cs, Engine::MainSideChannelData_AmPh data,
                                Engine::Setup const &engineSetup) const
 {
-    if (LE_UNLIKELY(resetState_))
+    if (resetState_) [[unlikely]]
         cs.reset();
 
 #if 1
@@ -410,6 +407,5 @@ LE_HOT void SynthImpl::process(SynthImpl::ChannelState &cs, Engine::MainSideChan
     LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow | Math::Negative, amps, "synth amplitudes");
     LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow, phases, "synth phases");
 }
-
 
 } // namespace LE::SW::Effects

@@ -27,7 +27,6 @@
 namespace LE::SW::Effects
 {
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // Titles that have moved since a preset named them.
 //
@@ -44,13 +43,11 @@ namespace
 using EffectNames = std::array<char const *LE_RESTRICT const, Constants::numberOfEffects>;
 
 #define LE_SW_AUX_EFFECT_TITLE(folder, module, name, group) name::title,
-LE_MSVC_SPECIFIC(LE_WEAK_SYMBOL_CONST)
 EffectNames const effectNames = {{LE_SW_EFFECT_LIST(LE_SW_AUX_EFFECT_TITLE)}};
 #undef LE_SW_AUX_EFFECT_TITLE
 
 #define LE_SW_AUX_EFFECT_STREAMING_NAME(folder, module, name, group)                               \
     EffectStreamingName<name>::string_,
-LE_MSVC_SPECIFIC(LE_WEAK_SYMBOL_CONST)
 EffectNames const effectStreamingNames = {{LE_SW_EFFECT_LIST(LE_SW_AUX_EFFECT_STREAMING_NAME)}};
 #undef LE_SW_AUX_EFFECT_STREAMING_NAME
 } // anonymous namespace
@@ -77,6 +74,5 @@ LE_COLD std::int8_t effectIndexFromStreamingName(std::string_view const streamin
         return -1;
     return static_cast<std::int8_t>(pFound - effectStreamingNames.begin());
 }
-
 
 } // namespace LE::SW::Effects

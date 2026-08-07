@@ -128,12 +128,12 @@ float PitchDetector::findPitch(SW::Engine::ReadOnlyDataRange const &amplitudes, 
     pd.findPeaksAndEstimateFrequency(amplitudes.begin(), numberOfBins,
                                      engineSetup.sampleRate<std::uint32_t>());
     // Delete non-peaks to make it easier for HPS:
-    LE_ALIGNED_SCOPED_STACK_BUFFER(filteredAmps, float, numberOfBins);
+    LE_ALIGNED_STACK_BUFFER(filteredAmps, float, numberOfBins);
     Math::copy(amplitudes, filteredAmps);
     pd.attenuateNonPeaks(filteredAmps.begin(), 0, numberOfBins - 1, 300.0f);
 
     // Find HPS spectrum:
-    LE_ALIGNED_SCOPED_STACK_BUFFER(hps, HPS, numberOfBins);
+    LE_ALIGNED_STACK_BUFFER(hps, HPS, numberOfBins);
     findHarmonicProductSpectrumAndSort(filteredAmps, hps);
     // Estimate pitch:
     float pitch(estimatePitch(cs.lastPitch, lfb, hfb, hps, pd));
@@ -149,7 +149,6 @@ float PitchDetector::findPitch(SW::Engine::ReadOnlyDataRange const &amplitudes, 
 // ---------------------------------------------------
 //
 ////////////////////////////////////////////////////////////////////////////////
-
 
 namespace
 {
@@ -285,7 +284,6 @@ Peak const *PitchDetector::binPeak(std::uint16_t const bin, PeakDetector const &
 
     return nullptr;
 }
-
 
 void PitchDetector::ChannelState::reset() { lastPitch = 0; }
 

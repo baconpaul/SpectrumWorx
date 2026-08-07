@@ -32,31 +32,16 @@
 
 #define LE_WEAK_SYMBOL __declspec(selectany)
 #define LE_WEAK_SYMBOL_CONST __declspec(selectany) extern
-// http://blogs.msdn.com/b/freik/archive/2005/10/26/485276.aspx
-#define LE_WEAK_FUNCTION extern __declspec(noinline) inline
 
 #define LE_UNREACHABLE_CODE()                                                                      \
     LE_ASSERT_MSG(false, "This code should not be reached.");                                      \
     __assume(false)
-
-#define LE_MSVC_SPECIFIC(expression) expression
-#define LE_GNU_SPECIFIC(expression)
 
 // https://msdn.microsoft.com/en-us/library/hh923901.aspx
 #define LE_DISABLE_LOOP_VECTORIZATION() __pragma(loop(no_vector))
 #define LE_DISABLE_LOOP_UNROLLING()
 
 #elif defined(__GNUC__)
-
-#if defined(__clang__)
-// http://clang.llvm.org/docs/LanguageExtensions.html
-#ifndef __has_extension
-#define __has_extension __has_feature // Compatibility with pre-3.0 compilers.
-#endif
-#define LE_HAS_CLANG_BUILTIN(builtin) __has_builtin(builtin)
-#else
-#define LE_HAS_CLANG_BUILTIN(builtin) 0
-#endif // __clang__
 
 //#define LE_NOVTABLE __declspec( novtable )...-fms-extensions
 #define LE_NOVTABLE
@@ -96,7 +81,6 @@
 
 #define LE_WEAK_SYMBOL __attribute__((weak))
 #define LE_WEAK_SYMBOL_CONST LE_WEAK_SYMBOL extern
-#define LE_WEAK_FUNCTION LE_WEAK_SYMBOL extern
 
 /// \note The three-armed cascade this replaces chose between __builtin_assume,
 /// __builtin_unreachable and neither, and carried a GCC 4.6 pessimisation
@@ -106,9 +90,6 @@
 #define LE_UNREACHABLE_CODE()                                                                      \
     LE_ASSERT_MSG(false, "This code should not be reached.");                                      \
     __builtin_unreachable()
-
-#define LE_MSVC_SPECIFIC(expression)
-#define LE_GNU_SPECIFIC(expression) expression
 
 /// \note The LE_OPTIMIZE_FOR_SIZE/SPEED and LE_FAST_MATH families stood here,
 /// over 89 call sites, and expanded to nothing on Clang -- their GCC arm was

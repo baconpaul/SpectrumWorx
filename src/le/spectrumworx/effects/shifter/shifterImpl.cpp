@@ -89,7 +89,7 @@ void ShifterImpl::shift(DataRange const &data) const
     unsigned int sourceBin;
     unsigned int targetBin;
 
-    LE_ALIGNED_SCOPED_STACK_BUFFER(circularTailBuffer, Engine::real_t, shiftLength);
+    LE_ALIGNED_STACK_BUFFER(circularTailBuffer, Engine::real_t, shiftLength);
     if (type == Tail::Circular)
     {
         if (positiveOffset)
