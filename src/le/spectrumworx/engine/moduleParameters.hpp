@@ -14,9 +14,7 @@
 #include "moduleNode.hpp"
 
 #include "le/parameters/lfoImpl.hpp"
-#if !LE_NO_PARAMETER_STRINGS
 #include "le/parameters/printer_fwd.hpp" //...mrmlj...GetParameterValueString
-#endif                                   // !LE_NO_PARAMETER_STRINGS
 #include "le/parameters/runtimeInformation.hpp"
 #include "le/spectrumworx/effects/baseParameters.hpp"
 #include "le/utility/platformSpecifics.hpp"
@@ -193,9 +191,7 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
     static ParameterInfos const &parameterInfos();
 
   public: //...mrmlj...AutomatedModuleImpl & getParameterValueString...
-#if !LE_NO_PARAMETER_STRINGS
     using ParameterPrinter = LE::Parameters::AutomatedParameterPrinter;
-#endif // !LE_NO_PARAMETER_STRINGS
     struct EffectMetaData;
     EffectMetaData const &metaData() const { return metaData_; }
 
@@ -208,7 +204,6 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
 #endif                  // _MSC_VER
     struct EffectMetaData
     {
-#if !LE_NO_PARAMETER_STRINGS
         /// \note This carried an explicit `__fastcall` on the GNU side, added as
         /// a workaround for a 2013-era Clang crash. It is the same dead calling
         /// convention stage 0.6 deleted `LE_FASTCALL` for — meaningless on
@@ -220,14 +215,11 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
         ///                               (29.07.2026.) (SW port)
         typedef char const *(GetParameterValueString)(std::uint8_t index,
                                                       ParameterPrinter const &)/*noexcept*/;
-#endif // !LE_NO_PARAMETER_STRINGS
 
         std::uint8_t const numberOfExtraParameters;
         std::uint8_t const typeIndex_;
         ParameterInfo const *LE_RESTRICT const pParameterInfos;
-#if !LE_NO_PARAMETER_STRINGS
         GetParameterValueString &getParameterValueString;
-#endif // !LE_NO_PARAMETER_STRINGS
 
         /// \note `EffectMetaData( EffectMetaData const & ) = delete;` used to
         /// stand here to make it non-copyable. C++20 counts a user-*declared*
