@@ -13,9 +13,6 @@
 #ifndef NDEBUG
 #include "le/math/math.hpp"
 #else //...mrmlj...
-#ifndef LE_LOCALLY_DISABLE_FPU_EXCEPTIONS
-#define LE_LOCALLY_DISABLE_FPU_EXCEPTIONS()
-#endif // LE_LOCALLY_DISABLE_FPU_EXCEPTIONS
 #ifndef LE_MATH_VERIFY_VALUES
 #define LE_MATH_VERIFY_VALUES(fpClasses, range, valueName)
 #endif // LE_MATH_VERIFY_VALUES

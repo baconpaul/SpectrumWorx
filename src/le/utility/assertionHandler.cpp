@@ -16,7 +16,6 @@
 //------------------------------------------------------------------------------
 #include "platformSpecifics.hpp"
 #include "tchar.hpp"
-#include "trace.hpp"
 
 #include "assert.hpp"
 
@@ -112,11 +111,20 @@ static void printDebugMessage(char const *const message)
     ::__android_log_assert("internal sanity check", LE::assertionFailureMessageTitle, message);
 #pragma clang diagnostic pop
 #else
-    using namespace LE::Utility;
-    auto const currentTag(Tracer::pTagString);
-    Tracer::pTagString = LE::assertionFailureMessageTitle;
-    Tracer::error(message);
-    Tracer::pTagString = currentTag;
+    /// \note Was LE::Utility::Tracer::error() with its tag swapped to the title
+    /// for the duration. The tracer is gone; this is what it did with it.
+    ///                                   (07.08.2026.) (SW port)
+    char formatted[4096];
+    std::snprintf(formatted, sizeof(formatted), "%s, ERROR: %s", LE::assertionFailureMessageTitle,
+                  message);
+#if defined(__APPLE__)
+    ::syslog(LOG_ERR, "%s", formatted);
+#elif defined(_WIN32)
+    ::OutputDebugStringA(formatted);
+    ::OutputDebugStringA("\n");
+#endif
+    std::fputs(formatted, stderr);
+    std::fputs("\n", stderr);
 #endif // platform/compiler
 }
 

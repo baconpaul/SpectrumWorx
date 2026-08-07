@@ -233,11 +233,6 @@ LE_HOT void VocoderImpl::process(Engine::MainSideChannelData_AmPh data,
 {
     using namespace Math;
 
-    /// \note This effect is known to produce invalid values due to taking the
-    /// logarithm of zero or near-zero values.
-    ///                                       (03.12.2012.) (Domagoj Saric)
-    LE_LOCALLY_DISABLE_FPU_EXCEPTIONS();
-
     // Implementation note:
     //   The "excitation" or the source signal is the side channel while the
     // main channel provides the spectral envelope.

@@ -39,7 +39,6 @@ add_library(sw-dsp STATIC
         # le/utility
         le/utility/assertionHandler.cpp
         le/utility/lexicalCast.cpp
-        le/utility/trace.cpp
 
         # le/spectrumworx -- the preset *format*, and the factory banks that are
         # in the binary. Reading and writing an actual file is sw-io's, above;

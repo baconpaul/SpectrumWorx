@@ -30,7 +30,6 @@
 #include "le/utility/lexicalCast.hpp"
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/tchar.hpp"
-#include "le/utility/trace.hpp"
 
 #include <tinyxml/tinyxml.h>
 

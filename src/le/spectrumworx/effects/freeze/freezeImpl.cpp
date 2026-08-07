@@ -41,7 +41,6 @@ void FreezeImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
 
     freeze_ = parameters().get<FreezeTrigger>().consumeValue();
     melt_ = parameters().get<MeltTrigger>().consumeValue();
-    LE_LOCALLY_DISABLE_FPU_EXCEPTIONS();
     inverseTransitionTime_ =
         1 /
         Math::convert<float>(engineSetup.milliSecondsToSteps(parameters().get<TransitionTime>()));
@@ -125,7 +124,6 @@ void FreezeImpl::process(ChannelState &cs, Engine::ChannelData_AmPh data,
 
     // If period is zero, then there is no transition, output formula
     // "out = blendFactor * ( in2 - in1 ) + in1" amounts to "out = in2".
-    LE_LOCALLY_DISABLE_FPU_EXCEPTIONS();
     float const blendFactor(std::min(cs.frameCounter++ * inverseTransitionTime_, 1.0f));
     LE_ASSUME(blendFactor >= 0);
     LE_ASSUME(blendFactor <= 1);

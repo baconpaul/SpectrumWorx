@@ -22,7 +22,6 @@
 #include "le/spectrumworx/engine/moduleChainImpl.hpp"
 #include "le/spectrumworx/engine/moduleParameters.hpp"
 #include "le/utility/cstdint.hpp"
-#include "le/utility/trace.hpp"
 
 #include "le/utility/intrusivePtr.hpp"
 
@@ -123,7 +122,6 @@ class AutomatedModuleChain final : public Engine::ModuleChainImpl
                                        : noModule);
         if (currentEffect == newValue)
         {
-            LE_TRACE("\tSW Trying to insert an already existing module in the same slot.");
             return std::make_pair(pCurrentModule, currentEffect);
         }
         else if (effectIndex == noModule)

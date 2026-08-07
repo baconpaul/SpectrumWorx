@@ -21,7 +21,6 @@
 #include "le/parameters/parametersUtilities.hpp"
 #include "le/plugins/plugin.hpp"
 #include "le/utility/platformSpecifics.hpp"
-#include "le/utility/trace.hpp"
 #include "le/utility/cstdint.hpp"
 
 #include "le/utility/assert.hpp"
@@ -158,8 +157,6 @@ template <class Impl, class Protocol> class Host2PluginInteropImpl<Impl, Protoco
         }
         else
         {
-            LE_TRACE("SW: attempt to change a 'non-tail' module (index %d).\n",
-                     parameterID.moduleIndex);
             return Plugins::ErrorCode<Protocol>::OutOfRange;
         }
     }
@@ -241,8 +238,6 @@ Host2PluginInteropImpl<Impl, Protocol>::setParameter(ParameterID const parameter
     // http://forum.cockos.com/showthread.php?t=60633
     if (impl().blockAutomation())
     {
-        LE_TRACE("\t SW: blocked automation of parameter %u.",
-                 parameterIndexFromBinaryID(parameterID.binaryValue));
         return Plugins::ErrorCode<Protocol>::CannotDoInCurrentContext;
     }
 

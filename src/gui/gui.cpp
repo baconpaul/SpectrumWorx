@@ -13,7 +13,6 @@
 
 #include "le/utility/assert.hpp"
 #include "le/utility/ignoreUnused.hpp"
-#include "le/utility/trace.hpp"
 #include "le/utility/polymorphicDowncast.hpp"
 
 #include <sst/plugininfra/paths.h>
@@ -235,12 +234,12 @@ juce::File &presetsFolder()
 /// someone's Documents -- but a browser that opens on a folder which is not
 /// there shows nothing and offers no way to make one.
 ///
-/// \note Traced and reported, not asserted. A plugin does not always get to
-/// write to the user's Documents folder: an AUv2 under macOS app sandboxing may
-/// not, a locked-down or roaming home directory may not, and a CI container
-/// certainly does not. None of those is a programming error, and none of them
-/// should stop the editor opening -- the browser shows an empty folder and
-/// saving is what fails, with a message.
+/// \note Not asserted, and as of 07.08.2026 not reported either. A plugin does
+/// not always get to write to the user's Documents folder: an AUv2 under macOS
+/// app sandboxing may not, a locked-down or roaming home directory may not, and
+/// a CI container certainly does not. None of those is a programming error, and
+/// none of them should stop the editor opening -- the browser shows an empty
+/// folder. What the caller does with `false` is the only signal left.
 ///                                       (31.07.2026.) (SW port)
 ///
 ////////////////////////////////////////////////////////////////////////////////
@@ -251,10 +250,7 @@ bool createUserPresetsFolder()
     if (folder.isDirectory())
         return true;
 
-    auto const created(folder.createDirectory());
-    LE_TRACE_IF(!created.wasOk(), "SW: cannot create the user preset directory (%s).",
-                created.getErrorMessage().toRawUTF8());
-    return created.wasOk();
+    return folder.createDirectory().wasOk();
 }
 
 void paintImage(juce::Graphics &graphics, Artwork const &artwork)
