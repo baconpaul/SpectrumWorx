@@ -28,12 +28,7 @@
 #error LE SDKs require MSVC10 SP1 (Visual Studio 2010) or later
 #endif // _MSC_VER
 
-#define LE_CDECL __cdecl
-
 #define LE_RESTRICT __restrict
-
-#define LE_DLL_EXPORT __declspec(dllexport)
-#define LE_DLL_IMPORT __declspec(dllimport)
 
 // MSVC has no branch hints; the profile guided optimiser is the substitute.
 #define LE_LIKELY(expression) (expression)
@@ -45,16 +40,7 @@
 #error LE SDKs require GCC 4.7+ or Clang 3.2+ with enabled C++11 support (-std=c++11)
 #endif // __cplusplus
 
-#ifdef __i386__
-#define LE_CDECL __attribute__((cdecl))
-#else
-#define LE_CDECL
-#endif // __i386__
-
 #define LE_RESTRICT __restrict__
-
-#define LE_DLL_EXPORT __attribute__((visibility("default")))
-#define LE_DLL_IMPORT __attribute__((visibility("default")))
 
 #define LE_LIKELY(expression) __builtin_expect(!!(expression), 1)
 #define LE_UNLIKELY(expression) __builtin_expect(!!(expression), 0)

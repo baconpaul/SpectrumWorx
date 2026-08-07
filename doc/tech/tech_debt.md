@@ -662,17 +662,17 @@ The decision itself is settled and written down in
 AGPL-3.0-or-later because JUCE 8 is AGPLv3-or-commercial. The 452 file headers
 are right as they stand. What is below is packaging.
 
-- **The duplicate licence file, and the two dead references to it.**
+- **The duplicate licence file, and the dead reference to it.**
   (03.08.2026) `doc/manual/EULA.txt` is a byte-for-byte duplicate of `LICENSE`
   under a filename that means the opposite of what it contains — 2016's
   commercial agreement was replaced before the port began and only the name
-  survived. `src/legacy-build.cmake:386` still points
-  `CPACK_RESOURCE_FILE_LICENSE` at `../installer/ProgramFolder/Licences/EULA.txt`,
+  survived. `doc/manual/readme.txt:110` still tells whoever packages a release to
+  name the licence `EULA.txt` and drop it in `installer/ProgramFolder/Licences`,
   a path outside this repository. Neither is reachable from a live target and
   neither is urgent: the installer that ships reads
   `assets/installer/License.txt`, which is the AGPL statement followed by the
-  GPL-3.0 text it refers to. What is left is a file and a line that say
-  otherwise, in a build nobody runs.
+  GPL-3.0 text it refers to. What is left is a file and an instruction that say
+  otherwise, in a release nobody runs that way.
 
 - **The licence file is assembled by hand and nothing checks it.**
   (05.08.2026) `assets/installer/License.txt` is a notice written for the

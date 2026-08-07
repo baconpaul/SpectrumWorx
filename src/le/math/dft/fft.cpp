@@ -36,10 +36,6 @@ LE_FAST_MATH_ON()
 #include <Accelerate/Accelerate.h> //vDSP.h
 #undef Point
 #else
-//#define LE_SORENSEN_PURE_REAL_FFT_TEST
-#if defined(LE_SORENSEN_PURE_REAL_FFT_TEST) && defined(LE_PURE_REAL_FFT_TEST)
-#error Cannot test Sorensen and our own internal pure real fft at the same time...
-#endif
 #include "pffft.h"
 
 #include "le/spectrumworx/engine/configuration.hpp"
@@ -193,7 +189,7 @@ void FFT_float_real_1D::transform(float *LE_RESTRICT const data /*in time, out D
                                   std::uint16_t const size) const
 {
     LE_ASSERT(size <= this->size());
-#if defined(LE_ACC_FFT) || defined(LE_SORENSEN_PURE_REAL_FFT_TEST)
+#ifdef LE_ACC_FFT
     std::uint16_t const halfSize(size / 2);
     vDSP_ctoz(reinterpret_cast<DSPComplex const *>(data), 2, &workBufferSplit(), 1, halfSize);
     vDSP_fft_zrip(
@@ -266,7 +262,7 @@ void FFT_float_real_1D::inverseTransform(float *LE_RESTRICT const data /*in DFT 
                                          std::uint16_t const size) const
 {
     LE_ASSERT(size <= this->size());
-#if defined(LE_ACC_FFT) || defined(LE_SORENSEN_PURE_REAL_FFT_TEST)
+#ifdef LE_ACC_FFT
     std::uint16_t const halfSize(size / 2);
     // http://developer.apple.com/library/ios/documentation/Performance/Conceptual/vDSP_Programming_Guide/UsingFourierTransforms/UsingFourierTransforms.html#//apple_ref/doc/uid/TP40005147-CH202-15411
     float const scale(1 / std::sqrt(convert<float>(size)));
@@ -332,12 +328,11 @@ void FFT_float_real_1D::inverseTransform(float *const dftData,
 
 /// \note The complex pair is unimplemented on every live backend. Accelerate
 /// has always said so here; the NT2 arm that did implement it was reachable only
-/// from the three `LE_PURE_REAL_FFT_TEST` call sites below and in
-/// channelData.cpp, all of which are compiled out, so no shipped configuration
-/// has ever called it and no golden depends on it. Left asserting rather than
-/// filled in with pffft, because an untested complex path is worse than an
-/// absent one — and note that in a release build the assert is gone and these
-/// silently do nothing, which was already true on macOS.
+/// from pure-real-FFT test paths that were never compiled, so no shipped
+/// configuration has ever called it and no golden depends on it. Left asserting
+/// rather than filled in with pffft, because an untested complex path is worse
+/// than an absent one — and note that in a release build the assert is gone and
+/// these silently do nothing, which was already true on macOS.
 ///                                           (29.07.2026.) (SW port)
 void FFT_float_real_1D::transform([[maybe_unused]] float *LE_RESTRICT const pReals,
                                   [[maybe_unused]] float *LE_RESTRICT const pImags) const
@@ -350,80 +345,6 @@ void FFT_float_real_1D::inverseTransform([[maybe_unused]] float *LE_RESTRICT con
 {
     LE_ASSERT(!"Not implemented!");
 }
-
-#ifdef LE_PURE_REAL_FFT_TEST
-namespace
-{
-void lock(void const *const address, std::size_t const /*size*/)
-{
-#ifdef _WIN32
-    DWORD old_protection;
-    LE_VERIFY(::VirtualProtect(const_cast<void *>(address), 4 /*size * sizeof( float )*/,
-                               PAGE_READONLY, &old_protection));
-    LE_ASSERT(old_protection == PAGE_READWRITE);
-#endif // _WIN32
-}
-
-void unlock(void const *const address, std::size_t const /*size*/)
-{
-#ifdef _WIN32
-    DWORD old_protection;
-    LE_VERIFY(::VirtualProtect(const_cast<void *>(address), 4 /*size * sizeof( float )*/,
-                               PAGE_READWRITE, &old_protection));
-    LE_ASSERT(old_protection == PAGE_READONLY);
-#endif // _WIN32
-}
-} // namespace
-
-void FFT_float_real_1D::transform(float const *const pTimeDomainData, float const *const pWindow,
-                                  float *const pReals, DataRange const &imags) const
-{
-    workBuffer_.clear();
-    clear(imags);
-    clear(pReals, imags.size());
-
-    lock(pTimeDomainData, size());
-    lock(pWindow, size());
-    lock(&workBuffer_[size() + 1024], 256);
-
-    multiply(pTimeDomainData, pWindow, &workBuffer_[0], size());
-
-    nt2::static_fft<128, 8192, float>::real_forward_transform(&workBuffer_[0], pReals,
-                                                              imags.begin(), size());
-
-    //move( &imags[ 0 ], &imags[ 1 ], imags.size() - 1 );
-    //imags.front() = 0;
-    //imags.back () = 0;
-
-    //pTimeDomainData; pReals; imags; pWindow;
-
-    unlock(pTimeDomainData, size());
-    unlock(pWindow, size());
-    unlock(&workBuffer_[size() + 1024], 256);
-}
-
-void FFT_float_real_1D::inverseTransform(float *const pTimeDomainData, float const *pReals,
-                                         ReadOnlyDataRange const &imags) const
-{
-    nt2::static_fft<128, 8192, float>::real_inverse_transform(pReals, imags.begin(),
-                                                              pTimeDomainData, size());
-}
-
-void FFT_float_real_1D::inverseTransform(DataRange const &reals, DataRange const &imags) const
-{
-    workBuffer_.clear();
-    float *pReals(&workBuffer_[0]);
-    float *pImags(&workBuffer_[size()]);
-    copy(reals.begin(), pReals, reals.size());
-    copy(imags.begin(), pImags, imags.size());
-    clear(reals);
-    clear(imags);
-    nt2::static_fft<128, 8192, float>::real_inverse_transform(pReals, pImags, reals.begin(),
-                                                              size());
-    float const scale(2.0f / size());
-    multiply(reals.begin(), scale, size());
-}
-#endif // LE_PURE_REAL_FFT_TEST
 
 void FFT_float_real_1D::fftshift(float *const pTimeDomainData) const
 {

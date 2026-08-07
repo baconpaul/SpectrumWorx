@@ -78,14 +78,6 @@
 /// force-included. Both are written out as of 04.08.2026.
 ///                                           (06.10.2014.) (Domagoj Saric)
 
-/// \note A quick way to disable the requriement for
-/// LE::Utility::assertionFailed to be defined in auxiliary projects when
-/// LE_ENABLE_ASSERT_HANDLER is globally defined in the CMakeLists.txt file.
-///                                           (15.11.2013.) (Domagoj Saric)
-#ifdef LE_DISABLE_ASSERT_HANDLER
-#undef LE_ENABLE_ASSERT_HANDLER
-#endif // LE_DISABLE_ASSERT_HANDLER
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Operating system specifics.

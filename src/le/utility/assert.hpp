@@ -50,21 +50,18 @@ void assertionFailed(char const *expression, char const *message,
     ((expression) ? static_cast<void>(0) : ::LE::Utility::assertionFailed(#expression, message))
 #define LE_ASSERT(expression) LE_ASSERT_MSG(expression, #expression)
 #define LE_VERIFY LE_ASSERT
-#define LE_VERIFY_MSG LE_ASSERT_MSG
 
 #elif defined(NDEBUG)
 
 #define LE_ASSERT(expression) static_cast<void>(0)
 #define LE_ASSERT_MSG(expression, message) static_cast<void>(0)
 #define LE_VERIFY(expression) static_cast<void>(expression)
-#define LE_VERIFY_MSG(expression, message) LE_VERIFY(expression)
 
 #else // no handler, checked build
 
 #define LE_ASSERT assert
 #define LE_ASSERT_MSG(expression, message) assert((expression) && (message))
 #define LE_VERIFY(expression) assert(expression)
-#define LE_VERIFY_MSG(expression, message) LE_VERIFY((expression) && (message))
 
 #endif // LE_ENABLE_ASSERT_HANDLER
 

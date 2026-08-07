@@ -77,14 +77,9 @@ float const *ChannelData::getNewTimeDomainData(Math::FFT_float_real_1D const &ff
                                                bool const fftShift)
 {
     updateReImData();
-#ifdef LE_PURE_REAL_FFT_TEST
-    fft.inverseTransform(dftData().main().reals(), dftData().main().imags());
-    dftAndTimeData_.setToTimeDomain();
-#else
     ReadOnlyDataRange const &imaginarySubRange(dftData().main().imags());
     dftAndTimeData_.setToTimeDomain();
     fft.inverseTransform(dftAndTimeData_.timeDomainData(), imaginarySubRange, fftShift);
-#endif // LE_PURE_REAL_FFT_TEST
     return dftAndTimeData_.timeDomainData();
 }
 
@@ -111,10 +106,6 @@ void ChannelData::time2DFT(float const *const pInputData, FullChannelData_ReIm &
                           ReadOnlyDataRange(pInputData, pInputData + fft.size()), "time domain");
     LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow, window, "window");
 
-#ifdef LE_PURE_REAL_FFT_TEST
-    LE_ASSERT(windowSizeFactor == 1);
-    fft.transform(pInputData, window.begin(), dftData.reals().begin(), dftData.imags());
-#else
     float *const windowedTimeData(dftData.jointView().begin());
 
     Math::multiply(pInputData, &window[0], windowedTimeData, frameSize);
@@ -128,7 +119,6 @@ void ChannelData::time2DFT(float const *const pInputData, FullChannelData_ReIm &
     }
 
     fft.transform(windowedTimeData, dftData.imags(), needFFTShift);
-#endif // LE_PURE_REAL_FFT_TEST
 
     LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow, dftData.reals(), "FFT reals");
     LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow, dftData.imags(), "FFT imags");
