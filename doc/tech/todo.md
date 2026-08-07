@@ -260,7 +260,7 @@ Three drifts, all visible to a user, all in
 
 ### Dead code that needs a decision rather than a sweep
 
-Roughly 8,000 lines across 51 files are in the tree and in no target. Every one
+Roughly 6,500 lines across 46 files are in the tree and in no target. Every one
 of them needs somebody to decide rather than somebody to sweep, which is why
 each is a paragraph and not a line on a list.
 
@@ -278,15 +278,6 @@ each is a paragraph and not a line on a list.
   and by nothing else — which is a live hazard, not a hypothetical one: their
   Matlab scaffolding was removed by hand and no compiler has seen the result.
   Whoever revives one starts by getting it into a target.
-- **Five cmake files that record a build nobody runs** — `legacy-build.cmake`
-  (768 lines), `core/sources.cmake` (342), `le/utility/CMakeLists.txt` (220) and
-  two `configuration.cmake` (189). Nothing includes any of them;
-  `src/CMakeLists.txt` says so in its second line. They were kept as the record
-  of the 2016 build, and the deletions of 05.08.2026 cost them that: **65 of the
-  names in them are now files that do not exist**, so as a record of anything
-  they are already wrong. Either delete them — git has the 2016 build — or
-  accept that they are prose and stop expecting them to resolve.
-
 - **`le/math/vector.cpp`'s dead NT2 arm** — ~750 lines across 18
   `#ifdef LE_MATH_USE_NT2` sites in a 2,034-line **live** file, each with a live
   `#else` beside it. Left when `src/nt2_static_fft/` went on 05.08.2026, and it

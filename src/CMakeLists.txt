@@ -2,8 +2,6 @@
 # clap_get_factory. clap-wrapper links it behind a per-format entry stub, so
 # this is where essentially all development happens.
 #
-# The 2016 target definitions are in legacy-build.cmake, which nothing includes.
-#
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # gui.cmake first: sw-gui-widgets links sw-io, which dsp.cmake defines. CMake

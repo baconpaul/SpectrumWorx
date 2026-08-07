@@ -55,13 +55,11 @@ struct Tracer
 #define LE_TRACE_IF(condition, formatString, ...)                                                  \
     if ((condition))                                                                               \
     LE_TRACE(formatString, ##__VA_ARGS__)
-#define LE_TRACE_RETURN(result, formatString, ...) (LE_TRACE(formatString, ##__VA_ARGS__), result)
 
 #else
 
 #define LE_TRACE(formatString, ...)
 #define LE_TRACE_IF(condition, formatString, ...)
-#define LE_TRACE_RETURN(result, formatString, ...) result
 
 #endif // _DEBUG
 

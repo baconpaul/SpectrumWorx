@@ -34,8 +34,6 @@
 #define LE_ACC_FFT
 #else
 #define LE_PFFFT
-//#define LE_PURE_REAL_FFT_TEST
-//#define LE_SORENSEN_PURE_REAL_FFT_TEST
 #endif
 
 #ifdef LE_ACC_FFT
@@ -100,14 +98,6 @@ class FFT_float_real_1D
     // complex
     void transform(float *pReals, float *pImags) const;
     void inverseTransform(float *pReals, float *pImags) const;
-
-#ifdef LE_PURE_REAL_FFT_TEST
-    void transform(float const *pTimeDomainData, float const *pWindow, float *pReals,
-                   DataRange const &imags) const;
-    void inverseTransform(float *pTimeDomainData, float const *pReals,
-                          ReadOnlyDataRange const &imags) const;
-    void inverseTransform(DataRange const &reals, DataRange const &imags) const;
-#endif // LE_PURE_REAL_FFT_TEST
 
     void resize(SW::Engine::StorageFactors const &factors, SW::Engine::Storage &);
 

@@ -335,31 +335,32 @@ Two things follow, and both are what §7 above is about:
 
 ## 8. The edition axis (the build-time one)
 
-`src/core/configuration.cmake:63` → `addSelectedEffects( "${LE_SW_INCLUDED_EFFECTS}" )`,
-implemented at `src/le/spectrumworx/effects/configuration/effectsList.cmake:101-258`.
-It selects which of the ~57 effects get compiled in — full edition
-(`-DLE_SW_FULL`, `:230-231`), cut-down editions, SDK builds. That file is a
-record rather than a build (its banner says so), and `LE_SW_FULL` itself was
-deleted on 04.08.2026 along with the demo SKU it gated; what survives is
-`Effects::includedEffects[]`, a constexpr table of all `true`.
+There is no longer a build-time edition axis: every one of the 57 effects is
+compiled in, and the cmake that used to select a subset was deleted on
+07.08.2026 along with the four other orphan build files. What survives of it is
+`Effects::includedEffects`, a constexpr array over the complete effect set whose
+every entry is `true`
+(`src/le/spectrumworx/effects/configuration/includedEffects.hpp:30`).
 
-Two things stop this from making the parameter list static per binary:
+The axis is worth recording anyway, because the *shape* it forced is still the
+shape the parameter system has, and two properties of it outlive the switch:
 
-1. **Indices are global and stable across editions by design**
-   (`effectsList.cmake:113-123`): metadata is emitted for *all* effects, not just
-   included ones, explicitly "to enable (host project) compatibility between
-   different editions". A non-included effect still occupies its index;
-   `Effects::includedEffects[]` is a `bool` array over the complete set
-   (`includedEffects.hpp.in:39`) and the factory refuses with a warning box
-   rather than shifting anything (`factory.cpp:161-171`).
-2. **It changes the candidate set, not the skeleton.** Even a hypothetical
-   single-effect edition still exposes 5 slots × 10 parameters.
+1. **Indices are global, and stable across editions by design.** Metadata was
+   emitted for all effects rather than only included ones, to keep a host's saved
+   automation valid across editions. A non-included effect still occupies its
+   index: `includedEffects` is consulted, and the factory refuses with a warning
+   rather than shifting anything (`factory.cpp:161-171`), as do the preset
+   loader (`presets.cpp:580`) and the module menu
+   (`moduleMenuHolder.cpp:37`).
+2. **It changed the candidate set, not the skeleton.** Even a single-effect
+   edition still exposed 5 slots × 10 parameters.
 
 Related: the LE framework served more than one product from this tree — see the
 `TuneWorx` special-cases (`plugin2Host.cpp:114-119`,
-`src/le/spectrumworx/effects/tune_worx/`, `-DLE_SIMPLE_TUNEWORX` at
-`src/core/configuration.cmake:59`). That is the sense in which "several plugins
-of different shapes" is true of the *framework*. This repo builds one plugin.
+`src/le/spectrumworx/effects/tune_worx/`, and `LE_SIMPLE_TUNEWORX` at
+`tuneWorx.hpp:38`, a switch nothing defines, so the full 34-parameter version is
+what compiles). That is the sense in which "several plugins of different shapes"
+is true of the *framework*. This repo builds one plugin.
 
 ---
 

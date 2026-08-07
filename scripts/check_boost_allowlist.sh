@@ -19,10 +19,9 @@
 # preset reader. Before it: fusion, mpl and preprocessor -- the parameter
 # system -- and intrusive, the module chain's circular_list_algorithms.
 #
-# Not scanned, reachable only from src/legacy-build.cmake and named by no live
-# target: spectrumWorx.cpp, the 2016 VST2/AU plugin class the CLAP replaced,
-# retained as the reference 5.0 still needs and holding the last boost::mmap in
-# the tree.
+# Not scanned, and named by no target: spectrumWorx.cpp, the 2016 VST2/AU plugin
+# class the CLAP replaced, retained as the reference 5.0 still needs and holding
+# the last boost::mmap in the tree.
 #
 # src/nt2_static_fft -- vendored NT2, the stage 4 reference -- was also on that
 # list until 05.08.2026, when it was deleted: stage 4 is done and

@@ -41,20 +41,12 @@
 
 #define LE_MSVC_SPECIFIC(expression) expression
 #define LE_GNU_SPECIFIC(expression)
-#define LE_CLANG_SPECIFIC(expression)
 
 #define LE_OPTIMIZE_FOR_SPEED_BEGIN()                                                              \
     __pragma(optimize("t", on)) __pragma(auto_inline(on)) __pragma(inline_recursion(on))           \
         __pragma(inline_depth(255))
 
-/// \note This one seems to interact badly with LTCG (as if Ot was never
-/// turned on) with MSVC10.
-///                                       (31.10.2013.) (Domagoj Saric)
-#ifdef LE_UNITY_BUILD
-#define LE_OPTIMIZE_FOR_SPEED_END() __pragma(optimize("", on))
-#else
 #define LE_OPTIMIZE_FOR_SPEED_END()
-#endif // LE_UNITY_BUILD
 
 #define LE_OPTIMIZE_FOR_SIZE_BEGIN() __pragma(optimize("s", on))
 
@@ -65,29 +57,9 @@
     __pragma(float_control(except, off)) __pragma(fenv_access(off))                                \
         __pragma(float_control(precise, off)) __pragma(fp_contract(on))
 
-#define LE_FAST_MATH_OFF()                                                                         \
-    __pragma(float_control(precise, on)) __pragma(fenv_access(on))                                 \
-        __pragma(float_control(except, on)) __pragma(fp_contract(off))
-
-#define LE_FAST_MATH_ON_BEGIN() __pragma(float_control(push)) LE_FAST_MATH_ON()
-
-#define LE_FAST_MATH_ON_END()                                                                      \
-    LE_FAST_MATH_OFF()                                                                             \
-    __pragma(float_control(pop))
-
-#define LE_FAST_MATH_OFF_BEGIN() __pragma(float_control(push)) LE_FAST_MATH_OFF()
-
-#define LE_FAST_MATH_OFF_END()                                                                     \
-    LE_FAST_MATH_ON()                                                                              \
-    __pragma(float_control(pop))
-
 // https://msdn.microsoft.com/en-us/library/hh923901.aspx
 #define LE_DISABLE_LOOP_VECTORIZATION() __pragma(loop(no_vector))
 #define LE_DISABLE_LOOP_UNROLLING()
-
-#if _MSC_VER < 1900
-#define LE_ARR_SZ(x) (sizeof(x) / sizeof(x.front()))
-#endif
 
 #elif defined(__GNUC__)
 
@@ -97,10 +69,8 @@
 #define __has_extension __has_feature // Compatibility with pre-3.0 compilers.
 #endif
 #define LE_HAS_CLANG_BUILTIN(builtin) __has_builtin(builtin)
-#define LE_HAS_CLANG_EXTENSION(extension) __has_extension(extension)
 #else
 #define LE_HAS_CLANG_BUILTIN(builtin) 0
-#define LE_HAS_CLANG_EXTENSION(extension) 0
 #endif // __clang__
 
 //#define LE_NOVTABLE __declspec( novtable )...-fms-extensions
@@ -155,11 +125,6 @@
 
 #define LE_MSVC_SPECIFIC(expression)
 #define LE_GNU_SPECIFIC(expression) expression
-#ifdef __clang__
-#define LE_CLANG_SPECIFIC(expression) expression
-#else // Clang
-#define LE_CLANG_SPECIFIC(expression)
-#endif // Clang
 
 /// \note Per-translation-unit optimisation and fast-math pragmas: no-ops on
 /// every compiler that reaches this branch, deliberately.
@@ -195,11 +160,6 @@
 #define LE_OPTIMIZE_FOR_SIZE_BEGIN()
 #define LE_OPTIMIZE_FOR_SIZE_END()
 #define LE_FAST_MATH_ON()
-#define LE_FAST_MATH_OFF()
-#define LE_FAST_MATH_ON_BEGIN()
-#define LE_FAST_MATH_ON_END()
-#define LE_FAST_MATH_OFF_BEGIN()
-#define LE_FAST_MATH_OFF_END()
 
 // http://llvm.org/docs/Vectorizers.html#pragma-loop-hint-directives
 #define LE_DISABLE_LOOP_VECTORIZATION()                                                            \
@@ -212,19 +172,9 @@
 
 #endif
 
-#ifndef LE_ARR_SZ //...ugh vs2013 quick-hack...
-#define LE_ARR_SZ(x) x.size()
-#endif // LE_ARR_SZ
-
 #define LE_DEFAULT_CASE_UNREACHABLE()                                                              \
     default:                                                                                       \
         LE_UNREACHABLE_CODE();                                                                     \
         break
-
-#ifdef NDEBUG
-#define LE_NDEBUG_NOVTABLE LE_NOVTABLE
-#else
-#define LE_NDEBUG_NOVTABLE
-#endif
 
 #endif // platformSpecifics_hpp

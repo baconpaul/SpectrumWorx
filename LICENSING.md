@@ -110,7 +110,7 @@ are installing is AGPL-3.0-or-later, that its source is GPL-3.0-or-later and
 where to get it, and that every other dependency is permissive and changes none
 of it. Then the GPL-3.0 text itself, which the AGPL differs from in one section.
 
-## Two loose ends, recorded rather than hidden
+## One loose end, recorded rather than hidden
 
 **`doc/manual/EULA.txt` is not a contradiction, and three tech documents used to
 say it was.** It was Little Endian's commercial end-user agreement in 2016; the
@@ -120,10 +120,3 @@ So there is no "licence contradiction"; what survives is a filename from a
 shipping model that does not. It is a duplicate of `LICENSE` under a name that
 means the opposite, and the packaging step should rename or drop it rather than
 ship it.
-
-**`src/legacy-build.cmake:386` still points `CPACK_RESOURCE_FILE_LICENSE` at
-`../installer/ProgramFolder/Licences/EULA.txt`**, a path outside this repository
-that no longer exists. That file is reachable from no live target and carries the
-"record, not build" banner, and the installer that does run reads
-`assets/installer/License.txt` instead — so what is left is a line in a dead
-build that names a file nobody has.

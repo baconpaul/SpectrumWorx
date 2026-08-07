@@ -6,8 +6,8 @@ SpectrumWorx - the ultimate sound mangler (VST/AU).
 ## Current state? 🔮
 The state of the project is - 2016 - very outdated. This includes the directory structure (inherited from SVN), 3rd party software, CMake makefiles, installer, VST/AU compatibility, etc. The code does not compile, the build does not work. 
 ## Where to start? 🚀
-- [doc/readme.txt](./doc/readme.txt)
-- [source/externals/le/doc/internal/readme.txt](./source/externals/le/doc/internal/readme.txt)
+- [doc/tech/README.md](./doc/tech/README.md) — how the engine, the parameters,
+  the preset format and the threading work, plus what is left to do.
 
 ## Licence ⚖️
 The source in this repository is **GPL-3.0-or-later**. A released binary links

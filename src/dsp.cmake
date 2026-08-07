@@ -38,7 +38,6 @@ add_library(sw-dsp STATIC
 
         # le/utility
         le/utility/assertionHandler.cpp
-        le/utility/filesystem.cpp
         le/utility/lexicalCast.cpp
         le/utility/trace.cpp
 
