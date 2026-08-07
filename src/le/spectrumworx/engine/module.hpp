@@ -92,17 +92,10 @@ class LE_NOVTABLE ModuleDSP : public LE::SW::Engine::ModuleParameters
     virtual bool resize(StorageFactors const &) = 0;
 
   protected:
-    ModuleDSP(ModuleParameters::EffectMetaData const &metaData,
-#ifndef LE_NO_LFOs
-              LFOPlaceholder *const pLFOs, float *const pUnmodulatedValues,
-#endif // !LE_NO_LFOs
-              std::uint8_t const *const pParameterOffsets, std::uint16_t const parametersBaseOffset)
-        :
-#ifdef LE_NO_LFOs
-          ModuleParameters(metaData),
-#else
-          ModuleParameters(metaData, pLFOs, pUnmodulatedValues),
-#endif
+    ModuleDSP(ModuleParameters::EffectMetaData const &metaData, LFOPlaceholder *const pLFOs,
+              float *const pUnmodulatedValues, std::uint8_t const *const pParameterOffsets,
+              std::uint16_t const parametersBaseOffset)
+        : ModuleParameters(metaData, pLFOs, pUnmodulatedValues),
           parametersBaseOffset_(parametersBaseOffset), pParameterOffsets_(pParameterOffsets)
     {
         LE_ASSERT(storage_.begin() == nullptr);

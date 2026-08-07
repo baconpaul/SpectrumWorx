@@ -936,7 +936,6 @@ LE_FORCEINLINE Processor::ProcessParameters::ProcessParameters(
 {
 }
 
-#ifndef LE_NO_LFOs
 void Processor::setPosition(std::uint32_t const absolutePositionInSamples)
 {
     lfoTimer().setPosition(absolutePositionInSamples, engineSetup().sampleRate<float>());
@@ -979,7 +978,6 @@ void Processor::updateModuleLFOs(LFO::Timer::TimingInformationChange const timin
     modules().forEach<Engine::ModuleDSP>(
         [&](Engine::ModuleDSP &module) { module.updateLFOs(timingInformationChange); });
 }
-#endif // LE_NO_LFOs
 
 /// \note Processor instances do not actually hold ModuleChainImpl instances as
 /// different project types have different requirements/usage patterns regarding

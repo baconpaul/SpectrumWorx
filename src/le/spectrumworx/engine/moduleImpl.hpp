@@ -13,9 +13,7 @@
 #include "configuration.hpp"
 #include "module.hpp"
 
-#ifndef LE_NO_LFOs
 #include "le/parameters/lfo.hpp"
-#endif                           // !LE_NO_LFOs
 #include "le/plugins/plugin.hpp" //...ugh...mrmlj...for Plugins::*AutomatedParameter usage in printer.hpp...clean this up...
 #include "le/parameters/parametersUtilities.hpp"
 #include "le/parameters/printer.hpp" // printers for module parameters
@@ -446,10 +444,8 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
     template <typename EffectTypeIndex, typename... T>
     LE_COLD ModuleEffectImpl(EffectTypeIndex, T &&...args)
         : Base(std::forward<T>(args)...,
-               Engine::Detail::MakeEffectMetaData<Effect, EffectTypeIndex>::data,
-#ifndef LE_NO_LFOs
-               &lfos_[0], &unmodulatedValues_[0],
-#endif // !LE_NO_LFOs
+               Engine::Detail::MakeEffectMetaData<Effect, EffectTypeIndex>::data, &lfos_[0],
+               &unmodulatedValues_[0],
                Engine::Detail::EffectParameterOffsets<Effect>::parameterOffsets,
                static_cast<std::uint16_t>(
                    reinterpret_cast<char const *>(&effect().parameters()) -
@@ -459,12 +455,10 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
           setupCalled_(false)
 #endif // NDEBUG
     {
-#ifndef LE_NO_LFOs
         /// \note Here and not in ModuleParameters' constructor: this is the first
         /// point at which `effect_` exists and its parameters hold their
         /// defaults, which is what an unmodulated value starts as.
         this->captureUnmodulatedValues();
-#endif // !LE_NO_LFOs
     }
 #ifdef __clang__
 #pragma clang diagnostic pop
@@ -525,7 +519,6 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
     Effect effect_;
     ChannelStatesHolder channelStatesHolder_;
 
-#ifndef LE_NO_LFOs
     /// \note Only allocate the storage for all (base + effect) LFOs in the
     /// implementation class and let the base class construct all the LFOs. The
     /// other approach is to have the base class allocate and construct the
@@ -545,7 +538,6 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
     /// ModuleParameters::unmodulatedBaseParameter().
     std::array<float, ModuleParameters::numberOfLFOBaseParameters + Effect::Parameters::static_size>
         unmodulatedValues_;
-#endif // !LE_NO_LFOs
 
 #ifndef NDEBUG
     bool setupCalled_;

@@ -47,19 +47,11 @@ LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 LE_COLD ModuleParameters::ModuleParameters(
     //std::uint8_t           const moduleSlotIndex,
-    EffectMetaData const &metadata
-#ifndef LE_NO_LFOs
-    ,
-    LFOPlaceholder *const pLFOStorage, float *const pUnmodulatedValues
-#endif // LE_NO_LFOs
-    )
+    EffectMetaData const &metadata, LFOPlaceholder *const pLFOStorage,
+    float *const pUnmodulatedValues)
     : //moduleSlotIndex_( moduleSlotIndex ),
-      metaData_(metadata)
-#ifdef LE_NO_LFOs
-          {}
-#else
-      ,
-      pLFOs_(reinterpret_cast<LFO *>(pLFOStorage)), pUnmodulatedValues_(pUnmodulatedValues)
+      metaData_(metadata), pLFOs_(reinterpret_cast<LFO *>(pLFOStorage)),
+      pUnmodulatedValues_(pUnmodulatedValues)
 {
     LE_DISABLE_LOOP_UNROLLING()
     for (auto &lfoPlaceholder : lfos())
@@ -73,9 +65,8 @@ LE_COLD ModuleParameters::ModuleParameters(
     /// asked for one in between must not read uninitialised memory.
     std::fill_n(pUnmodulatedValues_, numberOfLFOControledParameters(), 0.0f);
 }
-#endif // LE_NO_LFOs
 
-      LE_COLD bool ModuleParameters::bypass() const
+LE_COLD bool ModuleParameters::bypass() const
 {
     return baseParameters().get<Effects::BaseParameters::Bypass>();
 }
@@ -127,18 +118,15 @@ LE_COLD float ModuleParameters::setBaseParameter(std::uint8_t const baseParamete
                                                  float const parameterValue)
 {
     auto const setValue(setBaseParameterLive(baseParameterIndex, parameterValue));
-#ifndef LE_NO_LFOs
     /// \note What the *user, the host or a preset* asked for, so it is the
     /// unmodulated value as well as the live one. The LFO comes through
     /// setBaseParameterFromLFOAux() instead, which writes only the live one.
     /// Bypass has no LFO and therefore no unmodulated slot.
     if (baseParameterIndex >= numberOfNonLFOBaseParameters)
         pUnmodulatedValues_[baseParameterIndex - numberOfNonLFOBaseParameters] = setValue;
-#endif // LE_NO_LFOs
     return setValue;
 }
 
-#ifndef LE_NO_LFOs
 LE_COLD float
 ModuleParameters::unmodulatedBaseParameter(std::uint8_t const baseParameterIndex) const
 {
@@ -162,7 +150,6 @@ LE_COLD void ModuleParameters::captureUnmodulatedValues()
     for (std::uint8_t index(0); index < effectParameters; ++index)
         pUnmodulatedValues_[numberOfLFOBaseParameters + index] = getEffectParameter(index);
 }
-#endif // LE_NO_LFOs
 
 /// \note The shared base parameters' static descriptions. One definition, in
 /// the one translation unit that can see the template that builds them; every
@@ -213,7 +200,6 @@ ModuleParameters::effectSpecificParameterIndex(std::uint8_t const parameterIndex
     return parameterIndex - numberOfBaseParameters;
 }
 
-#ifndef LE_NO_LFOs
 LE_COLD void
 ModuleParameters::updateLFOs(LFO::Timer::TimingInformationChange const timingInformationChange)
 {
@@ -326,7 +312,6 @@ LE_COLD parameter_value_t ModuleParameters::parameterToNormalisedValue(
     return Math::convertLinearRange<float, 0, 1, 1, float>(parameterValue, parameterInfo.minimum,
                                                            parameterInfo.maximum);
 }
-#endif // !LE_NO_LFOs
 
 namespace
 {
