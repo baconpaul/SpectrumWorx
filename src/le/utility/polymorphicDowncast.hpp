@@ -4,8 +4,7 @@
 /// -----------------------------
 ///
 ///   Replaces Boost.Conversion's polymorphic_downcast: a static_cast that is
-/// checked with dynamic_cast in debug builds. Unlike the Boost original this
-/// compiles without RTTI, dropping to a plain static_cast rather than failing.
+/// checked with dynamic_cast in debug builds.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later
@@ -22,9 +21,9 @@ namespace LE::Utility
 
 template <class Target, class Source> Target polymorphicDowncast(Source *const pSource) noexcept
 {
-#if !defined(NDEBUG) && !defined(LE_NO_RTTI)
+#ifndef NDEBUG
     LE_ASSERT_MSG(dynamic_cast<Target>(pSource) == pSource, "Invalid downcast.");
-#endif
+#endif // NDEBUG
     return static_cast<Target>(pSource);
 }
 

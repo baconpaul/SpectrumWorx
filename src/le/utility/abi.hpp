@@ -58,13 +58,5 @@
 /// which does not need every one of them to be a preprocessor branch.
 ///                                           (28.07.2026.) (SW port)
 
-// Language feature detection, previously taken from boost/config.hpp.
-#if !defined(__cpp_exceptions) && !defined(_CPPUNWIND) && !defined(__EXCEPTIONS)
-#define LE_NO_EXCEPTIONS
-#endif
-#if !defined(__cpp_rtti) && !defined(_CPPRTTI) && !defined(__GXX_RTTI)
-#define LE_NO_RTTI
-#endif
-
 //------------------------------------------------------------------------------
 #endif // abi_hpp
