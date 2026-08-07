@@ -632,7 +632,6 @@ void LE_NOINLINE synthesis(SynthesisChannelState &state, DataRange const &anaFre
         state.binToReduce = (state.binToReduce + binsToReduce - 1) % numberOfBins;
         float *LE_RESTRICT pPhaseToReduce(&state.phaseSum()[startBinToReduce]);
         float *LE_RESTRICT pOutputPhase(&anaFreqInSynthPhaseOut[startBinToReduce]);
-        LE_DISABLE_LOOP_UNROLLING()
         for (std::uint16_t counter(binsToReduce); counter; --counter)
         {
             LE_ASSERT(*pPhaseToReduce == *pOutputPhase);

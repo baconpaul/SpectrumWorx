@@ -51,7 +51,6 @@ ModuleParameters::ModuleParameters(
       metaData_(metadata), pLFOs_(reinterpret_cast<LFO *>(pLFOStorage)),
       pUnmodulatedValues_(pUnmodulatedValues)
 {
-    LE_DISABLE_LOOP_UNROLLING()
     for (auto &lfoPlaceholder : lfos())
     {
         new (&lfoPlaceholder) LFO;
@@ -218,7 +217,6 @@ ModuleParameters::LFOs ModuleParameters::lfos() const
 
 void ModuleParameters::updateBaseParametersFromLFOs(LFO::Timer const &timer)
 {
-    LE_DISABLE_LOOP_UNROLLING()
     for (std::uint8_t baseParameter(numberOfNonLFOBaseParameters);
          baseParameter < numberOfBaseParameters; ++baseParameter)
     {

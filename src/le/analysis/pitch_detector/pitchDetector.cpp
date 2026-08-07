@@ -199,7 +199,6 @@ float PitchDetector::estimatePitch(float const lastPitch, float const lowerBound
     std::uint8_t detectedPitchHPSIndex(0);
 
     // Search top 30 in the HPS:
-    LE_DISABLE_LOOP_UNROLLING()
     for (std::uint8_t k(0); k < 30; ++k) //...mrmlj...can two HPS' bins be under the same peak?
     {
         // If HPS bin is inside a peak and within the bounds then it is the pitch:
@@ -226,7 +225,6 @@ float PitchDetector::estimatePitch(float const lastPitch, float const lowerBound
         std::uint16_t pos(detectedPitchHPSIndex + 1);
         // Search through lower harmonics if HPS amplitude is large enough
         // and pitch is still over 100Hz from previously detected pitch:
-        LE_DISABLE_LOOP_UNROLLING()
         while ((pos < 50 /*heuristic*/) &&
                (std::abs(detectedPitch - lastPitch) > 100 /*heuristic*/ /*Hz*/) &&
                (hps[pos].harmonicProduct >

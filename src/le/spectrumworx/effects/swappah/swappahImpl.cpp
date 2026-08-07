@@ -140,7 +140,6 @@ void SwappahImpl::swapBands(DataRange const &data) const
     }
 
     std::uint16_t target(0);
-    LE_DISABLE_LOOP_UNROLLING()
     for (auto const &band : bands)
     {
         if (band.source != target)

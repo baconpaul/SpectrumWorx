@@ -190,7 +190,6 @@ void SynthImpl::setup(IndexRange const &workingRange, Engine::Setup const &engin
         LE_ALIGNED_STACK_BUFFER(freqCoefficients, Engine::real_t,
                                 lastFFTSize_ + 2 +
                                     16 /*for alignment padding between real and imag*/);
-        LE_DISABLE_LOOP_UNROLLING()
         for (std::uint16_t bin(0); bin < lastFFTSize_; ++bin)
             freqCoefficients[bin] = std::sin(omega * bin / sr);
 
@@ -232,9 +231,7 @@ void SynthImpl::ChannelState::reset()
     /// investigated...
     ///                                       (22.10.2015.) (Domagoj Saric)
 #if 0
-    LE_DISABLE_LOOP_UNROLLING()
     for ( auto & oscillatorPhases : phases )
-        LE_DISABLE_LOOP_UNROLLING()
         for ( auto & phase : oscillatorPhases ) { phase = Math::rangedRand( Math::Constants::pi ); }
 #else
     Math::clear(phases.front().begin(), phases.back().end());
@@ -244,7 +241,6 @@ void SynthImpl::ChannelState::reset()
 void SynthImpl::ChannelState::resize(Engine::StorageFactors const &factors,
                                      Engine::Storage &storage)
 {
-    LE_DISABLE_LOOP_UNROLLING()
     for (auto &oscillatorPhases : phases)
         oscillatorPhases.resize(factors, storage);
 }

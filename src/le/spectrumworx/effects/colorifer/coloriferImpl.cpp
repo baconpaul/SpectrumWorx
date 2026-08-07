@@ -112,7 +112,6 @@ void ColoriferImpl::process(Engine::MainSideChannelData_AmPh data, Engine::Setup
     float *LE_RESTRICT pAmps(mainAmps.begin());
     float const *LE_RESTRICT pX(x.begin());
     float const *LE_RESTRICT pY(y.begin());
-    LE_DISABLE_LOOP_UNROLLING()
     while (binsLeft)
     {
         shapeWidth = std::min(binsLeft, shapeWidth);

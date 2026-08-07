@@ -152,7 +152,6 @@ float **makeDeinterLeaveBuffers(LE::Utility::Span<float> const deinterLeavedData
 {
     LE_ASSUME(deinterLeavedDataStorage.begin());
     LE_ASSUME(deinterLeavedDataPointers.begin());
-    LE_DISABLE_LOOP_VECTORIZATION()
     for (std::uint8_t channel(0); channel < numberOfChannels; ++channel)
     {
 #ifndef NDEBUG
@@ -246,7 +245,6 @@ void Processor::process /// \throws nothing
         }
     }
 
-    LE_DISABLE_LOOP_VECTORIZATION()
     while (samples)
     {
         if (numberOfChannels == 1)
