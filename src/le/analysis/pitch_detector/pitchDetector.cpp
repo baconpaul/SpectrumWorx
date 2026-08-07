@@ -154,8 +154,8 @@ namespace
 {
 using SW::Engine::ReadOnlyDataRange;
 
-float LE_HOT harmonic(std::uint8_t const harmonic, std::uint16_t const bin,
-                      ReadOnlyDataRange const &amplitudes)
+float harmonic(std::uint8_t const harmonic, std::uint16_t const bin,
+               ReadOnlyDataRange const &amplitudes)
 {
     auto pHarmonicAmp(amplitudes.begin() + (harmonic * bin));
     auto const pHarmonicAmpsEnd(pHarmonicAmp + harmonic);
@@ -165,9 +165,8 @@ float LE_HOT harmonic(std::uint8_t const harmonic, std::uint16_t const bin,
 }
 } // anonymous namespace
 
-void LE_HOT
-PitchDetector::findHarmonicProductSpectrumAndSort(SW::Engine::ReadOnlyDataRange const amps,
-                                                  HPSRange const hps)
+void PitchDetector::findHarmonicProductSpectrumAndSort(SW::Engine::ReadOnlyDataRange const amps,
+                                                       HPSRange const hps)
 {
     LE_ASSERT(amps.size() == hps.size());
 
@@ -190,9 +189,9 @@ PitchDetector::findHarmonicProductSpectrumAndSort(SW::Engine::ReadOnlyDataRange 
     std::sort(hps.begin(), hps.end());
 }
 
-float LE_HOT PitchDetector::estimatePitch(float const lastPitch, float const lowerBound,
-                                          float const upperBound, HPSRange const hps,
-                                          PeakDetector const &pd)
+float PitchDetector::estimatePitch(float const lastPitch, float const lowerBound,
+                                   float const upperBound, HPSRange const hps,
+                                   PeakDetector const &pd)
 {
     float detectedPitch(0);
     float detectedPitchPeakStrength(0);

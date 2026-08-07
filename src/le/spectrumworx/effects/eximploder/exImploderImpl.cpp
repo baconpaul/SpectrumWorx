@@ -51,8 +51,8 @@ float dB2BinAmplitude(int const dBAmplitude, Engine::Setup const &engineSetup)
     return Math::dB2NormalisedLinear(dBAmplitude) * engineSetup.maximumAmplitude();
 }
 
-float LE_COLD ExImPloderImpl::setup(int const glissando, int const threshold, int const gate,
-                                    Engine::Setup const &engineSetup)
+float ExImPloderImpl::setup(int const glissando, int const threshold, int const gate,
+                            Engine::Setup const &engineSetup)
 {
     /// \note We use the same gating logic for both Exploder and Imploder.
     ///                                   (18.04.2013.) (Domagoj Saric)
@@ -101,8 +101,8 @@ float LE_COLD ExImPloderImpl::setup(int const glissando, int const threshold, in
 //                                        (10.10.2011.) (Domagoj Saric)
 ////////////////////////////////////////////////////////////////////////////
 
-void LE_HOT ExImPloderImpl::process(ChannelState &cs, Engine::ChannelData_AmPh &data,
-                                    bool const thresholdIsLowerBound) const
+void ExImPloderImpl::process(ChannelState &cs, Engine::ChannelData_AmPh &data,
+                             bool const thresholdIsLowerBound) const
 {
     auto const fullNumberOfBins(data.full().numberOfBins());
 

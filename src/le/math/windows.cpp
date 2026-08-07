@@ -25,8 +25,7 @@ namespace LE::Math
 #pragma warning(push)
 #pragma warning(disable : 4244) // Conversion from 'window_t' to 'float', possible loss of data.
 
-LE_COLD void calculateWindow(DataRange const &window,
-                             LE::SW::Engine::Constants::Window const windowType)
+void calculateWindow(DataRange const &window, LE::SW::Engine::Constants::Window const windowType)
 {
     // http://en.wikipedia.org/wiki/Window_function
     // "On the Use of Windows for Harmonic Analysis with the Discrete Fourier

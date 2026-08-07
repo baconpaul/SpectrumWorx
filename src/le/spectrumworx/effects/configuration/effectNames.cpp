@@ -52,9 +52,9 @@ EffectNames const effectStreamingNames = {{LE_SW_EFFECT_LIST(LE_SW_AUX_EFFECT_ST
 #undef LE_SW_AUX_EFFECT_STREAMING_NAME
 } // anonymous namespace
 
-LE_COLD char const *effectName(std::uint8_t const effectIndex) { return effectNames[effectIndex]; }
+char const *effectName(std::uint8_t const effectIndex) { return effectNames[effectIndex]; }
 
-LE_COLD std::int8_t effectIndex(std::string_view const effectName)
+std::int8_t effectIndex(std::string_view const effectName)
 {
     auto const pFoundEffectName(std::ranges::find(effectNames, effectName));
     if (pFoundEffectName == effectNames.end())
@@ -62,12 +62,12 @@ LE_COLD std::int8_t effectIndex(std::string_view const effectName)
     return static_cast<std::int8_t>(pFoundEffectName - effectNames.begin());
 }
 
-LE_COLD char const *effectStreamingName(std::uint8_t const effectIndex)
+char const *effectStreamingName(std::uint8_t const effectIndex)
 {
     return effectStreamingNames[effectIndex];
 }
 
-LE_COLD std::int8_t effectIndexFromStreamingName(std::string_view const streamingName)
+std::int8_t effectIndexFromStreamingName(std::string_view const streamingName)
 {
     auto const pFound(std::ranges::find(effectStreamingNames, streamingName));
     if (pFound == effectStreamingNames.end())

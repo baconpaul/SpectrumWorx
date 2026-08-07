@@ -54,7 +54,7 @@ class SpectrumWorxEditor;
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class LE_NOVTABLE EditorHost
+class EditorHost
 {
   public:
     /// The engine. Parameters, the module chain, the setup and the process lock

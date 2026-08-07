@@ -137,7 +137,7 @@ class Setup
         operator std::uint16_t() const { return static_cast<std::uint16_t>(integer); }
         operator std::uint8_t() const { return static_cast<std::uint8_t>(integer); }
 
-        template <typename T> PositiveNumber &LE_COLD operator=(T const other)
+        template <typename T> PositiveNumber &operator=(T const other)
         {
             LE_ASSUME(other >= 0);
             Math::convert(other, real);
@@ -145,7 +145,7 @@ class Setup
             return *this;
         }
 
-        template <typename T> LE_COLD PositiveNumber(T const other) { (*this) = other; }
+        template <typename T> PositiveNumber(T const other) { (*this) = other; }
     }; // struct PositiveNumber
 
   private:

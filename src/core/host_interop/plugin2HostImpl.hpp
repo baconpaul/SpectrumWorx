@@ -36,7 +36,7 @@ namespace LE::SW
 #pragma warning(disable : 4127) // Conditional expression is constant.
 
 template <class Impl, class Protocol>
-class LE_NOVTABLE Plugin2HostPassiveInteropImpl : public Plugin2HostPassiveInteropController
+class Plugin2HostPassiveInteropImpl : public Plugin2HostPassiveInteropController
 {
   public:
     ////////////////////////////////////////////////////////////////////////////
@@ -151,7 +151,7 @@ class LE_NOVTABLE Plugin2HostPassiveInteropImpl : public Plugin2HostPassiveInter
 }; // class Plugin2HostPassiveInteropImpl
 
 template <class Impl, class Protocol, class Base = Plugin2HostInteropControler>
-class LE_NOVTABLE Plugin2HostActiveInteropImpl : public Base
+class Plugin2HostActiveInteropImpl : public Base
 {
   public:
     using AutomatedParameter = typename Plugins::AutomatedParameterFor<Protocol>::type;

@@ -97,7 +97,7 @@ template <> class ParameterInformation<Protocol::CLAP>
     /// produces, and shorter than CLAP_NAME_SIZE so the copy out cannot clip.
     using NameBuf = std::array<char, 160>;
 
-    template <class Parameter> result_type operator()() LE_COLD
+    template <class Parameter> result_type operator()()
     {
         using Tag = typename Parameter::Tag;
         using ParameterValue = typename Parameter::value_type;
@@ -130,7 +130,7 @@ template <> class ParameterInformation<Protocol::CLAP>
         unit_[0] = '\0';
     }
 
-    void set(AutomatedParameter::Info const &info) LE_COLD
+    void set(AutomatedParameter::Info const &info)
     {
         minimum_ = info.minimum;
         maximum_ = info.maximum;

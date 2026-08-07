@@ -24,7 +24,7 @@ namespace LE::Utility
 
 DSPProfiler DSPProfiler::singleton_;
 
-LE_COLD DSPProfiler::DSPProfiler() : totalSamples_(0), sampleRate_(0), totalCPUTime_(0), lastTime_()
+DSPProfiler::DSPProfiler() : totalSamples_(0), sampleRate_(0), totalCPUTime_(0), lastTime_()
 {
 #if defined(_MSC_VER)
     static_assert(sizeof(totalCPUTime_) == sizeof(std::uint64_t), "");
@@ -32,26 +32,26 @@ LE_COLD DSPProfiler::DSPProfiler() : totalSamples_(0), sampleRate_(0), totalCPUT
 #endif // MSVC version
 }
 
-LE_COLD void DSPProfiler::setSignalSampleRate(std::uint32_t const sampleRate)
+void DSPProfiler::setSignalSampleRate(std::uint32_t const sampleRate)
 {
     LE_ASSUME(sampleRate < 200000);
     sampleRate_ = static_cast<float>(sampleRate);
     reset();
 }
 
-LE_COLD void DSPProfiler::reset()
+void DSPProfiler::reset()
 {
     totalSamples_ = 0;
     totalCPUTime_ = totalCPUTime_.zero();
 }
 
-LE_HOT void DSPProfiler::beginInterval() { lastTime_ = std::chrono::steady_clock::now(); }
+void DSPProfiler::beginInterval() { lastTime_ = std::chrono::steady_clock::now(); }
 
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wassume"
 #endif // __clang__
-LE_HOT void DSPProfiler::endInterval(std::uint32_t const intervalLengthInSampleFrames)
+void DSPProfiler::endInterval(std::uint32_t const intervalLengthInSampleFrames)
 {
     auto const newTimeStamp(std::chrono::steady_clock::now());
     auto const timeInterval(newTimeStamp - lastTime_);
@@ -86,13 +86,13 @@ float DSPProfiler::cpuUsagePercentage() const
 _LIBCPP_BEGIN_NAMESPACE_STD
 namespace chrono
 {
-__attribute__((weak)) extern LE_COLD system_clock::time_point system_clock::now() _NOEXCEPT
+__attribute__((weak)) extern system_clock::time_point system_clock::now() _NOEXCEPT
 {
     timeval tv;
     gettimeofday(&tv, 0);
     return time_point(seconds(tv.tv_sec) + microseconds(tv.tv_usec));
 }
-__attribute__((weak)) extern LE_HOT steady_clock::time_point steady_clock::now() _NOEXCEPT
+__attribute__((weak)) extern steady_clock::time_point steady_clock::now() _NOEXCEPT
 {
     struct timespec tp;
     LE_VERIFY(::clock_gettime(CLOCK_MONOTONIC, &tp) == 0);

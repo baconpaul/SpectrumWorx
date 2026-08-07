@@ -452,7 +452,7 @@ void Processor::processSingleChannel(ProcessParameters const &processParameters)
 //  http://dev.vinux-project.org/time-aliased-hann
 ////////////////////////////////////////////////////////////////////////////////
 
-void LE_COLD Processor::calculateWindowAndWOLAGain()
+void Processor::calculateWindowAndWOLAGain()
 {
     auto const windowSize(engineSetup().windowSize<std::uint16_t>());
     auto const stepSize(engineSetup().stepSize<std::uint16_t>());
@@ -638,13 +638,13 @@ void LE_COLD Processor::calculateWindowAndWOLAGain()
     }
 }
 
-LE_COLD void Processor::setNumberOfChannels(std::uint8_t const numberOfMainChannels,
-                                            std::uint8_t const numberOfSideChannels)
+void Processor::setNumberOfChannels(std::uint8_t const numberOfMainChannels,
+                                    std::uint8_t const numberOfSideChannels)
 {
     engineSetup().setNumberOfChannels(numberOfMainChannels, numberOfSideChannels);
 }
 
-LE_COLD bool Processor::setSampleRate(float const sampleRate, StorageFactors &currentStorageFactors)
+bool Processor::setSampleRate(float const sampleRate, StorageFactors &currentStorageFactors)
 {
     float const currentSampleRate(engineSetup().sampleRate<float>());
     //...mrmlj...assert that we are in a non-processing state...
@@ -676,9 +676,9 @@ LE_COLD bool Processor::setSampleRate(float const sampleRate, StorageFactors &cu
     }
 }
 
-LE_COLD bool Processor::resize(StorageFactors &currentStorageFactors,
-                               StorageFactors const &newStorageFactors, Setup::Window const window,
-                               Engine::HeapSharedStorage &sharedStorage)
+bool Processor::resize(StorageFactors &currentStorageFactors,
+                       StorageFactors const &newStorageFactors, Setup::Window const window,
+                       Engine::HeapSharedStorage &sharedStorage)
 {
     /// \note If not all storage factors have been set yet, simply save the new
     /// values and return true (in expectation of a future resize() with
@@ -737,17 +737,16 @@ LE_COLD bool Processor::resize(StorageFactors &currentStorageFactors,
     return allocationSucceeded;
 }
 
-LE_COLD StorageFactors Processor::makeFactors(std::uint16_t const fftSize,
-                                              std::uint8_t const overlapFactor,
-                                              std::uint8_t const numberOfChannels,
-                                              std::uint32_t const sampleRate)
+StorageFactors Processor::makeFactors(std::uint16_t const fftSize, std::uint8_t const overlapFactor,
+                                      std::uint8_t const numberOfChannels,
+                                      std::uint32_t const sampleRate)
 {
     StorageFactors const storageFactors = {fftSize, overlapFactor, numberOfChannels, sampleRate};
     return storageFactors;
 }
 
-void LE_COLD Processor::changeWOLAParameters(StorageFactors const &storageFactors,
-                                             Setup::Window const window, Storage storage)
+void Processor::changeWOLAParameters(StorageFactors const &storageFactors,
+                                     Setup::Window const window, Storage storage)
 {
     LE_ASSERT(storage);
     this->resize(storageFactors, storage);
@@ -760,19 +759,19 @@ void LE_COLD Processor::changeWOLAParameters(StorageFactors const &storageFactor
     changeWindowFunction(window);
 }
 
-void LE_COLD Processor::changeWindowFunction(Setup::Window const window)
+void Processor::changeWindowFunction(Setup::Window const window)
 {
     engineSetup().setWindowFunction(window);
     calculateWindowAndWOLAGain();
 }
 
-void LE_COLD Processor::clearSideChannelData()
+void Processor::clearSideChannelData()
 {
     for (auto &channel : channels_)
         channel.channelData().clearSideChannelData();
 }
 
-void LE_COLD Processor::resetChannelBuffers()
+void Processor::resetChannelBuffers()
 {
     std::uint16_t const initialSilenceSamples(engineSetup().windowSize<std::uint16_t>() -
                                               engineSetup().stepSize<std::uint16_t>());
@@ -789,7 +788,7 @@ Processor const &Processor::fromEngineSetup(Setup const &engineSetup)
     return fromEngineSetup(const_cast<Setup &>(engineSetup));
 }
 
-LE_COLD std::uint32_t Processor::requiredStorage(StorageFactors const &factors)
+std::uint32_t Processor::requiredStorage(StorageFactors const &factors)
 {
     return Math::FFT_float_real_1D::requiredStorage(factors) +
            FFTWindow ::requiredStorage(factors) + // analysis
@@ -797,7 +796,7 @@ LE_COLD std::uint32_t Processor::requiredStorage(StorageFactors const &factors)
            Channels ::requiredStorage(factors);
 }
 
-LE_COLD void Processor::resize(StorageFactors const &factors, Storage &storage)
+void Processor::resize(StorageFactors const &factors, Storage &storage)
 {
     fft_.resize(factors, storage);
     analysisWindow_.resize(factors, storage);
@@ -807,7 +806,7 @@ LE_COLD void Processor::resize(StorageFactors const &factors, Storage &storage)
     synthesisWindowBackup_.alias(synthesisWindow_);
 }
 
-LE_COLD std::uint32_t Processor::Channels::requiredStorage(StorageFactors const &factors)
+std::uint32_t Processor::Channels::requiredStorage(StorageFactors const &factors)
 {
     using Utility::align;
     std::uint16_t const channelBuffersBaseSize(sizeof(value_type));
@@ -818,7 +817,7 @@ LE_COLD std::uint32_t Processor::Channels::requiredStorage(StorageFactors const 
     return factors.numberOfChannels * totalSizePerChannel;
 }
 
-LE_COLD void Processor::Channels::resize(StorageFactors const &factors, Storage &storage)
+void Processor::Channels::resize(StorageFactors const &factors, Storage &storage)
 {
     Utility::SharedStorageBuffer<ChannelBuffers>::resize(
         factors.numberOfChannels * sizeof(value_type), storage);

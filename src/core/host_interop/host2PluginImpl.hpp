@@ -19,7 +19,7 @@
 namespace LE::SW
 {
 
-template <class Impl, class Protocol> class LE_NOVTABLE Host2PluginInteropImpl
+template <class Impl, class Protocol> class Host2PluginInteropImpl
 /// \note No virtual functions so no need to inherit from
 /// Host2PluginInteropControler (makes implementing/defining derived classes
 /// easier.

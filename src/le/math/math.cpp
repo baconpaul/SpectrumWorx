@@ -692,7 +692,7 @@ using rand_t = std::size_t;
 #pragma warning(push)
 #pragma warning(disable : 4127) // Conditional expression is constant.
 #endif                          // _MSC_VER
-LE_NOINLINE LE_HOT rand_t xorshift128pRNG()
+LE_NOINLINE rand_t xorshift128pRNG()
 {
     LE_ASSERT_MSG(rng_state[0] && rng_state[1], "RNG not seeded.");
 
@@ -718,7 +718,7 @@ LE_NOINLINE LE_HOT rand_t xorshift128pRNG()
 #pragma warning(pop)
 #endif // _MSC_VER
 
-template <typename T> LE_HOT T rangedRand(T const maximum)
+template <typename T> T rangedRand(T const maximum)
 {
 #if 0 // std::rand() is usually slow and of poor quality
       // Implementation note:
@@ -747,7 +747,7 @@ template <typename T> LE_HOT T rangedRand(T const maximum)
 
 } // anonymous namespace
 
-void LE_COLD rngSeed()
+void rngSeed()
 {
     char stack;
     rng_state[0] = std::chrono::system_clock::now().time_since_epoch().count();
@@ -757,7 +757,7 @@ void LE_COLD rngSeed()
     //std::srand( static_cast<unsigned int>( std::time( 0 ) ) );
 }
 
-void LE_COLD rngSeed(std::uint64_t const seed)
+void rngSeed(std::uint64_t const seed)
 {
     // splitmix64, so that a small seed still fills both words. Neither may be
     // zero: xorshift128+ cannot leave the all-zero state.
@@ -847,7 +847,7 @@ float rangedRand(float const maximum) { return normalisedRand() * maximum; }
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-float LE_HOT normalisedRand()
+float normalisedRand()
 {
     /// \note The divisor used to be std::numeric_limits<rand_t>::max(), which no
     /// double can hold: it converts to one more than it is -- 2^digits -- and

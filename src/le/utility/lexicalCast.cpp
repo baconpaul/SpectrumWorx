@@ -43,44 +43,43 @@ namespace LE::Utility
 /// constant sizes too small shows up as a truncation in a debug build rather
 /// than as an overrun in a release one.
 ///                                           (02.08.2026.) (SW port)
-LE_COLD unsigned int lexical_cast(std::int32_t const value, char *const buffer)
+unsigned int lexical_cast(std::int32_t const value, char *const buffer)
 {
     auto const charactersWritten(
         std::snprintf(buffer, RequiredStringStorage<std::int32_t>::value, "%d", value));
     LE_ASSERT(charactersWritten < RequiredStringStorage<std::int32_t>::value);
     return static_cast<unsigned int>(charactersWritten);
 }
-LE_COLD unsigned int lexical_cast(long const value, char *const buffer)
+unsigned int lexical_cast(long const value, char *const buffer)
 {
     return lexical_cast(static_cast<std::int32_t>(value), buffer);
 }
-LE_COLD unsigned int lexical_cast(std::uint32_t const value, char *const buffer)
+unsigned int lexical_cast(std::uint32_t const value, char *const buffer)
 {
     auto const charactersWritten(
         std::snprintf(buffer, RequiredStringStorage<std::uint32_t>::value, "%u", value));
     LE_ASSERT(charactersWritten < RequiredStringStorage<std::uint32_t>::value);
     return static_cast<unsigned int>(charactersWritten);
 }
-LE_COLD unsigned int lexical_cast(unsigned long const value, char *const buffer)
+unsigned int lexical_cast(unsigned long const value, char *const buffer)
 {
     return lexical_cast(static_cast<std::uint32_t>(value), buffer);
 }
 
-LE_COLD unsigned int lexical_cast(float const value, char *const buffer)
+unsigned int lexical_cast(float const value, char *const buffer)
 {
     return lexical_cast(value, 4, buffer);
 }
-LE_COLD unsigned int lexical_cast(double const value, char *const buffer)
+unsigned int lexical_cast(double const value, char *const buffer)
 {
     return lexical_cast(value, 9, buffer);
 }
-LE_COLD unsigned int lexical_cast(float const value, std::uint8_t const decimalPlaces,
-                                  char *const buffer)
+unsigned int lexical_cast(float const value, std::uint8_t const decimalPlaces, char *const buffer)
 {
     return lexical_cast(static_cast<double>(value), decimalPlaces, buffer);
 }
-LE_COLD LE_NOINLINE unsigned int lexical_cast(double const value, std::uint8_t const decimalPlaces,
-                                              char *const buffer)
+LE_NOINLINE unsigned int lexical_cast(double const value, std::uint8_t const decimalPlaces,
+                                      char *const buffer)
 {
     char const format[] = {'%', '.', static_cast<char>('0' + decimalPlaces), 'f', '\0'};
     auto const charactersWanted(
@@ -114,7 +113,7 @@ LE_COLD LE_NOINLINE unsigned int lexical_cast(double const value, std::uint8_t c
     return totalCharactersWritten;
 }
 
-template <> LE_COLD bool lexical_cast<bool>(char const *const valueString)
+template <> bool lexical_cast<bool>(char const *const valueString)
 {
     LE_ASSERT(valueString[0] == '0' || valueString[0] == '1');
     LE_ASSERT(valueString[1] == '\0' || valueString[1] == '"' || valueString[1] == '<');
@@ -123,16 +122,13 @@ template <> LE_COLD bool lexical_cast<bool>(char const *const valueString)
     return reinterpret_cast<bool const &>(value);
 }
 
-template <> LE_COLD int lexical_cast<int>(char const *valueString)
-{
-    return std::atoi(valueString);
-}
+template <> int lexical_cast<int>(char const *valueString) { return std::atoi(valueString); }
 
-template <> LE_COLD long lexical_cast<long>(char const *const valueString)
+template <> long lexical_cast<long>(char const *const valueString)
 {
     return lexical_cast<int>(valueString);
 }
-template <> LE_COLD unsigned int lexical_cast<unsigned int>(char const *const valueString)
+template <> unsigned int lexical_cast<unsigned int>(char const *const valueString)
 {
     return lexical_cast<int>(valueString);
 }
@@ -155,11 +151,11 @@ double lexical_cast_double_worker(char const *&pValueString)
 }
 } // namespace
 
-template <> LE_COLD float lexical_cast<float>(char const *valueString)
+template <> float lexical_cast<float>(char const *valueString)
 {
     return lexical_cast_float_worker(valueString);
 }
-template <> LE_COLD double lexical_cast<double>(char const *valueString)
+template <> double lexical_cast<double>(char const *valueString)
 {
     return lexical_cast_double_worker(valueString);
 }

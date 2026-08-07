@@ -26,7 +26,7 @@ namespace LE::SW
 namespace Engine
 {
 
-class LE_NOVTABLE ModuleNode
+class ModuleNode
 {
   public:
     using NodePtr = LE::Utility::IntrusivePtr<ModuleNode>;

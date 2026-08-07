@@ -411,7 +411,7 @@ void FFT_float_real_1D::fftshift(float *const pTimeDomainData) const
 
 float FFT_float_real_1D::maximumAmplitude(float const size) { return std::sqrt(size) / 2; }
 
-LE_COLD std::uint32_t FFT_float_real_1D::requiredStorage(SW::Engine::StorageFactors const &factors)
+std::uint32_t FFT_float_real_1D::requiredStorage(SW::Engine::StorageFactors const &factors)
 {
     return WorkBuffer::requiredStorage(factors)
 #ifdef LE_PFFFT

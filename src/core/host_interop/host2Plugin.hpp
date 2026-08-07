@@ -28,7 +28,7 @@ namespace SW
 
 class AutomatedModuleChain;
 
-class LE_NOVTABLE Host2PluginInteropControler
+class Host2PluginInteropControler
 {
   public:
     using ModuleChain = AutomatedModuleChain;

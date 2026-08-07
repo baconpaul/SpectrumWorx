@@ -37,9 +37,9 @@ class ModuleDSP;
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
-                                     public Plugin2HostPassiveInteropController,
-                                     protected Engine::Processor
+class SpectrumWorxCore : public Host2PluginInteropControler,
+                         public Plugin2HostPassiveInteropController,
+                         protected Engine::Processor
 {
   protected:
     class InputBuffers;

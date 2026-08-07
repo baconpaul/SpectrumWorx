@@ -1633,8 +1633,8 @@ struct Polar2rectangularData // tiny x86 register file workaround
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wassume"
 #endif // __clang__
-void LE_HOT polar2rectangular(Polar2rectangularData const *LE_RESTRICT const pData,
-                              std::uint16_t const size)
+void polar2rectangular(Polar2rectangularData const *LE_RESTRICT const pData,
+                       std::uint16_t const size)
 {
     using index_t = FastIndexedPointer<vector_t>::index_type;
 #if defined(BOOST_SIMD_ARCH_X86) && !defined(BOOST_SIMD_ARCH_X86_64)

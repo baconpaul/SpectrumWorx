@@ -425,8 +425,7 @@ namespace
 /// thread a host chose to restore a session on.
 PresetLoadReport report_;
 
-LE_COLD void defaultPresetProblemReporter(PresetProblem const problem,
-                                          std::string_view const detail)
+void defaultPresetProblemReporter(PresetProblem const problem, std::string_view const detail)
 {
     if (report_.firstDetail.empty() && !detail.empty())
         report_.firstDetail.assign(detail);
@@ -470,7 +469,7 @@ PresetProblemReporter setPresetProblemReporter(PresetProblemReporter const repor
     return previous;
 }
 
-LE_COLD void reportPresetProblem(PresetProblem const problem, std::string_view const detail)
+void reportPresetProblem(PresetProblem const problem, std::string_view const detail)
 {
     presetProblemReporter(problem, detail);
 }
@@ -531,7 +530,7 @@ ParametersLoader::ParametersLoader(Preset const &preset)
 /// that happened to use the same effect started it mid-flight, and loading the
 /// same preset twice in a row did not give the same result as loading it once.
 ///                                           (02.08.2026.) (SW port)
-LE_COLD void ParametersLoader::loadModuleChain(ModuleChain &newChain)
+void ParametersLoader::loadModuleChain(ModuleChain &newChain)
 {
     LE_ASSERT_MSG(!switchedToModuleParameters(), "Already switched to module parameters.");
     LE_ASSERT(newChain.empty());
@@ -834,7 +833,7 @@ void ParametersLoader::reportUnreadParameters() const
     }
 }
 
-LE_COLD void ParametersLoader::warnAboutMissingParameter(char const *const pParameterName)
+void ParametersLoader::warnAboutMissingParameter(char const *const pParameterName)
 {
     LE_ASSERT(pParameterName);
     std::string_view const parameterName(pParameterName);

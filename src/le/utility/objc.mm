@@ -21,7 +21,7 @@ namespace LE::Utility::ObjC
 
 namespace
 {
-LE_COLD
+
 NSString *wrapString(char const *__restrict const c_str, std::uint32_t const encoding)
 {
     /// \note Using a CFString with 'toll-free bridging' as no equivalent
@@ -31,7 +31,7 @@ NSString *wrapString(char const *__restrict const c_str, std::uint32_t const enc
         ::CFStringCreateWithCStringNoCopy(nullptr, c_str, encoding, kCFAllocatorNull));
     return (__bridge NSString *)cfString;
 }
-LE_COLD
+
 NSString *copyString(char const *__restrict const c_str, std::uint32_t const encoding)
 {
     return [NSString stringWithCString:c_str encoding:encoding];

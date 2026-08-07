@@ -45,9 +45,8 @@ bool writePresetFile(juce::File const &, char const *data, unsigned int size);
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class PresetConsumer>
-bool LE_COLD loadPreset(juce::File const &presetFile, bool const ignoreExternalSample,
-                        std::string *const pComment, char const *const presetName,
-                        PresetConsumer consumer)
+bool loadPreset(juce::File const &presetFile, bool const ignoreExternalSample,
+                std::string *const pComment, char const *const presetName, PresetConsumer consumer)
 {
     auto const pPresetData(readPresetFile(presetFile));
     if (!pPresetData)

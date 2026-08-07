@@ -212,7 +212,7 @@ bool isParentOf(juce::Component const &parent, juce::Component const &possibleCh
 bool isParentOf(juce::Component const &parent, juce::Component const *pPossibleChild);
 } // namespace Detail
 
-template <class BaseComponent = juce::Component> class LE_NOVTABLE WidgetBase : public BaseComponent
+template <class BaseComponent = juce::Component> class WidgetBase : public BaseComponent
 {
   protected:
     WidgetBase() : BaseComponent(juce::String()) {}
@@ -310,7 +310,7 @@ class Message final : public juce::MessageManager::MessageBase
     }
 
   private:
-    LE_COLD void messageCallback() final
+    void messageCallback() final
     {
         if (pGUIHolder_->gui())
             if (!functor_(*pGUIHolder_->gui()))
@@ -337,7 +337,7 @@ class MessageToComponent final : public juce::MessageManager::MessageBase
     }
 
   private:
-    LE_COLD void messageCallback() final
+    void messageCallback() final
     {
         if (pComponent_)
             if (!functor_(*pComponent_))
@@ -355,7 +355,7 @@ template <class Functor> class MessageDirect final : public juce::MessageManager
     MessageDirect(Functor &&functor) : functor_(std::move(functor)) {}
 
   private:
-    LE_COLD void messageCallback() final { functor_(); }
+    void messageCallback() final { functor_(); }
 
   private:
     Functor const functor_;
@@ -638,7 +638,7 @@ class PopupMenuWithSelection : public PopupMenu
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class LE_NOVTABLE ComboBox : public WidgetBase<>, public PopupMenuWithSelection
+class ComboBox : public WidgetBase<>, public PopupMenuWithSelection
 {
   public: // ModuleUI control traits
     typedef unsigned int value_type;
@@ -675,7 +675,7 @@ class LE_NOVTABLE ComboBox : public WidgetBase<>, public PopupMenuWithSelection
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class LE_NOVTABLE BackgroundImage : public WidgetBase<>
+class BackgroundImage : public WidgetBase<>
 {
   protected:
     BackgroundImage(Artwork const &artwork) : pArtwork_(&artwork) {};
@@ -735,17 +735,14 @@ class TextButton : public WidgetBase<juce::Button>
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class LE_NOVTABLE Knob : public WidgetBase<juce::Slider>
+class Knob : public WidgetBase<juce::Slider>
 {
   public:
     typedef double value_type;
     typedef float param_type;
 
-    LE_COLD value_type getValue() const
-    {
-        return static_cast<value_type>(juce::Slider::getValue());
-    }
-    LE_COLD void setValue(param_type);
+    value_type getValue() const { return static_cast<value_type>(juce::Slider::getValue()); }
+    void setValue(param_type);
 
     param_type getNormalisedValue() const;
 

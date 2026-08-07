@@ -43,7 +43,7 @@ namespace LE::SW::Engine
 
 using LFO = Parameters::LFOImpl;
 
-LE_COLD ModuleParameters::ModuleParameters(
+ModuleParameters::ModuleParameters(
     //std::uint8_t           const moduleSlotIndex,
     EffectMetaData const &metadata, LFOPlaceholder *const pLFOStorage,
     float *const pUnmodulatedValues)
@@ -64,7 +64,7 @@ LE_COLD ModuleParameters::ModuleParameters(
     std::fill_n(pUnmodulatedValues_, numberOfLFOControledParameters(), 0.0f);
 }
 
-LE_COLD bool ModuleParameters::bypass() const
+bool ModuleParameters::bypass() const
 {
     return baseParameters().get<Effects::BaseParameters::Bypass>();
 }
@@ -80,7 +80,7 @@ struct ValueGetter
     }
 }; // struct ValueGetter
 } // namespace
-LE_COLD float ModuleParameters::getBaseParameter(std::uint8_t const baseParameterIndex) const
+float ModuleParameters::getBaseParameter(std::uint8_t const baseParameterIndex) const
 {
     return LE::Parameters::invokeFunctorOnIndexedParameter(baseParameters(), baseParameterIndex,
                                                            ValueGetter());
@@ -105,15 +105,15 @@ struct ValueSetter
     float const value_;
 }; // struct ValueSetter
 } // anonymous namespace
-LE_COLD float ModuleParameters::setBaseParameterLive(std::uint8_t const baseParameterIndex,
-                                                     float const parameterValue)
+float ModuleParameters::setBaseParameterLive(std::uint8_t const baseParameterIndex,
+                                             float const parameterValue)
 {
     return LE::Parameters::invokeFunctorOnIndexedParameter(baseParameters(), baseParameterIndex,
                                                            ValueSetter(parameterValue));
 }
 
-LE_COLD float ModuleParameters::setBaseParameter(std::uint8_t const baseParameterIndex,
-                                                 float const parameterValue)
+float ModuleParameters::setBaseParameter(std::uint8_t const baseParameterIndex,
+                                         float const parameterValue)
 {
     auto const setValue(setBaseParameterLive(baseParameterIndex, parameterValue));
     /// \note What the *user, the host or a preset* asked for, so it is the
@@ -125,21 +125,19 @@ LE_COLD float ModuleParameters::setBaseParameter(std::uint8_t const baseParamete
     return setValue;
 }
 
-LE_COLD float
-ModuleParameters::unmodulatedBaseParameter(std::uint8_t const baseParameterIndex) const
+float ModuleParameters::unmodulatedBaseParameter(std::uint8_t const baseParameterIndex) const
 {
     if (baseParameterIndex < numberOfNonLFOBaseParameters)
         return getBaseParameter(baseParameterIndex); // Bypass: never modulated
     return pUnmodulatedValues_[baseParameterIndex - numberOfNonLFOBaseParameters];
 }
 
-LE_COLD float
-ModuleParameters::unmodulatedEffectParameter(std::uint8_t const effectParameterIndex) const
+float ModuleParameters::unmodulatedEffectParameter(std::uint8_t const effectParameterIndex) const
 {
     return pUnmodulatedValues_[numberOfLFOBaseParameters + effectParameterIndex];
 }
 
-LE_COLD void ModuleParameters::captureUnmodulatedValues()
+void ModuleParameters::captureUnmodulatedValues()
 {
     for (std::uint8_t index(numberOfNonLFOBaseParameters); index < numberOfBaseParameters; ++index)
         pUnmodulatedValues_[index - numberOfNonLFOBaseParameters] = getBaseParameter(index);
@@ -152,7 +150,7 @@ LE_COLD void ModuleParameters::captureUnmodulatedValues()
 /// \note The shared base parameters' static descriptions. One definition, in
 /// the one translation unit that can see the template that builds them; every
 /// other caller has the declaration in the header and a call here.
-LE_COLD ModuleParameters::ParameterInfos const &ModuleParameters::parameterInfos()
+ModuleParameters::ParameterInfos const &ModuleParameters::parameterInfos()
 {
     return Detail::ParametersInformation<ModuleParameters::BaseParameters>::data;
 }
@@ -161,8 +159,7 @@ LE_COLD ModuleParameters::ParameterInfos const &ModuleParameters::parameterInfos
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wassume"
 #endif // __clang__
-LE_COLD ParameterInfo const &
-ModuleParameters::parameterInfo(std::uint8_t const parameterIndex) const
+ParameterInfo const &ModuleParameters::parameterInfo(std::uint8_t const parameterIndex) const
 {
     LE_ASSUME(parameterIndex < numberOfParameters());
 
@@ -181,7 +178,7 @@ ModuleParameters::parameterInfo(std::uint8_t const parameterIndex) const
     return pParameterInfos[index];
 }
 
-LE_COLD ParameterInfo const &
+ParameterInfo const &
 ModuleParameters::effectSpecificParameterInfo(std::uint8_t const parameterIndex) const
 {
     LE_ASSUME(parameterIndex < numberOfEffectSpecificParameters());
@@ -191,15 +188,13 @@ ModuleParameters::effectSpecificParameterInfo(std::uint8_t const parameterIndex)
 #pragma clang diagnostic pop
 #endif // __clang__
 
-LE_COLD std::uint8_t
-ModuleParameters::effectSpecificParameterIndex(std::uint8_t const parameterIndex)
+std::uint8_t ModuleParameters::effectSpecificParameterIndex(std::uint8_t const parameterIndex)
 {
     LE_ASSUME(parameterIndex >= numberOfBaseParameters);
     return parameterIndex - numberOfBaseParameters;
 }
 
-LE_COLD void
-ModuleParameters::updateLFOs(LFO::Timer::TimingInformationChange const timingInformationChange)
+void ModuleParameters::updateLFOs(LFO::Timer::TimingInformationChange const timingInformationChange)
 {
     LE_ASSERT_MSG(timingInformationChange.timingInfoChanged(), "No need to call this.");
 
@@ -207,21 +202,21 @@ ModuleParameters::updateLFOs(LFO::Timer::TimingInformationChange const timingInf
         lfo.updateForNewTimingInformation(timingInformationChange);
 }
 
-LE_COLD LFO &ModuleParameters::lfo(std::uint8_t const lfoableParameterIndex)
+LFO &ModuleParameters::lfo(std::uint8_t const lfoableParameterIndex)
 {
     return lfos()[lfoableParameterIndex];
 }
-LE_COLD LFO const &ModuleParameters::lfo(std::uint8_t const lfoableParameterIndex) const
+LFO const &ModuleParameters::lfo(std::uint8_t const lfoableParameterIndex) const
 {
     return const_cast<ModuleParameters &>(*this).lfo(lfoableParameterIndex);
 }
 
-LE_COLD ModuleParameters::LFOs ModuleParameters::lfos() const
+ModuleParameters::LFOs ModuleParameters::lfos() const
 {
     return LFOs(pLFOs_, pLFOs_ + numberOfLFOControledParameters());
 }
 
-LE_COLD void ModuleParameters::updateBaseParametersFromLFOs(LFO::Timer const &timer)
+void ModuleParameters::updateBaseParametersFromLFOs(LFO::Timer const &timer)
 {
     LE_DISABLE_LOOP_UNROLLING()
     for (std::uint8_t baseParameter(numberOfNonLFOBaseParameters);
@@ -257,7 +252,7 @@ LE_COLD void ModuleParameters::updateBaseParametersFromLFOs(LFO::Timer const &ti
 ///  - slower (e.g. generic value conversion without compile-time range
 ///    information, many more virtual function calls...).
 ///                                           (07.02.2014.) (Domagoj Saric)
-LE_COLD void ModuleParameters::updateEffectParametersFromLFOs(LFO::Timer const &timer)
+void ModuleParameters::updateEffectParametersFromLFOs(LFO::Timer const &timer)
 {
     auto const numberOfEffectSpecificParameters(this->numberOfEffectSpecificParameters());
     for (std::uint8_t effectParameter(0); effectParameter < numberOfEffectSpecificParameters;
@@ -272,8 +267,8 @@ LE_COLD void ModuleParameters::updateEffectParametersFromLFOs(LFO::Timer const &
     }
 }
 
-LE_COLD parameter_value_t ModuleParameters::setBaseParameterFromLFOAux(
-    std::uint8_t const parameterIndex, LFO::value_type const lfoValue)
+parameter_value_t ModuleParameters::setBaseParameterFromLFOAux(std::uint8_t const parameterIndex,
+                                                               LFO::value_type const lfoValue)
 {
     static_assert(LFO::minimumValue == 0 && LFO::maximumValue == 1,
                   "LFO::value_type not normalised.");
@@ -286,8 +281,8 @@ LE_COLD parameter_value_t ModuleParameters::setBaseParameterFromLFOAux(
     return setBaseParameterLive(parameterIndex, parameterValue);
 }
 
-LE_COLD parameter_value_t ModuleParameters::setEffectParameterFromLFOAux(
-    std::uint8_t const parameterIndex, LFO::value_type const lfoValue)
+parameter_value_t ModuleParameters::setEffectParameterFromLFOAux(std::uint8_t const parameterIndex,
+                                                                 LFO::value_type const lfoValue)
 {
     static_assert(LFO::minimumValue == 0 && LFO::maximumValue == 1,
                   "LFO::value_type not normalised.");
@@ -297,15 +292,15 @@ LE_COLD parameter_value_t ModuleParameters::setEffectParameterFromLFOAux(
     return setEffectParameterLive(parameterIndex, parameterValue);
 }
 
-LE_COLD LFO::value_type
+LFO::value_type
 ModuleParameters::normalisedToParameterValue(parameter_value_t const normalisedValue,
                                              ParameterInfo const &parameterInfo)
 {
     return Math::convertLinearRange<float, float, 0, 1, 1>(normalisedValue, parameterInfo.minimum,
                                                            parameterInfo.maximum);
 }
-LE_COLD parameter_value_t ModuleParameters::parameterToNormalisedValue(
-    LFO::value_type const parameterValue, ParameterInfo const &parameterInfo)
+parameter_value_t ModuleParameters::parameterToNormalisedValue(LFO::value_type const parameterValue,
+                                                               ParameterInfo const &parameterInfo)
 {
     return Math::convertLinearRange<float, 0, 1, 1, float>(parameterValue, parameterInfo.minimum,
                                                            parameterInfo.maximum);
@@ -314,9 +309,9 @@ LE_COLD parameter_value_t ModuleParameters::parameterToNormalisedValue(
 namespace
 {
 using LFO = Parameters::LFOImpl;
-LE_COLD std::optional<float> getParameterValueWithoutLFO(ParametersLoader const &parameterLoader,
-                                                         ParameterInfo const &parameterInfo,
-                                                         LFO &parameterLFO)
+std::optional<float> getParameterValueWithoutLFO(ParametersLoader const &parameterLoader,
+                                                 ParameterInfo const &parameterInfo,
+                                                 LFO &parameterLFO)
 {
     auto const parameterValueWithoutLFO(
         parameterLoader.getLFOParameterValue<float>(parameterInfo.streamingName, parameterLFO));
@@ -327,7 +322,7 @@ LE_COLD std::optional<float> getParameterValueWithoutLFO(ParametersLoader const 
         return std::nullopt;
 }
 } // anonymous namespace
-LE_COLD void ModuleParameters::loadPresetParameters(ParametersLoader const &parameterLoader)
+void ModuleParameters::loadPresetParameters(ParametersLoader const &parameterLoader)
 {
     //LE_ASSERT_MSG
     //(
@@ -361,7 +356,7 @@ LE_COLD void ModuleParameters::loadPresetParameters(ParametersLoader const &para
     }
 }
 
-LE_COLD void ModuleParameters::savePresetParameters(ParametersSaver const &parameterSaver) const
+void ModuleParameters::savePresetParameters(ParametersSaver const &parameterSaver) const
 {
     ParametersSaver &saver(const_cast<ParametersSaver &>(parameterSaver)); //...mrmlj...
 

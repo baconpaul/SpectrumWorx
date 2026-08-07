@@ -761,9 +761,9 @@ struct Parameters;
 using char_t = char;
 
 template <class PresetConsumer>
-LE_COLD bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignoreExternalSample,
-                        std::string *LE_RESTRICT const pComment, PresetConsumer const consumer,
-                        DawExtraState const *const pDawExtraState = nullptr)
+bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignoreExternalSample,
+                std::string *LE_RESTRICT const pComment, PresetConsumer const consumer,
+                DawExtraState const *const pDawExtraState = nullptr)
 {
     {
         Preset preset;

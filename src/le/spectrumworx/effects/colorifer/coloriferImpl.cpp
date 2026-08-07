@@ -39,7 +39,7 @@ char const Colorifer::description[] = "Spectrum colour transfer.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void LE_COLD ColoriferImpl::setup(IndexRange const &workingRange, Engine::Setup const &engineSetup)
+void ColoriferImpl::setup(IndexRange const &workingRange, Engine::Setup const &engineSetup)
 {
     shapeWidth_ = std::min(workingRange.size(),
                            engineSetup.frequencyInHzToBin(parameters().get<BandWidth>()));
@@ -52,8 +52,7 @@ void LE_COLD ColoriferImpl::setup(IndexRange const &workingRange, Engine::Setup 
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void LE_HOT ColoriferImpl::process(Engine::MainSideChannelData_AmPh data,
-                                   Engine::Setup const &) const
+void ColoriferImpl::process(Engine::MainSideChannelData_AmPh data, Engine::Setup const &) const
 {
     if (shapeWidth_ == 0)
         return;

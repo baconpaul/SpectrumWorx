@@ -46,7 +46,7 @@ char const Freqverb::description[] = "Frequency domain reverberation with pitch.
 // ---------------------
 //
 ////////////////////////////////////////////////////////////////////////////////
-LE_COLD void FreqverbImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
+void FreqverbImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
 {
     roomLevel_ = Math::dB2NormalisedLinear(parameters().get<RoomSize>());
 
@@ -67,8 +67,8 @@ LE_COLD void FreqverbImpl::setup(IndexRange const &, Engine::Setup const &engine
 // -----------------------
 //
 ////////////////////////////////////////////////////////////////////////////////
-LE_HOT void FreqverbImpl::process(ChannelState &cs, Engine::ChannelData_ReIm data,
-                                  Engine::Setup const &engineSetup) const
+void FreqverbImpl::process(ChannelState &cs, Engine::ChannelData_ReIm data,
+                           Engine::Setup const &engineSetup) const
 {
     // Based on:
     // "Frequency Domain Artificial Reverberation using Spectral Magnitude

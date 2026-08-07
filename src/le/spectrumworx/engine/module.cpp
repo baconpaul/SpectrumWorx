@@ -22,9 +22,9 @@
 namespace LE::SW::Engine
 {
 
-LE_COLD ModuleDSP::~ModuleDSP() {}
+ModuleDSP::~ModuleDSP() {}
 
-LE_COLD void ModuleDSP::preProcess(LFO::Timer const &timer, Setup const &engineSetup)
+void ModuleDSP::preProcess(LFO::Timer const &timer, Setup const &engineSetup)
 {
     if (bypass())
         return;
@@ -33,7 +33,7 @@ LE_COLD void ModuleDSP::preProcess(LFO::Timer const &timer, Setup const &engineS
     setup(engineSetup);
 }
 
-void LE_COLD ModuleDSP::setup(Setup const &engineSetup)
+void ModuleDSP::setup(Setup const &engineSetup)
 {
     using namespace Effects::BaseParameters;
 
@@ -47,7 +47,7 @@ void LE_COLD ModuleDSP::setup(Setup const &engineSetup)
     doPreProcess(engineSetup);
 }
 
-bool LE_COLD ModuleDSP::allocateStorage(
+bool ModuleDSP::allocateStorage(
     StorageFactors const &storageFactors, std::uint16_t const channelStateSize,
     std::uint32_t const channelStateRequiredStorage // HistoryBuffer requires uint32_t
 )

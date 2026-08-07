@@ -18,7 +18,7 @@
 namespace LE::SW
 {
 
-template <class InterfaceImpl> class LE_NOVTABLE AutomatedModuleImpl
+template <class InterfaceImpl> class AutomatedModuleImpl
 {
   public: // Parameters
     Plugins::AutomatedParameterValue getSharedAutomatedParameter(std::uint8_t parameterIndex,

@@ -89,7 +89,7 @@ char const Vocoder::description[] = "Classic vocoding.";
 // --------------------
 //
 ////////////////////////////////////////////////////////////////////////////////
-LE_COLD void VocoderImpl::setup(IndexRange const &workingRange, Engine::Setup const &engineSetup)
+void VocoderImpl::setup(IndexRange const &workingRange, Engine::Setup const &engineSetup)
 {
     std::uint32_t envelopeBorder(parameters().get<EnvelopeBorder>());
 
@@ -232,8 +232,7 @@ class LogRC : private RC
 #pragma warning(push)
 #pragma warning(disable : 4702) // Unreachable code.
 #endif                          // _MSC_VER
-LE_HOT void VocoderImpl::process(Engine::MainSideChannelData_AmPh data,
-                                 Engine::Setup const &setup) const
+void VocoderImpl::process(Engine::MainSideChannelData_AmPh data, Engine::Setup const &setup) const
 {
     using namespace Math;
 
@@ -368,9 +367,8 @@ LE_HOT void VocoderImpl::process(Engine::MainSideChannelData_AmPh data,
 #pragma warning(pop)
 #endif // _MSC_VER
 
-void LE_HOT VocoderImpl::lowPassSpectrum_cepstrum(DataRange const &spectrum,
-                                                  DataRange const &workBuffer,
-                                                  Engine::Setup const &engineSetup) const
+void VocoderImpl::lowPassSpectrum_cepstrum(DataRange const &spectrum, DataRange const &workBuffer,
+                                           Engine::Setup const &engineSetup) const
 {
     using namespace Math;
 

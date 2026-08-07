@@ -36,7 +36,7 @@ char const Exaggerator::description[] = "Emphasize or flatten spectral peaks.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void LE_COLD ExaggeratorImpl::setup(IndexRange const &, Engine::Setup const &)
+void ExaggeratorImpl::setup(IndexRange const &, Engine::Setup const &)
 {
     //exaggerate_  = -1 + 5 * (parameters().get<Exaggerate>() / 128.f + 0.5f);
 
@@ -54,7 +54,7 @@ void LE_COLD ExaggeratorImpl::setup(IndexRange const &, Engine::Setup const &)
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void LE_HOT ExaggeratorImpl::process(Engine::ChannelData_AmPh data, Engine::Setup const &) const
+void ExaggeratorImpl::process(Engine::ChannelData_AmPh data, Engine::Setup const &) const
 {
     auto const maxamp(Math::max(data.amps()));
     if (!maxamp)

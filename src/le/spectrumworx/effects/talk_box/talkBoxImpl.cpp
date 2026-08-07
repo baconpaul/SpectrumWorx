@@ -35,7 +35,7 @@ char const TalkBox::description[] = "Classic vocoding with a synthesized carrier
 // ----------------
 //
 ////////////////////////////////////////////////////////////////////////////////
-LE_COLD void TalkBoxImpl::setup(IndexRange const &workingRange, Engine::Setup const &engineSetup)
+void TalkBoxImpl::setup(IndexRange const &workingRange, Engine::Setup const &engineSetup)
 {
     synth_.parameters().set<Synth::Frequency>(parameters().get<BaseFrequency>());
     synth_.parameters().set<Synth::HarmonicSlope>(parameters().get<TalkBox::HarmonicSlope>());

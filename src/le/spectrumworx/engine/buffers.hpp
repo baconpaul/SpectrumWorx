@@ -107,12 +107,12 @@ class SharedStorageFFTBasedBuffer : public Utility::SharedStorageBuffer<T>
   public:
     SharedStorageFFTBasedBuffer() {}
 
-    LE_COLD static std::uint32_t requiredStorage(StorageFactors const &factors)
+    static std::uint32_t requiredStorage(StorageFactors const &factors)
     {
         auto const storageBytes(Engine::Detail::fftBufferSize(a, b, c, sizeof(T), factors.fftSize));
         return storageBytes;
     }
-    LE_COLD void resize(StorageFactors const &factors, Storage &storage)
+    void resize(StorageFactors const &factors, Storage &storage)
     {
         Utility::SharedStorageBuffer<T>::resize(requiredStorage(factors), storage);
     }
@@ -134,12 +134,12 @@ template <typename T = real_t> struct DoubleFFTBuffer : SharedStorageFFTBasedBuf
 template <typename T = real_t> class WindowBuffer : public Utility::SharedStorageBuffer<T>
 {
   public:
-    LE_COLD static std::uint32_t requiredStorage(StorageFactors const &factors)
+    static std::uint32_t requiredStorage(StorageFactors const &factors)
     {
         auto const storageBytes(Engine::Detail::fftBufferSize(1, 1, 0, sizeof(T), factors.fftSize));
         return storageBytes;
     }
-    LE_COLD void resize(Engine::StorageFactors const &factors, Storage &storage)
+    void resize(Engine::StorageFactors const &factors, Storage &storage)
     {
         Utility::SharedStorageBuffer<T>::resize(requiredStorage(factors), storage);
     }
@@ -280,7 +280,7 @@ template <class Data> class SharedStorageDataPairImpl : public DataPairImpl<Data
 #endif // __APPLE__
 
   public:
-    LE_COLD static std::uint32_t requiredStorage(StorageFactors const &factors)
+    static std::uint32_t requiredStorage(StorageFactors const &factors)
     {
         auto const dataElements(std::tuple_size<typename DataPairImpl<Data>::DataArray>::value);
         auto const requiredStorageBytes(Utility::align(Data::requiredStorage(factors)) *
@@ -289,7 +289,7 @@ template <class Data> class SharedStorageDataPairImpl : public DataPairImpl<Data
             requiredStorageBytes +
             (partial_address_aliasing_workaround_offset * (dataElements - 1)));
     }
-    LE_COLD void resize(StorageFactors const &factors, Storage &storage)
+    void resize(StorageFactors const &factors, Storage &storage)
     {
         //for ( auto & data : this->data() ) data.resize( factors, storage );
         this->data()[0].resize(factors, storage);

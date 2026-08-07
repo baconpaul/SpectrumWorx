@@ -20,7 +20,7 @@ namespace LE
 
 //...mrmlj...orphan...
 template <typename Char>
-LE_COLD char *copyToBuffer(Char const *const string, LE::Utility::Span<char> const &buffer)
+char *copyToBuffer(Char const *const string, LE::Utility::Span<char> const &buffer)
 {
     //std::strncpy( buffer.begin(), string, buffer.size() - 1 );
     Char const *LE_RESTRICT pSourceCharacter(string);

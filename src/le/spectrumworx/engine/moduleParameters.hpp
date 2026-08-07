@@ -44,7 +44,7 @@ namespace Engine
 
 using parameter_value_t = Parameters::LFOImpl::value_type;
 
-class LE_NOVTABLE ModuleParameters : public ModuleNode
+class ModuleParameters : public ModuleNode
 {
   public:
     using BaseParameters = Effects::BaseParameters::Parameters;
