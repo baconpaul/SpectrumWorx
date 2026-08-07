@@ -489,6 +489,49 @@ New entries go at the top of their area.
   because "the side chain does nothing" is a plausible bug report against four of
   the fifteen, and the answer is a parameter rather than a fix.
 
+## GUI and skin
+
+- **The knobs are 127 pictures of a knob.** (07.08.2026, from the skin
+  vectorisation) `02`, `03`, `12`, `63` and `64` are film strips: one tall image
+  holding 127 frames, indexed by `Knob::paintFilmStrip` from the value. They are
+  vectors now, which fixed their size — 415 KB of PNG became 121 KB of SVG — but
+  a tall SVG of 127 frames is still 127 frames, and it keeps what the
+  arrangement costs:
+
+  - **The value moves in 127 steps.** `pictureIndex` is
+    `126 * valueToProportionOfLength(value)`, so a slow drag visibly stairsteps.
+    No amount of resolution in the artwork changes that: the quantisation is in
+    the frame index, not in the pixels.
+  - **It is the only artwork that cannot be drawn at an arbitrary size**, because
+    a frame's height is baked into the sheet.
+
+  **They are not all the same problem, which is worth knowing before anyone
+  plans the fix.** Measuring the frames turned up two different animations:
+
+  - `02` is a rotating knob — a pointer swept through 270°, everything else
+    fixed. This one is replaced by drawing the knob once and rotating the
+    pointer by the value at paint time.
+  - `03`, `12`, `63` and `64` **do not rotate at all**. The frame-to-frame change
+    is a *shape*: a blue wedge opening from a fixed edge (`03`/`63` clockwise
+    from about 7:30, `12`/`64` from twelve o'clock in either direction) whose
+    inner radius grows as it opens, with a black cap whose radius *is* that inner
+    radius. A transform cannot express that; it needs a wedge generated from the
+    value.
+
+  Either way the change is to `Knob` and `ModuleKnob` — they would ask for "the
+  knob at proportion p" rather than "frame n", which means a second kind of
+  artwork (a knob, not a picture) — and not to anything in `assets/skin`. That
+  is why it is here and not in the conversion: converting the strips does not
+  get to it, and nothing in `todo.md` does either.
+
+- **JUCE's SVG parser reads `xlink:href` and not `href`.** (07.08.2026)
+  `getLinkedID` (`juce_SVGParser.cpp`) looks only at the namespaced spelling, so
+  a `<use href="#id">` — the modern form, which every browser and `rsvg-convert`
+  accept — silently draws nothing under JUCE while verifying perfectly against
+  the renderer used to check these files. Anything in `assets/skin` that uses
+  `<use>` must say `xlink:href`. There is no test that would catch the other
+  spelling, because the comparison harness is `rsvg-convert`.
+
 ## Tests
 
 - **Three effects now carry no numeric contract at all off the machine that

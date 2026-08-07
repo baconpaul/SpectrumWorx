@@ -35,6 +35,7 @@
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
 #include "le/spectrumworx/factoryPresets.hpp"
 #include "gui/editor/spectrumWorxEditor.hpp"
+#include "gui/editor/zoomedEditor.hpp"
 #include "gui/theme.hpp"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -179,9 +180,15 @@ class EditorPage final : public juce::Component
         /// own ReferenceCountedGUIInitializationGuard makes Theme the default
         /// LookAndFeel (gui.cpp), and a second reference to it outlives that
         /// guard -- which JUCE asserts on when the singleton goes.
-        editor_ = std::make_unique<GUI::SpectrumWorxEditor>(host_, panelPlacement());
-        addAndMakeVisible(*editor_);
-        setSize(editor_->getWidth(), editor_->getHeight());
+        /// \note Wrapped, so this page shows the editor at the size the
+        /// plugin does. The zoom lives in ZoomedEditor rather than in the
+        /// editor, so the test harness -- which builds a bare
+        /// SpectrumWorxEditor -- still renders at 1:1.
+        zoomed_ = std::make_unique<GUI::ZoomedEditor>(
+            std::make_unique<GUI::SpectrumWorxEditor>(host_, panelPlacement()));
+        editor_ = &zoomed_->editor();
+        addAndMakeVisible(*zoomed_);
+        setSize(zoomed_->getWidth(), zoomed_->getHeight());
 
         if (withModuleInFirstSlot)
             fillFirstSlot();
@@ -224,9 +231,9 @@ class EditorPage final : public juce::Component
     }
 
     /// \note The editor goes before the host it holds a reference to.
-    ~EditorPage() override { editor_.reset(); }
+    ~EditorPage() override { zoomed_.reset(); }
 
-    void resized() override { editor_->setTopLeftPosition(0, 0); }
+    void resized() override { zoomed_->setTopLeftPosition(0, 0); }
 
     /// \note The page is whatever size the editor is, and the editor changes
     /// size: opening a panel asks its host for a column and takes one here,
@@ -235,8 +242,8 @@ class EditorPage final : public juce::Component
     /// is the part that falls off.
     void childBoundsChanged(juce::Component *const pChild) override
     {
-        if (pChild == editor_.get())
-            setSize(editor_->getWidth(), editor_->getHeight());
+        if (pChild == zoomed_.get())
+            setSize(zoomed_->getWidth(), zoomed_->getHeight());
     }
 
   private:
@@ -344,7 +351,8 @@ class EditorPage final : public juce::Component
     }
 
     HarnessHost host_;
-    std::unique_ptr<GUI::SpectrumWorxEditor> editor_;
+    std::unique_ptr<GUI::ZoomedEditor> zoomed_;
+    GUI::SpectrumWorxEditor *editor_{nullptr};
 }; // class EditorPage
 
 SWShowUI::PageRegistration const registration{

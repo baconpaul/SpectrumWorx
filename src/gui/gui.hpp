@@ -121,10 +121,17 @@ class SkinLifetime
     static std::uint8_t liveEditors_;
 }; // class SkinLifetime
 
-void paintImage(juce::Graphics &, juce::Image const &);
-void paintImage(juce::Graphics &, juce::Image const &, int x, int y);
+/// \note These take an Artwork rather than a juce::Image, and there is no
+/// juce::Image overload on purpose. A widget holding a bitmap can only ever
+/// draw at the size the skin was authored for; holding an Artwork, it draws a
+/// converted file as a vector and an unconverted one exactly as before. Making
+/// it the only spelling is what stops the raster path growing back -- the
+/// symptom is invisible at 100 % and only shows as soft artwork once the
+/// editor is zoomed.
+void paintImage(juce::Graphics &, Artwork const &);
+void paintImage(juce::Graphics &, Artwork const &, int x, int y);
 
-void setSizeFromImage(juce::Component &, juce::Image const &);
+void setSizeFromImage(juce::Component &, Artwork const &);
 
 class SpectrumWorxEditor;
 
@@ -451,7 +458,13 @@ class DrawableText
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class BitmapButton : public WidgetBase<juce::ImageButton>
+/// \note Was a juce::ImageButton, which can only hold a juce::Image and so
+/// pinned every button to 1x no matter what its artwork was. It holds two
+/// Artworks now and paints them itself, which is all it took for a converted
+/// file to reach the screen as a vector -- juce::ImageButton's own painting was
+/// four lines of LookAndFeel_V2::drawImageButton, reproduced in paintButton().
+///                                       (06.08.2026.) (SW port)
+class BitmapButton : public WidgetBase<juce::Button>
 {
   public: // ModuleUI control traits
     typedef bool value_type;
@@ -468,13 +481,17 @@ class BitmapButton : public WidgetBase<juce::ImageButton>
     }
 
   public:
-    BitmapButton(juce::Component &parent, juce::Image const &on, juce::Image const &off,
+    BitmapButton(juce::Component &parent, Artwork const &on, Artwork const &off,
                  juce::Colour const &overlayColourWhenOver = defaultOverOverlay(),
                  bool toggled = true);
 
-  public
-      : //...mrmlj...as a workaround for the juce::ImageButton class that hides all this information...
-    juce::Image getCurrentImage() const;
+  public:
+    /// Whichever of the two the button is showing: `on` while held down or
+    /// toggled on, `off` otherwise. There is no separate hover artwork -- JUCE
+    /// fell back to the normal image for that, and so does this.
+    Artwork const &currentArtwork() const;
+
+    void paintButton(juce::Graphics &, bool isMouseOverButton, bool isButtonDown) override;
 
     static juce::Colour const &normalOverlay();
     static juce::Colour const &downOverlay();
@@ -493,6 +510,10 @@ class BitmapButton : public WidgetBase<juce::ImageButton>
 
   private:
     LE_IMPLEMENT_ASYNC_REPAINT
+
+    Artwork const *pOn_{nullptr};
+    Artwork const *pOff_{nullptr};
+    juce::Colour overOverlay_;
 
     using juce::Button::getToggleStateValue;
 }; // class BitmapButton
@@ -531,7 +552,7 @@ class PopupMenu
     PopupMenu();
     ~PopupMenu() {}
 
-    void addItem(ItemID, char const *newItemText, juce::Image const &icon = juce::Image(),
+    void addItem(ItemID, char const *newItemText, Artwork const *icon = nullptr,
                  bool enabled = true);
     void addSubMenu(PopupMenu &, char const *name);
     void addSectionHeader(char const *title);
@@ -566,7 +587,7 @@ class PopupMenu
     {
         ItemID id;
         juce::String text;
-        juce::Image icon;
+        Artwork const *icon;
         bool enabled;
         bool isSectionHeader;
         /// Non-owning, as it was when this held a juce::PopupMenu: sub-menus are
@@ -621,7 +642,7 @@ class PopupMenuWithSelection : public PopupMenu
     void setSelectedIndex(unsigned int newSelectionIndex);
 
     juce::String const &getSelectedItemText() const;
-    juce::Image const &getSelectedItemIcon() const;
+    Artwork const *getSelectedItemIcon() const;
 
     void showCenteredAtRight(juce::Component const &, OnSelection);
     void showCenteredBelow(juce::Component const &, OnSelection);
@@ -669,8 +690,8 @@ class LE_NOVTABLE ComboBox : public WidgetBase<>, public PopupMenuWithSelection
     void setSelectedIndex(unsigned int newSelectionIndex);
 
   protected:
-    ComboBox(juce::Component &parent, juce::Image const &normalBackground,
-             juce::Image const &selectedBackground);
+    ComboBox(juce::Component &parent, Artwork const &normalBackground,
+             Artwork const &selectedBackground);
 
     void showMenu(std::function<void(bool)> onValueChanged);
 
@@ -680,8 +701,8 @@ class LE_NOVTABLE ComboBox : public WidgetBase<>, public PopupMenuWithSelection
     LE_IMPLEMENT_ASYNC_REPAINT
 
   private:
-    juce::Image const &normalBackground_;
-    juce::Image const &selectedBackground_;
+    Artwork const &normalBackground_;
+    Artwork const &selectedBackground_;
 }; // class ComboBox
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -693,16 +714,16 @@ class LE_NOVTABLE ComboBox : public WidgetBase<>, public PopupMenuWithSelection
 class LE_NOVTABLE BackgroundImage : public WidgetBase<>
 {
   protected:
-    BackgroundImage(juce::Image const &image) : pImage_(&image) {};
+    BackgroundImage(Artwork const &artwork) : pArtwork_(&artwork) {};
 
-    juce::Image const &image() const;
-    void setImage(juce::Image const &);
+    Artwork const &image() const;
+    void setImage(Artwork const &);
 
   protected: // juce::Component overrides
     void paint(juce::Graphics &) override;
 
   private:
-    juce::Image const *pImage_;
+    Artwork const *pArtwork_;
 }; // class BackgroundImage
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -764,7 +785,7 @@ class LE_NOVTABLE Knob : public WidgetBase<juce::Slider>
 
     param_type getNormalisedValue() const;
 
-    void setupForParameter(char const *title, juce::Image const &filmStripToSizeFor,
+    void setupForParameter(char const *title, Artwork const &filmStripToSizeFor,
                            param_type defaultValue);
 
   protected:
@@ -784,7 +805,7 @@ class LE_NOVTABLE Knob : public WidgetBase<juce::Slider>
     /// arguments, and the derived knobs already had to qualify the call to say
     /// which they meant; the name now says it for them.
     ///                                       (05.08.2026.) (SW port)
-    void paintFilmStrip(juce::Image const &filmStrip, unsigned int xMargin, unsigned int yMargin,
+    void paintFilmStrip(Artwork const &filmStrip, unsigned int xMargin, unsigned int yMargin,
                         juce::Graphics &);
 
   protected: // juce::Component overrides

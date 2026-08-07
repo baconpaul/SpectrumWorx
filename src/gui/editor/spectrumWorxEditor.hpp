@@ -98,6 +98,33 @@ class SpectrumWorxEditor final : private SkinLifetime,
 
     static constexpr unsigned short estimatedHeight{artworkHeight + buildStampHeight};
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note A zoom belongs here and is not here yet.
+    ///
+    ///   A `zoomFactor` and a `setTransform()` at the end of the constructor
+    /// went in and came straight back out: the scale came out applied twice
+    /// (a factor of 1.5 needed `sqrt(1.5)` written down to look right). Setting
+    /// the transform on the editor *and* handing out pre-scaled bounds does it
+    /// once each -- the shim's holder divides the size back down by the child's
+    /// transform in its resized() (clap_juce_shim_impl.cpp) and then the
+    /// transform is applied again at paint time.
+    ///
+    ///   What that says is the editor is the wrong component to carry it. The
+    /// shape that works is an intermediate: the editor keeps its skin-pixel
+    /// bounds and holds one content child that everything else is parented to,
+    /// the transform goes on the child, and the editor's own size is the
+    /// scaled one -- so exactly one component scales and exactly one reports
+    /// size to the host.
+    ///
+    ///   Worth doing, because the artwork is becoming vectors and a Drawable
+    /// painted through that transform resolves at the zoomed size rather than
+    /// being interpolated: measured at 1.5x, 458 pixels of the preset button
+    /// carried detail no upscale of the bitmap could.
+    ///                                       (06.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
   public: //...mrmlj...VST 2.4 editor dummy implementation...
     static bool setKnobMode(int) { return false; }
 

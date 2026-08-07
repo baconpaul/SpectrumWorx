@@ -110,8 +110,8 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost, PanelPlacement co
       //cSpectrumDisplay( CRect( 0, 0, 235, 129 ).offset( 222, 17 ), this, SpectrumDisplay, 0, capture ),
 
       // buttons...
-      preset_(*this, resourceBitmap<PresetOn>(), resourceBitmap<PresetOff>()),
-      settingsButton_(*this, resourceBitmap<SettingsOn>(), resourceBitmap<SettingsOff>())
+      preset_(*this, resourceArtwork<PresetOn>(), resourceArtwork<PresetOff>()),
+      settingsButton_(*this, resourceArtwork<SettingsOn>(), resourceArtwork<SettingsOff>())
 {
     using LE::Parameters::IndexOf;
     using namespace GlobalParameters;
@@ -145,7 +145,7 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost, PanelPlacement co
     // http://www.kvraudio.com/forum/viewtopic.php?t=141313
     // http://lists.steinberg.net:8100/Lists/vst-plugins/Message/17785.html
     // http://www.u-he.com/vstsource
-    setSizeFromImage(*this, resourceBitmap<EditorBackground>());
+    setSizeFromImage(*this, resourceArtwork<EditorBackground>());
     LE_ASSERT_MSG(getWidth() == estimatedWidth && getHeight() == artworkHeight,
                   "the skin and the editor's constants disagree");
     // ...and the strip under the skin that says when this binary was built.
@@ -753,7 +753,7 @@ void drawMainAreaText(juce::Graphics &graphics, EditorMainAreaText const &text)
 
 void SpectrumWorxEditor::paint(juce::Graphics &graphics)
 {
-    auto const &background(resourceBitmap<EditorBackground>());
+    auto const &background(resourceArtwork<EditorBackground>());
     GUI::paintImage(graphics, background);
 
     ////////////////////////////////////////////////////////////////////////////
@@ -774,8 +774,8 @@ void SpectrumWorxEditor::paint(juce::Graphics &graphics)
     /// than its artwork by the build-stamp bar, and that bar runs the full width
     /// in one piece.
     if (auto const extra(getWidth() - background.getWidth()); extra > 0)
-        graphics.drawImage(background, background.getWidth(), 0, extra, background.getHeight(),
-                           background.getWidth() - 1, 0, 1, background.getHeight());
+        background.drawScaled(graphics, {background.getWidth(), 0, extra, background.getHeight()},
+                              {background.getWidth() - 1, 0, 1, background.getHeight()});
 
     juce::Font const &moduleNameFont(Theme::singleton().blueFont());
     juce::Font const &sampleNameFont(DrawableText::defaultFont());
@@ -1774,7 +1774,7 @@ void SpectrumWorxEditor::updateModuleParameterAndNotifyHost(ModuleUI &moduleUI,
 }
 
 SpectrumWorxEditor::ModuleMenuButton::ModuleMenuButton(SpectrumWorxEditor &parent)
-    : BitmapButton(parent, resourceBitmap<AddModule>(), resourceBitmap<AddModule>(),
+    : BitmapButton(parent, resourceArtwork<AddModule>(), resourceArtwork<AddModule>(),
                    Theme::singleton().blueColour())
 {
 }
@@ -1843,19 +1843,19 @@ LE_NOINLINE double lfoValueToRangeSliderValue(juce::Slider const &slider,
 
 void fillLFOWaveformsMenu(PopupMenu &menu)
 {
-    static juce::Image const *LE_RESTRICT const icons[] = {
-        &resourceBitmap<LFOSine>(),         &resourceBitmap<LFOTriangle>(),
-        &resourceBitmap<LFOSawtooth>(),     &resourceBitmap<LFOReverseSaw>(),
-        &resourceBitmap<LFOSquare>(),       &resourceBitmap<LFOExponent>(),
-        &resourceBitmap<LFORandomHold>(),   &resourceBitmap<LFORandomSlide>(),
-        &resourceBitmap<LFORandomWhacko>(), &resourceBitmap<LFODirac>(),
-        &resourceBitmap<LFOdIRAC>()};
+    static Artwork const *LE_RESTRICT const icons[] = {
+        &resourceArtwork<LFOSine>(),         &resourceArtwork<LFOTriangle>(),
+        &resourceArtwork<LFOSawtooth>(),     &resourceArtwork<LFOReverseSaw>(),
+        &resourceArtwork<LFOSquare>(),       &resourceArtwork<LFOExponent>(),
+        &resourceArtwork<LFORandomHold>(),   &resourceArtwork<LFORandomSlide>(),
+        &resourceArtwork<LFORandomWhacko>(), &resourceArtwork<LFODirac>(),
+        &resourceArtwork<LFOdIRAC>()};
 
     //LE_ASSERT( menu.getNumItems() == 0 );...mrmlj...add size information to the new ComboBox class...
     unsigned int itemId(0);
-    juce::Image const *LE_RESTRICT const *ppIcon = icons;
+    Artwork const *LE_RESTRICT const *ppIcon = icons;
     for (auto const waveFormName : LE::Parameters::DiscreteValues<LFO::Waveform>::strings)
-        menu.addItem(itemId++, waveFormName, **ppIcon++);
+        menu.addItem(itemId++, waveFormName, *ppIcon++);
 }
 } // namespace
 
@@ -1872,10 +1872,10 @@ SpectrumWorxEditor::LFODisplay::ComponentPtr const
 #pragma warning(disable : 4355) // 'this' used in base member initializer list.
 
 SpectrumWorxEditor::LFODisplay::LFODisplay()
-    : switch_(*this, resourceBitmap<LEDOn>(), resourceBitmap<LEDOff>()),
+    : switch_(*this, resourceArtwork<LEDOn>(), resourceArtwork<LEDOff>()),
       quarter_(*this, 62, 5, " N "), triplet_(*this, 62 + 18 * 1, 5, " T "),
       dotted_(*this, 62 + 18 * 2 - 2, 5, " D "),
-      typeArrow_(*this, resourceBitmap<ChangeWaveform>(), resourceBitmap<ChangeWaveform>(),
+      typeArrow_(*this, resourceArtwork<ChangeWaveform>(), resourceArtwork<ChangeWaveform>(),
                  juce::Colours::white.withAlpha(0.5f)),
       pModuleControl_(nullptr)
 {
@@ -2147,7 +2147,9 @@ void SpectrumWorxEditor::LFODisplay::paint(juce::Graphics &graphics)
                           text.height, text.justification, false);
     }
 
-    paintImage(graphics, type_.getSelectedItemIcon(), 79, 96);
+    // Null for an item with no icon; every LFO waveform has one.
+    if (auto const *const icon(type_.getSelectedItemIcon()); icon != nullptr)
+        paintImage(graphics, *icon, 79, 96);
 }
 
 void SpectrumWorxEditor::LFODisplay::buttonClicked(juce::Button *const pButton)
@@ -2504,7 +2506,7 @@ void SpectrumWorxEditor::SampleArea::mouseUp(juce::MouseEvent const &event)
     menu_.clear();
     menu_.addItem(browse, "Load audio file...");
     menu_.addItem(clear, "No external audio",
-                  /*icon*/ juce::Image(),
+                  /*icon*/ nullptr,
                   /*enabled*/ editor.editorHost().currentSampleFile() != juce::File());
     menu_.addSectionHeader("Factory samples");
     for (std::size_t sample(0); sample < factorySamples.size(); ++sample)
@@ -2594,9 +2596,9 @@ SpectrumWorxEditor::Settings::Settings() /// \throws std::bad_alloc Out of memor
     /// window, and would not be as an overlay over the editor. So it is the sum
     /// of what it draws, which is also what the preset browser measures.
     ///                                       (01.08.2026.) (SW port)
-    this->setSize(resourceBitmap<SettingsEngineBg>().getWidth(),
-                  resourceBitmap<SettingsEngineOn>().getHeight() +
-                      resourceBitmap<SettingsEngineBg>().getHeight());
+    this->setSize(resourceArtwork<SettingsEngineBg>().getWidth(),
+                  resourceArtwork<SettingsEngineOn>().getHeight() +
+                      resourceArtwork<SettingsEngineBg>().getHeight());
 
 #if LE_SW_ENGINE_WINDOW_PRESUM
     windowSizeFactor_->setEnabled(false);
@@ -2609,7 +2611,7 @@ SpectrumWorxEditor::Settings::Settings() /// \throws std::bad_alloc Out of memor
 
     setOutline(0);
     setIndent(0);
-    setTabBarDepth(resourceBitmap<SettingsEngineOn>().getHeight());
+    setTabBarDepth(resourceArtwork<SettingsEngineOn>().getHeight());
 
     juce::String const dummyName("a");
     addTab(dummyName, juce::Colours::transparentBlack, &enginePage_, false);
@@ -2743,7 +2745,7 @@ void SpectrumWorxEditor::Settings::updateEnginePage()
 }
 
 SpectrumWorxEditor::Settings::EnginePage::EnginePage()
-    : BackgroundImage(resourceBitmap<SettingsEngineBg>())
+    : BackgroundImage(resourceArtwork<SettingsEngineBg>())
 {
 }
 
@@ -2822,7 +2824,7 @@ void SpectrumWorxEditor::Settings::EnginePage::paint(juce::Graphics &g)
 }
 
 SpectrumWorxEditor::Settings::InterfacePage::InterfacePage()
-    : BackgroundImage(resourceBitmap<SettingsIntrfcBg>()),
+    : BackgroundImage(resourceArtwork<SettingsIntrfcBg>()),
       /// \note "Side window & menu opacity" until 6.4, when the side windows
       /// stopped being windows. It still drives exactly the same thing --
       /// BackgroundImage::paint, whose only subclasses are this panel's three
@@ -2886,9 +2888,9 @@ void SpectrumWorxEditor::Settings::InterfacePage::paint(juce::Graphics &graphics
 #pragma warning(push)
 #pragma warning(disable : 4355) // 'this' used in base member initializer list.
 SpectrumWorxEditor::Settings::AboutPage::AboutPage()
-    : BackgroundImage(resourceBitmap<SettingsAboutBg>()),
+    : BackgroundImage(resourceArtwork<SettingsAboutBg>()),
       versionText_(SW_VERSION_STRING SW_EDITION_STRING, 65, 43, 107, 16),
-      showUsersGuide_(*this, resourceBitmap<UsersGuideDown>(), resourceBitmap<UsersGuideUp>())
+      showUsersGuide_(*this, resourceArtwork<UsersGuideDown>(), resourceArtwork<UsersGuideUp>())
 {
     showUsersGuide_.setTopLeftPosition(101, 108);
     showUsersGuide_.setClickingTogglesState(false);
@@ -2905,7 +2907,7 @@ void SpectrumWorxEditor::Settings::AboutPage::paint(juce::Graphics &graphics)
 class SettingsTab : public juce::TabBarButton
 {
   public:
-    using Images = std::array<juce::Image const *, 2>; // [ inactive, active ]
+    using Images = std::array<Artwork const *, 2>; // [ inactive, active ]
 
   public:
     SettingsTab(juce::String const &tabName, juce::TabbedButtonBar &ownerBar, Images const &images)
@@ -2934,16 +2936,16 @@ juce::TabBarButton *SpectrumWorxEditor::Settings::createTabButton(juce::String c
     switch (tabIndex)
     {
     case 0:
-        images[0] = &resourceBitmap<SettingsEngineOff>();
-        images[1] = &resourceBitmap<SettingsEngineOn>();
+        images[0] = &resourceArtwork<SettingsEngineOff>();
+        images[1] = &resourceArtwork<SettingsEngineOn>();
         break;
     case 1:
-        images[0] = &resourceBitmap<SettingsGUIOff>();
-        images[1] = &resourceBitmap<SettingsGUIOn>();
+        images[0] = &resourceArtwork<SettingsGUIOff>();
+        images[1] = &resourceArtwork<SettingsGUIOn>();
         break;
     case 2:
-        images[0] = &resourceBitmap<SettingsAboutOff>();
-        images[1] = &resourceBitmap<SettingsAboutOn>();
+        images[0] = &resourceArtwork<SettingsAboutOff>();
+        images[1] = &resourceArtwork<SettingsAboutOn>();
         break;
         LE_DEFAULT_CASE_UNREACHABLE();
     }

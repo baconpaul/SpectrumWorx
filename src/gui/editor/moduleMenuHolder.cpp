@@ -35,7 +35,7 @@ void addModuleToMenuEntry(Menu &menu, std::uint8_t const moduleIndex)
     unsigned int const menuEntryID(moduleIndex);
     char const *const moduleName(Effects::effectName(moduleIndex));
     bool const moduleEnabled(Effects::includedEffects[moduleIndex]);
-    menu.addItem(menuEntryID, moduleName, juce::Image(), moduleEnabled);
+    menu.addItem(menuEntryID, moduleName, nullptr, moduleEnabled);
 }
 
 template <unsigned int moduleIndex, unsigned int subMenuIndex>

@@ -257,20 +257,19 @@ bool createUserPresetsFolder()
     return created.wasOk();
 }
 
-void paintImage(juce::Graphics &graphics, juce::Image const &image)
+void paintImage(juce::Graphics &graphics, Artwork const &artwork)
 {
-    paintImage(graphics, image, 0, 0);
+    paintImage(graphics, artwork, 0, 0);
 }
 
-void paintImage(juce::Graphics &graphics, juce::Image const &image, int const x, int const y)
+void paintImage(juce::Graphics &graphics, Artwork const &artwork, int const x, int const y)
 {
-    graphics.drawImage(image, x, y, image.getWidth(), image.getHeight(), 0, 0, image.getWidth(),
-                       image.getHeight());
+    artwork.draw(graphics, x, y);
 }
 
-void setSizeFromImage(juce::Component &component, juce::Image const &image)
+void setSizeFromImage(juce::Component &component, Artwork const &artwork)
 {
-    component.setSize(image.getWidth(), image.getHeight());
+    component.setSize(artwork.getWidth(), artwork.getHeight());
 }
 
 void addToParentAndShow(juce::Component &parent, juce::Component &childToBe)
@@ -440,19 +439,20 @@ void BackgroundImage::paint(juce::Graphics &graphics)
     paintImage(graphics, image());
 }
 
-juce::Image const &BackgroundImage::image() const
+Artwork const &BackgroundImage::image() const
 {
-    LE_ASSERT(pImage_);
-    return *pImage_;
+    LE_ASSERT(pArtwork_);
+    return *pArtwork_;
 }
 
-void BackgroundImage::setImage(juce::Image const &image) { pImage_ = &image; }
+void BackgroundImage::setImage(Artwork const &artwork) { pArtwork_ = &artwork; }
 
-BitmapButton::BitmapButton(juce::Component &parent, juce::Image const &on, juce::Image const &off,
+BitmapButton::BitmapButton(juce::Component &parent, Artwork const &on, Artwork const &off,
                            juce::Colour const &overlayColourWhenOver, bool const toggled)
+    : pOn_(&on), pOff_(&off), overOverlay_(overlayColourWhenOver)
 {
     //...mrmlj...the settings bitmaps are currently broken...
-    LE_ASSERT((on.getHeight() == off.getHeight()) || (&on == &resourceBitmap<SettingsOn>()));
+    LE_ASSERT((on.getHeight() == off.getHeight()) || (&on == &resourceArtwork<SettingsOn>()));
     LE_ASSERT(on.getWidth() == off.getWidth());
 
     /// \note The 2013 comment here explained that juce::Button registered itself
@@ -475,36 +475,37 @@ BitmapButton::BitmapButton(juce::Component &parent, juce::Image const &on, juce:
     setWantsKeyboardFocus(false);
     setMouseClickGrabsKeyboardFocus(false);
 
-    setImages(true,                  // resizeButtonNowToFitThisImage,
-              false,                 // rescaleImagesWhenButtonSizeChanges,
-              true,                  // preserveImageProportions,
-              off,                   // normalImage
-              normalOpacity(),       // imageOpacityWhenNormal,
-              normalOverlay(),       // overlayColourWhenNormal,
-              juce::Image(),         // overImage,
-              overOpacity(),         // imageOpacityWhenOver,
-              overlayColourWhenOver, // overlayColourWhenOver,
-              on,                    // downImage,
-              downOpacity(),         // imageOpacityWhenDown,
-              downOverlay(),         // overlayColourWhenDown,
-              0.0f                   // hitTestAlphaThreshold
-    );
+    // What setImages(resizeButtonNowToFitThisImage) used to do.
+    setSize(off.getWidth(), off.getHeight());
 
     setClickingTogglesState(toggled);
 
     addToParentAndShow(parent, *this);
 }
 
-//...mrmlj...copy pasted from the juce::ImageButton class because it hides it...
-juce::Image BitmapButton::getCurrentImage() const
+/// \note juce::ImageButton::getCurrentImage() had a third case, isOver(), which
+/// asked for an over-image this class never supplied; getOverImage() then fell
+/// back to the normal one. So hovering always drew `off`, and the hover is
+/// expressed entirely through opacity and the overlay colour in paintButton().
+Artwork const &BitmapButton::currentArtwork() const
 {
-    if (isDown() || getToggleState())
-        return getDownImage();
+    LE_ASSERT(pOn_ && pOff_);
+    return (isDown() || getToggleState()) ? *pOn_ : *pOff_;
+}
 
-    if (isOver())
-        return getOverImage();
+void BitmapButton::paintButton(juce::Graphics &graphics, bool isMouseOverButton, bool isButtonDown)
+{
+    if (!isEnabled())
+        isMouseOverButton = isButtonDown = false;
 
-    return getNormalImage();
+    auto opacity(isButtonDown ? downOpacity()
+                              : (isMouseOverButton ? overOpacity() : normalOpacity()));
+    if (!isEnabled())
+        opacity *= 0.3f; // as LookAndFeel_V2::drawImageButton dimmed a disabled one
+
+    currentArtwork().draw(graphics, 0, 0, opacity,
+                          isButtonDown ? downOverlay()
+                                       : (isMouseOverButton ? overOverlay_ : normalOverlay()));
 }
 
 juce::Colour const &BitmapButton::downOverlay() { return juce::Colours::transparentWhite; }
@@ -528,7 +529,7 @@ juce::Colour const &BitmapButton::normalOverlay() { return juce::Colours::transp
 PopupMenu::PopupMenu() : menuHeight_(0), menuWidth_(0) {}
 
 void PopupMenu::addItem(ItemID const newItemId, char const *const newItemText,
-                        juce::Image const &icon, bool const enabled)
+                        Artwork const *const icon, bool const enabled)
 {
     juce::String text(newItemText);
     updateDimensionsForNewItem(text);
@@ -540,7 +541,7 @@ void PopupMenu::addSubMenu(PopupMenu &subMenu, char const *const name)
     LE_ASSERT(name);
     juce::String text(name);
     updateDimensionsForNewItem(text);
-    items_.push_back({0, std::move(text), juce::Image(), true, false, &subMenu});
+    items_.push_back({0, std::move(text), nullptr, true, false, &subMenu});
 }
 
 void PopupMenu::addSectionHeader(char const *const title)
@@ -548,7 +549,7 @@ void PopupMenu::addSectionHeader(char const *const title)
     LE_ASSERT(title);
     juce::String text(title);
     updateDimensionsForNewItem(text);
-    items_.push_back({0, std::move(text), juce::Image(), false, true, nullptr});
+    items_.push_back({0, std::move(text), nullptr, false, true, nullptr});
 }
 
 void PopupMenu::updateDimensionsForNewItem(juce::String const &itemText)
@@ -582,9 +583,16 @@ juce::PopupMenu PopupMenu::build(int const tickedIndex) const
             menu.addSectionHeader(item.text);
         else if (item.pSubMenu)
             menu.addSubMenu(item.text, item.pSubMenu->build(item.pSubMenu->tickedIndex_), true);
+        else if (auto icon(item.icon ? item.icon->drawableCopy() : nullptr); icon != nullptr)
+        {
+            // A vector icon goes in as a Drawable, so the menu draws it at its
+            // own resolution rather than at the size the skin was authored for.
+            menu.addItem(toJuceID(item.id), item.text, item.enabled, index == tickedIndex,
+                         std::move(icon));
+        }
         else
             menu.addItem(toJuceID(item.id), item.text, item.enabled, index == tickedIndex,
-                         item.icon);
+                         item.icon ? item.icon->image() : juce::Image());
     }
     return menu;
 }
@@ -682,7 +690,7 @@ juce::String const &PopupMenuWithSelection::getSelectedItemText() const
     return getItemText(static_cast<unsigned int>(currentSelection_));
 }
 
-juce::Image const &PopupMenuWithSelection::getSelectedItemIcon() const
+Artwork const *PopupMenuWithSelection::getSelectedItemIcon() const
 {
     /// \note A reference into our own storage now, so it stays valid for as
     /// long as the item does. It used to point into juce::PopupMenu's internals.
@@ -742,8 +750,8 @@ juce::String const &PopupMenuWithSelection::getItemText(unsigned int const itemI
     return items()[itemIndex].text;
 }
 
-ComboBox::ComboBox(juce::Component &parent, juce::Image const &normalBackground,
-                   juce::Image const &selectedBackground)
+ComboBox::ComboBox(juce::Component &parent, Artwork const &normalBackground,
+                   Artwork const &selectedBackground)
     : normalBackground_(normalBackground), selectedBackground_(selectedBackground)
 {
     LE_ASSERT(normalBackground.getWidth() == selectedBackground.getWidth());
@@ -810,25 +818,22 @@ void Detail::paintTextButton(BitmapButton const &button, juce::Graphics &g,
 {
     g.setColour(juce::Colours::white);
     g.setFont(DrawableText::defaultFont());
-    juce::Image const &currentImage(button.getCurrentImage());
     g.drawFittedText(button.getName(), textX, textY, button.getWidth() - textX, 11,
                      juce::Justification::horizontallyCentred, 1);
 
-    Theme::singleton().Theme::drawImageButton(
-        g, const_cast<juce::Image *>(&currentImage), imageX, imageY, currentImage.getWidth(),
-        currentImage.getHeight(),
-        isButtonDown ? BitmapButton::downOverlay()
-                     : (isMouseOverButton ? BitmapButton::defaultOverOverlay()
-                                          : BitmapButton::normalOverlay()),
+    button.currentArtwork().draw(
+        g, static_cast<int>(imageX), static_cast<int>(imageY),
         isButtonDown
             ? BitmapButton::downOpacity()
             : (isMouseOverButton ? BitmapButton::overOpacity() : BitmapButton::normalOpacity()),
-        const_cast<BitmapButton &>(button));
+        isButtonDown ? BitmapButton::downOverlay()
+                     : (isMouseOverButton ? BitmapButton::defaultOverOverlay()
+                                          : BitmapButton::normalOverlay()));
 }
 
 LEDTextButton::LEDTextButton(juce::Component &parent, unsigned int const x, unsigned int const y,
                              char const *const text)
-    : BitmapButton(parent, resourceBitmap<LEDOn>(), resourceBitmap<LEDOff>())
+    : BitmapButton(parent, resourceArtwork<LEDOn>(), resourceArtwork<LEDOff>())
 {
     setName(text);
 
@@ -842,7 +847,7 @@ void LEDTextButton::paintButton(juce::Graphics &g, bool const isMouseOverButton,
                                 bool const isButtonDown)
 {
     std::size_t const imageWidth(25);
-    LE_ASSERT(getCurrentImage().getWidth() == imageWidth);
+    LE_ASSERT(currentArtwork().getWidth() == imageWidth);
     Detail::paintTextButton(*this, g, imageWidth, 3, 0, 0, isMouseOverButton, isButtonDown);
 }
 
@@ -899,7 +904,7 @@ Knob::Knob(juce::Component &parent, unsigned int const x, unsigned int const y,
     addToParentAndShow(parent, *this);
 }
 
-void Knob::setupForParameter(char const *const title, juce::Image const &filmStripToSizeFor,
+void Knob::setupForParameter(char const *const title, Artwork const &filmStripToSizeFor,
                              param_type const defaultValue)
 {
     setName(title);
@@ -988,7 +993,7 @@ void LE_NOINLINE Knob::setValue(param_type const newValue)
     juce::Slider::setValue(static_cast<value_type>(newValue), juce::dontSendNotification);
 }
 
-void Knob::paintFilmStrip(juce::Image const &filmStrip, unsigned int const xMargin,
+void Knob::paintFilmStrip(Artwork const &filmStrip, unsigned int const xMargin,
                           unsigned int const yMargin, juce::Graphics &graphics)
 {
     LE_ASSERT(filmStrip.getWidth() == filmStrip.getHeight() / signed(numberOfKnobSubbitmaps));
@@ -1001,8 +1006,9 @@ void Knob::paintFilmStrip(juce::Image const &filmStrip, unsigned int const xMarg
     LE_ASSERT(pictureIndex < numberOfKnobSubbitmaps);
     LE_ASSERT(pictureOffset < static_cast<unsigned int>(filmStrip.getHeight()));
 
-    graphics.drawImage(filmStrip, xMargin, yMargin, imageWidth, imageHeight, 0, pictureOffset,
-                       imageWidth, imageHeight);
+    filmStrip.drawScaled(
+        graphics, {signed(xMargin), signed(yMargin), signed(imageWidth), signed(imageHeight)},
+        {0, signed(pictureOffset), signed(imageWidth), signed(imageHeight)});
 }
 
 Knob::param_type Knob::getNormalisedValue() const
@@ -1026,7 +1032,7 @@ EditorKnob::EditorKnob(SpectrumWorxEditor &parent, unsigned int const x, unsigne
 void EditorKnob::setupForParameter(std::uint8_t const parameterIndex, param_type const minimumValue,
                                    param_type const maximumValue, param_type const defaultValue)
 {
-    Knob::setupForParameter(nullptr, resourceBitmap<EditorKnobStrip>(), defaultValue);
+    Knob::setupForParameter(nullptr, resourceArtwork<EditorKnobStrip>(), defaultValue);
 
     parameterIndex_ = parameterIndex;
 
@@ -1055,10 +1061,10 @@ struct ParameterPrinter
 
 void EditorKnob::paint(juce::Graphics &graphics)
 {
-    Knob::paintFilmStrip(resourceBitmap<EditorKnobStrip>(), 0, 0, graphics);
+    Knob::paintFilmStrip(resourceArtwork<EditorKnobStrip>(), 0, 0, graphics);
 
     // For main knobs we display the value within the knob itself.
-    LE_ASSERT(resourceBitmap<EditorKnobStrip>().getWidth() == 55);
+    LE_ASSERT(resourceArtwork<EditorKnobStrip>().getWidth() == 55);
     graphics.setColour(juce::Colours::white);
     {
         juce::Font font(Theme::singleton().whiteFont());
@@ -1123,7 +1129,7 @@ SpectrumWorxEditor &EditorKnob::editor()
 
 TitledComboBox::TitledComboBox(juce::Component &parent, unsigned int const x, unsigned int const y,
                                char const *const title)
-    : ComboBox(parent, resourceBitmap<SettingsCombo>(), resourceBitmap<SettingsComboOn>()),
+    : ComboBox(parent, resourceArtwork<SettingsCombo>(), resourceArtwork<SettingsComboOn>()),
       title_(title, 4, 0, getWidth() - 8, 13, juce::Justification::left)
 {
     TitledComboBox::setBounds(x, y, getWidth(), getHeight() + 15);
