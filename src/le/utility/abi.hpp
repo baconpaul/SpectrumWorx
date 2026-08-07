@@ -35,8 +35,6 @@
 #define LE_DLL_EXPORT __declspec(dllexport)
 #define LE_DLL_IMPORT __declspec(dllimport)
 
-#define LE_ASSUME(condition) __assume(condition)
-
 // MSVC has no branch hints; the profile guided optimiser is the substitute.
 #define LE_LIKELY(expression) (expression)
 #define LE_UNLIKELY(expression) (expression)
@@ -57,13 +55,6 @@
 
 #define LE_DLL_EXPORT __attribute__((visibility("default")))
 #define LE_DLL_IMPORT __attribute__((visibility("default")))
-
-#define LE_ASSUME(condition)                                                                       \
-    do                                                                                             \
-    {                                                                                              \
-        if (!(condition))                                                                          \
-            __builtin_unreachable();                                                               \
-    } while (0)
 
 #define LE_LIKELY(expression) __builtin_expect(!!(expression), 1)
 #define LE_UNLIKELY(expression) __builtin_expect(!!(expression), 0)

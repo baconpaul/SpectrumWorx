@@ -19,10 +19,6 @@
 #include "assert.hpp"
 //------------------------------------------------------------------------------
 
-/// \note Use a more elaborate version of assume for internal code.
-///                                           (31.10.2013.) (Domagoj Saric)
-#undef LE_ASSUME
-
 #if defined(_MSC_VER) && !defined(__clang__)
 
 #define LE_NOVTABLE __declspec(novtable)
@@ -42,9 +38,6 @@
 #define LE_UNREACHABLE_CODE()                                                                      \
     LE_ASSERT_MSG(false, "This code should not be reached.");                                      \
     __assume(false)
-#define LE_ASSUME(condition)                                                                       \
-    LE_ASSERT_MSG(condition, "Assumption broken.");                                                \
-    __assume(condition)
 
 #define LE_MSVC_SPECIFIC(expression) expression
 #define LE_GNU_SPECIFIC(expression)
@@ -151,43 +144,14 @@
 #define LE_WEAK_SYMBOL_CONST LE_WEAK_SYMBOL extern
 #define LE_WEAK_FUNCTION LE_WEAK_SYMBOL extern
 
-#if LE_HAS_CLANG_BUILTIN(__builtin_assume)
-#define LE_ASSUME(condition)                                                                       \
-    LE_ASSERT_MSG(condition, "Assumption broken.");                                                \
-    __builtin_assume(condition)
+/// \note The three-armed cascade this replaces chose between __builtin_assume,
+/// __builtin_unreachable and neither, and carried a GCC 4.6 pessimisation
+/// workaround. Both live arms defined LE_UNREACHABLE_CODE identically, and the
+/// third answered a compiler that abi.hpp's own #error already rules out.
+///                                       (07.08.2026.) (SW port)
 #define LE_UNREACHABLE_CODE()                                                                      \
     LE_ASSERT_MSG(false, "This code should not be reached.");                                      \
     __builtin_unreachable()
-#elif LE_HAS_CLANG_BUILTIN(__builtin_unreachable) || (((__GNUC__ * 10) + __GNUC_MINOR__) >= 45)
-// http://en.chys.info/2010/07/counterpart-of-assume-in-gcc
-// http://nondot.org/sabre/LLVMNotes/BuiltinUnreachable.txt
-// http://llvm-reviews.chandlerc.com/file/data/3qqhjnypd5j4vaxwuogy/PHID-FILE-q4turx3ss4xgvxyl2zht/D149.diff
-// http://gcc.gnu.org/ml/gcc-patches/2008-04/msg00059.html
-#define LE_UNREACHABLE_CODE()                                                                      \
-    LE_ASSERT_MSG(false, "This code should not be reached.");                                      \
-    __builtin_unreachable()
-#if !defined(__clang__) && (((__GNUC__ * 10) + __GNUC_MINOR__) > 45) &&                            \
-    (((__GNUC__ * 10) + __GNUC_MINOR__) < 48)
-// Broken/pessimization in GCC 4.6:
-//  https://bugs.launchpad.net/gcc-linaro/+bug/1020601
-//  http://gcc.gnu.org/bugzilla/show_bug.cgi?id=50385
-//  http://gcc.gnu.org/ml/gcc-patches/2012-07/msg00254.html
-//  http://gcc.gnu.org/bugzilla/show_bug.cgi?id=49054
-#define LE_ASSUME(condition) LE_ASSERT_MSG(condition, "Assumption broken.")
-#pragma GCC diagnostic ignored "-Wunused-value"
-#else
-#define LE_ASSUME(condition)                                                                       \
-    LE_ASSERT_MSG(condition, "Assumption broken.");                                                \
-    do                                                                                             \
-    {                                                                                              \
-        if (!(condition))                                                                          \
-            __builtin_unreachable();                                                               \
-    } while (0)
-#endif
-#else
-#define LE_UNREACHABLE_CODE() LE_ASSERT_MSG(false, "This code should not be reached.")
-#define LE_ASSUME(condition) LE_ASSERT_MSG(condition, "Assumption broken.")
-#endif
 
 #define LE_MSVC_SPECIFIC(expression)
 #define LE_GNU_SPECIFIC(expression) expression

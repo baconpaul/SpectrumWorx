@@ -11,6 +11,7 @@
 #ifndef parametersUtilities_hpp__EB1C0F5A_FC45_4407_A713_9197376BC784
 #define parametersUtilities_hpp__EB1C0F5A_FC45_4407_A713_9197376BC784
 //------------------------------------------------------------------------------
+#include "le/utility/assert.hpp" // LE_ASSUME
 #include "le/utility/cstdint.hpp"
 #include "le/utility/typeList.hpp"
 
