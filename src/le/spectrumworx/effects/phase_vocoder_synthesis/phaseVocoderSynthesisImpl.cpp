@@ -36,9 +36,6 @@ char const PhaseVocoderSynthesis::description[] =
 void PhaseVocoderSynthesisImpl::process(ChannelState &state, Engine::ChannelData_AmPh data,
                                         Engine::Setup const &) const
 {
-#ifdef LE_PV_USE_TSS
-    data.pSynthesisState = &state;
-#endif // LE_PV_USE_TSS
     PhaseVocoderShared::synthesis(state, data.full().phases(), pvParameters_);
 }
 

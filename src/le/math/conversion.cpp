@@ -77,7 +77,6 @@ bool Detail::convertToBool(double const source)
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-#if defined(__APPLE__) || !defined(LE_HAS_NT2) // others NT2 implementation@vector.cpp
 float dB2NormalisedLinear(float const dbValue) { return std::pow(10, dbValue / 20); }
 float dB2NormalisedLinear(std::int8_t const dbValue)
 {
@@ -129,7 +128,6 @@ float normalisedPower2dB(float const linearPowerValue)
 }
 
 float dB2NormalisedPower(float const dBValue) { return std::pow(10, dBValue / 10); }
-#endif // (for broken)Apple Clang || !LE_HAS_NT2
 
 ////////////////////////////////////////////////////////////////////////////////
 //

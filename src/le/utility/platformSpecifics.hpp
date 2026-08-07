@@ -21,8 +21,6 @@
 
 #if defined(_MSC_VER) && !defined(__clang__)
 
-#define LE_ALIGN(alignment) __declspec(align(alignment))
-
 #define LE_FORCEINLINE __forceinline
 #define LE_NOINLINE __declspec(noinline)
 
@@ -34,8 +32,6 @@
     __assume(false)
 
 #elif defined(__GNUC__)
-
-#define LE_ALIGN(alignment) __attribute__((aligned(alignment)))
 
 #ifdef _DEBUG
 #define LE_FORCEINLINE inline

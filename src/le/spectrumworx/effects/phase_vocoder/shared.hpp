@@ -32,13 +32,6 @@
 namespace LE::SW::Effects::PhaseVocoderShared
 {
 
-#ifdef LE_PV_USE_TSS
-#define LE_PV_TSS_DYNAMIC_THRESHOLD
-#define LE_PV_TSS_SPECIFIC(...) __VA_ARGS__
-#else
-#define LE_PV_TSS_SPECIFIC(...)
-#endif // LE_PV_USE_TSS
-
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \struct AnalysisChannelState
@@ -47,22 +40,12 @@ namespace LE::SW::Effects::PhaseVocoderShared
 
 namespace Detail
 {
-/// \note The analysis channel state uses the Array-of-Structures layout in
-/// order to reduce the TSS related performance hit on 32 bit x86 targets
-/// (because their small register file does not permit tracking all the
-/// pointers that would be required in a SoA layout). Once the PV code is
-/// vectorized this should be converted back to the SoA layout (as it was
-/// in revisions up to 6142).
-///                                       (17.05.2012.) (Domagoj Saric)
+/// \note One member left: the struct is what remains of an Array-of-Structures
+/// layout that carried the transient/steady-state per-bin data alongside it.
+///                                       (07.08.2026.) (SW port)
 struct AnalysisBinStateData
 {
     Engine::real_t lastPhase;
-#ifdef LE_PV_USE_TSS
-    Engine::real_t lastLastPhase;
-    std::uint8_t adaptiveThresholdFactor;
-    bool transient;
-    bool fellBelowThreshold;
-#endif // LE_PV_USE_TSS
 };
 struct AnalysisChannelStateBase : DynamicChannelState_<AnalysisChannelStateBase>
 {
@@ -117,18 +100,6 @@ class BaseParameters
     float const &expctRate() const { return expctRate_; }
     float deviationFactor() const { return deviationFactor_; }
     float invDeviationFactor() const { return 1 / deviationFactor_; }
-#ifdef LE_PV_USE_TSS
-#ifdef LE_PV_TSS_DYNAMIC_THRESHOLD
-    BaseParameters() : tssDynamicThreshold_(0.5f) {} //...mrmlj...testing...
-    void setTSSDynamicThreshold(float const &value) { tssDynamicThreshold_ = value; }
-    bool tssOff() const { return tssDynamicThreshold_ == 1; }
-    float tssThreshold() const { return tssDynamicThreshold_ * tssThresholdFactor_; }
-#else
-    float const &tssThresholdFactor() const { return tssThresholdFactor_; }
-#endif // LE_PV_TSS_DYNAMIC_THRESHOLD
-    float const &lowerSilenceThreshold() const { return lowerSilenceThreshold_; }
-    float const &upperSilenceThreshold() const { return upperSilenceThreshold_; }
-#endif // LE_PV_USE_TSS
 
     void setup(Engine::Setup const &);
 
@@ -136,14 +107,6 @@ class BaseParameters
     float freqPerBin_;
     float expctRate_; ///< The expected rate of phase change per frame.
     double deviationFactor_;
-#ifdef LE_PV_USE_TSS
-    float tssThresholdFactor_;
-    float lowerSilenceThreshold_;
-    float upperSilenceThreshold_;
-#ifdef LE_PV_TSS_DYNAMIC_THRESHOLD
-    float tssDynamicThreshold_;
-#endif // LE_PV_TSS_DYNAMIC_THRESHOLD
-#endif // LE_PV_USE_TSS
 }; // class BaseParameters
 
 ////////////////////////////////////////////////////////////////////////////////

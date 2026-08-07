@@ -24,21 +24,9 @@ namespace Detail
 {
 struct PitchShifterBase
 {
-#ifdef LE_PV_USE_TSS
-    LE_DEFINE_PARAMETER(TSSSensitivity, LinearFloat, Minimum<0>, Default<65>, Maximum<100>,
-                        Unit<"%">);
-/// The parameter list is a comma separated one now, so a conditional member of
-/// it carries its own separator.
-#define LE_PV_TSS_SENSITIVITY() , TSSSensitivity
-#else
-#define LE_PV_TSS_SENSITIVITY()
-#endif // LE_PV_USE_TSS
-
     LE_DEFINE_PARAMETER(SemiTones, SymmetricFloat, MaximumOffset<24>, Unit<"'">);
     LE_DEFINE_PARAMETER(Cents, SymmetricInteger, MaximumOffset<100>, Unit<"''">);
-    LE_DEFINE_PARAMETERS(SemiTones, Cents LE_PV_TSS_SENSITIVITY());
-
-#undef LE_PV_TSS_SENSITIVITY
+    LE_DEFINE_PARAMETERS(SemiTones, Cents);
 
     /// \typedef SemiTones
     /// \brief Specifies the number of semitones to pitch shift.
@@ -94,13 +82,6 @@ struct PVPitchShifter : Detail::PitchShifterBase
 
 EFFECT_PARAMETER_NAME(Detail::PitchShifterBase::SemiTones, "Semitones")
 EFFECT_PARAMETER_NAME(Detail::PitchShifterBase::Cents, "Cents")
-/// \note LE_PV_USE_TSS, which is what decides whether the parameter exists at
-/// all. It read LE_PV_TSS_DYNAMIC_THRESHOLD while it lived in the .cpp, so
-/// defining one of the pair without the other produced a parameter nothing
-/// names -- which was a link error then and is a compile error now.
-#ifdef LE_PV_USE_TSS
-EFFECT_PARAMETER_NAME(Detail::PitchShifterBase::TSSSensitivity, "Transient sensitivity")
-#endif // LE_PV_USE_TSS
 
 } // namespace LE::SW::Effects
 

@@ -382,13 +382,6 @@ typedef void const *const nullptr_t;
 #define BOOST_EXCEPTION_DISABLE
 #endif // BOOST_EXCEPTION_DISABLE
 
-/// \note Import the fixes/workarounds for Boost.Range's lack of restricted
-/// pointer support from NT2.
-///                                           (11.09.2013.) (Domagoj Saric)
-#if defined(LE_HAS_NT2)
-#include "boost/dispatch/meta/is_iterator.hpp"
-#endif // LE_HAS_NT2
-
 //------------------------------------------------------------------------------
 #endif // __cplusplus
 //------------------------------------------------------------------------------

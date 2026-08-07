@@ -47,10 +47,6 @@ void PhaseVocoderAnalysisImpl::setup(IndexRange const &, Engine::Setup const &en
 void PhaseVocoderAnalysisImpl::process(ChannelState &state, Engine::ChannelData_AmPh data,
                                        Engine::Setup const &) const
 {
-#ifdef LE_PV_USE_TSS
-    if (data.pSynthesisState)
-        data.pAnalysisState = &state;
-#endif // LE_PV_USE_TSS
     PhaseVocoderShared::analysis(state, data.full(), pvParameters_);
 }
 
