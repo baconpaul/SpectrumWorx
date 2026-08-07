@@ -44,7 +44,6 @@ char const TuneWorxPVD::title[] = "TuneWorx (pvd)";
 char const Detail::TuneWorxBase::description[] = "Chromatic scale pitch discretization.";
 namespace Detail
 {
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 void LE_COLD TuneWorxBaseImpl::setup(IndexRange const &,
                                      [[maybe_unused]] Engine::Setup const &engineSetup)
@@ -110,9 +109,7 @@ void LE_COLD TuneWorxBaseImpl::setup(IndexRange const &,
     }
 }
 
-LE_OPTIMIZE_FOR_SIZE_END()
 
-LE_OPTIMIZE_FOR_SPEED_BEGIN()
 
 float LE_NOINLINE LE_HOT TuneWorxBaseImpl::findNewPitchScale(Engine::ChannelData_AmPh const &data,
                                                              Engine::Setup const &engineSetup,
@@ -141,7 +138,6 @@ float LE_NOINLINE LE_HOT TuneWorxBaseImpl::findNewPitchScale(Engine::ChannelData
     return pitchScale;
 }
 
-LE_OPTIMIZE_FOR_SPEED_END()
 } // namespace Detail
 
 ////////////////////////////////////////////////////////////////////////////////

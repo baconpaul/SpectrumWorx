@@ -429,7 +429,6 @@ void Processor::processSingleChannel(ProcessParameters const &processParameters)
     } // while ( inputSamples )
 }
 
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -838,7 +837,6 @@ LE_COLD void Processor::Channels::resize(StorageFactors const &factors, Storage 
     }
 }
 
-LE_OPTIMIZE_FOR_SIZE_END()
 
 namespace
 {

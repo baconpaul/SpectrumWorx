@@ -40,7 +40,6 @@ namespace LE::Math
 #pragma check_stack(off)
 #endif // _MSC_VER
 
-LE_OPTIMIZE_FOR_SPEED_BEGIN()
 
 namespace
 {
@@ -660,7 +659,6 @@ bool isPowerOfTwo(float const value)
 
 namespace
 {
-LE_OPTIMIZE_FOR_SPEED_BEGIN()
 
 // https://channel9.msdn.com/Events/GoingNative/2013/rand-Considered-Harmful
 // https://www.youtube.com/watch?v=45Oet5qjlms "PCG: A Family of Better Random Number Generators"
@@ -748,7 +746,6 @@ template <typename T> LE_HOT T rangedRand(T const maximum)
 #endif
 }
 
-LE_OPTIMIZE_FOR_SPEED_END()
 } // anonymous namespace
 
 void LE_COLD rngSeed()
@@ -866,7 +863,6 @@ float LE_HOT normalisedRand()
     return result;
 }
 
-LE_OPTIMIZE_FOR_SPEED_END()
 
 } // namespace LE::Math
 

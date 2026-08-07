@@ -18,7 +18,6 @@ namespace LE
 #pragma warning(push)
 #pragma warning(disable : 4127) // Conditional expression is constant.
 
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 //...mrmlj...orphan...
 template <typename Char>
@@ -65,7 +64,6 @@ template char *copyToBuffer<char>(char const *, LE::Utility::Span<char> const &)
 template char *copyToBuffer<wchar_t>(wchar_t const *, LE::Utility::Span<char> const &);
 #endif // _WIN32
 
-LE_OPTIMIZE_FOR_SIZE_END()
 
 namespace SW
 {

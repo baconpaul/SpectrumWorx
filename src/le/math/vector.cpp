@@ -73,8 +73,6 @@
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/span.hpp"
 
-LE_OPTIMIZE_FOR_SPEED_BEGIN()
-LE_FAST_MATH_ON()
 
 // A nice list of profilers:
 // http://stackoverflow.com/questions/4394606/beyond-stack-sampling-c-profilers
@@ -2008,4 +2006,3 @@ void addPolar(float const amp1, float const phase1, float &LE_GNU_SPECIFIC(__res
 
 } // namespace LE::Math
 
-LE_OPTIMIZE_FOR_SPEED_END()

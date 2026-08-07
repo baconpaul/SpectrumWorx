@@ -33,7 +33,6 @@
 namespace LE::Utility
 {
 
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 // http://code.google.com/p/stringencoders/source/browse/trunk/src/modp_numtoa.c
 // http://www.dreamincode.net/code/snippet2482.htm
@@ -166,6 +165,5 @@ template <> LE_COLD double lexical_cast<double>(char const *valueString)
     return lexical_cast_double_worker(valueString);
 }
 
-LE_OPTIMIZE_FOR_SIZE_END()
 
 } // namespace LE::Utility

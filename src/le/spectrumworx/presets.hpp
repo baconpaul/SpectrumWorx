@@ -66,7 +66,6 @@ template <class Parameter> constexpr char const *streamingName();
 namespace SW
 {
 
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 class SpectrumWorx;
 
@@ -879,7 +878,6 @@ class Program;
 std::string savePreset(std::string_view externalSampleFilePath, std::string_view comment,
                        Program const &, DawExtraState const *pDawExtraState = nullptr);
 
-LE_OPTIMIZE_FOR_SIZE_END()
 
 } // namespace SW
 

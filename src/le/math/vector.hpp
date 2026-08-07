@@ -199,7 +199,6 @@ void deinterleave(float const *LE_RESTRICT pInput, float *LE_RESTRICT const *LE_
 /// \note These may be used in both AudioIO and SW and so have to be in the
 /// header (until LE.Math is separated into a shared library).
 ///                                           (05.02.2016.) (Domagoj Saric)
-LE_OPTIMIZE_FOR_SPEED_BEGIN()
 
 // http://blog.frama-c.com/index.php?post/2013/10/09/Overflow-float-integer
 // http://stackoverflow.com/questions/9832430/arm-saturate-signed-int-to-unsigned-byte
@@ -252,7 +251,6 @@ LE_HOT void convertSamples(Sample const *LE_RESTRICT const pInput,
     std::copy_n(pInput, samples, pOutput);
 }
 
-LE_OPTIMIZE_FOR_SPEED_END()
 
 } // namespace LE::Math
 

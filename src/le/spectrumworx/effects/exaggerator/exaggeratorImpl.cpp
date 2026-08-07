@@ -36,7 +36,6 @@ char const Exaggerator::description[] = "Emphasize or flatten spectral peaks.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 void LE_COLD ExaggeratorImpl::setup(IndexRange const &, Engine::Setup const &)
 {
@@ -49,7 +48,6 @@ void LE_COLD ExaggeratorImpl::setup(IndexRange const &, Engine::Setup const &)
     exaggerate_ = exaggerate / scaleFactor + 1;
 }
 
-LE_OPTIMIZE_FOR_SIZE_END()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -58,7 +56,6 @@ LE_OPTIMIZE_FOR_SIZE_END()
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_OPTIMIZE_FOR_SPEED_BEGIN()
 
 void LE_HOT ExaggeratorImpl::process(Engine::ChannelData_AmPh data, Engine::Setup const &) const
 {
@@ -111,6 +108,5 @@ void LE_HOT ExaggeratorImpl::process(Engine::ChannelData_AmPh data, Engine::Setu
     Math::multiply(data.amps(), normaliser);
 }
 
-LE_OPTIMIZE_FOR_SPEED_END()
 
 } // namespace LE::SW::Effects

@@ -278,7 +278,6 @@ struct MakeChannelStateHolder
             effect.process(channelStates_[channel], data, setup);
         }
 
-        LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
         LE_FORCEINLINE void LE_COLD callReset()
         {
@@ -320,7 +319,6 @@ struct MakeChannelStateHolder
             }
         }
 
-        LE_OPTIMIZE_FOR_SIZE_END()
 
         ChannelStateRange channelStates_;
     }; // struct ChannelStates
@@ -487,7 +485,6 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
         channelStatesHolder_.callProcess(effect(), channel, data, setup);
     }
 
-    LE_OPTIMIZE_FOR_SIZE_BEGIN()
   public: //...mrmlj...
     LE_NOINLINE LE_COLD void reset() override final { channelStatesHolder_.callReset(); }
 
@@ -513,7 +510,6 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
 
         return false;
     }
-    LE_OPTIMIZE_FOR_SIZE_END()
 
   private:
     Effect effect_;

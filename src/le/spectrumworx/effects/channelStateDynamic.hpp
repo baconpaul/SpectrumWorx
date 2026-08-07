@@ -107,7 +107,6 @@ template <class Derived> struct DynamicChannelState_
 /// \class CompoundChannelState
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 template <typename... ChannelStates> struct CompoundChannelState : ChannelStates...
 {
@@ -137,7 +136,6 @@ template <typename... ChannelStates> struct CompoundChannelState : ChannelStates
 #endif // __clang__
 }; // struct CompoundChannelState
 
-LE_OPTIMIZE_FOR_SIZE_END()
 
 } // namespace Effects
 

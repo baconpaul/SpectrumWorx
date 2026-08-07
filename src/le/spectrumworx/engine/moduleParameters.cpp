@@ -43,7 +43,6 @@ namespace LE::SW::Engine
 
 using LFO = Parameters::LFOImpl;
 
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 LE_COLD ModuleParameters::ModuleParameters(
     //std::uint8_t           const moduleSlotIndex,
@@ -403,6 +402,5 @@ LE_COLD void ModuleParameters::savePresetParameters(ParametersSaver const &param
     }
 }
 
-LE_OPTIMIZE_FOR_SIZE_END()
 
 } // namespace LE::SW::Engine

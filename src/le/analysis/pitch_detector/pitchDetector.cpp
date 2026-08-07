@@ -150,7 +150,6 @@ float PitchDetector::findPitch(SW::Engine::ReadOnlyDataRange const &amplitudes, 
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_OPTIMIZE_FOR_SPEED_BEGIN()
 
 namespace
 {
@@ -287,7 +286,6 @@ Peak const *PitchDetector::binPeak(std::uint16_t const bin, PeakDetector const &
     return nullptr;
 }
 
-LE_OPTIMIZE_FOR_SPEED_END()
 
 void PitchDetector::ChannelState::reset() { lastPitch = 0; }
 

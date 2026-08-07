@@ -112,7 +112,6 @@ char const Synth::description[] = "Spectrum colour transfer.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 namespace
 {
@@ -258,9 +257,7 @@ SynthImpl::ChannelState::requiredStorage(Engine::StorageFactors const &factors)
            static_cast<std::uint8_t>(Phases().size());
 }
 
-LE_OPTIMIZE_FOR_SIZE_END()
 
-LE_OPTIMIZE_FOR_SPEED_BEGIN()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -414,6 +411,5 @@ LE_HOT void SynthImpl::process(SynthImpl::ChannelState &cs, Engine::MainSideChan
     LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow, phases, "synth phases");
 }
 
-LE_OPTIMIZE_FOR_SPEED_END()
 
 } // namespace LE::SW::Effects

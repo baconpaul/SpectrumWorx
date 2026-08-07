@@ -22,7 +22,6 @@
 namespace LE::Math
 {
 
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 #pragma warning(push)
 #pragma warning(disable : 4244) // Conversion from 'window_t' to 'float', possible loss of data.
@@ -225,6 +224,5 @@ LE_COLD void calculateWindow(DataRange const &window,
 
 #pragma warning(pop)
 
-LE_OPTIMIZE_FOR_SIZE_END()
 
 } // namespace LE::Math

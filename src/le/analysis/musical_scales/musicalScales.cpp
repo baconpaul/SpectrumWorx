@@ -76,7 +76,6 @@ void Scale::tonesUpdated(std::uint8_t const snappedTo, std::uint8_t const bypass
     }
 }
 
-LE_OPTIMIZE_FOR_SPEED_BEGIN()
 
 float LE_HOT Scale::snap2Scale(float const freq, std::uint8_t const keyIndex) const
 {
@@ -150,7 +149,6 @@ float LE_HOT Scale::snap2Scale(float const freq, std::uint8_t const keyIndex) co
     return newPitchScale * freq;
 }
 
-LE_OPTIMIZE_FOR_SPEED_END()
 
 Scale::ToneOffsets::value_type Scale::toneOffset(std::uint8_t const i) const
 {
