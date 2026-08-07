@@ -84,8 +84,7 @@ struct HistoryBuffer : public Utility::SharedStorageBuffer<T>
         Utility::SharedStorageBuffer<T>::resize(requiredStorage(factors), storage);
     }
 
-    //...mrmlj...required for automatic reset() member function generation by
-    //...mrmlj...the LE_DYNAMIC_CHANNEL_STATE macro...
+    // required so DynamicChannelState_ can generate reset() automatically
     void reset() { this->clear(); }
 };
 
