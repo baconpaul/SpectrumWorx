@@ -679,6 +679,69 @@ TEST_CASE("A parameter written during process() is in a state saved before the c
     CHECK(viaFlush.data() == viaProcess.data());
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief The other half of `state-reproducibility-flush`, and the half that
+/// survived the fix above.
+///
+/// \note The case above sets a *global* parameter on two **active** instances.
+/// The validator does neither: its first instance is only `init()`ed and never
+/// activated, and its fuzzer writes the slot selectors, so each instance
+/// *constructs modules* -- and a module construction is where the LFO defaults
+/// are taken.
+///
+///   Those two facts together are the whole bug. An inactive plugin never runs
+/// `updateLFOTiming()`; an active one runs it at `spectrumWorxCLAP.cpp:861`,
+/// *after* the event loop at `:848` that built the module. So the engine's copy
+/// was built before the transport was known and the main thread's -- built when
+/// the echo drains, and the copy `stateSave` reads -- after it. With the sync
+/// default reading a process-global "has a host reported a tempo" flag, the two
+/// instances wrote `sync="0"` and `sync="1"` on all 225 LFO parameters: same
+/// length, 1782 bytes, and every byte of the difference in one attribute.
+///
+///   Two things made this expensive to find and are worth keeping. `sync` is the
+/// only LFO attribute `LFODataSaver` writes unconditionally -- every other one is
+/// omitted at its default -- so a wrong default shows up on all of them at once.
+/// And an in-tree harness that *looked* equivalent passed 200 random seeds
+/// without reproducing it, because it drove both instances the same way.
+///                                           (06.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A slot filled while inactive and one filled under a transport save the same state",
+          "[clap][state]")
+{
+    Entry const entry;
+
+    auto const slotSelector(SWTest::parameterID(SWTest::moduleChainType, 0 /*slot*/));
+    constexpr double someEffect{3};
+
+    // Never activated, so nothing ever tells this one a tempo.
+    OutStream viaFlush;
+    {
+        Plugin const plugin;
+        SWTest::OneParameterEvent const event(slotSelector, someEffect);
+        plugin.params().flush(&*plugin, &*event, &SWTest::discardedOutputEvents());
+        REQUIRE(plugin.state().save(&*plugin, &viaFlush));
+    }
+
+    // Activated, and told a tempo by the same block that fills the slot.
+    OutStream viaProcess;
+    {
+        SWTest::ActivePlugin plugin(sampleRate, blockSize);
+        SWTest::OneParameterEvent const event(slotSelector, someEffect);
+        auto const transport(SWTest::transportAt(120, 0, CLAP_TRANSPORT_IS_PLAYING));
+        std::vector<float> leftIn(blockSize, 0.0f), rightIn(blockSize, 0.0f);
+        std::vector<float> leftOut(blockSize), rightOut(blockSize);
+        plugin.process(leftIn, rightIn, leftOut, rightOut, &transport, &*event);
+        REQUIRE(stateOf(*plugin).save(&*plugin, &viaProcess));
+    }
+
+    REQUIRE_FALSE(viaFlush.data().empty());
+    CHECK(viaFlush.data().size() == viaProcess.data().size());
+    CHECK(viaFlush.data() == viaProcess.data());
+}
+
 TEST_CASE("A save whose stream fails is reported as a failure", "[clap][state]")
 {
     Entry const entry;

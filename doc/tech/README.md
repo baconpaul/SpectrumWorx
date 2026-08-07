@@ -1,6 +1,6 @@
 # SpectrumWorx — the tech documents
 
-Five documents, and every one of them describes the tree **as it is now**. Three
+Six documents, and every one of them describes the tree **as it is now**. Four
 say how something works, one says what is left to do, one says what finished work
 left behind. Nothing here is a plan being executed or a record of how the port
 got where it is; that is in [`old/`](old/).
@@ -12,6 +12,7 @@ got where it is; that is in [`old/`](old/).
 | [`threading_model.md`](threading_model.md) | Which thread owns the engine, the three channels they talk over, and what the layering forbids. |
 | [`parameter_system.md`](parameter_system.md) | How the plugin addresses, names and exports its 286 parameters, and why the answer is "dynamic" in a way that constrains the format choice. |
 | [`streaming_format.md`](streaming_format.md) | What goes into a preset and into session state: the on-disk names, the snapshot tests that pin them, and the rules for changing any of it. |
+| [`how-lfo-rates-work.md`](how-lfo-rates-work.md) | What an LFO's period holds, which bar it is a fraction of, and what tempo sync does and does not move. |
 
 ## What is left
 

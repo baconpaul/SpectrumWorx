@@ -29,9 +29,9 @@
 /// property would only restate the formula. Regenerate with SW_LFO_TABLE_UPDATE=1
 /// and read the diff -- a row that moves is an LFO shape that changed.
 ///
-/// \note `Timer`'s tempo, meter and "has tempo" flag are `static` -- process
-/// wide, which `tech_debt.md` records -- so every case here states the timing it
-/// wants rather than inheriting whatever ran before it.
+/// \note `Timer`'s tempo and meter are `static` -- process wide, which
+/// `tech_debt.md` records -- so every case here states the timing it wants
+/// rather than inheriting whatever ran before it.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later
@@ -86,21 +86,24 @@ constexpr float twoSeconds{2.0f};
 /// \brief States the host's tempo and meter, and puts them back.
 ///
 /// \note **Every case in this file needs one**, including the ones that do not
-/// care what the tempo is, and that is not tidiness. `Timer`'s tempo, meter and
-/// "has tempo" flag are `static` -- process wide, which tech_debt.md records --
-/// and `SyncTypes::default_()` reads the flag: a brand new LFO defaults to
-/// `Quarter` once anything in the process has reported a tempo and to `Free`
-/// before that. `adjustValueForPreset()` then writes a Free LFO's period in
-/// milliseconds and a synced one in bars.
-///
-///   So leaking the flag out of this file turns 303 preset digests red in
-/// `presetCorpusTests.cpp`, which never mentions an LFO -- which is exactly what
+/// care what the tempo is, and that is not tidiness. `Timer`'s tempo and meter
+/// are `static` -- process wide, which tech_debt.md records -- and
+/// `adjustValueForPreset()` converts a Free LFO's period to milliseconds
+/// through the bar duration. So a case that leaves 140 BPM behind changes what
+/// every later preset load in the binary converts to, and 303 digests go red in
+/// `presetCorpusTests.cpp`, which never mentions an LFO. That is exactly what
 /// the first version of this file did.
 ///
+/// \note What it no longer has to contain is the sync-type default. That used
+/// to read a third static -- a sticky "has a host ever reported a tempo" flag --
+/// so merely *establishing* a tempo here changed what a brand new LFO anywhere
+/// in the process defaulted to. The flag is gone and the default is the constant
+/// `Quarter`; see "A brand new LFO's sync type does not depend on the transport"
+/// below, which is what stops it coming back.
+///
 /// \note The way back is the *no-transport* overload of
-/// `updatePositionAndTimingInformation`, because it is the only thing that sets
-/// the flag false: `reset()` deliberately leaves it alone, a 2012 workaround for
-/// preset browsing in Live.
+/// `updatePositionAndTimingInformation`, which restores the assumed 120 BPM 4/4
+/// that `reset()` alone would leave a `barDurationChanged()` short of.
 ///
 /// \note `reset()` on the way in, because whether the timing is *established* is
 /// per timer and the first update after a reset establishes rather than changes
@@ -495,6 +498,64 @@ TEST_CASE("A bound crossing the other drags it along and says so", "[lfo]")
 // Sync types and period snapping
 ////////////////////////////////////////////////////////////////////////////////
 
+TEST_CASE("A brand new LFO's sync type does not depend on the transport", "[lfo]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note A parameter's *default* is a property of the parameter. This one
+    /// was `Timer::hasTempoInformation() ? Quarter : Free` from 2011 until
+    /// 06.08.2026 -- a property of the host's transport at the moment somebody
+    /// asked, on a process-global flag that `reset()` deliberately never
+    /// cleared.
+    ///
+    ///   `clap-cpp-validator`'s `state-reproducibility-flush` is what caught it,
+    /// and the reason it took a validator is that the two answers need two
+    /// *constructions at two moments* to be visible. The engine's module is
+    /// built inside `process()` when the slot event is handled; the main
+    /// thread's is built when the echo is drained; and `updateLFOTiming()` runs
+    /// between them. `stateSave` reads the main thread's, so a session stored
+    /// `sync="1"` for an LFO the audio thread was running as `Free`.
+    ///
+    ///   Deliberately **not** written with a `ScopedHostTiming`: the whole point
+    /// is that establishing a transport must not change the answer, so this case
+    /// states both timings itself and compares across them.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    auto const freshlyDefaultedSyncType([] {
+        LFOImpl lfo;
+        return lfo.syncTypes();
+    });
+
+    // No transport: the assumed 120 BPM 4/4.
+    {
+        LFOImpl::Timer timer;
+        timer.reset();
+        timer.updatePositionAndTimingInformation(0u /*samples*/, 48000.0f);
+    }
+    auto const withoutTransport(freshlyDefaultedSyncType());
+
+    // A host reports one, which is what used to flip the answer for ever after.
+    {
+        LFOImpl::Timer timer;
+        timer.reset();
+        timer.updatePositionAndTimingInformation(0, twoSeconds, 4);
+    }
+    auto const withTransport(freshlyDefaultedSyncType());
+
+    CAPTURE(withoutTransport, withTransport);
+    CHECK(withoutTransport == withTransport);
+    CHECK(withTransport == LFO::Quarter);
+
+    // ...and back, so the rest of the binary sees what it expects.
+    {
+        LFOImpl::Timer timer;
+        timer.reset();
+        timer.updatePositionAndTimingInformation(0u /*samples*/, 48000.0f);
+    }
+    CHECK(freshlyDefaultedSyncType() == LFO::Quarter);
+}
+
 TEST_CASE("A free LFO's period is clamped rather than snapped", "[lfo]")
 {
     ScopedHostTiming const timing;
@@ -628,8 +689,18 @@ TEST_CASE("A meter change resnaps a synced LFO and leaves a free one alone", "[l
     /// \note `updateForNewTimingInformation()`, which is the other half of what
     /// the sync types are for and is called once per block. A synced LFO has to
     /// follow the host into a new meter -- its period is in beats, and the bar
-    /// just changed length -- and a free one must not, its period being in
-    /// seconds and the host's meter none of its business.
+    /// just changed length -- and a free one must not, its period being a
+    /// duration and the host's meter none of its business.
+    ///
+    /// \note **The free half of this changed on 06.08.2026 and the line below is
+    /// the change.** It used to read
+    /// `freeBefore * (twoSeconds / 1.5f)` -- the period *rescaled*, so that
+    /// `periodScale * barDuration` stayed constant and the LFO went on sounding
+    /// at the same rate. Correct in what you heard and wrong in what it did to
+    /// the number, which is host-visible and automatable: a tempo change moved a
+    /// value the user had automated and the project had saved. A free period is
+    /// measured against the reference bar now, so it sounds the same and does not
+    /// move. See `LFOImpl::getValue` and the case below.
     ///
     ////////////////////////////////////////////////////////////////////////////
     LFOImpl::Timer timer;
@@ -658,9 +729,68 @@ TEST_CASE("A meter change resnaps a synced LFO and leaves a free one alone", "[l
     CHECK(synced.periodScale() != Catch::Approx(0.25f));
     CHECK(synced.periodScale() == Catch::Approx(1.0f / 3).margin(1e-4));
 
-    // ...and the free one is still whatever it was in seconds, rescaled by the
-    // bar duration rather than by the beat count.
-    CHECK(free.periodScale() == Catch::Approx(freeBefore * (twoSeconds / 1.5f)).margin(1e-4));
+    // ...and the free one did not move at all.
+    CHECK(free.periodScale() == Catch::Approx(freeBefore));
+}
+
+TEST_CASE("A tempo change moves neither a free LFO's rate nor its parameter", "[lfo]")
+{
+    ScopedHostTiming const timing;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The pair that has to hold together, and the reason the 2011
+    /// arrangement was not simply wrong: **the sounding rate has to survive a
+    /// tempo change and so does the number**. Rescaling the parameter bought the
+    /// first at the cost of the second. Measuring a free period against a bar
+    /// that never changes length buys both.
+    ///
+    ///   Measured as a phase rather than asserted as an identity, because the
+    /// identity is exactly what the implementation assumes and a test that
+    /// restates it would pass however the clock were wired. Two LFOs, one free
+    /// and one synced, over the same wall-clock interval either side of a tempo
+    /// change: the free one has to have advanced by the same fraction of its
+    /// period both times and the synced one must not have.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    /// \note A sawtooth, whose value *is* its normalised position -- so what is
+    /// compared below is a phase and not a level.
+    auto const phaseAfter(
+        [](float const barDuration, float const seconds, LFO::SyncType const syncType) {
+            LFOImpl lfo;
+            lfo.parameters().get<LFOImpl::SyncTypes>().setValue(syncType);
+            withWaveform(lfo, LFO::Sawtooth);
+            lfo.setPeriodScale(0.5f); // one second at the reference tempo
+
+            LFOImpl::Timer timer;
+            timer.reset();
+            timer.updatePositionAndTimingInformation(0, barDuration, 4);
+            timer.updatePositionAndTimingInformation(seconds / barDuration, barDuration, 4);
+            return lfo.getValue(timer);
+        });
+
+    constexpr float atNinety{4 * 60.0f / 90}; // a bar is 8/3 s rather than 2
+
+    // Three quarters of a second of real time, at two different tempi.
+    constexpr float seconds{0.75f};
+
+    auto const freeAt120(phaseAfter(twoSeconds, seconds, LFO::Free));
+    auto const freeAt90(phaseAfter(atNinety, seconds, LFO::Free));
+    CAPTURE(freeAt120, freeAt90);
+
+    // The free LFO is three quarters through a one second period, both times.
+    CHECK(freeAt120 == Catch::Approx(0.75f).margin(1e-4));
+    CHECK(freeAt90 == Catch::Approx(freeAt120).margin(1e-4));
+
+    /// \note And the control, without which the case above would pass on an LFO
+    /// that had simply stopped reading the clock: a synced LFO's rate *does*
+    /// follow the tempo, so the same wall-clock interval is a different fraction
+    /// of its period.
+    auto const syncedAt120(phaseAfter(twoSeconds, seconds, LFO::Quarter));
+    auto const syncedAt90(phaseAfter(atNinety, seconds, LFO::Quarter));
+    CAPTURE(syncedAt120, syncedAt90);
+    CHECK(syncedAt90 != Catch::Approx(syncedAt120).margin(1e-3));
 }
 
 TEST_CASE("The first block after a reset establishes the timing rather than changing it", "[lfo]")

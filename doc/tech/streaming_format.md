@@ -135,12 +135,21 @@ a 303-row diff that says nothing.
 ### The order to trust
 
 Run the snapshots under `ctest`. All three live in `sw-dsp-tests`, which as of
-02.08.2026 is one of two test binaries — the split put the only cases that could
-pollute them, `pluginTests.cpp`'s `[clap][lfo]` transport ones, in the other one.
-Running `sw-dsp-tests` bare is green today for that reason and not because
-anything was fixed: `LFO::Timer`'s tempo state is still three process-global
-statics, and a case added to this binary that sets a tempo would move 153 of the
-303 `[preset-corpus]` rows again. See `tech_debt.md`, "Threading".
+02.08.2026 is one of two test binaries.
+
+**A leaked *tempo* no longer moves a row.** A case that established one used to
+move 153 of the 303, because `adjustValueForPreset` converted a free LFO's period
+through `LFO::Timer`'s process-global bar duration; the binary split hid that and
+fixed nothing. The conversion reads a constant reference bar since 06.08.2026 —
+[`how-lfo-rates-work.md`](how-lfo-rates-work.md) §4.
+
+**A leaked *meter* still would**, and that one is by design rather than by
+accident: a synced period snaps to the divisions the meter has, so loading the
+same preset in three four genuinely produces a different period.
+`snapSyncedPeriodScale()` reads `Timer::measureNumerator()`, which is still a
+process-global static. Nothing in either binary drives a meter other than 4/4
+outside the scope guard in `lfoTests.cpp`, so this is a hazard rather than a
+symptom — see `tech_debt.md`.
 
 ---
 

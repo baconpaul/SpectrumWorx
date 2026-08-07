@@ -67,18 +67,26 @@ class LFOImpl : public LFO
 
     ////////////////////////////////////////////////////////////////////////////
     /// \class SyncTypes
-    /// \brief Implements the Parameter<> concept for the SyncTypes parameter.
+    /// \brief Which beat divisions the period may snap to; `Free` is none.
+    ///
+    /// \note A bit mask over Quarter|Triplet|Dotted, not an ordinal -- see
+    /// `LFO::SyncType`. `All` is the three of them offered together.
+    ///
+    /// \note This used to be a class whose only purpose was to hide the trait
+    /// default with `hasTempoInformation() ? Quarter : Free` -- a parameter
+    /// *default* that was a function of when it was asked, on a process-global
+    /// flag. Two constructions of the same module at two moments then disagreed,
+    /// which is what `clap-cpp-validator`'s `state-reproducibility-flush`
+    /// caught: `stateSave` reads the main thread's Program, whose module is
+    /// built when the slot echo is drained, and the engine's is built inside
+    /// `process()` *before* `updateLFOTiming()` -- so the transport became known
+    /// in between and the two copies wrote different `sync` attributes.
+    ///                                       (06.08.2026.) (SW port)
     ////////////////////////////////////////////////////////////////////////////
 
-    class SyncTypes : public Parameters::Parameter<Parameters::LinearUnsignedInteger::Modify<
-                          Parameters::Traits::Minimum<Free>, Parameters::Traits::Maximum<All>,
-                          Parameters::Traits::Default<Quarter>>::type>
-    {
-      public:
-        SyncTypes() : type(default_()) {}
-        static value_type default_();
-        using type::operator=;
-    }; // class SyncTypes
+    using SyncTypes = Parameters::Parameter<Parameters::LinearUnsignedInteger::Modify<
+        Parameters::Traits::Minimum<Free>, Parameters::Traits::Maximum<All>,
+        Parameters::Traits::Default<Quarter>>::type>;
 
     // Implementation note:
     //   Unlike with other enumerate/"discrete values parameters", we do not use the
@@ -182,8 +190,54 @@ class LFOImpl : public LFO
       public:
         Timer();
 
+        ////////////////////////////////////////////////////////////////////////
+        ///
+        /// \brief One bar at the tempo and meter the engine assumes when a host
+        /// reports none: 120 BPM in four four, so two seconds.
+        ///
+        /// \note **The unit a free-running LFO's period is measured in.** A
+        /// synced LFO's period is a fraction of the *host's* bar, which is the
+        /// whole of what syncing means and is why that one follows the tempo. A
+        /// free one is a duration in seconds, and expressing it against a bar
+        /// that never changes length is how it stays one without the parameter
+        /// having to be rewritten every time the tempo moves.
+        ///                                   (06.08.2026.) (SW port)
+        ///
+        ////////////////////////////////////////////////////////////////////////
+        static constexpr value_type referenceBarDuration{60.0f / 120 * 4};
+        static constexpr std::uint8_t referenceMeasureNumerator{4};
+
         value_type const &currentTimeInBars() const { return currentTimeInBars_; }
         value_type const &previousTimeInBars() const { return previousTimeInBars_; }
+
+        ////////////////////////////////////////////////////////////////////////
+        ///
+        /// \brief The same instant measured in reference bars rather than in the
+        /// host's, which is the clock a free-running LFO runs off.
+        ///
+        /// \note Derived rather than tracked, and the identity is what makes this
+        /// a rewrite of the old behaviour rather than a change to it. A free LFO
+        /// used to be kept honest by rescaling its *period* on every bar-duration
+        /// change, so that `periodScale * barDuration` stayed constant; its phase
+        /// was therefore
+        ///
+        ///     frac( (offset + timeInBars) / periodScale )
+        ///   = frac( (offset + timeInBars) * barDuration / periodInSeconds )
+        ///
+        /// -- which is exactly this clock divided by a period expressed in these
+        /// units. Same phase, same locate behaviour, same everything an LFO does;
+        /// what stops moving is the number the host and the file hold.
+        ///                                   (06.08.2026.) (SW port)
+        ///
+        ////////////////////////////////////////////////////////////////////////
+        value_type currentTimeInReferenceBars() const
+        {
+            return currentTimeInBars_ * basePeriod() / referenceBarDuration;
+        }
+        value_type previousTimeInReferenceBars() const
+        {
+            return previousTimeInBars_ * basePeriod() / referenceBarDuration;
+        }
 
         TimingInformationChange updatePositionAndTimingInformation(float positionInBars,
                                                                    float barDuration,
@@ -215,11 +269,15 @@ class LFOImpl : public LFO
         /// through the LFO parameter interface. Recorded in tech_debt.md.
         ///                                   (02.08.2026.) (SW port)
         ///
+        /// \note There used to be a third, `hasTempoInformation_`, and it was the
+        /// worst of them: sticky by design, never cleared by reset(), and read by
+        /// exactly one thing -- an LFO's *default* sync type. Deleted with that
+        /// reader. "Has a host told us a tempo" is not a question the plugin
+        /// needs an answer to: one that has not is 120 BPM 4/4, which every LFO
+        /// already runs against.
+        ///                                   (06.08.2026.) (SW port)
+        ///
         ////////////////////////////////////////////////////////////////////////
-        static bool hasTempoInformation()
-        {
-            return hasTempoInformation_.load(std::memory_order_relaxed);
-        }
         static value_type basePeriod() { return barDuration_.load(std::memory_order_relaxed); }
         static std::uint8_t measureNumerator()
         {
@@ -243,12 +301,10 @@ class LFOImpl : public LFO
         /// \brief Whether this timer has ever been told the timing, as opposed to
         /// still holding the assumed 120 BPM 4/4.
         ///
-        /// \note Per instance and *not* the static hasTempoInformation_ below,
-        /// which cannot answer this: reset() deliberately leaves that flag alone
-        /// -- a 2012 workaround for preset browsing in Live -- while it does put
-        /// barDuration_ back to the assumption, so after a reset the flag says
-        /// "known" about a value that is a placeholder again. It is also process
-        /// wide, and this question is per engine.
+        /// \note Per instance, and the reason no static can answer it: reset()
+        /// puts barDuration_ back to the assumption, so a process-wide "we have
+        /// been told" would claim knowledge of a value that is a placeholder
+        /// again. The question is also per engine rather than per process.
         ///
         ///   What it is for: the first block after construction or reset()
         /// *establishes* the timing rather than changing it, and the difference
@@ -264,7 +320,6 @@ class LFOImpl : public LFO
 
         static std::atomic<value_type> barDuration_;
         static std::atomic<std::uint8_t> measureNumerator_;
-        static std::atomic<bool> hasTempoInformation_;
     }; // class Timer
 #endif // LE_NO_LFOs
   public:
