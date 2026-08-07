@@ -93,10 +93,11 @@ Caveats on the numbers:
   why it is a decision rather than a switch, and why the option that used to hold
   the place open was deleted rather than left off — see
   [`future_items_to_revive.md`](future_items_to_revive.md).
-- `lfoExportedParameters` is **5** in a normal GUI build and **7** under
-  `LE_SW_SEPARATED_DSP_GUI || !LE_SW_GUI` — SyncTypes and Waveform are not
-  exported for automation in the GUI build
-  (`src/core/host_interop/parameters.hpp:27-36`).
+- `lfoExportedParameters` is **5**, unconditionally
+  (`src/core/host_interop/parameters.hpp:31`). SyncTypes and Waveform are not
+  exported for automation. It used to be 7 in a build without the GUI, behind
+  two edition macros that are gone; the editor reaches those two parameters by
+  another route (`spectrumWorxEditor.hpp:811-829`).
 
 This skeleton never changes at runtime. Everything below is about what the slots
 *mean*.
