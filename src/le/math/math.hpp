@@ -15,12 +15,7 @@
 //------------------------------------------------------------------------------
 #include "le/utility/platformSpecifics.hpp"
 
-#ifdef LE_HAS_NT2
-#include "boost/simd/sdk/config/arch.hpp"
-#include "boost/simd/sdk/simd/extensions.hpp"
-#else
 #include "le/utility/intrinsics.hpp"
-#endif // LE_HAS_NT2
 
 #include "le/utility/staticLog2.hpp"
 

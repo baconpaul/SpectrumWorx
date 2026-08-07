@@ -406,9 +406,6 @@ bool isNegative(int const value)
 
 bool isNegative(unsigned int /*value*/) { return false; }
 
-// others: NT2 implementation@vector.cpp — the guard has to match vector.cpp's
-// LE_MATH_SCALAR_NT2, Apple included (Xcode 6.3/7 Clang miscompiled nt2::exp2).
-#if defined(__APPLE__) || !defined(LE_HAS_NT2)
 float ln(float const value) { return std::log(value); }
 /// \note `std::log2`, like its four neighbours, and previously
 ///
@@ -423,7 +420,7 @@ float ln(float const value) { return std::log(value); }
 /// log2(0.5) came back -1.443. The commented-out `std` is the fossil of it; the
 /// divisor belongs to a natural log, which is what the call must once have been.
 ///
-///   It had never been compiled. This block is guarded on
+///   It had never been compiled. This block was guarded on
 /// `__APPLE__ || !LE_HAS_NT2`, and in 2016 every Windows build had NT2, so
 /// MSVC took `nt2::log2` from vector.cpp and the arm meant for it was dead.
 /// Stage 4 removed NT2, which made this the only arm on every platform -- and
@@ -438,7 +435,6 @@ float log2(float const value) { return std::log2(value); }
 float log10(float const value) { return std::log10(value); }
 float exp(float const value) { return std::exp(value); }
 float exp2(float const value) { return std::exp2(value); }
-#endif // disabled
 
 std::uint8_t log2(int const value)
 {
@@ -679,7 +675,7 @@ namespace
 
 // http://security.stackexchange.com/questions/47446/can-the-xor-of-two-rng-outputs-ever-be-less-secure-than-one-of-them
 
-static LE_ALIGN(16) std::uint64_t rng_state[2];
+alignas(16) static std::uint64_t rng_state[2];
 
 /// \note The 64 bit RNG is much slower in 32bit builds so we 'reduce'/limit
 /// its output width for those builds so that at least the ranged and

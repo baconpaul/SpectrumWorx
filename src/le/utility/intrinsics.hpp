@@ -46,7 +46,14 @@ typedef __m128 SIMDVector;
 #elif defined(__GNUC__)
 typedef float SIMDVector __attribute__((vector_size(16)));
 #else
-typedef LE_ALIGN(16) float SIMDVector[4];
+/// \note This arm used to be `typedef LE_ALIGN(16) float SIMDVector[4]`, and it
+/// is unreachable: MSVC defines LE_HAS_SSE1 for _M_X64 and for _M_IX86 with
+/// /arch:SSE, Clang and GCC answer __GNUC__, and abi.hpp #errors on anything
+/// that is neither. It cannot be written in standard C++ either -- alignas may
+/// not be applied to a typedef -- which is what makes an #error the honest arm
+/// rather than a fallback nothing has ever compiled.
+///                                       (07.08.2026.) (SW port)
+#error SpectrumWorx has no SIMDVector for this compiler
 #endif
 
 namespace Constants

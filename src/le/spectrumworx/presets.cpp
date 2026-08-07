@@ -804,10 +804,9 @@ char const *ParametersLoader::parameterValueText(TiXmlElement const &parameterNo
 ///
 /// \note An element the reader deliberately declines is still unread and is still
 /// reported. There is exactly one such case in the shipped format -- a `<Gate>`
-/// or `<Transient sensitivity>` for a build compiled without it -- and none of
-/// the 303 factory banks has one, which is why this can be an error rather than a
-/// list of exemptions. If a build ever ships without those, this is where it will
-/// say so.
+/// for a build compiled without it -- and none of the 303 factory banks has one,
+/// which is why this can be an error rather than a list of exemptions. If a build
+/// ever ships without it, this is where it will say so.
 ///                                           (02.08.2026.) (SW port)
 ///
 ////////////////////////////////////////////////////////////////////////////////
@@ -837,11 +836,7 @@ void ParametersLoader::warnAboutMissingParameter(char const *const pParameterNam
 {
     LE_ASSERT(pParameterName);
     std::string_view const parameterName(pParameterName);
-    if (
-#ifdef LE_PV_USE_TSS
-        (parameterName != "Transient sensitivity") &&
-#endif // LE_PV_USE_TSS
-        (parameterName != "Gate"))
+    if (parameterName != "Gate")
     {
         reportPresetProblem(PresetProblem::MissingParameter, parameterName);
     }

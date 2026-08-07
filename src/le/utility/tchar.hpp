@@ -66,38 +66,6 @@ typedef char TCHAR;
 
 #include "platformSpecifics.hpp"
 
-//...mrmlj...quick-fixes for Boost.Range restrict support...
-/// \note Boost.Range is gone; only NT2/Boost.SIMD still needs to be told about
-/// restrict qualified pointers, and it brings its own Boost with it.
-///                                           (28.07.2026.) (SW port)
-#ifdef LE_HAS_NT2
-#include "boost/dispatch/meta/is_iterator.hpp"
-#include "boost/type_traits/detail/yes_no_type.hpp"
-
-#include <type_traits>
-namespace boost
-{
-#ifdef BOOST_DISPATCH_NO_RESTRICT
-template <typename T> struct is_pointer;
-template <typename T> struct is_pointer<T *LE_RESTRICT> : std::true_type
-{
-};
-template <typename T> struct is_pointer<T const *LE_RESTRICT> : std::true_type
-{
-};
-#endif // BOOST_DISPATCH_NO_RESTRICT
-template <typename T> struct remove_const;
-template <typename T> struct remove_const<T *LE_RESTRICT const>
-{
-    typedef T *LE_RESTRICT type;
-};
-template <typename T> struct remove_const<T const *LE_RESTRICT const>
-{
-    typedef T const *LE_RESTRICT type;
-};
-} // namespace boost
-#endif // LE_HAS_NT2
-
 /// \note There was a global operator==( std::string_view, std::string_view )
 /// here, comparing with memcmp over begin(). The standard library has provided
 /// that comparison since C++17, so it was a second candidate for every

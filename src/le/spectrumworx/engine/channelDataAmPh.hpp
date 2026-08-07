@@ -18,12 +18,6 @@
 namespace LE::SW
 {
 
-namespace Effects::PhaseVocoderShared
-{
-struct AnalysisChannelState;
-struct SynthesisChannelState;
-} // namespace Effects::PhaseVocoderShared
-
 namespace Engine
 {
 
@@ -65,13 +59,6 @@ class ChannelData_AmPh : public SubRange<FullChannelData_AmPh, DataRange>
 
     ReadOnlyDataRange const &amps() const { return first(); }
     ReadOnlyDataRange const &phases() const { return second(); }
-
-#ifdef LE_PV_USE_TSS
-    //...mrmlj...quick temporary workaround to enable PVD effects to work with
-    //...mrmlj...with TSS enabled...
-    Effects::PhaseVocoderShared::AnalysisChannelState const *LE_RESTRICT pAnalysisState;
-    Effects::PhaseVocoderShared::SynthesisChannelState *LE_RESTRICT pSynthesisState;
-#endif // LE_PV_USE_TSS
 }; // class ChannelData_AmPh
 
 #pragma warning(pop)

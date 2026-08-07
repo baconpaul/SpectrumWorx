@@ -53,18 +53,11 @@ void PitchShifterImpl::setup(IndexRange const &, Engine::Setup const &engineSetu
 {
     PhaseVocoderShared::PitchShifter::setup(engineSetup);
     setPitchScale(pitchShiftParameters(), parameters(), engineSetup.numberOfBins());
-#ifdef LE_PV_TSS_DYNAMIC_THRESHOLD
-    baseParameters().setTSSDynamicThreshold(1 - (parameters().get<TSSSensitivity>() / 100));
-#endif // LE_PV_USE_TSS
 }
 
 void PVPitchShifterImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
 {
     setPitchScale(pitchShiftParameters(), parameters(), engineSetup.numberOfBins());
-#ifdef LE_PV_TSS_DYNAMIC_THRESHOLD
-    LE_ASSERT_MSG(parameters().get<TSSSensitivity>() == TSSSensitivity::default_(),
-                  "PVD PitchShifter does not (yet) support the Transient sensitivity parameter.");
-#endif // LE_PV_TSS_DYNAMIC_THRESHOLD
 }
 
 void PVPitchShifterImpl::process(Engine::ChannelData_AmPh data, Engine::Setup const &) const

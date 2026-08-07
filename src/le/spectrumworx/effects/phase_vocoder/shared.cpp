@@ -18,10 +18,6 @@
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 
-#ifdef LE_PV_USE_TSS
-#include "le/utility/stackBuffer.hpp"
-#endif // LE_PV_USE_TSS
-
 #include <cstdint>
 
 namespace LE::SW::Effects::PhaseVocoderShared
@@ -70,13 +66,6 @@ LE_NOINLINE void BaseParameters::setup(Engine::Setup const &engineSetupParam)
     LE_ASSERT_MSG(inverseInverseDeviationFactor == deviationFactor_,
                   "Deviation factor inverse suffers from numerical error.");
 #endif // __clang__
-
-#ifdef LE_PV_USE_TSS
-    // DAFx, p283:
-    tssThresholdFactor_ = twoPi / pEngineSetup->windowOverlappingFactor<float>();
-    lowerSilenceThreshold_ = pEngineSetup->maximumAmplitude() * Math::dB2NormalisedLinear(-60);
-    upperSilenceThreshold_ = pEngineSetup->maximumAmplitude() * Math::dB2NormalisedLinear(-50);
-#endif // LE_PV_USE_TSS
 }
 
 void PVPitchShifter::setPitchScaleFromSemitones(float const semitones,
@@ -152,20 +141,12 @@ void LE_NOINLINE PitchShifter::process(ChannelState &channelState,
         for (auto const inputPhase : inputPhases)
         {
             pBinState->lastPhase = inputPhase;
-#ifdef LE_PV_USE_TSS
-            pBinState->lastLastPhase = inputPhase;
-#endif // LE_PV_USE_TSS
             ++pBinState;
         }
         channelState.reinitializePhases = false;
     }
     LE_ASSERT(channelState.reinitializePhases == false);
     channelState.previousScaleFactor = scaleFactor;
-
-#ifdef LE_PV_USE_TSS
-    data.pAnalysisState = &channelState;
-    data.pSynthesisState = &channelState;
-#endif // LE_PV_USE_TSS
 
     analysis(channelState, data.full(), baseParameters());
     pitchShiftAndScale(data, pitchShiftParameters());
@@ -217,14 +198,6 @@ void LE_NOINLINE PitchShifter::process(ChannelState &channelState,
 //  http://music.columbia.edu/pipermail/music-dsp/2004-May/060249.html
 //  Accuracy of Frequency Estimates Using the Phase Vocoder:
 //  http://academics.wellesley.edu/Physics/brown/pubs/pvocWmiller00661475.pdf
-//
-// - transient/steady state separation:
-//  http://www.csis.ul.ie/dafx01/proceedings/papers/duxbury.pdf
-//  http://articles.ircam.fr/textes/Roebel03b/index.pdf
-//  http://www.elec.qmul.ac.uk/digitalmusic/audioengineering/transientmodification/transient_shaping_report.pdf
-//  http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.126.9540&rep=rep1&type=pdf
-//  http://www.rfel.com/download/w03006-comparison_of_fft_and_polydft_transient_response.pdf
-//  http://homepage.eircom.net/~derryfitzgerald/ISSC05Drum.pdf
 //
 // - peak analysis
 //  see the links in peakDetector.cpp
@@ -384,39 +357,9 @@ void LE_NOINLINE analysis(AnalysisChannelState &state, Engine::FullChannelData_A
     //phase...uncomment this when these get fixed...
     //verifyDCPhase( phaseInAnaFreqOut.front() );
 
-#ifdef LE_PV_USE_TSS
-    float const lowerSilenceThreshold(parameters.lowerSilenceThreshold());
-    float const upperSilenceThreshold(parameters.upperSilenceThreshold());
-
-    /// \note Check the Duxbury paper (also partially followed by the DAFx
-    /// chapter 8.4.5) for an explanation of the following constants and in
-    /// general of the TSS algorithm employed.
-    ///                                       (19.04.2012.) (Domagoj Saric)
-    std::uint8_t const a(3);
-    std::uint8_t const b(4);
-#ifdef LE_PV_TSS_DYNAMIC_THRESHOLD
-    float const threshold(parameters.tssThreshold());
-#else
-    //...mrmlj...it seems different (maximum) values are acceptable for pitching
-    //...mrmlj...up and down...~88% seems ok for pitching up but introduces very
-    //...mrmlj...audible artefacts when pitching down..so 65% was chosen as the
-    //...mrmlj...default for now...
-    float const defaultTSSSensitivity(0.65f);
-    float const threshold(defaultTSSSensitivity * parameters.tssThresholdFactor());
-#endif // LE_PV_TSS_DYNAMIC_THRESHOLD
-#endif // LE_PV_USE_TSS
-
-#define LE_PV_ANALYSIS_DAFX
-
-#ifdef LE_PV_ANALYSIS_DAFX
     // Omega_k * Ra (hop size), DAFx, p. 263, eq. 8.42
     float const deviationFactor(parameters.deviationFactor());
     float const normalisedOmega(parameters.freqPerBin() / deviationFactor);
-#else
-    float const expctRate(parameters.expctRate());
-    float const freqPerBin(parameters.freqPerBin());
-    float const deviationFactor(parameters.deviationFactor());
-#endif // LE_PV_ANALYSIS_DAFX
 
     /// \note
     ///   The following code assumes a zero-phase windowed FFT procedure. See
@@ -460,87 +403,17 @@ void LE_NOINLINE analysis(AnalysisChannelState &state, Engine::FullChannelData_A
 
         float const phaseDifference(phase - lastPhase);
 
-#ifdef LE_PV_ANALYSIS_DAFX
         float const currentBinNormalisedOmega(binf * normalisedOmega);
         float const deltaPhi(mapToPiInterval(phaseDifference - currentBinNormalisedOmega));
         float const frequency((currentBinNormalisedOmega + deltaPhi) * deviationFactor);
-#else  // DSPDimension
-        float const expectedPhaseDifference(binf * expctRate);
-        float const currentBinFrequency(binf * freqPerBin);
-        float const phasePredictionError(
-            mapToPiInterval(phaseDifference - expectedPhaseDifference));
-        // Deviation from the bin frequency.
-        float const deviation(phasePredictionError * deviationFactor);
-        // Calculate the frequency.
-        float const frequency(currentBinFrequency + deviation);
-#endif // analysis implementation
 
         *pLastPhase = phase;
         *pPhFq = frequency; // store estimated frequency (overwriting the phase data)
-
-#ifdef LE_PV_USE_TSS
-        float const *LE_RESTRICT const pAmp(&pData->amps()[bin]);
-        /// \todo There are various values whose delta can be used to estimate
-        /// the 'stability' of a bin (true frequency, true phase, true phase
-        /// increment, measured phase...) but so far only the measured phase
-        /// delta (i.e. it's second derivative, the approach used by the aubio
-        /// library and DAFx example code) gave somewhat meaningful results. It
-        /// is not clear why this is so, intuitively the true frequency or the
-        /// true phase increment seem like the logical values to track (as
-        /// explained in the Duxbury's paper). Reinvestigate this properly...
-        ///                                   (12.04.2012.) (Domagoj Saric)
-        float *LE_RESTRICT const pLastLastPhase(&pState->binData[bin].lastLastPhase);
-        std::uint8_t *LE_RESTRICT const pAdaptiveThresholdFactor(
-            &pState->binData[bin].adaptiveThresholdFactor);
-        bool *LE_RESTRICT const pTransientBin(&pState->binData[bin].transient);
-        bool *LE_RESTRICT const pFellBelowThreshold(&pState->binData[bin].fellBelowThreshold);
-
-#if defined(_DEBUG) && !defined(LE_PUBLIC_BUILD)
-        float adaptiveThresholdReference;
-        {
-            // "straight" implementation:
-            float const lastAdaptiveThreshold(*pAdaptiveThresholdFactor * threshold);
-            float const alpha(!*pTransientBin ? a : 0.0f);
-            float const beta((lastAdaptiveThreshold >= (threshold + alpha * threshold)) ? b : 0.0f);
-            float const adaptiveThreshold(threshold + alpha * threshold + beta * threshold);
-            adaptiveThresholdReference = adaptiveThreshold;
-        }
-#endif // _DEBUG
-        // branchless implementation:
-        std::uint8_t thresholdFactor(1);
-        std::uint8_t const alpha(a & (static_cast<std::int8_t>(*pTransientBin) - 1));
-        thresholdFactor += alpha;
-        std::uint8_t const beta(
-            b & (-static_cast<std::int8_t>(*pAdaptiveThresholdFactor >= thresholdFactor)));
-        thresholdFactor += beta;
-        float const adaptiveThreshold(convert<float>(thresholdFactor) * threshold);
-#if defined(_DEBUG) && !defined(LE_PUBLIC_BUILD)
-        LE_ASSERT(adaptiveThreshold == adaptiveThresholdReference);
-#endif // _DEBUG && !LE_PUBLIC_BUILD
-        *pAdaptiveThresholdFactor = thresholdFactor;
-
-        float const delta(mapToPiInterval(phaseDifference - lastPhase + *pLastLastPhase));
-        *pLastLastPhase = lastPhase;
-        float const amp(*pAmp);
-        bool const roseFromSilence(isGreater(amp, upperSilenceThreshold) & *pFellBelowThreshold);
-        bool const transientBin(isGreater(abs(delta), adaptiveThreshold) | roseFromSilence);
-
-        *pFellBelowThreshold = isGreater(lowerSilenceThreshold, amp);
-        *pTransientBin = transientBin;
-#endif // LE_PV_USE_TSS
     }
 
     //LE_ASSERT( pPhFq == pData->phases().end() );
 
     //verifyDCPhase( phaseInAnaFreqOut.front() );
-
-#ifdef LE_PV_TSS_DYNAMIC_THRESHOLD
-    if (parameters.tssOff())
-    {
-        for (auto &binState : state.binData)
-            binState.transient = false;
-    }
-#endif // LE_PV_TSS_DYNAMIC_THRESHOLD
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -652,69 +525,6 @@ void LE_NOINLINE synthesis(SynthesisChannelState &state, DataRange const &anaFre
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifdef LE_PV_USE_TSS
-namespace
-{
-#pragma warning(push)
-#pragma warning(                                                                                   \
-    disable                                                                                        \
-    : 4480) // Nonstandard extension used: specifying underlying type for enum 'Effects::PhaseVocoderShared::pitchShiftAndScale::TransientBins'.
-enum TransientBins : std::uint8_t
-{
-    None = false | false << 1,
-    Target = false | true << 1,
-    Source = true | false << 1,
-    TargetAndSource = true | true << 1,
-};
-#pragma warning(pop)
-
-TransientBins
-    LE_FORCEINLINE transientBins(Detail::AnalysisBinStateData const *LE_RESTRICT const pBinData,
-                                 std::uint16_t const inputIndex, std::uint16_t const outputIndex)
-{
-    TransientBins const result(static_cast<TransientBins>(
-        static_cast<std::uint8_t>(pBinData[inputIndex].transient) |
-        static_cast<std::uint8_t>(pBinData[outputIndex].transient << 1)));
-    return result;
-}
-
-void LE_FORCEINLINE
-reinitialisePhase(std::uint16_t const bin, float *LE_RESTRICT const pSynthesisPhaseSum,
-                  Detail::AnalysisBinStateData const *LE_RESTRICT const pAnalysisData)
-{
-    // Set the synthesis phase state such that the reconstructed phase
-    // becomes equal to the input analysis phase (this could be done more
-    // efficiently by passing transient bin information to the synthesis
-    // step).
-    pSynthesisPhaseSum[bin] = pAnalysisData[bin].lastLastPhase;
-}
-
-void zeroAbandonedBins(Engine::real_t *LE_RESTRICT pBin, Engine::real_t const *const pEnd,
-                       Engine::real_t *LE_RESTRICT pSynthesisPhaseSum,
-                       Detail::AnalysisBinStateData const *LE_RESTRICT pAnalysisData)
-{
-    while (pBin != pEnd)
-    {
-        bool const transient(pAnalysisData->transient);
-        float &bin(*pBin++);
-        float &synthesisPhaseSum(*pSynthesisPhaseSum++);
-        float const &analysisPhase(pAnalysisData++->lastLastPhase);
-        if (transient)
-            synthesisPhaseSum = analysisPhase; // reinitialise phase
-        else
-            bin = 0;
-    }
-}
-
-#ifdef __GNUC__
-static SynthesisChannelState dummySynthesisState; // const on MSVC only: GCC/Clang reject an
-                                                  // uninitialised const object
-#else
-static SynthesisChannelState const dummySynthesisState;
-#endif
-} // anonymous namespace
-#endif // LE_PV_USE_TSS
-
 void LE_NOINLINE
 pitchShiftAndScale(Engine::ChannelData_AmPh &data,
                    PitchShiftParameters const &pitchShiftParameters) /// \throws nothing
@@ -725,29 +535,6 @@ pitchShiftAndScale(Engine::ChannelData_AmPh &data,
 
     float const scale(pitchShiftParameters.scale());
     float const scaleInverse(1 / scale);
-
-#ifdef LE_PV_USE_TSS
-    ////...mrmlj...quick temporary workaround to enable PVD effects to work with
-    ////...mrmlj...with TSS enabled...
-    if (!pData->pAnalysisState)
-    {
-        AnalysisChannelState dummy;
-        auto const numberOfBins(pData->full().numberOfBins());
-        auto const storageBytes(numberOfBins * sizeof(Detail::AnalysisBinStateData));
-        LE_STACK_BUFFER(dummyStorage, char, storageBytes);
-        Utility::Storage storage(dummyStorage);
-        dummy.binData.Utility::SharedStorageBuffer<Detail::AnalysisBinStateData>::resize(
-            storageBytes, storage);
-        dummy.binData.reset();
-        pData->pAnalysisState = &dummy;
-        LE_ASSERT(!pData->pSynthesisState || pData->pSynthesisState == &dummySynthesisState);
-        pData->pSynthesisState = const_cast<SynthesisChannelState *>(&dummySynthesisState);
-    }
-
-    Detail::AnalysisBinStateData const *LE_RESTRICT const pAnalysisData(
-        pData->pAnalysisState->binData.begin());
-    float *LE_RESTRICT const pSynthesisPhaseSum(pData->pSynthesisState->phaseSum().begin());
-#endif // LE_PV_USE_TSS
 
     float *LE_RESTRICT const amplitudes(pData->amps().begin());
     float *LE_RESTRICT const frequencies(pData->phases().begin());
@@ -761,18 +548,11 @@ pitchShiftAndScale(Engine::ChannelData_AmPh &data,
     // Shift up (stretching the spectrum):
     if (scale > 1)
     {
-// Test "backward propagation", section 9.1 in
-// http://www.hvass-labs.org/people/magnus/schoolwork/pvoc/phasevocoder.pdf
-#define LE_PV_USE_BACKWARD_PROPAGATION
-
+        // "Backward propagation", section 9.1 in
+        // http://www.hvass-labs.org/people/magnus/schoolwork/pvoc/phasevocoder.pdf
         std::uint16_t const startOutputIndex(pData->size() - 1);
-#ifdef LE_PV_USE_BACKWARD_PROPAGATION
         float floatOutputIndex(convert<float>(startOutputIndex));
-#else
-        float floatInputIndex(convert<float>(startOutputIndex) * scaleInverse);
-#endif // LE_PV_USE_BACKWARD_PROPAGATION
 
-#ifdef LE_PV_USE_BACKWARD_PROPAGATION
         for (;;)
         {
             std::uint16_t const inputIndex(round(floatOutputIndex * scaleInverse));
@@ -780,15 +560,6 @@ pitchShiftAndScale(Engine::ChannelData_AmPh &data,
             --floatOutputIndex;
             if (!inputIndex)
                 break;
-#else
-        std::uint16_t lastOutputIndex(startOutputIndex);
-        // 'Shifting' to/from the DC bin is nonsensical so we skip it.
-        while (floatInputIndex > 0.5f)
-        {
-            std::uint16_t const inputIndex(round(floatInputIndex));
-            std::uint16_t const outputIndex(round(floatInputIndex * scale));
-            --floatInputIndex;
-#endif // LE_PV_USE_BACKWARD_PROPAGATION
 
             LE_ASSERT_MSG(inputIndex < pData->numberOfBins(), "Index out of range.");
             LE_ASSERT_MSG(outputIndex < pData->numberOfBins(), "Index out of range.");
@@ -796,77 +567,12 @@ pitchShiftAndScale(Engine::ChannelData_AmPh &data,
 #ifndef __APPLE__
             //...mrmlj...this sometimes fails in SDK builds on Apple platforms...
             LE_ASSERT_MSG(amplitudes[inputIndex] >= 0, "Negative amplitude");
-#endif      // __APPLE__
+#endif // __APPLE__
             //LE_ASSERT_MSG( frequencies[ inputIndex ] >= 0, "Negative frequency" );//...mrmlj...
 
-#ifdef LE_PV_USE_TSS
-            switch (transientBins(pAnalysisData, inputIndex, outputIndex))
-            {
-            case Target:
-                // If the target bin contains a (stronger) transient do not
-                // overwrite it (we could properly add the two frequencies
-                // in the ReIm domain).
-                if (amplitudes[outputIndex] > amplitudes[inputIndex])
-                {
-                    reinitialisePhase(outputIndex, pSynthesisPhaseSum, pAnalysisData);
-                    break;
-                }
-            case None:
-                frequencies[outputIndex] = frequencies[inputIndex] * scale;
-                amplitudes[outputIndex] = amplitudes[inputIndex];
-                break;
-            case Source:
-                // If the input bin contains a transient, leave it as it is
-                // and zero the target bin.
-                reinterpret_cast<std::int32_t &>(amplitudes[outputIndex]) = 0;
-                break;
-            case TargetAndSource:
-                reinitialisePhase(outputIndex, pSynthesisPhaseSum, pAnalysisData);
-                break;
-
-                LE_DEFAULT_CASE_UNREACHABLE();
-            }
-#else
             frequencies[outputIndex] = frequencies[inputIndex] * scale;
             amplitudes[outputIndex] = amplitudes[inputIndex];
-#endif // LE_PV_USE_TSS
-
-#ifndef LE_PV_USE_BACKWARD_PROPAGATION
-            /// \note
-            /// If we have skipped over one or more (output) bins (since we are
-            /// stretching the spectrum) we need to fill them somehow:
-            ///  - perform some sort of interpolation
-            ///  - zero the in-between bins
-            ///  - replicate/copy one of the neighbouring bins (in effect brick
-            ///    wall interpolation).
-            /// Currently we copy the neighbouring bin (as recommended by
-            /// "Yggdrasil") in order to approximately preserve/recreate the DFT
-            /// frequency "spillage".
-            ///                               (03.04.2012.) (Domagoj Saric)
-            while (--lastOutputIndex > outputIndex)
-            {
-                // Zeroing:
-                //amplitudes[ lastOutputIndex ] = 0;
-                // Replication:
-                frequencies[lastOutputIndex] = frequencies[inputIndex] * scale;
-                amplitudes[lastOutputIndex] = amplitudes[inputIndex];
-            }
-            /// \note
-            ///   The above while() condition was written as it was in order to
-            /// eliminate an extra check (if ( lastOutputIndex != outputIndex ))
-            /// but this can in turn cause lastOutputIndex to decrement past the
-            /// outputIndex pointer (with smaller scale values, when no bins are
-            /// skipped and lastOutputIndex == outputIndex) so it must be
-            /// explicitly set to the correct value/position.
-            ///                               (03.04.2012.) (Domagoj Saric)
-            LE_ASSERT((lastOutputIndex == outputIndex) || (lastOutputIndex == outputIndex - 1));
-            lastOutputIndex = outputIndex;
-#endif // LE_PV_USE_BACKWARD_PROPAGATION
         }
-
-#ifndef LE_PV_USE_BACKWARD_PROPAGATION
-        LE_ASSERT(round(++floatInputIndex) == 1);
-#endif // LE_PV_USE_BACKWARD_PROPAGATION
     }
     else
         // Shift down (compressing the spectrum):
@@ -903,31 +609,12 @@ pitchShiftAndScale(Engine::ChannelData_AmPh &data,
                 LE_ASSERT_MSG(amplitudes[inputIndex] >= 0, "Negative amplitude");
                 //LE_ASSERT_MSG( frequencies[ inputIndex ] >= 0, "Negative frequency" );
 
-#ifdef LE_PV_USE_TSS
-                float const inputAmp(pAnalysisData[inputIndex].transient ? 0
-                                                                         : amplitudes[inputIndex]);
-                float const inputFreq(frequencies[inputIndex]);
-
                 /// \note If we are writing/moving into the same bin as in the
                 /// previous iteration we need to "combine" the frequencies somehow.
                 /// Because we cannot easily add them (while working with polar
                 /// coordinates) we overwrite the old (previously stored) frequency
                 /// if the new one has a larger amplitude.
                 ///                               (21.05.2012.) (Domagoj Saric)
-                bool const targetIsTransient(pAnalysisData[outputIndex].transient);
-                bool const newNonTransientTargetBin(!targetIsTransient &
-                                                    (lastOutputIndex != outputIndex));
-                lastOutputIndex = outputIndex;
-                if (newNonTransientTargetBin || (inputAmp > amplitudes[outputIndex]))
-                {
-                    frequencies[outputIndex] = inputFreq * scale;
-                    amplitudes[outputIndex] = inputAmp;
-                }
-                else if (targetIsTransient)
-                {
-                    reinitialisePhase(outputIndex, pSynthesisPhaseSum, pAnalysisData);
-                }
-#else
                 if ((lastOutputIndex != outputIndex) ||
                     (amplitudes[inputIndex] > amplitudes[outputIndex]))
                 {
@@ -935,22 +622,11 @@ pitchShiftAndScale(Engine::ChannelData_AmPh &data,
                     amplitudes[outputIndex] = amplitudes[inputIndex];
                 }
                 lastOutputIndex = outputIndex;
-#endif // LE_PV_USE_TSS
             }
 
             /// \note Zero the "abandoned" high frequencies.
             ///                                   (03.04.2012.) (Domagoj Saric)
-#ifdef LE_PV_USE_TSS
-            /// \note We zero all of the "abandoned high frequency" bins even when
-            /// TSS is on because the current algorithm does not seem good enough
-            /// and the high frequency "transient" bins it detects produce only
-            /// ugly audible artefacts.
-            ///                                   (22.05.2012.) (Domagoj Saric)
-            //zeroAbandonedBins( &amplitudes[ lastOutputIndex ], pData->amps().end(), &pSynthesisPhaseSum[ lastOutputIndex ], pAnalysisData );
             clear(&amplitudes[lastOutputIndex], pData->amps().end());
-#else
-            clear(&amplitudes[lastOutputIndex], pData->amps().end());
-#endif // LE_PV_USE_TSS
         }
         else
         // Skip (scale == 1):
@@ -978,14 +654,6 @@ pitchShiftAndScale(Engine::ChannelData_AmPh &data,
 
             LE_ASSERT(pitchShiftParameters.skipProcessing());
         }
-
-#ifdef LE_PV_USE_TSS
-    if (pData->pSynthesisState == &dummySynthesisState)
-    {
-        pData->pAnalysisState = nullptr;
-        pData->pSynthesisState = nullptr;
-    }
-#endif // LE_PV_USE_TSS
 }
 
 } // namespace LE::SW::Effects::PhaseVocoderShared

@@ -66,10 +66,6 @@ namespace Engine
 
 ChannelData_AmPh::ChannelData_AmPh(FullChannelData_AmPh &data, IndexRange const &workingRange)
     : SubRange<FullChannelData_AmPh, DataRange>(data, workingRange)
-#ifdef LE_PV_USE_TSS
-      ,
-      pAnalysisState(nullptr), pSynthesisState(nullptr)
-#endif // LE_PV_USE_TSS
 {
 }
 
