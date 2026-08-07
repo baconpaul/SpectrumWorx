@@ -176,56 +176,48 @@ Three drifts, all visible to a user, all in
   chooser will happily walk into the on-disk `assets/presets` and present a
   factory bank as writable.
 
-### Finish stripping the `LE_` macro layer
+### The `LE_` macro layer: a Windows log, and one decision
 
-Begun 07.08.2026 and stopped part-way, deliberately: what is left is the half
-that changes generated code, and it wants a Windows log in the loop rather than
-a run of green macOS builds.
+The strip ran on 07.08.2026 and is done on macOS: 184 `LE_` names down to 83,
+around 8,700 lines deleted over two branches, goldens bit-identical throughout.
+What survives is what C++20 genuinely cannot express — the assert family,
+`LE_RESTRICT`, `LE_ASSUME`, the alloca buffers, and the effect and resource
+X-macro tables. Two things are left over.
 
-**Done** — the `LE_ASSUME` double definition (it was defined twice with different
-meanings and include order picked the winner, so an assumption broken in twelve
-headers was silent undefined behaviour); the sixteen macros defined with no call
-site; the five orphan cmake files; the doxygen template; `le/utility/filesystem`
-and its `#pragma comment(lib)` naming a library this project has never built; the
-dead feature switches `LE_NO_PARAMETER_STRINGS`, `LE_SIMPLE_TUNEWORX`,
-`LE_NO_PRESETS`, `LE_NO_LFOs`, `LE_NO_RTTI`/`LE_NO_EXCEPTIONS`; window presum and
-its parameter, with the fold collapsed to the single frame it always ran at; the
-tracer and the FPU exception guards; the 89 per-translation-unit optimise and
-fast-math pragmas; and the macros C++20 can spell for itself. Around 6,400 lines.
+**A Windows log is owed.** Most of what the last phases deleted was MSVC-only
+code and nothing here has an MSVC, so these are unverified on it:
 
-**Left**, in the order to do it:
+- The assertion handler writes to `OutputDebugStringA` itself now, rather than
+  through the deleted tracer.
+- `float &LE_RESTRICT` replaced `LE_GNU_SPECIFIC` at six sites in `vector.hpp`
+  and `phase_vocoder/shared.cpp`, where a 2012 comment says MSVC could not take
+  a restricted reference; three of those also changed MSVC from pass-by-value to
+  pass-by-const-reference.
+- The fake secure-CRT shim is gone from `leConfigurationAndODRHeader.h`. It was
+  live in release MSVC builds, so this is the deletion most likely to surface
+  there. `__STDC_WANT_SECURE_LIB__` is still 0 in release and
+  `__STDC_SECURE_LIB__` is no longer force-undefined, so a header in our include
+  closure that gates a `strcpy_s`-family call on it would now fail to compile.
+  None was found; only MSVC can settle it.
 
-- **`LE_COLD` (166 sites), `LE_HOT` (38), `LE_NOVTABLE` (31).** The plan that
-  scoped these called them no-ops, and on MSVC and GCC they are. **On Clang they
-  are not**: `LE_COLD` is `__attribute__((minsize))` and `LE_HOT` is
-  `__attribute__((hot))`, so deleting them re-optimises 200-odd functions in the
-  compiler that renders the goldens. The goldens are the check and the risk is
-  real rather than notional — Clang contracts FMAs by default, so a function
-  moving from `minsize` to `-O3` can round differently. If they move, that is an
-  answer about the macros, not a bug to chase.
-- **`LE_DISABLE_LOOP_UNROLLING` (19) and `LE_DISABLE_LOOP_VECTORIZATION` (6).**
-  Same shape, sharper: these are live `clang loop` pragmas, and removing them
-  lets the vectoriser into loops it has never been in. Do them alone, after the
-  above, so a golden change has one candidate cause.
-- **`LE_ALIGN`** — one live use, eleven more inside `vector.cpp`'s NT2 arms, so
-  it cannot go until that strip below does. `alignas` replaces it.
-- **The ODR force-include.** `leConfigurationAndODRHeader.h` still carries a
-  ~78-line fake secure-CRT shim dated 2009 that is *reachable in release MSVC
-  builds*, a `__GLIBCXX__ < 20110325` typedef and a 2011 iOS `__MMX__` hack. Once
-  those go, the only genuinely ODR-critical thing left in it is `LE_HAS_SSE1`; if
-  that moves to `target_compile_definitions` then the force-include and
-  `tests/checkODRHeaderScope.cmake` can both retire.
-- **A Windows log.** Most of what the first three items delete is MSVC-only code,
-  and nothing here has an MSVC. Three changes already made are unverified on it:
-  the assertion handler now writes to `OutputDebugStringA` itself rather than
-  through the deleted tracer, `float &LE_RESTRICT` replaced `LE_GNU_SPECIFIC` at
-  six sites in `vector.hpp` and `phase_vocoder/shared.cpp` where a 2012 comment
-  says MSVC could not take a restricted reference, and three of those changed
-  MSVC from pass-by-value to pass-by-const-reference.
+**`LE_MATH_NATIVE_POINTER_SIZE_INTERFACE` is the one decision left**, 37 sites
+in `vector.cpp`. It is not a dead arm. `vector.cpp` publishes each primitive
+three ways — Span, `(begin, end)`, and `(pointer, count)` — and exactly one of
+the latter two can hold the implementation while the other forwards, or they
+recurse. This macro picks which. It is defined on Apple, where the vDSP and vvv
+calls are naturally `(pointer, count)`, and undefined elsewhere, where the
+`(begin, end)` forms hold the loops.
+
+So both arms have a live reason, which is why the NT2 strip did not settle it.
+The question worth answering is whether the three-way interface is wanted at all
+now that there is exactly one vectorised backend: collapsing to Span plus one
+forwarding pair would delete the macro and about a third of the file's surface.
+That is a refactor of the vector math, so it belongs beside the entry below
+rather than in a macro sweep.
 
 ### Dead code that needs a decision rather than a sweep
 
-Roughly 6,500 lines across 46 files are in the tree and in no target. Every one
+Roughly 5,800 lines across 45 files are in the tree and in no target. Every one
 of them needs somebody to decide rather than somebody to sweep, which is why
 each is a paragraph and not a line on a list.
 
@@ -243,15 +235,15 @@ each is a paragraph and not a line on a list.
   and by nothing else — which is a live hazard, not a hypothetical one: their
   Matlab scaffolding was removed by hand and no compiler has seen the result.
   Whoever revives one starts by getting it into a target.
-- **`le/math/vector.cpp`'s dead NT2 arm** — ~750 lines across 18
-  `#ifdef LE_MATH_USE_NT2` sites in a 2,034-line **live** file, each with a live
-  `#else` beside it. Left when `src/nt2_static_fft/` went on 05.08.2026, and it
-  is not a dangling reference the way the deleted files' callers were: the arm
-  needs `boost/simd/…`, which **is not vendored either**, so it has been
-  un-compilable for as long as this port has existed rather than merely
-  unreachable. Stripping it is a refactor of the vector math the whole engine
-  runs on, which is why it is a decision and not a sweep — and it is what would
-  let `boost/simd` and `boost/dispatch` off `scripts/check_boost_allowlist.sh`.
+- **`le/math/vector.cpp`'s three interfaces.** The NT2 arm is gone as of
+  07.08.2026 and the file is 1,126 lines rather than 2,002, but it still
+  publishes every primitive three times — Span, `(begin, end)` and
+  `(pointer, count)` — with `LE_MATH_NATIVE_POINTER_SIZE_INTERFACE` choosing
+  which pair holds the implementation and which forwards. That made sense with
+  two vector backends. With one, collapsing to Span plus a single forwarding
+  pair would take about a third of the file's surface and the last live
+  configuration macro in the math layer with it. It is the vector math the whole
+  engine runs on, so it is a decision and not a sweep.
 
 ---
 
