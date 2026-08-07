@@ -258,7 +258,18 @@ int renderPage(juce::String const &pageName, juce::File const &output)
     if (component->getWidth() <= 0 || component->getHeight() <= 0)
         component->setSize(900, 600);
 
-    juce::Image image(juce::Image::ARGB, component->getWidth(), component->getHeight(), true);
+    /// \note SoftwareImageType explicitly, rather than whatever a juce::Image
+    /// defaults to. That default is the *native* type -- CoreGraphics on macOS
+    /// and the software renderer everywhere else -- and the two do not round a
+    /// transformed clip region the same way, so these pages were rendering by
+    /// one code path here and another on CI. The editor is drawn through a
+    /// scale transform now, which is exactly where the two diverge: a preset
+    /// browser row past the end of the listing got a sliver of clip to paint in
+    /// under the software renderer and none under CoreGraphics, and the
+    /// assertion that caught it could only ever fire on Linux. Same renderer
+    /// everywhere means a red CI run can be reproduced here.
+    juce::Image image(juce::Image::ARGB, component->getWidth(), component->getHeight(), true,
+                      juce::SoftwareImageType{});
     {
         juce::Graphics graphics(image);
         component->paintEntireComponent(graphics, true);
