@@ -22,7 +22,6 @@
 namespace LE::SW::Engine
 {
 
-
 LE_COLD ModuleDSP::~ModuleDSP() {}
 
 LE_COLD void ModuleDSP::preProcess(LFO::Timer const &timer, Setup const &engineSetup)
@@ -68,7 +67,6 @@ bool LE_COLD ModuleDSP::allocateStorage(
 
     return storage_.resize(totalBytes);
 }
-
 
 void ModuleDSP::process(std::uint8_t const channel, ChannelData &channelData,
                         Setup const &engineSetup) const

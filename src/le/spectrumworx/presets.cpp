@@ -1063,4 +1063,3 @@ std::string savePreset(std::string_view const externalSampleFilePath,
 } // namespace SW
 
 } // namespace LE
-

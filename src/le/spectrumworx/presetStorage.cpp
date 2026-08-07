@@ -19,7 +19,6 @@
 namespace LE::SW
 {
 
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // readPresetFile()
@@ -113,6 +112,5 @@ void copyPresetName(char const *const name, std::span<char> const target)
     }
     target[written] = '\0';
 }
-
 
 } // namespace LE::SW

@@ -29,7 +29,6 @@
 namespace LE::Parameters
 {
 
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // print()
@@ -151,7 +150,6 @@ struct AutomatedParameterPrinter
 }; // struct AutomatedParameterPrinter
 
 #pragma warning(pop)
-
 
 } // namespace LE::Parameters
 

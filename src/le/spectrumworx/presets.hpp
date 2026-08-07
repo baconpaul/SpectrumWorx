@@ -66,7 +66,6 @@ template <class Parameter> constexpr char const *streamingName();
 namespace SW
 {
 
-
 class SpectrumWorx;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -877,7 +876,6 @@ class Program;
 /// plus where the user had got to. See DawExtraState.
 std::string savePreset(std::string_view externalSampleFilePath, std::string_view comment,
                        Program const &, DawExtraState const *pDawExtraState = nullptr);
-
 
 } // namespace SW
 

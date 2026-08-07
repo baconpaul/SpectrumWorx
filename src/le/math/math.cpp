@@ -40,7 +40,6 @@ namespace LE::Math
 #pragma check_stack(off)
 #endif // _MSC_VER
 
-
 namespace
 {
 union Float32
@@ -862,7 +861,6 @@ float LE_HOT normalisedRand()
     LE_ASSUME(result <= 1);
     return result;
 }
-
 
 } // namespace LE::Math
 

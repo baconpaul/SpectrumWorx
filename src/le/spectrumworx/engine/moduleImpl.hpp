@@ -278,7 +278,6 @@ struct MakeChannelStateHolder
             effect.process(channelStates_[channel], data, setup);
         }
 
-
         LE_FORCEINLINE void LE_COLD callReset()
         {
 #ifndef _MSC_VER
@@ -318,7 +317,6 @@ struct MakeChannelStateHolder
                 pNewChannelState->resize(factors, storage);
             }
         }
-
 
         ChannelStateRange channelStates_;
     }; // struct ChannelStates

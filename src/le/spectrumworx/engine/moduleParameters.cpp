@@ -43,7 +43,6 @@ namespace LE::SW::Engine
 
 using LFO = Parameters::LFOImpl;
 
-
 LE_COLD ModuleParameters::ModuleParameters(
     //std::uint8_t           const moduleSlotIndex,
     EffectMetaData const &metadata, LFOPlaceholder *const pLFOStorage,
@@ -401,6 +400,5 @@ LE_COLD void ModuleParameters::savePresetParameters(ParametersSaver const &param
         //}
     }
 }
-
 
 } // namespace LE::SW::Engine
