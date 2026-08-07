@@ -285,10 +285,14 @@ latency** — `activate()` caches `engineSetup().latencyInSamples()`. A preset t
 changes the spectral setup therefore takes the restart with it and installs its
 chain in `activate()`.
 
-> `request_restart` has never been answered by a real host. The test hosts in
-> `tests/clap/` implement it as a no-op observer, which is enough to say the
-> plugin asks and not enough to say a DAW answers. [`todo.md`](todo.md) item 1
-> owns finding out.
+> `request_restart` has still not been *observed* being answered by a real host.
+> The test hosts in `tests/clap/` implement it as a no-op observer, which is
+> enough to say the plugin asks and not enough to say a DAW answers. The DAW pass
+> did not settle it either way, because it takes a specific act to see: change
+> the FFT size from the host's own generic panel while audio runs. A host that
+> ignores the request leaves that parameter reading one thing and the engine
+> running another — visible, harmless, and not what anyone asked for. It is on
+> `todo.md`'s by-hand checklist for that reason.
 
 ---
 
@@ -407,5 +411,7 @@ shared assertion counter and is reported as a race in
 `processStatus()` for exactly this: the workers record and the main thread
 asserts.
 
-**And what no headless case substitutes for.** Logic, Bitwig and Reaper, by
-hand. [`todo.md`](todo.md) item 1 has the list.
+**And what no headless case substitutes for.** Hosts, by hand. Testers ran the
+plugin in DAWs on macOS, Windows and Linux on 07.08.2026 and the deadlocks this
+model was designed against are gone — which is the observation the redesign had
+been an argument for.

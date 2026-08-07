@@ -217,15 +217,6 @@ New entries go at the top of their area.
   `stateSave` and the preset writer all answer from the main thread's copy, so
   every existing case agreed with a change the audio thread never received.
 
-- **The main thread's `Program` is only half fed.** (06.08.2026, branch
-  `main-program-copy`) `programMain_` exists and the editor and host-automation
-  routes keep it level, but a preset or session load still fills only the
-  engine's copy, so the four host-facing reads in `spectrumWorxCLAP.cpp` still
-  answer from `program()` and still walk a chain the audio thread splices — each
-  carries a `\todo`. `todo.md` item 1 owns finishing it; the shape it needs is in
-  `SW::loadPreset`'s existing `loader.onlySetParameters()` branch, which assigns
-  the global parameters and moves a chain in while touching no engine.
-
 - **A host writing a slot selector allocates on the audio thread.** (02.08.2026)
   The one exception to "modules are built on the main thread"
   (`threading_model.md` §5). Every other route — the interface, a preset, a
@@ -636,6 +627,17 @@ The decision itself is settled and written down in
 [`LICENSING.md`](../../LICENSING.md): source GPL-3.0-or-later, released binary
 AGPL-3.0-or-later because JUCE 8 is AGPLv3-or-commercial. The 452 file headers
 are right as they stand. What is below is packaging.
+
+- **The standalone ships under an identifier that is not ours.** (07.08.2026)
+  clap-wrapper hardcodes `"<name>.standalone"` in its own `Info.plist.in` and no
+  CMake property overrides that key; `src/clap-first/CMakeLists.txt` says so at
+  length. This was queued as a shipping blocker on the theory that notarisation
+  would object. Notarisation does not object — signing, submission and stapling
+  all succeed — so what is left is a released application carrying a bundle
+  identifier that belongs to the wrapper rather than to SpectrumWorx. Cosmetic
+  until something keys off it, and the sort of thing that is far cheaper to fix
+  before a release than after one, because an identifier is what a user's
+  settings and a host's plugin cache are filed under.
 
 - **The duplicate licence file, and the dead reference to it.**
   (03.08.2026) `doc/manual/EULA.txt` is a byte-for-byte duplicate of `LICENSE`
