@@ -239,13 +239,9 @@ template <class Parameter> constexpr ParameterInfo info()
             /// -- "parameter names are required for presets" -- was the warning that
             /// they should not be: renaming a knob re-keyed every file that named it.
             Parameters::Name<Parameter>::string_, Parameters::streamingName<Parameter>(),
-#ifdef LE_NO_PARAMETER_STRINGS
-            nullptr, nullptr
-#else
+
             Parameters::DisplayValueTransformer<Parameter>::Suffix::c_str(),
-            EnumeratedValueStrings<Parameter, Tag>::type::stringsBegin()
-#endif // LE_NO_PARAMETER_STRINGS
-    };
+            EnumeratedValueStrings<Parameter, Tag>::type::stringsBegin()};
 }
 
 template <typename Parameters, index_t... Indices>
@@ -356,7 +352,6 @@ struct MakeEmptyChannelStateHolder
     }; // struct ChannelStates
 }; // struct MakeEmptyChannelStateHolder
 
-#if !LE_NO_PARAMETER_STRINGS
 /// \note The `__fastcall` this carried is gone for the reason given over
 /// `EffectMetaData::GetParameterValueString`, which is the type this function
 /// has to match: a dead calling convention that Clang accepts and ignores and
@@ -373,7 +368,6 @@ template <class Parameters> struct EffectParameterPrinter
             parameterIndex, std::forward<LE::Parameters::AutomatedParameterPrinter const>(printer));
     }
 }; // class EffectParameterPrinter
-#endif // !LE_NO_PARAMETER_STRINGS
 
 template <class Effect, typename TypeIndex> struct MakeEffectMetaData
 {
@@ -384,10 +378,7 @@ template <class Effect, typename TypeIndex>
 ModuleParameters::EffectMetaData const MakeEffectMetaData<Effect, TypeIndex>::data = {
     Effect::Parameters::static_size, TypeIndex::value,
     &ParametersInformation<typename Effect::Parameters>::data[0],
-#if !LE_NO_PARAMETER_STRINGS
-    EffectParameterPrinter<typename Effect::Parameters>::print
-#endif // !LE_NO_PARAMETER_STRINGS
-};
+    EffectParameterPrinter<typename Effect::Parameters>::print};
 
 ////////////////////////////////////////////////////////////////////////////
 // EffectParameterOffsets<Effect>
