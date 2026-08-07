@@ -33,7 +33,6 @@
 namespace LE::Utility
 {
 
-
 // http://code.google.com/p/stringencoders/source/browse/trunk/src/modp_numtoa.c
 // http://www.dreamincode.net/code/snippet2482.htm
 // http://www.piumarta.com/software/fcvt
@@ -164,6 +163,5 @@ template <> LE_COLD double lexical_cast<double>(char const *valueString)
 {
     return lexical_cast_double_worker(valueString);
 }
-
 
 } // namespace LE::Utility

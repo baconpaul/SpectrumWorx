@@ -30,7 +30,6 @@ void warningMessageBox(std::string_view title, std::string_view message, bool ca
 namespace SW
 {
 
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // \note What used to be here -- reading a file into the parser's buffer and
@@ -82,7 +81,6 @@ void savePreset(juce::File const &file, juce::File const &externalSampleFile,
     if (!writePresetFile(file, preset.c_str(), static_cast<unsigned int>(preset.size() + 1)))
         reportPresetProblem(PresetProblem::SaveFailed);
 }
-
 
 } // namespace SW
 

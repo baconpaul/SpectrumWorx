@@ -16,7 +16,6 @@
 
 #include "le/utility/platformSpecifics.hpp"
 
-
 #include "fft.hpp"
 
 #include <cmath>
@@ -422,4 +421,3 @@ LE_COLD std::uint32_t FFT_float_real_1D::requiredStorage(SW::Engine::StorageFact
 }
 
 } // namespace LE::Math
-

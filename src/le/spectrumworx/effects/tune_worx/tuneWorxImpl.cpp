@@ -109,8 +109,6 @@ void LE_COLD TuneWorxBaseImpl::setup(IndexRange const &,
     }
 }
 
-
-
 float LE_NOINLINE LE_HOT TuneWorxBaseImpl::findNewPitchScale(Engine::ChannelData_AmPh const &data,
                                                              Engine::Setup const &engineSetup,
                                                              ChannelState &cs) const

@@ -52,7 +52,6 @@ void LE_COLD ColoriferImpl::setup(IndexRange const &workingRange, Engine::Setup 
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-
 void LE_HOT ColoriferImpl::process(Engine::MainSideChannelData_AmPh data,
                                    Engine::Setup const &) const
 {
@@ -136,6 +135,5 @@ void LE_HOT ColoriferImpl::process(Engine::MainSideChannelData_AmPh data,
         binsLeft -= shapeWidth;
     }
 }
-
 
 } // namespace LE::SW::Effects

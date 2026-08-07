@@ -107,7 +107,6 @@ template <class Derived> struct DynamicChannelState_
 /// \class CompoundChannelState
 ////////////////////////////////////////////////////////////////////////////////
 
-
 template <typename... ChannelStates> struct CompoundChannelState : ChannelStates...
 {
   private:
@@ -135,7 +134,6 @@ template <typename... ChannelStates> struct CompoundChannelState : ChannelStates
 #pragma clang diagnostic pop
 #endif // __clang__
 }; // struct CompoundChannelState
-
 
 } // namespace Effects
 

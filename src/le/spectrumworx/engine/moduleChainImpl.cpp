@@ -19,7 +19,6 @@
 namespace LE::SW::Engine
 {
 
-
 LE_COLD ModuleChainBase::ModuleChainBase()
 {
     referenceCount_.verifyCountEqual(0);
@@ -373,6 +372,5 @@ LE_COLD bool ModuleChainImpl::resizeAll(Engine::StorageFactors const &newfactors
     LE_VERIFY(resize(pModulesBegin, *reachedIterator, currentFactors) == reachedIterator);
     return false;
 }
-
 
 } // namespace LE::SW::Engine

@@ -23,7 +23,6 @@
 namespace LE::SW::Automation
 {
 
-
 using BaseParameters = Effects::BaseParameters::Parameters;
 
 char const *getParameterValueString(std::uint8_t const index, ParameterPrinter const &printer,
@@ -153,6 +152,5 @@ Detail::autoAdjustedLFOParameter(LFO &lfo, std::uint8_t const lfoParameterIndex)
     }
     return std::nullopt;
 }
-
 
 } // namespace LE::SW::Automation
