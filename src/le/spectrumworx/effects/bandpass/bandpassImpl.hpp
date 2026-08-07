@@ -19,12 +19,6 @@
 namespace LE::SW::Effects
 {
 
-#if defined(_DEBUG)
-/// \note Testing phase...
-///                                       (17.02.2012.) (Domagoj Saric)
-#define LE_BAND_FILTER_USE_ENGINE_WINDOW
-#endif // _DEBUG
-
 namespace Detail ///< \internal
 {
 class BandGainImpl : public EffectImpl<BandGain>
@@ -38,11 +32,6 @@ class BandGainImpl : public EffectImpl<BandGain>
 
   protected:
     float attenuation_;
-#ifdef LE_BAND_FILTER_USE_ENGINE_WINDOW
-    DataRange downSlope_;
-    float *pUpSlope_;
-    Engine::StaticHalfFFTBuffer window_;
-#endif // LE_BAND_FILTER_USE_ENGINE_WINDOW
 };
 } // namespace Detail
 
