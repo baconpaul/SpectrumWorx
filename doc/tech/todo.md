@@ -20,8 +20,8 @@ cannot be held to a number off the machine that minted their fixtures.
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone, on every push: macOS universal, Windows x64 under MSVC 19.51, Linux x64 under GCC 12.4, and again in an Ubuntu 20 / GCC 11 container for the glibc a released binary needs. |
 | Runs | Standalone, with audio, with the real editor, with presets. **Loaded in Bitwig on 06.08.2026 and it crashed** — changing presets with audio running, in `paramsInfo`; not the old deadlock but the same class of fault, and item 1 owns it. Logic and Reaper still unvisited — item 2. |
-| Tests | **Green on 06.08.2026** — 102 plugin cases and 140 dsp cases, Debug and Release, the four that were red now fixed and one added for the `stateSave` echo. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`, plus 66 `sw-show-ui` renders. Goldens run in Release only. |
-| Validators | `auval` 10 runs of 10. `vst3-validator` 47/47. **`clap-cpp-validator` 21 of 22** — `state-reproducibility-flush` fails, and it is a regression: it passes at `ce011db~1`. Item 1 owns it. One warning (`scan-time`, below). All three by hand on this machine as of 06.08.2026; CI runs none of them. |
+| Tests | **Green on 06.08.2026** — 109 plugin cases and 142 dsp cases, Debug and Release. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`, plus 66 `sw-show-ui` renders. Goldens run in Release only. |
+| Validators | **All three clean on 06.08.2026** — `auval` 5 runs of 5, `vst3-validator` 47/47, and `clap-cpp-validator` **22 of 22 with zero failures**, `state-reproducibility-flush` included. The one `scan-time` warning comes and goes with the page cache (below). All three by hand on this machine; CI runs none of them. |
 | CI | `.github/workflows/build-plugin.yml`. **Green on 06.08.2026** — ten jobs (gates, five test legs, four builds) over three platforms, run `31112026299`. Windows Debug is the sixth test leg and is excluded; `tech_debt.md` says why. |
 | Warnings | **Two**, both deliberate `#pragma message` build banners. Our own sources compile under `-Wall -Wextra -Werror` on Apple Clang, GCC 12.4 and GCC 11 — CI passes `-DSW_WERROR=ON` to every leg. MSVC gets nothing and compiles warning-blind — `tech_debt.md`. |
 | Sanitizers | **tsan clean over both binaries as of 06.08.2026** — zero reports across 101 plugin cases and 106 dsp cases, including the case that reproduced the preset-swap race. The earlier clean run, on 02.08.2026, is what that race shows the limit of: nothing then drove a host reading parameters against a running engine, so tsan had nothing to see. `reset()` and `paramsFlush()` entered the realtime region on 03.08.2026 and **have not been run under rtsan since** — item 2. |
@@ -106,29 +106,25 @@ read back:
 > touched. Both check real values now. Worth remembering as the shape of the
 > mistake: a green case measuring the wrong object.
 
-**Still red, and a genuine regression** — `clap-cpp-validator`'s
-`state-reproducibility-flush`, which passes at `ce011db~1` and fails at HEAD.
-Same length both times, 1782 bytes; the whole diff is the `sync` attribute of
-every module parameter, 0 from the instance driven through `flush()` and 1 from
-the one driven through `process()`.
+**`state-reproducibility-flush` is green**, and closing it took the LFO rate
+model with it — [`how-lfo-rates-work.md`](how-lfo-rates-work.md) is the new
+document. Three things landed, each verified by reversion:
 
-`LFOImpl::SyncTypes::default_()` answers `hasTempoInformation() ? Quarter : Free`
-— a parameter default that reads process-global mutable state, untouched since
-2011 and untouched by this work. What the split changed is *when* the main
-thread's module is built: the engine's is created while the slot event is
-handled, `programMain_`'s when the echo is drained, and the transport becomes
-known in between. Two constructions, two answers, and the copy that gets saved is
-the later one.
-
-The user's own sync edits are safe — `LFODisplay` writes both copies and queues
-the engine leg — so this is the *default* on a freshly filled slot, not lost
-data. Two ways out, and the choice is a real one:
-
-- make the default deterministic, which costs the 2011 nicety of a new LFO
-  arriving tempo-synced when the host has a tempo; or
-- have the slot echo carry the module's unexported LFO values, so the main copy
-  adopts the engine's rather than deriving its own — correct, and a protocol
-  change with per-LFO fan-out.
+- **An LFO's sync type defaults to the constant `Quarter`.** It was
+  `hasTempoInformation() ? Quarter : Free`, a default that read process-global
+  sticky state, so the engine's module and `programMain_`'s — built at two
+  moments with `updateLFOTiming()` between them — disagreed, and `stateSave`
+  saved the later one. The flag is deleted with its only reader.
+  `presetCorpus.txt` moved by 153 rows, digest column only; the dumps differ in
+  `sync` alone and every one of those LFOs is disabled.
+- **The N/T/D buttons reach the engine.** They wrote the strip's LFO directly,
+  which since the editor moved to `programMain_` meant a sync-mode change was
+  silently inaudible — `ca9029d` converted the waveform popup and not this
+  branch. `tests/gui/lfoDisplayTests.cpp` is new and covers it.
+- **A free LFO's period is measured against a reference bar**, so a tempo change
+  no longer rewrites a host-visible parameter, the CLAP edge's normalisation and
+  default stop moving with the meter, and the preset conversion stops reading the
+  global tempo. The goldens render bit-identically across it.
 
 ### 2 — Drive it in a DAW
 

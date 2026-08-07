@@ -100,12 +100,19 @@ std::uint16_t LFO::setPeriodInMilliseconds(std::uint16_t const periodInMilisecon
 float LFO::setPeriodInSeconds(float const periodInSeconds)
 {
     auto &impl(static_cast<LFOImpl &>(*this));
-    auto const periodScale(periodInSeconds / LFOImpl::Timer::basePeriod());
-    auto const clampedPeriodScale((impl.syncTypes() == LFO::Free)
+
+    /// \note The bar the period is a fraction *of*, which is the reference one
+    /// for a free LFO and the host's for a synced one. \see LFOImpl::getValue
+    bool const freeRunning(impl.syncTypes() == LFO::Free);
+    auto const bar(freeRunning ? LFOImpl::Timer::referenceBarDuration
+                               : LFOImpl::Timer::basePeriod());
+
+    auto const periodScale(periodInSeconds / bar);
+    auto const clampedPeriodScale(freeRunning
                                       ? impl.clampFreePeriod(periodScale)
                                       : impl.snapSyncedPeriod(periodScale, impl.syncTypes()).first);
     impl.setPeriodScale(clampedPeriodScale);
-    return clampedPeriodScale * LFOImpl::Timer::basePeriod();
+    return clampedPeriodScale * bar;
 }
 
 /// \todo These synchronization type altering functions do not automatically
@@ -176,10 +183,28 @@ void LFOImpl::setPeriodScale(value_type const newPeriodScale)
     parameters().set<PeriodScale>(newPeriodScale);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The **reference** measure numerator rather than the host's, so that the
+/// range is a constant. It was `Timer::measureNumeratorFloat()`, which made the
+/// parameter's minimum a function of the host's time signature -- and that pair
+/// is what `CLAPEdge` normalises against, so the host's 0..1 meant a different
+/// period in three four than in four four, and `clap_param_info.default_value`
+/// moved with the meter. CLAP has no rescan flag that means "the default
+/// changed", so there was no way to tell a host about it either.
+///
+///   The meter still decides the *grid* a synced period snaps to -- see
+/// `snapSyncedPeriodScale()`, which divides by the host's numerator throughout.
+/// It no longer decides what values are representable. Four four gives the wider
+/// of the two, so nothing that used to be in range has left it.
+///                                           (06.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
 LFOImpl::value_type LFOImpl::currentPeriodScaleMinimum()
 {
     return (2.0f / 3.0f /*for triplets    */) / LFOImpl::minimumPeriodAsMaximumBeatDenominator /
-           LFOImpl::Timer::measureNumeratorFloat();
+           LFOImpl::Timer::referenceMeasureNumerator;
 }
 LFOImpl::value_type LFOImpl::currentPeriodScaleMaximum()
 {
@@ -341,6 +366,23 @@ LFOImpl::value_type LFOImpl::getValue(Timer const &timer) const
 {
     value_type const periodScale(this->periodScale());
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note **Which clock, and it is the whole of what SyncTypes means.** A
+    /// synced period is a fraction of the host's bar, so it is read against the
+    /// host's bar clock and follows the tempo. A free one is a duration, so it
+    /// is read against a bar that never changes length -- see
+    /// `Timer::currentTimeInReferenceBars()`, which also has the identity
+    /// showing this is what the old rescale-the-parameter arrangement computed.
+    ///                                       (06.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    bool const freeRunning(syncTypes() == LFO::Free);
+    value_type const currentTime(freeRunning ? timer.currentTimeInReferenceBars()
+                                             : timer.currentTimeInBars());
+    value_type const previousTime(freeRunning ? timer.previousTimeInReferenceBars()
+                                              : timer.previousTimeInBars());
+
     //...mrmlj...
 #ifndef NDEBUG
     value_type const periodOffset(Math::abs(periodScale * phase()));
@@ -349,16 +391,16 @@ LFOImpl::value_type LFOImpl::getValue(Timer const &timer) const
 #endif // _DEBUG
 
     value_type const currentPeriodNormalisedPosition(
-        Math::splitFloat((periodOffset + timer.currentTimeInBars()) / periodScale).fractional);
+        Math::splitFloat((periodOffset + currentTime) / periodScale).fractional);
     LE_ASSERT(currentPeriodNormalisedPosition >= 0);
     LE_ASSERT(currentPeriodNormalisedPosition <= 1);
 
     value_type const previousPeriodPosition(
-        Math::PositiveFloats::modulo((periodOffset + timer.previousTimeInBars()), periodScale));
+        Math::PositiveFloats::modulo((periodOffset + previousTime), periodScale));
     value_type const previousTimeDifferenceToPeriodBoundary(periodScale - previousPeriodPosition);
-    value_type const periodEndForPreviousTime(timer.previousTimeInBars() +
+    value_type const periodEndForPreviousTime(previousTime +
                                               previousTimeDifferenceToPeriodBoundary);
-    bool const newPeriod(timer.currentTimeInBars() > periodEndForPreviousTime);
+    bool const newPeriod(currentTime > periodEndForPreviousTime);
 
     value_type const newValue(
         getWaveformAmplitudeForPosition(currentPeriodNormalisedPosition, newPeriod));
@@ -373,17 +415,34 @@ LFOImpl::value_type LFOImpl::getValue(Timer const &timer) const
     return result;
 }
 
-// Implementation note:
-//   'Free' LFO absolute<->relative value conversion. See the implementation
-// note for the static barDuration member for more details.
-//                                            (07.01.2011.) (Domagoj Saric)
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note 'Free' LFO absolute<->relative value conversion: the `T` attribute is
+/// milliseconds for a free LFO and bars for a synced one, and has been since
+/// 2011. That is not what changed here -- the file format is untouched. What
+/// changed is the **`referenceBarDuration` rather than `Timer::basePeriod()`**:
+/// the conversion used to read the process-global bar duration, so the same
+/// preset loaded at 140 BPM produced a different `PeriodScale` than at 120, and
+/// the same session saved at two tempi wrote two different files.
+///
+///   That is why `[preset-corpus]` used to turn red about one run in three when
+/// the whole suite ran in one process -- 153 of the 303 rows, the ones with a
+/// tempo-synced LFO -- and why the two test binaries had to be split. Nothing
+/// was ever fixed there; this is the fix. A constant converts the same way from
+/// any tempo, which is what "the file holds an absolute duration" was always
+/// supposed to mean.
+///                                       (07.01.2011.) (Domagoj Saric)
+///                                       (06.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
 template <>
 LFOImpl::PeriodScale::value_type LFOImpl::adjustValueForPreset(PeriodScale const &periodScale) const
 {
     LE_ASSERT(periodScale == this->periodScale());
     if (syncTypes() == LFO::Free)
     {
-        return periodScale * LFOImpl::Timer::basePeriod() * 1000;
+        return periodScale * LFOImpl::Timer::referenceBarDuration * 1000;
     }
     return periodScale;
 }
@@ -393,7 +452,7 @@ LFOImpl::PeriodScale::value_type LFOImpl::adjustValueFromPreset<LFOImpl::PeriodS
     LFOImpl::PeriodScale::value_type const periodScale) const
 {
     if (syncTypes() == LFO::Free)
-        return clampFreePeriod(periodScale / LFOImpl::Timer::basePeriod() / 1000);
+        return clampFreePeriod(periodScale / LFOImpl::Timer::referenceBarDuration / 1000);
     else
         return snapSyncedPeriod(periodScale, syncTypes()).first;
 }
@@ -518,21 +577,33 @@ LFOImpl::SnappedPeriod LFOImpl::snapPeriodScale(value_type const periodScale,
                                : snapSyncedPeriod(periodScale, syncTypes);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note **A tempo change moves nothing here any more.** The Free arm used to
+/// rescale the period by the bar-duration ratio so that the period in seconds
+/// survived a tempo change -- correct in what it sounded like and wrong in what
+/// it did to the number: `PeriodScale` is host-visible and automatable, so a
+/// project's automation lane, and the value saved in it, moved on their own
+/// whenever the tempo did. `tech_debt.md` asked whether a genuine tempo change
+/// should move a host-visible parameter at all; the answer is no, and the way to
+/// get it is to measure a free period against a bar that does not change length
+/// rather than to keep rewriting the period. See `getValue()`.
+///
+///   The synced arm stays, and is not the same thing: a *meter* change alters
+/// which divisions of a bar exist, so a period snapped to the old grid has to be
+/// resnapped to the new one. That is a quantisation, not a rescale.
+///                                           (06.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
 void LFOImpl::updateForNewTimingInformation(
     Timer::TimingInformationChange const &timingInformationChage)
 {
     if (syncTypes() == Free)
-    {
-        if (timingInformationChage.barDurationChanged())
-            setPeriodScale(
-                clampFreePeriod(periodScale() * timingInformationChage.barDurationChangeRatio_));
-    }
-    else
-    {
-        LE_ASSERT(syncTypes() != Free);
-        if (timingInformationChage.measureNumeratorChanged())
-            setPeriodScale(snapSyncedPeriod(periodScale(), syncTypes()).first);
-    }
+        return;
+
+    if (timingInformationChage.measureNumeratorChanged())
+        setPeriodScale(snapSyncedPeriod(periodScale(), syncTypes()).first);
 }
 
 namespace
@@ -629,9 +700,8 @@ LFOImpl::linearisePeriodScale(Plugins::AutomatedParameterValue const nonlinearNo
 // host uses more than one tempo value at any given time is correct.
 //                                            (07.01.2011.) (Domagoj Saric)
 // Assume 120 BPM 4/4
-std::atomic<LFOImpl::value_type> LFOImpl::Timer::barDuration_(60.0f / 120 * 4);
+std::atomic<LFOImpl::value_type> LFOImpl::Timer::barDuration_(LFOImpl::Timer::referenceBarDuration);
 std::atomic<std::uint8_t> LFOImpl::Timer::measureNumerator_(4);
-std::atomic<bool> LFOImpl::Timer::hasTempoInformation_(false);
 
 namespace
 {
@@ -708,8 +778,6 @@ LFOImpl::Timer::TimingInformationChange LFOImpl::Timer::updatePositionAndTimingI
     //                                        (02.02.2011.) (Domagoj Saric)
     TimingInformationChange const changeInfo(establishedChange(barDuration, measureNumerator));
 
-    relaxed(hasTempoInformation_, true);
-
     relaxed(barDuration_, barDuration);
     relaxed(measureNumerator_, measureNumerator);
 
@@ -732,14 +800,11 @@ LFOImpl::Timer::updatePositionAndTimingInformation(unsigned int const deltaNumbe
     previousTimeInBars_ = currentTimeInBars_;
     currentTimeInBars_ += timeToAdvanceInBars;
 
-    // Timing info
-    // Assume 120 BPM 4/4
-    std::uint8_t const measureNumerator(4);
-    float const barDuration(60.0f / 120 * measureNumerator);
+    // Timing info: the assumption, which is what the reference bar *is*.
+    std::uint8_t const measureNumerator(referenceMeasureNumerator);
+    float const barDuration(referenceBarDuration);
 
     TimingInformationChange const changeInfo(establishedChange(barDuration, measureNumerator));
-
-    relaxed(hasTempoInformation_, false);
 
     relaxed(barDuration_, barDuration);
     relaxed(measureNumerator_, measureNumerator);
@@ -778,19 +843,9 @@ void LFOImpl::Timer::reset()
     currentTimeInBars_ = 0;
     previousTimeInBars_ = 0;
 
-    // Assume 120 BPM 4/4
-    /// \note The hasTempoInformation_ flag is not reset here because this
-    /// causes bogus sporadic "Loaded preset uses tempo-synced LFOs but the host
-    /// does not provide tempo information." popups in Live! when browsing
-    /// through presets. This is most probably due to the threading logic in
-    /// Live! where the preset loading hasTempoInformation() checking code gets
-    /// executed between the time Live! calls resume() (which calls
-    /// LFOImpl::Timer::reset()) and process() (which again fetches valid tempo
-    /// information).
-    ///                                       (28.05.2012.) (Domagoj Saric)
-    //relaxed( hasTempoInformation_, false );
-    relaxed(barDuration_, 60.0f / 120 * 4);
-    relaxed(measureNumerator_, std::uint8_t(4));
+    // Back to the assumption, which is what the reference bar is.
+    relaxed(barDuration_, referenceBarDuration);
+    relaxed(measureNumerator_, referenceMeasureNumerator);
 }
 
 LFOImpl::value_type LFOImpl::Timer::measureNumeratorFloat()
@@ -803,10 +858,6 @@ bool LFOImpl::Timer::TimingInformationChange::barDurationChanged() const
     return !Math::is<1>(barDurationChangeRatio_);
 }
 
-LFOImpl::SyncTypes::value_type LFOImpl::SyncTypes::default_()
-{
-    return LFOImpl::Timer::hasTempoInformation() ? LFO::Quarter : LFO::Free;
-}
 //...mrmlj...a 'dynamic' (bounds) parameter...
 LFOImpl::value_type LFOImpl::PeriodScaleParameterTraits::minimum()
 {

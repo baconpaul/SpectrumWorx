@@ -793,13 +793,14 @@ class SpectrumWorxEditor final : private SkinLifetime,
         /// this for every parameter: the message thread writing an LFO the audio
         /// thread reads every block, unsynchronised.
         ///
-        /// \note **Two of them still do it.** The parameters past
-        /// `lfoExportedParameters` -- Waveform and SyncTypes -- have no
-        /// ParameterID and so no route through the queue, so they go straight
-        /// into the LFO. That is the last unsynchronised write from the interface
-        /// into engine state; doc/tech/tech_debt.md has it and what it would take
-        /// to close.
-        ///                                   (02.08.2026, amended 04.08.2026.) (SW port)
+        /// \note The two past `lfoExportedParameters` -- Waveform and SyncTypes
+        /// -- have no ParameterID and so no route through the parameter queue.
+        /// They take `ToEngine::SetUnexportedLFOParameter` instead, addressed by
+        /// index. **Everything that edits an LFO has to come through here**: the
+        /// N/T/D buttons wrote `LFO::addSyncType()` directly until 06.08.2026 and
+        /// were therefore inaudible for as long as the editor has been bound to
+        /// `programMain_`.
+        ///                                   (02.08.2026, amended 06.08.2026.) (SW port)
         template <class LFOParameter, typename T>
         void updateParameterAndNotifyHost(T const widgetValue)
         {

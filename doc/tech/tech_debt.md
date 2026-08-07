@@ -224,39 +224,23 @@ New entries go at the top of their area.
 
 ## Threading
 
-- ~~**An LFO's Waveform and SyncTypes**~~ — **closed 06.08.2026.** They travel as
-  a `ToEngine::SetUnexportedLFOParameter`, addressed by
-  `(moduleIndex, moduleParameterIndex, lfoParameterIndex)` because they have no
-  `ParameterID` to be addressed by, and are applied on the engine side through
-  the same `invokeFunctorOnIndexedParameter` the global parameters go through.
-  Kept here for one release as the record of a debt that changed shape twice
-  before it closed — it was an unsynchronised write into engine state, then
-  briefly a perfectly safe write nothing could hear:
+- **A "closed" entry can be closed for one of the two things it named.**
+  (06.08.2026) Kept as the shape of a mistake rather than as an open debt. The
+  Waveform/SyncTypes routing was recorded closed earlier the same day, on
+  `ca9029d`, whose message says "an LFO's waveform **and sync mode**". Only the
+  waveform had a route: the waveform popup goes through
+  `updateParameterAndNotifyHost<>`, which queues
+  `ToEngine::SetUnexportedLFOParameter`, and the N/T/D branch of
+  `LFODisplay::buttonClicked()` called `LFO::addSyncType()` on the strip's own
+  LFO — `programMain_`'s — and queued nothing. So a sync-mode change stayed
+  silently inaudible for the rest of the day, under an entry that said it was
+  fixed.
 
-  **An LFO's Waveform and SyncTypes do not reach the engine at all.**
-  (06.08.2026 — was "written straight into the engine from the message thread",
-  04.08.2026) Every other edit crosses as a `SetBaseParameter` command, but these
-  two are past `ParameterCounts::lfoExportedParameters`, so they have no
-  `ParameterID` and no route through the queue:
-  `SpectrumWorxEditor::…::updateParameterAndNotifyHost`
-  (`spectrumWorxEditor.hpp:754`) branches on the index and calls
-  `lfo().parameters().set<LFOParameter>()` directly on the module its strip
-  holds.
-
-  **This changed shape when the editor was bound to `programMain_`.** The strip's
-  module used to be the engine's, so the write was unsynchronised but did at
-  least land; it is now the main thread's own, so the write is perfectly safe and
-  the audio thread never sees it. A waveform or sync-mode change made in the
-  interface is silently inaudible. That is worse than what it replaced and it is
-  the immediate next thing to fix on this branch.
-
-  Closing it means a `ToEngine` case carrying an LFO sub-parameter by
-  `(moduleIndex, moduleParameterIndex, lfoParameterIndex)` rather than by
-  `ParameterID`, dispatched on the engine side through
-  `invokeFunctorOnIndexedParameter<LFO::Parameters>` the way the global
-  parameters already are. The alternative — exporting the two — would move
-  `parameterTable.txt` and is a decision about what a host should see rather than
-  a threading fix.
+  Both halves are routed now and `tests/gui/lfoDisplayTests.cpp` covers them.
+  What is worth keeping is why nothing caught it: **no case in the suite had ever
+  read the engine's side of an LFO after a UI edit.** The display, `paramsValue`,
+  `stateSave` and the preset writer all answer from the main thread's copy, so
+  every existing case agreed with a change the audio thread never received.
 
 - **The main thread's `Program` is only half fed.** (06.08.2026, branch
   `main-program-copy`) `programMain_` exists and the editor and host-automation
@@ -297,23 +281,6 @@ New entries go at the top of their area.
   honest shape, and choosing one is a DSP decision with an audible answer.
   The unexplained `/ 2` in its normaliser is worth the same look.
 
-- **An LFO's default sync type depends on whether a host has reported a tempo.**
-  (02.08.2026, from making the N/T/D buttons work in the standalone)
-  `LFOImpl::SyncTypes::default_()` is `hasTempoInformation() ? Quarter : Free`,
-  and it is the last reader of that flag now that the interface has stopped
-  asking. A parameter's *default* is supposed to be a property of the parameter:
-  this one is a property of the host's transport at the moment somebody asks, on
-  a process-global flag that `Timer::reset()` deliberately never clears. So the
-  same preset, loaded into the same build, can get a different sync type
-  depending on what happened earlier in the process — which is the shape of the
-  order-dependent `[preset-corpus]` digests recorded below, and plausibly a
-  direct cause rather than a coincidence.
-
-  Making it a constant `Quarter` is the obvious fix and is deliberately not done
-  here: it would move `parameterTable.txt`, and possibly `presetCorpus.txt`, and
-  a committed digest moving is a decision rather than a chore. Worth doing with
-  the fixtures regenerated in the same commit and the reason written on it.
-
 - **The LFO panel does not follow the host's tempo.** (02.08.2026)
   `SpectrumWorxEditor::updateForNewTimingInfo()` is correct and unreachable: its
   one caller was `SpectrumWorx::updatePosition()` in the 2016 host class, which
@@ -323,30 +290,28 @@ New entries go at the top of their area.
   as an LFO panel showing the old period after a tempo change.
 
 - **`LFOImpl::Timer`'s tempo is one value for every instance in the process.**
-  (02.08.2026) `std::atomic`, so it is no longer a data race — but two tracks at
-  two tempi still see one tempo. Making it per-instance means threading a timer
-  through `snapPeriodScale()`, `clampFreePeriod()` and the two period-scale
-  bounds, all of them static and all called from the parameter layer and the
-  editor; that is the LFO parameter interface's redesign rather than the
-  threading model's.
+  (02.08.2026, narrowed 06.08.2026) `std::atomic`, so it is no longer a data race
+  — but two tracks at two tempi still see one tempo. Making it per-instance means
+  threading a timer through `snapPeriodScale()` and the period-scale bounds, all
+  of them static and all called from the parameter layer and the editor; that is
+  the LFO parameter interface's redesign rather than the threading model's.
 
-  **A test binary is where this stops being benign**, and it has been live once
-  already. `[preset-corpus]` used to fail about one run in three when the whole
-  suite ran bare in one process — 153 of the 303 rows move, the ones with a
-  tempo-synced LFO — because once a `[clap][lfo]` transport case had told the
-  plugin a tempo, every later preset load in that process converted
-  `PeriodScale` differently. `ctest` could never see it: `catch_discover_tests`
-  gives each case its own process. What ended the symptom was the split into
-  `sw-dsp-tests` and `sw-plugin-tests`, which put the two sets in different
-  binaries — **nothing was fixed**. A case added to `sw-dsp-tests` that
-  establishes a tempo brings the whole thing back with no warning.
+  **What this used to reach, and no longer does.** `[preset-corpus]` failed about
+  one run in three when the whole suite ran bare in one process — 153 of the 303
+  rows, the ones with a tempo-synced LFO — because `adjustValueForPreset`
+  converted a Free LFO's period through the global bar duration, so once a
+  `[clap][lfo]` transport case had told the plugin a tempo, every later preset
+  load in that process converted differently. The split into two binaries hid the
+  symptom and fixed nothing. The conversion reads
+  `Timer::referenceBarDuration` now — a constant — so a preset loads to the same
+  numbers from any tempo, and `[preset-corpus]` is no longer order-dependent.
+  Same for the third static, `hasTempoInformation_`, which is deleted.
 
-  `Timer::reset()` deliberately does not clear `hasTempoInformation_` — a 2012
-  workaround for Ableton Live raising "preset uses tempo-synced LFOs but the host
-  provides no tempo" while browsing (`lfoImpl.cpp:766-784`). That dialog is gone
-  (a host with no transport gets 120 BPM 4/4, which is an answer rather than a
-  fault) but the stickiness it produced is not. The 2012 note explains why the
-  flag is sticky and not why the state is global.
+  What is left is the honest remainder: two instances at two tempi share one
+  `barDuration_`, so a synced LFO in one of them snaps to the other's grid. That
+  needs a real per-instance timer and nothing forces it yet — every host this has
+  been run in has one tempo at a time. See
+  [`how-lfo-rates-work.md`](how-lfo-rates-work.md) §7.
 
 - **`UIEdits` drops on full, and that is wrong for gestures.** (01.08.2026) The
   ring is otherwise correct. Dropping a `Kind::Value` is right — the next one
@@ -410,40 +375,6 @@ New entries go at the top of their area.
   question and not obviously yes.
 
 ## Parameters and LFOs
-
-- **Should a genuine tempo change move a host-visible parameter at all?**
-  (03.08.2026) `LFOImpl::updateForNewTimingInformation()` rescales a **Free**
-  LFO's period by the bar-duration ratio, so that the period stays constant in
-  seconds when the tempo changes. `LFOImpl::Timer::establishedChange()` stops the
-  *first* announcement of a tempo counting as a change — the engine assumes 120
-  BPM until told, and a host announcing 140 used to be indistinguishable from a
-  user retempoing the project — but that only settles the assumption. Mid-session,
-  a real tempo change still rescales every Free LFO's period, and the number the
-  host sees — and automates, and has saved in its project — moves with it.
-
-  Holding the sounding period constant and holding the automation value constant
-  are incompatible; the honest resolutions are bigger than a flag. Either export
-  the tempo-independent quantity at the CLAP edge and convert in `CLAPEdge`, or
-  store the period in seconds internally and convert to bars where it is used.
-  The first does not touch the file format, which makes it the cheaper of the two.
-
-- **A new LFO's default sync type depends on what some other instance was told.**
-  (05.08.2026, from `lfoTests.cpp`) `LFOImpl::SyncTypes::default_()` is
-  `Timer::hasTempoInformation() ? Quarter : Free`, and that flag is one of the
-  three **process-wide statics** on `Timer`. So the default is `Free` until
-  anything anywhere in the process reports a tempo and `Quarter` for ever after:
-  `reset()` deliberately does not clear it — a 2012 workaround for preset
-  browsing in Live — and only the no-transport overload of
-  `updatePositionAndTimingInformation` does.
-
-  Which makes it order-dependent in a way that reaches the *preset format*:
-  `adjustValueForPreset` writes a Free LFO's period in milliseconds and a synced
-  one in bars, so the same session saved before and after the host's first
-  transport report writes different files. Found because the first version of
-  `lfoTests.cpp` left the flag set and turned 303 preset digests red in
-  `presetCorpusTests.cpp`, a file that never mentions an LFO. The test now scopes
-  it (`ScopedHostTiming`); the fix is the same per-instance timer the note on
-  `Timer`'s statics already asks for.
 
 - **The measure-numerator half of `establishedChange()` is reasoned, not
   measured.** (03.08.2026) It reports no change for the meter as well as for the

@@ -2203,12 +2203,32 @@ void SpectrumWorxEditor::LFODisplay::buttonClicked(juce::Button *const pButton)
             syncType = LFO::Dotted;
         }
 
+        ////////////////////////////////////////////////////////////////////////
+        ///
+        /// \note Through `updateParameterAndNotifyHost<>` rather than through
+        /// `LFO::addSyncType()`/`removeSyncType()`, which write the parameter and
+        /// nothing else. Those wrote the strip's own module, and since the editor
+        /// was bound to `programMain_` that module is the *main thread's* -- so
+        /// clicking N, T or D moved the display, moved what a session saved, and
+        /// never reached the audio thread. `SyncTypes` is past
+        /// `lfoExportedParameters` and has no ParameterID, so the route is the
+        /// same `ToEngine::SetUnexportedLFOParameter` the waveform popup already
+        /// took; only this branch had been left behind.
+        ///
+        ///   Before the mask reaches the queue and not after, because the ring is
+        /// ordered and `updateLFOAndHostFromPeriodControl()` below queues the
+        /// period the new mask snapped it to. The engine resnaps what it is given
+        /// against whatever mask it holds, so the two have to arrive that way
+        /// round.
+        ///                                   (06.08.2026.) (SW port)
+        ///
+        ////////////////////////////////////////////////////////////////////////
         bool const addSyncType(pButton->getToggleState());
+        LE_ASSERT(addSyncType != lfo.hasEnabledSync(syncType));
 
-        if (addSyncType)
-            lfo.addSyncType(syncType);
-        else
-            lfo.removeSyncType(syncType);
+        auto const syncTypes(static_cast<unsigned>(lfo.syncTypes()));
+        updateParameterAndNotifyHost<LFO::SyncTypes>(
+            addSyncType ? (syncTypes | syncType) : (syncTypes & ~static_cast<unsigned>(syncType)));
 
         updatePeriodControl();
         updateLFOAndHostFromPeriodControl();
@@ -2287,8 +2307,11 @@ void SpectrumWorxEditor::LFODisplay::updatePeriodControl()
     float const rangeMaximum(LFO::PeriodScale::maximum());
     double const rangeBeginning(LFO::snapPeriodScale(rangeMinimum, lfo.syncTypes()).first);
     double const rangeEnd(LFO::snapPeriodScale(rangeMaximum, lfo.syncTypes()).first);
-    double const step((lfo.syncTypes() != LFO::Free) ? 0
-                                                     : 1 / 1000.0 / LFO::Timer::basePeriod() // 1 ms
+    /// \note One millisecond of the bar a free period is measured against, which
+    /// is the reference one and therefore a constant -- the slider's step no
+    /// longer changes under the user when the host changes tempo.
+    double const step(
+        (lfo.syncTypes() != LFO::Free) ? 0 : 1 / 1000.0 / LFO::Timer::referenceBarDuration // 1 ms
     );
 
     period_.setRange(rangeBeginning, rangeEnd, step);
@@ -2431,9 +2454,14 @@ double SpectrumWorxEditor::LFODisplay::Period::snapValue(double const attemptedV
 
 double SpectrumWorxEditor::LFODisplay::Period::milliseconds() const
 {
-    float const basePeriod(parent().editor().effect().lfoTimer().basePeriod());
-    double const periodInMilliseconds(this->getValue() * basePeriod * 1000);
-    return periodInMilliseconds;
+    /// \note Whichever bar the period is a fraction of: the reference one for a
+    /// free LFO, the host's for a synced one. \see LFOImpl::getValue -- the panel
+    /// has to convert the way the oscillator does or it prints a number the LFO
+    /// is not running at.
+    float const bar((lastSyncType() == LFO::Free)
+                        ? LFO::Timer::referenceBarDuration
+                        : parent().editor().effect().lfoTimer().basePeriod());
+    return this->getValue() * bar * 1000;
 }
 
 SpectrumWorxEditor::LFODisplay const &SpectrumWorxEditor::LFODisplay::Period::parent() const
