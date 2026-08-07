@@ -276,23 +276,22 @@ void PresetBrowser::listBoxItemDoubleClicked(int const row, juce::MouseEvent con
 void PresetBrowser::paintListBoxItem(int const rowNumber, juce::Graphics &graphics, int const width,
                                      int const height, bool const rowIsSelected)
 {
-#ifdef __APPLE__
-    // Implementation note:
-    //   Under OS X this also gets called when the user double-clicks on the
-    // last preset in the browser (on double-click we bring up the filename
-    // edit box and add the bogus extra row for which this paint method gets
-    // invoked).
-    //                                        (25.11.2011.) (Domagoj Saric)
+    /// \note A row past the end of the listing is not something to assert on:
+    /// JUCE paints whatever row number the recycled RowComponent last held
+    /// (RowComponent::paint, juce_ListBox.cpp) and updateContents() stamps one
+    /// on every component it keeps, not just on the ones the model has rows for.
+    /// The extras sit below the viewed component and are normally clipped away
+    /// -- but the editor is drawn through a scale transform, and the software
+    /// renderer (which is what a juce::Image gets everywhere except macOS)
+    /// rounds a transformed clip outwards, leaving the first one past the end a
+    /// sliver to paint in. Drawing nothing for it is the whole job.
+    ///
+    /// This was an `#ifdef __APPLE__` guard for the other way the same thing
+    /// happens: double-clicking the last preset brings up the filename edit box
+    /// and adds the bogus row (addOneRow_) that then gets painted.
+    ///                                        (25.11.2011.) (Domagoj Saric)
     if (rowNumber >= files_.size())
-    {
-        LE_ASSERT(addOneRow_ == true);
-        LE_ASSERT(rowNumber == files_.size());
-        LE_ASSERT(!rowIsSelected);
         return;
-    }
-#endif // __APPLE__
-
-    LE_ASSERT(rowNumber < files_.size());
 
     if (rowIsSelected)
         graphics.fillAll(Theme::singleton().Theme::findColour(
