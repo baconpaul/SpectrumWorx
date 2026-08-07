@@ -83,12 +83,8 @@ class Processor
     bool resize(StorageFactors &currentStorageFactors, StorageFactors const &newStorageFactors,
                 Setup::Window window, Engine::HeapSharedStorage &sharedStorage);
 
-    static StorageFactors makeFactors(std::uint16_t fftSize,
-#if LE_SW_ENGINE_WINDOW_PRESUM
-                                      std::uint8_t windowSizeFactor,
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
-                                      std::uint8_t overlapFactor, std::uint8_t numberOfChannels,
-                                      std::uint32_t sampleRate);
+    static StorageFactors makeFactors(std::uint16_t fftSize, std::uint8_t overlapFactor,
+                                      std::uint8_t numberOfChannels, std::uint32_t sampleRate);
 
   protected: // LFO & timing
     using LFO = Parameters::LFOImpl;

@@ -59,11 +59,7 @@ class Setup
 
     Window windowFunction() const { return windowFunction_; }
     float const &wolaGain() const { return wolaGain_; }
-#if LE_SW_ENGINE_WINDOW_PRESUM
-    std::uint8_t windowSizeFactor() const { return windowSizeFactor_; }
-#else
     std::uint8_t windowSizeFactor() const { return 1; }
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
     std::uint8_t numberOfChannels() const { return numberOfChannels_; }
     std::uint8_t numberOfSideChannels() const { return numberOfSideChannels_; }
     float const &maximumAmplitude() const { return maximumAmplitude_; }
@@ -104,9 +100,6 @@ class Setup
     template <typename T> void setOverlappingFactor(T const &newValue);
     template <typename T> void setSampleRate(T const &newValue) { sampleRate_ = newValue; }
 
-#if LE_SW_ENGINE_WINDOW_PRESUM
-    void setWindowSizeFactor(std::uint8_t const value) { windowSizeFactor_ = value; }
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
     void setWindowFunction(Window);
     void setNumberOfChannels(std::uint8_t numberOfMainChannels, std::uint8_t numberOfSideChannels);
 
@@ -163,9 +156,6 @@ class Setup
     Window windowFunction_;
     std::uint8_t numberOfChannels_;
     std::uint8_t numberOfSideChannels_;
-#if LE_SW_ENGINE_WINDOW_PRESUM
-    std::uint8_t windowSizeFactor_;
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
     float wolaGain_;
     float maximumAmplitude_;
     float wolaRippleFactor_;

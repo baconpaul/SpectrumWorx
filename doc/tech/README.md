@@ -1,9 +1,10 @@
 # SpectrumWorx — the tech documents
 
-Six documents, and every one of them describes the tree **as it is now**. Four
+Seven documents, and every one of them describes the tree **as it is now**. Four
 say how something works, one says what is left to do, one says what finished work
-left behind. Nothing here is a plan being executed or a record of how the port
-got where it is; that is in [`old/`](old/).
+left behind, one says what was deliberately not built. Nothing here is a plan
+being executed or a record of how the port got where it is; that is in
+[`old/`](old/).
 
 ## How it works
 
@@ -20,10 +21,12 @@ got where it is; that is in [`old/`](old/).
 |---|---|
 | [`todo.md`](todo.md) | **The work queue.** Two ordered items and a page of smaller things. An item that closes comes out of the file. |
 | [`tech_debt.md`](tech_debt.md) | What finished work left behind — the half-fix, the correct-but-unsatisfying answer, the finding with no owner. An entry that is remediated comes out too. |
+| [`future_items_to_revive.md`](future_items_to_revive.md) | Capabilities deliberately deleted rather than carried, and what reviving one would cost. The cost is usually compatibility, not code. |
 
-The line between them: `todo.md` is work somebody will sit down and do;
+The line between the three: `todo.md` is work somebody will sit down and do;
 `tech_debt.md` is what would still be true if all of it were done exactly as
-written.
+written; `future_items_to_revive.md` is what nobody is going to do next, recorded
+so that the reasoning survives the deletion.
 
 ## [`old/`](old/) — the path, kept for the reasoning
 

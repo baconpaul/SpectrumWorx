@@ -170,34 +170,17 @@ target_link_libraries(sw-dsp PUBLIC sst-plugininfra::tinyxml)
 # asserts degrade to the CRT's and the DAW never sees them.
 target_compile_definitions(sw-dsp PUBLIC LE_ENABLE_ASSERT_HANDLER)
 
-# Window presum: analyse a window longer than the FFT by folding it down, so that
-# the analysis resolution can exceed the bin count. Off, as it was in 2016.
-#
-# It is an option and a definition rather than a macro nothing defines because
-# the two are not the same claim: `#if LE_SW_ENGINE_WINDOW_PRESUM` against an
-# undefined name silently reads 0 and says nothing about whether that was meant.
-# The engine's half of this is live either way -- channelData.cpp's analysis fold
-# and channelBuffers.cpp's synthesis unfold both run every block with a factor of
-# one -- so what the option adds is the plumbing that lets the factor be anything
-# else, and a WindowSizeFactor global parameter to set it with.
-#
-# **Turning it on has been tried, once, on 04.08.2026, and here is what happens.**
-# It compiles, after one fix -- the parameter's own constructor named its base
-# unqualified and had never been through a compiler. Then 7 cases fail because
-# the parameter table grew a row, which is a decision rather than a fault: adding
-# a global parameter moves parameterTable.txt and every automation lane a host
-# has saved against it. And one case aborts on "Short integer overflow", from a
-# window of fftSize * windowSizeFactor kept in a std::uint16_t: at the maximum
-# FFT size the factor cannot exceed one. See doc/tech/tech_debt.md.
-#
-# The other six of its family are gone rather than configurable: LE_SW_SDK_BUILD,
-# LE_SW_FMOD, LE_SW_FULL, LE_SW_PURE_ANALYSIS, LE_SW_TW_RETUNE_TEST and
-# LE_MELODIFY_SDK_BUILD named an SDK, an audio backend and two SKUs that no
-# longer exist, and LE_SW_ENGINE_INPUT_MODE named a parameter that reconfigured
-# the plugin's I/O -- which is audio-ports-config's job in CLAP.
-option(SW_ENGINE_WINDOW_PRESUM "Analyse a window longer than the FFT (see src/dsp.cmake)" OFF)
-target_compile_definitions(sw-dsp PUBLIC
-        LE_SW_ENGINE_WINDOW_PRESUM=$<BOOL:${SW_ENGINE_WINDOW_PRESUM}>)
+# \note The 2016 build's configuration macros are gone rather than configurable:
+# LE_SW_SDK_BUILD, LE_SW_FMOD, LE_SW_FULL, LE_SW_PURE_ANALYSIS,
+# LE_SW_TW_RETUNE_TEST and LE_MELODIFY_SDK_BUILD named an SDK, an audio backend
+# and two SKUs that no longer exist; LE_SW_ENGINE_INPUT_MODE named a parameter
+# that reconfigured the plugin's I/O -- which is audio-ports-config's job in
+# CLAP; and LE_SW_ENGINE_WINDOW_PRESUM was an SW_ENGINE_WINDOW_PRESUM option,
+# always OFF, over the plumbing that let the analysis fold factor be something
+# other than one, plus a WindowSizeFactor global parameter to set it with. The
+# fold and unfold themselves are live code and stay; turning the option on grew
+# the parameter table by a row and overflowed the std::uint16_t window size at
+# the maximum FFT size, so the factor could not exceed one anyway.
 
 # rtsan_support.h, for the RealtimeSanitizer region ScopedAudioThreadEntry opens, and
 # for the RTSAN_DISABLE guards the conceded audio-thread allocations will carry.

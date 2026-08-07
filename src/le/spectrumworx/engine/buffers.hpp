@@ -57,21 +57,11 @@ using real_t = float;
 struct StorageFactors
 {
     std::uint16_t /*const*/ fftSize;
-#if LE_SW_ENGINE_WINDOW_PRESUM
-    std::uint8_t /*const*/ windowSizeFactor;
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
     std::uint8_t /*const*/ overlapFactor;
     std::uint8_t /*const*/ numberOfChannels;
     std::uint32_t /*const*/ samplerate;
 
-    bool complete() const
-    {
-        return fftSize &&
-#if LE_SW_ENGINE_WINDOW_PRESUM
-               windowSizeFactor &&
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
-               overlapFactor && numberOfChannels && samplerate;
-    }
+    bool complete() const { return fftSize && overlapFactor && numberOfChannels && samplerate; }
 
     bool operator==(StorageFactors const &other) const
     {
@@ -146,11 +136,7 @@ template <typename T = real_t> class WindowBuffer : public Utility::SharedStorag
   public:
     LE_COLD static std::uint32_t requiredStorage(StorageFactors const &factors)
     {
-#if LE_SW_ENGINE_WINDOW_PRESUM
-        std::uint8_t const windowSizeFactor(factors.windowSizeFactor);
-#else
         std::uint8_t const windowSizeFactor(1);
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
         auto const storageBytes(
             Engine::Detail::fftBufferSize(windowSizeFactor, 1, 0, sizeof(T), factors.fftSize));
         return storageBytes;

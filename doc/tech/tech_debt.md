@@ -57,31 +57,6 @@ New entries go at the top of their area.
   alignment. If one ever does, the fix is to trim by the gapless metadata
   ourselves rather than to ask which decoder answered.
 
-- **Window presum is an option now, and turning it on does not work.**
-  (04.08.2026, from the stage 7 macro pass) `SW_ENGINE_WINDOW_PRESUM`
-  (`src/dsp.cmake`) is the surviving one of the seven macros no live build could
-  define, kept because the technique is real and the engine's half of it is live:
-  `channelData.cpp`'s analysis fold and `channelBuffers.cpp`'s synthesis unfold
-  both run every block, with a factor of one. What the option adds is the
-  plumbing that lets the factor be anything else, and a `WindowSizeFactor` global
-  parameter to set it with.
-
-  It had never been compiled. Turning it on for the first time found:
-
-  - **A parameter whose constructor had never been through a compiler.**
-    `WindowSizeFactor`'s mem-initialiser named `PowerOfTwoParameter` unqualified,
-    which names nothing from `LE::SW::Engine`. Fixed, because a build that does
-    not compile cannot be measured.
-  - **7 cases fail, and they are the right ones.** The parameter table grows a
-    row, so `parameterTable.txt`, `presetCorpus.txt` and `streamingNames.txt` all
-    move. That is the decision this option really is: a global parameter added is
-    every automation lane a host has saved against the old numbering.
-  - **One case aborts: "Short integer overflow."** The window is
-    `fftSize * windowSizeFactor` in a `std::uint16_t`, so at the maximum FFT size
-    the factor cannot exceed one — and a host writing the parameter's maximum is
-    exactly what `[clap][host]`'s range case does. Whoever revives this starts
-    here.
-
 - **The include-what-you-use sweep did not happen, and the obvious tool is wrong
   about this tree.** (04.08.2026, from stage 7) The mechanical half of that item
   did land — `LE_IMPL_NAMESPACE_BEGIN` is gone, and with it the 47 files that

@@ -136,9 +136,7 @@ float *ChannelBuffers::putNewTimeDomainDataToOutput(Math::FFT_float_real_1D cons
                                                     ReadOnlyDataRange const &window,
                                                     std::uint8_t windowSizeFactor)
 {
-#if !LE_SW_ENGINE_WINDOW_PRESUM
     LE_ASSUME(windowSizeFactor == 1);
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
 
     LE_ASSERT_MSG((readyOutputDataSize() + window.size()) <= outputOLA_.size(), "Buffer overflow.");
     LE_ASSERT_MSG(window.size() == unsigned(fft.size() * windowSizeFactor),
@@ -287,11 +285,7 @@ LE_COLD std::uint32_t ChannelBuffers::OutputOLA::requiredStorage(StorageFactors 
     //                                        (05.10.2011.) (Domagoj Saric)
 
     std::uint8_t const overlapFactor(factors.overlapFactor);
-#if LE_SW_ENGINE_WINDOW_PRESUM
-    std::uint8_t const windowSizeFactor(factors.windowSizeFactor);
-#else
     std::uint8_t const windowSizeFactor(1);
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
     std::uint8_t const a(2 * windowSizeFactor * overlapFactor - 1);
     std::uint8_t const b(overlapFactor);
     std::uint8_t const c(0);

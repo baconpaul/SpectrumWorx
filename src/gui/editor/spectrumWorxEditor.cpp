@@ -1386,13 +1386,6 @@ template <> void SpectrumWorxEditor::updateGlobalParameterWidget<WindowFunction>
     updateSettings();
     updateForEngineSetupChanges();
 }
-#if LE_SW_ENGINE_WINDOW_PRESUM
-template <> void SpectrumWorxEditor::updateGlobalParameterWidget<WindowSizeFactor>()
-{
-    updateSettings();
-    updateForEngineSetupChanges();
-}
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
 template <> void SpectrumWorxEditor::updateGlobalParameterWidget<InputGain>() { updateMainKnobs(); }
 template <> void SpectrumWorxEditor::updateGlobalParameterWidget<OutputGain>()
 {
@@ -2552,16 +2545,9 @@ SpectrumWorxEditor::Settings::Settings() /// \throws std::bad_alloc Out of memor
       overlapFactor_(enginePage_, xMargin, yMargin + yStep * 1, (Engine ::OverlapFactor *)(0)),
       windowFunction_(enginePage_, xMargin, yMargin + yStep * 2, (Engine ::WindowFunction *)(0))
 /// \note pRegistrationData_(0) came last here; the member itself went with the
-/// licence manager in stage 0 and the initialiser did not, so nothing has
-/// compiled this constructor since. It was also the only unconditional entry
-/// after this point, which is why every conditional one above it could end in a
-/// comma. Leading commas instead, so that both settings of
-/// LE_SW_ENGINE_WINDOW_PRESUM are well formed.
+/// licence manager in stage 0 and the initialiser did not, so nothing had
+/// compiled this constructor since.
 ///                                       (28.07.2026.) (SW port)
-#if LE_SW_ENGINE_WINDOW_PRESUM
-      ,
-      windowSizeFactor_(enginePage_, xMargin, yMargin + yStep * 3, (Engine ::WindowSizeFactor *)(0))
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
 {
     /// \note The height was editor().getHeight() -- 376 -- while what this
     /// paints is a 16 px tab bar over a 347 px page bitmap: 363. The 13 px
@@ -2572,10 +2558,6 @@ SpectrumWorxEditor::Settings::Settings() /// \throws std::bad_alloc Out of memor
     this->setSize(resourceArtwork<SettingsEngineBg>().getWidth(),
                   resourceArtwork<SettingsEngineOn>().getHeight() +
                       resourceArtwork<SettingsEngineBg>().getHeight());
-
-#if LE_SW_ENGINE_WINDOW_PRESUM
-    windowSizeFactor_->setEnabled(false);
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
 
     updateEnginePage();
     updateLoadLastSessionOnStartup();
@@ -2657,13 +2639,6 @@ void SpectrumWorxEditor::Settings::comboBoxValueChanged(ComboBox const &comboBox
         LE_VERIFY(editor.globalParameterChanged<WindowFunction>(
             static_cast<WindowFunction ::value_type>(value), true));
     }
-#if LE_SW_ENGINE_WINDOW_PRESUM
-    else if (&comboBox == &settings.windowSizeFactor_)
-    {
-        LE_VERIFY(editor.globalParameterChanged<WindowSizeFactor>(
-            static_cast<WindowSizeFactor::value_type>(value), true));
-    }
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
     else if (&comboBox == &settings.interfacePage_.mouseOverComboBox())
     {
         Theme::singleton().settings().moduleUIMouseOverReaction =
@@ -2711,9 +2686,6 @@ void SpectrumWorxEditor::Settings::updateEnginePage()
     fftSize_->setValue(parameters.get<Engine::FFTSize>());
     overlapFactor_->setValue(parameters.get<Engine::OverlapFactor>());
     windowFunction_->setValue(parameters.get<Engine::WindowFunction>());
-#if LE_SW_ENGINE_WINDOW_PRESUM
-    windowSizeFactor_->setValue(parameters.get<Engine::WindowSizeFactor>());
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
     enginePage_.setNewQualityFactor(engineSetup.wolaRippleFactor());
 }
 

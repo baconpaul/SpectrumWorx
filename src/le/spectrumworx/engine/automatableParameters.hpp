@@ -50,39 +50,6 @@ using OverlapFactor =
                                     Parameters::Traits::Maximum<Constants::maximumOverlapFactor>,
                                     Parameters::Traits::Default<Constants::defaultOverlapFactor>>;
 
-#if LE_SW_ENGINE_WINDOW_PRESUM
-/// \note We need to be able to forward declare the WindowSizeFactor
-/// parameter for the special temporary handling of pre 2.7 presets so we cannot
-/// use a simple typedef for the time being.
-///                                           (24.04.2012.) (Domagoj Saric)
-//using WindowSizeFactor = Parameters::PowerOfTwoParameter
-//<
-//    Parameters::Traits::Minimum<1>,
-//    Parameters::Traits::Maximum<8>,
-//    Parameters::Traits::Default<4>
-//>;
-
-struct WindowSizeFactor : Parameters::PowerOfTwoParameter<Parameters::Traits::Minimum<1>,
-                                                          Parameters::Traits::Maximum<8>,
-                                                          Parameters::Traits::Default<1>>
-{
-    /// \note The base named through a typedef rather than as
-    /// `PowerOfTwoParameter(...)`. Unqualified, that names nothing here -- the
-    /// template is LE::Parameters::PowerOfTwoParameter and this is
-    /// LE::SW::Engine -- so the mem-initialiser did not compile at all. Nothing
-    /// noticed for twelve years because nothing could define the macro over it.
-    ///                                       (04.08.2026.) (SW port)
-    using Base = Parameters::PowerOfTwoParameter<Parameters::Traits::Minimum<1>,
-                                                 Parameters::Traits::Maximum<8>,
-                                                 Parameters::Traits::Default<1>>;
-
-    explicit WindowSizeFactor(unsigned int const initialValue = WindowSizeFactor::default_())
-        : Base(initialValue)
-    {
-    }
-};
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
-
 } // namespace SW::Engine
 
 namespace Parameters
@@ -97,9 +64,6 @@ namespace Parameters
 UI_NAME(SW::Engine::FFTSize, "FFT size")
 UI_NAME(SW::Engine::OverlapFactor, "Overlap factor")
 UI_NAME(SW::Engine::WindowFunction, "Window type")
-#if LE_SW_ENGINE_WINDOW_PRESUM
-UI_NAME(SW::Engine::WindowSizeFactor, "Window size factor")
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
 
 //...mrmlj...this does not work yet because the Window enum is not a member
 //...of the WindowFunction parameter class...fix this...

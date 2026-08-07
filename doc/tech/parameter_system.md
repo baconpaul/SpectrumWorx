@@ -88,10 +88,11 @@ Caveats on the numbers:
   side-chain port since it was written. The AU path used to exclude it separately
   (AU has no plugin-initiated I/O change), so every format's list is now the same
   one.
-- A seventh could come back: `SW_ENGINE_WINDOW_PRESUM` (`src/dsp.cmake`) adds
-  `WindowSizeFactor` and is off, as it was in 2016. Turning it on moves this table
-  and every automation lane a host has saved against it, which is why it is a
-  decision rather than a switch — see `tech_debt.md`.
+- A seventh could come back: window presum would add a `WindowSizeFactor`, which
+  moves this table and every automation lane a host has saved against it. That is
+  why it is a decision rather than a switch, and why the option that used to hold
+  the place open was deleted rather than left off — see
+  [`future_items_to_revive.md`](future_items_to_revive.md).
 - `lfoExportedParameters` is **5** in a normal GUI build and **7** under
   `LE_SW_SEPARATED_DSP_GUI || !LE_SW_GUI` — SyncTypes and Waveform are not
   exported for automation in the GUI build

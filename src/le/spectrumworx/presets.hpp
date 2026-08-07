@@ -71,13 +71,6 @@ LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 class SpectrumWorx;
 
-#if LE_SW_ENGINE_WINDOW_PRESUM
-namespace Engine
-{
-struct WindowSizeFactor;
-}
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
-
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \enum PresetProblem
@@ -307,7 +300,7 @@ class Preset
     /// 2.8, 2.9 and 2.93 in that field, and it tracked the format only because
     /// the two moved together in 2011. They do not any more: this tree is
     /// 3.0.0, so it was already writing `Version="3.0"` onto 2.6-shaped files
-    /// while `isPre27Preset()` read that number as a format version.
+    /// while the pre-2.7 check read that number as a format version.
     ///
     /// \note Absent means **0**, which is every file written before 08.2026 and
     /// is what selects the legacy reader. Greater than
@@ -497,8 +490,6 @@ class ParametersLoader : private PresetHandler
     ////////////////////////////////////////////////////////////////////////////
     void reportUnreadParameters() const;
 
-    bool isPre27Preset() const;
-
     template <typename T>
     LE_NOINLINE std::optional<T> getSimpleParameterValue(char const *const parameterName) const
     {
@@ -529,10 +520,6 @@ class ParametersLoader : private PresetHandler
   public: // For-each functor interface.
     using result_type = void;
     using const_qualified_lfo_t = LFO;
-
-#if LE_SW_ENGINE_WINDOW_PRESUM
-    result_type operator()(Engine::WindowSizeFactor &) const;
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
 
     template <class Parameter> void operator()(Parameter &parameter) const
     {

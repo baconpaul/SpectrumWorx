@@ -25,21 +25,10 @@ namespace GlobalParameters // Automated parameters
 //------------------------------------------------------------------------------
 {
 using FFTSize = Engine::FFTSize;
-#if LE_SW_ENGINE_WINDOW_PRESUM
-using WindowSizeFactor = Engine::WindowSizeFactor;
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
 using OverlapFactor = Engine::OverlapFactor;
 using WindowFunction = Engine::WindowFunction;
 
 //LE_ENUMERATED_PARAMETER(StreamMode, Always, MIDITrigger, MIDIGate); // ...MIDI not supported yet
-
-/// The parameter list is a comma separated one now, so a conditional member of
-/// it carries its own separator.
-#if LE_SW_ENGINE_WINDOW_PRESUM
-#define LE_SW_WINDOW_SIZEFACTOR_PARAMETER() , WindowSizeFactor
-#else
-#define LE_SW_WINDOW_SIZEFACTOR_PARAMETER()
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
 
 using LE::Parameters::Traits::Default;
 using LE::Parameters::Traits::Maximum;
@@ -51,12 +40,10 @@ LE_DEFINE_PARAMETER(InputGain, LE::Parameters::LinearFloat, Minimum<1>, Maximum<
 LE_DEFINE_PARAMETER(OutputGain, InputGain);
 LE_DEFINE_PARAMETER(MixPercentage, LE::Parameters::LinearFloat, Minimum<0>, Maximum<1>, Default<1>);
 
-LE_DEFINE_PARAMETERS(InputGain, OutputGain, MixPercentage, FFTSize, OverlapFactor,
-                     WindowFunction LE_SW_WINDOW_SIZEFACTOR_PARAMETER()
+LE_DEFINE_PARAMETERS(InputGain, OutputGain, MixPercentage, FFTSize, OverlapFactor, WindowFunction
                      //, StreamMode // ...MIDI not supported yet
 );
 
-#undef LE_SW_WINDOW_SIZEFACTOR_PARAMETER
 //------------------------------------------------------------------------------
 } // namespace GlobalParameters
 //------------------------------------------------------------------------------
