@@ -91,13 +91,6 @@ class Processor
                                       std::uint32_t sampleRate);
 
   protected: // LFO & timing
-#ifdef LE_NO_LFOs
-  private:
-    using lfoTimer = Parameters::LFOImpl::Timer;
-
-  public:
-    void updatePosition(std::uint32_t) {}
-#else
     using LFO = Parameters::LFOImpl;
 
     void setPosition(std::uint32_t absolutePositionInSamples);
@@ -116,8 +109,7 @@ class Processor
 
   private:
     void updateModuleLFOs(LFO::Timer::TimingInformationChange);
-#endif // LE_NO_LFOs
-  private:
+
     class ProcessParameters;
 
     Setup &engineSetup() { return engineSetup_; }
@@ -142,9 +134,7 @@ class Processor
 
   private:
     Setup engineSetup_;
-#ifndef LE_NO_LFOs
     LFO::Timer lfoTimer_;
-#endif // LE_NO_LFOs
     Math::FFT_float_real_1D fft_;
     FFTWindow analysisWindow_;
     FFTWindow synthesisWindow_;

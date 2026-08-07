@@ -234,21 +234,15 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
   protected:
     ModuleParameters(
         //std::uint8_t moduleSlotIndex,
-        EffectMetaData const &metadata
-#ifndef LE_NO_LFOs
-        ,
-        LFOPlaceholder *pLFOStorage,
+        EffectMetaData const &metadata, LFOPlaceholder *pLFOStorage,
         /// \note From the same place and sized the same way as the LFO storage:
         /// the most derived class holds an array whose length the effect decides.
-        float *pUnmodulatedValues
-#endif
-    );
+        float *pUnmodulatedValues);
 
   public: // Presets
     void loadPresetParameters(ParametersLoader const &);
     void savePresetParameters(ParametersSaver const &) const;
 
-#ifndef LE_NO_LFOs
   protected:
     void updateBaseParametersFromLFOs(LFO::Timer const &);
     void updateEffectParametersFromLFOs(LFO::Timer const &);
@@ -272,7 +266,6 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
     ///                                       (02.08.2026.) (SW port)
 
     LFO *constructLFOs(LFOPlaceholder *) const;
-#endif // LE_NO_LFOs
 
   private:
     /// \note We need to have local storage for caching shared parameters in
@@ -288,12 +281,10 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
     //std::uint8_t                             moduleSlotIndex_;
     EffectMetaData const &metaData_;
     BaseParameters baseParameters_;
-#ifndef LE_NO_LFOs
     LFO *LE_RESTRICT const pLFOs_;
     /// One per LFO-able parameter, indexed as pLFOs_ is. See
     /// unmodulatedBaseParameter().
     float *LE_RESTRICT const pUnmodulatedValues_;
-#endif
 }; // class ModuleParameters
 
 } // namespace Engine

@@ -151,13 +151,6 @@ class LFOImpl : public LFO
     void setPeriodScale(value_type periodScale);
 
   public:
-#ifdef LE_NO_LFOs
-    struct Timer
-    {
-        struct TimingInformationChange;
-        void reset() {}
-    };
-#else
     class Timer
     {
       public:
@@ -319,7 +312,7 @@ class LFOImpl : public LFO
         static std::atomic<value_type> barDuration_;
         static std::atomic<std::uint8_t> measureNumerator_;
     }; // class Timer
-#endif // LE_NO_LFOs
+
   public:
     LFOImpl();
 
