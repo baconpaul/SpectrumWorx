@@ -370,11 +370,7 @@ bool SpectrumWorxCore::isEngineSetupUpToDate() const
     Parameters const &parameters(this->parameters());
     return ((uncheckedEngineSetup().fftSize<unsigned int>() == parameters.get<FFTSize>()) &&
             (uncheckedEngineSetup().windowOverlappingFactor<unsigned int>() ==
-             parameters.get<OverlapFactor>())
-#if LE_SW_ENGINE_WINDOW_PRESUM
-            && (uncheckedEngineSetup().windowSizeFactor() == parameters.get<WindowSizeFactor>())
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
-    );
+             parameters.get<OverlapFactor>()));
 }
 
 Engine::Setup const &SpectrumWorxCore::engineSetup() const
@@ -422,13 +418,9 @@ bool SpectrumWorxCore::updateEngineSetup()
     /// nothing else moved.
     ///                                       (02.08.2026.) (SW port)
 
-    StorageFactors storageFactors(Processor::makeFactors(parameters.get<FFTSize>(),
-#if LE_SW_ENGINE_WINDOW_PRESUM
-                                                         parameters.get<WindowSizeFactor>(),
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
-                                                         parameters.get<OverlapFactor>(),
-                                                         setup.numberOfChannels(),
-                                                         setup.sampleRate<std::uint32_t>()));
+    StorageFactors storageFactors(
+        Processor::makeFactors(parameters.get<FFTSize>(), parameters.get<OverlapFactor>(),
+                               setup.numberOfChannels(), setup.sampleRate<std::uint32_t>()));
 
     if (resize(storageFactors))
         return true;
@@ -436,9 +428,6 @@ bool SpectrumWorxCore::updateEngineSetup()
     // Restore previous settings on failure:
     parameters.set<FFTSize>(setup.fftSize<FFTSize ::value_type>());
     parameters.set<OverlapFactor>(setup.windowOverlappingFactor<OverlapFactor::value_type>());
-#if LE_SW_ENGINE_WINDOW_PRESUM
-    parameters.set<WindowSizeFactor>(setup.windowSizeFactor());
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
     updateInputModeForIOConfig(setup.numberOfChannels(), setup.numberOfSideChannels());
 
     return false;

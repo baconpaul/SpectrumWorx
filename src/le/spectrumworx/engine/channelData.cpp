@@ -94,9 +94,7 @@ void ChannelData::time2DFT(float const *const pInputData, FullChannelData_ReIm &
                            ReadOnlyDataRange const &window, Math::FFT_float_real_1D const &fft,
                            std::uint8_t windowSizeFactor)
 {
-#if !LE_SW_ENGINE_WINDOW_PRESUM
     LE_ASSUME(windowSizeFactor == 1);
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
 
     auto const frameSize(fft.size());
 

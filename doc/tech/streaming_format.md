@@ -169,8 +169,9 @@ SpectrumWorx" reads as itself.
 (`presets.cpp:74-91`). The corpus carries 2.6 ×269, 2.7 ×20, 2.8 ×11, 2.9 ×1,
 2.93 ×2 — it tracked the format only because product and format moved together in
 2011. The tree is at 3.0.0, so this build already writes `Version="3.0"` onto
-2.6-shaped files, and `isPre27Preset()` — which gates a real default for
-`WindowSizeFactor` — already reads a product version as a format version.
+2.6-shaped files. The reader that used to consult it, a pre-2.7 check gating a
+default for the window-presum parameter, read that product version as a format
+version; both went with the parameter on 07.08.2026.
 
 ### 4.2 The 3.0 grammar
 

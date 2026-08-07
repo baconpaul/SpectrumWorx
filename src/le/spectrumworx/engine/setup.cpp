@@ -45,11 +45,7 @@ Setup::Setup()
       overlappingFactor_(
           1), // To prevent div-by-zero crashes in stepSize() before the engine is fully configured
       sampleRate_(Constants::defaultSampleRate), windowFunction_(Constants::defaultWindow),
-      numberOfChannels_(0), numberOfSideChannels_(0),
-#if LE_SW_ENGINE_WINDOW_PRESUM
-      windowSizeFactor_(0),
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
-      wolaGain_(0), maximumAmplitude_(0)
+      numberOfChannels_(0), numberOfSideChannels_(0), wolaGain_(0), maximumAmplitude_(0)
 {
 }
 

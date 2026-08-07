@@ -44,11 +44,7 @@ class FFTFixture
   public:
     explicit FFTFixture(std::uint16_t const fftSize)
     {
-        Engine::StorageFactors const factors{fftSize,
-#if LE_SW_ENGINE_WINDOW_PRESUM
-                                             1,
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
-                                             2, 1, 44100};
+        Engine::StorageFactors const factors{fftSize, 2, 1, 44100};
         auto const required(Math::FFT_float_real_1D::requiredStorage(factors));
         REQUIRE(storage_.resize(required + LE::Utility::Constants::vectorAlignment));
         Engine::Storage span(storage_.begin(), storage_.end());

@@ -977,9 +977,6 @@ class SpectrumWorxEditor final : private SkinLifetime,
         DiscreteParameterComboBox fftSize_;
         DiscreteParameterComboBox overlapFactor_;
         DiscreteParameterComboBox windowFunction_;
-#if LE_SW_ENGINE_WINDOW_PRESUM
-        DiscreteParameterComboBox windowSizeFactor_;
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
 
       public:
         static std::uint8_t const xMargin = 20;

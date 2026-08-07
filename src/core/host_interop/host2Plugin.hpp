@@ -37,9 +37,6 @@ class LE_NOVTABLE Host2PluginInteropControler
 
     using MixPercentage = GlobalParameters::MixPercentage;
     using FFTSize = GlobalParameters::FFTSize;
-#if LE_SW_ENGINE_WINDOW_PRESUM
-    using WindowSizeFactor = GlobalParameters::WindowSizeFactor;
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
     using OverlapFactor = GlobalParameters::OverlapFactor;
     using WindowFunction = GlobalParameters::WindowFunction;
 

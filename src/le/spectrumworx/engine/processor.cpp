@@ -702,13 +702,9 @@ LE_COLD bool Processor::setSampleRate(float const sampleRate, StorageFactors &cu
     //...mrmlj...assert that we are in a non-processing state...
     engineSetup().setSampleRate(sampleRate);
 
-    StorageFactors const storageFactors{currentStorageFactors.fftSize,
-#if LE_SW_ENGINE_WINDOW_PRESUM
-                                        currentStorageFactors.windowSizeFactor,
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
-                                        currentStorageFactors.overlapFactor,
-                                        currentStorageFactors.numberOfChannels,
-                                        engineSetup().sampleRate<std::uint32_t>()};
+    StorageFactors const storageFactors{
+        currentStorageFactors.fftSize, currentStorageFactors.overlapFactor,
+        currentStorageFactors.numberOfChannels, engineSetup().sampleRate<std::uint32_t>()};
 
     if (!storageFactors.complete())
     {
@@ -794,18 +790,11 @@ LE_COLD bool Processor::resize(StorageFactors &currentStorageFactors,
 }
 
 LE_COLD StorageFactors Processor::makeFactors(std::uint16_t const fftSize,
-#if LE_SW_ENGINE_WINDOW_PRESUM
-                                              std::uint8_t const windowSizeFactor,
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
                                               std::uint8_t const overlapFactor,
                                               std::uint8_t const numberOfChannels,
                                               std::uint32_t const sampleRate)
 {
-    StorageFactors const storageFactors = {fftSize,
-#if LE_SW_ENGINE_WINDOW_PRESUM
-                                           windowSizeFactor,
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
-                                           overlapFactor, numberOfChannels, sampleRate};
+    StorageFactors const storageFactors = {fftSize, overlapFactor, numberOfChannels, sampleRate};
     return storageFactors;
 }
 
@@ -820,9 +809,6 @@ void LE_COLD Processor::changeWOLAParameters(StorageFactors const &storageFactor
 
     engineSetup().setFFTSize(storageFactors.fftSize);
     engineSetup().setOverlappingFactor(storageFactors.overlapFactor);
-#if LE_SW_ENGINE_WINDOW_PRESUM
-    engineSetup().setWindowSizeFactor(storageFactors.windowSizeFactor);
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
     changeWindowFunction(window);
 }
 
@@ -889,11 +875,7 @@ LE_COLD void Processor::Channels::resize(StorageFactors const &factors, Storage 
     Utility::SharedStorageBuffer<ChannelBuffers>::resize(
         factors.numberOfChannels * sizeof(value_type), storage);
 
-#if LE_SW_ENGINE_WINDOW_PRESUM
-    std::uint8_t const windowSizeFactor(factors.windowSizeFactor);
-#else
     std::uint8_t const windowSizeFactor(1);
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
     std::uint16_t const windowSize(factors.fftSize * windowSizeFactor);
     std::uint16_t const stepSize(factors.fftSize / factors.overlapFactor);
     std::uint16_t const initialSilenceSamples(windowSize - stepSize);

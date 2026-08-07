@@ -615,23 +615,6 @@ bool ParametersLoader::switchedToModuleParameters() const
             != globalParametersNodeName_);
 }
 
-#if LE_SW_ENGINE_WINDOW_PRESUM
-ParametersLoader::result_type
-ParametersLoader::operator()(Engine::WindowSizeFactor &parameter) const
-{
-    using Parameter = Engine::WindowSizeFactor;
-    using binary_type = Parameter::binary_type;
-    auto const parameterName(Parameters::streamingName<Parameter>());
-    auto const pParameterAttribute(getParameterAttribute(parameterName));
-    std::optional<binary_type> const parameterValue(
-        (pParameterAttribute || !isPre27Preset())
-            ? getParameterValue<binary_type>(pParameterAttribute, parameterName)
-            : Engine::WindowSizeFactor::default_());
-    if (parameterValue.has_value() && parameter.isValidValue(*parameterValue))
-        parameter.setValue(*parameterValue);
-}
-#endif // LE_SW_ENGINE_WINDOW_PRESUM
-
 /// \brief Which effect an element name belongs to.
 ///
 /// \note Mangled-to-mangled, rather than unmangling the element name and looking
@@ -689,14 +672,6 @@ std::string_view ParametersLoader::getSampleFileName()
                   "Sample file name must be fetched before switching to module parameters.");
     auto const *const pSampleFileName(getParameterAttribute(sampleAttributeName_));
     return pSampleFileName ? std::string_view(pSampleFileName) : std::string_view();
-}
-
-bool ParametersLoader::isPre27Preset() const
-{
-    auto const *const pVersion(preset().root().Attribute("Version"));
-    if (!pVersion)
-        return true;
-    return Utility::lexical_cast<float>(pVersion) < 2.7f;
 }
 
 namespace
