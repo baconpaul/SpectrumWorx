@@ -221,11 +221,31 @@
 // nothing to re-diagnose the next time a compiler decides differently.
 //                                        (05.08.2026.) (SW port)
 
-#define __STDC_WANT_SECURE_LIB__ LE_CHECKED_BUILD
-#define _CRT_SECURE_CPP_OVERLOAD_SECURE_NAMES LE_CHECKED_BUILD
-#define _CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES LE_CHECKED_BUILD
-#define _CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES_COUNT LE_CHECKED_BUILD
-#define _SECURE_ATL LE_CHECKED_BUILD
+// Implementation note:
+//   Five defines opting out of the secure CRT stood here, all of them
+// LE_CHECKED_BUILD, so all of them off in a release build:
+//
+//     __STDC_WANT_SECURE_LIB__, _SECURE_ATL, and the three
+//     _CRT_SECURE_CPP_OVERLOAD_{SECURE_NAMES,STANDARD_NAMES,STANDARD_NAMES_COUNT}
+//
+//   The opt-out is not available: __STDC_WANT_SECURE_LIB__ is what guards the
+// declarations of sprintf_s and swprintf_s in <stdio.h>, and MSVC's own <string>
+// calls both -- unguarded, as `_CSTD sprintf_s` -- to implement std::to_string
+// and std::to_wstring. Setting it to zero makes the standard library fail to
+// compile against itself.
+//
+//   That it ever built is the shim below: it defined those two names as
+// object-like macros, so <string> line 490 read ::_snprintf instead and the
+// contradiction went unnoticed for seventeen years. Removing the shim is what
+// surfaced it. Both belong to one 2009 gesture, and neither half of it survives.
+//
+//   Nothing is lost by their going. Every one is a switch over which
+// *declarations* exist, not over generated code -- there is no release build
+// speed here to trade away, unlike the iterator debugging below. They also made
+// checked and release builds see different overload sets, which is its own way
+// to find out at release time that something does not compile.
+//                                        (07.08.2026.) (SW port)
+
 #ifndef _ITERATOR_DEBUG_LEVEL
 #define _SECURE_SCL LE_CHECKED_BUILD
 #define _ITERATOR_DEBUG_LEVEL LE_CHECKED_BUILD
@@ -261,6 +281,14 @@
 // Catch2 -- which our tests do not include, taking v3's modular headers --
 // writes `sprintf_s( buffer, "%.3f", duration )`, which does not compile as
 // _snprintf. So the shim was answering a 2009 question with a 2026 hazard.
+//
+//   With one client after all, found by deleting it: MSVC's own <string>, whose
+// std::to_string and std::to_wstring call ::sprintf_s and ::swprintf_s. The
+// macros were answering those calls. Taking them away left <string> naming two
+// functions that __STDC_WANT_SECURE_LIB__ 0 had kept undeclared, and every
+// Windows translation unit that reaches <string> stopped compiling -- which is
+// to say all of them. The define above went with it, and that is the fix; the
+// shim was never the thing holding this up, only the thing hiding it.
 //                                        (07.08.2026.) (SW port)
 
 //   As we use a lot of heavy template (meta)programing it is actually

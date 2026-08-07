@@ -153,8 +153,10 @@ What survives is what C++20 genuinely cannot express — the assert family,
 `LE_RESTRICT`, `LE_ASSUME`, the alloca buffers, and the effect and resource
 X-macro tables. Two things are left over.
 
-**A Windows log is owed.** Most of what the last phases deleted was MSVC-only
-code and nothing here has an MSVC, so these are unverified on it:
+**A Windows log is still owed.** The first came back on 07.08.2026 and stopped
+in `sw-dsp` on the secure-CRT shim's removal, which is fixed. Nothing after that
+target compiled, so most of the strip remains unseen by an MSVC and these two are
+still unverified:
 
 - The assertion handler writes to `OutputDebugStringA` itself now, rather than
   through the deleted tracer.
@@ -162,12 +164,6 @@ code and nothing here has an MSVC, so these are unverified on it:
   and `phase_vocoder/shared.cpp`, where a 2012 comment says MSVC could not take
   a restricted reference; three of those also changed MSVC from pass-by-value to
   pass-by-const-reference.
-- The fake secure-CRT shim is gone from `leConfigurationAndODRHeader.h`. It was
-  live in release MSVC builds, so this is the deletion most likely to surface
-  there. `__STDC_WANT_SECURE_LIB__` is still 0 in release and
-  `__STDC_SECURE_LIB__` is no longer force-undefined, so a header in our include
-  closure that gates a `strcpy_s`-family call on it would now fail to compile.
-  None was found; only MSVC can settle it.
 
 **`LE_MATH_NATIVE_POINTER_SIZE_INTERFACE` is the one decision left**, 37 sites
 in `vector.cpp`. It is not a dead arm. `vector.cpp` publishes each primitive
