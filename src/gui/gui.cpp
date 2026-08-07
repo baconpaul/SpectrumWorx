@@ -309,18 +309,15 @@ void fadeOutComponent(juce::Component &component, float const finalAlpha,
 /// they ask JUCE, which is the thing being asked about, and `getInstanceWithoutCreating()`
 /// is the call that does not bring one into existence to answer.
 ///                                           (02.08.2026.) (SW port)
-LE_NOINLINE bool LE_COLD isThisTheGUIThread()
+LE_NOINLINE bool isThisTheGUIThread()
 {
     auto const *const pMessageManager(juce::MessageManager::getInstanceWithoutCreating());
     return pMessageManager && pMessageManager->isThisTheMessageThread();
 }
 
-bool LE_COLD isGUIInitialised()
-{
-    return juce::MessageManager::getInstanceWithoutCreating() != nullptr;
-}
+bool isGUIInitialised() { return juce::MessageManager::getInstanceWithoutCreating() != nullptr; }
 
-float LE_COLD displayScale()
+float displayScale()
 {
     auto const &desktop(juce::Desktop::getInstance());
     auto const scale(desktop.getGlobalScaleFactor());
@@ -333,11 +330,11 @@ float LE_COLD displayScale()
 
 namespace Detail
 {
-LE_COLD void setName(juce::Component &widget, juce::String const &newName)
+void setName(juce::Component &widget, juce::String const &newName)
 {
     widget.juce::Component::setName(newName);
 }
-LE_NOINLINE LE_COLD void setName(juce::Component &widget, char const *const newName)
+LE_NOINLINE void setName(juce::Component &widget, char const *const newName)
 {
     setName(widget, juce::String(newName));
 }

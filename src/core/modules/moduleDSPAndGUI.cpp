@@ -27,7 +27,7 @@ namespace LE::SW
 //   This is required to prevent Clang from inlining the base destructor into
 // each ModuleDSP<> destructor.
 //                                            (13.12.2011.) (Domagoj Saric)
-LE_NOINLINE LE_COLD Module::~Module() {}
+LE_NOINLINE Module::~Module() {}
 
 /// \note `createGUI()` and `destroyGUI()` stood here, ~100 lines of building a
 /// module's editor region into a member of the module and taking it down again.

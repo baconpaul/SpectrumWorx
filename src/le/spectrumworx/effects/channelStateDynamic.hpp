@@ -118,13 +118,13 @@ template <typename... ChannelStates> struct CompoundChannelState : ChannelStates
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-value"
 #endif // __clang__
-    void LE_COLD resize(Engine::StorageFactors const &factors, Engine::Storage &storage)
+    void resize(Engine::StorageFactors const &factors, Engine::Storage &storage)
     {
         expander{0, (static_cast<ChannelStates &>(*this).resize(factors, storage), '\0')...};
     }
-    void LE_COLD reset() { expander{0, (static_cast<ChannelStates &>(*this).reset(), '\0')...}; }
+    void reset() { expander{0, (static_cast<ChannelStates &>(*this).reset(), '\0')...}; }
 
-    static std::uint32_t LE_COLD requiredStorage(Engine::StorageFactors const &factors)
+    static std::uint32_t requiredStorage(Engine::StorageFactors const &factors)
     {
         std::uint32_t sum(0);
         expander{0, (sum += Utility::align(ChannelStates::requiredStorage(factors)), '\0')...};

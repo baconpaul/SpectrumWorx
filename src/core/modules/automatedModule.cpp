@@ -120,7 +120,7 @@ float effectAutomated2InternalValue(std::uint8_t const effectParameterIndex,
         automatedValue, module.effectSpecificParameterInfo(effectParameterIndex));
 }
 
-std::optional<AutoAdjustedLFOParameter> LE_COLD
+std::optional<AutoAdjustedLFOParameter>
 Detail::autoAdjustedLFOParameter(LFO &lfo, std::uint8_t const lfoParameterIndex)
 {
     //LFO::value_type const * __restrict pSourceBound;

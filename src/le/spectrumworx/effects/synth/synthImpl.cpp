@@ -130,7 +130,7 @@ float const toneFrequencyScales[SynthImpl::numberOfTones] = {
 bool const standardHarmonicFormula(false);
 } // anonymous namespace
 
-LE_COLD void SynthImpl::setup(IndexRange const &workingRange, Engine::Setup const &engineSetup)
+void SynthImpl::setup(IndexRange const &workingRange, Engine::Setup const &engineSetup)
 {
     synthesisParameters_.setup(engineSetup);
 
@@ -226,7 +226,7 @@ LE_COLD void SynthImpl::setup(IndexRange const &workingRange, Engine::Setup cons
         resetState_ = false;
 }
 
-LE_COLD void SynthImpl::ChannelState::reset()
+void SynthImpl::ChannelState::reset()
 {
     /// \note Randomize initial phases for a more 'spacey' effect. To be further
     /// investigated...
@@ -241,16 +241,15 @@ LE_COLD void SynthImpl::ChannelState::reset()
 #endif // initial phases generation
 }
 
-LE_COLD void SynthImpl::ChannelState::resize(Engine::StorageFactors const &factors,
-                                             Engine::Storage &storage)
+void SynthImpl::ChannelState::resize(Engine::StorageFactors const &factors,
+                                     Engine::Storage &storage)
 {
     LE_DISABLE_LOOP_UNROLLING()
     for (auto &oscillatorPhases : phases)
         oscillatorPhases.resize(factors, storage);
 }
 
-LE_COLD std::uint32_t
-SynthImpl::ChannelState::requiredStorage(Engine::StorageFactors const &factors)
+std::uint32_t SynthImpl::ChannelState::requiredStorage(Engine::StorageFactors const &factors)
 {
     return Utility::align(static_cast<std::uint32_t>(OscillatorPhases::requiredStorage(factors))) *
            static_cast<std::uint8_t>(Phases().size());
@@ -265,11 +264,10 @@ SynthImpl::ChannelState::requiredStorage(Engine::StorageFactors const &factors)
 
 namespace //...mrmlj...copy-pasted from phase vocoder sources...
 {
-LE_FORCEINLINE LE_HOT float reconstructPhase(float const estimatedFrequency,
-                                             float const binFrequency,
-                                             float const invDeviationFactor,
-                                             float const expectedPhaseDifference,
-                                             float const currentPhaseSum)
+LE_FORCEINLINE float reconstructPhase(float const estimatedFrequency, float const binFrequency,
+                                      float const invDeviationFactor,
+                                      float const expectedPhaseDifference,
+                                      float const currentPhaseSum)
 {
     float const phase((estimatedFrequency - binFrequency) * invDeviationFactor +
                       expectedPhaseDifference);
@@ -278,15 +276,15 @@ LE_FORCEINLINE LE_HOT float reconstructPhase(float const estimatedFrequency,
     return phaseSum;
 }
 
-LE_FORCEINLINE LE_HOT float mapTo2PiInterval(float const phase)
+LE_FORCEINLINE float mapTo2PiInterval(float const phase)
 {
     float const reducedPhase(Math::PositiveFloats::modulo(phase, Math::Constants::twoPi));
     return reducedPhase;
 }
 } // anonymous namespace
 
-LE_HOT void SynthImpl::process(SynthImpl::ChannelState &cs, Engine::MainSideChannelData_AmPh data,
-                               Engine::Setup const &engineSetup) const
+void SynthImpl::process(SynthImpl::ChannelState &cs, Engine::MainSideChannelData_AmPh data,
+                        Engine::Setup const &engineSetup) const
 {
     if (resetState_) [[unlikely]]
         cs.reset();

@@ -48,7 +48,7 @@ class SpectrumWorxEditor;
 class ModuleControlBase;
 template <class ImplWidget> class ModuleControlImpl;
 
-template <class ImplWidget> class LE_NOVTABLE ModuleControl
+template <class ImplWidget> class ModuleControl
 {
   private:
     using Impl = ModuleControlImpl<ImplWidget>;
@@ -89,7 +89,7 @@ class ModuleUI;
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class LE_NOVTABLE ModuleControlBase
+class ModuleControlBase
 {
   protected:
     ModuleControlBase(std::uint8_t const parameterIndex, ModuleUI &moduleUI)

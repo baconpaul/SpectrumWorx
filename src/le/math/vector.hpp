@@ -203,8 +203,7 @@ void deinterleave(float const *LE_RESTRICT pInput, float *LE_RESTRICT const *LE_
 // http://blog.frama-c.com/index.php?post/2013/10/09/Overflow-float-integer
 // http://stackoverflow.com/questions/9832430/arm-saturate-signed-int-to-unsigned-byte
 // http://stackoverflow.com/questions/24546927/behavior-of-arm-neon-float-integer-conversion-with-overflow
-LE_FORCEINLINE LE_HOT void convertSample(float const &LE_RESTRICT input,
-                                         std::int16_t &LE_RESTRICT output)
+LE_FORCEINLINE void convertSample(float const &LE_RESTRICT input, std::int16_t &LE_RESTRICT output)
 {
 #if 0 // slower & not autovectorized
     static auto constexpr scale( static_cast<float>( std::numeric_limits<std::int16_t>::max() ) );
@@ -219,23 +218,21 @@ LE_FORCEINLINE LE_HOT void convertSample(float const &LE_RESTRICT input,
 #endif
 }
 
-LE_FORCEINLINE LE_HOT void convertSample(std::int16_t const &LE_RESTRICT input,
-                                         float &LE_RESTRICT output)
+LE_FORCEINLINE void convertSample(std::int16_t const &LE_RESTRICT input, float &LE_RESTRICT output)
 {
     static float constexpr scale(-1.0f / std::numeric_limits<std::int16_t>::min());
     output = input * scale;
 }
 
-LE_FORCEINLINE LE_HOT void convertSample(std::int32_t const &LE_RESTRICT input,
-                                         float &LE_RESTRICT output)
+LE_FORCEINLINE void convertSample(std::int32_t const &LE_RESTRICT input, float &LE_RESTRICT output)
 {
     static float constexpr scale(-1.0f / std::numeric_limits<std::int32_t>::min());
     output = input * scale;
 }
 
 template <typename Input, typename Output>
-LE_HOT void convertSamples(Input const *LE_RESTRICT pInput, Output *LE_RESTRICT pOutput,
-                           std::uint32_t samples)
+void convertSamples(Input const *LE_RESTRICT pInput, Output *LE_RESTRICT pOutput,
+                    std::uint32_t samples)
 {
 #ifdef __clang__
 #pragma clang loop vectorize(enable) interleave(enable)
@@ -245,8 +242,8 @@ LE_HOT void convertSamples(Input const *LE_RESTRICT pInput, Output *LE_RESTRICT 
 }
 
 template <typename Sample>
-LE_HOT void convertSamples(Sample const *LE_RESTRICT const pInput,
-                           Sample *LE_RESTRICT const pOutput, std::uint32_t const samples)
+void convertSamples(Sample const *LE_RESTRICT const pInput, Sample *LE_RESTRICT const pOutput,
+                    std::uint32_t const samples)
 {
     std::copy_n(pInput, samples, pOutput);
 }

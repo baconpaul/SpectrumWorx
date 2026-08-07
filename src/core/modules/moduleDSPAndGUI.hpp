@@ -38,7 +38,7 @@ namespace LE::SW
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class LE_NOVTABLE Module : public Engine::ModuleDSP, public AutomatedModuleImpl<Module>
+class Module : public Engine::ModuleDSP, public AutomatedModuleImpl<Module>
 {
   public:
     float setParameterValueFromUI(std::uint8_t parameterIndex, float value);

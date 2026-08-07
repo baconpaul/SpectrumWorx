@@ -48,9 +48,8 @@ DataRange resize(DataRange const &range, IndexRange const &workingRange)
 ///   The element counts still fit in 16 bits and the callers all sum into 32,
 /// so widening the byte count is the whole fix.
 ///                                           (29.07.2026.) (SW port)
-LE_COLD std::uint32_t fftBufferSize(std::uint8_t const a, std::uint8_t const b,
-                                    std::uint8_t const c, std::uint8_t const sizeOfT,
-                                    std::uint16_t const fftSize)
+std::uint32_t fftBufferSize(std::uint8_t const a, std::uint8_t const b, std::uint8_t const c,
+                            std::uint8_t const sizeOfT, std::uint16_t const fftSize)
 {
     using Utility::Constants::vectorAlignment;
     LE_ASSERT_MSG(fftSize * a / b < std::numeric_limits<std::uint16_t>::max(),

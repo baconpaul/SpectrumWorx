@@ -4,7 +4,7 @@
 /// -----------------------
 ///
 ///   Drives the DSP core without a host. SpectrumWorxCore is abstract only in
-/// the LE_NOVTABLE sense -- it has no pure virtuals -- but its constructor is
+/// the abstract sense -- it has no pure virtuals -- but its constructor is
 /// protected and Engine::Processor::modules() downcasts to it, so the engine
 /// cannot be instantiated except through a derived class. This is that class,
 /// plus the deterministic signal generators the goldens are rendered from.

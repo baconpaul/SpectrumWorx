@@ -613,7 +613,7 @@ void ModuleUI::setParameter(std::uint8_t const parameterIndex, float const param
 
 void ModuleUI::setBypass(bool const bypass) { bypass_.setValue(bypass); }
 
-LE_COLD void ModuleUI::updateForEngineSetupChanges(Engine::Setup const &engineSetup)
+void ModuleUI::updateForEngineSetupChanges(Engine::Setup const &engineSetup)
 {
     /// \note SharedModuleControls are updated in/by
     /// SpectrumWorxEditor::updateForEngineSetupChanges().

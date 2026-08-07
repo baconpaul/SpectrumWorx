@@ -74,7 +74,7 @@ bool isThisTheGUIThread();
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class LE_NOVTABLE Plugin2HostInteropControler
+class Plugin2HostInteropControler
 {
   public:
     using Parameters = GlobalParameters::Parameters;
@@ -149,7 +149,7 @@ class LE_NOVTABLE Plugin2HostInteropControler
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class LE_NOVTABLE Plugin2HostPassiveInteropController
+class Plugin2HostPassiveInteropController
 {
   public:
     ////////////////////////////////////////////////////////////////////////////

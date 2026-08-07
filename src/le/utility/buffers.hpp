@@ -170,7 +170,7 @@ template <typename T> class AlignedHeapBuffer : public Span<T>
 
     unsigned int size() const { return static_cast<unsigned int>(Range::size()); }
 
-    bool LE_COLD resize(unsigned int const numberOfElements)
+    bool resize(unsigned int const numberOfElements)
     {
 #ifdef _MSC_VER
         //...mrmlj...MSVC10 aligned_realloc seems to reallocate even if the size
@@ -285,14 +285,14 @@ template <typename T> class SharedStorageBuffer : public Span<T>
 
     using Range = Span<T>;
 
-    LE_NOINLINE LE_COLD void clear()
+    LE_NOINLINE void clear()
     {
         static_assert(std::is_trivially_default_constructible_v<T> || std::is_scalar_v<T>,
                       "SharedStorageBuffer supports only primitive types");
         std::memset(Range::begin(), 0, size() * sizeof(T));
     }
 
-    LE_NOINLINE LE_COLD void resize(std::uint32_t const newSize, Storage &storage)
+    LE_NOINLINE void resize(std::uint32_t const newSize, Storage &storage)
     {
         LE_ASSERT_MSG(newSize % sizeof(T) == 0, "Invalid size.");
         LE_ASSERT_MSG(static_cast<std::size_t>(storage.size()) >= newSize,

@@ -86,7 +86,7 @@ char const TalkingWind::description[] = "Classic vocoding.";
 // ------------------------
 //
 ////////////////////////////////////////////////////////////////////////////////
-LE_COLD void TalkingWindImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
+void TalkingWindImpl::setup(IndexRange const &, Engine::Setup const &engineSetup)
 {
     envgain_ = Math::dB2NormalisedLinear(parameters().get<EnvelopeGain>());
     cutoff_ = engineSetup.frequencyInHzToBin(parameters().get<EnvelopeBorder>());
@@ -99,8 +99,8 @@ LE_COLD void TalkingWindImpl::setup(IndexRange const &, Engine::Setup const &eng
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_HOT void TalkingWindImpl::process(Engine::MainSideChannelData_AmPh data,
-                                     Engine::Setup const &setup) const
+void TalkingWindImpl::process(Engine::MainSideChannelData_AmPh data,
+                              Engine::Setup const &setup) const
 {
     using namespace Math;
 
@@ -160,9 +160,9 @@ LE_HOT void TalkingWindImpl::process(Engine::MainSideChannelData_AmPh data,
     //LE_ASSERT( data.main().amps()[ 0 ] == 0 ); //...mrmlj...envelope DC bin is currently not fully zeroed
 }
 
-void LE_HOT TalkingWindImpl::lowPassSpectrum_cepstrum(DataRange const &spectrum,
-                                                      DataRange const &workBuffer,
-                                                      Engine::Setup const &engineSetup) const
+void TalkingWindImpl::lowPassSpectrum_cepstrum(DataRange const &spectrum,
+                                               DataRange const &workBuffer,
+                                               Engine::Setup const &engineSetup) const
 {
     using namespace Math;
 

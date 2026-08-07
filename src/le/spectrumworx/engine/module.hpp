@@ -44,7 +44,7 @@ class Setup;
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class LE_NOVTABLE ModuleDSP : public LE::SW::Engine::ModuleParameters
+class ModuleDSP : public LE::SW::Engine::ModuleParameters
 {
   public:
     using Parameters = Effects::BaseParameters::Parameters;

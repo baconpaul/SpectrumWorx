@@ -199,7 +199,7 @@ juce::String ModuleControlBase::getValueString(float const *LE_RESTRICT const pV
 namespace
 {
 // Cheap cross-casting between widget and ModuleControlBase instances
-class LE_NOVTABLE ControlWidgetBridge : public ModuleControlBase, public WidgetBase<>
+class ControlWidgetBridge : public ModuleControlBase, public WidgetBase<>
 {
   public:
     /// \note The four `LE_ASSUME( &reference )`s that stood here are gone. They

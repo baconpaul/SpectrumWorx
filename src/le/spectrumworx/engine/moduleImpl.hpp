@@ -271,14 +271,14 @@ struct MakeChannelStateHolder
         using ChannelState = typename Effect::ChannelState;
         using ChannelStateRange = LE::Utility::Span<ChannelState>;
 
-        void LE_FORCEINLINE LE_HOT callProcess(Effect const &effect, std::uint8_t const channel,
-                                               ChannelDataProxy const &data,
-                                               Engine::Setup const &setup) const
+        void LE_FORCEINLINE callProcess(Effect const &effect, std::uint8_t const channel,
+                                        ChannelDataProxy const &data,
+                                        Engine::Setup const &setup) const
         {
             effect.process(channelStates_[channel], data, setup);
         }
 
-        LE_FORCEINLINE void LE_COLD callReset()
+        LE_FORCEINLINE void callReset()
         {
 #ifndef _MSC_VER
             LE_DISABLE_LOOP_UNROLLING()
@@ -294,8 +294,7 @@ struct MakeChannelStateHolder
             return ChannelState::requiredStorage(factors);
         }
 
-        LE_FORCEINLINE LE_COLD void resize(Engine::Storage storage,
-                                           Engine::StorageFactors const &factors)
+        LE_FORCEINLINE void resize(Engine::Storage storage, Engine::StorageFactors const &factors)
         {
             LE_ASSUME(factors.numberOfChannels <= 16);
             char *const pChannelStatesBegin(storage.begin());
@@ -326,9 +325,9 @@ struct MakeEmptyChannelStateHolder
 {
     template <class Effect> struct ChannelStates
     {
-        void LE_FORCEINLINE LE_HOT callProcess(Effect const &effect, std::uint8_t /*channel*/,
-                                               ChannelDataProxy const &data,
-                                               Engine::Setup const &setup) const
+        void LE_FORCEINLINE callProcess(Effect const &effect, std::uint8_t /*channel*/,
+                                        ChannelDataProxy const &data,
+                                        Engine::Setup const &setup) const
         {
             effect.process(data, setup);
             ((void)effect);
@@ -354,8 +353,8 @@ struct MakeEmptyChannelStateHolder
 ///                                           (29.07.2026.) (SW port)
 template <class Parameters> struct EffectParameterPrinter
 {
-    LE_COLD static char const *print(std::uint8_t const parameterIndex,
-                                     LE::Parameters::AutomatedParameterPrinter const &printer)
+    static char const *print(std::uint8_t const parameterIndex,
+                             LE::Parameters::AutomatedParameterPrinter const &printer)
     {
         LE_ASSUME(parameterIndex < Parameters::static_size);
         return LE::Parameters::invokeFunctorOnIndexedParameter<Parameters>(
@@ -422,7 +421,7 @@ typename EffectParameterOffsets<Effect>::ParameterOffsets const
     disable                                                                                        \
     : 4373) // Previous versions of the compiler did not override when parameters only differed by const/volatile qualifiers.
 
-template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : public Base
+template <class EffectParam, class Base> class ModuleEffectImpl : public Base
 {
   public:
     using Effect = EffectParam;
@@ -438,7 +437,7 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
 #pragma clang diagnostic ignored "-Wuninitialized"
 #endif // __clang__
     template <typename EffectTypeIndex, typename... T>
-    LE_COLD ModuleEffectImpl(EffectTypeIndex, T &&...args)
+    ModuleEffectImpl(EffectTypeIndex, T &&...args)
         : Base(std::forward<T>(args)...,
                Engine::Detail::MakeEffectMetaData<Effect, EffectTypeIndex>::data, &lfos_[0],
                &unmodulatedValues_[0],
@@ -467,7 +466,7 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
     ChannelStatesHolder const &channelStatesHolder() const { return channelStatesHolder_; }
 
   protected: // Module process interface implementation.
-    LE_FORCEINLINE LE_COLD void doPreProcess(Setup const &engineSetup) override
+    LE_FORCEINLINE void doPreProcess(Setup const &engineSetup) override
     {
         effect().setup(ModuleDSP::workingRange(), engineSetup);
 #ifndef NDEBUG
@@ -475,19 +474,19 @@ template <class EffectParam, class Base> class LE_NOVTABLE ModuleEffectImpl : pu
 #endif
     }
 
-    LE_FORCEINLINE LE_HOT void doProcess(std::uint8_t const channel,
-                                         Engine::ModuleDSP::ChannelDataProxy const data,
-                                         Setup const &setup) const override
+    LE_FORCEINLINE void doProcess(std::uint8_t const channel,
+                                  Engine::ModuleDSP::ChannelDataProxy const data,
+                                  Setup const &setup) const override
     {
         LE_ASSERT(setupCalled_);
         channelStatesHolder_.callProcess(effect(), channel, data, setup);
     }
 
   public: //...mrmlj...
-    LE_NOINLINE LE_COLD void reset() override final { channelStatesHolder_.callReset(); }
+    LE_NOINLINE void reset() override final { channelStatesHolder_.callReset(); }
 
   private:
-    LE_COLD bool resize(StorageFactors const &factors) override final
+    bool resize(StorageFactors const &factors) override final
     {
         //...mrmlj...au uninitialise...LE_ASSERT( factors.complete() );
 

@@ -76,7 +76,7 @@ namespace GUI
 
 class ModuleUI;
 
-class LE_NOVTABLE ModuleKnob : public Knob, public ModuleControl<ModuleKnob>
+class ModuleKnob : public Knob, public ModuleControl<ModuleKnob>
 {
   protected:
     ModuleKnob(juce::Component &parent, unsigned int x, unsigned int y);
@@ -166,8 +166,7 @@ template <> struct ModuleKnob::QuantizationImpl<ModuleKnob::Millisecond>
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class LE_NOVTABLE ModuleLEDTextButton : public LEDTextButton,
-                                        public ModuleControl<ModuleLEDTextButton>
+class ModuleLEDTextButton : public LEDTextButton, public ModuleControl<ModuleLEDTextButton>
 {
   protected:
     ModuleLEDTextButton(juce::Component &parent, unsigned int x, unsigned int y);
@@ -200,7 +199,7 @@ class LE_NOVTABLE ModuleLEDTextButton : public LEDTextButton,
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class LE_NOVTABLE TriggerButton : public BitmapButton, public ModuleControl<TriggerButton>
+class TriggerButton : public BitmapButton, public ModuleControl<TriggerButton>
 {
   protected:
     TriggerButton(juce::Component &parent, unsigned int x, unsigned int y);
@@ -239,7 +238,7 @@ class LE_NOVTABLE TriggerButton : public BitmapButton, public ModuleControl<Trig
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class LE_NOVTABLE DiscreteParameter : public ComboBox, public ModuleControl<DiscreteParameter>
+class DiscreteParameter : public ComboBox, public ModuleControl<DiscreteParameter>
 {
   protected:
     DiscreteParameter(juce::Component &parent, unsigned int x, unsigned int y);

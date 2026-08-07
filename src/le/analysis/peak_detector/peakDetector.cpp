@@ -216,8 +216,8 @@ void calculateTrueFrequency(Peak &peak, float const bins, std::uint32_t const fs
 }
 } // anonymous namespace
 
-void LE_HOT PeakDetector::findPeaksImpl(float const *LE_RESTRICT const amplitudes,
-                                        std::uint16_t const numBins, std::uint32_t const fs)
+void PeakDetector::findPeaksImpl(float const *LE_RESTRICT const amplitudes,
+                                 std::uint16_t const numBins, std::uint32_t const fs)
 {
     restart();
 
@@ -350,9 +350,9 @@ Peak const *PeakDetector::getPeakAboveThreshold(float const threshold) const
 
 namespace
 {
-void LE_HOT attenuateBins(float *LE_RESTRICT const pAmplitudes, bool *LE_RESTRICT const pPeaks,
-                          std::uint16_t const startBin, std::uint16_t const stopInclusive,
-                          float const factor, bool const ifPeak)
+void attenuateBins(float *LE_RESTRICT const pAmplitudes, bool *LE_RESTRICT const pPeaks,
+                   std::uint16_t const startBin, std::uint16_t const stopInclusive,
+                   float const factor, bool const ifPeak)
 {
     float const gain((factor > 150) ? 0 : Math::dB2NormalisedLinear(-factor));
 

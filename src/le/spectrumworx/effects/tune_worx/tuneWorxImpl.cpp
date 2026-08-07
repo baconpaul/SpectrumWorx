@@ -45,8 +45,7 @@ char const Detail::TuneWorxBase::description[] = "Chromatic scale pitch discreti
 namespace Detail
 {
 
-void LE_COLD TuneWorxBaseImpl::setup(IndexRange const &,
-                                     [[maybe_unused]] Engine::Setup const &engineSetup)
+void TuneWorxBaseImpl::setup(IndexRange const &, [[maybe_unused]] Engine::Setup const &engineSetup)
 {
     // Tones:
     {
@@ -109,9 +108,9 @@ void LE_COLD TuneWorxBaseImpl::setup(IndexRange const &,
     }
 }
 
-float LE_NOINLINE LE_HOT TuneWorxBaseImpl::findNewPitchScale(Engine::ChannelData_AmPh const &data,
-                                                             Engine::Setup const &engineSetup,
-                                                             ChannelState &cs) const
+float LE_NOINLINE TuneWorxBaseImpl::findNewPitchScale(Engine::ChannelData_AmPh const &data,
+                                                      Engine::Setup const &engineSetup,
+                                                      ChannelState &cs) const
 {
     unsigned int const vibratoPitch(1);
     unsigned int const pitchShift_(1);

@@ -76,7 +76,7 @@ void Scale::tonesUpdated(std::uint8_t const snappedTo, std::uint8_t const bypass
     }
 }
 
-float LE_HOT Scale::snap2Scale(float const freq, std::uint8_t const keyIndex) const
+float Scale::snap2Scale(float const freq, std::uint8_t const keyIndex) const
 {
     using namespace Math;
 

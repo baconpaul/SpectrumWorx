@@ -19,7 +19,7 @@
 namespace LE::SW::Engine
 {
 
-LE_COLD ModuleChainBase::ModuleChainBase()
+ModuleChainBase::ModuleChainBase()
 {
     referenceCount_.verifyCountEqual(0);
     ++referenceCount_;
@@ -28,7 +28,7 @@ LE_COLD ModuleChainBase::ModuleChainBase()
     referenceCount_.verifyCountEqual(3);
 }
 
-LE_COLD ModuleChainBase::ModuleChainBase(ModuleChainBase &&other)
+ModuleChainBase::ModuleChainBase(ModuleChainBase &&other)
 {
     referenceCount_.verifyCountEqual(0);
     ++referenceCount_;
@@ -39,7 +39,7 @@ LE_COLD ModuleChainBase::ModuleChainBase(ModuleChainBase &&other)
     moveAssign(std::forward<ModuleChainBase>(other));
 }
 
-LE_COLD ModuleChainBase &ModuleChainBase::operator=(ModuleChainBase &&other)
+ModuleChainBase &ModuleChainBase::operator=(ModuleChainBase &&other)
 {
     clear();
     moveAssign(std::forward<ModuleChainBase>(other));
@@ -78,7 +78,7 @@ LE_COLD ModuleChainBase &ModuleChainBase::operator=(ModuleChainBase &&other)
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_COLD ModuleChainBase::~ModuleChainBase()
+ModuleChainBase::~ModuleChainBase()
 {
     while (next_.get() != this)
     {
@@ -93,7 +93,7 @@ LE_COLD ModuleChainBase::~ModuleChainBase()
     LE_ASSERT(this->referenceCount_ == 1 || this->referenceCount_ == 3);
 }
 
-LE_COLD void ModuleChainBase::moveAssign(ModuleChainBase &&other)
+void ModuleChainBase::moveAssign(ModuleChainBase &&other)
 {
     LE_ASSERT(this->empty());
 
@@ -114,7 +114,7 @@ LE_COLD void ModuleChainBase::moveAssign(ModuleChainBase &&other)
     LE_ASSERT(this->size() == otherSize);
 }
 
-LE_COLD std::uint8_t ModuleChainBase::getIndexForModule(Node const &module) const
+std::uint8_t ModuleChainBase::getIndexForModule(Node const &module) const
 {
 #if 0
     LE_ASSERT_MSG
@@ -143,7 +143,7 @@ LE_COLD std::uint8_t ModuleChainBase::getIndexForModule(Node const &module) cons
 #endif // impl
 }
 
-LE_COLD ModuleChainBase::iterator ModuleChainBase::module(std::uint8_t index)
+ModuleChainBase::iterator ModuleChainBase::module(std::uint8_t index)
 {
     LE_ASSERT_MSG(!dynamic_cast<Engine::ModuleDSP const *>(end().get()),
                   "Root node is not supposed to be an actual module.");
@@ -155,12 +155,12 @@ LE_COLD ModuleChainBase::iterator ModuleChainBase::module(std::uint8_t index)
     }
     return pCurrentModule;
 }
-LE_COLD ModuleChainBase::const_iterator ModuleChainBase::module(std::uint8_t const index) const
+ModuleChainBase::const_iterator ModuleChainBase::module(std::uint8_t const index) const
 {
     return const_cast<ModuleChainBase &>(*this).module(index);
 }
 
-LE_COLD void ModuleChainBase::clear()
+void ModuleChainBase::clear()
 {
     iterator pCurrentModule(this->begin());
     while (pCurrentModule != pCurrentModule.get()->next_)
@@ -182,8 +182,7 @@ void ModuleChainBase::swap(ModuleChainBase &other)
     this->moveAssign(std::move(scratch));
 }
 
-LE_COLD void ModuleChainBase::moveModule(std::uint8_t const sourceIndex,
-                                         std::uint8_t const targetIndex)
+void ModuleChainBase::moveModule(std::uint8_t const sourceIndex, std::uint8_t const targetIndex)
 {
     LE_ASSUME(sourceIndex != targetIndex);
     //LE_ASSUME( sourceIndex < Constants::maxNumberOfModules );
@@ -204,14 +203,13 @@ LE_COLD void ModuleChainBase::moveModule(std::uint8_t const sourceIndex,
     //insert( erase( iterator_to( *pTarget ) ), *pSource );
 }
 
-LE_COLD void ModuleChainBase::push_back(Node &module)
+void ModuleChainBase::push_back(Node &module)
 {
     //...mrmlj...LE_ASSERT_MSG( node_algorithms::inited( &module ), "Module already belongs to a different chain." );
     node_algorithms::link_before(this, &module);
 }
 
-LE_COLD void ModuleChainBase::insertAtAndReplace(iterator const &pInsertPosition,
-                                                 Node &moduleToInsert)
+void ModuleChainBase::insertAtAndReplace(iterator const &pInsertPosition, Node &moduleToInsert)
 {
     LE_ASSERT_MSG(node_algorithms::inited(&moduleToInsert),
                   "Module already belongs to a different chain.");
@@ -220,7 +218,7 @@ LE_COLD void ModuleChainBase::insertAtAndReplace(iterator const &pInsertPosition
         remove(*pInsertPosition);
 }
 
-LE_COLD void ModuleChainBase::remove(Node &node)
+void ModuleChainBase::remove(Node &node)
 {
 #ifndef NDEBUG
     LE_ASSERT_MSG(&node != this, "You can't remove the root node.");
@@ -246,16 +244,13 @@ LE_COLD void ModuleChainBase::remove(Node &node)
 /// assumption told the optimiser nothing and GCC 15 reported it as a nonnull
 /// argument compared to NULL.
 ///                                           (05.08.2026.) (SW port)
-LE_COLD ModuleChainBase::iterator ModuleChainBase::iterator_to(Node &module)
-{
-    return iterator(&module);
-}
-LE_COLD ModuleChainBase::const_iterator ModuleChainBase::iterator_to(Node const &module)
+ModuleChainBase::iterator ModuleChainBase::iterator_to(Node &module) { return iterator(&module); }
+ModuleChainBase::const_iterator ModuleChainBase::iterator_to(Node const &module)
 {
     return const_iterator(&module);
 }
 
-LE_COLD ModuleChainBase::iterator ModuleChainBase::begin()
+ModuleChainBase::iterator ModuleChainBase::begin()
 {
     //LE_ASSUME( this->next_.get() );
     //return reinterpret_cast<iterator const &>( this->next_ );
@@ -263,7 +258,7 @@ LE_COLD ModuleChainBase::iterator ModuleChainBase::begin()
     LE_ASSUME(pNode);
     return iterator(pNode);
 }
-LE_COLD ModuleChainBase::const_iterator ModuleChainBase::begin() const
+ModuleChainBase::const_iterator ModuleChainBase::begin() const
 {
     auto const *LE_RESTRICT const pNode(this->next_.get());
     LE_ASSUME(pNode);
@@ -271,10 +266,10 @@ LE_COLD ModuleChainBase::const_iterator ModuleChainBase::begin() const
     //return reinterpret_cast<const_iterator const &>( const_cast<ModuleChainBase &>( *this ).begin() );
 }
 
-LE_COLD ModuleChainBase::iterator ModuleChainBase::end() { return this; }
-LE_COLD ModuleChainBase::const_iterator ModuleChainBase::end() const { return this; }
-LE_COLD bool ModuleChainBase::isEnd(Node const *const pNode) const { return pNode == this; }
-LE_COLD void ModuleChainBase::resetRoot()
+ModuleChainBase::iterator ModuleChainBase::end() { return this; }
+ModuleChainBase::const_iterator ModuleChainBase::end() const { return this; }
+bool ModuleChainBase::isEnd(Node const *const pNode) const { return pNode == this; }
+void ModuleChainBase::resetRoot()
 {
     //...mrmlj...a module sent to be destroyed in the GUI thread might still be
     //...mrmlj...referencing the root node...
@@ -283,9 +278,9 @@ LE_COLD void ModuleChainBase::resetRoot()
     //LE_ASSERT( this->referenceCount_ == 3 );
 }
 
-LE_COLD bool ModuleChainBase::empty() const { return this->next_.get() == this; }
+bool ModuleChainBase::empty() const { return this->next_.get() == this; }
 
-LE_COLD std::uint8_t ModuleChainBase::size() const
+std::uint8_t ModuleChainBase::size() const
 {
     return static_cast<std::uint8_t>(node_algorithms::count(&rootNode()) - 1);
 }
@@ -333,22 +328,22 @@ void module_node_traits::set_previous(node_ptr const n, node_ptr const prev)
 //}
 } // namespace Detail
 
-LE_COLD void ModuleChainImpl::preProcessAll(Parameters::LFOImpl::Timer const &timer,
-                                            Setup const &engineSetup)
+void ModuleChainImpl::preProcessAll(Parameters::LFOImpl::Timer const &timer,
+                                    Setup const &engineSetup)
 {
     forEach<Module>([&](Module &module) { module.preProcess(timer, engineSetup); });
 }
 
-LE_COLD void ModuleChainImpl::resetAll()
+void ModuleChainImpl::resetAll()
 {
     forEach<ModuleDSP>([](ModuleDSP &module) { module.reset(); });
 }
 
 namespace
 {
-ModuleChainImpl::iterator LE_COLD resize(ModuleChainImpl::iterator const pModulesBegin,
-                                         ModuleChainImpl::Node const &endNode,
-                                         StorageFactors const &factors)
+ModuleChainImpl::iterator resize(ModuleChainImpl::iterator const pModulesBegin,
+                                 ModuleChainImpl::Node const &endNode,
+                                 StorageFactors const &factors)
 {
     auto pModulePtr(pModulesBegin);
     while (pModulePtr.get() != &endNode)
@@ -362,8 +357,8 @@ ModuleChainImpl::iterator LE_COLD resize(ModuleChainImpl::iterator const pModule
 }
 } // anonymous namespace
 
-LE_COLD bool ModuleChainImpl::resizeAll(Engine::StorageFactors const &newfactors,
-                                        Engine::StorageFactors const &currentFactors)
+bool ModuleChainImpl::resizeAll(Engine::StorageFactors const &newfactors,
+                                Engine::StorageFactors const &currentFactors)
 {
     iterator const pModulesBegin(this->begin());
     iterator const reachedIterator(resize(pModulesBegin, *end(), newfactors));

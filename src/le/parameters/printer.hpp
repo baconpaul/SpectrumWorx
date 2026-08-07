@@ -37,8 +37,8 @@ namespace LE::Parameters
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class Parameter, typename Source>
-char const *LE_COLD print(Source const parameterValue, SW::Engine::Setup const &engineSetup,
-                          PrintBuffer const &buffer)
+char const *print(Source const parameterValue, SW::Engine::Setup const &engineSetup,
+                  PrintBuffer const &buffer)
 {
     char const *const valueString(
         Detail::print<Parameter>(parameterValue, engineSetup, buffer, typename Parameter::Tag()));
@@ -56,7 +56,7 @@ struct PrinterBase
 {
     typedef char const *result_type;
     template <class Parameter, typename Source>
-    result_type LE_COLD operator()(Source const parameterValue) const
+    result_type operator()(Source const parameterValue) const
     {
         return Parameters::print<Parameter>(parameterValue, engineSetup, buffer);
     }
@@ -67,7 +67,7 @@ struct PrinterBase
 struct ParameterPrinter
 {
     using result_type = char const *;
-    template <class Parameter> result_type LE_COLD operator()() const
+    template <class Parameter> result_type operator()() const
     {
         return printer.operator()<Parameter>(parameterValue);
     }
@@ -79,7 +79,7 @@ struct Printer
 {
     using result_type = ParameterPrinter::result_type;
 
-    template <class Parameter> result_type LE_COLD operator()(Parameter const &parameter) const
+    template <class Parameter> result_type operator()(Parameter const &parameter) const
     {
         char const *const pString(pValue_ ? printer.operator()<Parameter>(*pValue_)
                                           : printer.operator()<Parameter>(parameter.getValue()));
@@ -103,7 +103,7 @@ struct AutomatedParameterPrinter
         Internal
     };
 
-    template <class Parameter> LE_COLD result_type operator()(Parameter const &parameter) const
+    template <class Parameter> result_type operator()(Parameter const &parameter) const
     {
         switch (valueSource)
         {
@@ -114,7 +114,7 @@ struct AutomatedParameterPrinter
         }
     }
 
-    template <class Parameter> LE_COLD result_type operator()() const
+    template <class Parameter> result_type operator()() const
     {
         float const automationValue(this->automationValue);
         Parameter parameterValue;

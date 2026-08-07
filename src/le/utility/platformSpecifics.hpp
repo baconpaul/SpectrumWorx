@@ -21,14 +21,10 @@
 
 #if defined(_MSC_VER) && !defined(__clang__)
 
-#define LE_NOVTABLE __declspec(novtable)
-
 #define LE_ALIGN(alignment) __declspec(align(alignment))
 
 #define LE_FORCEINLINE __forceinline
 #define LE_NOINLINE __declspec(noinline)
-#define LE_HOT
-#define LE_COLD
 
 #define LE_WEAK_SYMBOL __declspec(selectany)
 #define LE_WEAK_SYMBOL_CONST __declspec(selectany) extern
@@ -43,9 +39,6 @@
 
 #elif defined(__GNUC__)
 
-//#define LE_NOVTABLE __declspec( novtable )...-fms-extensions
-#define LE_NOVTABLE
-
 #define LE_ALIGN(alignment) __attribute__((aligned(alignment)))
 
 #ifdef _DEBUG
@@ -54,30 +47,6 @@
 #define LE_FORCEINLINE __attribute__((always_inline)) inline
 #endif
 #define LE_NOINLINE __attribute__((noinline))
-
-// http://lists.cs.uiuc.edu/pipermail/cfe-commits/Week-of-Mon-20120507/057599.html
-// http://clang-developers.42468.n3.nabble.com/PROPOSAL-per-function-optimization-level-control-td4031670.html
-// https://gcc.gnu.org/onlinedocs/gcc/ARM-Function-Attributes.html
-#define LE_HOT __attribute__((hot))
-//...mrmlj...disable 'cold' until we split cold and minsize (as cold can slow down calling code)...
-#if defined(__clang__)
-#define LE_COLD __attribute__((/*cold,*/ minsize))
-#else
-/// \note `minsize` is a Clang attribute; GCC has no such thing and warned
-/// "'minsize' attribute directive ignored" at every one of the several hundred
-/// `LE_COLD` sites. It was therefore already a no-op there — but not an inert
-/// one: GCC rejects a GNU attribute in the trailing declarator position of a
-/// function *definition*, which is how `le/plugins/clap/tag.hpp` writes it, so
-/// the macro had to expand to nothing rather than to something ignorable.
-///
-///   `__attribute__((cold))` is the GCC equivalent in spirit and is deliberately
-/// *not* used: the comment above records that it was switched off on purpose,
-/// because marking a callee cold pessimises the call sites too. If per-function
-/// size optimisation is wanted back on GCC it needs `optimize("Os")`, which
-/// GCC's own documentation restricts to debugging.
-///                                           (29.07.2026.) (SW port)
-#define LE_COLD
-#endif
 
 #define LE_WEAK_SYMBOL __attribute__((weak))
 #define LE_WEAK_SYMBOL_CONST LE_WEAK_SYMBOL extern
