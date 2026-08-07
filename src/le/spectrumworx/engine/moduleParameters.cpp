@@ -35,10 +35,8 @@
 ///                                           (31.07.2026.) (SW port)
 #include "le/spectrumworx/effects/baseParameters.hpp"
 
-#ifndef LE_NO_PRESETS
 #include "le/spectrumworx/presets.hpp"
 #include <optional>
-#endif // !LE_NO_PRESETS
 
 namespace LE::SW::Engine
 {
@@ -330,7 +328,6 @@ LE_COLD parameter_value_t ModuleParameters::parameterToNormalisedValue(
 }
 #endif // !LE_NO_LFOs
 
-#ifndef LE_NO_PRESETS
 namespace
 {
 using LFO = Parameters::LFOImpl;
@@ -420,7 +417,6 @@ LE_COLD void ModuleParameters::savePresetParameters(ParametersSaver const &param
         //}
     }
 }
-#endif // LE_NO_PRESETS
 
 LE_OPTIMIZE_FOR_SIZE_END()
 

@@ -16,9 +16,7 @@
 #include "gui/gui.hpp"
 #include "gui/editor/auxiliaryComponents.hpp"
 #include "gui/editor/moduleMenuHolder.hpp"
-#ifndef LE_NO_PRESETS
 #include "gui/preset_browser/presetBrowser.hpp"
-#endif // !LE_NO_PRESETS
 
 #include "le/parameters/lfoImpl.hpp" //...mrmlj...member typedefs...
 #include "le/parameters/parametersUtilities.hpp"
@@ -184,15 +182,12 @@ class SpectrumWorxEditor final : private SkinLifetime,
 
   public:
     static SpectrumWorxEditor &fromChild(juce::Component const &);
-#ifndef LE_NO_PRESETS
     static SpectrumWorxEditor &fromPresetBrowser(PresetBrowser &);
-#endif // !LE_NO_PRESETS
 
     Engine::Setup const &engineSetup() const;
     AutomatedModuleChain &moduleChain();
     AutomatedModuleChain const &moduleChain() const;
 
-#ifndef LE_NO_PRESETS
     bool loadPreset(juce::File const &, bool ignoreExternalSample, juce::String &comment,
                     juce::String const &presetName);
     /// \note A factory preset has no file; it comes out of the binary.
@@ -201,7 +196,6 @@ class SpectrumWorxEditor final : private SkinLifetime,
     void savePreset(juce::File const &, bool ignoreExternalSample,
                     juce::String const &comment) const;
     char const *currentProgramName() const;
-#endif // !LE_NO_PRESETS
 
     bool presetLoadingInProgress() const;
 
@@ -1043,9 +1037,7 @@ class SpectrumWorxEditor final : private SkinLifetime,
     friend class SharedModuleControls;
     std::optional<SharedModuleControls> sharedModuleControls_;
     std::optional<LFODisplay> lfoDisplay_;
-#ifndef LE_NO_PRESETS
     std::optional<PresetBrowser> presetBrowser_;
-#endif // !LE_NO_PRESETS
     std::optional<Settings> settings_;
 
     /// \note Deliberately not indexed by slot; see createModuleRegion().

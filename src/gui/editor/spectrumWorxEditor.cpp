@@ -163,12 +163,6 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost, PanelPlacement co
     preset_.addListener(this);
     settingsButton_.addListener(this);
 
-#ifdef LE_NO_PRESETS
-    /// \note There is no preset browser to open, so the button says so rather
-    /// than swallowing the click. Goes with the flag.
-    preset_.setEnabled(false);
-#endif // LE_NO_PRESETS
-
     resyncModuleRack();
 
     ////////////////////////////////////////////////////////////////////////////
@@ -257,9 +251,7 @@ SpectrumWorxEditor::~SpectrumWorxEditor()
     ///                                       (12.01.2012.) (Domagoj Saric)
     //...mrmlj...think of a cleaner solution...
     settings_ = std::nullopt;
-#ifndef LE_NO_PRESETS
     presetBrowser_ = std::nullopt;
-#endif // !LE_NO_PRESETS
 }
 
 /// \note `attachToHostWindow` had three overloads here -- a Win32 SetParent, a
@@ -291,14 +283,12 @@ SpectrumWorxEditor &SpectrumWorxEditor::fromChild(juce::Component const &widget)
     LE_UNREACHABLE_CODE();
 }
 
-#ifndef LE_NO_PRESETS
 SpectrumWorxEditor &SpectrumWorxEditor::fromPresetBrowser(PresetBrowser &presetBrowser)
 {
     return Utility::ParentFromOptionalMember<SpectrumWorxEditor, PresetBrowser,
                                              &SpectrumWorxEditor::presetBrowser_, false>()(
         presetBrowser);
 }
-#endif // !LE_NO_PRESETS
 
 Engine::Setup const &SpectrumWorxEditor::engineSetup() const
 {
@@ -371,10 +361,8 @@ void SpectrumWorxEditor::showPanel(juce::Component &panel)
     /// every caller passes through. Both toggle buttons feed this, and a host or
     /// a harness can reach showSettings()/showPresetBrowser() without touching
     /// either button, so the invariant belongs here rather than in the handlers.
-#ifndef LE_NO_PRESETS
     LE_ASSERT_MSG(!(settings_.has_value() && presetBrowser_.has_value()),
                   "the settings panel and the preset browser share one rectangle");
-#endif // !LE_NO_PRESETS
     LE_ASSERT(!panel.getParentComponent());
 
     addAndMakeVisible(panel);
@@ -386,10 +374,8 @@ juce::Component *SpectrumWorxEditor::currentPanel()
 {
     if (settings_.has_value())
         return &*settings_;
-#ifndef LE_NO_PRESETS
     if (presetBrowser_.has_value())
         return &*presetBrowser_;
-#endif // !LE_NO_PRESETS
     return nullptr;
 }
 
@@ -504,22 +490,15 @@ void SpectrumWorxEditor::openRestingPanel()
     LE_ASSERT(panelPlacement_ == PanelPlacement::alwaysVisible);
     LE_ASSERT(!currentPanel());
 
-#ifndef LE_NO_PRESETS
     showPresetBrowser(true);
-#else
-    /// \note A build with no browser still may not leave the column empty.
-    showSettings(aboutPageIndex);
-#endif // !LE_NO_PRESETS
 }
 
 void SpectrumWorxEditor::hidePanels()
 {
     settings_ = std::nullopt;
     settingsButton_.setToggleState(false, juce::dontSendNotification);
-#ifndef LE_NO_PRESETS
     presetBrowser_ = std::nullopt;
     preset_.setToggleState(false, juce::dontSendNotification);
-#endif // !LE_NO_PRESETS
 
     if (panelPlacement_ == PanelPlacement::alwaysVisible)
         openRestingPanel();
@@ -841,13 +820,11 @@ void SpectrumWorxEditor::buttonClicked(juce::Button *const pButton)
             hidePanels();
         }
     }
-#ifndef LE_NO_PRESETS
     else
     {
         LE_ASSERT(pButton == &preset_);
         togglePresetBrowser(*pButton);
     }
-#endif // !LE_NO_PRESETS
 }
 
 void LE_NOINLINE SpectrumWorxEditor::updateString(String const stringID,
@@ -1073,7 +1050,6 @@ void SpectrumWorxEditor::addUserAddedModule(std::uint8_t const effectIndex)
     refreshModuleRackAsync();
 }
 
-#ifndef LE_NO_PRESETS
 bool SpectrumWorxEditor::loadPreset(juce::File const &presetFile, bool const ignoreExternalSample,
                                     juce::String &comment, juce::String const &presetName)
 {
@@ -1099,7 +1075,6 @@ void SpectrumWorxEditor::savePreset(juce::File const &presetFile, bool const ign
 }
 
 char const *SpectrumWorxEditor::currentProgramName() const { return program().name().data(); }
-#endif // !LE_NO_PRESETS
 
 /// \note Not preset machinery despite the name: the flag lives on the engine
 /// side and guards automation while a whole program is being swapped in.
@@ -1365,10 +1340,8 @@ void SpectrumWorxEditor::showSettings(unsigned int const pageIndexToActivate)
 {
     if (!settings_.has_value())
     {
-#ifndef LE_NO_PRESETS
         presetBrowser_ = std::nullopt;
         preset_.setToggleState(false, juce::dontSendNotification);
-#endif // !LE_NO_PRESETS
         settings_.emplace();
         showPanel(*settings_);
     }

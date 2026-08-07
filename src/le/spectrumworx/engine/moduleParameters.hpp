@@ -36,10 +36,8 @@ namespace SW
 {
 using ParameterInfo = Parameters::RuntimeInformation;
 
-#ifndef LE_NO_PRESETS
 class ParametersLoader;
 class ParametersSaver;
-#endif // !LE_NO_PRESETS
 
 namespace Engine
 {
@@ -246,11 +244,9 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
 #endif
     );
 
-#ifndef LE_NO_PRESETS
   public: // Presets
     void loadPresetParameters(ParametersLoader const &);
     void savePresetParameters(ParametersSaver const &) const;
-#endif // !LE_NO_PRESETS
 
 #ifndef LE_NO_LFOs
   protected:
