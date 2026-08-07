@@ -14,15 +14,8 @@
 #include "tag.hpp"
 
 #include "le/math/conversion.hpp"
-//------------------------------------------------------------------------------
-namespace LE
-{
-//------------------------------------------------------------------------------
-namespace Parameters
-{
-//------------------------------------------------------------------------------
 
-namespace Detail
+namespace LE::Parameters::Detail
 {
 #pragma warning(push)
 #pragma warning(disable : 4127) // Conditional expression is constant.
@@ -53,11 +46,6 @@ Target convertParameterValueToLinearValue(typename Parameter::value_type const s
 }
 
 #pragma warning(pop)
-} // namespace Detail
+} // namespace LE::Parameters::Detail
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
 #endif // conversion_hpp

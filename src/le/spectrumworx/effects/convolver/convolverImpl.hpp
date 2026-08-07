@@ -16,16 +16,9 @@
 #include "le/spectrumworx/effects/channelStateDynamic.hpp"
 #include "le/spectrumworx/effects/effects.hpp"
 #include "le/spectrumworx/engine/buffers.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 class ConvolverImpl : public EffectImpl<Convolver>
 {
@@ -63,11 +56,6 @@ class ConvolverImpl : public EffectImpl<Convolver>
     bool freeze_;
 };
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // convolverImpl_hpp

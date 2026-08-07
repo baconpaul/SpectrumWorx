@@ -16,16 +16,9 @@
 #include "le/spectrumworx/effects/channelStateDynamic.hpp"
 #include "le/spectrumworx/effects/effects.hpp"
 #include "le/spectrumworx/engine/buffers.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 class SlicerImpl : public EffectImpl<Slicer>
 {
@@ -61,11 +54,6 @@ class SlicerImpl : public EffectImpl<Slicer>
     unsigned int timeOff_;
 };
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // slicerImpl_hpp

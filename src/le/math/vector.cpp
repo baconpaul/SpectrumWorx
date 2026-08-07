@@ -192,13 +192,9 @@ static_assert((std::endian::native == std::endian::little) || (sizeof(unsigned i
 #include <cmath>
 #include <functional>
 #include <numeric>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Math
 {
-//------------------------------------------------------------------------------
-namespace Math
-{
-//------------------------------------------------------------------------------
 
 #ifdef LE_MATH_USE_NT2
 
@@ -1906,11 +1902,7 @@ void deinterleave(float const *LE_RESTRICT pInput,
     }
 }
 
-//------------------------------------------------------------------------------
-} // namespace Math
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Math
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Scalar NT2 replacements of CRT functions (for math.cpp and conversion.cpp)
@@ -1941,13 +1933,9 @@ void deinterleave(float const *LE_RESTRICT pInput,
 #include "nt2/signal/include/functions/mag2db.hpp"
 #include "nt2/signal/include/functions/pow2db.hpp"
 #endif // LE_MATH_SCALAR_NT2
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Math
 {
-//------------------------------------------------------------------------------
-namespace Math
-{
-//------------------------------------------------------------------------------
 
 #if LE_MATH_SCALAR_NT2
 
@@ -2025,10 +2013,6 @@ void addPolar(float const amp1, float const phase1, float &LE_GNU_SPECIFIC(__res
 #endif // LE_MATH_SCALAR_NT2
 }
 
-//------------------------------------------------------------------------------
-} // namespace Math
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Math
 
 LE_OPTIMIZE_FOR_SPEED_END()

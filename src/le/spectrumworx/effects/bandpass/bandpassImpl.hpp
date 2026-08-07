@@ -15,16 +15,9 @@
 
 #include "le/spectrumworx/effects/effects.hpp"
 #include "le/spectrumworx/engine/buffers.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 #if defined(_DEBUG)
 /// \note Testing phase...
@@ -65,11 +58,6 @@ class BandstopImpl : public Detail::BandGainImpl, public Bandstop
     void process(Engine::ChannelData_AmPh, Engine::Setup const &) const;
 };
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // bandpassImpl_hpp

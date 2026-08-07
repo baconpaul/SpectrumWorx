@@ -10,13 +10,10 @@
 //------------------------------------------------------------------------------
 #ifndef channelData_fwd_hpp__A3D62820_9F64_4D13_AA59_70401537C88E
 #define channelData_fwd_hpp__A3D62820_9F64_4D13_AA59_70401537C88E
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
+
 namespace Engine
 {
 template <class Data> class MainSide;
@@ -24,7 +21,6 @@ template <class FullRangeData, class SubRangeHolder> class SubRange;
 } // namespace Engine
 namespace Engine
 {
-//------------------------------------------------------------------------------
 
 class ChannelData_AmPh;
 class ChannelData_ReIm;
@@ -41,11 +37,8 @@ using MainSideChannelData_ReIm = MainSide<SubRange<FullMainSideChannelData_ReIm,
 struct ChannelData_AmPh2ReIm;
 struct ChannelData_ReIm2AmPh;
 
-//------------------------------------------------------------------------------
 } // namespace Engine
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+
+} // namespace LE::SW
+
 #endif // channelData_fwd_hpp

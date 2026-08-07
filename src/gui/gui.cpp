@@ -19,12 +19,6 @@
 #include <sst/plugininfra/paths.h>
 #include <algorithm>
 
-#ifdef __APPLE__
-#include "dlfcn.h"
-#include "ApplicationServices/ApplicationServices.h" // only for CoreGraphics...
-#include "le/utility/ignoreUnused.hpp"
-#endif // __APPLE__
-
 #include <array>
 #include <cstdio>
 #include <cstdlib>
@@ -35,21 +29,9 @@
 #ifdef _WIN32
 extern "C" IMAGE_DOS_HEADER __ImageBase;
 #endif // _WIN32
-//------------------------------------------------------------------------------
-namespace LE
-{
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace GUI
-{
-//------------------------------------------------------------------------------
 
-#ifdef __APPLE__
-// gui.mm forward declarations.
-void initialiseMac() noexcept;
-#endif
+namespace LE::SW::GUI
+{
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -75,13 +57,9 @@ SkinLifetime::SkinLifetime()
 
     JUCE_AUTORELEASEPOOL
     {
-#if defined(__APPLE__)
-        /// \note Idempotent, and not JUCE's business: it puts Cocoa into
-        /// multithreaded mode, which it never leaves.
-        initialiseMac();
-#elif defined(_WIN32)
+#if defined(_WIN32)
         juce::Process::setCurrentModuleInstanceHandle(&__ImageBase);
-#endif // __APPLE__
+#endif // _WIN32
         Theme::createSingleton();
         juce::LookAndFeel::setDefaultLookAndFeel(&Theme::singleton());
     }
@@ -1225,13 +1203,7 @@ bool shouldUpdateLFOControl(ModuleControlBase const &control)
             Detail::hasDirectFocus(control.widget()));
 }
 
-//------------------------------------------------------------------------------
-} // namespace GUI
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::GUI
 
 /// \note Two weak `extern "C"` definitions of `strnlen` and `wcsnlen` stood
 /// here, from 2013, for an OS X 10.6 whose libc had neither. They went on

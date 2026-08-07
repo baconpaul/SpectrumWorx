@@ -11,13 +11,9 @@
 #include "profiler.hpp"
 
 #include "platformSpecifics.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Utility
 {
-//------------------------------------------------------------------------------
-namespace Utility
-{
-//------------------------------------------------------------------------------
 
 // Evaluating Performance of Android Platform Using Native C for Embedded Systems
 // http://anibal.gyte.edu.tr/hebe/AblDrive/69276048/w/Storage/104_2011_1_601_69276048/Downloads/m33.pdf
@@ -79,11 +75,7 @@ float DSPProfiler::cpuUsagePercentage() const
     return duration_cast<duration<float>>(ratio).count() * 100;
 }
 
-//------------------------------------------------------------------------------
-} // namespace Utility
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Utility
 
 #ifdef __ANDROID__
 /// \note Provide a default implementation (c/p from libc++ sources) in order to

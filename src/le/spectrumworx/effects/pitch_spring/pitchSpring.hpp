@@ -18,16 +18,9 @@
 #include "le/parameters/enumerated/parameter.hpp"
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/uiElements.hpp" // the UIElements below
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 namespace Detail
 {
@@ -109,11 +102,6 @@ struct PitchSpringPVD : Detail::PitchSpringBase
 EFFECT_PARAMETER_NAME(Detail::PitchSpringBase::Depth, "Depth")
 EFFECT_PARAMETER_NAME(Detail::PitchSpringBase::Period, "Period")
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // pitchSpring_hpp

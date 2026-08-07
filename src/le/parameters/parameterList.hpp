@@ -26,13 +26,9 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Parameters
 {
-//------------------------------------------------------------------------------
-namespace Parameters
-{
-//------------------------------------------------------------------------------
 
 namespace Detail ///< \internal
 {
@@ -145,9 +141,6 @@ class ParameterList : private Detail::ParameterSlots<std::index_sequence_for<Par
     }
 }; // class ParameterList
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Parameters
+
 #endif // parameterList_hpp

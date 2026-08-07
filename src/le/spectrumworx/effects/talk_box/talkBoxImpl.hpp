@@ -16,16 +16,9 @@
 #include "le/spectrumworx/effects/effects.hpp"
 #include "le/spectrumworx/effects/vocoder/vocoderImpl.hpp"
 #include "le/spectrumworx/effects/synth/synthImpl.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 class TalkBoxImpl : public EffectImpl<TalkBox>
 {
@@ -50,11 +43,6 @@ class TalkBoxImpl : public EffectImpl<TalkBox>
     VocoderImpl vocoder_;
 }; // class TalkBoxImpl
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // talkBoxImpl_hpp

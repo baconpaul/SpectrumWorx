@@ -14,16 +14,9 @@
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/math/conversion.hpp"
 #include "le/math/math.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -92,9 +85,4 @@ void PitchMagnetPVDImpl::process(ChannelState &cs, Engine::ChannelData_AmPh data
     PVPitchShifter::process(scale, std::forward<Engine::ChannelData_AmPh>(data), setup);
 }
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
+} // namespace LE::SW::Effects

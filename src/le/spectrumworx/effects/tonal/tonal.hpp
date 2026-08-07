@@ -16,16 +16,9 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/uiElements.hpp" // the UIElements below
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 namespace Detail
 {
@@ -141,11 +134,6 @@ EFFECT_PARAMETER_NAME(Atonal::Strength, "Peak strength")
 EFFECT_PARAMETER_NAME(Atonal::GlobalThreshold, "Global threshold")
 EFFECT_PARAMETER_NAME(Atonal::Attenuation, "Attenuation")
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // tonal_hpp

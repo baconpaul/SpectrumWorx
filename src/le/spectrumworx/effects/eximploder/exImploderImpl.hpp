@@ -17,16 +17,12 @@
 #include "le/spectrumworx/effects/effects.hpp"
 #include "le/spectrumworx/effects/phase_vocoder/shared.hpp"
 #include "le/utility/buffers.hpp"
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
-namespace SW
+
+namespace SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 namespace Detail
 {
@@ -88,14 +84,10 @@ class PVExploderImpl : public Detail::ExImPloderImpl, public EffectImpl<PVExplod
 
 using ExploderImpl = PhaseVocoderShared::StandaloneEffect<PVExploderImpl, Exploder>;
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
+} // namespace SW::Effects
+
 namespace Parameters
 {
-//------------------------------------------------------------------------------
 template <class Parameter> struct DisplayValueTransformer;
 
 template <> struct DisplayValueTransformer<SW::Effects::Detail::ExImPloder::Gate>
@@ -109,9 +101,9 @@ template <> struct DisplayValueTransformer<SW::Effects::Detail::ExImPloder::Gate
     }
     using Suffix = LE::Parameters::UnitString<" dB">;
 }; // struct DisplayValueTransformer<SW::Effects::Detail::ExImPloder::Gate>
-//------------------------------------------------------------------------------
+
 } // namespace Parameters
-//------------------------------------------------------------------------------
+
 } // namespace LE
-//------------------------------------------------------------------------------
+
 #endif // exImploderImpl_hpp

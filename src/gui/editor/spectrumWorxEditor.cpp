@@ -40,16 +40,9 @@
 #include <optional>
 #include <string_view>
 #include "le/utility/span.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::GUI
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace GUI
-{
-//------------------------------------------------------------------------------
 
 //...mrmlj...the specialized/optimized fillComboBoxForParameter<>() helpers no
 //...longer go through the generic Parameters::print<>() function so we also
@@ -89,9 +82,7 @@ template <> void fillComboBoxForParameter<Engine::OverlapFactor>(ComboBox &combo
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace Constants
-{
-namespace Layout
+namespace Constants::Layout
 {
 unsigned int const textBoxHorizontalOffset = 76;
 unsigned int const textBoxHeight = 22;
@@ -101,8 +92,7 @@ unsigned int const moduleNameVerticalOffset = 13;
 unsigned int const controlNameVerticalOffset = 42;
 unsigned int const controlValueVerticalOffset = 53;
 unsigned int const sampleNameVerticalOffset = 306;
-} // namespace Layout
-} //namespace Constants
+} // namespace Constants::Layout
 
 #pragma warning(push)
 #pragma warning(disable : 4355) // 'this' used in base member initializer list.
@@ -2992,15 +2982,7 @@ void SpectrumWorxEditor::Settings::updateLoadLastSessionOnStartup()
         editor().editorHost().shouldLoadLastSessionOnStartup(), juce::dontSendNotification);
 }
 
-//------------------------------------------------------------------------------
-} // namespace GUI
-//------------------------------------------------------------------------------
-
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::GUI
 
 /*
     Alex's scrap:

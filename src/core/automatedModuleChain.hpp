@@ -27,13 +27,9 @@
 #include "le/utility/intrusivePtr.hpp"
 
 #include <array>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
 
 //...mrmlj...defined outside of the AutomatedModuleChain class to enable forward declarations to speed up compilation...clean this up...
 std::int8_t constexpr noModule = -1;
@@ -170,9 +166,6 @@ class Program
     Name name_;
 }; // class Program
 
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW
+
 #endif // automatedModuleChain_hpp

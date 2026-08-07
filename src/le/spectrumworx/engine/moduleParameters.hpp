@@ -25,28 +25,26 @@
 #include <cstdint>
 #include <utility>
 #include "le/utility/span.hpp"
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
+
 namespace Parameters
 {
 struct RuntimeInformation;
 }
-//------------------------------------------------------------------------------
+
 namespace SW
 {
-//------------------------------------------------------------------------------
 using ParameterInfo = Parameters::RuntimeInformation;
 
 #ifndef LE_NO_PRESETS
 class ParametersLoader;
 class ParametersSaver;
 #endif // !LE_NO_PRESETS
-//------------------------------------------------------------------------------
+
 namespace Engine
 {
-//------------------------------------------------------------------------------
 
 using parameter_value_t = Parameters::LFOImpl::value_type;
 
@@ -310,11 +308,10 @@ class LE_NOVTABLE ModuleParameters : public ModuleNode
 #endif
 }; // class ModuleParameters
 
-//------------------------------------------------------------------------------
 } // namespace Engine
-//------------------------------------------------------------------------------
+
 } // namespace SW
-//------------------------------------------------------------------------------
+
 } // namespace LE
-//------------------------------------------------------------------------------
+
 #endif // automatedModule_hpp

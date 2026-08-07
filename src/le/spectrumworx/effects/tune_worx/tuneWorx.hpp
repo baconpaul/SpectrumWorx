@@ -20,14 +20,8 @@
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
 #include "le/parameters/uiElements.hpp" // the UIElements below
-//------------------------------------------------------------------------------
-namespace LE
-{
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
+
+namespace LE::SW::Effects
 {
 
 namespace Detail
@@ -292,11 +286,6 @@ EFFECT_ENUMERATED_PARAMETER_STRINGS(Detail::TuneWorxBase, Key,
     {G, "G"},
     {Gis, "G#"})
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // tuneWorx_hpp

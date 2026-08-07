@@ -23,10 +23,10 @@
 
 #include "le/utility/intrusivePtr.hpp"
 #include "le/utility/span.hpp"
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
+
 namespace Parameters
 {
 //...mrmlj...required to be in the header only for getParameterProperties() and EditorKnob::paint()...
@@ -52,12 +52,9 @@ char const *print<SW::Engine::OverlapFactor>(float const &parameterValue, SW::En
                                              PrintBuffer const &, PowerOfTwoParameterTag);
 } // namespace Detail
 } // namespace Parameters
-//------------------------------------------------------------------------------
 
-//------------------------------------------------------------------------------
 namespace SW
 {
-//------------------------------------------------------------------------------
 
 namespace Engine
 {
@@ -242,9 +239,8 @@ Plugin2HostInteropControler::make<Plugins::ParameterIndex>(SW::ParameterID const
     return parameterIndexFromBinaryID(selector.binaryValue);
 }
 
-//------------------------------------------------------------------------------
 } // namespace SW
-//------------------------------------------------------------------------------
+
 } // namespace LE
-//------------------------------------------------------------------------------
+
 #endif // plugin2Host_hpp

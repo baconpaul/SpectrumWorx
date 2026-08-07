@@ -18,13 +18,10 @@
 #ifndef NDEBUG
 #include <limits>
 #endif // NDEBUG
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
+
 namespace Engine
 {
 ////////////////////////////////////////////////////////////////////////////////
@@ -68,7 +65,6 @@ LE_WEAK_FUNCTION LE_COLD std::uint32_t fftBufferSize(std::uint8_t const a, std::
 } // namespace Engine
 namespace Engine
 {
-//------------------------------------------------------------------------------
 
 ChannelData_AmPh::ChannelData_AmPh(FullChannelData_AmPh &data, IndexRange const &workingRange)
     : SubRange<FullChannelData_AmPh, DataRange>(data, workingRange)
@@ -112,10 +108,6 @@ DataRange subRange(DataRange const &range, std::uint16_t const beginIndex,
     return DataRange(&range.begin()[beginIndex], &range.begin()[endIndex]);
 }
 
-//------------------------------------------------------------------------------
 } // namespace Engine
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+
+} // namespace LE::SW

@@ -14,16 +14,9 @@
 #include "whisperer.hpp"
 
 #include "le/spectrumworx/effects/effects.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 class WhispererImpl : public NoParametersEffectImpl<Whisperer>
 {
@@ -36,11 +29,6 @@ class WhispererImpl : public NoParametersEffectImpl<Whisperer>
     void process(Engine::ChannelData_AmPh, Engine::Setup const &) const;
 };
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // whispererImpl_hpp

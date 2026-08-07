@@ -16,15 +16,8 @@
 #include "le/parameters/linear/printer.hpp"
 
 #include "le/utility/cstdint.hpp"
-//------------------------------------------------------------------------------
-namespace LE
-{
-//------------------------------------------------------------------------------
-namespace Parameters
-{
-//------------------------------------------------------------------------------
 
-namespace Detail
+namespace LE::Parameters::Detail
 {
 template <class Parameter>
 char const *print(std::uint16_t const parameterValue, SW::Engine::Setup const &,
@@ -39,11 +32,6 @@ char const *print(float const parameterValue, SW::Engine::Setup const &, PrintBu
 {
     return printLinear(buffer.begin(), parameterValue, LinearIntegerParameterTag());
 }
-} // namespace Detail
+} // namespace LE::Parameters::Detail
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
 #endif // printer_hpp

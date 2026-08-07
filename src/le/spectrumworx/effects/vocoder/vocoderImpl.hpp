@@ -17,16 +17,9 @@
 #include "le/parameters/uiElements.hpp" // the UIElements below
 
 #include <cstdint>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 class VocoderImpl : public EffectImpl<Vocoder>
 {
@@ -70,11 +63,6 @@ EFFECT_ENUMERATED_PARAMETER_STRINGS(VocoderImpl, FilterMethod,
     {MelEnvelope, "Mel envelope"},
     {Passthrough, "Passthrough"})
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // vocoderImpl_hpp

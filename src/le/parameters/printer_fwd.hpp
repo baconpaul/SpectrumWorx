@@ -14,21 +14,16 @@
 #include "le/utility/tchar.hpp"
 #include "le/utility/span.hpp"
 
-//------------------------------------------------------------------------------
 namespace LE
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-namespace Engine
+
+namespace SW::Engine
 {
 class Setup;
-} // namespace Engine
-} // namespace SW
-//------------------------------------------------------------------------------
+} // namespace SW::Engine
+
 namespace Parameters
 {
-//------------------------------------------------------------------------------
 
 typedef LE::Utility::Span<char> PrintBuffer;
 
@@ -54,9 +49,8 @@ struct ParameterPrinter;
 struct Printer;
 struct AutomatedParameterPrinter;
 
-//------------------------------------------------------------------------------
 } // namespace Parameters
-//------------------------------------------------------------------------------
+
 } // namespace LE
-//------------------------------------------------------------------------------
+
 #endif // printer_fwd_hpp

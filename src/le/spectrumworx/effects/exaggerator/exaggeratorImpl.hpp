@@ -14,16 +14,9 @@
 #include "exaggerator.hpp"
 
 #include "le/spectrumworx/effects/effects.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 class ExaggeratorImpl : public EffectImpl<Exaggerator>
 {
@@ -39,11 +32,6 @@ class ExaggeratorImpl : public EffectImpl<Exaggerator>
     float exaggerate_;
 }; // class ExaggeratorImpl
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // exaggeratorImpl_hpp

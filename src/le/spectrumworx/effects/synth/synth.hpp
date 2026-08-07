@@ -15,16 +15,9 @@
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
 #include "le/parameters/uiElements.hpp" // the UIElements below
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -75,11 +68,6 @@ EFFECT_PARAMETER_NAME(Synth::HarmonicSlope, "Slope")
 EFFECT_PARAMETER_NAME(Synth::FlangeIntensity, "Flange amount")
 EFFECT_PARAMETER_NAME(Synth::FlangeOffset, "Flange offset")
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // synth_hpp

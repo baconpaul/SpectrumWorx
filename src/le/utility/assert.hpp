@@ -22,13 +22,9 @@
 #else
 #include <cassert>
 #endif // LE_ENABLE_ASSERT_HANDLER
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Utility
 {
-//------------------------------------------------------------------------------
-namespace Utility
-{
-//------------------------------------------------------------------------------
 
 /// \note LE_ASSERT compiles away under NDEBUG, which the handler branch used
 /// not to do. The tree assumes it does, in two ways that only a release build
@@ -72,9 +68,6 @@ void assertionFailed(char const *expression, char const *message,
 
 #endif // LE_ENABLE_ASSERT_HANDLER
 
-//------------------------------------------------------------------------------
-} // namespace Utility
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Utility
+
 #endif // assert_hpp

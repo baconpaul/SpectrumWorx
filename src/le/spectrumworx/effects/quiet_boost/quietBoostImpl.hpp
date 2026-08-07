@@ -14,16 +14,9 @@
 #include "quietBoost.hpp"
 
 #include "le/spectrumworx/effects/effects.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 class QuietBoostImpl : public EffectImpl<QuietBoost>
 {
@@ -36,11 +29,6 @@ class QuietBoostImpl : public EffectImpl<QuietBoost>
     void process(Engine::ChannelData_AmPh, Engine::Setup const &) const;
 };
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // quietBoostImpl_hpp

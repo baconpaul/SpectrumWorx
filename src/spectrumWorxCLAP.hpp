@@ -39,10 +39,9 @@
 #include <cstddef>
 #include <memory>
 #include <vector>
-//------------------------------------------------------------------------------
+
 namespace LE::SW
 {
-//------------------------------------------------------------------------------
 
 namespace GUI
 {
@@ -544,7 +543,6 @@ class SpectrumWorxCLAP final
     bool chainChangedPending_{false};
 }; // class SpectrumWorxCLAP
 
-//------------------------------------------------------------------------------
 } // namespace LE::SW
-//------------------------------------------------------------------------------
+
 #endif // spectrumWorxCLAP_hpp

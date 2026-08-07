@@ -16,21 +16,13 @@
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/span.hpp"
 
-//------------------------------------------------------------------------------
-namespace LE
+namespace LE::Math
 {
-//------------------------------------------------------------------------------
-namespace Math
-{
-//------------------------------------------------------------------------------
 
 using DataRange = LE::Utility::Span<float>;
 
 void calculateWindow(DataRange const &window, LE::SW::Engine::Constants::Window);
 
-//------------------------------------------------------------------------------
-} // namespace Math
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Math
+
 #endif // windows_hpp

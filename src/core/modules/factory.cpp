@@ -32,13 +32,9 @@
 
 #include "le/utility/assert.hpp"
 #include "le/utility/intrusivePtr.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
 
 /// \note A `ModuleKnob::QuantizationFor` specialisation for
 /// `PitchMagnetBase::Target` stood here -- a statement about a *widget*, in the
@@ -220,8 +216,4 @@ template void ModuleFactory::destroy(SW::Module const &);
 /// GUI build.
 ///                                       (28.07.2026.) (SW port)
 
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW

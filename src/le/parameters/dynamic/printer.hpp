@@ -15,13 +15,9 @@
 
 #include "le/parameters/printer_fwd.hpp"
 #include "le/utility/lexicalCast.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Parameters
 {
-//------------------------------------------------------------------------------
-namespace Parameters
-{
-//------------------------------------------------------------------------------
 
 /// \todo Yet to be fully and properly implemented.
 ///                                           (11.03.2011.) (Domagoj Saric)
@@ -37,9 +33,6 @@ char const *print(typename Parameter::value_type const parameterValue, SW::Engin
 }
 } // namespace Detail
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Parameters
+
 #endif // printer_hpp

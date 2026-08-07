@@ -24,10 +24,9 @@
 #include <cstdint>
 #include <limits>
 #include <numeric>
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
 
 // https://www.littleendian.com/wiki/index.php/PitchDetectorSDK
 
@@ -292,6 +291,4 @@ LE_OPTIMIZE_FOR_SPEED_END()
 
 void PitchDetector::ChannelState::reset() { lastPitch = 0; }
 
-//------------------------------------------------------------------------------
 } // namespace LE
-//------------------------------------------------------------------------------

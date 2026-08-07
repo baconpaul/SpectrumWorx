@@ -30,18 +30,17 @@
 #ifdef _MSC_VER
 #include <malloc.h>
 #endif // _MSC_VER
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
+
 namespace Math
 {
 void *align(void *);
 } // namespace Math
-//------------------------------------------------------------------------------
+
 namespace Utility
 {
-//------------------------------------------------------------------------------
 
 //...mrmlj...move/rename to some better location/namespace...
 inline unsigned int align(unsigned int const storageBytes)
@@ -368,9 +367,8 @@ template <typename T> class SharedStorageBuffer : public Span<T>
 
 #pragma warning(pop)
 
-//------------------------------------------------------------------------------
 } // namespace Utility
-//------------------------------------------------------------------------------
+
 } // namespace LE
-//------------------------------------------------------------------------------
+
 #endif // buffers_hpp

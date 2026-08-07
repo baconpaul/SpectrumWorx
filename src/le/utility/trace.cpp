@@ -33,13 +33,9 @@ extern "C" __declspec(dllimport) void __stdcall OutputDebugStringA(char const *l
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Utility
 {
-//------------------------------------------------------------------------------
-namespace Utility
-{
-//------------------------------------------------------------------------------
 
 LE_WEAK_SYMBOL char const *Tracer::pTagString = "LE";
 
@@ -169,8 +165,4 @@ bool Tracer::setObjCCallback(void (^newCallback)(NSString *message))
 }
 #endif // os
 
-//------------------------------------------------------------------------------
-} // namespace Utility
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Utility

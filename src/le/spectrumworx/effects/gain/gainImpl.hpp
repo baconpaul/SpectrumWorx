@@ -14,16 +14,9 @@
 #include "gain.hpp"
 
 #include "le/spectrumworx/effects/effects.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 class GainImpl : public NoParametersEffectImpl<Gain>
 {
@@ -36,11 +29,6 @@ class GainImpl : public NoParametersEffectImpl<Gain>
     static void process(Engine::ChannelData_AmPh const &, Engine::Setup const &) {}
 };
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // gainImpl_hpp

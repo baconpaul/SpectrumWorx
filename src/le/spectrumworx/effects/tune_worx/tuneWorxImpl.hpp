@@ -17,16 +17,9 @@
 #include "le/spectrumworx/effects/phase_vocoder/shared.hpp"
 #include "le/analysis/musical_scales/musicalScales.hpp"
 #include "le/analysis/pitch_detector/pitchDetector.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 namespace Detail
 {
@@ -65,11 +58,6 @@ class TuneWorxPVDImpl
     void process(ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const &) const;
 };
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // tuneWorxImpl_hpp

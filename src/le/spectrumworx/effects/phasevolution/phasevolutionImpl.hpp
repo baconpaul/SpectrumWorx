@@ -15,16 +15,9 @@
 
 #include "le/spectrumworx/effects/effects.hpp"
 #include "le/spectrumworx/effects/channelStateStatic.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 class PhasevolutionImpl : public EffectImpl<Phasevolution>
 {
@@ -52,11 +45,6 @@ class PhasevolutionImpl : public EffectImpl<Phasevolution>
     float stepTime_;
 };
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // phasevolutionImpl_hpp

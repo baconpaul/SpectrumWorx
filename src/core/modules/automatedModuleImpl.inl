@@ -15,13 +15,9 @@
 
 #include "le/parameters/printer.hpp"
 #include "le/spectrumworx/engine/moduleParameters.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
 
 template <class Impl>
 Plugins::AutomatedParameterValue
@@ -107,10 +103,6 @@ char const *AutomatedModuleImpl<Impl>::getParameterValueString(
     return Automation::getParameterValueString(index, printer, impl());
 }
 
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW
 
 #endif // automatedModuleImpl_inl

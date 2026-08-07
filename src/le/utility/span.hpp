@@ -30,13 +30,9 @@
 #include <iterator>
 #include <span>
 #include <type_traits>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Utility
 {
-//------------------------------------------------------------------------------
-namespace Utility
-{
-//------------------------------------------------------------------------------
 
 template <class T> class Span
 {
@@ -163,9 +159,6 @@ constexpr auto makeSpan(Container &container) noexcept
     return Span<Element>(std::data(container), std::size(container));
 }
 
-//------------------------------------------------------------------------------
-} // namespace Utility
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Utility
+
 #endif // span_hpp

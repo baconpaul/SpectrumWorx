@@ -56,13 +56,9 @@ struct PFFFT_Setup;
 
 #include <cstdint>
 #include "le/utility/span.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Math
 {
-//------------------------------------------------------------------------------
-namespace Math
-{
-//------------------------------------------------------------------------------
 
 //...mrmlj...cleanup these duplicated typedefs (also in effects.hpp)...
 typedef LE::Utility::Span<float> DataRange;
@@ -162,9 +158,6 @@ class FFT_float_real_1D
     static std::uint32_t requiredStorage(SW::Engine::StorageFactors const &);
 }; // class FFT_float_real_1D
 
-//------------------------------------------------------------------------------
-} // namespace Math
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Math
+
 #endif // fft_hpp

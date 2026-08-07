@@ -20,16 +20,9 @@
 #include "le/spectrumworx/effects/channelStateStatic.hpp"
 #include "le/spectrumworx/effects/phase_vocoder/shared.hpp"
 #include "le/analysis/pitch_detector/pitchDetector.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 namespace Detail
 {
@@ -80,11 +73,6 @@ class PitchMagnetPVDImpl
     void process(ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const &) const;
 };
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // pitchMagnetImpl_hpp

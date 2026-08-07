@@ -19,10 +19,9 @@
 #if defined(_MSC_VER) && !defined(__clang__) && (_MSC_VER < 1800)
 #include "le/parameters/boolean/parameter.hpp"
 #endif // old MSVC
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
 
 namespace Parameters
 {
@@ -42,13 +41,8 @@ struct SymmetricFloat;
 class TriggerParameter;
 } // namespace Parameters
 
-//------------------------------------------------------------------------------
-namespace SW
+namespace SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 // Implementation note:
 //   Import shared parameter types into the Effects namespace for less
@@ -80,11 +74,8 @@ using Parameters::Traits::Minimum;
 using Parameters::Traits::Unit;
 using Parameters::Traits::ValuesDenominator;
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
+} // namespace SW::Effects
+
 } // namespace LE
-//------------------------------------------------------------------------------
+
 #endif // parameters_hpp

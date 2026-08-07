@@ -16,13 +16,9 @@
 #include "le/parameters/boolean/parameter.hpp"
 #include "le/parameters/parameter.hpp"
 #include "le/utility/platformSpecifics.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Parameters
 {
-//------------------------------------------------------------------------------
-namespace Parameters
-{
-//------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 /// \internal
@@ -46,9 +42,6 @@ class TriggerParameter : public Boolean
     void operator--();
 }; // class TriggerParameter
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Parameters
+
 #endif // parameter_hpp

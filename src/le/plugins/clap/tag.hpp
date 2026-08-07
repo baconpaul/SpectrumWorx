@@ -30,10 +30,10 @@
 #include <array>
 #include <cstring>
 #include <type_traits>
-//------------------------------------------------------------------------------
+
 namespace LE::Plugins
 {
-//------------------------------------------------------------------------------
+
 namespace Protocol
 {
 struct CLAP
@@ -208,7 +208,6 @@ template <> class ParameterInformation<Protocol::CLAP>
     char unit_[16];
 }; // class ParameterInformation<Protocol::CLAP>
 
-//------------------------------------------------------------------------------
 } // namespace LE::Plugins
-//------------------------------------------------------------------------------
+
 #endif // tag_hpp

@@ -11,13 +11,9 @@
 #include "automatedModuleChain.hpp"
 
 #include "le/spectrumworx/engine/module.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
 
 ModuleChainParameter
 AutomatedModuleChain::getParameterForIndex(std::uint8_t const moduleIndex) const
@@ -38,8 +34,4 @@ AutomatedModuleChain::ModuleCPtr AutomatedModuleChain::module(std::uint8_t const
     return moduleAs<Module const>(index);
 }
 
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW

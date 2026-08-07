@@ -16,16 +16,9 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/uiElements.hpp" // the UIElements below
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 namespace Detail
 {
@@ -88,11 +81,6 @@ struct PitchMagnetPVD : Detail::PitchMagnetBase
 EFFECT_PARAMETER_NAME(Detail::PitchMagnetBase::Target, "Target")
 EFFECT_PARAMETER_NAME(Detail::PitchMagnetBase::Speed, "Strength")
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // pitchMagnet_hpp

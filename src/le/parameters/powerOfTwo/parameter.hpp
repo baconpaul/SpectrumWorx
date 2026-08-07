@@ -18,13 +18,9 @@
 #include "le/parameters/parameter.hpp"
 
 #include <cstdint>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Parameters
 {
-//------------------------------------------------------------------------------
-namespace Parameters
-{
-//------------------------------------------------------------------------------
 
 namespace Detail ///< \internal
 {
@@ -81,9 +77,6 @@ template <class... ArgumentPack> struct PowerOfTwoParameterTraits
 template <typename... Traits>
 using PowerOfTwoParameter = Parameter<Detail::PowerOfTwoParameterTraits<Traits...>>;
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Parameters
+
 #endif // parameter_hpp

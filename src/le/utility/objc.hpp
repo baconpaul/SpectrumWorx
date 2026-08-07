@@ -17,16 +17,9 @@
 #include "abi.hpp"
 
 @class NSString;
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Utility::ObjC
 {
-//------------------------------------------------------------------------------
-namespace Utility
-{
-//------------------------------------------------------------------------------
-namespace ObjC
-{
-//------------------------------------------------------------------------------
 
 NSString *asciiString(char const *c_str);
 NSString *utf8String(char const *c_str);
@@ -34,12 +27,7 @@ NSString *utf8String(char const *c_str);
 NSString *copyASCIIString(char const *c_str);
 NSString *copyUTF8String(char const *c_str);
 
-//------------------------------------------------------------------------------
-} // namespace ObjC
-//------------------------------------------------------------------------------
-} // namespace Utility
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Utility::ObjC
+
 #endif // __OBJC__
 #endif // objc_hpp

@@ -21,10 +21,9 @@
 #include <clapwrapper/vst3.h>
 
 #include <cstring>
-//------------------------------------------------------------------------------
+
 namespace LE::SW::ClapFirst
 {
-//------------------------------------------------------------------------------
 namespace
 {
 std::uint32_t pluginCount(clap_plugin_factory const *) { return 1; }
@@ -123,6 +122,4 @@ void const *getFactory(char const *const factoryID)
     return nullptr;
 }
 
-//------------------------------------------------------------------------------
 } // namespace LE::SW::ClapFirst
-//------------------------------------------------------------------------------

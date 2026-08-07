@@ -27,13 +27,9 @@
 
 #include <filesystem>
 #include <span>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
 
 /// \brief Reads a preset file into the writable, NUL-terminated buffer that the
 /// destructive parse in Preset::loadFrom() requires.
@@ -46,9 +42,6 @@ bool writePresetFile(std::filesystem::path const &, char const *data, unsigned i
 /// \brief Truncating copy of a NUL-terminated name into a Program::Name.
 void copyPresetName(char const *name, std::span<char> target);
 
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW
+
 #endif // presetStorage_hpp

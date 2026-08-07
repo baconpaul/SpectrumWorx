@@ -52,10 +52,10 @@
 #include <type_traits>
 #include <string_view>
 #include <utility> // rvalues
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
+
 namespace Parameters
 {
 class LFOImpl;
@@ -63,10 +63,9 @@ template <class Parameter> struct Name;
 template <class Parameter> struct StreamingName;
 template <class Parameter> constexpr char const *streamingName();
 } // namespace Parameters
-//------------------------------------------------------------------------------
+
 namespace SW
 {
-//------------------------------------------------------------------------------
 
 LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
@@ -896,9 +895,8 @@ std::string savePreset(std::string_view externalSampleFilePath, std::string_view
 
 LE_OPTIMIZE_FOR_SIZE_END()
 
-//------------------------------------------------------------------------------
 } // namespace SW
-//------------------------------------------------------------------------------
+
 } // namespace LE
-//------------------------------------------------------------------------------
+
 #endif

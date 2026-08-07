@@ -15,13 +15,9 @@
 #include "le/utility/cstdint.hpp"
 
 #include "le/utility/intrusivePtr.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
 
 struct ModuleFactory
 {
@@ -39,9 +35,6 @@ struct ModuleFactory
     template <class ModuleInterface> static void destroy(ModuleInterface const &);
 }; // struct ModuleFactory
 
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW
+
 #endif // moduleFactory_hpp

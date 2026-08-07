@@ -16,16 +16,9 @@
 #include "le/spectrumworx/effects/effects.hpp"
 #include "le/spectrumworx/effects/indexRange.hpp"
 #include "le/analysis/pitch_detector/pitchDetector.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 class CentroidExtractorImpl : public EffectImpl<CentroidExtractor>
 {
@@ -47,11 +40,6 @@ class CentroidExtractorImpl : public EffectImpl<CentroidExtractor>
     float amplification_;
 }; // class CentroidExtractorImpl
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // centroidExtractorImpl_hpp

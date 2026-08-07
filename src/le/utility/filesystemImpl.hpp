@@ -38,13 +38,9 @@ int const accessFlags(S_IRUSR | S_IWUSR | S_IROTH | S_IWOTH | S_IRGRP | S_IWGRP)
 #include <cerrno>
 #include <cstdint>
 #include <cstring>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Utility
 {
-//------------------------------------------------------------------------------
-namespace Utility
-{
-//------------------------------------------------------------------------------
 
 using CString = std::unique_ptr<char[]>;
 
@@ -77,9 +73,6 @@ LE_FORCEINLINE Result PathResolver<AbsolutePath>::apply(char const *const absolu
     return f(absolutePath);
 }
 
-//------------------------------------------------------------------------------
-} // namespace Utility
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Utility
+
 #endif // filesystemImpl_hpp

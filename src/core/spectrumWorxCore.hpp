@@ -24,13 +24,9 @@
 #include "le/utility/cstdint.hpp"
 #include "le/utility/intrinsics.hpp"
 #include "le/utility/platformSpecifics.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
 
 class Module;
 class ModuleDSP;
@@ -501,9 +497,6 @@ class LE_NOVTABLE SpectrumWorxCore : public Host2PluginInteropControler,
     Engine::HeapSharedStorage sharedStorage_;
 }; // class SpectrumWorxCore
 
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW
+
 #endif // spectrumWorxCore_hpp

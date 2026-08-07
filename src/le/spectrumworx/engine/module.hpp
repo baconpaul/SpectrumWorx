@@ -23,13 +23,10 @@
 
 #include <cstdint>
 #include "le/utility/span.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
+
 namespace Engine
 {
 struct StorageFactors;
@@ -37,7 +34,6 @@ using Storage = LE::Utility::Span<char>;
 } // namespace Engine
 namespace Engine
 {
-//------------------------------------------------------------------------------
 
 class ChannelData;
 class Setup;
@@ -143,11 +139,8 @@ class LE_NOVTABLE ModuleDSP : public LE::SW::Engine::ModuleParameters
     HeapSharedStorage storage_;
 }; // class ModuleDSP
 
-//------------------------------------------------------------------------------
 } // namespace Engine
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+
+} // namespace LE::SW
+
 #endif // module_hpp

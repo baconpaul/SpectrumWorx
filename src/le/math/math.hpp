@@ -67,13 +67,9 @@ inline int signbit(float const value) { return __signbitf(value); }
 inline int signbit(double const value) { return __signbit(value); }
 } // namespace std
 #endif // compiler/CRT
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Math
 {
-//------------------------------------------------------------------------------
-namespace Math
-{
-//------------------------------------------------------------------------------
 
 // http://www.strchr.com/optimized_abs_function
 using std::abs;
@@ -766,9 +762,7 @@ LE_FORCEINLINE float valueIfGreater(float const testValue, float const lowerBoun
 #endif
 }
 } // namespace PositiveFloats
-//------------------------------------------------------------------------------
-} // namespace Math
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+
+} // namespace LE::Math
+
 #endif // math_hpp

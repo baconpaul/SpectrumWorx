@@ -19,20 +19,16 @@
 #include "le/spectrumworx/effects/baseParameters.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/utility/parentFromMember.hpp"
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
+
 namespace Parameters
 {
 class LFOImpl;
 }
-namespace SW
+namespace SW::GUI
 {
-//------------------------------------------------------------------------------
-namespace GUI
-{
-//------------------------------------------------------------------------------
 
 using Effects::BaseParameters::Bypass;
 using Effects::BaseParameters::Gain;
@@ -474,10 +470,6 @@ SharedModuleControls &SharedModuleControls::FrequencyRange::parent()
                                      &SharedModuleControls::frequencyRange_>()(*this);
 }
 
-//------------------------------------------------------------------------------
-} // namespace GUI
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
+} // namespace SW::GUI
+
 } // namespace LE
-//------------------------------------------------------------------------------

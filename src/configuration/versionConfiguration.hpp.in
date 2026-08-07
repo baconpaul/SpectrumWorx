@@ -10,13 +10,9 @@
 //------------------------------------------------------------------------------
 #ifndef versionConfiguration_hpp__BB8C450C_443D_4F87_9241_44B477F0DE52
 #define versionConfiguration_hpp__BB8C450C_443D_4F87_9241_44B477F0DE52
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
 
 #define SW_VERSION_MAJOR        @versionMajor@
 #define SW_VERSION_MINOR        @versionMinor@
@@ -30,9 +26,6 @@ namespace SW
 #define MB_ERROR   "SpectrumWorx" SW_EDITION_STRING " error:"
 #define MB_WARNING "SpectrumWorx" SW_EDITION_STRING " warning:"
 
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW
+
 #endif // versionConfiguration_hpp

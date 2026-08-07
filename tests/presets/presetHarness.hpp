@@ -27,10 +27,9 @@
 
 #include <cstdint>
 #include <string>
-//------------------------------------------------------------------------------
+
 namespace SWTest
 {
-//------------------------------------------------------------------------------
 
 using LE::SW::PresetProblem;
 using LE::SW::PresetProblemReporter;
@@ -173,7 +172,6 @@ Loaded dump(Engine &);
 /// FNV-1a, 64 bit, over the dump text.
 std::uint64_t digest(std::string_view text);
 
-//------------------------------------------------------------------------------
 } // namespace SWTest
-//------------------------------------------------------------------------------
+
 #endif // presetHarness_hpp

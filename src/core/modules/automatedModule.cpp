@@ -19,16 +19,9 @@
 #include "le/spectrumworx/effects/baseParameters.hpp" // BaseParameters printers
 #include "le/spectrumworx/engine/moduleParameters.hpp"
 #include <optional>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Automation
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Automation
-{
-//------------------------------------------------------------------------------
 
 LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
@@ -164,10 +157,4 @@ Detail::autoAdjustedLFOParameter(LFO &lfo, std::uint8_t const lfoParameterIndex)
 
 LE_OPTIMIZE_FOR_SIZE_END()
 
-//------------------------------------------------------------------------------
-} // namespace Automation
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Automation

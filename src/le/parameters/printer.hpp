@@ -25,13 +25,9 @@
 
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/tchar.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Parameters
 {
-//------------------------------------------------------------------------------
-namespace Parameters
-{
-//------------------------------------------------------------------------------
 
 LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
@@ -159,9 +155,6 @@ struct AutomatedParameterPrinter
 
 LE_OPTIMIZE_FOR_SIZE_END()
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Parameters
+
 #endif // printer_hpp

@@ -17,15 +17,8 @@
 
 #include "le/parameters/printer_fwd.hpp"
 #include "le/parameters/uiElements.hpp"
-//------------------------------------------------------------------------------
-namespace LE
-{
-//------------------------------------------------------------------------------
-namespace Parameters
-{
-//------------------------------------------------------------------------------
 
-namespace Detail
+namespace LE::Parameters::Detail
 {
 template <class Parameter>
 static char const *print(typename Parameter::param_type const parameterValue,
@@ -41,11 +34,6 @@ static char const *print(Source const &parameterValue, SW::Engine::Setup const &
     return print<Parameter>(Math::convert<typename Parameter::binary_type>(parameterValue),
                             engineSetup, buffer, EnumeratedParameterTag());
 }
-} // namespace Detail
+} // namespace LE::Parameters::Detail
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
 #endif // printer_hpp

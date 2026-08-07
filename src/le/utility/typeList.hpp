@@ -27,13 +27,9 @@
 #include <cstddef>
 #include <type_traits>
 #include <utility>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Utility
 {
-//------------------------------------------------------------------------------
-namespace Utility
-{
-//------------------------------------------------------------------------------
 
 template <class... Types> struct TypeList
 {
@@ -122,9 +118,6 @@ typename std::remove_reference_t<F>::result_type switchOn(Index const index, F &
     return Detail::switchOn(List(), index, std::forward<F>(f));
 }
 
-//------------------------------------------------------------------------------
-} // namespace Utility
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Utility
+
 #endif // typeList_hpp

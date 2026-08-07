@@ -18,16 +18,9 @@
 #include "le/parameters/boolean/parameter.hpp"
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/uiElements.hpp" // the UIElements below
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -78,11 +71,6 @@ EFFECT_PARAMETER_NAME(TalkBox::ExternalCarrier, "External carrier")
 EFFECT_PARAMETER_NAME(TalkBox::BaseFrequency, "Base frequency")
 EFFECT_PARAMETER_NAME(TalkBox::CutOff, "Cutoff")
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // talkBox_hpp

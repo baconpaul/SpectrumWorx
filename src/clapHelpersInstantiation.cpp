@@ -18,7 +18,7 @@
 #include <clap/helpers/plugin.hxx>
 
 #include <type_traits>
-//------------------------------------------------------------------------------
+
 namespace clap::helpers
 {
 template class Plugin<LE::SW::misbehaviourLevel, LE::SW::checkingLevel>;

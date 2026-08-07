@@ -14,16 +14,9 @@
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
 #include "le/spectrumworx/effects/configuration/includedEffects.hpp"
 #include "le/utility/typeList.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::GUI
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace GUI
-{
-//------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -160,10 +153,4 @@ std::uint8_t ModuleMenuHolder::effectIndexForEntry(unsigned int const menuEntryI
 
 Menu &ModuleMenuHolder::subMenu(std::uint8_t const index) { return menus_[1 + index]; }
 
-//------------------------------------------------------------------------------
-} // namespace GUI
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::GUI

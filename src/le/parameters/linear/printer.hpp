@@ -18,15 +18,8 @@
 
 #include <cstdio>
 #include <type_traits>
-//------------------------------------------------------------------------------
-namespace LE
-{
-//------------------------------------------------------------------------------
-namespace Parameters
-{
-//------------------------------------------------------------------------------
 
-namespace Detail
+namespace LE::Parameters::Detail
 {
 template <class TraitTag, class Traits, class... DefaultTraits> struct GetTraitDefaulted;
 
@@ -63,11 +56,6 @@ char const *print(Source const &parameterValue, SW::Engine::Setup const &engineS
     return printLinear(buffer.begin(), ValueTransformer::transform(parameterValue, engineSetup),
                        typename Parameter::Tag());
 }
-} // namespace Detail
+} // namespace LE::Parameters::Detail
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
 #endif // printer_hpp

@@ -23,16 +23,9 @@
 #include "le/utility/assert.hpp"
 
 #include <memory>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::GUI
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace GUI
-{
-//------------------------------------------------------------------------------
 
 // Implementation note:
 //   The (PVD)PitchMagnet::Target parameter is so far the only parameter
@@ -110,10 +103,4 @@ std::unique_ptr<ModuleWidgets> createModuleWidgets(std::uint8_t const effectInde
     return LE::Utility::switchOn<Effects::ValidIndices>(effectIndex, Builder{region});
 }
 
-//------------------------------------------------------------------------------
-} // namespace GUI
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::GUI

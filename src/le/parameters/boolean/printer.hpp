@@ -14,15 +14,8 @@
 #include "tag.hpp"
 
 #include "le/parameters/printer_fwd.hpp"
-//------------------------------------------------------------------------------
-namespace LE
-{
-//------------------------------------------------------------------------------
-namespace Parameters
-{
-//------------------------------------------------------------------------------
 
-namespace Detail
+namespace LE::Parameters::Detail
 {
 template <class Parameter>
 char const *print(bool const parameterValue, SW::Engine::Setup const &, PrintBuffer const &,
@@ -37,11 +30,6 @@ char const *print(float const &parameterValue, SW::Engine::Setup const &, PrintB
 {
     return Math::round(parameterValue) ? "yes" : "no";
 }
-} // namespace Detail
+} // namespace LE::Parameters::Detail
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
 #endif // printer_hpp

@@ -16,13 +16,9 @@
 #include "le/math/conversion.hpp"
 
 #include <cstdint>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Parameters
 {
-//------------------------------------------------------------------------------
-namespace Parameters
-{
-//------------------------------------------------------------------------------
 
 /// \todo Add more extensive documentation for the Parameter class template and
 /// the related architecture.
@@ -77,8 +73,4 @@ bool isValueInRange<float const &>(float const &value, float const &rangeMinimum
 }
 } // namespace Detail
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Parameters

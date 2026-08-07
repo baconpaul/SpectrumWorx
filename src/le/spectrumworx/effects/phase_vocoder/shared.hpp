@@ -28,19 +28,9 @@
 #include <cstdint>
 #include <type_traits>
 #include <utility>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects::PhaseVocoderShared
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
-namespace PhaseVocoderShared
-{
-//------------------------------------------------------------------------------
 
 #ifdef LE_PV_USE_TSS
 #define LE_PV_TSS_DYNAMIC_THRESHOLD
@@ -395,13 +385,6 @@ void synthesis(SynthesisChannelState &, DataRange const &anaFreqInSynthPhaseOut,
                BaseParameters const &);
 void pitchShiftAndScale(Engine::ChannelData_AmPh &, PitchShiftParameters const &);
 
-//------------------------------------------------------------------------------
-} // namespace PhaseVocoderShared
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects::PhaseVocoderShared
+
 #endif // shared_hpp

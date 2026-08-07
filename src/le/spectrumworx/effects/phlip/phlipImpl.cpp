@@ -13,16 +13,9 @@
 #include "le/spectrumworx/effects/indexRange.hpp"
 #include "le/spectrumworx/engine/channelDataAmPh.hpp"
 #include "le/math/vector.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -77,9 +70,4 @@ void PhlipImpl::process(Engine::ChannelData_AmPh data, Engine::Setup const &) co
     Math::negate(DataRange(data.phases().begin() + oddEvenAdjustment_, data.phases().end()), step_);
 }
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
+} // namespace LE::SW::Effects

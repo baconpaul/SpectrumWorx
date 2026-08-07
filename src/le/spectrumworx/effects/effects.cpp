@@ -12,16 +12,9 @@
 
 #include "commonParameters.hpp"
 #include "le/utility/platformSpecifics.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 void UnpackedMagPhaseMode::unpack(CommonParameters::Mode const &mode)
 {
@@ -70,10 +63,4 @@ std::pair<ModuloCounter::value_type, bool> ModuloCounter::nextValueFor(value_typ
     return std::pair<value_type, bool>(actualCounter, wrapAround);
 }
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
