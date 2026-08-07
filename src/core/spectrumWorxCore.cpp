@@ -20,7 +20,6 @@
 #include "le/utility/clear.hpp"
 #include "le/utility/parentFromMember.hpp"
 #include "le/utility/tchar.hpp"
-#include "le/utility/trace.hpp"
 
 #include "le/utility/stackBuffer.hpp"
 
@@ -64,10 +63,6 @@ char const SpectrumWorxCore::productString[] = "SpectrumWorx (Little Endian Ltd.
 
 SpectrumWorxCore::SpectrumWorxCore()
 {
-#ifndef NDEBUG
-    Utility::Tracer::pTagString = "SW";
-#endif // NDEBUG
-
     Utility::clear(currentStorageFactors_);
 
     suspended_ = true;
@@ -322,11 +317,8 @@ bool SpectrumWorxCore::checkChannelConfiguration(std::uint8_t const numberOfInpu
                   "SW cannot 'produce' channels.");
 #endif // __APPLE__
 
-    bool canDoIt((numberOfInputChannels == numberOfOutputChannels) ||
-                 (numberOfInputChannels == 2 * numberOfOutputChannels));
-    LE_TRACE_IF(!canDoIt, "\tSW: requested an unsupported IO configuration (%u : %u).",
-                numberOfInputChannels, numberOfOutputChannels);
-    return canDoIt;
+    return (numberOfInputChannels == numberOfOutputChannels) ||
+           (numberOfInputChannels == 2 * numberOfOutputChannels);
 }
 
 void SpectrumWorxCore::updateInputModeForIOConfig(

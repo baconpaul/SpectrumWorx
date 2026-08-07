@@ -163,7 +163,6 @@ LE_COLD void SynthImpl::setup(IndexRange const &workingRange, Engine::Setup cons
         auto const minHarmonic(std::ceil(minFrequency / fundamentalFrequency));
         auto const maxHarmonics(std::max<float>(0, maxHarmonic - minHarmonic + 1));
 
-        LE_LOCALLY_DISABLE_FPU_EXCEPTIONS();
         harmonicSlope_ =
             std::pow(Math::percentage2NormalisedLinear(parameters().get<HarmonicSlope>()),
                      4); // 'delinearise', slope = slope**4
@@ -347,11 +346,6 @@ LE_HOT void SynthImpl::process(SynthImpl::ChannelState &cs, Engine::MainSideChan
 
     //...mrmlj...think of a better name...
     auto const halfNumberOfCoefficients(static_cast<std::uint8_t>((coefficients_.size() - 1) / 2));
-
-    /// \note Math::addPolar() calls atan2() which can in turn do a division by
-    /// zero internally.
-    ///                                       (22.10.2015.) (Domagoj Saric)
-    LE_LOCALLY_DISABLE_FPU_EXCEPTIONS();
 
     for (std::uint8_t harmonic(startHarmonic_); harmonics; ++harmonic, --harmonics)
     {

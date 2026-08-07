@@ -866,54 +866,6 @@ float LE_HOT normalisedRand()
     return result;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-//
-// FPUExceptionsGuard::FPUExceptionsGuard()
-// ----------------------------------------
-//
-////////////////////////////////////////////////////////////////////////////////
-/// Related reading:
-/// http://msdn.microsoft.com/en-us/library/aa289157(VS.71).aspx#floapoint_topic8
-/// http://www.dinkumware.com/manuals/?manual=compleat&page=fenv.html
-////////////////////////////////////////////////////////////////////////////////
-
-FPUExceptionsGuard::FPUExceptionsGuard()
-#ifdef _MSC_VER
-    : originalFloatingPointControlWord_(::_control87(0, 0))
-#endif // _MSC_VER
-{
-#ifdef _MSC_VER
-    LE_ASSERT((originalFloatingPointControlWord_ & EM_AMBIGUOUS) == 0);
-    ::_clear87();
-#endif // _MSC_VER
-}
-
-FPUExceptionsGuard::~FPUExceptionsGuard()
-{
-#ifdef _MSC_VER
-    ::_clear87();
-
-    // Reset the control word.
-    ::_control87(originalFloatingPointControlWord_, exceptionsMask);
-#endif // _MSC_VER
-}
-
-FPUExceptionsEnabler::FPUExceptionsEnabler()
-{
-#ifdef _MSC_VER
-    // Set the exception masks OFF/turn exceptions on.
-    ::_controlfp(0, exceptionsMask);
-#endif // _MSC_VER
-}
-
-FPUExceptionsDisabler::FPUExceptionsDisabler()
-{
-#ifdef _MSC_VER
-    // Set the exception masks ON/turn exceptions off.
-    ::_controlfp(static_cast<unsigned int>(-1), exceptionsMask);
-#endif // _MSC_VER
-}
-
 LE_OPTIMIZE_FOR_SPEED_END()
 
 } // namespace LE::Math

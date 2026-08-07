@@ -1523,13 +1523,6 @@ void rectangular2polar(float const *LE_RESTRICT const pReals, float const *LE_RE
                        std::uint16_t const numberOfElements)
 {
 #ifdef LE_MATH_USE_NT2
-    // Implementation note:
-    //   It frequently happens that a real component is zero which causes a
-    // division-by-zero FPU exception in the atan2 function so we have to
-    // locally mask them.
-    //                                        (13.10.2011.) (Domagoj Saric)
-    LE_LOCALLY_DISABLE_FPU_EXCEPTIONS();
-
     EdgeRestoredAlignedRange const amplitudes(pAmplitudes, pAmplitudes + numberOfElements);
     EdgeRestoredAlignedRange const phases(pPhases, pPhases + numberOfElements);
     LE_ASSERT_MSG(amplitudes.compatiblyAligned(pPhases), "Misaligned data");

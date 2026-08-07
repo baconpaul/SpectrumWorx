@@ -12,7 +12,6 @@ add_library(sw-gui-resources STATIC
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/resources.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/theme.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/le/utility/assertionHandler.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/le/utility/trace.cpp # assertionHandler routes through it
 )
 
 sw_force_include_odr_header(sw-gui-resources)

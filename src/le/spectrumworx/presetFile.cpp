@@ -13,7 +13,6 @@
 #include "configuration/versionConfiguration.hpp" // MB_ERROR
 
 #include "le/utility/assert.hpp"
-#include "le/utility/trace.hpp"
 
 #include <juce_core/juce_core.h>
 

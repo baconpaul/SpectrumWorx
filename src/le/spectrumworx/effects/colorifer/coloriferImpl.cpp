@@ -91,7 +91,6 @@ void LE_HOT ColoriferImpl::process(Engine::MainSideChannelData_AmPh data,
              numberOfBins); //...mrmlj...no out-of-place vectorized squareRoot, square, exp...
         copy(mainAmps.begin(), yStorage.begin(), numberOfBins);
 
-        LE_LOCALLY_DISABLE_FPU_EXCEPTIONS();
         switch (mode)
         {
         case SpectrumPreprocess::SquareRoot:

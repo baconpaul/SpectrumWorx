@@ -21,7 +21,6 @@
 #include "le/spectrumworx/effects/effects.hpp"
 #include "le/utility/parentFromMember.hpp"
 #include "le/utility/platformSpecifics.hpp"
-#include "le/utility/trace.hpp"
 
 #include "le/utility/stackBuffer.hpp"
 
@@ -638,11 +637,6 @@ void LE_COLD Processor::calculateWindowAndWOLAGain()
         float const variation((maximum - minimum) / maximum / wolaGain);
 
         engineSetup().setWOLAGainAndRipple(wolaGain, variation);
-
-#if 0  //...mrmlj...can be noisy/not needed that much anymore...
-        LE_TRACE("\tWindow ID: %u, window overlap factor: %u, gain: %f, variation: %f%%.",
-                 engineSetup().windowFunction(), windowSize / stepSize, wolaGain, variation * 100);
-#endif // _DEBUG
     }
 }
 

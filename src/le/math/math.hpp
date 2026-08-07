@@ -37,7 +37,6 @@
 ///                                           (28.07.2026.) (SW port)
 #include "le/utility/span.hpp"
 
-#include <cfloat>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -236,73 +235,15 @@ UnsignedInteger roundUpUnsignedIntegerDivision(UnsignedInteger const dividend,
 /// were compiled out.
 ///                                           (29.07.2026.) (SW port)
 ///
-////////////////////////////////////////////////////////////////////////////////
-
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \class FPUExceptionsGuard
-///
-/// \brief Saves and restores the FPU control word exception mask.
-///
-/// None of its member functions may throw.
+/// \note FPUExceptionsGuard, FPUExceptionsEnabler, FPUExceptionsDisabler and
+/// LE_LOCALLY_DISABLE_FPU_EXCEPTIONS followed it and are deleted too. The macro
+/// was gated on _DEBUG -- MSVC-only, and defined by nothing in this build --
+/// and every body of the guard itself was inside `#ifdef _MSC_VER`, so the ten
+/// call sites expanded to nothing on every configuration. Nothing named the
+/// Enabler at all. `<cfloat>` went with them: it was here for the EM_* masks.
+///                                           (07.08.2026.) (SW port)
 ///
 ////////////////////////////////////////////////////////////////////////////////
-
-class FPUExceptionsGuard
-{
-  public:
-    FPUExceptionsGuard(FPUExceptionsGuard const &) = delete; // makes non-copyable
-    FPUExceptionsGuard &operator=(FPUExceptionsGuard const &) = delete;
-
-    FPUExceptionsGuard();
-    ~FPUExceptionsGuard();
-
-  protected:
-#ifdef _MSC_VER
-    unsigned int const originalFloatingPointControlWord_;
-
-    static unsigned int const exceptionsMask =
-        EM_OVERFLOW /*| EM_UNDERFLOW*/ /*| EM_INEXACT*/ | EM_ZERODIVIDE | EM_INVALID | EM_DENORMAL;
-#endif // _MSC_VER
-}; // class FPUExceptionsGuard
-
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \class FPUExceptionsEnabler
-///
-/// \brief Locally enables FPU exceptions.
-///
-/// None of its member functions may throw.
-///
-////////////////////////////////////////////////////////////////////////////////
-
-class FPUExceptionsEnabler : public FPUExceptionsGuard
-{
-  public:
-    FPUExceptionsEnabler();
-}; // class FPUExceptionsEnabler
-
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \class FPUExceptionsDisabler
-///
-/// \brief Locally disables FPU exceptions.
-///
-/// None of its member functions may throw.
-///
-////////////////////////////////////////////////////////////////////////////////
-
-class FPUExceptionsDisabler : public FPUExceptionsGuard
-{
-  public:
-    FPUExceptionsDisabler();
-}; // class FPUExceptionsDisabler
-
-#if defined(_DEBUG)
-#define LE_LOCALLY_DISABLE_FPU_EXCEPTIONS() ::LE::Math::FPUExceptionsDisabler const fpuDebuggerGuard
-#else
-#define LE_LOCALLY_DISABLE_FPU_EXCEPTIONS()
-#endif
 
 enum FPClass
 {
@@ -323,8 +264,6 @@ enum FPClass
 template <unsigned FPClasses>
 unsigned int LE_NOINLINE has(float const *LE_RESTRICT pRange, std::size_t rangeSize)
 {
-    LE_LOCALLY_DISABLE_FPU_EXCEPTIONS();
-
     unsigned int result(0);
 
     while (rangeSize-- && (result != FPClasses))

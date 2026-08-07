@@ -23,7 +23,6 @@
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
 #include "le/spectrumworx/effects/configuration/includedEffects.hpp"
 #include "le/utility/countof.hpp"
-#include "le/utility/tracePrivate.hpp"
 
 #include "le/utility/assert.hpp"
 #include "le/utility/intrusivePtr.hpp"
@@ -300,15 +299,9 @@ bool Preset::loadFrom(char const *const pBuffer)
         document_.Clear();
         document_.Parse(repaired->c_str());
         if (parsedAsPreset())
-        {
-            LE_TRACE_LOGONLY("SW: preset uses 2016 numeric element names; repaired on read.");
             return true;
-        }
     }
 
-    LE_TRACE_IF(!document_.Error(), "SW: document parsed but has no <%s> root.", headerNodeName_);
-    LE_TRACE_IF(document_.Error(), "SW preset parsing failed (%s @ row %d).", document_.ErrorDesc(),
-                document_.ErrorRow());
     return false;
 }
 
@@ -483,11 +476,7 @@ LE_COLD void reportPresetProblem(PresetProblem const problem, std::string_view c
     presetProblemReporter(problem, detail);
 }
 
-void Preset::reportPresetLoadingError()
-{
-    LE_TRACE("Unable to load preset.");
-    reportPresetProblem(PresetProblem::LoadFailed);
-}
+void Preset::reportPresetLoadingError() { reportPresetProblem(PresetProblem::LoadFailed); }
 
 /// \note The RapidXML allocation tracer that stood here is gone with the arena
 /// it traced. It printed a line per node on every debug preset load, which the
@@ -842,7 +831,6 @@ void ParametersLoader::reportUnreadParameters() const
         auto const *const pName((grammar_ == Grammar::V3)
                                     ? pNode->Attribute(parameterNameAttributeName_)
                                     : pNode->Value());
-        LE_TRACE_LOGONLY("Unreadable parameter in preset (%s).", pName ? pName : "?");
         reportPresetProblem(PresetProblem::UnknownParameter, pName ? pName : "");
     }
 }
@@ -857,7 +845,6 @@ LE_COLD void ParametersLoader::warnAboutMissingParameter(char const *const pPara
 #endif // LE_PV_USE_TSS
         (parameterName != "Gate"))
     {
-        LE_TRACE_LOGONLY("Missing parameter value in preset (%s).", pParameterName);
         reportPresetProblem(PresetProblem::MissingParameter, parameterName);
     }
 }

@@ -57,7 +57,6 @@ set(notDSPRoots "${SOURCE_DIR}/src/core/host_interop")
 # compile lines. Each is one file compiled twice, not sw-dsp reaching for JUCE.
 set(alsoCompiledElsewhere
         "${SOURCE_DIR}/src/le/utility/assertionHandler.cpp" # sw-gui-resources
-        "${SOURCE_DIR}/src/le/utility/trace.cpp"            # sw-gui-resources
         "${SOURCE_DIR}/src/le/spectrumworx/presetFile.cpp"  # sw-io
 )
 

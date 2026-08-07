@@ -10,7 +10,6 @@
 //------------------------------------------------------------------------------
 #include "host2Plugin.hpp"
 
-#include "le/utility/trace.hpp"
 #include "le/utility/span.hpp"
 
 namespace LE
@@ -55,13 +54,6 @@ LE_COLD char *copyToBuffer(Char const *const string, LE::Utility::Span<char> con
         ++pDestinationCharacter;
     }
     *pDestinationCharacter = '\0';
-
-    LE_TRACE_IF(
-        std::char_traits<Char>::length(string) >= unsigned(buffer.size()),
-        "\tSW: source string (\"%s\") does not fit into destination buffer (%d characters).",
-        std::is_same<Char, char>::value ? reinterpret_cast<char const *>(string) : buffer.begin(),
-        buffer.size() //...mrmlj...
-    );
 
     return pDestinationCharacter;
 }

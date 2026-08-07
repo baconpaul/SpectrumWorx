@@ -225,8 +225,6 @@ void LE_HOT PeakDetector::findPeaksImpl(float const *LE_RESTRICT const amplitude
 
     using namespace Math;
 
-    LE_LOCALLY_DISABLE_FPU_EXCEPTIONS();
-
     // Find max element
     float maxLocal(Math::max(amplitudes, numBins));
     // ... and global maximum
