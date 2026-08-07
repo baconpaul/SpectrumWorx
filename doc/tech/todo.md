@@ -109,15 +109,6 @@ to compare the two interfaces before deciding — `threading_model.md` §3
 describes what the channels actually need, which is less than a general queue
 offers.
 
-### Save-As offers a garbage name
-
-The preset browser's Save-As prefills its name field from
-`editor().currentProgramName()` and then appends a `" (NN)"` counter until the
-name is unused (`presetBrowser.cpp:563-580`). What a user sees when the box
-opens is not a sensible default. Blank it: an empty field with the old name as
-placeholder text is what every other application does, and the dedup loop can
-run when the name is committed rather than when the box appears.
-
 ### Run the tests under rtsan again
 
 `reset()` and `paramsFlush()` went into the realtime region on 03.08.2026 and
