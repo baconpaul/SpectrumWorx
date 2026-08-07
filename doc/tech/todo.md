@@ -258,6 +258,53 @@ Three drifts, all visible to a user, all in
   chooser will happily walk into the on-disk `assets/presets` and present a
   factory bank as writable.
 
+### Finish stripping the `LE_` macro layer
+
+Begun 07.08.2026 and stopped part-way, deliberately: what is left is the half
+that changes generated code, and it wants a Windows log in the loop rather than
+a run of green macOS builds.
+
+**Done** — the `LE_ASSUME` double definition (it was defined twice with different
+meanings and include order picked the winner, so an assumption broken in twelve
+headers was silent undefined behaviour); the sixteen macros defined with no call
+site; the five orphan cmake files; the doxygen template; `le/utility/filesystem`
+and its `#pragma comment(lib)` naming a library this project has never built; the
+dead feature switches `LE_NO_PARAMETER_STRINGS`, `LE_SIMPLE_TUNEWORX`,
+`LE_NO_PRESETS`, `LE_NO_LFOs`, `LE_NO_RTTI`/`LE_NO_EXCEPTIONS`; window presum and
+its parameter, with the fold collapsed to the single frame it always ran at; the
+tracer and the FPU exception guards; the 89 per-translation-unit optimise and
+fast-math pragmas; and the macros C++20 can spell for itself. Around 6,400 lines.
+
+**Left**, in the order to do it:
+
+- **`LE_COLD` (166 sites), `LE_HOT` (38), `LE_NOVTABLE` (31).** The plan that
+  scoped these called them no-ops, and on MSVC and GCC they are. **On Clang they
+  are not**: `LE_COLD` is `__attribute__((minsize))` and `LE_HOT` is
+  `__attribute__((hot))`, so deleting them re-optimises 200-odd functions in the
+  compiler that renders the goldens. The goldens are the check and the risk is
+  real rather than notional — Clang contracts FMAs by default, so a function
+  moving from `minsize` to `-O3` can round differently. If they move, that is an
+  answer about the macros, not a bug to chase.
+- **`LE_DISABLE_LOOP_UNROLLING` (19) and `LE_DISABLE_LOOP_VECTORIZATION` (6).**
+  Same shape, sharper: these are live `clang loop` pragmas, and removing them
+  lets the vectoriser into loops it has never been in. Do them alone, after the
+  above, so a golden change has one candidate cause.
+- **`LE_ALIGN`** — one live use, eleven more inside `vector.cpp`'s NT2 arms, so
+  it cannot go until that strip below does. `alignas` replaces it.
+- **The ODR force-include.** `leConfigurationAndODRHeader.h` still carries a
+  ~78-line fake secure-CRT shim dated 2009 that is *reachable in release MSVC
+  builds*, a `__GLIBCXX__ < 20110325` typedef and a 2011 iOS `__MMX__` hack. Once
+  those go, the only genuinely ODR-critical thing left in it is `LE_HAS_SSE1`; if
+  that moves to `target_compile_definitions` then the force-include and
+  `tests/checkODRHeaderScope.cmake` can both retire.
+- **A Windows log.** Most of what the first three items delete is MSVC-only code,
+  and nothing here has an MSVC. Three changes already made are unverified on it:
+  the assertion handler now writes to `OutputDebugStringA` itself rather than
+  through the deleted tracer, `float &LE_RESTRICT` replaced `LE_GNU_SPECIFIC` at
+  six sites in `vector.hpp` and `phase_vocoder/shared.cpp` where a 2012 comment
+  says MSVC could not take a restricted reference, and three of those changed
+  MSVC from pass-by-value to pass-by-const-reference.
+
 ### Dead code that needs a decision rather than a sweep
 
 Roughly 6,500 lines across 46 files are in the tree and in no target. Every one
