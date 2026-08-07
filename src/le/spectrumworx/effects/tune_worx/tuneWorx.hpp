@@ -35,7 +35,6 @@ struct TuneWorxBase ///<
 
     LE_ENUMERATED_PARAMETER(Key, A, Ais, B, C, Cis, D, Dis, E, F, Fis, G, Gis);
 
-#ifndef LE_SIMPLE_TUNEWORX
     LE_DEFINE_PARAMETER(Semi01, Boolean);
     LE_DEFINE_PARAMETER(Semi02, Boolean);
     LE_DEFINE_PARAMETER(Semi03, Boolean);
@@ -82,22 +81,6 @@ struct TuneWorxBase ///<
                          BypassSemi08, BypassSemi09, BypassSemi10, BypassSemi11, BypassSemi12,
                          Vibrato, PitchMinFreq, PitchMaxFreq, TuneTolerance, RetuneTime,
                          VibratoDelay, VibratoPeriod, VibratoDepth, PitchShift);
-#else  // LE_SIMPLE_TUNEWORX
-    LE_DEFINE_PARAMETER(Semi01, Boolean);
-    LE_DEFINE_PARAMETER(Semi02, Boolean);
-    LE_DEFINE_PARAMETER(Semi03, Boolean);
-    LE_DEFINE_PARAMETER(Semi04, Boolean);
-    LE_DEFINE_PARAMETER(Semi05, Boolean);
-    LE_DEFINE_PARAMETER(Semi06, Boolean);
-    LE_DEFINE_PARAMETER(Semi07, Boolean);
-    LE_DEFINE_PARAMETER(Semi08, Boolean);
-    LE_DEFINE_PARAMETER(Semi09, Boolean);
-    LE_DEFINE_PARAMETER(Semi10, Boolean);
-    LE_DEFINE_PARAMETER(Semi11, Boolean);
-    LE_DEFINE_PARAMETER(Semi12, Boolean);
-    LE_DEFINE_PARAMETERS(Key, Semi01, Semi02, Semi03, Semi04, Semi05, Semi06, Semi07, Semi08,
-                         Semi09, Semi10, Semi11, Semi12);
-#endif // LE_SIMPLE_TUNEWORX
 
     /// \typedef Key
     /// \brief chromatic scale root tone (default "A").
