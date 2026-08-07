@@ -85,12 +85,11 @@ void ChannelBuffers::addNewData(float const *LE_RESTRICT &pNewMainChannelData,
 
 void ChannelBuffers::setCurrentDataToChannelData(bool const useSideChannel,
                                                  Math::FFT_float_real_1D const &fft,
-                                                 ReadOnlyDataRange const &window,
-                                                 std::uint8_t const windowSizeFactor)
+                                                 ReadOnlyDataRange const &window)
 {
     LE_ASSERT_MSG(inputDataSize() == unsigned(window.size()), "Buffer size mismatch.");
     channelData_.setNewTimeDomainData(mainOLA_.begin(), useSideChannel ? sideOLA_.begin() : 0, fft,
-                                      window, windowSizeFactor);
+                                      window);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -133,31 +132,20 @@ void ChannelBuffers::moveForwardByHopSize(std::uint16_t const hopSize, bool cons
 }
 
 float *ChannelBuffers::putNewTimeDomainDataToOutput(Math::FFT_float_real_1D const &fft,
-                                                    ReadOnlyDataRange const &window,
-                                                    std::uint8_t windowSizeFactor)
+                                                    ReadOnlyDataRange const &window)
 {
-    LE_ASSUME(windowSizeFactor == 1);
-
     LE_ASSERT_MSG((readyOutputDataSize() + window.size()) <= outputOLA_.size(), "Buffer overflow.");
-    LE_ASSERT_MSG(window.size() == unsigned(fft.size() * windowSizeFactor),
-                  "Window-FFT sizes mismatched.");
+    LE_ASSERT_MSG(window.size() == unsigned(fft.size()), "Window-FFT sizes mismatched.");
 
-    bool const needFFTShift(windowSizeFactor == 1);
-    float const *const pNewData(channelData_.getNewTimeDomainData(fft, needFFTShift));
+    float const *const pNewData(channelData_.getNewTimeDomainData(fft, true /*FFT shift*/));
     float *const pOutput(&outputOLA_[readyOutputDataSize()]);
 
     // Implementation note:
     //   Windowing and adding in one step.
     //                                        (11.02.2010.) (Domagoj Saric)
     unsigned int const frameSize(fft.size());
-    unsigned int position(0);
-    while (windowSizeFactor--)
-    {
-        LE_ASSERT_MSG(&pOutput[position + frameSize] <= outputOLA_.end(),
-                      "Output OLA buffer overflow!");
-        Math::addProduct(pNewData, &window[position], &pOutput[position], frameSize);
-        position += frameSize;
-    }
+    LE_ASSERT_MSG(&pOutput[frameSize] <= outputOLA_.end(), "Output OLA buffer overflow!");
+    Math::addProduct(pNewData, &window[0], pOutput, frameSize);
 
     return pOutput;
 }
@@ -274,19 +262,18 @@ LE_COLD std::uint32_t ChannelBuffers::OutputOLA::requiredStorage(StorageFactors 
     // ---------------------------------------- =
     //               overlapFactor
     //
-    // 2 * fftSize * windowSizeFactor * overlapFactor - fftSize
-    // -------------------------------------------------------- =
-    //                     overlapFactor
+    // 2 * fftSize * overlapFactor - fftSize
+    // ------------------------------------- =
+    //             overlapFactor
     //
-    //            2 * windowSizeFactor * overlapFactor - 1
-    // fftSize * ------------------------------------------ =
-    //                         overlapFactor
+    //            2 * overlapFactor - 1
+    // fftSize * -----------------------
+    //                overlapFactor
     //
     //                                        (05.10.2011.) (Domagoj Saric)
 
     std::uint8_t const overlapFactor(factors.overlapFactor);
-    std::uint8_t const windowSizeFactor(1);
-    std::uint8_t const a(2 * windowSizeFactor * overlapFactor - 1);
+    std::uint8_t const a(2 * overlapFactor - 1);
     std::uint8_t const b(overlapFactor);
     std::uint8_t const c(0);
 

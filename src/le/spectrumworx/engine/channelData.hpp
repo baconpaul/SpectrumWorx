@@ -107,8 +107,7 @@ class ChannelData
     ChannelData();
 
     void setNewTimeDomainData(float const *mainChannel, float const *sideChannel,
-                              Math::FFT_float_real_1D const &fft, ReadOnlyDataRange const &window,
-                              std::uint8_t windowSizeFactor);
+                              Math::FFT_float_real_1D const &fft, ReadOnlyDataRange const &window);
 
     float const *getNewTimeDomainData(Math::FFT_float_real_1D const &, bool fftShift);
 
@@ -178,8 +177,7 @@ class ChannelData
 
   private:
     static void time2DFT(float const *pInputData, FullChannelData_ReIm &dftData,
-                         ReadOnlyDataRange const &window, Math::FFT_float_real_1D const &fft,
-                         std::uint8_t windowSizeFactor);
+                         ReadOnlyDataRange const &window, Math::FFT_float_real_1D const &fft);
 
     static void dft2AmPh(FullChannelData_ReIm const &input, FullChannelData_AmPh &output);
 

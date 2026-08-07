@@ -36,20 +36,19 @@ ChannelData::ChannelData() : amphDataFreshness_(0), dftDataFreshness_(0) {}
 void ChannelData::setNewTimeDomainData(float const *const mainChannel,
                                        float const *const sideChannel,
                                        Math::FFT_float_real_1D const &fft,
-                                       ReadOnlyDataRange const &window,
-                                       std::uint8_t const windowSizeFactor)
+                                       ReadOnlyDataRange const &window)
 {
     amphDataFreshness_ = 0;
     dftDataFreshness_ = 0;
     LE_ASSERT(fftSize() == fft.size());
 
     dftAndTimeData_.setToDFTDomain();
-    time2DFT(mainChannel, dftData().main(), window, fft, windowSizeFactor);
+    time2DFT(mainChannel, dftData().main(), window, fft);
     dftDataFreshness_ = 1;
 
     if (sideChannel)
     {
-        time2DFT(sideChannel, dftData().mutableSide(), window, fft, windowSizeFactor);
+        time2DFT(sideChannel, dftData().mutableSide(), window, fft);
 
         dft2AmPh(dftData().mutableSide(), amphData().mutableSide());
     }
@@ -91,11 +90,8 @@ void ChannelData::clearSideChannelData()
 }
 
 void ChannelData::time2DFT(float const *const pInputData, FullChannelData_ReIm &dftData,
-                           ReadOnlyDataRange const &window, Math::FFT_float_real_1D const &fft,
-                           std::uint8_t windowSizeFactor)
+                           ReadOnlyDataRange const &window, Math::FFT_float_real_1D const &fft)
 {
-    LE_ASSUME(windowSizeFactor == 1);
-
     auto const frameSize(fft.size());
 
     LE_ASSERT_MSG(frameSize < dftData.size() * 2, "Buffer size incorrect.");
@@ -107,16 +103,8 @@ void ChannelData::time2DFT(float const *const pInputData, FullChannelData_ReIm &
     float *const windowedTimeData(dftData.jointView().begin());
 
     Math::multiply(pInputData, &window[0], windowedTimeData, frameSize);
-    bool const needFFTShift(windowSizeFactor == 1);
-    auto position(frameSize);
-    while (--windowSizeFactor)
-    {
-        Math::addProduct(&pInputData[position], &window[position - 1] + 1, windowedTimeData,
-                         frameSize);
-        position += frameSize;
-    }
 
-    fft.transform(windowedTimeData, dftData.imags(), needFFTShift);
+    fft.transform(windowedTimeData, dftData.imags(), true /*FFT shift*/);
 
     LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow, dftData.reals(), "FFT reals");
     LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow, dftData.imags(), "FFT imags");
