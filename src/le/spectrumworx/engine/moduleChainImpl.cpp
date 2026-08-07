@@ -147,10 +147,8 @@ LE_COLD std::uint8_t ModuleChainBase::getIndexForModule(Node const &module) cons
 
 LE_COLD ModuleChainBase::iterator ModuleChainBase::module(std::uint8_t index)
 {
-#if !defined(LE_NO_RTTI)
     LE_ASSERT_MSG(!dynamic_cast<Engine::ModuleDSP const *>(end().get()),
                   "Root node is not supposed to be an actual module.");
-#endif
     iterator pCurrentModule(this->begin());
     while (index && !isEnd(pCurrentModule))
     {

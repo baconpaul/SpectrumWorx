@@ -15,9 +15,7 @@
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/referenceCounter.hpp"
 
-#if !defined(LE_NO_RTTI) && (!defined(LE_NO_EXCEPTIONS) || defined(_MSC_VER))
 #include "le/utility/polymorphicDowncast.hpp"
-#endif // !LE_NO_RTTI && ( !LE_NO_EXCEPTIONS || _MSC_VER )
 #include "le/utility/intrusivePtr.hpp"
 
 #include <type_traits>
@@ -68,13 +66,7 @@ inline void intrusive_ptr_release(ModuleNode const *LE_RESTRICT const pModuleNod
 
 template <class ActualModule> ActualModule &actualModule(ModuleNode &node)
 {
-    auto *LE_RESTRICT const pModule(
-#if !defined(LE_NO_RTTI) && (!defined(LE_NO_EXCEPTIONS) || defined(_MSC_VER))
-        LE::Utility::polymorphicDowncast<ActualModule *>(&node)
-#else
-        static_cast<ActualModule *>(&node)
-#endif // LE_NO_RTTI
-    );
+    auto *LE_RESTRICT const pModule(LE::Utility::polymorphicDowncast<ActualModule *>(&node));
     LE_ASSUME(pModule);
     return *pModule;
 }
@@ -85,13 +77,7 @@ template <class ActualModule> ActualModule const &actualModule(ModuleNode const 
 
 template <class ActualModule> ModuleNode &node(ActualModule &module)
 {
-    auto *LE_RESTRICT const pNode(
-#if !defined(LE_NO_RTTI) && (!defined(LE_NO_EXCEPTIONS) || defined(_MSC_VER))
-        LE::Utility::polymorphicDowncast<ModuleNode *>(&module)
-#else
-        static_cast<ModuleNode *>(&module)
-#endif // LE_NO_RTTI
-    );
+    auto *LE_RESTRICT const pNode(LE::Utility::polymorphicDowncast<ModuleNode *>(&module));
     LE_ASSUME(pNode);
     return *pNode;
 }

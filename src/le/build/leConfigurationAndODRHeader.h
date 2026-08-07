@@ -375,8 +375,8 @@ typedef void const *const nullptr_t;
 ///                                           (28.07.2026.) (SW port)
 #define BOOST_NO_IOSTREAM
 #ifdef NDEBUG
-#define BOOST_NO_TYPEID // implies LE_NO_RTTI
-#endif                  // NDEBUG
+#define BOOST_NO_TYPEID
+#endif // NDEBUG
 
 #ifndef BOOST_EXCEPTION_DISABLE
 #define BOOST_EXCEPTION_DISABLE
