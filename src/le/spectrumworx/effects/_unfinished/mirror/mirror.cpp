@@ -11,13 +11,9 @@
 #include "mirror.hpp"
 
 #include "../../parameters/uiElements.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Algorithms
 {
-//------------------------------------------------------------------------------
-namespace Algorithms
-{
-//------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -96,7 +92,4 @@ void Mirror::mirror(float *const data, unsigned int const start) const
     std::reverse_copy(&data[first], &data[last], &data[destination]);
 }
 
-//------------------------------------------------------------------------------
-} // namespace Algorithms
-//------------------------------------------------------------------------------
-} // namespace LE
+} // namespace LE::Algorithms

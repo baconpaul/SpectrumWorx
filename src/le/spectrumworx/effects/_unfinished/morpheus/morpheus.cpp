@@ -13,13 +13,9 @@
 #include "../../parameters/uiElements.hpp"
 #include "math/math.hpp"
 #include "../../../fastmath.h"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Algorithms
 {
-//------------------------------------------------------------------------------
-namespace Algorithms
-{
-//------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -188,7 +184,4 @@ void Morpheus::process(ChannelData_AmPh &data) const
     // data.amplitudes[k] +=  amount_ * ( data.sideChannelAmplitudes[k] - data.amplitudes[k] );
 }
 
-//------------------------------------------------------------------------------
-} // namespace Algorithms
-//------------------------------------------------------------------------------
-} // namespace LE
+} // namespace LE::Algorithms

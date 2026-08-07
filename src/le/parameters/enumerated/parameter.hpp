@@ -16,13 +16,9 @@
 #include "le/parameters/linear/parameter.hpp"
 
 #include <cstdint>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Parameters
 {
-//------------------------------------------------------------------------------
-namespace Parameters
-{
-//------------------------------------------------------------------------------
 
 template <typename... Traits> struct TraitPack;
 
@@ -127,9 +123,6 @@ __pragma(warning(disable : 4480)) /* Nonstandard extension*/
         operator value_type() const { return static_cast<value_type>(Base::getValue()); }          \
     }
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Parameters
+
 #endif // parameter_hpp

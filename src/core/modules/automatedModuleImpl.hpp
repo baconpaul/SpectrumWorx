@@ -14,13 +14,9 @@
 #include "automatedModule.hpp"
 
 #include "le/utility/cstdint.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
 
 template <class InterfaceImpl> class LE_NOVTABLE AutomatedModuleImpl
 {
@@ -44,9 +40,6 @@ template <class InterfaceImpl> class LE_NOVTABLE AutomatedModuleImpl
     InterfaceImpl const &impl() const { return const_cast<AutomatedModuleImpl &>(*this).impl(); }
 }; // class AutomatedModuleImpl
 
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW
+
 #endif // automatedModuleImpl_hpp

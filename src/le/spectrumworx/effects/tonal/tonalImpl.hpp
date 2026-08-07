@@ -15,16 +15,9 @@
 
 #include "le/spectrumworx/effects/effects.hpp"
 #include "le/analysis/peak_detector/peakDetector.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 namespace Detail ///< \internal
 {
@@ -76,11 +69,6 @@ class AtonalImpl : public EffectImpl<Atonal>, public Detail::TonalBaseImpl
     void process(Engine::ChannelData_AmPh, Engine::Setup const &) const;
 };
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // tonalImpl_hpp

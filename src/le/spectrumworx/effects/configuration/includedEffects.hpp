@@ -21,16 +21,9 @@
 #include "le/utility/typeList.hpp"
 
 #include <array>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 using IncludedEffects = std::array<bool, Constants::numberOfEffects>;
 
@@ -43,11 +36,6 @@ inline constexpr IncludedEffects includedEffects{[] {
 /// Shared list of module indices, for Utility::switchOn and Utility::forEach.
 using ValidIndices = LE::Utility::IndexList<unsigned, Constants::numberOfEffects>;
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // includedEffects_hpp

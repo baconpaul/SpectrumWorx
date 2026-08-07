@@ -27,13 +27,9 @@
 #include "le/utility/platformSpecifics.hpp"
 
 #include <array>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
 
 /// \note `template <class Effect> class ModuleWidgets` stood here, and
 /// `Module::Impl<Effect>` inherited it -- so every module the factory allocated
@@ -58,9 +54,6 @@ template <class Effect> class Module::Impl final : public Engine::ModuleEffectIm
     }
 }; // class Module::Impl
 
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW
+
 #endif // finalImplementations_hpp

@@ -41,10 +41,9 @@
 
 #include <memory>
 #include <vector>
-//------------------------------------------------------------------------------
+
 namespace SWTest
 {
-//------------------------------------------------------------------------------
 using namespace LE;
 using namespace LE::SW;
 
@@ -189,7 +188,6 @@ struct HostSideJuce
     ~HostSideJuce() { GUI::releaseCachedResources(); }
 }; // struct HostSideJuce
 
-//------------------------------------------------------------------------------
 } // namespace SWTest
-//------------------------------------------------------------------------------
+
 #endif // editorHarness_hpp

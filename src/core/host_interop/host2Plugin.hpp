@@ -19,13 +19,12 @@
 #include "le/spectrumworx/engine/configuration.hpp"
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/span.hpp"
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
+
 namespace SW
 {
-//------------------------------------------------------------------------------
 
 class AutomatedModuleChain;
 
@@ -92,9 +91,7 @@ class Host2PluginInteropControler::AutomationBlocker
     bool *LE_RESTRICT pBlockAutomation_;
 }; // class Host2PluginInteropControler::AutomationBlocker
 
-//------------------------------------------------------------------------------
 } // namespace SW
-//------------------------------------------------------------------------------
 
 //...mrmlj...orphan...
 template <typename Char>
@@ -106,7 +103,6 @@ char *copyToBuffer(Char const *const string, std::array<char, N> &buffer)
     return copyToBuffer<Char>(string, LE::Utility::makeSpan(&buffer[0], buffer.size()));
 }
 
-//------------------------------------------------------------------------------
 } // namespace LE
-//------------------------------------------------------------------------------
+
 #endif // hostInterop_hpp

@@ -17,19 +17,9 @@
 #include "effectsList.hpp"
 
 #include <cstdint>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects::Constants
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
-namespace Constants
-{
-//------------------------------------------------------------------------------
 
 std::uint8_t constexpr numberOfEffects{LE_SW_NUMBER_OF_EFFECTS};
 std::uint8_t constexpr numberOfGroups{LE_SW_NUMBER_OF_EFFECT_GROUPS};
@@ -40,13 +30,6 @@ std::uint8_t constexpr numberOfGroups{LE_SW_NUMBER_OF_EFFECT_GROUPS};
 ///                                       (28.07.2026.) (SW port)
 std::uint8_t constexpr numberOfIncludedEffects{numberOfEffects};
 
-//------------------------------------------------------------------------------
-} // namespace Constants
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects::Constants
+
 #endif // constants_hpp

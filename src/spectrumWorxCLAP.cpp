@@ -48,10 +48,9 @@
 #include <cstring>
 #include <mutex>
 #include <optional>
-//------------------------------------------------------------------------------
+
 namespace LE::SW
 {
-//------------------------------------------------------------------------------
 namespace
 {
 constexpr clap_id mainInputPort{0};
@@ -1855,6 +1854,4 @@ bool SpectrumWorxCLAP::registerOrUnregisterPosixFd(int const fd, clap_posix_fd_f
                        : _host.posixFdSupportUnregister(fd);
 }
 
-//------------------------------------------------------------------------------
 } // namespace LE::SW
-//------------------------------------------------------------------------------

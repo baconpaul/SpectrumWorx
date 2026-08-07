@@ -17,16 +17,9 @@
 #include "le/spectrumworx/effects/commonParameters.hpp"
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/uiElements.hpp" // the UIElements below
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -88,11 +81,6 @@ EFFECT_PARAMETER_NAME(Inserter::Destination, "Destination")
 EFFECT_PARAMETER_NAME(Inserter::Source, "Source")
 EFFECT_PARAMETER_NAME(Inserter::InsertSize, "Size")
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // inserter_hpp

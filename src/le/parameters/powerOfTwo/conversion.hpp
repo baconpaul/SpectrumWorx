@@ -15,15 +15,8 @@
 
 #include "le/math/math.hpp"
 #include "le/math/conversion.hpp"
-//------------------------------------------------------------------------------
-namespace LE
-{
-//------------------------------------------------------------------------------
-namespace Parameters
-{
-//------------------------------------------------------------------------------
 
-namespace Detail
+namespace LE::Parameters::Detail
 {
 template <typename Source, int sourceRangeOffset, unsigned int sourceRangeSize,
           unsigned int sourceRangeScaleFactor, class Parameter, typename Target>
@@ -42,11 +35,6 @@ Target convertParameterValueToLinearValue(Source const sourceValue, PowerOfTwoPa
                                                targetRangeScaleFactor, Parameter::unscaledMinimum,
                                                Parameter::unscaledMaximum>(sourceValue);
 }
-} // namespace Detail
+} // namespace LE::Parameters::Detail
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
 #endif // conversion_hpp

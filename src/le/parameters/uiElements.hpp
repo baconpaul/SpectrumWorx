@@ -34,21 +34,14 @@
 #include <array>
 #include <cstdint>
 #include <string_view>
-//------------------------------------------------------------------------------
-namespace LE
-{
-//------------------------------------------------------------------------------
-namespace SW
-{
-namespace Engine
+
+namespace LE::SW::Engine
 {
 class Setup;
-} // namespace Engine
-} // namespace SW
-//------------------------------------------------------------------------------
-namespace Parameters
+} // namespace LE::SW::Engine
+
+namespace LE::Parameters
 {
-//------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -275,16 +268,15 @@ template <class Parameter> struct DisplayValueTransformer
             return Detail::valueStrings<parentNameSpaceOrClass::parameter>({__VA_ARGS__});         \
         }()};
 
+/// \note One closing brace, not two: the effect headers say
+/// `namespace LE::SW::Effects`, which is a single scope to leave and re-enter.
 #define EFFECT_ENUMERATED_PARAMETER_STRINGS(parentClass, parameter, ...)                           \
     }                                                                                              \
-    }                                                                                              \
-    namespace Parameters                                                                           \
+    namespace LE::Parameters                                                                       \
     {                                                                                              \
     ENUMERATED_PARAMETER_STRINGS(SW::Effects::parentClass, parameter, __VA_ARGS__)                                                                   \
     }                                                                                              \
-    namespace SW                                                                                   \
-    {                                                                                              \
-    namespace Effects                                                                              \
+    namespace LE::SW::Effects                                                                      \
     {
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -318,14 +310,11 @@ template <class Parameter> struct DisplayValueTransformer
 
 #define EFFECT_PARAMETER_NAME(parameter, name)                                                     \
     }                                                                                              \
-    }                                                                                              \
-    namespace Parameters                                                                           \
+    namespace LE::Parameters                                                                       \
     {                                                                                              \
     UI_NAME(SW::Effects::parameter, name)                                                          \
     }                                                                                              \
-    namespace SW                                                                                   \
-    {                                                                                              \
-    namespace Effects                                                                              \
+    namespace LE::SW::Effects                                                                      \
     {
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -360,23 +349,16 @@ template <class Parameter> struct DisplayValueTransformer
 
 #define EFFECT_PARAMETER_STREAMING_NAME(parameter, name)                                           \
     }                                                                                              \
-    }                                                                                              \
-    namespace Parameters                                                                           \
+    namespace LE::Parameters                                                                       \
     {                                                                                              \
     STREAMING_NAME(SW::Effects::parameter, name)                                                   \
     }                                                                                              \
-    namespace SW                                                                                   \
-    {                                                                                              \
-    namespace Effects                                                                              \
+    namespace LE::SW::Effects                                                                      \
     {
 
 /// \} // UIElementMacros
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Parameters
 
 namespace boost
 {

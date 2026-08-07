@@ -14,13 +14,9 @@
 #include "le/utility/platformSpecifics.hpp"
 
 #include <cstdint>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Math
 {
-//------------------------------------------------------------------------------
-namespace Math
-{
-//------------------------------------------------------------------------------
 
 void reim2AmPh(float const *reals, float const *imags, // input
                float *amplitudes, float *phases,       // output
@@ -30,9 +26,6 @@ void amph2ReIm(float const *amplitudes, float const *phases, // input
                float *reals, float *imags,                   // output
                std::uint16_t numberOfSamples);
 
-//------------------------------------------------------------------------------
-} // namespace Math
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Math
+
 #endif // domainConversion_hpp

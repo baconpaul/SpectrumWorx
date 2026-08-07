@@ -27,10 +27,9 @@
 #include <span>
 #include <string>
 #include <vector>
-//------------------------------------------------------------------------------
+
 namespace SWTest
 {
-//------------------------------------------------------------------------------
 
 /// Log-spaced, so the bands are musically rather than linearly meaningful and
 /// a shift of one bin at the top does not swamp everything below it.
@@ -203,7 +202,6 @@ struct Comparison
 
 Comparison compare(Digest const &golden, Digest const &actual, bool exact, Tolerances const &);
 
-//------------------------------------------------------------------------------
 } // namespace SWTest
-//------------------------------------------------------------------------------
+
 #endif // goldenDigest_hpp

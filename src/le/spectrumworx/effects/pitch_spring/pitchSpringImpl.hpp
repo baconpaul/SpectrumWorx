@@ -16,16 +16,9 @@
 #include "le/spectrumworx/effects/effects.hpp"
 #include "le/spectrumworx/effects/phase_vocoder/shared.hpp"
 #include "le/spectrumworx/effects/vibrato.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 namespace Detail
 {
@@ -62,11 +55,6 @@ class PitchSpringPVDImpl
     void process(ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const &) const;
 };
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // pitchSpringImpl_hpp

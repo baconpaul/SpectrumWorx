@@ -16,16 +16,9 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/uiElements.hpp" // the UIElements below
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -73,11 +66,6 @@ EFFECT_PARAMETER_NAME(QuietBoost::Threshold, "Threshold")
 EFFECT_PARAMETER_NAME(QuietBoost::Ratio, "Ratio")
 EFFECT_PARAMETER_NAME(QuietBoost::NoiseGateThreshold, "Noise threshold")
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // quietBoost_hpp

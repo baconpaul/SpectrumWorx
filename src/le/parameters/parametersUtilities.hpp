@@ -16,13 +16,9 @@
 
 #include <type_traits>
 #include <utility>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Parameters
 {
-//------------------------------------------------------------------------------
-namespace Parameters
-{
-//------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -255,9 +251,6 @@ typename Functor::result_type invokeFunctorOnIndexedParameter(std::uint8_t const
 template <class Parameters, class Parameter>
 using IndexOf = typename Parameters::template IndexOf<Parameter>;
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Parameters
+
 #endif // parametersUtilities_hpp

@@ -15,16 +15,12 @@
 #include "le/parameters/enumerated/parameter.hpp"
 #include "le/parameters/powerOfTwo/parameter.hpp"
 #include "le/parameters/uiElements.hpp" // the UIElements below
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
-namespace SW
+
+namespace SW::Engine
 {
-//------------------------------------------------------------------------------
-namespace Engine
-{
-//------------------------------------------------------------------------------
 
 // Implementation note:
 //   Unlike with other enumerate/"discrete values parameters", we do not use the
@@ -87,14 +83,10 @@ struct WindowSizeFactor : Parameters::PowerOfTwoParameter<Parameters::Traits::Mi
 };
 #endif // LE_SW_ENGINE_WINDOW_PRESUM
 
-//------------------------------------------------------------------------------
-} // namespace Engine
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
+} // namespace SW::Engine
+
 namespace Parameters
 {
-//------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -134,9 +126,8 @@ constexpr DiscreteValues<SW::Engine::WindowFunction>::Strings
                                                         "BlackmanHarris", "Gaussian", "FlatTop",
                                                         "Welch",          "Triangle", "Rectangle"};
 
-//------------------------------------------------------------------------------
 } // namespace Parameters
-//------------------------------------------------------------------------------
+
 } // namespace LE
-//------------------------------------------------------------------------------
+
 #endif // automatableParameters_hpp

@@ -50,15 +50,12 @@ target_link_libraries(sw-gui-widgets PUBLIC sw-gui-resources sw-io)
 # nothing above it needs to know where the answer came from.
 target_link_libraries(sw-gui-widgets PRIVATE sst-plugininfra)
 
-if (APPLE)
-    # gui.mm is Cocoa only now. "-framework Carbon" stood beside Cocoa here and
-    # was linked into every macOS build for the owned windows' HIView path,
-    # which stage 6.4 deleted.
-    target_sources(sw-gui-widgets PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/gui/gui.mm)
-    target_link_libraries(sw-gui-widgets PRIVATE "-framework Cocoa")
-endif()
-
-# After the .mm above, so that it gets the header too.
+# \note gui/gui.mm and "-framework Cocoa" stood here. The .mm held one function,
+# initialiseMac(), which detached a throwaway NSThread to put Cocoa into
+# multithreaded mode -- a Mac OS X-era requirement that Foundation has not needed
+# for many releases, and JUCE has threads running long before an editor opens
+# anyway. With it went the last Objective-C in the GUI layer, and the frameworks
+# JUCE actually needs it links for itself.
 sw_force_include_odr_header(sw-gui-widgets)
 
 ################################################################################

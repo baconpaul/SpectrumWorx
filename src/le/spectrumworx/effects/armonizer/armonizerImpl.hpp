@@ -17,16 +17,9 @@
 
 #include "le/spectrumworx/effects/phase_vocoder/shared.hpp"
 #include "le/spectrumworx/engine/buffers.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 class ArmonizerImpl : public EffectImpl<Armonizer>, public PhaseVocoderShared::PitchShifter
 {
@@ -34,11 +27,6 @@ class ArmonizerImpl : public EffectImpl<Armonizer>, public PhaseVocoderShared::P
     void setup(IndexRange const &, Engine::Setup const &);
 };
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // armonizerImpl_hpp

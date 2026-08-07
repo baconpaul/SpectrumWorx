@@ -31,10 +31,9 @@
 #include <numbers>
 #include <span>
 #include <vector>
-//------------------------------------------------------------------------------
+
 namespace SWTest
 {
-//------------------------------------------------------------------------------
 
 /// \brief The engine, instantiable, with its own Program.
 class Engine : public LE::SW::SpectrumWorxCore
@@ -209,7 +208,6 @@ std::vector<float> renderChain(RenderSetup const &, std::span<Slot const>,
                                std::span<float const> monoInput,
                                std::span<float const> monoSideInput = {});
 
-//------------------------------------------------------------------------------
 } // namespace SWTest
-//------------------------------------------------------------------------------
+
 #endif // engineHarness_hpp

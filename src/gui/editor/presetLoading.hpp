@@ -22,26 +22,20 @@
 //------------------------------------------------------------------------------
 #ifndef presetLoading_hpp__5E29B7D4_1A63_4C08_B7F2_9D4E60C381AB
 #define presetLoading_hpp__5E29B7D4_1A63_4C08_B7F2_9D4E60C381AB
-//------------------------------------------------------------------------------
+
 namespace juce
 {
 class File;
 class String;
 } // namespace juce
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
 
 struct DawExtraState;
 
-//------------------------------------------------------------------------------
 namespace GUI
 {
-//------------------------------------------------------------------------------
 
 class EditorHost;
 class SpectrumWorxEditor;
@@ -88,11 +82,8 @@ bool loadPreset(EditorHost &, SpectrumWorxEditor *pEditor, char *inMemoryPreset,
                 bool ignoreExternalSample, juce::String *comment, char const *presetName,
                 DawExtraState const *pDawExtraState = nullptr);
 
-//------------------------------------------------------------------------------
 } // namespace GUI
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+
+} // namespace LE::SW
+
 #endif // presetLoading_hpp

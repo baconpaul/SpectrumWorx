@@ -19,13 +19,9 @@
 #include <cstdint>
 #include <limits>
 #include "le/utility/span.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Math
 {
-//------------------------------------------------------------------------------
-namespace Math
-{
-//------------------------------------------------------------------------------
 
 unsigned int alignIndex(unsigned int index);
 void *align(void *pointer);
@@ -258,9 +254,6 @@ LE_HOT void convertSamples(Sample const *LE_RESTRICT const pInput,
 
 LE_OPTIMIZE_FOR_SPEED_END()
 
-//------------------------------------------------------------------------------
-} // namespace Math
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Math
+
 #endif // vector_hpp

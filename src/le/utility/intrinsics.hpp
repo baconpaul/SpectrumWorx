@@ -33,13 +33,9 @@
 #include "emmintrin.h"
 #endif // LE_HAS_SSE1
 #endif
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Utility
 {
-//------------------------------------------------------------------------------
-namespace Utility
-{
-//------------------------------------------------------------------------------
 
 #if defined(_XBOX)
 typedef __vector4 SIMDVector;
@@ -58,9 +54,6 @@ namespace Constants
 unsigned int const vectorAlignment = sizeof(SIMDVector);
 }
 
-//------------------------------------------------------------------------------
-} // namespace Utility
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Utility
+
 #endif // intrinsics_hpp

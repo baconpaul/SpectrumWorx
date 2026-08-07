@@ -35,13 +35,9 @@
 #include "le/utility/assert.hpp"
 #include <algorithm>
 #include <ranges>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Parameters
 {
-//------------------------------------------------------------------------------
-namespace Parameters
-{
-//------------------------------------------------------------------------------
 
 using Enabled = LFOImpl::Enabled;
 using PeriodScale = LFOImpl::PeriodScale;
@@ -872,8 +868,4 @@ bool LFOImpl::PeriodScaleParameterTraits::isValidValue(param_type value)
     return Math::isValueInRange<param_type>(value, minimum(), maximum());
 }
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Parameters

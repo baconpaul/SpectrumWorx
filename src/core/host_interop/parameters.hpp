@@ -15,10 +15,9 @@
 
 #include "le/spectrumworx/engine/parameters.hpp"
 #include "le/utility/cstdint.hpp"
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
 namespace SW
 //------------------------------------------------------------------------------
 {
@@ -46,13 +45,10 @@ static std::uint16_t const maxNumberOfParameters =
 //------------------------------------------------------------------------------
 
 //...mrmlj...required to be in the header only for getParameterProperties() and EditorKnob::paint()...
-namespace SW
-{
-namespace Engine
+namespace SW::Engine
 {
 class Setup;
-}
-} // namespace SW
+} // namespace SW::Engine
 namespace Parameters
 {
 template <class Parameter> struct DisplayValueTransformer;
@@ -95,7 +91,6 @@ template <> struct DisplayValueTransformer<SW::GlobalParameters::OverlapFactor>
 };
 } // namespace Parameters
 
-//------------------------------------------------------------------------------
 } // namespace LE
-//------------------------------------------------------------------------------
+
 #endif // parameters_hpp

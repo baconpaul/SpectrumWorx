@@ -15,10 +15,9 @@
 
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/factoryMacro.hpp"
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
 namespace SW
 //------------------------------------------------------------------------------
 {
@@ -62,10 +61,9 @@ LE_DEFINE_PARAMETERS(InputGain, OutputGain, MixPercentage, FFTSize, OverlapFacto
 } // namespace GlobalParameters
 //------------------------------------------------------------------------------
 } // namespace SW
-//------------------------------------------------------------------------------
+
 namespace Parameters
 {
-//------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -78,9 +76,8 @@ UI_NAME(SW::GlobalParameters::OutputGain, "Out")
 UI_NAME(SW::GlobalParameters::MixPercentage, "Mix")
 //UI_NAME( SW::GlobalParameters::StreamMode, "Sampler streaming mode" ) // ...MIDI not supported yet
 
-//------------------------------------------------------------------------------
 } // namespace Parameters
-//------------------------------------------------------------------------------
+
 } // namespace LE
-//------------------------------------------------------------------------------
+
 #endif // parameters_hpp

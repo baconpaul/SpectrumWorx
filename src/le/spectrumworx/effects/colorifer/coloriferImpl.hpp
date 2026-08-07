@@ -15,16 +15,9 @@
 
 #include "le/spectrumworx/effects/effects.hpp"
 #include "le/spectrumworx/effects/indexRange.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 class ColoriferImpl : public EffectImpl<Colorifer>
 {
@@ -40,11 +33,6 @@ class ColoriferImpl : public EffectImpl<Colorifer>
     IndexRange::value_type shapeWidth_;
 }; // class ColoriferImpl
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // coloriferImpl_hpp

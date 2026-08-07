@@ -14,27 +14,18 @@
 #include "le/spectrumworx/engine/buffers.hpp"
 
 #include <cstdint>
-//------------------------------------------------------------------------------
-namespace LE
-{
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
 
-namespace Effects
+namespace LE::SW
 {
-namespace PhaseVocoderShared
+
+namespace Effects::PhaseVocoderShared
 {
 struct AnalysisChannelState;
 struct SynthesisChannelState;
-} // namespace PhaseVocoderShared
-} // namespace Effects
+} // namespace Effects::PhaseVocoderShared
 
-//------------------------------------------------------------------------------
 namespace Engine
 {
-//------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -126,11 +117,8 @@ class ChannelData_AmPhStorage : private FullChannelData_AmPh, public ChannelData
 
 DataRange subRange(DataRange const &, std::uint16_t beginIndex, std::uint16_t endIndex);
 
-//------------------------------------------------------------------------------
 } // namespace Engine
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+
+} // namespace LE::SW
+
 #endif // channelDataAmPh_hpp

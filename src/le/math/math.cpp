@@ -32,13 +32,9 @@
 #include <cmath>
 #include <chrono>
 #include <cstdlib>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Math
 {
-//------------------------------------------------------------------------------
-namespace Math
-{
-//------------------------------------------------------------------------------
 #ifdef _MSC_VER
 #pragma runtime_checks("", off)
 #pragma check_stack(off)
@@ -920,11 +916,7 @@ FPUExceptionsDisabler::FPUExceptionsDisabler()
 
 LE_OPTIMIZE_FOR_SPEED_END()
 
-//------------------------------------------------------------------------------
-} // namespace Math
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Math
 
 /// \note Non-template juce::jmin / jmax / jlimit overloads for float lived
 /// here, gated on the GUI being built, so that the GUI's uses picked these up

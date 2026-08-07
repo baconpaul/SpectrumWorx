@@ -22,24 +22,17 @@
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
 #include "le/parameters/uiElements.hpp" // the UIElements below
-//------------------------------------------------------------------------------
-namespace LE
-{
-//------------------------------------------------------------------------------
-namespace SW
-{
-namespace Engine
+
+namespace LE::SW::Engine
 {
 class Setup;
-} // namespace Engine
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Engine
 
 /// \addtogroup Effects
 /// @{
 
-namespace Effects
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
 
 /// \addtogroup Effects
 /// @{
@@ -93,15 +86,11 @@ EFFECT_PARAMETER_NAME(BaseParameters::Wet, "Wet")
 EFFECT_PARAMETER_NAME(BaseParameters::StartFrequency, "Start frequency")
 EFFECT_PARAMETER_NAME(BaseParameters::StopFrequency, "Stop frequency")
 
-//------------------------------------------------------------------------------
-} // namespace Effects
+} // namespace LE::SW::Effects
 /// @}
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-namespace Parameters
+
+namespace LE::Parameters
 {
-//------------------------------------------------------------------------------
 
 /// \note Here, and not in a .cpp beside transform()'s definition, for the reason
 /// UI_NAME gives: a translation unit that builds the parameter table without
@@ -122,9 +111,6 @@ struct DisplayValueTransformer<SW::Effects::BaseParameters::StopFrequency>
 {
 };
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Parameters
+
 #endif // baseParameters_hpp

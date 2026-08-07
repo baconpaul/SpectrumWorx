@@ -26,10 +26,9 @@
 #include <numbers>
 #include <sstream>
 #include <string>
-//------------------------------------------------------------------------------
+
 namespace SWTest
 {
-//------------------------------------------------------------------------------
 
 namespace
 {
@@ -388,6 +387,4 @@ Comparison compare(Digest const &golden, Digest const &actual, bool const exact,
     return Comparison{true, {}};
 }
 
-//------------------------------------------------------------------------------
 } // namespace SWTest
-//------------------------------------------------------------------------------

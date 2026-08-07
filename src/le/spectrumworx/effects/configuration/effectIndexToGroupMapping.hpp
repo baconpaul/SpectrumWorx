@@ -21,16 +21,9 @@
 #include "le/utility/typeList.hpp"
 
 #include <tuple>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 #define LE_SW_AUX_EFFECT_GROUP(folder, module, name, group) ModuleGroups::group,
 using EffectGroups = std::tuple<LE_SW_EFFECT_LIST(LE_SW_AUX_EFFECT_GROUP) void>;
@@ -46,11 +39,6 @@ using Groups =
                           ModuleGroups::Space, ModuleGroups::Phase, ModuleGroups::Loudness,
                           ModuleGroups::Combine, ModuleGroups::PVD, ModuleGroups::Misc>;
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // effectIndexToGroupMapping_hpp

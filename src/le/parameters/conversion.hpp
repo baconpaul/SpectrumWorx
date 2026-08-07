@@ -18,13 +18,9 @@
 #include "powerOfTwo/conversion.hpp"
 #include "symmetric/conversion.hpp"
 #include "trigger/conversion.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Parameters
 {
-//------------------------------------------------------------------------------
-namespace Parameters
-{
-//------------------------------------------------------------------------------
 
 #ifdef __GNUC__
 namespace Detail
@@ -83,9 +79,6 @@ Target convertParameterValueToLinearValue(Parameter const &source) ///< \throws 
         source.getValue(), typename Parameter::Tag());
 }
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Parameters
+
 #endif // conversion_hpp

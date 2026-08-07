@@ -17,16 +17,9 @@
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
 #include "le/parameters/uiElements.hpp" // EFFECT_PARAMETER_STREAMING_NAME, below
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -99,11 +92,6 @@ EFFECT_PARAMETER_NAME(AhAh::Center, "Center frequency")
 EFFECT_PARAMETER_NAME(AhAh::Width, "Width")
 EFFECT_PARAMETER_NAME(AhAh::Strength, "Strength")
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // ahAh_hpp

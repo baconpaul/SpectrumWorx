@@ -23,20 +23,16 @@
 #include <cstdint>
 #include <iterator>
 #include <utility>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
+
 namespace Engine
 {
 struct StorageFactors;
 }
 namespace Engine
 {
-//------------------------------------------------------------------------------
 
 class ModuleDSP;
 class Setup;
@@ -397,11 +393,8 @@ class ModuleChainImpl : public ModuleChainBase
     bool resizeAll(StorageFactors const &newfactors, StorageFactors const &currentFactors);
 }; // class ModuleChainImpl
 
-//------------------------------------------------------------------------------
 } // namespace Engine
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+
+} // namespace LE::SW
+
 #endif // moduleChainImpl_hpp

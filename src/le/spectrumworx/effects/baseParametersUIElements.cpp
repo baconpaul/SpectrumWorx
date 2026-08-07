@@ -18,18 +18,12 @@
 #include "baseParameters.hpp"
 
 #include "le/spectrumworx/engine/setup.hpp"
-//------------------------------------------------------------------------------
-namespace LE
-{
-//------------------------------------------------------------------------------
-namespace Parameters
+
+namespace LE::Parameters
 {
 float DisplayValueTransformer<SW::Effects::BaseParameters::StartFrequency>::transform(
     float const &value, SW::Engine::Setup const &engineSetup)
 {
     return engineSetup.normalisedFrequencyToHz(value);
 }
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Parameters

@@ -16,13 +16,9 @@
 #define polymorphicDowncast_hpp__D51A73E8_6C29_4F84_A0B7_39E2C6D1B845
 //------------------------------------------------------------------------------
 #include "assert.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Utility
 {
-//------------------------------------------------------------------------------
-namespace Utility
-{
-//------------------------------------------------------------------------------
 
 template <class Target, class Source> Target polymorphicDowncast(Source *const pSource) noexcept
 {
@@ -32,9 +28,6 @@ template <class Target, class Source> Target polymorphicDowncast(Source *const p
     return static_cast<Target>(pSource);
 }
 
-//------------------------------------------------------------------------------
-} // namespace Utility
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Utility
+
 #endif // polymorphicDowncast_hpp

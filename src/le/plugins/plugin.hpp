@@ -24,18 +24,17 @@
 #include "le/utility/platformSpecifics.hpp"
 
 #include "le/utility/staticLog2.hpp"
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
+
 namespace Parameters
 {
 struct RuntimeInformation;
 }
-//------------------------------------------------------------------------------
+
 namespace Plugins
 {
-//------------------------------------------------------------------------------
 
 ///   The Capability enum is not really 'done by the book' in the sense
 /// that it mentions functionality/capabilities from derived classes (for
@@ -307,7 +306,6 @@ class Plugin<Impl, Protocol>::AutomatedParameter
         result_type operator()( Parameter const & ) const;
     };
 
-
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \class Setter
@@ -325,7 +323,6 @@ class Plugin<Impl, Protocol>::AutomatedParameter
         void operator()( Parameter & );
     };
 }; // class Plugin<Impl, Protocol>::AutomatedParameter
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -516,9 +513,7 @@ template <class Protocol> class ParameterInformation;
 template <class Protocol> struct ErrorCode;
 template <class Protocol> struct AutomatedParameterFor;
 
-//------------------------------------------------------------------------------
 } // namespace Plugins
-//------------------------------------------------------------------------------
 
 //...mrmlj...figure out a proper place for this Plugins<->Parameters bridge...
 namespace Plugins
@@ -586,5 +581,5 @@ typename Parameter::value_type FullRangeAutomatedParameter::convertAutomationToP
 } // namespace Plugins
 
 } // namespace LE
-//------------------------------------------------------------------------------
+
 #endif // plugin_hpp

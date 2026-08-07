@@ -15,16 +15,9 @@
 
 #include "le/spectrumworx/effects/effects.hpp"
 #include "le/spectrumworx/effects/indexRange.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 class QuantizerImpl : public EffectImpl<Quantizer>
 {
@@ -61,11 +54,6 @@ class QuantizerImpl : public EffectImpl<Quantizer>
     float origami_;                    ///< linear interpolation intensity
 };
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // quantizerImpl_hpp

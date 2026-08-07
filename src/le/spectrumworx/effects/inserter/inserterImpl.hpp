@@ -17,16 +17,9 @@
 #include "le/spectrumworx/effects/effects.hpp"
 #include "le/spectrumworx/effects/indexRange.hpp"
 #include "le/utility/buffers.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 class InserterImpl : public EffectImpl<Inserter>
 {
@@ -45,11 +38,6 @@ class InserterImpl : public EffectImpl<Inserter>
     UnpackedMagPhaseMode mode_;
 }; // class InserterImpl
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // inserterImpl_hpp

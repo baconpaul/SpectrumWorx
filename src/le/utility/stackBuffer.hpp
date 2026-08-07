@@ -34,14 +34,8 @@
 #else
 #define LE_AUX_ALLOCA(bytes) __builtin_alloca(bytes)
 #endif // _MSC_VER
-//------------------------------------------------------------------------------
-namespace LE
-{
-//------------------------------------------------------------------------------
-namespace Utility
-{
-//------------------------------------------------------------------------------
-namespace Detail
+
+namespace LE::Utility::Detail
 {
 
 /// \note Clang's alloca() returns unaligned pointers, which is why even the
@@ -55,12 +49,7 @@ inline void *alignToVector(void *const pStorage) noexcept
     return reinterpret_cast<void *>((address + alignment - 1) & ~(alignment - 1));
 }
 
-} // namespace Detail
-//------------------------------------------------------------------------------
-} // namespace Utility
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Utility::Detail
 
 /// \brief count elements of T on the stack, unaligned. \p name is a T *.
 #define LE_STACK_BUFFER(name, T, count)                                                            \

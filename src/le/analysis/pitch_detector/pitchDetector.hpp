@@ -16,20 +16,13 @@
 
 #include <cstdint>
 #include "le/utility/span.hpp"
-//------------------------------------------------------------------------------
-namespace LE
-{
-namespace SW
-{
-namespace Engine
+
+namespace LE::SW::Engine
 {
 class Setup;
-} // namespace Engine
-} // namespace SW
-} // namespace LE
+} // namespace LE::SW::Engine
 namespace LE
 {
-//------------------------------------------------------------------------------
 //namespace Analysis
 //{
 //------------------------------------------------------------------------------
@@ -90,7 +83,7 @@ class PitchDetector
 
 //------------------------------------------------------------------------------
 //} // namespace Analysis
-//------------------------------------------------------------------------------
+
 } // namespace LE
-//------------------------------------------------------------------------------
+
 #endif // pitchDetector_hpp

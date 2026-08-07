@@ -27,27 +27,25 @@
 #include "le/utility/assert.hpp"
 
 #include <utility>
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
+
 namespace Parameters
 {
 struct RuntimeInformation;
 }
-//------------------------------------------------------------------------------
+
 namespace SW
 {
-//------------------------------------------------------------------------------
 using ParameterInfo = Parameters::RuntimeInformation;
 namespace Engine
 {
 class ModuleParameters;
 }
-//------------------------------------------------------------------------------
+
 namespace Automation
 {
-//------------------------------------------------------------------------------
 
 using LFO = Parameters::LFOImpl;
 using ParameterPrinter = Parameters::AutomatedParameterPrinter;
@@ -201,11 +199,10 @@ setAutomatedLFOParameter(std::uint8_t const parameterIndex, std::uint8_t const l
     return Detail::autoAdjustedLFOParameter(lfo, lfoParameterIndex);
 }
 
-//------------------------------------------------------------------------------
 } // namespace Automation
-//------------------------------------------------------------------------------
+
 } // namespace SW
-//------------------------------------------------------------------------------
+
 } // namespace LE
-//------------------------------------------------------------------------------
+
 #endif // automatedModule_hpp

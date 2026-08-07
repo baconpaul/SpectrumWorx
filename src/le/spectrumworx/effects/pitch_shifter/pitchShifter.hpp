@@ -16,16 +16,9 @@
 #include "le/spectrumworx/effects/parameters.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
 #include "le/parameters/uiElements.hpp" // the UIElements below
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 namespace Detail
 {
@@ -109,11 +102,6 @@ EFFECT_PARAMETER_NAME(Detail::PitchShifterBase::Cents, "Cents")
 EFFECT_PARAMETER_NAME(Detail::PitchShifterBase::TSSSensitivity, "Transient sensitivity")
 #endif // LE_PV_USE_TSS
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // pitchShifter_hpp

@@ -16,16 +16,14 @@
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
 #include "le/spectrumworx/engine/moduleParameters.hpp"
 #include "le/utility/span.hpp"
-//------------------------------------------------------------------------------
+
 namespace LE
 {
 
 template <typename Char>
 char *copyToBuffer(Char const *string, LE::Utility::Span<char> const &buffer);
 
-namespace Parameters
-{
-namespace Detail
+namespace Parameters::Detail
 {
 namespace Engine = SW::Engine;
 
@@ -51,13 +49,10 @@ char const *print<Engine::OverlapFactor>(float const &parameterValue,
     return print<Engine::OverlapFactor>(Math::convert<unsigned int>(parameterValue), engineSetup,
                                         buffer, PowerOfTwoParameterTag());
 }
-} // namespace Detail
-} // namespace Parameters
+} // namespace Parameters::Detail
 
-//------------------------------------------------------------------------------
 namespace SW
 {
-//------------------------------------------------------------------------------
 
 using LFO = Parameters::LFOImpl;
 
@@ -822,8 +817,6 @@ parameterIndexFromBinaryID(ParameterID::BinaryValue const parameterIDValue)
     }
 }
 
-//------------------------------------------------------------------------------
 } // namespace SW
-//------------------------------------------------------------------------------
+
 } // namespace LE
-//------------------------------------------------------------------------------

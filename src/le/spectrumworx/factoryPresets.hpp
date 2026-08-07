@@ -28,16 +28,9 @@
 #include <string>
 #include <string_view>
 #include <vector>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::FactoryPresets
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace FactoryPresets
-{
-//------------------------------------------------------------------------------
 
 /// The extension the banks are written in, without the dot.
 inline constexpr std::string_view extension{"swp"};
@@ -64,11 +57,6 @@ Preset::InMemoryPreset load(std::string_view bank, std::string_view preset);
 /// read-only bank from a user directory of the same name.
 bool isBank(std::string_view bank);
 
-//------------------------------------------------------------------------------
-} // namespace FactoryPresets
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::FactoryPresets
+
 #endif // factoryPresets_hpp

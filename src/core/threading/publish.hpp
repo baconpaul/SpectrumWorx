@@ -28,13 +28,9 @@
 #include "core/threading/messages.hpp"
 
 #include <cstdint>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
 
 class AutomatedModuleChain;
 class Module;
@@ -42,7 +38,6 @@ class SpectrumWorxCore;
 
 namespace Threading
 {
-//------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -78,11 +73,8 @@ void publishModuleMove(SpectrumWorxCore &, ToEngineQueue &, std::uint8_t from, s
 /// to be moved rather than copied and the caller keeps the object.
 void publishChain(SpectrumWorxCore &, ToEngineQueue &, AutomatedModuleChain &newChain);
 
-//------------------------------------------------------------------------------
 } // namespace Threading
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+
+} // namespace LE::SW
+
 #endif // publish_hpp

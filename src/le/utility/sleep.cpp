@@ -14,13 +14,9 @@ extern "C" __declspec(dllimport) void __stdcall Sleep(unsigned long dwMillisecon
 #else
 #include <unistd.h>
 #endif // _WIN32
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Utility
 {
-//------------------------------------------------------------------------------
-namespace Utility
-{
-//------------------------------------------------------------------------------
 
 void sleep(unsigned int const seconds)
 {
@@ -34,8 +30,4 @@ void sleep(unsigned int const seconds)
 #endif // OS
 }
 
-//------------------------------------------------------------------------------
-} // namespace Utility
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Utility

@@ -48,18 +48,17 @@ LE_OPTIMIZE_FOR_SIZE_BEGIN()
 /// beside it for the no-exceptions build, which this one is not.) TinyXML
 /// reports through `TiXmlDocument::Error()` and needs neither.
 ///                                           (31.07.2026.) (SW port)
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
+
 namespace GUI
 {
 void warningMessageBox(std::string_view title, std::string_view message, bool canBlock);
 }
-//------------------------------------------------------------------------------
+
 namespace SW
 {
-//------------------------------------------------------------------------------
 
 using PresetModule = SW::Module;
 
@@ -1100,10 +1099,8 @@ std::string savePreset(std::string_view const externalSampleFilePath,
     return parametersSaver.saveTo();
 }
 
-//------------------------------------------------------------------------------
 } // namespace SW
-//------------------------------------------------------------------------------
+
 } // namespace LE
-//------------------------------------------------------------------------------
 
 LE_OPTIMIZE_FOR_SIZE_END()

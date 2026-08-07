@@ -20,16 +20,9 @@
 #include "effectsList.hpp"
 
 #include <tuple>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 #define LE_SW_AUX_EFFECT_IMPL(folder, module, name, group) name##Impl,
 using EffectImpls = std::tuple<LE_SW_EFFECT_LIST(LE_SW_AUX_EFFECT_IMPL) void>;
@@ -42,11 +35,6 @@ template <unsigned int index> struct ImplForIndex
     using type = std::tuple_element_t<index, EffectImpls>;
 };
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // indexToEffectImplMapping_hpp

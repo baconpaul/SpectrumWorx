@@ -34,13 +34,12 @@
 #include <cstdlib>
 #include <ctime>
 #include <string_view>
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
+
 namespace SW
 {
-//------------------------------------------------------------------------------
 
 namespace Engine
 {
@@ -629,13 +628,11 @@ bool SpectrumWorxCore::setGlobalParameter(WindowFunction &parameter,
     return deferOrApplySpectralSetup();
 }
 
-//------------------------------------------------------------------------------
 } // namespace SW
-//------------------------------------------------------------------------------
+
 #ifndef NDEBUG
 LE_WEAK_SYMBOL extern char const assertionFailureMessageTitle[] =
     "SpectrumWorx internal error. Press Ok to ignore or Cancel to abort...";
 #endif // NDEBUG
-//------------------------------------------------------------------------------
+
 } // namespace LE
-//------------------------------------------------------------------------------

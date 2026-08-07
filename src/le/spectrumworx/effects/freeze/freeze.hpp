@@ -17,16 +17,9 @@
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/trigger/parameter.hpp"
 #include "le/parameters/uiElements.hpp" // the UIElements below
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -73,11 +66,6 @@ EFFECT_PARAMETER_NAME(Freeze::FreezeTrigger, "Freeze")
 EFFECT_PARAMETER_NAME(Freeze::MeltTrigger, "Melt")
 EFFECT_PARAMETER_NAME(Freeze::TransitionTime, "Transition time")
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // freeze_hpp

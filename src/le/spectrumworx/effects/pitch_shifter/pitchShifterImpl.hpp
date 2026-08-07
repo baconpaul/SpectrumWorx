@@ -14,16 +14,9 @@
 #include "pitchShifter.hpp"
 
 #include "le/spectrumworx/effects/phase_vocoder/shared.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 class PitchShifterImpl : public EffectImpl<PitchShifter>, public PhaseVocoderShared::PitchShifter
 {
@@ -39,11 +32,6 @@ class PVPitchShifterImpl : public EffectImpl<PVPitchShifter>,
     void process(Engine::ChannelData_AmPh, Engine::Setup const &) const;
 };
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // pitchShifterImpl_hpp

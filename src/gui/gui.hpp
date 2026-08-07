@@ -45,10 +45,9 @@ typedef unsigned int ATSFontContainerRef;
 typedef unsigned long ATSFontContainerRef;
 #endif // __LP64__
 #endif // _WIN32
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
 
 namespace Parameters
 {
@@ -56,10 +55,8 @@ template <class Parameter> struct DiscreteValues;
 template <class Parameter> struct Name;
 } // namespace Parameters
 
-//------------------------------------------------------------------------------
 namespace SW
 {
-//------------------------------------------------------------------------------
 
 namespace Engine
 {
@@ -67,10 +64,8 @@ class Setup;
 }
 class SpectrumWorx;
 
-//------------------------------------------------------------------------------
 namespace GUI
 {
-//------------------------------------------------------------------------------
 
 /// \note `enum ResourceBitmaps` and `resourceBitmap()` used to be declared here
 /// too, numbered with multi-character literals ('01') and read off disk. Both
@@ -936,11 +931,10 @@ struct DiscreteParameterComboBox
     TitledComboBox comboBox_;
 }; // struct DiscreteParameterComboBox
 
-//------------------------------------------------------------------------------
 } // namespace GUI
-//------------------------------------------------------------------------------
+
 } // namespace SW
-//------------------------------------------------------------------------------
+
 } // namespace LE
-//------------------------------------------------------------------------------
+
 #endif // gui_hpp

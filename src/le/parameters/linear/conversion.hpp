@@ -16,15 +16,8 @@
 #include "le/math/conversion.hpp"
 
 #include <type_traits>
-//------------------------------------------------------------------------------
-namespace LE
-{
-//------------------------------------------------------------------------------
-namespace Parameters
-{
-//------------------------------------------------------------------------------
 
-namespace Detail
+namespace LE::Parameters::Detail
 {
 // Implementation note:
 //   Using the 'semi-compile-time' versions of the Math range conversion
@@ -87,11 +80,6 @@ convertParameterValueToLinearValue(Source const sourceValue, LinearParameterTag)
         sourceValue, static_cast<Source>(Parameter::minimum()),
         static_cast<Source>(Parameter::maximum()));
 }
-} // namespace Detail
+} // namespace LE::Parameters::Detail
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
 #endif // conversion_hpp

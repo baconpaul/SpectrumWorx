@@ -16,13 +16,9 @@
 
 #include <bit>
 #include <cmath>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Math
 {
-//------------------------------------------------------------------------------
-namespace Math
-{
-//------------------------------------------------------------------------------
 
 #ifdef _MSC_VER
 #pragma runtime_checks("", off)
@@ -195,7 +191,6 @@ float interval12TET2Semitone(float const interval) { return 12 * log2(interval);
         document.write(value + "<br>");
     }
 
-
     function logslider(value)
     {
         // value will be between 0 and 100
@@ -218,8 +213,4 @@ float interval12TET2Semitone(float const interval) { return 12 * log2(interval);
 #pragma optimize("", on)
 #endif // _MSC_VER
 
-//------------------------------------------------------------------------------
-} // namespace Math
-//------------------------------------------------------------------------------
-} //namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Math

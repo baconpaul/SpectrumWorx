@@ -15,13 +15,9 @@
 
 #include "le/plugins/plugin.hpp"
 #include "le/utility/platformSpecifics.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
 
 template <class Impl, class Protocol> class LE_NOVTABLE Host2PluginInteropImpl
 /// \note No virtual functions so no need to inherit from
@@ -68,9 +64,6 @@ template <class Impl, class Protocol> class LE_NOVTABLE Host2PluginInteropImpl
     class ParameterSetter;
 }; // class Host2PluginInteropImpl
 
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW
+
 #endif // host2PluginImpl_hpp

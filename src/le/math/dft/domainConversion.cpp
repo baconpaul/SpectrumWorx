@@ -13,13 +13,9 @@
 #include "le/math/vector.hpp"
 
 #include "le/utility/assert.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Math
 {
-//------------------------------------------------------------------------------
-namespace Math
-{
-//------------------------------------------------------------------------------
 
 void reim2AmPh(float const *const reals, float const *const imags, // input
                float *const amplitudes, float *const phases,       // output
@@ -39,8 +35,4 @@ void amph2ReIm(float const *const amplitudes, float const *const phases, // inpu
     polar2rectangular(amplitudes, phases, reals, imags, numberOfSamples);
 }
 
-//------------------------------------------------------------------------------
-} // namespace Math
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Math

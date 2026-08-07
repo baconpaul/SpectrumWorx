@@ -20,13 +20,9 @@
 
 #include <cstddef>
 #include <utility>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Utility
 {
-//------------------------------------------------------------------------------
-namespace Utility
-{
-//------------------------------------------------------------------------------
 
 template <class T> class IntrusivePtr
 {
@@ -139,9 +135,6 @@ template <class T> T *getPointer(IntrusivePtr<T> const &p) noexcept { return p.g
 /// which flavour of handle the thing it is asking about happens to use.
 template <class T> T *getPointer(T *const p) noexcept { return p; }
 
-//------------------------------------------------------------------------------
-} // namespace Utility
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Utility
+
 #endif // intrusivePtr_hpp

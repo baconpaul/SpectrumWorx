@@ -13,16 +13,14 @@
 //------------------------------------------------------------------------------
 #ifndef swClapEntryImpl_hpp__D4A81E67_23BC_4C95_B60F_8E5721A0C3D4
 #define swClapEntryImpl_hpp__D4A81E67_23BC_4C95_B60F_8E5721A0C3D4
-//------------------------------------------------------------------------------
+
 namespace LE::SW::ClapFirst
 {
-//------------------------------------------------------------------------------
 
 bool clapInit(char const *pluginPath);
 void clapDeinit();
 void const *getFactory(char const *factoryID);
 
-//------------------------------------------------------------------------------
 } // namespace LE::SW::ClapFirst
-//------------------------------------------------------------------------------
+
 #endif // swClapEntryImpl_hpp

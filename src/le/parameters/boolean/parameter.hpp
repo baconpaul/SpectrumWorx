@@ -16,13 +16,9 @@
 #include "le/parameters/parameter.hpp" //...mrmlj...for Default
 
 #include "le/utility/assert.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Parameters
 {
-//------------------------------------------------------------------------------
-namespace Parameters
-{
-//------------------------------------------------------------------------------
 
 template <typename... Traits> struct TraitPack;
 
@@ -97,9 +93,6 @@ template <> struct Boolean::Modify<Parameters::Traits::Default<true>>
     using type = Detail::BooleanParameterTraits<true>;
 };
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Parameters
+
 #endif // parameter_hpp

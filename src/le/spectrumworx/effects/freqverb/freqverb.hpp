@@ -17,16 +17,9 @@
 #include "le/parameters/linear/parameter.hpp"
 #include "le/parameters/symmetric/parameter.hpp"
 #include "le/parameters/uiElements.hpp" // the UIElements below
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -84,11 +77,6 @@ EFFECT_PARAMETER_NAME(Freqverb::RoomSize, "Room size")
 EFFECT_PARAMETER_NAME(Freqverb::ReverbPitch, "Pitch")
 EFFECT_PARAMETER_NAME(Freqverb::HFAbsorption, "HF absorb")
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // freqverb_hpp

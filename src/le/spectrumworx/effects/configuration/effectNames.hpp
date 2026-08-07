@@ -14,16 +14,9 @@
 #include <string_view>
 
 #include <cstdint>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 /// \brief The effect's title, as shown to a user.
 char const *effectName(std ::uint8_t effectIndex);
@@ -60,11 +53,6 @@ template <class Effect> struct EffectStreamingName
 char const *effectStreamingName(std::uint8_t effectIndex);
 std::int8_t effectIndexFromStreamingName(std::string_view streamingName);
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // effectNames_hpp

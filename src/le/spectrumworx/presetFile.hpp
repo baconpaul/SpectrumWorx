@@ -21,19 +21,15 @@
 #define presetFile_hpp__0C4A6D19_8E37_4B52_9A6D_1F73B0C5E842
 //------------------------------------------------------------------------------
 #include "presetStorage.hpp"
-//------------------------------------------------------------------------------
+
 namespace juce
 {
 class File;
 class String;
 } // namespace juce
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
 
 class Program;
 
@@ -80,9 +76,6 @@ std::string savePreset(juce::File const &externalSampleFile, juce::String const 
 void savePreset(juce::File const &, juce::File const &externalSampleFile,
                 juce::String const &comment, Program const &);
 
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW
+
 #endif // presetFile_hpp

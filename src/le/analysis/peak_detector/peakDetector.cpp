@@ -21,10 +21,9 @@
 
 #include <algorithm>
 #include <cmath>
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
 // https://ccrma.stanford.edu/~jos/parshl/Peak_Detection_Steps_3.html
 // http://hci.rwth-aachen.de/materials/publications/lee2006a.pdf (under
 // "Multiresolution Peak-Picking Algorithm")
@@ -390,6 +389,4 @@ void PeakDetector::attenuateNonPeaks(float *const amplitudes, std::uint16_t cons
     attenuateBins(amplitudes, &isPeak_[0], startBin, stopInclusive, factor, false);
 }
 
-//------------------------------------------------------------------------------
 } // namespace LE
-//------------------------------------------------------------------------------

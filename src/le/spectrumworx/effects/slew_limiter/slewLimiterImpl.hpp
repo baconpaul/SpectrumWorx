@@ -16,16 +16,9 @@
 #include "le/spectrumworx/effects/channelStateDynamic.hpp"
 #include "le/spectrumworx/effects/effects.hpp"
 #include "le/spectrumworx/engine/buffers.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 class SlewLimiterImpl : public EffectImpl<SlewLimiter>
 {
@@ -59,11 +52,6 @@ class SlewLimiterImpl : public EffectImpl<SlewLimiter>
     float gainUpperBound_;
 };
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // slewLimiterImpl_hpp

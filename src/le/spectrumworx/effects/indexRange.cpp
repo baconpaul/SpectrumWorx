@@ -11,16 +11,9 @@
 #include "indexRange.hpp"
 
 #include "le/utility/assert.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 IndexRange::IndexRange(value_type const begin, value_type const end) : Pair(begin, end)
 {
@@ -50,10 +43,4 @@ bool IndexRange::isValid(value_type const first, value_type const end) { return 
 
 bool IndexRange::isValid() const { return isValid(first(), end()); }
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects

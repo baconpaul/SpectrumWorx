@@ -61,10 +61,9 @@
 ///                                           (30.07.2026.) (SW port)
 #include <exception>
 #include <source_location>
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
 
 #pragma message("LEB: assertion handling enabled.")
 
@@ -80,9 +79,7 @@ LE_WEAK_SYMBOL_CONST char const assertionFailureMessageTitle[] = "LE SDK asserti
 /// know whether it has a message thread. See doc/tech/threading_model.md §6.
 ///                                           (02.08.2026.) (SW port)
 
-//------------------------------------------------------------------------------
 } // namespace LE
-//------------------------------------------------------------------------------
 
 #pragma warning(push)
 #pragma warning(disable : 4702) // Unreachable code.
@@ -260,9 +257,7 @@ static LE_NOINLINE void assertionFailedMsgAux([[maybe_unused]] char const *const
 /// LE_ASSERT at LE::Utility::assertionFailed and left the handler behind, so
 /// nothing had defined it since.
 ///                                           (28.07.2026.) (SW port)
-namespace LE
-{
-namespace Utility
+namespace LE::Utility
 {
 LE_WEAK_FUNCTION void assertionFailed(char const *const expression, char const *const message,
                                       std::source_location const &location)
@@ -274,8 +269,7 @@ LE_WEAK_FUNCTION void assertionFailed(char const *const expression, char const *
                           location.line());
 #endif // LE_PUBLIC_BUILD
 }
-} // namespace Utility
-} // namespace LE
+} // namespace LE::Utility
 
 #pragma warning(pop)
 

@@ -17,22 +17,18 @@
 #include "le/math/dft/domainConversion.hpp"
 #include "le/math/dft/fft.hpp"
 #include "le/math/math.hpp"
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
+
 namespace Math
 {
 template void convert<float, unsigned int>(unsigned int source, float &target);
 template void convert<unsigned int, unsigned int>(unsigned int source, unsigned int &target);
 } // namespace Math
-//------------------------------------------------------------------------------
-namespace SW
+
+namespace SW::Engine
 {
-//------------------------------------------------------------------------------
-namespace Engine
-{
-//------------------------------------------------------------------------------
 
 Setup::Setup()
     : // Implementation note:
@@ -238,10 +234,6 @@ void Setup::verifyOverlapFactor()
                   "Invalid overlap factor.");
 }
 
-//------------------------------------------------------------------------------
-} // namespace Engine
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
+} // namespace SW::Engine
+
 } // namespace LE
-//------------------------------------------------------------------------------

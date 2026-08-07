@@ -13,16 +13,9 @@
 //------------------------------------------------------------------------------
 #include "phaseVocoderSynthesis.hpp"
 #include "le/spectrumworx/effects/phase_vocoder/shared.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 class PhaseVocoderSynthesisImpl : public NoParametersEffectImpl<PhaseVocoderSynthesis>
 {
@@ -44,11 +37,6 @@ class PhaseVocoderSynthesisImpl : public NoParametersEffectImpl<PhaseVocoderSynt
     PhaseVocoderShared::BaseParameters pvParameters_;
 };
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // phaseVocoderSynthesisImpl_hpp

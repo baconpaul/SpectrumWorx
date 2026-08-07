@@ -40,11 +40,9 @@ class JNIHelper;
 #pragma comment(lib, "LE_Utility_Win32_x86-32_SSE2.lib")
 #endif // _WIN32/64
 #endif // _MSC_VER && !LE_SDK_NO_AUTO_LINK
-//------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
+
 namespace LE
 {
-//------------------------------------------------------------------------------
 /// \addtogroup Utility
 /// \brief Shared, utility code used by LE SDKs and example apps.
 /// \details Not to be confused with the documented API of the accompanying LE
@@ -429,7 +427,7 @@ bool setAppContext(::ANativeActivity const &,
 } // namespace Utility
 //------------------------------------------------------------------------------
 /// @} // group Utility
-//------------------------------------------------------------------------------
+
 } // namespace LE
-//------------------------------------------------------------------------------
+
 #endif // filsystem_hpp

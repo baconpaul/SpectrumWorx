@@ -19,13 +19,9 @@
 
 #include <cstdint>
 #include <type_traits>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Parameters
 {
-//------------------------------------------------------------------------------
-namespace Parameters
-{
-//------------------------------------------------------------------------------
 
 /// \note MaximumOffset is declared beside the other five traits in
 /// le/parameters/parameter.hpp: a trait is a {tag, value} pair and nothing about
@@ -131,9 +127,6 @@ struct SymmetricFloat
     };
 };
 
-//------------------------------------------------------------------------------
-} // namespace Parameters
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Parameters
+
 #endif // parameter_hpp

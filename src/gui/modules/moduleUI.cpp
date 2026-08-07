@@ -24,16 +24,9 @@
 
 #include <cstdio>
 #include <cstdlib>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::GUI
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace GUI
-{
-//------------------------------------------------------------------------------
 
 ModuleLEDTextButton::ModuleLEDTextButton(juce::Component &parent, unsigned int const x,
                                          unsigned int const y)
@@ -706,7 +699,6 @@ ModuleUI::Module &ModuleUI::module()
 }
 ModuleUI::Module const &ModuleUI::module() const { return const_cast<ModuleUI &>(*this).module(); }
 
-//------------------------------------------------------------------------------
 namespace Detail
 {
 ModuleWidgetConstructionState::ModuleWidgetConstructionState(ModuleUI &parent)
@@ -756,10 +748,4 @@ ModuleWidgetHolder<ModuleKnob>::ModuleWidgetHolder(ModuleWidgetConstructionState
 
 } // namespace Detail
 
-//------------------------------------------------------------------------------
-} // namespace GUI
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::GUI

@@ -21,16 +21,12 @@
 #include "le/utility/intrusivePtr.hpp"
 
 #include <type_traits>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
+
 namespace Engine
 {
-//------------------------------------------------------------------------------
 
 class LE_NOVTABLE ModuleNode
 {
@@ -104,9 +100,8 @@ template <class ActualModule> ModuleNode const &node(ActualModule const &chained
     return node(const_cast<ActualModule &>(chainedModule));
 }
 
-//------------------------------------------------------------------------------
 } // namespace Engine
-//------------------------------------------------------------------------------
+
 template <class ActualModule>
 LE_FORCEINLINE void intrusive_ptr_add_ref(ActualModule const *const pModule)
 {
@@ -117,9 +112,7 @@ LE_FORCEINLINE void intrusive_ptr_release(ActualModule const *const pModule)
 {
     intrusive_ptr_release(&Engine::node(*pModule));
 }
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+
+} // namespace LE::SW
+
 #endif // moduleNode_hpp

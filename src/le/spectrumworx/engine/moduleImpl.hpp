@@ -75,7 +75,7 @@ __if_not_exists(std::make_index_sequence)
 #endif
 namespace LE
 {
-//------------------------------------------------------------------------------
+
 namespace Parameters
 {
 template <class Parameter> struct DiscreteValues;
@@ -84,13 +84,9 @@ template <class Parameter> struct Name;
 
 struct PowerOfTwoParameterTag;
 } // namespace Parameters
-//------------------------------------------------------------------------------
-namespace SW
+
+namespace SW::Engine
 {
-//------------------------------------------------------------------------------
-namespace Engine
-{
-//------------------------------------------------------------------------------
 
 struct StorageFactors;
 
@@ -590,11 +586,8 @@ template <class Effect> class ModuleDSP::Impl final : public ModuleEffectImpl<Ef
 /// Callers outside this header see the declaration alone and must get a real
 /// symbol.                                    (29.07.2026.) (SW port)
 
-//------------------------------------------------------------------------------
-} // namespace Engine
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
+} // namespace SW::Engine
+
 } // namespace LE
-//------------------------------------------------------------------------------
+
 #endif // moduleImpl_hpp

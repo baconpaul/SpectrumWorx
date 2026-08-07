@@ -17,16 +17,9 @@
 #include "le/spectrumworx/effects/effects.hpp"
 #include "le/spectrumworx/effects/phase_vocoder/shared.hpp"
 #include "le/analysis/pitch_detector/pitchDetector.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Effects
-{
-//------------------------------------------------------------------------------
 
 class SumoPitchImpl : public EffectImpl<SumoPitch>
 {
@@ -66,11 +59,6 @@ class SumoPitchImpl : public EffectImpl<SumoPitch>
     PhaseVocoderShared::PitchShifter ps_;
 };
 
-//------------------------------------------------------------------------------
-} // namespace Effects
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Effects
+
 #endif // sumoPitchImpl_hpp

@@ -21,13 +21,9 @@
 
 #include "le/utility/polymorphicDowncast.hpp"
 #include "le/utility/span.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
 // http://forum.cockos.com/showthread.php?p=538840
@@ -444,9 +440,6 @@ void Plugin2HostActiveInteropImpl<Impl, Protocol, Base>::automatedParameterChang
     automatedParameterChanged(parameterID, normalised ? value.normalised : value.fullRange);
 }
 
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW
+
 #endif // plugin2HostImpl_inl

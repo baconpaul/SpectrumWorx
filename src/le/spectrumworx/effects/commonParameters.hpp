@@ -17,20 +17,13 @@
 //------------------------------------------------------------------------------
 #include "le/parameters/enumerated/parameter.hpp"
 #include "le/parameters/uiElements.hpp" // the UIElements below
-//------------------------------------------------------------------------------
-namespace LE
-{
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
+
 /// \addtogroup Effects
 /// @{
 
 /// \brief SpectrumWorx Effect classes and utilities
-namespace Effects
+namespace LE::SW::Effects
 {
-//------------------------------------------------------------------------------
 
 /// \addtogroup Effects
 /// @{
@@ -76,12 +69,7 @@ EFFECT_ENUMERATED_PARAMETER_STRINGS(CommonParameters, SpringType,
     {Up, "Up"},
     {Down, "Down"})
 
-//------------------------------------------------------------------------------
-} // namespace Effects
+} // namespace LE::SW::Effects
 /// @}
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+
 #endif // commonParameters_hpp

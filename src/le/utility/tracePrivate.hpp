@@ -12,13 +12,9 @@
 #define tracePrivate_hpp__363A7DB6_02EA_48C5_93CC_D38F9B5EE959
 //------------------------------------------------------------------------------
 #include "trace.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::Utility
 {
-//------------------------------------------------------------------------------
-namespace Utility
-{
-//------------------------------------------------------------------------------
 
 #ifndef NDEBUG
 /// \note Ad-hoc solution for logging we do not want to appear in/spam the
@@ -35,9 +31,6 @@ extern void *Tracer_setUserMessageMethod(void *);
 #define LE_TRACE_LOGONLY(formatString, ...)
 #endif // _DEBUG
 
-//------------------------------------------------------------------------------
-} // namespace Utility
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::Utility
+
 #endif // tracePrivate_hpp

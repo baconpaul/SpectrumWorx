@@ -18,16 +18,9 @@
 #include "le/math/vector.hpp"
 #include "le/spectrumworx/engine/setup.hpp"
 #include "le/utility/platformSpecifics.hpp"
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW::Engine
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
-namespace Engine
-{
-//------------------------------------------------------------------------------
 
 LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
@@ -253,10 +246,4 @@ float ModuleParameters::setEffectParameterLive(std::uint8_t const parameterIndex
     return static_cast<ModuleDSP &>(*this).setEffectParameter(parameterIndex, value, info);
 }
 
-//------------------------------------------------------------------------------
-} // namespace Engine
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW::Engine

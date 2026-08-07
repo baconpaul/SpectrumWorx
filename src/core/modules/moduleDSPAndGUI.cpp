@@ -19,13 +19,9 @@
 #include "le/utility/intrusivePtr.hpp"
 
 #include <optional>
-//------------------------------------------------------------------------------
-namespace LE
+
+namespace LE::SW
 {
-//------------------------------------------------------------------------------
-namespace SW
-{
-//------------------------------------------------------------------------------
 
 // Implementation note:
 //   This is required to prevent Clang from inlining the base destructor into
@@ -75,8 +71,4 @@ void LE_NOINLINE intrusive_ptr_release_deleter(ModuleNode const *LE_RESTRICT con
 }
 } // namespace Engine
 
-//------------------------------------------------------------------------------
-} // namespace SW
-//------------------------------------------------------------------------------
-} // namespace LE
-//------------------------------------------------------------------------------
+} // namespace LE::SW
