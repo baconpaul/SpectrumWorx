@@ -194,7 +194,6 @@ void PeakDetector::findPeaksAndEstimateFrequency(float const *const amplitudes,
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-LE_OPTIMIZE_FOR_SPEED_BEGIN()
 
 namespace
 {
@@ -366,7 +365,6 @@ void LE_HOT attenuateBins(float *LE_RESTRICT const pAmplitudes, bool *LE_RESTRIC
 }
 } // anonymous namespace
 
-LE_OPTIMIZE_FOR_SPEED_END()
 
 void PeakDetector::attenuatePeaks(float *const amplitudes, std::uint16_t const startBin,
                                   std::uint16_t const stopInclusive, float const factor)

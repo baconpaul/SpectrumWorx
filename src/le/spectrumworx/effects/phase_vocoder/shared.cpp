@@ -120,7 +120,6 @@ void LE_NOINLINE PitchShifter::process(float const pitchScale, ChannelState &cha
     process(channelState, std::forward<Engine::ChannelData_AmPh>(data));
 }
 
-LE_OPTIMIZE_FOR_SPEED_BEGIN()
 
 void LE_NOINLINE PitchShifter::process(ChannelState &channelState,
                                        Engine::ChannelData_AmPh &&data) const
@@ -987,6 +986,5 @@ LE_HOT pitchShiftAndScale(Engine::ChannelData_AmPh &data,
 #endif // LE_PV_USE_TSS
 }
 
-LE_OPTIMIZE_FOR_SPEED_END()
 
 } // namespace LE::SW::Effects::PhaseVocoderShared

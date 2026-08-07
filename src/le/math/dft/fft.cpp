@@ -16,8 +16,6 @@
 
 #include "le/utility/platformSpecifics.hpp"
 
-LE_OPTIMIZE_FOR_SPEED_BEGIN()
-LE_FAST_MATH_ON()
 
 #include "fft.hpp"
 
@@ -425,4 +423,3 @@ LE_COLD std::uint32_t FFT_float_real_1D::requiredStorage(SW::Engine::StorageFact
 
 } // namespace LE::Math
 
-LE_OPTIMIZE_FOR_SPEED_END()

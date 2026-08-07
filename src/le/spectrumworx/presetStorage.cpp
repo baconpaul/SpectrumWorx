@@ -19,7 +19,6 @@
 namespace LE::SW
 {
 
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -115,6 +114,5 @@ void copyPresetName(char const *const name, std::span<char> const target)
     target[written] = '\0';
 }
 
-LE_OPTIMIZE_FOR_SIZE_END()
 
 } // namespace LE::SW

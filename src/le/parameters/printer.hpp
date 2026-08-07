@@ -29,7 +29,6 @@
 namespace LE::Parameters
 {
 
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -153,7 +152,6 @@ struct AutomatedParameterPrinter
 
 #pragma warning(pop)
 
-LE_OPTIMIZE_FOR_SIZE_END()
 
 } // namespace LE::Parameters
 

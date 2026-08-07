@@ -30,7 +30,6 @@ void warningMessageBox(std::string_view title, std::string_view message, bool ca
 namespace SW
 {
 
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -84,7 +83,6 @@ void savePreset(juce::File const &file, juce::File const &externalSampleFile,
         reportPresetProblem(PresetProblem::SaveFailed);
 }
 
-LE_OPTIMIZE_FOR_SIZE_END()
 
 } // namespace SW
 

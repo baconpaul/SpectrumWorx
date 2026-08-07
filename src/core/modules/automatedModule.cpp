@@ -23,7 +23,6 @@
 namespace LE::SW::Automation
 {
 
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 using BaseParameters = Effects::BaseParameters::Parameters;
 
@@ -155,6 +154,5 @@ Detail::autoAdjustedLFOParameter(LFO &lfo, std::uint8_t const lfoParameterIndex)
     return std::nullopt;
 }
 
-LE_OPTIMIZE_FOR_SIZE_END()
 
 } // namespace LE::SW::Automation

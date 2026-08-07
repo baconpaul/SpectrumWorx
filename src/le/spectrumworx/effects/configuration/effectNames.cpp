@@ -27,7 +27,6 @@
 namespace LE::SW::Effects
 {
 
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 ////////////////////////////////////////////////////////////////////////////////
 // Titles that have moved since a preset named them.
@@ -79,6 +78,5 @@ LE_COLD std::int8_t effectIndexFromStreamingName(std::string_view const streamin
     return static_cast<std::int8_t>(pFound - effectStreamingNames.begin());
 }
 
-LE_OPTIMIZE_FOR_SIZE_END()
 
 } // namespace LE::SW::Effects

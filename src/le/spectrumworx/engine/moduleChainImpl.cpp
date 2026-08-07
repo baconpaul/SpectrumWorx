@@ -19,7 +19,6 @@
 namespace LE::SW::Engine
 {
 
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 LE_COLD ModuleChainBase::ModuleChainBase()
 {
@@ -375,6 +374,5 @@ LE_COLD bool ModuleChainImpl::resizeAll(Engine::StorageFactors const &newfactors
     return false;
 }
 
-LE_OPTIMIZE_FOR_SIZE_END()
 
 } // namespace LE::SW::Engine

@@ -22,7 +22,6 @@
 namespace LE::SW::Engine
 {
 
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 LE_COLD ModuleDSP::~ModuleDSP() {}
 
@@ -70,9 +69,7 @@ bool LE_COLD ModuleDSP::allocateStorage(
     return storage_.resize(totalBytes);
 }
 
-LE_OPTIMIZE_FOR_SIZE_END()
 
-LE_OPTIMIZE_FOR_SPEED_BEGIN()
 void ModuleDSP::process(std::uint8_t const channel, ChannelData &channelData,
                         Setup const &engineSetup) const
 {
@@ -101,7 +98,6 @@ void ModuleDSP::process(std::uint8_t const channel, ChannelData &channelData,
         }
     }
 }
-LE_OPTIMIZE_FOR_SPEED_END()
 
 ModuleDSP::ChannelDataProxy::ChannelDataProxy(ChannelData &data, ModuleDSP const &module,
                                               bool const doBlend, bool &amPh2ReIm)

@@ -34,7 +34,6 @@
 #include <string>
 #include <string_view>
 //------------------------------------------------------------------------------
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 // CDATA Sections [XML Standards]
 // http://msdn.microsoft.com/en-us/library/ms256076.aspx
@@ -1065,4 +1064,3 @@ std::string savePreset(std::string_view const externalSampleFilePath,
 
 } // namespace LE
 
-LE_OPTIMIZE_FOR_SIZE_END()

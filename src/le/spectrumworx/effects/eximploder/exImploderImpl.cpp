@@ -51,7 +51,6 @@ float dB2BinAmplitude(int const dBAmplitude, Engine::Setup const &engineSetup)
     return Math::dB2NormalisedLinear(dBAmplitude) * engineSetup.maximumAmplitude();
 }
 
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 float LE_COLD ExImPloderImpl::setup(int const glissando, int const threshold, int const gate,
                                     Engine::Setup const &engineSetup)
@@ -77,7 +76,6 @@ float LE_COLD ExImPloderImpl::setup(int const glissando, int const threshold, in
     return frameTime;
 }
 
-LE_OPTIMIZE_FOR_SIZE_END()
 
 ////////////////////////////////////////////////////////////////////////////
 //
@@ -105,7 +103,6 @@ LE_OPTIMIZE_FOR_SIZE_END()
 //                                        (10.10.2011.) (Domagoj Saric)
 ////////////////////////////////////////////////////////////////////////////
 
-LE_OPTIMIZE_FOR_SPEED_BEGIN()
 
 void LE_HOT ExImPloderImpl::process(ChannelState &cs, Engine::ChannelData_AmPh &data,
                                     bool const thresholdIsLowerBound) const
@@ -156,9 +153,7 @@ void LE_HOT ExImPloderImpl::process(ChannelState &cs, Engine::ChannelData_AmPh &
     }
 }
 
-LE_OPTIMIZE_FOR_SPEED_END()
 
-LE_OPTIMIZE_FOR_SIZE_BEGIN()
 
 void ExImPloderImpl::setMagnitudeScale(float const magnitudeScale)
 {
@@ -236,6 +231,5 @@ void PVExploderImpl::process(ChannelState &cs, Engine::ChannelData_AmPh data,
     Detail::ExImPloderImpl::process(cs, data, false);
 }
 
-LE_OPTIMIZE_FOR_SIZE_END()
 
 } // namespace LE::SW::Effects

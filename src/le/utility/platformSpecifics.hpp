@@ -42,21 +42,6 @@
 #define LE_MSVC_SPECIFIC(expression) expression
 #define LE_GNU_SPECIFIC(expression)
 
-#define LE_OPTIMIZE_FOR_SPEED_BEGIN()                                                              \
-    __pragma(optimize("t", on)) __pragma(auto_inline(on)) __pragma(inline_recursion(on))           \
-        __pragma(inline_depth(255))
-
-#define LE_OPTIMIZE_FOR_SPEED_END()
-
-#define LE_OPTIMIZE_FOR_SIZE_BEGIN() __pragma(optimize("s", on))
-
-#define LE_OPTIMIZE_FOR_SIZE_END LE_OPTIMIZE_FOR_SPEED_END
-
-// msdn.microsoft.com/en-us/library/45ec64h6.aspx
-#define LE_FAST_MATH_ON()                                                                          \
-    __pragma(float_control(except, off)) __pragma(fenv_access(off))                                \
-        __pragma(float_control(precise, off)) __pragma(fp_contract(on))
-
 // https://msdn.microsoft.com/en-us/library/hh923901.aspx
 #define LE_DISABLE_LOOP_VECTORIZATION() __pragma(loop(no_vector))
 #define LE_DISABLE_LOOP_UNROLLING()
@@ -104,8 +89,7 @@
 /// *not* used: the comment above records that it was switched off on purpose,
 /// because marking a callee cold pessimises the call sites too. If per-function
 /// size optimisation is wanted back on GCC it needs `optimize("Os")`, which
-/// GCC's own documentation restricts to debugging — see the note over
-/// LE_OPTIMIZE_FOR_SIZE_BEGIN below.
+/// GCC's own documentation restricts to debugging.
 ///                                           (29.07.2026.) (SW port)
 #define LE_COLD
 #endif
@@ -126,40 +110,19 @@
 #define LE_MSVC_SPECIFIC(expression)
 #define LE_GNU_SPECIFIC(expression) expression
 
-/// \note Per-translation-unit optimisation and fast-math pragmas: no-ops on
-/// every compiler that reaches this branch, deliberately.
+/// \note The LE_OPTIMIZE_FOR_SIZE/SPEED and LE_FAST_MATH families stood here,
+/// over 89 call sites, and expanded to nothing on Clang -- their GCC arm was
+/// gated on a version test Clang answers with 42 -- so every golden this project
+/// has ever rendered was rendered without them. Deleted 07.08.2026.
 ///
-///   The GCC arm of this block was written in 2013 and gated on
-/// `__GNUC__ * 10 + __GNUC_MINOR__ >= 44`. Clang answers that test with 42, so
-/// **Clang has always taken the empty arm** — which means the whole family has
-/// been inert on macOS, and the stage 3.6 goldens were rendered without any of
-/// it. Real GCC does honour the pragmas, and three things follow:
-///
-///   - `LE_FAST_MATH_ON()` was `#pragma GCC optimize("associative-math")`, and
-///     GCC 15 acts on it: a float reduction inside the pragma's scope gets
-///     vectorised, i.e. reassociated. Enabling that on Linux only would reorder
-///     sums macOS never reordered, and would make any golden difference
-///     impossible to attribute to the FFT backend it is supposed to be
-///     measuring.
-///   - `_Pragma("arm")` / `_Pragma("thumb")` are ARM32 (RVCT) directives GCC
-///     never implemented, and bare `_Pragma("push")` / `_Pragma("pop")` are not
-///     GCC pragmas either. The `thumb` one had additionally been split into two
-///     adjacent literals by the stage 0.6 reformat, which `_Pragma` rejects
-///     outright — so this arm had not compiled at all since then.
-///   - GCC's own documentation says of the underlying attribute: "the optimize
-///     attribute should be used for debugging purposes only. It is not suitable
-///     in production code."
-///
-///   `-O3` / `-Os` per translation unit is a size/speed knob, not a semantic
-/// one, so nothing is lost by letting the build type decide it uniformly. If a
-/// cold-code size win is ever wanted back, it should arrive measured, and as
-/// `__attribute__((cold))` on the declarations rather than a file-scope pragma.
+///   Worth keeping from that: per-translation-unit `-O3`/`-Os` is a size/speed
+/// knob the build type already decides, and GCC's own documentation restricts
+/// the underlying attribute to debugging. Fast-math is the one that was not
+/// merely inert: GCC acts on `optimize("associative-math")` and vectorises float
+/// reductions under it, so honouring it on Linux alone would reorder sums macOS
+/// never reordered -- and make a golden difference impossible to attribute to
+/// the FFT backend it is meant to be measuring.
 ///                                       (29.07.2026.) (SW port)
-#define LE_OPTIMIZE_FOR_SPEED_BEGIN()
-#define LE_OPTIMIZE_FOR_SPEED_END()
-#define LE_OPTIMIZE_FOR_SIZE_BEGIN()
-#define LE_OPTIMIZE_FOR_SIZE_END()
-#define LE_FAST_MATH_ON()
 
 // http://llvm.org/docs/Vectorizers.html#pragma-loop-hint-directives
 #define LE_DISABLE_LOOP_VECTORIZATION()                                                            \
