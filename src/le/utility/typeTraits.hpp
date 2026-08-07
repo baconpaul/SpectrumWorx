@@ -20,6 +20,7 @@
 #include <type_traits>
 
 #include "abi.hpp"
+#include "assert.hpp" // LE_ASSUME
 //------------------------------------------------------------------------------
 
 /// \note Kept because a `new (pRestrictPointer) T` in the engine relied on it

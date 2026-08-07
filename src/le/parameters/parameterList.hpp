@@ -21,6 +21,8 @@
 #ifndef parameterList_hpp__0C4E9B15_7A32_4D68_9F21_6B8D5E3A47C0
 #define parameterList_hpp__0C4E9B15_7A32_4D68_9F21_6B8D5E3A47C0
 //------------------------------------------------------------------------------
+#include "le/utility/assert.hpp" // LE_ASSUME
+
 #include <cstddef>
 #include <cstdint>
 #include <tuple>
