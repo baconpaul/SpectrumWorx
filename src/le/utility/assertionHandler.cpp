@@ -19,16 +19,16 @@
 
 #include "assert.hpp"
 
-#if defined(__ANDROID__)
-#include "android/log.h"
-#elif defined(__APPLE__)
-// http://stackoverflow.com/questions/1083541/built-in-preprocessor-token-to-detect-iphone-platform
-#include "TargetConditionals.h"
-#if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR
-#include "MacTypes.h"
-#else
+/// \note Six chains through this file had an Android or an iOS arm: an
+/// __android_log_assert() reporting path, a TargetConditionals.h/MacTypes.h
+/// include cascade, and `!(TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR)` guards
+/// on the macOS ones. Neither is a target of this plugin, so each chain now
+/// spells out only what macOS, Windows and Linux were already selecting -- and
+/// three of them had nothing left to choose between: the CoreServices include
+/// below, the backtrace one, and printDebugMessage()'s whole body.
+///                                           (07.08.2026.) (SW port)
+#if defined(__APPLE__)
 #include "CoreServices/CoreServices.h"
-#endif
 #include "signal.h"
 #include "syslog.h"
 #elif defined(_WIN32)
@@ -45,10 +45,8 @@
 /// the platform whose failures arrive here as a log rather than a debugger
 /// session.
 ///                                           (31.07.2026.) (SW port)
-#ifndef __ANDROID__
 #define LE_ASSERT_HAS_BACKTRACE
 #include <sst/plugininfra/misc_platform.h>
-#endif
 
 #include <csignal>
 #include <cstdio>
@@ -87,8 +85,7 @@ namespace
 {
 [[maybe_unused]] static void printAssertionFailureTitle()
 {
-#if defined(__ANDROID__)
-#elif defined(__APPLE__) && !(TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR)
+#if defined(__APPLE__)
     /// \note Was DebugStr(), deprecated since 10.8 and now gone. stderr is
     /// what a DAW log and a test runner both capture.
     ///                               (28.07.2026.) (SW port)
@@ -104,13 +101,6 @@ namespace
 
 static void printDebugMessage(char const *const message)
 {
-#if defined(__ANDROID__)
-// http://mobilepearls.com/labs/native-android-api/#logging
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wformat-security"
-    ::__android_log_assert("internal sanity check", LE::assertionFailureMessageTitle, message);
-#pragma clang diagnostic pop
-#else
     /// \note Was LE::Utility::Tracer::error() with its tag swapped to the title
     /// for the duration. The tracer is gone; this is what it did with it.
     ///                                   (07.08.2026.) (SW port)
@@ -122,10 +112,9 @@ static void printDebugMessage(char const *const message)
 #elif defined(_WIN32)
     ::OutputDebugStringA(formatted);
     ::OutputDebugStringA("\n");
-#endif
+#endif // platform
     std::fputs(formatted, stderr);
     std::fputs("\n", stderr);
-#endif // platform/compiler
 }
 
 #ifdef _WIN32
@@ -193,11 +182,11 @@ static void printBacktrace()
 
 void breakIntoDebugger()
 {
-#if defined(__ANDROID__)
-#elif defined(_MSC_VER)
+#if defined(_MSC_VER)
     _CrtDbgBreak();
 #else
-    // http://iphone.m20.nl/wp/2010/10/xcode-iphone-debugger-halt-assertions
+    // SIGINT rather than a trap instruction: an attached debugger stops here,
+    // and a run without one is still resumable.
     std::raise(SIGINT);
 #endif
 }
@@ -252,7 +241,7 @@ static LE_NOINLINE void assertionFailedMsgAux([[maybe_unused]] char const *const
         breakIntoDebugger();
 
         // Do not forcibly terminate in internal debug builds...
-#if defined(LE_PUBLIC_BUILD) && !defined(__ANDROID__)
+#ifdef LE_PUBLIC_BUILD
         std::terminate();
 #endif // LE_PUBLIC_BUILD
     }

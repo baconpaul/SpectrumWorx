@@ -40,12 +40,11 @@
 // clap-wrapper included. Five separate Windows failures came of that, none of
 // them in our code; stage 7.5 of doc/tech/old/implementation_sequence.md lists them.
 //
-//   Nothing here applies to C, and <cstddef> below is a hard error in it. Now
-// that the header only reaches our own sources, none of which are C, this guard
-// is belt rather than braces -- kept because the guard that was *supposed* to do
-// this job, $<COMPILE_LANGUAGE:CXX>, is silently ignored for compile options by
-// the Visual Studio generator, and a header that is inert in C cannot be
-// mis-applied by a generator.
+//   Nothing here applies to C. Now that the header only reaches our own
+// sources, none of which are C, this guard is belt rather than braces -- kept
+// because the guard that was *supposed* to do this job, $<COMPILE_LANGUAGE:CXX>,
+// is silently ignored for compile options by the Visual Studio generator, and a
+// header that is inert in C cannot be mis-applied by a generator.
 //                                        (30.07.2026.) (SW port)
 #ifdef __cplusplus
 //------------------------------------------------------------------------------
@@ -239,84 +238,30 @@
 #endif // LE_CHECKED_BUILD
 #endif // DEBUG || _DEBUG
 
-#if !__STDC_WANT_SECURE_LIB__
-////////////////////////////////////////////////////////////////////////
-//
 // Implementation note:
+//   A 78-line "secure CRT" shim dated 2009 stood here, under
+// `#if !__STDC_WANT_SECURE_LIB__` -- which is `#if !LE_CHECKED_BUILD`, so it was
+// compiled into every release MSVC build rather than merely stale. It undefined
+// __STDC_SECURE_LIB__ and __GOT_SECURE_LIB__, then supplied its own versions of
+// what they announce:
 //
-//   Certain headers and/or libraries do not properly use the
-// __STDC_WANT_SECURE_LIB__ macro and, for example, have hardcoded calls
-// to "secure CRT" functions or they only check for the
-// __STDC_SECURE_LIB__ (or the deprecated __GOT_SECURE_LIB__) macro and
-// expect the secure versions to exist if those macros are defined to a
-// sufficiently high version. Unfortunately the __STDC_SECURE_LIB__ can
-// not be predefined or undefined as the crtdefs.h header forcibly
-// defines it. This section provides a workaround for the mentioned
-// problems: forcibly includes crtdefs.h, undefines the two macros and
-// then defines several (pseudo) secure CRT function versions as
-// required by certain 'broken' headers/libraries.
-//                                           (25.02.2009.) (Domagoj)
+//   - memcpy_s, memmove_s, wmemcpy_s, wmemmove_s, strcpy_s, strcat_s, wcscpy_s,
+//     wcscat_s, strncpy_s and wcsncpy_s as inline forwarders that *discarded*
+//     the destination-size argument and returned 0 -- the bounds check is the
+//     entire difference between those names and the ones they call;
+//   - sprintf_s and swprintf_s as object-like macros for _snprintf/_snwprintf,
+//     so those two names were rewritten in every header our sources include,
+//     ours or not, and neither replacement null-terminates on truncation;
+//   - wcstok_s as a macro dropping its third argument, which today's three-
+//     argument wcstok would reject outright.
 //
-////////////////////////////////////////////////////////////////////////
-
-#include "crtdefs.h"
-#undef __STDC_SECURE_LIB__
-#undef __GOT_SECURE_LIB__
-
-// Implementation note:
-//   MSVC's CRT _wcstok_s_l function is defined even if
-// __STDC_SECURE_LIB__ is not and it references the wcstok_s function.
-//                                    (15.09.2011.) (Domagoj Saric)
-#define wcstok_s(strToken, strDelimit, context) wcstok(strToken, strDelimit)
-
-// <required by Dinkumware STL's <xlocnum> header>
-#define sprintf_s _snprintf
-// </required by Dinkumware STL's <xlocnum> header>
-
-// <required by ATL>
-#include "string.h"
-#include "wchar.h"
-#define DEFINE_SECURE_MEMFUNCTION(nonSecureName, dataType)                                         \
-    __inline errno_t nonSecureName##_s(dataType *const dest, size_t const numberOfElements,        \
-                                       dataType const *const src, size_t const count)              \
-    {                                                                                              \
-        (void)numberOfElements;                                                                    \
-        nonSecureName(dest, src, count);                                                           \
-        return 0;                                                                                  \
-    }
-
-DEFINE_SECURE_MEMFUNCTION(memcpy, void)
-DEFINE_SECURE_MEMFUNCTION(memmove, void)
-DEFINE_SECURE_MEMFUNCTION(wmemcpy, wchar_t)
-DEFINE_SECURE_MEMFUNCTION(wmemmove, wchar_t)
-
-#define DEFINE_SECURE_STRFUNCTION(nonSecureName, dataType)                                         \
-    __inline errno_t nonSecureName##_s(dataType *const strDestination,                             \
-                                       size_t const numberOfElements,                              \
-                                       dataType const *const strSource)                            \
-    {                                                                                              \
-        (void)numberOfElements;                                                                    \
-        nonSecureName(strDestination, strSource);                                                  \
-        return 0;                                                                                  \
-    }
-
-DEFINE_SECURE_STRFUNCTION(strcpy, char)
-DEFINE_SECURE_STRFUNCTION(wcscat, wchar_t)
-DEFINE_SECURE_STRFUNCTION(strcat, char)
-DEFINE_SECURE_STRFUNCTION(wcscpy, wchar_t)
-
-#define DEFINE_SECURE_STRNFUNCTION DEFINE_SECURE_MEMFUNCTION
-DEFINE_SECURE_STRNFUNCTION(strncpy, char)
-DEFINE_SECURE_STRNFUNCTION(wcsncpy, wchar_t)
-
-#undef DEFINE_SECURE_STRNFUNCTION
-#undef DEFINE_SECURE_STRFUNCTION
-#undef DEFINE_SECURE_MEMFUNCTION
-
-#define swprintf_s _snwprintf
-// </required by ATL>
-
-#endif // !__STDC_WANT_SECURE_LIB__
+//   Its 'broken' headers/libraries were ATL and a Dinkumware <xlocnum> of the
+// era. Nothing in src/, tests/ or tools/ names any of these, and for a third-
+// party header the rewrite could only break things: the vendored single-header
+// Catch2 -- which our tests do not include, taking v3's modular headers --
+// writes `sprintf_s( buffer, "%.3f", duration )`, which does not compile as
+// _snprintf. So the shim was answering a 2009 question with a 2026 hazard.
+//                                        (07.08.2026.) (SW port)
 
 //   As we use a lot of heavy template (meta)programing it is actually
 // useful to instruct the MSVC++ compiler to be maximally aggressive with
@@ -326,15 +271,13 @@ DEFINE_SECURE_STRNFUNCTION(wcsncpy, wchar_t)
 
 #elif defined(__GNUC__) // compiler
 
+/// \note This arm also defined __MMX__ itself when __SSE__ was set without it,
+/// which was true of the 2011 x86 iOS simulator and of nothing this builds for:
+/// on x86 both Clang and GCC define __MMX__ alongside __SSE__, and on ARM
+/// neither is defined at all.
+///                                           (07.08.2026.) (SW port)
 #if defined(__SSE__)
 #define LE_HAS_SSE1
-// Implementation note:
-//   When compiling for the iOS simulator __SSE__ and __SSE2__ get
-// defined without __MMX__ which causes compilation errors.
-//                                    (28.11.2011.) (Domagoj Saric)
-#if !defined(__MMX__)
-#define __MMX__
-#endif
 #endif
 
 #if defined(__SSE2__)
@@ -347,40 +290,20 @@ DEFINE_SECURE_STRNFUNCTION(wcsncpy, wchar_t)
 
 #endif // compiler
 
-#ifdef __APPLE__
-#include <cstddef>
-#if !defined(_LIBCPP_VERSION) && (__GLIBCXX__ < 20110325)
-namespace std
-{
-typedef void const *const nullptr_t;
-}
-#endif // old stdlibc++
-#endif // __APPLE__
+/// \note An `#ifdef __APPLE__` block stood here that added a std::nullptr_t
+/// typedef for a libstdc++ older than 20110325, and included <cstddef> to have
+/// somewhere to put it. Apple has been libc++ since well before that date, so
+/// the `!defined( _LIBCPP_VERSION )` half was already false; the include went
+/// with it, being the only thing in this header that was not a macro.
+///                                           (07.08.2026.) (SW port)
 
-////////////////////////////////////////////////////////////////////////////////
-//
-// 3rd party library specifics.
-// ----------------------------
-//
-////////////////////////////////////////////////////////////////////////////////
-
-////////////////////////////////////////////////////////////////////////////////
-// Boost.
-////////////////////////////////////////////////////////////////////////////////
-
-/// \note What is left here only reaches Boost.Fusion, Boost.MPL and
-/// Boost.Preprocessor, the three libraries stage 2 kept. The Spirit, Karma,
-/// Phoenix, TR1, endian, throw_exception and compiler-config tuning that used
-/// to live here went with the libraries it configured.
-///                                           (28.07.2026.) (SW port)
-#define BOOST_NO_IOSTREAM
-#ifdef NDEBUG
-#define BOOST_NO_TYPEID
-#endif // NDEBUG
-
-#ifndef BOOST_EXCEPTION_DISABLE
-#define BOOST_EXCEPTION_DISABLE
-#endif // BOOST_EXCEPTION_DISABLE
+/// \note A "3rd party library specifics" section stood here, and by the end it
+/// was three Boost macros -- BOOST_NO_IOSTREAM, BOOST_NO_TYPEID and
+/// BOOST_EXCEPTION_DISABLE -- configuring Fusion, MPL and Preprocessor. Those
+/// three went with the parameter system, and scripts/check_boost_allowlist.sh
+/// now fails the build on a single Boost include anywhere in src/. So there is
+/// no library left for these to configure.
+///                                           (07.08.2026.) (SW port)
 
 //------------------------------------------------------------------------------
 #endif // __cplusplus
