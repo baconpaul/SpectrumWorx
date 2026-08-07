@@ -357,10 +357,11 @@ shape the parameter system has, and two properties of it outlive the switch:
 
 Related: the LE framework served more than one product from this tree — see the
 `TuneWorx` special-cases (`plugin2Host.cpp:114-119`,
-`src/le/spectrumworx/effects/tune_worx/`, and `LE_SIMPLE_TUNEWORX` at
-`tuneWorx.hpp:38`, a switch nothing defines, so the full 34-parameter version is
-what compiles). That is the sense in which "several plugins of different shapes"
-is true of the *framework*. This repo builds one plugin.
+`src/le/spectrumworx/effects/tune_worx/`). Tune Worx also had a cut-down
+13-parameter edition, selected by a switch this tree never set; it was deleted on
+07.08.2026 and the full 34-parameter version is the only one there has ever been
+here. That is the sense in which "several plugins of different shapes" is true of
+the *framework*. This repo builds one plugin.
 
 ---
 
