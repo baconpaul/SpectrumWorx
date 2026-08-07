@@ -30,9 +30,22 @@ union ParameterID
 {
 #pragma warning(push)
 #pragma warning(disable : 4480) // Nonstandard extension used: specifying underlying type for enum.
+    /// \note Deliberately not zero-based. The discriminator is the high byte of
+    /// the packed value, so a zero-based first type made the first global
+    /// parameter's ID `0x00000000` -- legal as a `clap_id`, since only
+    /// `CLAP_INVALID_ID` is reserved, but indistinguishable from an
+    /// uninitialised one in a log, a debugger or a host's saved session.
+    ///
+    ///   Starting at one buys the property outright rather than special-casing
+    /// the first parameter: no valid ID can be zero, so the default constructor
+    /// below yields a value that means "no parameter" and cannot be confused
+    /// with In's. Changing this renumbers every automation lane a host has
+    /// saved, which is why it happened before the first release and cannot
+    /// happen after one.
+    ///                                       (07.08.2026.) (SW port)
     enum Type : std::uint8_t
     {
-        GlobalParameter,
+        GlobalParameter = 1,
         ModuleChainParameter,
         ModuleParameter,
         LFOParameter

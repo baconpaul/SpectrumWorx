@@ -116,7 +116,20 @@ struct LFO         { std::uint8_t lfoParameterIndex; std::uint8_t moduleParamete
 ```
 
 plus a `Type` discriminator (`GlobalParameter`, `ModuleChainParameter`,
-`ModuleParameter`, `LFOParameter`).
+`ModuleParameter`, `LFOParameter`), which occupies the high byte and **starts at
+one, not zero**. That is deliberate and it is worth not undoing: a zero-based
+discriminator made the first global parameter's ID `0x00000000`, which is a
+legal `clap_id` — only `CLAP_INVALID_ID` is reserved — but indistinguishable
+from an uninitialised value in a log, a debugger, or a host's saved session.
+Starting at one makes zero impossible for *any* parameter, so the default
+constructor's `binaryValue{0}` now means "no parameter" and cannot be mistaken
+for `In`.
+
+It moved on 07.08.2026, which renumbered every ID by `+0x01000000`: `In` is
+`0x01000000` and slot 1's selector is `0x02000000`. An ID is what a host writes
+into a saved session to name an automation lane, so that was a break, taken
+deliberately before the first release because it cannot be taken after one.
+`tests/parameters/data/parameterTable.txt` pins all 388 of them.
 
 The critical design property: an ID means **"slot 3's 4th parameter"**, never
 **"Convolver's Wet"**. The ID stays valid across effect swaps; only the metadata

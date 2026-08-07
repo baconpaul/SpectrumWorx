@@ -877,12 +877,17 @@ inline clap_event_transport transportAt(double const tempo, double const positio
 /// \note ParameterID's members are laid out in reverse so that the hex reads
 /// naturally on a little-endian machine: the type is the top byte and the module
 /// index the one below it. See core/parameterID.hpp.
+///
+/// \note Taken from the plugin's own enum rather than restated. These were four
+/// literals until 07.08.2026, when the discriminator moved off zero so that no
+/// valid ID could be `0x00000000` -- and a hand-copied table agrees with the
+/// thing it copies only until somebody changes it.
 enum ParameterType : clap_id
 {
-    globalType = 0,
-    moduleChainType = 1,
-    moduleType = 2,
-    lfoType = 3
+    globalType = LE::SW::ParameterID::GlobalParameter,
+    moduleChainType = LE::SW::ParameterID::ModuleChainParameter,
+    moduleType = LE::SW::ParameterID::ModuleParameter,
+    lfoType = LE::SW::ParameterID::LFOParameter
 };
 
 inline clap_id parameterID(ParameterType const type, unsigned const moduleIndex = 0,
