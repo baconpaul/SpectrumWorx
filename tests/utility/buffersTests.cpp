@@ -121,7 +121,7 @@ TEST_CASE("The stack buffers are sized and aligned", "[buffers][stackBuffer]")
     CHECK(floats.front() == 1);
     CHECK(floats.back() == 1);
 
-    LE_ALIGNED_SCOPED_STACK_BUFFER(bytes, char, 7);
+    LE_ALIGNED_STACK_BUFFER(bytes, char, 7);
     CHECK(bytes.size() == 7);
     CHECK(aligned(bytes.data()));
 

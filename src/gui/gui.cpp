@@ -375,44 +375,6 @@ bool isParentOf(juce::Component const &parent, juce::Component const *pPossibleC
 }
 } // namespace Detail
 
-#if 0  //...mrmlj...does not work with the latest juce...cleanup...
-void AsyncRepainter::repaint( juce::Component & component, int const x, int const y, int const w, int const h )
-{
-    if ( isThisTheGUIThread() )
-    {
-        static_cast<AsyncRepainter &>( component ).juce::Component::internalRepaint( x, y, w, h );
-    }
-    else
-    {
-        class AsyncRepaintCallback : public juce::CallbackMessage
-        {
-        public:
-            AsyncRepaintCallback( juce::Component & component, int const x, int const y, int const w, int const h )
-                : pComponent_( &component ), x_( x ), y_( y ), w_( w ), h_( h )
-            {
-                juce::CallbackMessage::post();
-            }
-
-        private:
-            void messageCallback() override
-            {
-                juce::Component * const pComponent( pComponent_.getComponent() );
-                if ( pComponent )
-                    static_cast<AsyncRepainter &>( *pComponent ).juce::Component::internalRepaint( x_, y_, w_, h_ );
-            }
-
-            juce::Component::SafePointer<juce::Component> pComponent_;
-            int const x_;
-            int const y_;
-            int const w_;
-            int const h_;
-        };
-
-        new (std::nothrow) AsyncRepaintCallback( component, x, y, w, h );
-    }
-}
-#endif // 0
-
 DrawableText::DrawableText(char const *const text, unsigned int const x, unsigned int const y,
                            unsigned int const width, unsigned int const height,
                            juce::Justification const justification, juce::Font const &font)

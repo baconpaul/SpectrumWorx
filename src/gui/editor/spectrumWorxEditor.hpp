@@ -545,8 +545,6 @@ class SpectrumWorxEditor final : private SkinLifetime,
     void paint(juce::Graphics &) override;
     void parentHierarchyChanged() override;
 
-    LE_IMPLEMENT_ASYNC_REPAINT
-
   private: // JUCE ButtonListener overrides.
     void buttonClicked(juce::Button *) override;
 
@@ -740,7 +738,6 @@ class SpectrumWorxEditor final : private SkinLifetime,
                        private juce::Slider::Listener
     {
       public: //...mrmlj...
-        //class LE_NOVTABLE AsyncSlider : public WidgetBase<juce::Slider> { LE_IMPLEMENT_ASYNC_REPAINT };
         using AsyncSlider = juce::Slider;
         using LFO = LE::Parameters::LFOImpl;
 
@@ -789,8 +786,6 @@ class SpectrumWorxEditor final : private SkinLifetime,
 
         void buttonClicked(juce::Button *) override;
         void sliderValueChanged(juce::Slider *) noexcept override;
-
-        LE_IMPLEMENT_ASYNC_REPAINT
 
       private:
         void updateAllControls();

@@ -429,7 +429,6 @@ void Processor::processSingleChannel(ProcessParameters const &processParameters)
     } // while ( inputSamples )
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Processor::calculateWindowAndWOLAGain()
@@ -596,7 +595,7 @@ void LE_COLD Processor::calculateWindowAndWOLAGain()
     // Fill a temporary buffer with overlap-added copies of the window(s) to
     // determine the total gain and whether the COLA condition is (sufficiently)
     // satisfied (the gain variation is sufficiently small).
-    LE_ALIGNED_SCOPED_STACK_BUFFER(wolaBuffer, real_t, windowSize);
+    LE_ALIGNED_STACK_BUFFER(wolaBuffer, real_t, windowSize);
     Math::clear(wolaBuffer);
     /// \note LE_RESTRICT spelled out rather than carried in by
     /// DataRange::iterator: it is the declaration that makes the promise, and
@@ -836,7 +835,6 @@ LE_COLD void Processor::Channels::resize(StorageFactors const &factors, Storage 
         pNewChannelBuffers->reset(initialSilenceSamples);
     }
 }
-
 
 namespace
 {

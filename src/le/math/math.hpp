@@ -692,8 +692,11 @@ LE_FORCEINLINE float valueIfGreater(float const testValue, float const lowerBoun
                                     float const value)
 {
 #ifdef BOOST_SIMD_HAS_SSE_SUPPORT
-    __m128 const mask(LE_MSVC_SPECIFIC(_mm_cmpgt_ps) //...mrmlj...
-                      LE_GNU_SPECIFIC(_mm_cmpgt_ss)(_mm_set_ss(testValue), _mm_set_ss(lowerBound)));
+#ifdef __GNUC__
+    __m128 const mask(_mm_cmpgt_ss(_mm_set_ss(testValue), _mm_set_ss(lowerBound)));
+#else
+    __m128 const mask(_mm_cmpgt_ps(_mm_set_ss(testValue), _mm_set_ss(lowerBound))); //...mrmlj...
+#endif
     return _mm_cvtss_f32(_mm_and_ps(mask, _mm_set_ss(value)));
 #else
     auto const isGreater_(isGreater(testValue, lowerBound));

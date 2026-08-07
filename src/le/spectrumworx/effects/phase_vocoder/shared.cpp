@@ -120,7 +120,6 @@ void LE_NOINLINE PitchShifter::process(float const pitchScale, ChannelState &cha
     process(channelState, std::forward<Engine::ChannelData_AmPh>(data));
 }
 
-
 void LE_NOINLINE PitchShifter::process(ChannelState &channelState,
                                        Engine::ChannelData_AmPh &&data) const
 {
@@ -709,7 +708,12 @@ void zeroAbandonedBins(Engine::real_t *LE_RESTRICT pBin, Engine::real_t const *c
     }
 }
 
-static SynthesisChannelState LE_MSVC_SPECIFIC(const) dummySynthesisState;
+#ifdef __GNUC__
+static SynthesisChannelState dummySynthesisState; // const on MSVC only: GCC/Clang reject an
+                                                  // uninitialised const object
+#else
+static SynthesisChannelState const dummySynthesisState;
+#endif
 } // anonymous namespace
 #endif // LE_PV_USE_TSS
 
@@ -985,6 +989,5 @@ LE_HOT pitchShiftAndScale(Engine::ChannelData_AmPh &data,
     }
 #endif // LE_PV_USE_TSS
 }
-
 
 } // namespace LE::SW::Effects::PhaseVocoderShared

@@ -75,7 +75,7 @@ void SwappahImpl::swapBands(DataRange const &data) const
 {
     using namespace Math;
 
-    LE_ALIGNED_SCOPED_STACK_BUFFER(swapBuffer, Engine::real_t, data.size());
+    LE_ALIGNED_STACK_BUFFER(swapBuffer, Engine::real_t, data.size());
     copy(data, swapBuffer);
 
     std::uint16_t const numBins(static_cast<std::uint16_t>(data.size()));

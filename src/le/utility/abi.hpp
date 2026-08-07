@@ -30,10 +30,6 @@
 
 #define LE_RESTRICT __restrict
 
-// MSVC has no branch hints; the profile guided optimiser is the substitute.
-#define LE_LIKELY(expression) (expression)
-#define LE_UNLIKELY(expression) (expression)
-
 #elif defined(__GNUC__)
 
 #if __cplusplus < 201103L
@@ -41,9 +37,6 @@
 #endif // __cplusplus
 
 #define LE_RESTRICT __restrict__
-
-#define LE_LIKELY(expression) __builtin_expect(!!(expression), 1)
-#define LE_UNLIKELY(expression) __builtin_expect(!!(expression), 0)
 
 #else
 

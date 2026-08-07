@@ -113,10 +113,9 @@ template <class Parameters, class Functor> class StaticInvoker : public Functor
     template <class TypeIndex> result_type operator()(TypeIndex const &)
     {
         using Parameter = ParameterAt<Parameters, TypeIndex::value>;
-        /// \note Was LE_GNU_SPECIFIC( template ), which expands to nothing on
-        /// MSVC. Functor is a template parameter, so the keyword is required
-        /// rather than a GNU extension -- without it `<` parses as less-than and
-        /// the error surfaces at the call site rather than here.
+        /// \note Functor is a template parameter, so the `template` keyword is
+        /// required rather than a GNU extension -- without it `<` parses as
+        /// less-than and the error surfaces at the call site rather than here.
         ///                                   (30.07.2026.) (SW port)
         return Functor::template operator()<Parameter>();
     }

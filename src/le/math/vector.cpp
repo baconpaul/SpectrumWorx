@@ -73,7 +73,6 @@
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/span.hpp"
 
-
 // A nice list of profilers:
 // http://stackoverflow.com/questions/4394606/beyond-stack-sampling-c-profilers
 
@@ -1972,8 +1971,8 @@ float dB2NormalisedPower(float const dBValue)
 
 #endif // LE_MATH_SCALAR_NT2
 
-void addPolar(float const amp1, float const phase1, float &LE_GNU_SPECIFIC(__restrict) amp2,
-              float &LE_GNU_SPECIFIC(__restrict) phase2)
+void addPolar(float const amp1, float const phase1, float &LE_RESTRICT amp2,
+              float &LE_RESTRICT phase2)
 {
 #if LE_MATH_SCALAR_NT2
     float real1;
@@ -2005,4 +2004,3 @@ void addPolar(float const amp1, float const phase1, float &LE_GNU_SPECIFIC(__res
 }
 
 } // namespace LE::Math
-
