@@ -108,7 +108,7 @@ class LE_NOVTABLE ModuleKnob : public Knob, public ModuleControl<ModuleKnob>
     {
     }; // struct QuantizationFor
 
-    void setupForParameter(juce::Image const &imageStrip, Quantization quantizationType,
+    void setupForParameter(Artwork const &imageStrip, Quantization quantizationType,
                            std::uint8_t quantizationStep);
 
   private: // juce::Component overrides
@@ -140,7 +140,7 @@ class LE_NOVTABLE ModuleKnob : public Knob, public ModuleControl<ModuleKnob>
 
   private:
     Quantization quantization_;
-    juce::Image const *LE_RESTRICT pImageStrip_;
+    Artwork const *LE_RESTRICT pImageStrip_;
 
   private:
     static unsigned int const marginForGlow = 4;
@@ -506,8 +506,8 @@ struct WidgetInitialiser
     {
         knob.setupForParameter(
             std::is_base_of<LE::Parameters::SymmetricParameterTag, typename Parameter::Tag>::value
-                ? resourceBitmap<SymmetricKnobStrip>()
-                : resourceBitmap<ModuleKnobStrip>(),
+                ? resourceArtwork<SymmetricKnobStrip>()
+                : resourceArtwork<ModuleKnobStrip>(),
             ModuleKnob::QuantizationFor<Parameter>::value, Parameter::discreteValueDistance);
     }
 }; // struct WidgetInitialiser

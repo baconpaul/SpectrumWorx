@@ -15,6 +15,10 @@
 
 #include <cmrc/cmrc.hpp>
 
+// juce::Drawable, for the skin files that have been redrawn as vectors: it
+// lives in gui_basics rather than in graphics, which resources.hpp includes.
+#include <juce_gui_basics/juce_gui_basics.h>
+
 #include <array>
 #include <cstdio>
 //------------------------------------------------------------------------------
@@ -44,11 +48,92 @@ std::pair<char const *, std::size_t> embeddedFile(juce::String const &name)
     return {file.begin(), static_cast<std::size_t>(file.end() - file.begin())};
 }
 
-juce::Image decodeBitmap(unsigned int const number)
+/// \brief Draws one embedded SVG through a juce::Drawable.
+///
+/// \note The canvas is taken from the <svg> width/height, not from
+/// Drawable::getDrawableBounds(): a DrawableComposite computes that as the
+/// union of its children, which is the ink rather than the page. The two
+/// differ for every one of these buttons -- 09.svg's pill stops short of its
+/// own edges -- and sizing by the ink would crop the file and move every
+/// widget that lays itself out from image.getWidth(). JUCE's parser has
+/// already set the drawable's content area to the viewBox (juce_SVGParser.cpp,
+/// parseSVGElement), so drawing it at the origin lands where the file says.
+Artwork loadVector(char const *const data, std::size_t const size)
 {
-    // "01.png" ... "68.png": zero padded to two digits, as the files are named.
-    auto const name(juce::String(number).paddedLeft('0', 2) + ".png");
-    auto const [data, size](embeddedFile(name));
+    auto const svg(
+        juce::parseXML(juce::String::createStringFromData(data, static_cast<int>(size))));
+    if (svg == nullptr)
+    {
+        LE_ASSERT_MSG(false, "Malformed skin vector.");
+        return {};
+    }
+
+    auto drawable(juce::Drawable::createFromSVG(*svg));
+    if (drawable == nullptr)
+    {
+        LE_ASSERT_MSG(false, "Unrenderable skin vector.");
+        return {};
+    }
+
+    auto width(svg->getDoubleAttribute("width"));
+    auto height(svg->getDoubleAttribute("height"));
+    if ((width <= 0) || (height <= 0)) // width/height are optional; the viewBox is the fallback
+    {
+        auto const box(juce::StringArray::fromTokens(svg->getStringAttribute("viewBox"), " ,", {}));
+        if (box.size() == 4)
+        {
+            width = box[2].getDoubleValue();
+            height = box[3].getDoubleValue();
+        }
+    }
+    LE_ASSERT_MSG((width > 0) && (height > 0), "Skin vector has no size.");
+    if ((width <= 0) || (height <= 0))
+        return {};
+
+    return Artwork(std::move(drawable), juce::roundToInt(width), juce::roundToInt(height));
+}
+
+/// \brief One skin file: the vector if it has been redrawn, else the bitmap.
+///
+/// \note The conversion is file by file (assets/skin/08.svg and friends), so
+/// both forms are embedded and the vector wins where there is one. Reverting a
+/// conversion is deleting the .svg.
+Artwork loadArtwork(unsigned int const number)
+{
+    // "01" ... "68": zero padded to two digits, as the files are named.
+    auto const stem(juce::String(number).paddedLeft('0', 2));
+
+    if (auto const [vector, vectorSize](embeddedFile(stem + ".svg")); vector)
+    {
+        if (auto artwork(loadVector(vector, vectorSize)); artwork.isValid())
+        {
+#if !defined(NDEBUG)
+            ////////////////////////////////////////////////////////////////////
+            ///
+            /// \note A conversion has to keep its bitmap's canvas, because the
+            /// widgets lay themselves out from getWidth()/getHeight() and a
+            /// vector that comes back a different size moves controls around
+            /// the editor -- silently, and only on the screens nobody
+            /// screenshotted. Both forms are still embedded while the skin is
+            /// half converted, so the check is free to make and this is the one
+            /// place that has both. Debug only: it costs a PNG decode.
+            ///
+            ////////////////////////////////////////////////////////////////////
+            if (auto const [bitmap, bitmapSize](embeddedFile(stem + ".png")); bitmap)
+            {
+                juce::MemoryInputStream original(bitmap, bitmapSize, false);
+                auto const wasImage(juce::PNGImageFormat().decodeImage(original));
+                LE_ASSERT_MSG((wasImage.getWidth() == artwork.getWidth()) &&
+                                  (wasImage.getHeight() == artwork.getHeight()),
+                              "Skin vector does not have its bitmap's size.");
+            }
+#endif // NDEBUG
+            return artwork;
+        }
+        // a broken .svg has already asserted; fall through to the bitmap
+    }
+
+    auto const [data, size](embeddedFile(stem + ".png"));
     if (!data)
         return {}; // a gap in the numbering, not an error -- see the header
 
@@ -73,10 +158,10 @@ juce::Image decodeBitmap(unsigned int const number)
     /// what the artwork says and to what Windows has always drawn.
     ///                                       (28.07.2026.) (SW port)
 
-    return image;
+    return Artwork(image);
 }
 
-std::array<juce::Image, numberOfResourceBitmaps + 1> bitmapCache;
+std::array<Artwork, numberOfResourceBitmaps + 1> artworkCache;
 
 juce::Typeface::Ptr loadTypeface(juce::String const &name, juce::Typeface::Ptr &cache)
 {
@@ -94,22 +179,139 @@ juce::Typeface::Ptr regularTypefaceCache;
 juce::Typeface::Ptr boldTypefaceCache;
 } // anonymous namespace
 
-juce::Image const &resourceBitmap(unsigned int const number)
+Artwork::Artwork() = default;
+Artwork::Artwork(Artwork &&) noexcept = default;
+Artwork &Artwork::operator=(Artwork &&) noexcept = default;
+Artwork::~Artwork() = default;
+
+Artwork::Artwork(juce::Image image)
+    : image_(std::move(image)), width_(image_.getWidth()), height_(image_.getHeight())
+{
+}
+
+Artwork::Artwork(std::unique_ptr<juce::Drawable> drawable, int const width, int const height)
+    : drawable_(std::move(drawable)), width_(width), height_(height)
+{
+}
+
+bool Artwork::isValid() const { return (drawable_ != nullptr) || image_.isValid(); }
+bool Artwork::isVector() const { return drawable_ != nullptr; }
+
+void Artwork::draw(juce::Graphics &graphics, int const x, int const y, float const opacity,
+                   juce::Colour const overlay) const
+{
+    if (!isValid())
+        return;
+
+    //   The vector path, and the reason any of this exists: the Drawable is
+    // painted into the caller's context, so it is rasterised at whatever scale
+    // that context is really rendering at rather than at the 1x the skin was
+    // drawn for.
+    if (isVector() && overlay.isTransparent())
+    {
+        drawable_->draw(
+            graphics, opacity,
+            juce::AffineTransform::translation(static_cast<float>(x), static_cast<float>(y)));
+        return;
+    }
+
+    //   Tinting means filling the artwork's alpha with a colour, which needs
+    // the pixels. Three buttons ask for it, on mouse-over, and none of their
+    // files are vectors yet; if one becomes one this rasterises it at 1x,
+    // which is what it did before it was a vector at all.
+    auto const &pixels(image());
+    if (!pixels.isValid())
+        return;
+
+    auto const target(juce::Rectangle<int>(x, y, width_, height_).toFloat());
+    auto const placement(juce::RectanglePlacement(juce::RectanglePlacement::stretchToFit)
+                             .getTransformToFit(pixels.getBounds().toFloat(), target));
+
+    if (!overlay.isOpaque())
+    {
+        graphics.setOpacity(opacity);
+        graphics.drawImageTransformed(pixels, placement, false);
+    }
+    if (!overlay.isTransparent())
+    {
+        graphics.setColour(overlay);
+        graphics.drawImageTransformed(pixels, placement, true);
+    }
+}
+
+void Artwork::drawScaled(juce::Graphics &graphics, juce::Rectangle<int> const target,
+                         juce::Rectangle<int> const source, float const opacity) const
+{
+    if (!isValid() || target.isEmpty() || source.isEmpty())
+        return;
+
+    if (isVector())
+    {
+        juce::Graphics::ScopedSaveState const state(graphics);
+        graphics.reduceClipRegion(target);
+        auto const scaleX(static_cast<float>(target.getWidth()) /
+                          static_cast<float>(source.getWidth()));
+        auto const scaleY(static_cast<float>(target.getHeight()) /
+                          static_cast<float>(source.getHeight()));
+        drawable_->draw(
+            graphics, opacity,
+            juce::AffineTransform::translation(static_cast<float>(-source.getX()),
+                                               static_cast<float>(-source.getY()))
+                .scaled(scaleX, scaleY)
+                .translated(static_cast<float>(target.getX()), static_cast<float>(target.getY())));
+        return;
+    }
+
+    auto const &pixels(image());
+    if (!pixels.isValid())
+        return;
+    graphics.setOpacity(opacity);
+    graphics.drawImage(pixels, target.getX(), target.getY(), target.getWidth(), target.getHeight(),
+                       source.getX(), source.getY(), source.getWidth(), source.getHeight());
+}
+
+std::unique_ptr<juce::Drawable> Artwork::drawableCopy() const
+{
+    return (drawable_ != nullptr) ? drawable_->createCopy() : nullptr;
+}
+
+juce::Image const &Artwork::image() const
+{
+    if ((drawable_ != nullptr) && !image_.isValid() && (width_ > 0) && (height_ > 0))
+    {
+        image_ = juce::Image(juce::Image::ARGB, width_, height_, true);
+        juce::Graphics graphics(image_);
+        drawable_->draw(graphics, 1.0f);
+    }
+    return image_;
+}
+
+Artwork const &resourceArtwork(unsigned int const number)
 {
     LE_ASSERT(number <= numberOfResourceBitmaps);
-    static juce::Image const invalid;
+    static Artwork const invalid;
     if (number > numberOfResourceBitmaps)
         return invalid;
 
-    auto &cached(bitmapCache[number]);
+    auto &cached(artworkCache[number]);
     if (!cached.isValid())
-        cached = decodeBitmap(number);
+        cached = loadArtwork(number);
     return cached;
+}
+
+juce::Image const &resourceBitmap(unsigned int const number)
+{
+    return resourceArtwork(number).image();
 }
 
 bool hasResourceBitmap(unsigned int const number)
 {
-    return (number <= numberOfResourceBitmaps) && resourceBitmap(number).isValid();
+    return (number <= numberOfResourceBitmaps) && resourceArtwork(number).isValid();
+}
+
+bool resourceIsVector(unsigned int const number)
+{
+    return (number <= numberOfResourceBitmaps) && resourceArtwork(number).isVector();
 }
 
 juce::Typeface::Ptr regularTypeface() { return loadTypeface("Vera.ttf", regularTypefaceCache); }
@@ -117,8 +319,8 @@ juce::Typeface::Ptr boldTypeface() { return loadTypeface("VeraBd.ttf", boldTypef
 
 void releaseCachedResources()
 {
-    for (auto &image : bitmapCache)
-        image = juce::Image();
+    for (auto &artwork : artworkCache)
+        artwork = Artwork();
     regularTypefaceCache = nullptr;
     boldTypefaceCache = nullptr;
 }

@@ -27,7 +27,7 @@ std::optional<Theme> singleton_;
 
 /// \note The film-strip thumb is drawn at 5/3 while dragged, which is what the
 /// enlarge flag means. Lifted unchanged from gui.cpp.
-void paintSliderThumb(juce::Graphics &graphics, juce::Image const &image, float const position,
+void paintSliderThumb(juce::Graphics &graphics, Artwork const &image, float const position,
                       int const sliderVerticalPosition, int const sliderHeight, bool const enlarge)
 {
     auto const thumbWidth(image.getWidth());
@@ -40,8 +40,9 @@ void paintSliderThumb(juce::Graphics &graphics, juce::Image const &image, float 
     auto const verticalPosition(sliderVerticalPosition + (sliderHeight / 2) -
                                 (scaledThumbHeight / 2));
 
-    graphics.drawImage(image, horizontalPosition, verticalPosition, scaledThumbWidth,
-                       scaledThumbHeight, 0, 0, thumbWidth, thumbHeight);
+    image.drawScaled(graphics,
+                     {horizontalPosition, verticalPosition, scaledThumbWidth, scaledThumbHeight},
+                     {0, 0, thumbWidth, thumbHeight});
 }
 } // anonymous namespace
 
@@ -187,7 +188,7 @@ void Theme::drawLinearSliderThumb(juce::Graphics &graphics, int const /*x*/, int
                                   float const minSliderPos, float const maxSliderPos,
                                   juce::Slider::SliderStyle const style, juce::Slider &slider)
 {
-    auto const &thumb(resourceBitmap<LFOSliderThumb>());
+    auto const &thumb(resourceArtwork<LFOSliderThumb>());
 
     auto const activeThumb(selectedOrDraggedThumb(slider));
 
@@ -210,7 +211,7 @@ void Theme::drawLinearSliderThumb(juce::Graphics &graphics, int const /*x*/, int
 
 int Theme::getSliderThumbRadius(juce::Slider &)
 {
-    return resourceBitmap<LFOSliderThumb>().getWidth() / 2;
+    return resourceArtwork<LFOSliderThumb>().getWidth() / 2;
 }
 
 void Theme::createSingleton() { singleton_.emplace(); }

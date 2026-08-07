@@ -30,6 +30,7 @@
 #include "le/parameters/lfoImpl.hpp"
 #include "presets/presetHarness.hpp"
 #include "gui/editor/spectrumWorxEditor.hpp"
+#include "gui/editor/zoomedEditor.hpp"
 #include "le/spectrumworx/presetStorage.hpp"
 
 #include <clap/clap.h>
@@ -1319,16 +1320,31 @@ TEST_CASE("Opening a panel asks the host for a wider window", "[clap][gui]")
     REQUIRE(host.resizeRequests.empty());
     REQUIRE(editor->getWidth() == Editor::estimatedWidth);
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Two units, deliberately. The editor lays itself out in skin pixels
+    /// and asks in them -- it does not know it is being drawn zoomed -- and
+    /// SpectrumWorxCLAP scales on the way out, because a size crossing into the
+    /// host is in window units. So `getWidth()` below is the skin's number and
+    /// what the host was told is that number through ZoomedEditor::scaled().
+    /// The editor this case builds is bare, at 1:1, which is the point: the
+    /// zoom is the wrapper's and the editor is the same either way.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    using Zoomed = LE::SW::GUI::ZoomedEditor;
+
     editor->showPresetBrowser(true);
     REQUIRE(host.resizeRequests.size() == 1);
     CHECK(host.resizeRequests.back() ==
-          std::pair<std::uint32_t, std::uint32_t>{Editor::expandedWidth, Editor::estimatedHeight});
+          std::pair<std::uint32_t, std::uint32_t>{Zoomed::scaled(Editor::expandedWidth),
+                                                  Zoomed::scaled(Editor::estimatedHeight)});
     CHECK(editor->getWidth() == Editor::expandedWidth);
 
     editor->showPresetBrowser(false);
     REQUIRE(host.resizeRequests.size() == 2);
     CHECK(host.resizeRequests.back() ==
-          std::pair<std::uint32_t, std::uint32_t>{Editor::estimatedWidth, Editor::estimatedHeight});
+          std::pair<std::uint32_t, std::uint32_t>{Zoomed::scaled(Editor::estimatedWidth),
+                                                  Zoomed::scaled(Editor::estimatedHeight)});
     CHECK(editor->getWidth() == Editor::estimatedWidth);
 
     editor.reset();

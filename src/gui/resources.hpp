@@ -23,8 +23,94 @@
 //------------------------------------------------------------------------------
 #include <juce_graphics/juce_graphics.h>
 
+#include <memory>
+
+namespace juce
+{
+class Drawable;
+}
+
 namespace LE::SW::GUI
 {
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \class Artwork
+///
+////////////////////////////////////////////////////////////////////////////////
+
+/// \brief One piece of skin artwork: a vector where the skin has been redrawn,
+/// a bitmap where it has not.
+///
+///   A file that exists as `NN.svg` is kept as a juce::Drawable and painted
+/// into whatever juce::Graphics it is given, so it comes out at that context's
+/// resolution -- crisp on a 2x display, and crisp again if the editor ever
+/// scales. A file that is still `NN.png` is a juce::Image and draws exactly as
+/// it always did. Both report getWidth()/getHeight() in skin coordinates, so
+/// nothing about layout depends on which one a number turned out to be.
+///
+/// \note image() rasterises a vector on demand rather than refusing, so a call
+/// site that has not been moved off juce::Image keeps working the moment its
+/// artwork is converted. That is what makes the two migrations -- redrawing a
+/// file, and teaching its widget to hold an Artwork -- independent of each
+/// other. It is also the thing to grep for when a converted button still looks
+/// soft: it means the widget is asking for a bitmap.
+class Artwork
+{
+  public:
+    Artwork();
+    explicit Artwork(juce::Image);
+    Artwork(std::unique_ptr<juce::Drawable>, int width, int height);
+    Artwork(Artwork &&) noexcept;
+    Artwork &operator=(Artwork &&) noexcept;
+    ~Artwork();
+
+    Artwork(Artwork const &) = delete;
+    Artwork &operator=(Artwork const &) = delete;
+
+    bool isValid() const;
+    bool isVector() const;
+
+    int getWidth() const { return width_; }
+    int getHeight() const { return height_; }
+
+    /// \brief Paints at (x, y) at the artwork's own size.
+    ///
+    /// \param overlay a colour to tint the artwork's alpha with, as
+    /// juce::LookAndFeel_V2::drawImageButton does for a moused-over
+    /// ImageButton. Transparent -- which is every case but three -- keeps a
+    /// vector on the vector path; a real tint needs the pixels, so it
+    /// rasterises, which is no worse than the bitmap it replaced.
+    void draw(juce::Graphics &, int x, int y, float opacity = 1.0f,
+              juce::Colour overlay = juce::Colour()) const;
+
+    /// \brief Draws the \p source region of the artwork into \p target.
+    ///
+    ///   Two callers, both of which need a part of the artwork rather than all
+    /// of it: a knob film strip takes one frame's band out of a tall sheet, and
+    /// a slider thumb is drawn at 5/3 while dragged. A vector gets a clip and a
+    /// transform, so it still resolves at the target's size rather than the
+    /// source's -- which is the point for the enlarged thumb.
+    void drawScaled(juce::Graphics &, juce::Rectangle<int> target, juce::Rectangle<int> source,
+                    float opacity = 1.0f) const;
+
+    /// The bitmap; a vector is rasterised at its own size on first ask.
+    juce::Image const &image() const;
+
+    /// \brief A copy of the drawable, or null for a bitmap.
+    ///
+    /// \note For juce::PopupMenu, whose icon overloads take either a
+    /// juce::Image or ownership of a juce::Drawable. Handing it the latter is
+    /// what keeps a menu icon sharp -- and JUCE wants its own, so this cannot
+    /// be a reference to ours.
+    std::unique_ptr<juce::Drawable> drawableCopy() const;
+
+  private:
+    std::unique_ptr<juce::Drawable> drawable_;
+    mutable juce::Image image_;
+    int width_ = 0;
+    int height_ = 0;
+}; // class Artwork
 
 /// \brief Widget name to skin file number, the single source of truth.
 ///
@@ -138,7 +224,30 @@ unsigned int constexpr numberOfResourceBitmaps = 68;
 /// a better place for it than every call.
 juce::Image const &resourceBitmap(unsigned int number);
 
+/// \brief The same artwork, in the form that can still be a vector.
+///
+/// \note Prefer this to resourceBitmap() in new code and when touching old:
+/// it is what lets a converted file reach the screen as one. The reference
+/// stays valid until releaseCachedResources(), same as resourceBitmap()'s.
+Artwork const &resourceArtwork(unsigned int number);
+
+template <unsigned int bitmapID> Artwork const &resourceArtwork()
+{
+    return resourceArtwork(bitmapID);
+}
+
 bool hasResourceBitmap(unsigned int number);
+
+/// \brief Whether this number is served by a vector file rather than by its
+/// bitmap.
+///
+/// \note The skin is being redrawn as SVG a few files at a time and both forms
+/// are embedded, so which one a number resolves to is otherwise invisible from
+/// out here -- a converted button and its bitmap are the same size and, at 1x,
+/// very nearly the same pixels. Without this, a glob that quietly stopped
+/// picking up assets/skin/*.svg would leave every test passing against the
+/// artwork it was supposed to have replaced.
+bool resourceIsVector(unsigned int number);
 
 template <unsigned int bitmapID> juce::Image const &resourceBitmap()
 {

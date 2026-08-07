@@ -42,14 +42,14 @@ unsigned int const presetExtensionLength = _countof(presetExtension) - 1;
 #pragma warning(disable : 4355) // 'this' used in base member initializer list.
 
 PresetBrowser::PresetBrowser()
-    : BackgroundImage(resourceBitmap<PresetBackground>()),
-      save_(*this, resourceBitmap<PresetSaveDown>(), resourceBitmap<PresetSaveUp>(),
+    : BackgroundImage(resourceArtwork<PresetBackground>()),
+      save_(*this, resourceArtwork<PresetSaveDown>(), resourceArtwork<PresetSaveUp>(),
             juce::Colours::transparentWhite, false),
-      saveAs_(*this, resourceBitmap<PresetSaveAsDown>(), resourceBitmap<PresetSaveAsUp>(),
+      saveAs_(*this, resourceArtwork<PresetSaveAsDown>(), resourceArtwork<PresetSaveAsUp>(),
               juce::Colours::transparentWhite, false),
-      delete_(*this, resourceBitmap<PresetDeleteDown>(), resourceBitmap<PresetDeleteUp>(),
+      delete_(*this, resourceArtwork<PresetDeleteDown>(), resourceArtwork<PresetDeleteUp>(),
               juce::Colours::transparentWhite, false),
-      browseArrow_(*this, resourceBitmap<ChangeWaveform>(), resourceBitmap<ChangeWaveform>(),
+      browseArrow_(*this, resourceArtwork<ChangeWaveform>(), resourceArtwork<ChangeWaveform>(),
                    juce::Colours::white.withAlpha(0.5f), false),
       ignoreExternalSamples_(*this, 15, 58, "Ignore external audio"), ignoreSelectionChange_(false),
       addOneRow_(false), newPresetPending_(false), dirtyCommentPresetIndex_(-1)

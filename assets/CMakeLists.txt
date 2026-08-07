@@ -29,8 +29,14 @@ include(CmakeRC)
 # CONFIGURE_DEPENDS so that adding a skin bitmap or a factory preset does not
 # also mean editing this file. The sets are small and change rarely; the
 # reconfigure cost is noise.
+#
+# \note Both *.png and *.svg, deliberately. The skin is being redrawn as
+# vectors a few files at a time, and resources.cpp prefers "NN.svg" over
+# "NN.png" wherever both are present -- so a converted button is one added file
+# rather than a deleted one, and reverting a conversion is deleting the .svg.
 file(GLOB SW_SKIN_FILES CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/skin/*.png"
+        "${CMAKE_CURRENT_SOURCE_DIR}/skin/*.svg"
         "${CMAKE_CURRENT_SOURCE_DIR}/skin/*.ttf"
 )
 

@@ -34,7 +34,7 @@ ModuleLEDTextButton::ModuleLEDTextButton(juce::Component &parent, unsigned int c
 {
     setName(control().name());
     //...mrmlj...for temporary test selection...
-    setSize(resourceBitmap<ModuleComboOn>().getWidth(), getHeight() + 2);
+    setSize(resourceArtwork<ModuleComboOn>().getWidth(), getHeight() + 2);
 }
 
 void ModuleLEDTextButton::clicked() { moduleParameterChanged(); }
@@ -55,13 +55,13 @@ void ModuleLEDTextButton::paintButton(juce::Graphics &g, bool const isMouseOverB
                                       bool const isButtonDown)
 {
     if (hasDirectFocus())
-        paintImage(g, resourceBitmap<ModuleComboOn>(), 0, -1);
+        paintImage(g, resourceArtwork<ModuleComboOn>(), 0, -1);
     g.setOrigin(3, 1);
     LEDTextButton::paintButton(g, isMouseOverButton, isButtonDown);
 }
 
 TriggerButton::TriggerButton(juce::Component &parent, unsigned int const x, unsigned int const y)
-    : BitmapButton(parent, resourceBitmap<TriggerBtnOn>(), resourceBitmap<TriggerBtnOff>(),
+    : BitmapButton(parent, resourceArtwork<TriggerBtnOn>(), resourceArtwork<TriggerBtnOff>(),
                    juce::Colours::transparentWhite, false)
 {
     setName(control().name());
@@ -105,13 +105,13 @@ void TriggerButton::paintButton(juce::Graphics &graphics, bool const isMouseOver
 {
     unsigned int const imageWidth(51);
     unsigned int const imageHeight(51);
-    LE_ASSERT(getCurrentImage().getWidth() == imageWidth);
-    LE_ASSERT(getCurrentImage().getHeight() == imageHeight);
+    LE_ASSERT(currentArtwork().getWidth() == imageWidth);
+    LE_ASSERT(currentArtwork().getHeight() == imageHeight);
     Detail::paintTextButton(*this, graphics, 0, imageHeight + 2, (ModuleUI::width - imageWidth) / 2,
                             0, isMouseOverButton, isButtonDown);
     if (this->hasDirectFocus())
     {
-        paintImage(graphics, resourceBitmap<ModuleKnobSelected>(),
+        paintImage(graphics, resourceArtwork<ModuleKnobSelected>(),
                    (ModuleUI::width - imageWidth) / 2 - 1, -1);
     }
 }
@@ -127,8 +127,7 @@ ModuleKnob::ModuleKnob(juce::Component &parent, unsigned int const x, unsigned i
     setScrollWheelEnabled(false);
 }
 
-void ModuleKnob::setupForParameter(juce::Image const &imageStrip,
-                                   Quantization const quantizationType,
+void ModuleKnob::setupForParameter(Artwork const &imageStrip, Quantization const quantizationType,
                                    std::uint8_t const quantizationStep)
 {
     auto const &info(control().info());
@@ -181,11 +180,11 @@ void ModuleKnob::paint(juce::Graphics &graphics)
     if (!control().isLFOEnabled() || shouldUpdateLFOControl(control()))
         Knob::paintFilmStrip(*pImageStrip_, marginForGlow, marginForGlow, graphics);
     else
-        paintImage(graphics, resourceBitmap<ModuleKnobLFOed>(), marginForGlow, marginForGlow);
+        paintImage(graphics, resourceArtwork<ModuleKnobLFOed>(), marginForGlow, marginForGlow);
     if (this->hasDirectFocus())
     {
-        juce::Image const &selection(imageWidth < 51 ? resourceBitmap<SmallModuleKnobSelected>()
-                                                     : resourceBitmap<ModuleKnobSelected>());
+        Artwork const &selection(imageWidth < 51 ? resourceArtwork<SmallModuleKnobSelected>()
+                                                 : resourceArtwork<ModuleKnobSelected>());
         LE_ASSERT(selection.getWidth() == selection.getHeight());
         LE_ASSERT(unsigned(selection.getWidth()) == imageWidth + 2);
         unsigned int const selectionWidth(imageWidth + 2);
@@ -283,7 +282,7 @@ unsigned int const ModuleKnob::spaceForText /* = 18*/;
 
 DiscreteParameter::DiscreteParameter(juce::Component &parent, unsigned int const x,
                                      unsigned int const y)
-    : ComboBox(parent, resourceBitmap<ModuleCombo>(), resourceBitmap<ModuleComboOn>())
+    : ComboBox(parent, resourceArtwork<ModuleCombo>(), resourceArtwork<ModuleComboOn>())
 {
     setName(control().name());
     DiscreteParameter::setTopLeftPosition(x, y);
@@ -318,25 +317,25 @@ void DiscreteParameter::focusChanged() { repaint(); }
 ModuleUI::ModuleUI(SpectrumWorxEditor &editor, LE::Utility::IntrusivePtr<SW::Module> pModule,
                    std::uint8_t const slotIndex)
     : editor_(editor), pModule_(std::move(pModule)),
-      bypass_(*this, resourceBitmap<ModuleMuted>(), resourceBitmap<ModuleOn>()),
-      eject_(*this, resourceBitmap<Eject>(), resourceBitmap<Eject>(),
+      bypass_(*this, resourceArtwork<ModuleMuted>(), resourceArtwork<ModuleOn>()),
+      eject_(*this, resourceArtwork<Eject>(), resourceArtwork<Eject>(),
              juce::Colours::darkgrey.withAlpha(0.4f))
 {
     LE_ASSERT(isThisTheGUIThread() ||
               juce::MessageManager::getInstance()->currentThreadHasLockedMessageManager());
     LE_ASSERT(pModule_);
 
-    LE_ASSERT(resourceBitmap<ModuleBgSelected>().getWidth() ==
-              resourceBitmap<ModuleBg>().getWidth());
-    LE_ASSERT(resourceBitmap<ModuleBgSelected>().getHeight() ==
-              resourceBitmap<ModuleBg>().getHeight());
-    LE_ASSERT(resourceBitmap<ModuleBgSelected>().getWidth() == width);
-    LE_ASSERT(resourceBitmap<ModuleBgSelected>().getHeight() == height);
+    LE_ASSERT(resourceArtwork<ModuleBgSelected>().getWidth() ==
+              resourceArtwork<ModuleBg>().getWidth());
+    LE_ASSERT(resourceArtwork<ModuleBgSelected>().getHeight() ==
+              resourceArtwork<ModuleBg>().getHeight());
+    LE_ASSERT(resourceArtwork<ModuleBgSelected>().getWidth() == width);
+    LE_ASSERT(resourceArtwork<ModuleBgSelected>().getHeight() == height);
 
     setSize(width, height);
 
     bypass_.setTopLeftPosition((ModuleUI::width / 2) - (bypass_.getWidth() / 2),
-                               ModuleUI::height - 26 - resourceBitmap<ModuleOn>().getHeight());
+                               ModuleUI::height - 26 - resourceArtwork<ModuleOn>().getHeight());
 
     eject_.setTopLeftPosition((ModuleUI::width - eject_.getWidth()) / 2, -3);
 
@@ -455,7 +454,7 @@ void ModuleUI::paint(juce::Graphics &graphics)
     bool const isActive(selected());
     graphics.setOpacity(isActive ? 1.0f : 0.5f);
     paintImage(graphics,
-               isActive ? resourceBitmap<ModuleBgSelected>() : resourceBitmap<ModuleBg>());
+               isActive ? resourceArtwork<ModuleBgSelected>() : resourceArtwork<ModuleBg>());
     graphics.setColour(Theme::singleton().blueColour());
     graphics.drawHorizontalLine(height - 30, static_cast<float>(ModuleUI::border),
                                 Math::convert<float>(getWidth() - ModuleUI::border));
@@ -742,7 +741,7 @@ ModuleWidgetHolder<ModuleKnob>::ModuleWidgetHolder(ModuleWidgetConstructionState
 {
     state.yOffset += widget.getHeight();
     //...mrmlj...
-    LE_ASSERT(resourceBitmap<ModuleKnobStrip>().getWidth() == 51);
+    LE_ASSERT(resourceArtwork<ModuleKnobStrip>().getWidth() == 51);
     state.yOffset += 51;
 }
 

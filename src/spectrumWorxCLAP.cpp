@@ -10,6 +10,7 @@
 //------------------------------------------------------------------------------
 #include "spectrumWorxCLAP.hpp"
 #include "gui/editor/spectrumWorxEditor.hpp"
+#include "gui/editor/zoomedEditor.hpp"
 
 #include "core/modules/factory.hpp"
 // \note Order matters and is not alphabetical: finalImplementations.hpp defines
@@ -1683,9 +1684,13 @@ DawExtraState SpectrumWorxCLAP::sessionState() const
 /// \note The shim owns what this returns and destroys it before this plugin.
 /// The editor registers and deregisters itself through EditorHost, which is why
 /// this does not have to wrap it -- SpectrumWorxEditor is final anyway.
+/// \note Wrapped, so the plugin shows the editor scaled: the editor lays itself
+/// out in skin pixels and ZoomedEditor is what carries the transform and what
+/// answers for size. Anything that wants 1:1 -- the test harness does --
+/// constructs a SpectrumWorxEditor and skips the wrapper.
 std::unique_ptr<juce::Component> SpectrumWorxCLAP::createEditor()
 {
-    return std::make_unique<GUI::SpectrumWorxEditor>(*this);
+    return std::make_unique<GUI::ZoomedEditor>(std::make_unique<GUI::SpectrumWorxEditor>(*this));
 }
 
 void SpectrumWorxCLAP::editorOpened(GUI::SpectrumWorxEditor &editor) { pEditor_ = &editor; }
@@ -1721,8 +1726,12 @@ bool SpectrumWorxCLAP::requestEditorSize(int const width, int const height)
     if (!_host.canUseGui())
         return false;
 
-    auto const requestedWidth(static_cast<std::uint32_t>(width));
-    auto const requestedHeight(static_cast<std::uint32_t>(height));
+    ///   Scaled, because the editor asks in skin pixels -- it does not know it
+    /// is being drawn zoomed -- and every size crossing this boundary is in the
+    /// host's window units. The same factor ZoomedEditor uses, or the window
+    /// and the column it was opened for disagree by exactly the zoom.
+    auto const requestedWidth(static_cast<std::uint32_t>(GUI::ZoomedEditor::scaled(width)));
+    auto const requestedHeight(static_cast<std::uint32_t>(GUI::ZoomedEditor::scaled(height)));
     if (!_host.guiRequestResize(requestedWidth, requestedHeight))
         return false;
 
