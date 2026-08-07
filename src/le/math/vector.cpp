@@ -1839,10 +1839,8 @@ void interleave(float const *LE_RESTRICT const *LE_RESTRICT const pInputs,
 #endif // LE_MATH_USE_NT2
 
     default:
-        LE_DISABLE_LOOP_UNROLLING()
         for (; element < numberOfElements; ++element)
         {
-            LE_DISABLE_LOOP_UNROLLING()
             for (std::uint8_t channel(0); channel < numberOfChannels; ++channel)
             {
                 *pOutput++ = pInputs[channel][element];
@@ -1880,10 +1878,8 @@ void deinterleave(float const *LE_RESTRICT pInput,
 #endif // LE_MATH_USE_NT2
 
     default:
-        LE_DISABLE_LOOP_UNROLLING()
         for (; element < numberOfElements; ++element)
         {
-            LE_DISABLE_LOOP_UNROLLING()
             for (std::uint8_t channel(0); channel < numberOfChannels; ++channel)
             {
                 pOutputs[channel][element] = *pInput++;

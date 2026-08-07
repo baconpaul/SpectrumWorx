@@ -33,10 +33,6 @@
     LE_ASSERT_MSG(false, "This code should not be reached.");                                      \
     __assume(false)
 
-// https://msdn.microsoft.com/en-us/library/hh923901.aspx
-#define LE_DISABLE_LOOP_VECTORIZATION() __pragma(loop(no_vector))
-#define LE_DISABLE_LOOP_UNROLLING()
-
 #elif defined(__GNUC__)
 
 #define LE_ALIGN(alignment) __attribute__((aligned(alignment)))
@@ -74,10 +70,14 @@
 /// the FFT backend it is meant to be measuring.
 ///                                       (29.07.2026.) (SW port)
 
-// http://llvm.org/docs/Vectorizers.html#pragma-loop-hint-directives
-#define LE_DISABLE_LOOP_VECTORIZATION()                                                            \
-    _Pragma("clang loop vectorize( disable ) interleave( disable )")
-#define LE_DISABLE_LOOP_UNROLLING() _Pragma("clang loop unroll( disable )")
+/// \note LE_DISABLE_LOOP_UNROLLING and LE_DISABLE_LOOP_VECTORIZATION stood here
+/// over 21 loops. Unlike the rest of this file's portability layer these were
+/// live on Clang -- `clang loop unroll(disable)` and
+/// `vectorize(disable) interleave(disable)` -- so removing them let the
+/// vectoriser into loops it had been kept out of since 2013. The goldens are
+/// bit-identical across it, which is what says the exclusions were a size and
+/// compile-time preference rather than a numerical one.
+///                                       (07.08.2026.) (SW port)
 
 #else
 

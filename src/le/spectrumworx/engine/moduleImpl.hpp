@@ -281,8 +281,6 @@ struct MakeChannelStateHolder
         LE_FORCEINLINE void callReset()
         {
 #ifndef _MSC_VER
-            LE_DISABLE_LOOP_UNROLLING()
-            LE_DISABLE_LOOP_VECTORIZATION()
 #endif // _MSC_VER
             for (auto &channelState : channelStates_)
                 channelState.reset();
@@ -305,8 +303,6 @@ struct MakeChannelStateHolder
                                   reinterpret_cast<ChannelState *>(pChannelStatesEnd));
             LE_ASSERT(unsigned(channelStates_.size()) == factors.numberOfChannels);
 #ifndef _MSC_VER
-            LE_DISABLE_LOOP_UNROLLING()
-            LE_DISABLE_LOOP_VECTORIZATION()
 #endif // _MSC_VER
             for (auto &channelState : channelStates_)
             {
