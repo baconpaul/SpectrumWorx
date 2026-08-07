@@ -37,6 +37,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cstring>
+#include <new>
 #include <vector>
 //------------------------------------------------------------------------------
 namespace
@@ -111,6 +113,38 @@ std::vector<std::vector<float>> makeInput()
     return input;
 }
 } // anonymous namespace
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Constructed over deliberately dirtied storage, because that is the only
+/// way to fail deterministically. Program has no constructor, so the question is
+/// whether its members carry default member initialisers; a plain
+/// `std::array<char, 24> name_;` is default-initialised and its bytes are
+/// whatever was in the memory. On a first instance in a fresh process that is
+/// almost always a zeroed page, which is why the symptom -- a garbage name in
+/// the editor's Save-As field -- was reported once and then would not
+/// reproduce.
+///
+///   Only a preset load writes this array, so every instance that has not
+/// loaded one depends on the initialiser. Nothing here reads uninitialised
+/// memory: the placement-new default-initialises, and reading a char array that
+/// the initialiser was supposed to have zeroed is exactly the thing under test.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A program that has loaded no preset has an empty name", "[core][program]")
+{
+    alignas(LE::SW::Program) std::byte storage[sizeof(LE::SW::Program)];
+    std::memset(storage, 0x5A, sizeof(storage));
+
+    auto *const pProgram(new (static_cast<void *>(storage)) LE::SW::Program);
+
+    CHECK(pProgram->name().front() == '\0');
+    CHECK(std::all_of(pProgram->name().begin(), pProgram->name().end(),
+                      [](char const character) { return character == '\0'; }));
+
+    pProgram->~Program();
+}
 
 TEST_CASE("Who may mutate the engine follows from whether anything is processing",
           "[core][ownership]")

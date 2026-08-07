@@ -161,7 +161,21 @@ class Program
   private:
     ModuleChain moduleChain_;
     Parameters parameters_;
-    Name name_;
+
+    /// \note Value-initialised, and it matters. Program has no constructor, so a
+    /// plain `Name name_;` default-initialises -- which for a std::array<char>
+    /// leaves all 24 bytes indeterminate. A preset load is the only thing that
+    /// ever writes it (copyPresetName, from presetLoading.cpp and
+    /// presetFile.hpp), so on an instance that has not loaded one
+    /// `SpectrumWorxEditor::currentProgramName()` returned 24 indeterminate
+    /// bytes with no guarantee of a terminator anywhere in them -- and the
+    /// preset browser hands that straight to juce::String for the Save-As field.
+    ///
+    ///   It reads empty far more often than not, which is what made it a ghost:
+    /// a first instance in a fresh process gets zeroed pages from the OS, and
+    /// one created after the process has churned memory does not.
+    ///                                       (07.08.2026.) (SW port)
+    Name name_{};
 }; // class Program
 
 } // namespace LE::SW
