@@ -136,9 +136,7 @@ template <typename T = real_t> class WindowBuffer : public Utility::SharedStorag
   public:
     LE_COLD static std::uint32_t requiredStorage(StorageFactors const &factors)
     {
-        std::uint8_t const windowSizeFactor(1);
-        auto const storageBytes(
-            Engine::Detail::fftBufferSize(windowSizeFactor, 1, 0, sizeof(T), factors.fftSize));
+        auto const storageBytes(Engine::Detail::fftBufferSize(1, 1, 0, sizeof(T), factors.fftSize));
         return storageBytes;
     }
     LE_COLD void resize(Engine::StorageFactors const &factors, Storage &storage)

@@ -180,10 +180,10 @@ float Setup::stepTime() const { return stepSize<float>() / sampleRate<float>(); 
 /// \brief Calculate processing latency, required for latency compensating (PDC
 /// - Plugin Delay Compensation) hosts.
 ///
-/// This is in effect equivalent to the window size (frame size * window size
-/// factor). Overlap factor/step size has no influence on this value because
-/// each sample has to "pass through" the entire FFT buffer before appearing at
-/// the output regardless of window overlapping.
+/// This is in effect equivalent to the window/frame size. Overlap factor/step
+/// size has no influence on this value because each sample has to "pass
+/// through" the entire FFT buffer before appearing at the output regardless of
+/// window overlapping.
 ///
 /// http://www.mathworks.com/help/dsp/ref/overlapaddfftfilter.html
 /// http://dsp.stackexchange.com/questions/2537/do-fft-based-filtering-methods-add-intrinsic-latency-to-a-real-time-algorithm
@@ -192,13 +192,10 @@ float Setup::stepTime() const { return stepSize<float>() / sampleRate<float>(); 
 
 std::uint16_t Setup::latencyInSamples() const
 {
-    return static_cast<std::uint16_t>(frameSize<unsigned int>() * windowSizeFactor());
+    return static_cast<std::uint16_t>(frameSize<unsigned int>());
 }
 
-float Setup::latencyInMilliseconds() const
-{
-    return frameTime() * Math::convert<float>(windowSizeFactor()) * 1000;
-}
+float Setup::latencyInMilliseconds() const { return frameTime() * 1000; }
 
 void Setup::setWindowFunction(Window const window)
 {

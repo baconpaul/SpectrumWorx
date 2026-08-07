@@ -296,7 +296,6 @@ void Processor::process /// \throws nothing
 void Processor::processSingleChannel(ProcessParameters const &processParameters) /// \throws nothing
 {
     auto const stepSize(engineSetup().stepSize<std::uint16_t>());
-    auto const windowSizeFactor(engineSetup().windowSizeFactor());
     auto const windowSize(engineSetup().windowSize<std::uint16_t>());
     LE_ASSERT(windowSize == static_cast<std::uint16_t>(analysisWindow().size()));
 
@@ -367,8 +366,7 @@ void Processor::processSingleChannel(ProcessParameters const &processParameters)
             // merged into one: input data is copied into the destination
             // buffer, windowed and then the FFT is performed.
             //                                (11.02.2010.) (Domagoj Saric)
-            channelBuffers.setCurrentDataToChannelData(useSideChannel, fft_, analysisWindow(),
-                                                       windowSizeFactor);
+            channelBuffers.setCurrentDataToChannelData(useSideChannel, fft_, analysisWindow());
 
             // The processing phase:
             {
@@ -383,8 +381,8 @@ void Processor::processSingleChannel(ProcessParameters const &processParameters)
             // The IFFT+Window+Overlap-Add phase:
             //  Get the time-domain results, window them and add with/to the
             // output FIFO buffer at the current position.
-            float *const pOutput(channelBuffers.putNewTimeDomainDataToOutput(
-                fft_, synthesisWindow(), windowSizeFactor));
+            float *const pOutput(
+                channelBuffers.putNewTimeDomainDataToOutput(fft_, synthesisWindow()));
 
             // Scale the results to:
             // - apply the user selected post/output gain
@@ -457,27 +455,6 @@ LE_OPTIMIZE_FOR_SIZE_BEGIN()
 //  http://dev.vinux-project.org/time-aliased-hann
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace
-{
-LE_COLD void sincWindow(float *LE_RESTRICT const pWindow, std::uint16_t const halfWindowSize,
-                        std::uint16_t const sincPeriod)
-{
-    double const period(Math::Constants::pi_d / Math::convert<double>(sincPeriod));
-    double const half(Math::convert<double>(halfWindowSize));
-
-    float *LE_RESTRICT pWindowRight(&pWindow[halfWindowSize + 1]);
-    float *LE_RESTRICT pWindowLeft(pWindowRight - 2);
-
-    for (double i(1); i < half; ++i)
-    {
-        double const x(i * period);
-        float const sinc(static_cast<float>(std::sin(x) / x));
-        *pWindowRight++ *= sinc;
-        *pWindowLeft-- *= sinc;
-    }
-}
-} // anonymous namespace
-
 void LE_COLD Processor::calculateWindowAndWOLAGain()
 {
     auto const windowSize(engineSetup().windowSize<std::uint16_t>());
@@ -511,10 +488,10 @@ void LE_COLD Processor::calculateWindowAndWOLAGain()
     /// handling for windows that don't work well with the default approach.
     ///                                       (25.04.2012.) (Domagoj Saric)
 
-    /// \todo Power complementary windows do not actually need two windows (when
-    /// window presumming is not used). Refactor the relevant code so that it
-    /// does not allocate and initialise the (duplicated) synthesis window
-    /// (rather it should simply alias the analysis window).
+    /// \todo Power complementary windows do not actually need two windows.
+    /// Refactor the relevant code so that it does not allocate and initialise
+    /// the (duplicated) synthesis window (rather it should simply alias the
+    /// analysis window).
     ///                                       (25.04.2012.) (Domagoj Saric)
     /// \note As a quick-workaround/optimisation we make the synthesis window
     /// alias the analysis window when possible to improve locality of reference
@@ -551,7 +528,7 @@ void LE_COLD Processor::calculateWindowAndWOLAGain()
     // at high overlap factors.
     case Engine::Constants::Blackman:
     case Engine::Constants::BlackmanHarris:
-        if ((overlapFactor > 3) || (overlapFactor > 2 && engineSetup().windowSizeFactor() >= 4))
+        if (overlapFactor > 3)
             synthesisWindowFunction = analysisWindowFunction;
         break;
 
@@ -611,27 +588,6 @@ void LE_COLD Processor::calculateWindowAndWOLAGain()
         }
         while (pSynthesisWindowSample != synthesisWindow_.end())
             *pSynthesisWindowSample++ /= *pAnalysisWindowSample++;
-    }
-
-    if (engineSetup().windowSizeFactor() > 1)
-    {
-        /// \note When window presumming we need to apply the sinc function to
-        /// both the analysis and synthesis windows (with different periods) in
-        /// order to avoid the echo/flanging caused by adding the delayed signal
-        /// to itself. This step was simply taken from Richard Dobson's
-        /// open-sourced VST plugins but it is not yet clear why or how this
-        /// works and it is not prescribed in any of the papers and so it
-        /// requires further research.
-        ///                                   (24.04.2012.) (Domagoj Saric)
-        /// \note The original RWD code uses different sinc "periods" for the
-        /// analysis and synthesis windows (DFT and step sizes respectively).
-        /// This has been found to produce more ripple than using the DFT
-        /// size for both windows but it seems to do a better job in eliminating
-        /// the echo/flanging so we use this approach also.
-        ///                                   (25.04.2012.) (Domagoj Saric)
-        auto const halfWindowSize(windowSize / 2);
-        sincWindow(analysisWindow_.begin(), halfWindowSize, engineSetup().fftSize<unsigned int>());
-        sincWindow(synthesisWindow_.begin(), halfWindowSize, stepSize);
     }
 
     LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow, analysisWindow_, "analysis  window");
@@ -875,8 +831,7 @@ LE_COLD void Processor::Channels::resize(StorageFactors const &factors, Storage 
     Utility::SharedStorageBuffer<ChannelBuffers>::resize(
         factors.numberOfChannels * sizeof(value_type), storage);
 
-    std::uint8_t const windowSizeFactor(1);
-    std::uint16_t const windowSize(factors.fftSize * windowSizeFactor);
+    std::uint16_t const windowSize(factors.fftSize);
     std::uint16_t const stepSize(factors.fftSize / factors.overlapFactor);
     std::uint16_t const initialSilenceSamples(windowSize - stepSize);
     for (auto &channelBuffers : *this)

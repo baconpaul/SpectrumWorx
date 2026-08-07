@@ -59,7 +59,6 @@ class Setup
 
     Window windowFunction() const { return windowFunction_; }
     float const &wolaGain() const { return wolaGain_; }
-    std::uint8_t windowSizeFactor() const { return 1; }
     std::uint8_t numberOfChannels() const { return numberOfChannels_; }
     std::uint8_t numberOfSideChannels() const { return numberOfSideChannels_; }
     float const &maximumAmplitude() const { return maximumAmplitude_; }
@@ -71,7 +70,7 @@ class Setup
     {
         return frameSize<T>() / windowOverlappingFactor<T>();
     }
-    template <typename T> T windowSize() const { return fftSize<T>() * windowSizeFactor(); }
+    template <typename T> T windowSize() const { return fftSize<T>(); }
     template <typename T> T frequencyRangePerBin() const { return sampleRate<T>() / fftSize<T>(); }
 
     std::uint16_t numberOfBins() const;

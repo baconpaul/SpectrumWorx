@@ -177,10 +177,11 @@ target_compile_definitions(sw-dsp PUBLIC LE_ENABLE_ASSERT_HANDLER)
 # that reconfigured the plugin's I/O -- which is audio-ports-config's job in
 # CLAP; and LE_SW_ENGINE_WINDOW_PRESUM was an SW_ENGINE_WINDOW_PRESUM option,
 # always OFF, over the plumbing that let the analysis fold factor be something
-# other than one, plus a WindowSizeFactor global parameter to set it with. The
-# fold and unfold themselves are live code and stay; turning the option on grew
-# the parameter table by a row and overflowed the std::uint16_t window size at
-# the maximum FFT size, so the factor could not exceed one anyway.
+# other than one, plus a WindowSizeFactor global parameter to set it with.
+# Turning the option on grew the parameter table by a row and overflowed the
+# std::uint16_t window size at the maximum FFT size, so the factor could not
+# exceed one anyway; the fold and unfold have since been collapsed to that
+# single-frame case.
 
 # rtsan_support.h, for the RealtimeSanitizer region ScopedAudioThreadEntry opens, and
 # for the RTSAN_DISABLE guards the conceded audio-thread allocations will carry.

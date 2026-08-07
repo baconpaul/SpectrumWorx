@@ -31,12 +31,10 @@ class ChannelBuffers
                     bool useSideChannel);
 
     void setCurrentDataToChannelData(bool useSideChannel, Math::FFT_float_real_1D const &fft,
-                                     ReadOnlyDataRange const &window,
-                                     std::uint8_t windowSizeFactor);
+                                     ReadOnlyDataRange const &window);
 
     float *putNewTimeDomainDataToOutput(Math::FFT_float_real_1D const &fft,
-                                        ReadOnlyDataRange const &window,
-                                        std::uint8_t windowSizeFactor);
+                                        ReadOnlyDataRange const &window);
 
     void moveForwardByHopSize(std::uint16_t hopSize, bool useSideChannel);
 
