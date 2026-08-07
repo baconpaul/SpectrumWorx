@@ -276,17 +276,18 @@ Table readTable()
 void writeTable(Table const &table)
 {
     std::ofstream file(tablePath(), std::ios::trunc);
-    file << "# SpectrumWorx parameter table -- generated, do not hand edit.\n"
-            "# Regenerate with SW_PARAMETER_TABLE_UPDATE=1 ./sw-tests \"[parameter-table]\"\n"
-            "#\n"
-            "# effect/<Effect>/<index> | type | min | max | default | name | [unit] [| enums]\n"
-            "#     the per-effect parameter table, in declaration order. Presets\n"
-            "#     serialise by name and automation addresses by index, so a row that\n"
-            "#     moves is a preset that loads differently.\n"
-            "#\n"
-            "# id/<parameterID> | name | [unit]\n"
-            "#     the same parameters as a host sees them, plus the globals, the slot\n"
-            "#     selectors and the exported LFO parameters.\n";
+    file
+        << "# SpectrumWorx parameter table -- generated, do not hand edit.\n"
+           "# Regenerate with SW_PARAMETER_TABLE_UPDATE=1 ./sw-plugin-tests \"[parameter-table]\"\n"
+           "#\n"
+           "# effect/<Effect>/<index> | type | min | max | default | name | [unit] [| enums]\n"
+           "#     the per-effect parameter table, in declaration order. Presets\n"
+           "#     serialise by name and automation addresses by index, so a row that\n"
+           "#     moves is a preset that loads differently.\n"
+           "#\n"
+           "# id/<parameterID> | name | [unit]\n"
+           "#     the same parameters as a host sees them, plus the globals, the slot\n"
+           "#     selectors and the exported LFO parameters.\n";
     for (auto const &[key, row] : table)
         file << key << " | " << row << '\n';
 }

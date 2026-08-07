@@ -99,28 +99,6 @@ The work, in order:
    what found the NaN.
 4. Then the GUI can offer it: right-click a knob and type a value.
 
-### CLAP parameter IDs
-
-Two things about the encoding in `src/core/parameterID.hpp`, which packs a
-`type` byte over three index bytes in a union:
-
-- **The first parameter's ID is `0x00000000`.** It falls out of the encoding —
-  `GlobalParameter` is the zeroth `Type` and its index is zero — and it is a
-  perfectly legal `clap_id`, since only `CLAP_INVALID_ID` (`0xFFFFFFFF`) is
-  reserved. It still reads like an uninitialised value in every log and every
-  debugger, which is a bad property for the one number a host stores forever.
-- **Some IDs are one apart.** An LFO's parameters vary in the low byte, so
-  consecutive ones are consecutive integers, while global parameters land on
-  `0x10000` boundaries. The density is not wrong, it is just uneven, and it
-  leaves no room in the places that are dense.
-
-**The constraint that governs both:** a parameter ID is what a host writes into
-a saved session to name an automation lane. Changing the encoding renumbers
-every lane anyone has saved. That makes this a thing to settle *before* a
-release and not after — the same argument as the standalone's bundle identifier
-in `tech_debt.md`, and the same argument that deleted window presum rather than
-leaving it switchable.
-
 ### Consider the cpputils ring buffer
 
 `src/core/threading/spscQueue.hpp` is ours, hand written, and carries the

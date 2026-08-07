@@ -459,7 +459,8 @@ bool SpectrumWorxCLAP::isValidParamId(clap_id const id) const noexcept
     /// pretending the ID is unknown, which is what keeps a host's automation
     /// lane attached across an effect swap.
     ParameterID const parameterID{Plugins::ParameterID{id}};
-    return parameterID.type() <= ParameterID::LFOParameter;
+    return (parameterID.type() >= ParameterID::GlobalParameter) &&
+           (parameterID.type() <= ParameterID::LFOParameter);
 }
 
 std::uint32_t SpectrumWorxCLAP::paramsCount() const noexcept
