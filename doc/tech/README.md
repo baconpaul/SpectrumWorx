@@ -31,15 +31,16 @@ so that the reasoning survives the deletion.
 
 ## [`old/`](old/) — the path, kept for the reasoning
 
-Neither of these describes this tree. Both are the record of how it was read and
-planned before it built, both contain claims the port has since disproved, and
-both are kept because they are the only account of *why* several decisions went
-the way they did.
+None of these describes this tree. All three are a record of how it was read —
+the first two before it built, the third against the built tree — each contains
+claims the work has since disproved, and each is kept because it is the only
+account of *why* several decisions went the way they did.
 
 | | Read it for |
 |---|---|
 | [`old/initial_scan.md`](old/initial_scan.md) | The analysis pass on the 2016 snapshot, before anything was touched. Its inventory of what that tree contained is not repeated anywhere else. |
 | [`old/implementation_sequence.md`](old/implementation_sequence.md) | The nine-stage plan the port was executed against, plus the per-stage "done when" each commit was measured against. |
+| [`old/fable_review.md`](old/fable_review.md) | A full read of `src/` against these documents, ranked by severity, and what each finding turned into. Every one of them is fixed; it is here for the two claims that did not survive contact, the near miss, the inventory of what was checked and found sound, and the account of which instrument pinned which fix. |
 
 ---
 

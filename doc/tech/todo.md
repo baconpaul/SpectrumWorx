@@ -20,11 +20,11 @@ cannot be held to a number off the machine that minted their fixtures.
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone, on every push: macOS universal, Windows x64 under MSVC 19.51, Linux x64 under GCC 12.4, and again in an Ubuntu 20 / GCC 11 container for the glibc a released binary needs. |
 | Runs | **In DAWs, on macOS, Windows and Linux, driven by testers rather than by us** (07.08.2026). The deadlocks that motivated the threading redesign are gone, and the plugin works. That closes the question the redesign was an argument about: it is an observation now. |
-| Tests | **Green on 07.08.2026** — 119 plugin cases and 143 dsp cases, Debug and Release. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`, plus 66 `sw-show-ui` renders. Goldens run in Release only. |
+| Tests | **Green on 08.08.2026** — 371 registered cases, Debug and Release. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`, plus 66 `sw-show-ui` renders. Goldens run in Release only. The count went 333 → 371 over the response to the code review in [`old/fable_review.md`](old/fable_review.md); the goldens and the 303-preset corpus digests did not move. |
 | Validators | `clap-cpp-validator` **22 of 22 with zero failures** and `vst3-validator` **47/47**, both re-run on 07.08.2026 against `text_to_value`. `auval` was 5 runs of 5 on 06.08.2026 and **has not been re-run since**: it reads `~/Library/Audio/Plug-Ins/Components`, so running it means installing over whatever is there. The one `scan-time` warning comes and goes with the page cache (below). All by hand on this machine; CI runs none of them. |
 | CI | `.github/workflows/build-plugin.yml`. **Green on 06.08.2026** — ten jobs (gates, five test legs, four builds) over three platforms, run `31112026299`. Windows Debug is the sixth test leg and is excluded; `tech_debt.md` says why. |
 | Warnings | **Two**, both deliberate `#pragma message` build banners. Our own sources compile under `-Wall -Wextra -Werror` on Apple Clang, GCC 12.4 and GCC 11 — CI passes `-DSW_WERROR=ON` to every leg. MSVC gets nothing and compiles warning-blind — `tech_debt.md`. |
-| Sanitizers | **tsan clean over both binaries as of 06.08.2026** — zero reports across 101 plugin cases and 106 dsp cases, including the case that reproduced the preset-swap race. The earlier clean run, on 02.08.2026, is what that race shows the limit of: nothing then drove a host reading parameters against a running engine, so tsan had nothing to see. `reset()` and `paramsFlush()` entered the realtime region on 03.08.2026 and **have not been run under rtsan since** — below. |
+| Sanitizers | **tsan, ASan and rtsan all clean over `[threading]` as of 08.08.2026**, with one expected rtsan report: `ModuleFactory::create` allocating inside `process()`, which is the concession [`tech_debt.md`](tech_debt.md) records. Each of those three instruments pinned a different Tier 2 fix by reversion — see the table at the end of [`old/fable_review.md`](old/fable_review.md). The full tsan sweep of both binaries was clean on 06.08.2026 and has not been re-run since; note that the rtsan recipe now needs `-D CMAKE_OSX_DEPLOYMENT_TARGET=14.0` for that tree only, Homebrew's libc++ 22 having dropped 10.15 ([`threading_model.md`](threading_model.md) §8). |
 
 ---
 
@@ -39,6 +39,14 @@ Two items came off this list on 07.08.2026. *Give the main thread its own
 [`threading_model.md`](threading_model.md) states it — rule 2, the diagram, and
 the recomputation table. *Drive it in a DAW* was the acceptance test for that
 work and testers have now run it on all three platforms.
+
+A third came off on 08.08.2026: **responding to the code review**. Every finding
+in it is fixed, one commit each, and what the work turned into is stated in the
+documents that own the mechanisms rather than in the review — `threading_model.md`
+§1/§3/§5/§7/§8, `parameter_system.md` §3 and §6, `streaming_format.md` §5. The
+review itself moved to [`old/`](old/fable_review.md), which is where a record of
+how the tree was read belongs; read it for the two claims that did not survive
+contact and for which instrument pinned which fix.
 
 ### 1 — Ship
 

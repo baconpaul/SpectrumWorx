@@ -744,7 +744,7 @@ bool SpectrumWorxCLAP::paramsInfo(std::uint32_t const index,
     /// back only under RESCAN_ALL, which a plugin may not send while active. So
     /// in every VST3 host the flags captured on an *empty* instance were the
     /// flags forever: an automation list of eleven rows -- six globals and five
-    /// slot selectors -- out of 388, for the life of the instance, with no way to
+    /// slot selectors -- out of 286, for the life of the instance, with no way to
     /// automate anything a user then loaded.
     ///
     ///   Not worked around, dropped. A flag whose whole value is that it changes

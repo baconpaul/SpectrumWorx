@@ -8,17 +8,18 @@ Written against commit `6e09d15` (post-restructure: `source/` → `src/`,
 [`streaming_format.md`](streaming_format.md), which is what happens to a
 parameter once it reaches a file.
 
-> **Still accurate as of 07.08.2026**, and the only document about this layer.
-> The port did not change the parameter system: the skeleton, the addressing and
-> the runtime re-meaning are what they were. Two things it does not know about,
-> both additive — the base value now travels separately from the LFO's output
-> (`threading_model.md` §4), and `tests/parameters/data/parameterTable.txt` pins
-> the whole 286-row enumeration.
+> **Accurate as of 08.08.2026**, and the only document about this layer. The
+> skeleton, the addressing and the runtime re-meaning are what they were in 2016.
+> Two things are additive: the base value now travels separately from the LFO's
+> output (`threading_model.md` §4), and `tests/parameters/data/parameterTable.txt`
+> pins the enumeration.
 >
-> Two things did change and have sections of their own. **§7** is *where* a
-> parameter's name lives (04.08.2026): beside the parameter it names, in the
-> header, not in a `.cpp`. **§8** is a parameter's display text, which now goes
-> both ways (07.08.2026).
+> Three sections carry what did change. **§6** is what a host is told, rewritten
+> for CLAP — the VST 2.4 and AU capability probes it used to describe are gone
+> with those backends, and two flags that looked applicable are deliberately never
+> used. **§7** is *where* a parameter's name lives (04.08.2026): beside the
+> parameter it names, in the header, not in a `.cpp`. **§8** is a parameter's
+> display text, which now goes both ways (07.08.2026).
 
 ---
 
@@ -42,14 +43,14 @@ Two independent axes are easy to conflate:
 | **Edition** (`LE_SW_INCLUDED_EFFECTS`) | build time | *which effects may be loaded* into a slot |
 | **Slot occupancy** (`ModuleChainParameter`) | run time | *what every module/LFO parameter means* |
 
-Only the second one makes the parameter list dynamic. §6 covers the first, which
+Only the second one makes the parameter list dynamic. §9 covers the first, which
 is real but does not do what it might appear to.
 
 ---
 
 ## 2. The fixed skeleton
 
-`src/configuration/constants.hpp:28-30`:
+`src/configuration/constants.hpp:21-23`:
 
 ```cpp
 std::uint8_t const maxNumberOfModules            (  5 );
@@ -120,7 +121,14 @@ plus a `Type` discriminator (`GlobalParameter`, `ModuleChainParameter`,
 `ModuleParameter`, `LFOParameter`), which occupies the high byte and is
 **zero-based**, like every other index in this system. So `In` is `0x00000000`
 and slot 1's selector is `0x01000000`.
-`tests/parameters/data/parameterTable.txt` pins all 388 of them.
+
+`tests/parameters/data/parameterTable.txt` pins them, in two sections: 482
+`effect/` rows, which are the per-effect parameter descriptions presets bind to,
+and 388 `id/` rows keyed by the packed ID. The second is deliberately larger than
+the 286 above — it also covers what a host cannot address, the two LFO
+sub-parameters that are not exported. **286 is the number a host sees**, and
+`pluginTests.cpp` asserts `params.count()` against the constant rather than
+against a literal.
 
 `In == 0` is a legal `clap_id` — only `CLAP_INVALID_ID` is reserved — but it is
 indistinguishable from an uninitialised value in a log or a debugger, and on
@@ -149,7 +157,7 @@ name/label/value getter goes through.
 
 ### 4.1 The effect selector is a parameter
 
-`src/core/automatedModuleChain.hpp:41-48`:
+`src/core/automatedModuleChain.hpp:36-39`:
 
 ```cpp
 LE_DEFINE_PARAMETER
@@ -169,7 +177,7 @@ They are ordinary automatable parameters.
 ### 4.2 What a write to it does
 
 `AutomatedModuleChain::setParameter`
-(`src/core/automatedModuleChain.hpp:103-144`) destroys whatever module occupies
+(`src/core/automatedModuleChain.hpp:107-206`) replaces whatever module occupies
 the slot and constructs a new one:
 
 ```cpp
@@ -229,61 +237,58 @@ The same fork appears in:
 - the LFO name getter (`:616-652`), which composes onto the module parameter name
 
 The context itself is trivially `the current program`
-(`src/core/spectrumWorxCore.hpp:163`):
+(`src/core/spectrumWorxCore.hpp:280`):
 
 ```cpp
 Program const & dynamicParameterAccessContext() const { return program(); }
 ```
 
-and the *decision* to pass it is made per dispatch, at
-`src/le/plugins/vst/2.4/plugin.inl:261`:
-
-```cpp
-auto const * LE_RESTRICT const pContextForDynamicParameterAccess
-    ( impl.useDynamicParameterLists() ? &impl.dynamicParameterAccessContext() : nullptr );
-```
-
-then threaded into `effGetParamLabel` / `effGetParamName` /
-`canParameterBeAutomated` (`:285-289`, `:449-456`).
+Which program that is depends on who is asking, and it is the one thing about
+this mechanism that changed with the threading redesign: the three `[main-thread]`
+readers — `paramsInfo`, `paramsValue`, `paramsValueToText` — resolve against
+`programMain_`, because the engine's copy belongs to the audio thread while the
+plugin is activated. `handleEvent` resolves against the engine's, being on it.
 
 ---
 
-## 6. Host capability probing, and the fallback
+## 6. What a host is told, and what it is not
 
-Neither VST 2.4 nor AU could be trusted to honour a changing parameter list, so
-the framework **probes the host at runtime** and degrades.
+There is no capability probe and no degraded mode. CLAP states what a host must
+honour, so the plugin says what changed and the host re-reads:
+`clap_host_params::rescan` with `CLAP_PARAM_RESCAN_INFO | TEXT | VALUES`,
+which is legal while active because the parameter *count* never moves (§2).
+`RESCAN_ALL` is the one a plugin may not send while active, and nothing needs it.
 
-**VST 2.4** (`src/le/plugins/vst/2.4/plugin.hpp:967-971`):
+Two decisions are worth stating because both went against what the mechanism
+seems to offer.
 
-```cpp
-bool LE_FASTCALL useDynamicParameterLists() const
-{
-    return host().knownToSupportDynamicParameterLists() || VSTPluginBase::allParametersInspected_;
-}
-```
+**Nothing is ever `CLAP_PARAM_IS_HIDDEN.** Flagging a parameter hidden while no
+effect owns it is what the flag is for, and it would be right if hosts re-read
+flags. The shipped clap-wrapper maps them once, at construction, and a VST3
+`RESCAN_INFO` re-reads only the name — flags come back only under `RESCAN_ALL`.
+So in every VST3 host the flags captured on an empty instance were the flags
+forever: eleven automatable rows out of 286, for the life of the instance. The
+flag was dropped rather than worked around. An unowned parameter is answerable —
+it reads as `N/A` and writes to it are refused — so a host gets a row that does
+nothing yet rather than a row that is missing.
 
-The second disjunct is the probe. `parameterListChanged()` (`plugin.hpp:757-763`)
-clears a bitset, calls `updateDisplay()`, and returns whether the host responded
-by re-reading *every* parameter name — each `effGetParamName` sets its bit via
-`inspectedParameter()` (`plugin.inl:288`, `plugin.hpp:973-981`). If the host
-re-read all of them, it is treated as honouring dynamic lists.
+**Nothing is ever `CLAP_PARAM_REQUIRES_PROCESS.** The slot selectors carried it,
+read as "changing this needs a rescan". It means the opposite: that the change
+must be delivered through `process()` and not `flush()` (ext/params.h:196). A
+slot change through `flush()` is applied correctly — it drains the command queue
+and runs `handleEvent()` on the thread that owns the engine — and forbidding it
+penalises exactly the host that needs it, the one with the transport parked and
+no block to offer.
 
-**AU** (`src/le/plugins/au/plugin.cpp:101-112`) checks whether the host
-acknowledged `kAudioUnitProperty_ParameterList`, falling back to
-`kAudioUnitProperty_ParameterInfo`.
-
-**When the probe fails**, `moduleChangedByUser` and `modulesChanged`
-(`plugin2Host.cpp:88-89`, `:183-184`) fall through to `moduleChanged`
-(`src/core/host_interop/plugin2HostImpl.inl:361-368`, whose first line asserts
-`!parameterListChanged()` — "Should not get here if host supports parameter list
-changes"). That path manually pushes all 50 module parameter values plus every
-LFO parameter value at the host so the automation lanes at least hold correct
-numbers. Names stay generic. `presetChangeEnd` does the same after a preset load
-(`plugin.hpp:764-772`).
-
-> Both backends are slated for deletion under the CLAP-first plan. The behaviour
-> is documented here because it is the accumulated evidence about *what hosts
-> actually do*, and because it is the thing the CLAP port gets to delete.
+> What the deleted VST 2.4 and AU backends had to do instead is the reason this
+> section is short. Neither could be trusted to honour a changing list, so the
+> framework probed — VST by clearing a bitset, calling `updateDisplay()` and
+> seeing whether the host re-read *every* name; AU by checking whether the host
+> acknowledged `kAudioUnitProperty_ParameterList` — and fell back to pushing all
+> 50 module parameter values plus every LFO value at the host so the lanes at
+> least held correct numbers, with generic names. That machinery is gone with the
+> backends. It is recorded here because it is the accumulated evidence about what
+> hosts actually do, and because it is what the format choice bought (§10).
 
 ---
 

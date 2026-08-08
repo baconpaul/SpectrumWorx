@@ -282,11 +282,25 @@ for free, and `setNewSample()` can finally mark the session dirty.
 
 ## 5. What the host holds
 
-`stateSave` writes `savePreset(currentSampleFile(), {}, program_, &sessionState())`
-and puts the bytes on the stream, terminator included. `stateLoad` reads the
-stream to its end, NUL-terminates it and hands it to
-`GUI::loadPreset(*this, pEditor_, …)`. That is the whole of it, which is the
-point.
+`stateSave` writes
+`savePreset(currentSampleFile(), {}, programMain_, &sessionState())` and puts the
+bytes on the stream, terminator included. **`programMain_`, not the engine's
+`program_`**, and that is the entire point of there being two: `stateSave` is
+`[main-thread]` and a host calls it with audio running, so reading the copy the
+audio thread owns would be reading the chain it is splicing.
+
+`stateLoad` reads the stream to its end, NUL-terminates it and hands it to
+`GUI::loadPreset(*this, pEditor_, …)`. Three things go with that and are worth
+naming, because "that is the whole of it" was not quite true:
+
+- it opens a `GUI::UnattendedLoad` scope, which asserts that nothing raises a
+  modal box underneath it — nobody asked for this load and there may be no window
+  to answer one;
+- the load asks the host to re-read the parameters afterwards, deferred and
+  coalesced, because every value has moved at once;
+- the preset may name an audio file, and loading one is synchronous. A file that
+  will not load clears the sample rather than leaving the previous one in place,
+  and reports a `PresetProblem` that `stateLoad` drops — there is nobody to tell.
 
 What it replaced: `SWX1` followed by 286 `(uint32 id, double value)` pairs, keyed
 on `SW::ParameterID` — which means "slot 3's 4th parameter" and never "Convolver's

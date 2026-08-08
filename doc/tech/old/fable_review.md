@@ -1,11 +1,20 @@
 # SpectrumWorx — review of src vs doc/tech, and a roadmap for the next Opus work
 
-## Status as of 08.08.2026
+## Status as of 08.08.2026 — closed
 
-Tier 0, Tier 1 and Tier 4 are done — Tier 4 out of order, at Paul's direction —
-one commit per finding with a reproduction in each. Tests went 333 → 364, green
-in `build/` and `build-release/`; the goldens and the 303-preset corpus digests
-did not move.
+**Every finding in this document is fixed.** One commit per finding, with a
+reproduction in each: reverted, the case fails or the sanitizer names the
+defect; restored, it does not. Tests went 333 → 371, green in `build/` and
+`build-release/`; the goldens and the 303-preset corpus digests never moved.
+
+The tiers were taken out of order at Paul's direction — Tier 4 first, then 2 and
+3 together — and two of them turned on decisions that were his to make rather
+than a reviewer's: never using `CLAP_PARAM_IS_HIDDEN`, and dismissing menus at
+the points where what they describe is replaced.
+
+> **The hashes below are this branch's.** They have already been invalidated once
+> by a rebase and remapped by subject; if they do not resolve, `git log --grep`
+> on the subject line will find them.
 
 | | Finding | |
 |---|---|---|
@@ -16,14 +25,20 @@ did not move.
 | ✅ | T0.5 sample decode bounds | `422de402`, `495fd3e6` |
 | ✅ | T1.1 side effects in `LE_ASSERT_MSG` | `72ae3c1b`, gate in `f250206a` |
 | ✅ | T1.2 unchecked ring pushes | `1e571acf` |
-| ☐ | T2.1 – T2.6 threading and lifetime | |
-| ☐ | T3.1 – T3.3 GUI use-after-free | |
+| ✅ | T2.1 + T2.4 stale chain, undrained queue | `8da03f86` |
+| ✅ | T2.2 slot selector frees on the audio thread | `750910c8` |
+| ✅ | T2.3 preset writes the engine's globals | `5038ec0b` |
+| ✅ | T2.5 cross-thread flags | `04623400` |
+| ✅ | T2.6 double `activate()` | `a02cf0ee` |
+| ✅ | T3.1 menus outliving what they describe | `37afc6c9` |
+| ✅ | T3.2 `detachFrom()` guards on the wrong pointers | `14aee4b8` |
+| ✅ | T3.3 the smaller GUI guards | `a2a5d00d` |
 | ✅ | T4 locale-dependent number I/O | `5c0845e1` |
 | ✅ | T4 VST3 `IS_HIDDEN` — decided: never used | `c2f4abbc` |
 | ✅ | T4 sample rate re-read, and the sample a session keeps | `86bd3028` |
 | ✅ | T4 unbounded module count | `ae0f892d` |
-| ☐ | T4 leftovers | `REQUIRES_PROCESS`, `updateEngineSetup` rollback, Save-As spin |
-| ☐ | doc drift | partly — see below |
+| ✅ | T4 leftovers | `5f462c2b` |
+| ✅ | doc drift | this pass |
 
 Two things Tier 4 turned up that the review did not have:
 
@@ -36,6 +51,32 @@ Two things Tier 4 turned up that the review did not have:
 - **The test harness had the locale bug too**, in the function `presetCorpus.txt`
   hashes — so all 303 committed digests were a statement about the locale of the
   machine that generated them.
+
+Four more came out of Tiers 2 and 3, each found by a case written for something
+else:
+
+- **A checked build aborted in the audio callback on two ordinary user actions.**
+  `SpectrumWorxCore::blockAutomation()` asserted that a preset load could not be
+  in progress when a host automation event arrived. A lane running while the user
+  clicks a preset is exactly that, and it fired about one run in ten once a case
+  delivered events and loaded a preset at the same time. Nothing has blocked
+  automation since the port, so the assertion was deleted rather than satisfied —
+  and it was the only thing reading that flag off the main thread.
+- **The settings page could not change the FFT size.** `EditorHost::editParameter`
+  takes the value the host automation edge speaks, and a power-of-two parameter
+  crosses that edge as its *exponent*. Nothing converted, so 2048 was read as an
+  exponent two orders of magnitude out of range: an assertion in a checked build,
+  arithmetic on nonsense in a shipped one, on the FFT size, the overlap factor and
+  the window function alike. The three knobs were unaffected, being linear, which
+  is why it survived. Found by T2.3 needing the same conversion.
+- **`CLAP_PARAM_REQUIRES_PROCESS` was on backwards.** The review called it "used
+  for a meaning the flag does not have"; reading the header, it is worse than
+  neutral — it tells a host it may *not* use `flush()` for that parameter, which
+  is the one route a parked-transport host has.
+- **The `[threading]` cases were passing by timing luck.** One asserted that a
+  restart had been requested after joining the audio thread, without waiting for a
+  block in which the queued change could be picked up. It passed everywhere until
+  tsan slowed it down. Waiting is now explicit.
 
 **Two of the review's claims did not survive contact**, both marked below:
 
@@ -249,7 +290,7 @@ decision rather than a patch.
 
 ## Tier 2 — threading / lifetime races (UB; not yet exercised by tests)
 
-### ☐ T2.1 — Stale-sized chain installs after a spectral restart (heap corruption) — VERIFIED (hand + agent)
+### ✅ T2.1 — Stale-sized chain installs after a spectral restart (heap corruption) — VERIFIED (hand + agent)
 Preset changes FFT size while active → new chain built against the **old**
 storage factors, queued via `publishChain`. `presetChangeEnd` requests restart;
 if the host restarts before the next `process()` drains the ring (Logic, parked
@@ -261,8 +302,16 @@ state writes past its heap block. `engineOwnershipTests.cpp:199` pins only the
 no-queued-chain halves.
 **Fix:** drain `toEngine_` in `deactivate()` after `suspend()` (main thread owns
 the engine there), before `applyPendingSpectralSetup()`. Closes T2.4 too.
+**Done — `8da03f86`.** Exactly that, and it does close T2.4. Reverted, the case
+reports the engine's chain as still empty after the restart (`0 == 3`), and then
+the engine's own bounds assertion fires from inside the phase vocoder --
+"Buffer sizes mismatch", a module built for 2048 fed 8192 bins -- and the output
+stops being finite. Two details cost some finding: the overrun is *inside* the
+shared arena, so ASan cannot see it, and no module runs at all for the first 32
+blocks after the restart, because a hop at 8192 with an overlap of 4 is 2048
+samples and the block is 64. One block after the restart looks healthy.
 
-### ☐ T2.2 — Host writing a slot selector FREES on the audio thread — VERIFIED mechanism
+### ✅ T2.2 — Host writing a slot selector FREES on the audio thread — VERIFIED mechanism
 `handleEvent` → `AutomatedModuleChain::setParameter`
 (`automatedModuleChain.hpp:129,137`): `remove()`/`insertAtAndReplace()` drop the
 chain's reference; the displaced module's last reference is the local iterator,
@@ -272,8 +321,15 @@ Strips can't save it (they hold `programMain_`'s modules). Failed `initialise()`
 destroys the fresh module on the audio thread too.
 **Fix:** take a reference before unlinking and hand the module to `retire()` —
 the three lines `installModuleInSlot` already has (`spectrumWorxCore.cpp:530`).
+**Done — `750910c8`.** `AutomatedModuleChain::setParameter()` hands the displaced
+module out with a reference on it, and a module built and then refused by its own
+`initialise()` leaves the same way. A destroying overload serves the callers that
+may destroy on the spot -- either Program on the main thread -- and says so in its
+own documentation. Reverted, the realtime sanitizer reports "Intercepted call to
+real-time unsafe function `free` in real-time context" from the module's storage;
+the reference count in the ordinary build discriminates too.
 
-### ☐ T2.3 — Preset load writes the engine's six global parameters from the main thread — VERIFIED
+### ✅ T2.3 — Preset load writes the engine's six global parameters from the main thread — VERIFIED
 `GlobalParameterUpdater` (`presetLoading.cpp:47-58`) writes the engine's
 `InputGain`/`OutputGain`/`MixPercentage` via the one `setGlobalParameter` arm with
 no `currentThreadMayMutateEngineState()` assert (`spectrumWorxCore.hpp:350-363`),
@@ -281,30 +337,59 @@ racing `process()`'s per-block reads. Normal browser load with audio running.
 Violates §2 rules 1–2. **Fix:** route non-spectral globals over
 `ToEngine::SetBaseParameter` when `engineIsRunning()`, or at minimum add the
 missing assert (would have caught it).
+**Done — `5038ec0b`, both.** All six go over the queue while audio runs and are
+applied directly only when it does not, and `setGlobalParameter` carries the
+assert. Two consequences worth knowing: the load now asks the host to flush at
+the end, because a queue nobody drains is a preset that never arrives and a
+parked transport has no block coming; and getting the *units* right turned up a
+separate defect in the settings page, recorded at the top of this file.
 
-### ☐ T2.4 — `toEngine_` never drained at `deactivate()`/destruction — VERIFIED
+### ✅ T2.4 — `toEngine_` never drained at `deactivate()`/destruction — VERIFIED
 `~SpectrumWorxCLAP` drains only `toUI_` (`:222`). Queued `SetSlot`/`SwapChain`/
 `SwapSample` payloads leak at destruction, and stale commands replay on top of
 newer direct-applied state after reactivation. T2.1's fix closes this.
+**Done — `8da03f86`.** Destruction is the half `deactivate()` does not cover, and
+it is real: an editor open on a deactivated plugin goes on filling the queue, and
+a plugin created and destroyed without ever being activated never saw a
+`deactivate()` at all. Those are *discarded* rather than applied -- what is owed
+there is the memory, and applying a slot change would call into a host that is
+midway through `clap_plugin::destroy`.
 
-### ☐ T2.5 — Cross-thread flags are plain `bool`s — VERIFIED
+### ✅ T2.5 — Cross-thread flags are plain `bool`s — VERIFIED
 `spectralSetupPending_` (`spectrumWorxCore.hpp:494`), `restartRequested_`
 (`spectrumWorxCLAP.hpp:540`) are written and read across threads;
 `restartRequested_` as a test-and-set gating `request_restart()`, so a lost
 update can **drop the restart** (engine one FFT size, parameter another).
 `blockAutomation_` (`host2Plugin.hpp`) is a non-atomic bool whose assert reads it
 cross-thread. **Fix:** `std::atomic<bool>` + `exchange`.
+**Done — `04623400`.** The first two are `std::atomic<bool>`, and
+`restartRequested_` is read through `exchange` at both sites. The third went the
+other way: the assertion reading it cross-thread was *false* -- see the top of
+this file -- so deleting the reader was the fix, and the flag is the interface's
+own again. Thread sanitizer named `spectralSetupPending_` and `restartRequested_`
+before and names neither now.
 
-### ☐ T2.6 — Double-`activate()` reallocates the working set under a live audio thread — agent-traced
+### ✅ T2.6 — Double-`activate()` reallocates the working set under a live audio thread — agent-traced
 No re-entry guard (`spectrumWorxCLAP.cpp:244`); with `MisbehaviourHandler::Ignore`
 a misbehaving host re-enters and `initialise()`→`resize()` reallocates
 `sharedStorage_` while `process()` reads it. One line: `if (engineRunning_) return true;`.
+**Done — `a02cf0ee`**, and that is the line. Two corrections to the mechanism. It
+is not `sharedStorage_` that moves at the same sample rate -- the storage factors
+have not changed, so `resize()` finds nothing to do; what reallocates is the
+*input buffers*, when the host also changes the block size, which clap-helpers
+lets through because it keys its simulated deactivation on the sample rate alone.
+And the reproduction needs an input gain that is not unity, because at unity
+`process()` hands the host's own pointers to the engine and never touches the
+buffers being freed. With both, ASan reports a heap-use-after-free: the audio
+thread reading what the main thread freed. The case runs in release only -- a
+checked build cannot reach the plugin, clap-helpers' own `assert( !_isActive )`
+aborting first, which is exactly the assertion a shipped build does not have.
 
 ---
 
 ## Tier 3 — GUI use-after-free (message thread)
 
-### ☐ T3.1 — Popup-menu callbacks UAF on editor close — VERIFIED mechanism
+### ✅ T3.1 — Popup-menu callbacks UAF on editor close — VERIFIED mechanism
 `PopupMenu::showAt` (`gui.cpp:581-599`) captures raw `this` and writes
 `menuActive_=false` in the async callback. `dismissAllActiveMenus()` only
 **queues** dismissal (JUCE `triggerAsyncUpdate`), so the callback runs a
@@ -313,8 +398,19 @@ also walks the destroyed `items_` vector — all before the inner `SafePointer`
 guards. Owners that die under an open menu: module combo (ejected/resynced),
 LFO type, sample-area menu, settings combos, editor close. **Fix:** guard at the
 outermost lambda with a SafePointer/alive-token, not two layers in.
+**Done — `37afc6c9`, Paul's call and a different one.** `dismissAllActiveMenus()`
+is called wherever what a menu describes is about to be replaced: the editor's
+destructor already did, and a rack resync and a preset load now do too. Be exact
+about what that buys, because it is not the token: dismissal is *queued* --
+`ModalComponentManager::cancel()` calls `triggerAsyncUpdate()` -- so the menu
+stops taking input at the point the state changes and answers "dismissed" a
+message-loop turn later, rather than answering with a choice made against a
+module that has left the chain. A callback arriving after its menu is *destroyed*
+is not reachable in a headless test either way: JUCE 8 compiles
+`runDispatchLoopUntil` out with `JUCE_MODAL_LOOPS_PERMITTED=0`, so there is no
+way to pump the loop, and the menu test written for it was thrown away.
 
-### ☐ T3.2 — `detachFrom()` guards on the wrong pointers (the 608f0773 bug class, second instance) — VERIFIED code
+### ✅ T3.2 — `detachFrom()` guards on the wrong pointers (the 608f0773 bug class, second instance) — VERIFIED code
 `spectrumWorxEditor.cpp:1280-1281` keys on `pActiveControl_`/`pSelectedModule_`,
 but deactivation is deferred and clears those first, leaving
 `sharedModuleControls_`/`lfoDisplay_` alive with raw back-pointers
@@ -324,8 +420,15 @@ but deactivation is deferred and clears those first, leaving
 → `moduleUI().pModule_`) or mouse delivery to the disabled control derefs the
 freed strip. **Fix:** guard on the pointers that actually dangle. Test: select →
 deactivate → resync before pumping → pump+paint under ASan.
+**Done — `14aee4b8`**, and the test is the one the review describes, near enough:
+select a knob, move the focus away, remove the module, resync, paint into an
+image. Each of the three now asks whether *it* points into the strip.
+`ModuleControlBase::pointsInto()` compares rather than dereferences, which
+matters, because it is asked of controls that may already be pointing at freed
+memory. Reverted, ASan reports the paint as a heap-use-after-free through
+`IntrusivePtr<Module>::get()`.
 
-### ☐ T3.3 — smaller GUI hazards
+### ✅ T3.3 — smaller GUI hazards
 `SharedModuleControls` derefs `editor().selectedModule()` behind assert-only
 guards (`auxiliaryComponents.cpp:96,137,309,323`) → null deref in release inside
 T3.2's window and during editor member destruction;
@@ -339,6 +442,14 @@ unchecked → OOB `juce::Array` read on a name mismatch (NFD/Windows munging);
 the *new* editor (rack/automation updates stop). `clapJuceShim_` declared before
 the rings/`pEditor_` — reorder so an editor surviving to `~SpectrumWorxCLAP` is
 torn down before the state it reads.
+**Done — `a2a5d00d`, all six.** The chain walk is bounded by the chain's own
+length and answers `notInChain`, which every caller already handles -- a
+`ParameterID` past the end is refused and the edit is dropped, which is what an
+edit against a module that is not there should be. `catch (...)` went with the
+optional check: none of the three calls inside it throws, and an empty optional
+is not an exception. `editorClosed()` takes the editor, so only the editor the
+plugin knows about can clear the pointer. And the shim is declared **last** so it
+is destroyed **first**, which is the opposite of where it was.
 
 ---
 
@@ -429,6 +540,16 @@ torn down before the state it reads.
 
 ## Doc drift (worth a pass so the docs stay the source of truth)
 
+✅ **Done, 08.08.2026.** Everything below was corrected in the four documents
+named, and each of them also gained an account of what this branch changed:
+`threading_model.md` §1/§3/§5/§7/§8 (the third drain point, the third route into
+the chain, the synchronous resync and what follows from it, a rebuilt
+cross-thread inventory, and what an assertion is not), `parameter_system.md` §3
+and a rewritten §6 (the VST/AU probes are gone with those backends; two CLAP
+flags are deliberately never used), `streaming_format.md` §5, and `tech_debt.md`.
+The list is kept because it is the record of *how* the documents drifted, which is
+the same failure mode they will have again.
+
 threading_model.md: §1 "each strip holds an `IntrusivePtr<Module>` into the
 engine" — strips hold **programMain_'s** modules now, so the "can't reach zero on
 the audio thread" argument is void (and T2.2 breaks it anyway); §3 table lists 5
@@ -486,59 +607,39 @@ inventory and streaming grammar.
 
 ---
 
-## Suggested order for the Opus sessions
+## The order it was actually done in
 
-~~1–3 are done~~, and so is Tier 4 — see the status table at the top. Tier 4 was
-taken out of order at Paul's direction, and the `IS_HIDDEN` decision it turned on
-was his to make: the review concluded there was no plugin-side fix, and declining
-to use the flag is one.
+Tier 4 first, at Paul's direction, then Tier 2 in the order the review
+recommended, then Tier 3, then Tier 4's leftovers, then this pass.
 
-What is left, renumbered so the next session can start at the top:
+1. **T4** — locale, `IS_HIDDEN`, the sample rate re-read and the sample a session
+   keeps, the unbounded module count.
+2. **T2.5** — the cross-thread flags first, deliberately: mechanical, and doing it
+   first means the tsan run that validates the rest of Tier 2 is reporting the
+   races rather than the flags. It worked exactly that way — with the flags
+   atomic, the next tsan run named the preset load's parameter writes, which is
+   T2.3.
+3. **T2.1 + T2.4**, **T2.6**, **T2.2**, **T2.3**.
+4. **T3.1**, **T3.2**, **T3.3**.
+5. **T4's leftovers**, then the doc-sync pass, last, so that the documents
+   describe the fixed tree.
 
-1. **T2.5** — atomics for the two or three flags. Moved up: it is mechanical, and
-   doing it first means the tsan run that validates the rest of Tier 2 is not
-   reporting the flags instead of the races.
-2. **T2.1 + T2.4** — drain `toEngine_` in `deactivate()`; closes the corruption
-   window and the shutdown leak together. Add the FFT-change-while-running test.
-3. **T2.6** — the `activate()` re-entry guard. One line.
-4. **T2.2** — retire the displaced module on the slot-selector path.
-5. **T2.3** — route preset globals through the protocol (or add the assert).
-6. **T3.1 + T3.2** — the two GUI UAF classes; add the deferred-teardown ASan test
-   the suite is missing.
-7. **T3.3** — the smaller GUI guards.
-8. **The Tier 4 leftovers and the doc-sync pass.** Three things the locale bullet
-   had swept in with it are still open — `CLAP_PARAM_REQUIRES_PROCESS` used for a
-   "meta" meaning the flag does not have, a failed `updateEngineSetup()` rolling
-   back only the engine copy, and the Save-As uniquifier's spin at ≥100 same-named
-   presets — and the docs should be synced last, so they describe the fixed tree.
-   Note that `threading_model.md` and `parameter_system.md` now also owe an
-   account of what Tier 4 changed: nothing is hidden from a host, a preset load
-   reports two new problem kinds, and `EditorHost::setNewSample` answers rather
-   than interrupts.
+## What each fix is pinned by
 
-The original order, for the record:
+Not every defect here can fail a test deterministically, and the ones that cannot
+say so rather than pretending otherwise. The instruments, and what each was used
+for:
 
-1. **T1.1** — `LE_ASSERT_MSG` → checked push at the two sites, plus a CI grep
-   rule. Two lines; the difference between a correct and a leaking/desyncing
-   release build. (One session, mostly the CI rule and a leak test.)
-2. **T0.1 + T0.2** — the two audio-thread-reachable OOB indirect calls from
-   file/host data. One guard each; both want new hostile-input tests. Highest
-   safety payoff.
-3. **T0.3 + T0.4 + T0.5** — the buffer/size/decode bounds. T0.3 and T0.5 both
-   want the fix even though a full repro needs T0.1/hostile files.
-4. **T2.1 + T2.4** — drain `toEngine_` in `deactivate()`; closes the corruption
-   window and the shutdown leak together. Add the FFT-change-while-running test.
-5. **T2.2** — retire the displaced module on the slot-selector path.
-6. **T2.5** — atomics for the two/three flags (quick, unblocks a real tsan run
-   of the preset-load-during-process case).
-7. **T2.3** — route preset globals through the protocol (or add the assert).
-8. **T3.1 + T3.2** — the two GUI UAF classes; add the deferred-teardown ASan
-   test the suite is missing.
-9. **T2.6, T1.2, T3.3** — the smaller races/guards.
-10. **T4 + doc drift** — VST3 IS_HIDDEN (upstream issue), sample-rate re-read,
-    stale-sample-on-load, then a doc-sync pass. Do the doc pass last so it
-    describes the fixed tree.
+| | Used for |
+|---|---|
+| An ordinary case, reverted | T0.*, T1.*, T2.1, T2.2, T2.3, T4 — the fix is removed, the case fails, the fix goes back |
+| `-fsanitize=thread` | T2.5 — a data race is undefined behaviour rather than a wrong answer, so the receipt is that tsan named `spectralSetupPending_` and `restartRequested_` before and names nothing now |
+| `-fsanitize=address` | T2.6 (heap-use-after-free, audio thread reading buffers the main thread freed) and T3.2 (a paint reading a freed `ModuleUI`) |
+| `-fsanitize=realtime` | T2.2 — `free` in a real-time context, from the displaced module's storage |
+| The engine's own bounds assertion | T2.1 — "Buffer sizes mismatch" out of the phase vocoder, a module built for one FFT size running at another |
+| Argued from the code, not reproduced | T3.1's remaining window. `dismissAllActiveMenus()` is queued rather than immediate, so it stops a stale menu *acting*; a callback arriving after its menu is destroyed is not reachable in a headless test, because JUCE 8 compiles `runDispatchLoopUntil` out with `JUCE_MODAL_LOOPS_PERMITTED=0` and there is no way to pump the loop |
 
-A standing rtsan run (`threading_model.md §8` recipe) over a case that loads a
-preset against a live process loop would independently catch T2.1–T2.4; it's the
-one instrument the suite hasn't pointed at this surface yet.
+One report under a sanitizer is **expected**: `ModuleFactory::create` allocating
+inside `process()`, which is the concession `tech_debt.md` records and the
+`threading_model.md` §5 note explains. Nothing else in `[threading]` is reported
+under `thread`, `address` or `realtime`.

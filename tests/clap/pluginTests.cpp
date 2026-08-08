@@ -483,7 +483,7 @@ TEST_CASE("The host sees the engine's own parameters, not a stand-in", "[clap]")
 /// and would have been right if hosts re-read it. The shipped clap-wrapper maps
 /// flags once at construction and a VST3 RESCAN_INFO re-reads only the name, so
 /// in a VST3 host the flags of an *empty* instance were the flags forever: an
-/// automation list of eleven rows out of 388, permanently. Every parameter is
+/// automation list of eleven rows out of 286, permanently. Every parameter is
 /// visible now, and this is the case that says so -- it is a decision about what
 /// hosts are told, so it is worth a test that fails if someone reaches for the
 /// flag again.

@@ -209,13 +209,21 @@ New entries go at the top of their area.
   `stateSave` and the preset writer all answer from the main thread's copy, so
   every existing case agreed with a change the audio thread never received.
 
-- **A host writing a slot selector allocates on the audio thread.** (02.08.2026)
-  The one exception to "modules are built on the main thread"
-  (`threading_model.md` §5). Every other route — the interface, a preset, a
-  session — builds its modules on the main thread and hands the engine a pointer
-  to link. A host's parameter event arrives inside `process()`, and deferring it
-  means a round trip to the main thread and back before the slot changes, which
-  is a latency a generic panel would notice.
+- **A host writing a slot selector allocates on the audio thread.** (02.08.2026,
+  narrowed 08.08.2026) The one exception to "modules are built on the main
+  thread" (`threading_model.md` §5). Every other route — the interface, a preset,
+  a session — builds its modules on the main thread and hands the engine a
+  pointer to link. A host's parameter event arrives inside `process()`, and
+  deferring it means a round trip to the main thread and back before the slot
+  changes, which is a latency a generic panel would notice.
+
+  It used to *free* on that thread as well, which was the unrecorded half and was
+  not a concession anybody had made: unlinking dropped the chain's last reference
+  to the displaced module and ran its deleter under the callback. That is fixed —
+  `AutomatedModuleChain::setParameter()` hands the module back for the retire
+  queue — so the allocation is now the only thing a realtime-sanitizer run over
+  `[threading]` reports, which is what makes the entry checkable rather than
+  merely stated.
 
 - **Rendering real spectra trips the negative-amplitude verification.**
   (02.08.2026, from `presetRenderTests.cpp`) `goldenTests.cpp` already records

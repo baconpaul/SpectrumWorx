@@ -29,9 +29,16 @@ engine and never back. §6 is what keeps it that way.
 `ModuleChainBase::forEach` holds an `IntrusivePtr` per node deliberately
 (`moduleChainImpl.hpp:314-320`), so when a module leaves the chain the reference
 that hits zero can be the audio thread's. Whatever comes out of the engine goes
-back to the main thread as a `ToUI::Retire` and is deleted there (§5). A module
-that has a strip cannot reach zero on the audio thread at all, because the
-strip's reference outlives the chain's.
+back to the main thread as a `ToUI::Retire` and is deleted there (§5).
+
+A strip is **not** a second reference that makes this safe by itself: strips hold
+`programMain_`'s modules, which are different objects from the engine's, so the
+engine's last reference is the chain's whenever no other route has taken one.
+Every route that unlinks a module therefore takes one first and hands it over —
+`installModuleInSlot()` and `AutomatedModuleChain::setParameter()` both, the
+second since 08.08.2026. Until then a host automating a slot selector freed the
+displaced module inside `process()`; the realtime sanitizer reports that as a
+`free` in a real-time context, which is how it is now checked.
 
 **The engine reports; it does not raise.** Preset loading counts its problems
 into a `PresetLoadReport` and hands it back —
@@ -125,7 +132,7 @@ engine the main thread owns.
 
 | `core/threading/messages.hpp` | cases |
 |---|---|
-| `ToEngine` | `SetBaseParameter`, `SetSlot`, `MoveModule`, `SwapChain`, `SwapSample` |
+| `ToEngine` | `SetBaseParameter`, `SetSlot`, `MoveModule`, `SwapChain`, `SwapSample`, `SetUnexportedLFOParameter` |
 | `ToUI` | `BaseParameterChanged`, `ChainChanged`, `Retire` |
 
 Both are tagged unions, trivially copyable, owning nothing. Each case says which
@@ -160,6 +167,24 @@ it began — and also from `paramsFlush()`, because a host with the transport
 parked may not be calling `process()` at all. Two callers is safe because CLAP
 forbids a host from running flush and process concurrently, so there is still
 one consumer. `drainEngineEvents()` runs in `onMainThread()`.
+
+**And at `deactivate()`, which is the third.** Both queues are emptied there,
+after `suspend()` and before the pending spectral setup is applied — the main
+thread owns the engine at that point, so the commands apply exactly as
+`process()` would have applied them. Without it a chain queued behind a restart
+was still in the ring when the restart resized the chain, so the first block
+after it spliced in modules built for the *previous* FFT size and ran them at the
+new one. A host is not obliged to render, or to run a main-thread callback,
+between the change and the restart it asks for; Logic with the transport parked
+is the reported one. What is left in the command queue at destruction is freed
+rather than applied — `discardQueuedCommands()`, since applying it would call
+into a host that is midway through `clap_plugin::destroy`.
+
+**Nothing else drains them, so a queued edit has to be asked for.** A preset load
+queues its six global parameters like any other edit and then calls
+`clap_host_params::request_flush` once, at the end. A knob gets that for free
+from `automatedParameterChanged`; a preset makes no per-parameter notification by
+design, and a queue nobody drains is a preset that never arrives.
 
 **Ownership: `SpectrumWorxCLAP` owns all three — not the editor.** `paramsValue`,
 `paramsValueToText` and `stateSave` are `[main-thread]` calls that happen with
@@ -231,6 +256,12 @@ relinking, because unlinking would otherwise call the deleter on the audio
 thread — and `swapModuleChain()`, three splices of a circular list with no
 destruction.
 
+`AutomatedModuleChain::setParameter()` is a third way into the chain and is held
+to the same rule: it hands the displaced module out with a reference on it, and
+the caller either retires it (the audio thread) or releases it (either Program on
+the main thread). A destroying overload exists for the second case and says in
+its own name that it is never to be called from `process()`.
+
 **`Threading::publish{Slot,ModuleMove,Chain}()` is where the branch lives**
 (`core/threading/publish.hpp`), so that no caller has to know which side of
 `activate()` it is on: with nothing processing they apply the change directly,
@@ -241,7 +272,10 @@ working without a message pump, and what makes the preset loader one code path.
 does the allocation and the audio thread only links the result. The one
 exception is a *host* writing a slot selector: that arrives as a parameter event
 inside `process()`, and deferring it would mean a round trip to the main thread
-and back — so it still allocates. Recorded in `tech_debt.md`.
+and back — so it still allocates. Recorded in `tech_debt.md`. It is an
+allocation and **only** an allocation: the module it displaces leaves by the
+retire route like every other, and a realtime-sanitizer run over
+`tests/clap/threadingTests.cpp` reports the one and not the other.
 
 **The rack is a function of the main thread's chain.** `resyncModuleRack()` drops
 strips whose module has gone, builds strips for modules that have none, and puts
@@ -249,11 +283,22 @@ every one of them where `programMain_`'s chain says. It is a recomputation rathe
 than a diff, because between a click and the engine applying it the rack is what
 the user asked for and the engine's chain is what is playing.
 
-Two things ask for it, and both have to. **Whatever changed the main thread's
-chain says so** — `addUserAddedModule()`, `moduleAdded()`/`moduleRemoved()` and
-`GUI::loadPreset()` each call `refreshModuleRackAsync()`. **And the engine's echo
-says so**, `ToUI::ChainChanged`, coalesced, for the changes that originate on the
-audio thread — a host writing a slot selector inside `process()`.
+Three things ask for it. **Whatever changed the main thread's chain says so** —
+`addUserAddedModule()`, `moduleAdded()`/`moduleRemoved()` and `GUI::loadPreset()`
+each call `refreshModuleRackAsync()`. **The engine's echo says so**,
+`ToUI::ChainChanged`, coalesced, for the changes that originate on the audio
+thread — a host writing a slot selector inside `process()`. And that echo is
+acted on **synchronously**, from `drainEngineEvents()` in `onMainThread()`, which
+is worth stating because it is a precondition for everything below: a strip can
+be destroyed inside a host callback, between one paint and the next.
+
+Which is why `resyncModuleRack()` opens by dismissing any open menu, and why
+`detachFrom()` decides what to drop by asking each widget what it is pointing at
+rather than by asking the editor what is currently selected. The LFO display and
+the shared module controls are children of the *editor*, each holding a raw
+pointer into a strip, and deactivation deliberately leaves them alive while
+clearing the editor's records — so the two questions have different answers
+exactly when a strip is being freed.
 
 The first is not redundant. A preset load fills `programMain_` outright and only
 *queues* the engine's copy, so waiting for the echo makes the picture depend on
@@ -336,19 +381,26 @@ The inventory the model is measured by.
 
 | What | Shared how | State |
 |---|---|---|
-| Parameter edits, interface → engine | `ToEngineQueue`, drained at the top of `process()` and in `paramsFlush()` | ✅ |
-| Base-value changes, engine → interface | `ToUIQueue`, drained in `onMainThread()` | ✅ |
+| Parameter edits, interface → engine | `ToEngineQueue`, drained at the top of `process()`, in `paramsFlush()` and in `deactivate()`; freed unapplied at destruction | ✅ |
+| Base-value changes, engine → interface | `ToUIQueue`, drained in `onMainThread()` and in `deactivate()` | ✅ |
 | Modulated values, for painting | `ValueMailbox`, written per block, swept at 30 Hz | ✅ |
 | Plugin → host notifications | `UIEdits` ring | ✅ |
 | Which thread is which | `Threading::{isMainThread,isAudioThread}` | ✅ |
 | Who owns the engine | `engineIsRunning()`: the audio thread while activated, the main thread otherwise | ✅ |
-| The module chain | `ToEngine::{SetSlot,MoveModule,SwapChain}` + `ToUI::Retire`; built on the main thread, linked on the audio thread | ✅ |
-| `Engine::Setup` and the spectral storage | `spectralSetupPending_` + `clap_host::request_restart()`, applied in `deactivate()` | ✅ |
+| The module chain | `ToEngine::{SetSlot,MoveModule,SwapChain}` + `ToUI::Retire`; built on the main thread, linked on the audio thread, and every route out of it retires | ✅ |
+| The six global parameters | `ToEngine::SetBaseParameter` while audio runs, written directly when it does not; `setGlobalParameter()` asserts which | ✅ |
+| `Engine::Setup` and the spectral storage | `spectralSetupPending_` (`std::atomic`) + `clap_host::request_restart()`, applied in `deactivate()` after the queue is drained | ✅ |
+| An outstanding restart request | `restartRequested_`, `std::atomic`, test-and-set through `exchange` — both threads reach it | ✅ |
 | The `Sample` | `ToEngine::SwapSample` + `ToUI::Retire`; the main thread keeps the file name and the decoded rate | ✅ |
 | The module rack | recomputed from `programMain_`'s chain, by whatever changed it and by `ToUI::ChainChanged` | ✅ |
-| Editor selection and active control | `SpectrumWorxEditor::{pSelectedModule_,pActiveControl_}`, per editor | ✅ |
-| `PopupMenu::menuActive_` | a member, per menu and therefore per editor | ✅ |
+| Editor selection and active control | `SpectrumWorxEditor::{pSelectedModule_,pActiveControl_}`, per editor — and **not** what decides whether a widget is let go of; see §5 | ✅ |
+| The LFO display and the shared module controls | children of the editor holding a raw `ModuleUI *`; dropped by `detachFrom()` on their own pointer | ✅ |
+| `PopupMenu::menuActive_` | a member, per menu and therefore per editor; menus are dismissed before a strip, a chain or a program is replaced | ✅ |
+| `Host2PluginInteropControler::blockAutomation_` | the interface's own, main thread only, since the assertion that read it from the audio thread went | ✅ |
+| The editor pointer the plugin holds | `pEditor_`, set and cleared by the editor naming itself, so an unparented editor's teardown cannot clear a live one's | ✅ |
 | **`LFOImpl::Timer`'s tempo** | three process-wide statics, `std::atomic` — no longer a race, still shared between instances | `tech_debt.md` |
+| `SkinLifetime::liveEditors_` | a process-wide count, main thread only — every editor is built and destroyed there | ✅ |
+| `PresetLoadReport` | a file-scope report the loader counts into and the caller takes; main thread only, and `stateLoad` drops it | ✅ |
 | `Theme::settings()` | process-wide, and arguably correct: these are application preferences | not addressed |
 
 **JUCE has one owner.** `SkinLifetime` builds the `Theme` and installs it as the
@@ -365,9 +417,19 @@ whether JUCE was up.
 
 ## 8. How this is checked
 
-**Assertions.** Six sites read `currentThreadMayMutateEngineState()`. Every
-unimplemented message case asserts, so a caller that sends a message nobody
-handles says so rather than dropping it.
+**Assertions.** Ten sites read `currentThreadMayMutateEngineState()` — the
+tenth is `setGlobalParameter()`, which had none until 08.08.2026 and is how a
+preset load came to write the engine's six globals from the main thread with
+audio running. Every unimplemented message case asserts, so a caller that sends a
+message nobody handles says so rather than dropping it.
+
+**And an assertion is not a check.** `LE_ASSERT`/`LE_ASSERT_MSG` compile to
+nothing under `NDEBUG`, so anything a shipped build must not do needs something
+else. Three of them were the only thing standing in front of a real fault and
+have been replaced by one: a bound on the chain walk that finds a module's index,
+a range check in the preset browser's row selection, and the ownership question
+`AutomatedModuleChain::setParameter()` now answers by handing the module back.
+Two more were asserting something untrue and were deleted rather than satisfied.
 
 **Sanitizers.** One `SW_SANITIZER` cache variable rather than a pair of blessed
 build directories, applied before `add_subdirectory(libs)` so that it reaches
@@ -378,8 +440,15 @@ fails to link:
 ```
 cmake -B build-rtsan -D SW_SANITIZER=realtime \
       -D SW_BUILD_PLUGIN_BUNDLES=OFF \
+      -D CMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
       -D CMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++
 ```
+
+The deployment target is raised **for that tree only**: Homebrew's libc++ 22
+refuses to compile against the 10.15 the plugin ships to ("The selected platform
+is no longer supported by libc++"), and a sanitizer tree is not a shipping one.
+Leave `CMAKE_OSX_DEPLOYMENT_TARGET` alone everywhere else — 10.15 is what decides
+that `std::to_chars` for floating point is unavailable, which two files depend on.
 
 `SW_BUILD_PLUGIN_BUNDLES=OFF` because clap-wrapper fetches the VST3 and
 AudioUnit SDKs over the network at *configure* time, and a sanitizer tree wants
@@ -401,9 +470,18 @@ result.
 | `tests/gui/twoInstanceTests.cpp` | closing one editor leaves the other's `MessageManager` alive; selection is independent; ejecting a module and then its ghost |
 | `tests/clap/hostInteropTests.cpp` | `reset()` between blocks; flush conditional on `isActive()`; both arms of every `canUseThreadCheck()` branch |
 | `tests/clap/pluginTests.cpp` | *"A full rack with LFOs running and an editor open processes cleanly"* and *"Two instances process while their editors come and go"* — the latter with **two real audio threads** and a message thread opening and closing both windows underneath them |
+| `tests/clap/threadingTests.cpp` | the cases that need two threads at once: a preset arriving while blocks are rendered, a chain queued behind a restart, a second `activate()` under a live callback, a host emptying a slot from inside `process()` |
 
-The last two are ordinary functional tests that *become* the acceptance test
-when the tree is built with a sanitizer.
+These are ordinary functional tests that *become* the acceptance test when the
+tree is built with a sanitizer, and `threadingTests.cpp` says so at the top: each
+case asserts the outcome that must hold whatever the interleaving, and separately
+*creates* the overlap so that a `-fsanitize=thread` build has something to
+report. A data race is undefined behaviour rather than a wrong answer that turns
+up once in a hundred runs, so the second job is the one that pins the fix.
+
+**One report is expected and is not a fault**: `ModuleFactory::create` allocating
+inside `process()`, which is the recorded concession above. Nothing else in
+`[threading]` is reported under `thread`, `address` or `realtime`.
 
 **Under tsan, mind the harness.** `REQUIRE` from a worker thread writes Catch2's
 shared assertion counter and is reported as a race in
