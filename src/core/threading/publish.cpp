@@ -46,47 +46,61 @@ Module *createModuleForSlot(SpectrumWorxCore &core, std::int8_t const effectInde
     return pModule.detach();
 }
 
-void publishSlot(SpectrumWorxCore &core, ToEngineQueue &toEngine, std::uint8_t const slot,
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note All three answer whether the engine got it, where they answered
+/// nothing. A refusal is not a detail the caller can be indifferent to: every
+/// one of them is called *after* the same change has been made to the main
+/// thread's `Program`, so a drop is a divergence between the two copies and the
+/// caller is the only thing in a position to say so. `SpectrumWorxCLAP::pushed()`
+/// is what counts them.
+///
+/// \note The `LE_ASSERT_MSG(false, ...)` that stood at these sites is gone for
+/// the reason given there: an assertion answers differently in a checked build
+/// and a shipped one, and this whole branch has been about that.
+///                                           (08.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+bool publishSlot(SpectrumWorxCore &core, ToEngineQueue &toEngine, std::uint8_t const slot,
                  std::int8_t const effectIndex, Module *const pModule)
 {
     if (!core.engineIsRunning())
     {
         releaseModule(core.installModuleInSlot(slot, pModule));
-        return;
+        return true;
     }
 
     if (toEngine.push(setSlot(slot, effectIndex, pModule)))
-        return;
+        return true;
 
     /// \note A full command ring drops the request, and the module built for it
     /// has to go with it -- the alternative is a leak per dropped slot change.
     /// 1024 deep against a handful of clicks, so this is a "something is very
     /// wrong" path rather than a rate limit.
-    LE_ASSERT_MSG(false, "The command queue is full; a slot change was dropped.");
     releaseModule(pModule);
+    return false;
 }
 
-void publishModuleMove(SpectrumWorxCore &core, ToEngineQueue &toEngine, std::uint8_t const from,
+bool publishModuleMove(SpectrumWorxCore &core, ToEngineQueue &toEngine, std::uint8_t const from,
                        std::uint8_t const to)
 {
     if (!core.engineIsRunning())
     {
         core.moveModule(from, to);
-        return;
+        return true;
     }
-    if (toEngine.push(moveModule(from, to)))
-        return;
 
     /// \note Nothing to undo, unlike its two neighbours -- a move owns nothing --
-    /// so the drop is the whole of it. Written this way round regardless, because
-    /// the push was inside the assert and `LE_ASSERT_MSG` is
+    /// so answering is the whole of it. Written this way round regardless,
+    /// because the push was inside an assert and `LE_ASSERT_MSG` is
     /// `static_cast<void>(0)` under NDEBUG: every shipped build reordered the
     /// rack and the saved state and left the engine playing the old order.
     ///                                       (08.08.2026.) (SW port)
-    LE_ASSERT_MSG(false, "The command queue is full; a module move was dropped.");
+    return toEngine.push(moveModule(from, to));
 }
 
-void publishChain(SpectrumWorxCore &core, ToEngineQueue &toEngine, AutomatedModuleChain &newChain)
+bool publishChain(SpectrumWorxCore &core, ToEngineQueue &toEngine, AutomatedModuleChain &newChain)
 {
     if (!core.engineIsRunning())
     {
@@ -94,7 +108,7 @@ void publishChain(SpectrumWorxCore &core, ToEngineQueue &toEngine, AutomatedModu
         /// caller's own chain holds what used to be live -- which its destructor
         /// releases. One code path, two threads, no special case.
         core.swapModuleChain(newChain);
-        return;
+        return true;
     }
 
     /// \note Raw, and deliberately: the message *is* the owner from the push
@@ -104,13 +118,13 @@ void publishChain(SpectrumWorxCore &core, ToEngineQueue &toEngine, AutomatedModu
     pOutgoing->swap(newChain);
 
     if (toEngine.push(swapChain(pOutgoing)))
-        return;
+        return true;
 
-    LE_ASSERT_MSG(false, "The command queue is full; a chain change was dropped.");
     /// \note And the new chain goes back where it came from, so that a caller
     /// that meant to install it still owns what it built.
     pOutgoing->swap(newChain);
     delete pOutgoing;
+    return false;
 }
 
 } // namespace LE::SW::Threading

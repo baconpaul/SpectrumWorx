@@ -868,8 +868,13 @@ bool SpectrumWorxCLAP::handleEvent(clap_event_header const *const header)
     ///                                       (06.08.2026.) (SW port)
     ///
     ////////////////////////////////////////////////////////////////////////////
+    ///   A dropped echo leaves `programMain_` behind the engine for that
+    /// parameter, permanently: this is the only thing that carries a host's write
+    /// across, and `paramsValue` and `stateSave` answer from the copy that did
+    /// not get it. \see pushed()
     if (applied == Plugins::ErrorCode<Protocol>::Success)
-        toUI_.push(Threading::baseParameterChanged(parameterID.binaryValue, value));
+        pushed(toUI_.push(Threading::baseParameterChanged(parameterID.binaryValue, value)),
+               "The echo queue is full; the main thread's Program is now behind the engine.");
 
     /// \note Only a module-chain parameter changes what the *other* parameters
     /// are: it decides which effect a slot holds, and so how many parameters
@@ -1288,6 +1293,46 @@ void SpectrumWorxCLAP::drainCommands()
 // What the audio thread hands back. `[audio-thread]`
 ////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note One answer to "what happens when a ring is full", where there were
+/// seven. Six of the pushes did not look at the result at all, so the two
+/// `Program` copies -- and, for the outgoing edits, the host -- drifted apart
+/// with nothing said and no way to find out afterwards.
+///
+///   What this can and cannot do is worth being exact about. It counts; it does
+/// not repair. `publishSlot` and `publishChain` undo their own allocation and
+/// still do. An echo, an edit or a gesture that is dropped is *gone*: the other
+/// side has already moved by the time the push fails, and the ring was where the
+/// information to put it back would have been. So the counter is the honest
+/// answer -- the plugin can at least say that it is no longer describable.
+///
+/// \note A lossless echo is the design answer if this is ever seen above zero
+/// in the field, and it is a bigger change than a bug fix: `ValueMailbox` cannot
+/// overflow and coalesces, and the note on it explains why base values were put
+/// in the ring instead. `tech_debt.md` carries that.
+///
+/// \note A counter and **not** an assertion, which is a deliberate departure
+/// from the `LE_ASSERT_MSG(false, ...)` that stood at the two publish.cpp sites.
+/// An assertion here answers differently in a checked build and a shipped one,
+/// which is the whole family of defect this branch has been removing -- and it
+/// makes the behaviour untestable, because a case that fills a ring on purpose
+/// aborts instead of measuring. The counter reads the same in every
+/// configuration, which is what lets "the ring never fills" stop being a belief.
+///                                           (08.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+bool SpectrumWorxCLAP::pushed(bool const wasPushed, char const *const what) const
+{
+    if (wasPushed) [[likely]]
+        return true;
+
+    LE::Utility::ignoreUnused(what);
+    droppedMessages_.fetch_add(1, std::memory_order_relaxed);
+    return false;
+}
+
 /// \note A full retire ring is a leak, and there is nothing sensible to do about
 /// it here -- freeing on this thread is the one thing the ring exists to prevent.
 /// 1024 deep against one entry per structural change, so it is a checked-build
@@ -1315,7 +1360,11 @@ void SpectrumWorxCLAP::retire(Threading::ToUI::Retired const what, void *const p
 /// through `setParameter()`.
 void SpectrumWorxCLAP::chainChanged()
 {
-    toUI_.push(Threading::chainChanged());
+    /// \note Dropping this leaves the rack drawing the chain that was there
+    /// before, with no second announcement coming: `drainEngineEvents()` is
+    /// edge-triggered on this message.
+    pushed(toUI_.push(Threading::chainChanged()),
+           "The echo queue is full; the module rack will not be resynchronised.");
     requestRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT | CLAP_PARAM_RESCAN_VALUES);
     markCurrentProgramAsModified();
 }
@@ -1441,7 +1490,12 @@ void SpectrumWorxCLAP::editParameter(ParameterID const parameterID, float const 
 {
     auto &plugin(const_cast<SpectrumWorxCLAP &>(*this));
     setParameterIn<Protocol>(plugin.programMain_, parameterID, value);
-    toEngine_.push(Threading::setBaseParameter(parameterID.binaryValue, value));
+    /// \note The other half. This one is applied above before the push is
+    /// attempted, so a drop is the T1.1 shape from the other side: the interface
+    /// and the saved session hold the edit and the engine never hears it.
+    pushed(
+        toEngine_.push(Threading::setBaseParameter(parameterID.binaryValue, value)),
+        "The command queue is full; an edit was applied to the interface and not to the engine.");
 }
 
 /// \note Two modules built for one slot change, and they are not
@@ -1458,14 +1512,30 @@ bool SpectrumWorxCLAP::editSlot(std::uint8_t const slot, std::int8_t const effec
         return false;
 
     programMain_.moduleChain().setParameter(slot, effectIndex, ParametersOnlyModuleInitialiser{});
-    Threading::publishSlot(*this, toEngine_, slot, effectIndex, pModule);
+    pushed(Threading::publishSlot(*this, toEngine_, slot, effectIndex, pModule),
+           "The command queue is full; a slot change reached the interface and not the engine.");
     return true;
 }
 
 void SpectrumWorxCLAP::editModuleMove(std::uint8_t const from, std::uint8_t const to)
 {
     programMain_.moduleChain().moveModule(from, to);
-    Threading::publishModuleMove(*this, toEngine_, from, to);
+    pushed(Threading::publishModuleMove(*this, toEngine_, from, to),
+           "The command queue is full; a module move reached the interface and not the engine.");
+}
+
+void SpectrumWorxCLAP::publishUnexportedLFOParameter(std::uint8_t const moduleIndex,
+                                                     std::uint8_t const moduleParameterIndex,
+                                                     std::uint8_t const lfoParameterIndex,
+                                                     float const value)
+{
+    /// \note No `engineIsRunning()` arm, unlike the publishers in publish.cpp:
+    /// the engine's module is reached by index from `drainCommands()` and there
+    /// is no main-thread equivalent to apply here. With nothing processing the
+    /// command simply waits, which is what `activate()` then drains.
+    pushed(toEngine_.push(Threading::setUnexportedLFOParameter(moduleIndex, moduleParameterIndex,
+                                                               lfoParameterIndex, value)),
+           "The command queue is full; an LFO waveform or sync change was not heard.");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1536,10 +1606,11 @@ void SpectrumWorxCLAP::HostProxy::automatedParameterChanged(
     /// and the editor runs there.
     liveRanges(parameterID, ranges, plugin_.programMain_);
 
-    plugin_.uiEdits_.push({parameter.value,
-                           static_cast<Plugins::AutomatedParameterValue>(
-                               CLAPEdge::toHost(parameterID, ranges, value)),
-                           UIEdit::Kind::Value});
+    plugin_.pushed(plugin_.uiEdits_.push({parameter.value,
+                                          static_cast<Plugins::AutomatedParameterValue>(
+                                              CLAPEdge::toHost(parameterID, ranges, value)),
+                                          UIEdit::Kind::Value}),
+                   "The outgoing edit queue is full; the host was not told about an edit.");
 
     /// \note The same rescan handleEvent() asks for when the *host* fills a slot.
     /// A slot selector is the one parameter whose value changes what the others
@@ -1559,13 +1630,18 @@ void SpectrumWorxCLAP::HostProxy::automatedParameterChanged(
 void SpectrumWorxCLAP::HostProxy::automatedParameterBeginEdit(
     ParameterSelector const parameter) const
 {
-    plugin_.uiEdits_.push({parameter.value, 0, UIEdit::Kind::GestureBegin});
+    /// \note A dropped gesture is the worst of these to leave silent: the pair
+    /// has to balance, and a host whose lane sees a begin without an end stays
+    /// latched in write mode until something else ends it.
+    plugin_.pushed(plugin_.uiEdits_.push({parameter.value, 0, UIEdit::Kind::GestureBegin}),
+                   "The outgoing edit queue is full; a gesture will not be balanced.");
     plugin_.requestParameterFlush();
 }
 
 void SpectrumWorxCLAP::HostProxy::automatedParameterEndEdit(ParameterSelector const parameter) const
 {
-    plugin_.uiEdits_.push({parameter.value, 0, UIEdit::Kind::GestureEnd});
+    plugin_.pushed(plugin_.uiEdits_.push({parameter.value, 0, UIEdit::Kind::GestureEnd}),
+                   "The outgoing edit queue is full; a gesture will not be balanced.");
     plugin_.requestParameterFlush();
 }
 
@@ -1999,22 +2075,44 @@ void SpectrumWorxCLAP::setNewSample(juce::File const &newSampleFile)
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The bookkeeping goes after the handover, not before it.
+///
+///   `sampleFile_` and `decodedSampleRate_` are the main thread's record of what
+/// the engine is playing, and `stateSave` writes the first of them. They were
+/// written at the top of this function, before the push that can fail -- so a
+/// dropped sample load left the session naming a file the engine never received,
+/// and reopening that session would load it as though it had always been there.
+///
+///   The same shape as `publishSlot` and `publishChain`, which already undo
+/// their own half on a refusal.
+///                                           (08.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
 void SpectrumWorxCLAP::publishSample(Sample *const pNewSample)
 {
-    sampleFile_ = pNewSample ? pNewSample->sampleFile() : juce::File();
-    decodedSampleRate_ = pNewSample ? pNewSample->sampleRate() : 0;
+    auto const recordWhatTheEngineHasNow([&] {
+        sampleFile_ = pNewSample ? pNewSample->sampleFile() : juce::File();
+        decodedSampleRate_ = pNewSample ? pNewSample->sampleRate() : 0;
+    });
 
     if (!engineIsRunning())
     {
         delete std::exchange(pSample_, pNewSample);
         clearSideChannelData();
+        recordWhatTheEngineHasNow();
         return;
     }
 
-    if (toEngine_.push(Threading::swapSample(pNewSample)))
+    if (pushed(toEngine_.push(Threading::swapSample(pNewSample)),
+               "The command queue is full; a sample load was dropped."))
+    {
+        recordWhatTheEngineHasNow();
         return;
+    }
 
-    LE_ASSERT_MSG(false, "The command queue is full; a sample load was dropped.");
     delete pNewSample;
 }
 

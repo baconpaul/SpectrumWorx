@@ -100,6 +100,24 @@ class EditorHost
     /// \brief Moves the module in \p from to \p to, in both copies. `[main-thread]`
     virtual void editModuleMove(std::uint8_t from, std::uint8_t to) = 0;
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Hands the engine one of the two LFO parameters that have no
+    /// `ParameterID` -- Waveform and SyncTypes -- addressed by index.
+    /// `[main-thread]`
+    ///
+    /// \note Only the engine's half: the caller has the parameter's type and has
+    /// already written its own copy, which is what `editParameter` does through
+    /// the protocol for the five that a host can see. Here so that the push is
+    /// checked where every other push is, rather than being the one bare
+    /// `toEngine().push()` left in the interface -- see the note on
+    /// `editParameter`, which is the same argument.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    virtual void publishUnexportedLFOParameter(std::uint8_t moduleIndex,
+                                               std::uint8_t moduleParameterIndex,
+                                               std::uint8_t lfoParameterIndex, float value) = 0;
+
     /// The other direction: telling the host that the user moved something.
     /// Gestures, automation notifications and module chain changes.
     virtual Plugin2HostInteropControler &automation() = 0;

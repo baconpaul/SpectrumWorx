@@ -2435,8 +2435,8 @@ void SpectrumWorxEditor::LFODisplay::queueUnexportedLFOParameter(
     if (moduleParameterIndex >= (SW::Constants::maxNumberOfParametersPerModule - 1))
         return;
 
-    editor().editorHost().toEngine().push(Threading::setUnexportedLFOParameter(
-        moduleIndex(), moduleParameterIndex, lfoParameterIndex, value));
+    editor().editorHost().publishUnexportedLFOParameter(moduleIndex(), moduleParameterIndex,
+                                                        lfoParameterIndex, value);
 }
 
 void SpectrumWorxEditor::LFODisplay::verifyGUIAndLFOConsistency() const

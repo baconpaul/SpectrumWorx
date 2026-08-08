@@ -219,6 +219,16 @@ class SpectrumWorxCLAP final
         return static_cast<std::uint16_t>(parameterIDs_.size());
     }
 
+    /// \brief How many messages a full ring has thrown away. \see droppedMessages_
+    ///
+    /// \note Public because it is the only way to ask whether what this plugin
+    /// says about itself is still true, and because a case that fills a ring has
+    /// nothing else to assert on.
+    unsigned int droppedMessages() const
+    {
+        return droppedMessages_.load(std::memory_order_relaxed);
+    }
+
   protected: // GUI::EditorHost
     /// \note All four are trivial: the engine and the notification layer are
     /// both bases of this class. The interface exists because sw-impl links
@@ -234,6 +244,8 @@ class SpectrumWorxCLAP final
     void editParameter(ParameterID, float value) const override;
     bool editSlot(std::uint8_t slot, std::int8_t effectIndex) override;
     void editModuleMove(std::uint8_t from, std::uint8_t to) override;
+    void publishUnexportedLFOParameter(std::uint8_t moduleIndex, std::uint8_t moduleParameterIndex,
+                                       std::uint8_t lfoParameterIndex, float value) override;
 
     void editorOpened(GUI::SpectrumWorxEditor &) override;
     void editorClosed() override;
@@ -329,6 +341,17 @@ class SpectrumWorxCLAP final
     Threading::ValueMailbox const &modulatedValues() const override { return values_; }
 
   private:
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Records that \p pushed was false, and answers it.
+    ///
+    /// \note Every ring push goes through this, so that "what happens when the
+    /// ring is full" has one answer rather than seven. Publishers that can undo
+    /// still undo -- this counts, it does not clean up.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    bool pushed(bool wasPushed, char const *what) const;
+
     /// \brief Applies everything the main thread has asked for, at the top of
     /// process(). `[audio-thread]`
     void drainCommands();
@@ -498,6 +521,31 @@ class SpectrumWorxCLAP final
     mutable Threading::ToEngineQueue toEngine_;
     Threading::ToUIQueue toUI_;
     Threading::ValueMailbox values_;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief How many messages a full ring has thrown away, ever.
+    ///
+    ///   Every one of these is a divergence between the two `Program` copies, or
+    /// between one of them and the host, that nothing can put right afterwards --
+    /// the ring is where the information was. A slot change and a chain change
+    /// can be undone by their publisher and are; an echo, an edit and a gesture
+    /// cannot, because by the time the push fails the other side has already
+    /// moved.
+    ///
+    ///   So this is not a statistic. It is the one place the plugin admits it is
+    /// no longer describable, and it exists because the alternative -- what was
+    /// here -- is that the two copies drift with nothing said. 1024 deep against
+    /// a ring drained every block, so a non-zero value means something is wrong
+    /// upstream rather than that the user was quick.
+    ///
+    /// \note Atomic and monotonic: written from whichever thread lost the
+    /// message, read by anybody. `spectrumWorxCLAP.cpp`'s `messageDropped()` is
+    /// the only writer.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    mutable std::atomic<unsigned int> droppedMessages_{0};
 
     ////////////////////////////////////////////////////////////////////////////
     ///

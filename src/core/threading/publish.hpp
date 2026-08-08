@@ -56,22 +56,37 @@ namespace Threading
 
 Module *createModuleForSlot(SpectrumWorxCore &, std::int8_t effectIndex, std::uint8_t slot);
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note All three answer whether the engine got the change: true when it was
+/// applied outright or queued, false when a full ring refused it.
+///
+///   Not a courtesy. Each is called after the same change has already been made
+/// to the main thread's `Program` -- `editSlot`, `editModuleMove`, a preset load
+/// -- so a refusal is a divergence between the two copies, and the caller is the
+/// only thing placed to record it. `SpectrumWorxCLAP::pushed()` is what does.
+/// They undo their own half either way; what they cannot undo is the caller's.
+///
+////////////////////////////////////////////////////////////////////////////////
+
 /// \brief Puts \p pModule (one reference, transferred; null empties) in \p slot.
 ///
 /// \note Destroys the displaced module itself when it applied the change
-/// directly, and hands it to the retire ring when the audio thread did.
-void publishSlot(SpectrumWorxCore &, ToEngineQueue &, std::uint8_t slot, std::int8_t effectIndex,
+/// directly, and hands it to the retire ring when the audio thread did. A
+/// refusal destroys \p pModule, so the caller never owns it afterwards.
+bool publishSlot(SpectrumWorxCore &, ToEngineQueue &, std::uint8_t slot, std::int8_t effectIndex,
                  Module *pModule);
 
 /// \brief Moves the module in slot \p from to slot \p to.
-void publishModuleMove(SpectrumWorxCore &, ToEngineQueue &, std::uint8_t from, std::uint8_t to);
+bool publishModuleMove(SpectrumWorxCore &, ToEngineQueue &, std::uint8_t from, std::uint8_t to);
 
 /// \brief Installs \p newChain, whose modules are already built and sized.
 ///
 /// \note Takes it by reference and leaves it empty, rather than by value: a
 /// chain is an intrusive list and its nodes point back at their root, so it has
-/// to be moved rather than copied and the caller keeps the object.
-void publishChain(SpectrumWorxCore &, ToEngineQueue &, AutomatedModuleChain &newChain);
+/// to be moved rather than copied and the caller keeps the object. A refusal
+/// puts it back, so the caller still owns what it built.
+bool publishChain(SpectrumWorxCore &, ToEngineQueue &, AutomatedModuleChain &newChain);
 
 } // namespace Threading
 
