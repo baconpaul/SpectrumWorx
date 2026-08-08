@@ -149,7 +149,7 @@ class HarnessHost final : public GUI::EditorHost
     Threading::ValueMailbox const &modulatedValues() const override { return values_; }
 
     void editorOpened(GUI::SpectrumWorxEditor &) override {}
-    void editorClosed() override {}
+    void editorClosed(GUI::SpectrumWorxEditor &) override {}
 
     /// \note Granted, as a host that honours `request_resize` does, so that this
     /// page renders the arrangement a user gets rather than the fallback. The

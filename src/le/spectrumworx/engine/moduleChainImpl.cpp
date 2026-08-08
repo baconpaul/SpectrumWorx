@@ -131,17 +131,42 @@ std::uint8_t ModuleChainBase::getIndexForModule(Node const &module) const
     );
     return static_cast<std::uint8_t>( std::distance( begin(), iterator_to( module ) ) );
 #elif 1
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Bounded by the chain's own length, where the bound used to be an
+    /// `LE_ASSERT_MSG` -- which is not compiled in a shipped build, so a module
+    /// that had left this chain sent the walk round a circular list **forever**.
+    /// Reachable from a focus change on a strip whose module has just been
+    /// removed, which is a hung interface rather than a crash and so is the
+    /// harder kind to report.
+    ///
+    ///   The bound is `size()` inclusive rather than exclusive because the root
+    /// node is a legitimate answer: `module.next_` is the root when \p module is
+    /// the last in the chain, and matching it there is what makes the index
+    /// right. (Reading the *next* node is the 2016 trick for a module that has
+    /// already been unlinked; it works only while the unlinked node still points
+    /// back into this chain, which is why there has to be an end to the search.)
+    ///
+    /// \note And a value rather than a hang when the answer is no. Every caller
+    /// puts it straight into a `ParameterID`, where a module index past the end
+    /// is already handled -- `isValidParamId()` refuses it and `moduleAs()`
+    /// answers null -- so the edit is dropped, which is what an edit against a
+    /// module that is not in the chain should be.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    auto const nodes(this->size());
     unsigned int index(0);
-    for (iterator pCurrentModule(this->begin());; ++pCurrentModule, ++index)
+    for (iterator pCurrentModule(this->begin()); index <= nodes; ++pCurrentModule, ++index)
     {
-        if (pCurrentModule.get() ==
-            module.next_
-                .get()) //...mrmlj...ugh...use the next node to handle the case when this module is already removed...
-            break;
-        LE_ASSERT_MSG(!isEnd(pCurrentModule), "Module not from this chain!");
+        //...mrmlj...ugh...use the next node to handle the case when this module
+        //is already removed...
+        if (pCurrentModule.get() == module.next_.get())
+            return static_cast<std::uint8_t>(index - 1);
     }
-    LE_ASSERT(index <= this->size());
-    return index - 1;
+
+    LE_ASSERT_MSG(false, "Module not from this chain!");
+    return notInChain;
 #endif // impl
 }
 

@@ -2135,7 +2135,26 @@ std::unique_ptr<juce::Component> SpectrumWorxCLAP::createEditor()
 }
 
 void SpectrumWorxCLAP::editorOpened(GUI::SpectrumWorxEditor &editor) { pEditor_ = &editor; }
-void SpectrumWorxCLAP::editorClosed() { pEditor_ = nullptr; }
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Only if it is the editor this plugin knows about, which is why the
+/// editor now says which one it is. `guiCreate` and `guiDestroy` do not have to
+/// balance the way a window's lifetime does -- a host may create a GUI, never
+/// parent it and destroy it, and the shim can outlive that call -- so two
+/// editors can exist at once for a moment. Clearing unconditionally meant the
+/// *old* one going away turned off the rack resyncs and the automation
+/// notifications for the *new* one, and nothing said so: the window simply
+/// stopped following the engine.
+///                                           (08.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxCLAP::editorClosed(GUI::SpectrumWorxEditor &editor)
+{
+    if (pEditor_ == &editor)
+        pEditor_ = nullptr;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //

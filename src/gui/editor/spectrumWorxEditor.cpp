@@ -204,7 +204,7 @@ SpectrumWorxEditor::~SpectrumWorxEditor()
 
     // First: nothing may reach a dying editor.
     stopTimer();
-    editorHost_.editorClosed();
+    editorHost_.editorClosed(*this);
 
     /// \note And nothing may be *pointing* at one either. A menu is asynchronous
     /// -- JUCE 8 defaults JUCE_MODAL_LOOPS_PERMITTED to 0 -- so a host closing
@@ -857,20 +857,24 @@ void SpectrumWorxEditor::setActiveControlValue(juce::String const &newValue)
     updateString(activeControlValue, controlValueVerticalOffset, textBoxHeight, newValue);
 }
 
+/// \note The check where an assertion was. There is no display between one
+/// control being deactivated and the next being selected -- and this is called
+/// from the timer, which does not know that -- so the assertion described a
+/// state that does not hold and a shipped build dereferenced an empty optional
+/// on the strength of it. The `catch (...)` around it was catching nothing: none
+/// of the three calls throws, and an empty optional is not an exception in any
+/// case.
+///                                           (08.08.2026.) (SW port)
 void SpectrumWorxEditor::updateActiveControlValue()
 {
-    try
-    {
-        LE_ASSERT(lfoDisplay_);
-        LFODisplay const &lfoDisplay(/*static_cast<LFODisplay const &>*/ (*lfoDisplay_));
-        if (lfoDisplay.lfo().enabled())
-            setActiveControlValue("[LFO]");
-        else
-            setActiveControlValue(lfoDisplay.control().getValueText());
-    }
-    catch (...)
-    {
-    }
+    if (!lfoDisplay_)
+        return;
+
+    LFODisplay const &lfoDisplay(*lfoDisplay_);
+    if (lfoDisplay.lfo().enabled())
+        setActiveControlValue("[LFO]");
+    else
+        setActiveControlValue(lfoDisplay.control().getValueText());
 }
 
 void SpectrumWorxEditor::updateSampleName(juce::String const &newSampleName)

@@ -134,12 +134,17 @@ ModuleControlBase &SharedModuleControls::controlForParameter(std::uint8_t const 
     }
 }
 
+/// \note Checked rather than asserted. Losing focus is something JUCE does to
+/// these controls on the way *out* -- a strip being dropped moves the focus, and
+/// the editor's record of what is selected is cleared before that -- so "there
+/// is a selected module" is exactly what does not hold here. In a shipped build
+/// the assertion was not there and the null was dereferenced.
+///                                           (08.08.2026.) (SW port)
 void SharedModuleControls::focusLost(FocusChangeType)
 {
-    LE_ASSERT(editor().selectedModule());
-    ModuleUI &moduleUI(*editor().selectedModule());
-    if (!moduleUI.hasFocus())
-        moduleUI.deactivate();
+    auto *const pModuleUI(editor().selectedModule());
+    if (pModuleUI && !pModuleUI->hasFocus())
+        pModuleUI->deactivate();
 }
 
 void SharedModuleControls::focusOfChildComponentChanged(FocusChangeType const type)
@@ -318,11 +323,17 @@ void SharedModuleControls::FrequencyRange::valueChanged() noexcept
     moduleParameterChanged();
 }
 
+/// \note The control's own module, which is what this always returned. It read
+/// it out of `editor().selectedModule()` first and then asserted the two were the
+/// same -- so a shipped build dereferenced a pointer that is null whenever
+/// nothing is selected, to obtain something it already had. `pointsInto()`'s note
+/// says when that is: the editor forgets what is selected before the strip goes.
+///                                           (08.08.2026.) (SW port)
 LFOImpl &SharedModuleControls::FrequencyRange::lfo()
 {
-    auto &selectedModule(editor().selectedModule()->module());
     auto &controlModule(this->module());
-    LE_ASSUME(&selectedModule == &controlModule);
+    LE_ASSERT(editor().selectedModule() == nullptr ||
+              (&editor().selectedModule()->module() == &controlModule));
     return controlModule.baseLFO(activeParameterIndex());
 }
 

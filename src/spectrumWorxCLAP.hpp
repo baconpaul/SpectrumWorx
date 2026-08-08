@@ -264,7 +264,7 @@ class SpectrumWorxCLAP final
                                        std::uint8_t lfoParameterIndex, float value) override;
 
     void editorOpened(GUI::SpectrumWorxEditor &) override;
-    void editorClosed() override;
+    void editorClosed(GUI::SpectrumWorxEditor &) override;
 
     bool requestEditorSize(int width, int height) override;
 
@@ -521,8 +521,6 @@ class SpectrumWorxCLAP final
 
     Program programMain_;
 
-    std::unique_ptr<sst::clap_juce_shim::ClapJuceShim> clapJuceShim_;
-
     std::atomic<std::uint32_t> pendingRescan_{0};
 
     /// \note `mark_dirty` is main-thread-only and the interop layer marks the
@@ -645,6 +643,24 @@ class SpectrumWorxCLAP final
 
     /// \brief A `ToUI::ChainChanged` waiting to be acted on. \see drainEngineEvents().
     bool chainChangedPending_{false};
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The window, and whatever it holds.
+    ///
+    /// \note **Last, and that is the whole reason it is down here** rather than
+    /// beside `programMain_` where it was declared. Members are destroyed in
+    /// reverse declaration order, so this one goes first -- and it owns the
+    /// editor. An editor that survives to `~SpectrumWorxCLAP`, which is a host
+    /// destroying a plugin without closing its window first, tears down while
+    /// everything it reads on the way out is still there: the two rings it
+    /// pushes into, `programMain_`, and the `pEditor_` its destructor clears.
+    /// Declared first, all of those were gone before it started.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    std::unique_ptr<sst::clap_juce_shim::ClapJuceShim> clapJuceShim_;
 }; // class SpectrumWorxCLAP
 
 } // namespace LE::SW

@@ -176,7 +176,7 @@ class EditorHost
     /// last, so nothing reaches a half-built editor, and closed() first, so
     /// nothing reaches a dying one.
     virtual void editorOpened(SpectrumWorxEditor &) = 0;
-    virtual void editorClosed() = 0;
+    virtual void editorClosed(SpectrumWorxEditor &) = 0;
 
     ////////////////////////////////////////////////////////////////////////////
     ///

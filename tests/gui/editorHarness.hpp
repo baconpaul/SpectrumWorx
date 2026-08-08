@@ -151,7 +151,7 @@ class Instance final : public GUI::EditorHost
     Threading::ValueMailbox const &modulatedValues() const override { return values_; }
 
     void editorOpened(GUI::SpectrumWorxEditor &) override {}
-    void editorClosed() override {}
+    void editorClosed(GUI::SpectrumWorxEditor &) override {}
 
     ////////////////////////////////////////////////////////////////////////////
     ///

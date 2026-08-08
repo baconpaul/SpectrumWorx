@@ -279,6 +279,11 @@ class ModuleChainBase :
 
     ModuleChainBase &operator=(ModuleChainBase &&);
 
+    /// \brief What `getIndexForModule()` answers about a module this chain does
+    /// not hold. Past every real slot, so a `ParameterID` carrying it is refused
+    /// rather than acted on. \see the definition.
+    static std::uint8_t constexpr notInChain{static_cast<std::uint8_t>(-1)};
+
     std::uint8_t getIndexForModule(Node const &) const;
     template <class Module> std::uint8_t getIndexForModule(Module const &chainedModule) const
     {

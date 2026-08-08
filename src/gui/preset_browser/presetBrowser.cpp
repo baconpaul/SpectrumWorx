@@ -881,9 +881,27 @@ void PresetBrowser::refreshAndSelectPreset(juce::String const &presetName)
 {
     refresh();
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Checked, where the check was an assertion that a shipped build does
+    /// not compile. `findPreset()` answers `end()` when the name is not in the
+    /// list, and `end() - begin()` is the size -- one past the last row -- so
+    /// what followed was a `juce::Array` read past its end and a selection of a
+    /// row that does not exist.
+    ///
+    ///   The name not matching is not hypothetical: this is called with the name
+    /// a preset was just saved under, and what comes back from `refresh()` is
+    /// what the *file system* reports. A decomposed accent on macOS, or a
+    /// character Windows will not put in a file name, and the two spellings
+    /// differ.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
     Item const *const pItem(findPreset(presetName));
+    if (pItem == files_.end())
+        return;
+
     unsigned int const indexToSelect(static_cast<unsigned int>(pItem - files_.begin()));
-    LE_ASSERT(indexToSelect < unsigned(files_.size()));
 
     comment().grabKeyboardFocus();
 
