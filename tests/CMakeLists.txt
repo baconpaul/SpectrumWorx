@@ -171,6 +171,19 @@ add_test(NAME engine-links-no-juce
         -D "SOURCE_DIR=${CMAKE_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/checkNoJuceInDSP.cmake")
 
+# And the one that no Catch2 case can express, because what it is about is code
+# that a Catch2 case -- which runs the checked build -- cannot see. LE_ASSERT and
+# friends do not evaluate their argument under NDEBUG, so anything with a side
+# effect written inside one is missing from every shipped binary. Two ring pushes
+# were, for two weeks, under a green suite.
+#
+# \note No BUILD_DIR: this one reads the sources rather than the compile lines, so
+# it also runs under the generators the two above have to skip.
+add_test(NAME asserts-have-no-side-effects
+        COMMAND ${CMAKE_COMMAND}
+        -D "SOURCE_DIR=${CMAKE_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/checkNoAssertSideEffects.cmake")
+
 # \note check_gui_flag_parity.py was wired in here, to compile every sw-dsp
 # source at both settings of LE_SW_GUI and compare the objects. It did its job:
 # it kept the two configurations honest for exactly as long as there were two.
