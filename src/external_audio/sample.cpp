@@ -169,6 +169,17 @@ char const *Sample::load(juce::File const &sampleFile, unsigned int const desire
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
+namespace
+{
+/// \note Both are guards on numbers a file header supplies, not opinions about
+/// what a side chain wants. The frame count is the 2016 one, kept: two channels
+/// of 32-bit float, so 800 MB. The rate is a couple of octaves above anything
+/// any format actually carries -- it exists because "greater than zero" is not a
+/// bound on an AIFF's 80-bit extended float.
+constexpr std::int64_t maximumFrames{100'000'000};
+constexpr double maximumSampleRate{10'000'000};
+} // anonymous namespace
+
 char const *Sample::doLoad(juce::File const &sampleFile, unsigned int const desiredSampleRate,
                            DataHolder &data)
 {
@@ -187,11 +198,34 @@ char const *Sample::doLoad(juce::File const &sampleFile, unsigned int const desi
     /// \note The whole file is decoded into memory and looped from there, as it
     /// always was. A guard rather than a design: 32 bit frames x 2 channels, so
     /// this is 800 MB and nothing a side chain wants.
-    if (sourceFrames > 100'000'000)
+    if (sourceFrames > maximumFrames)
         return "The file is too long.";
 
-    juce::AudioBuffer<float> source(static_cast<int>(reader->numChannels),
-                                    static_cast<int>(sourceFrames));
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Every number below this point comes out of a file header and none
+    /// of them was bounded beyond "not zero". All three ways that ends are
+    /// `std::bad_alloc` or a bad cast out of a `noexcept` `stateLoad`, which is
+    /// `std::terminate` -- the host dying while opening a project.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    /// \note A file declaring a rate no audio file has. AIFF stores its rate as
+    /// an 80-bit extended float, so "greater than zero" admits 1e-300, which
+    /// makes the ratio below zero and the frame count infinite.
+    if ((reader->sampleRate < 1.0) || (reader->sampleRate > maximumSampleRate))
+        return "The file declares an impossible sample rate.";
+
+    /// \note Only the channels that are going to be read. This was
+    /// `reader->numChannels`, unbounded -- a header claiming a thousand channels
+    /// against the hundred million frames allowed above asks for a 400 GB
+    /// `juce::AudioBuffer`, which throws. Nothing past the first two is ever
+    /// looked at, so nothing past the first two is decoded.
+    auto const decodedChannels(
+        std::min<int>(static_cast<int>(reader->numChannels), fixedNumberOfChannels));
+
+    juce::AudioBuffer<float> source(decodedChannels, static_cast<int>(sourceFrames));
     if (!reader->read(source.getArrayOfWritePointers(), source.getNumChannels(), 0,
                       source.getNumSamples()))
         return "Failed reading data.";
@@ -201,10 +235,22 @@ char const *Sample::doLoad(juce::File const &sampleFile, unsigned int const desi
     /// before there is an engine rate at all -- takes the copy path.
     auto const ratio(desiredSampleRate ? reader->sampleRate / static_cast<double>(desiredSampleRate)
                                        : 1.0);
-    auto const targetFrames(
-        static_cast<std::size_t>(std::floor(static_cast<double>(sourceFrames) / ratio)));
-    if (targetFrames == 0)
+
+    /// \note Kept in double and bounded before the cast, which is where this
+    /// used to go wrong: `static_cast<std::size_t>` of a double outside the
+    /// type's range is undefined, and a small ratio puts it there.
+    ///
+    ///   The upper bound is not only about hostile files. An 8 kHz file against
+    /// a 768 kHz engine resamples to ninety-six times its own length, so a
+    /// legitimate ten-million-frame file asks for 7.7 GB -- and the guard above
+    /// only ever looked at the length before resampling.
+    auto const targetFramesWanted(std::floor(static_cast<double>(sourceFrames) / ratio));
+    if (!(targetFramesWanted >= 1)) // and so also NaN
         return "The file is too short for this sample rate.";
+    if (targetFramesWanted > static_cast<double>(maximumFrames))
+        return "The file is too long at this sample rate.";
+
+    auto const targetFrames(static_cast<std::size_t>(targetFramesWanted));
 
     if (!data.recreate(targetFrames))
         return "Out of memory.";
