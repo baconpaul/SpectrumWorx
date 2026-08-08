@@ -374,7 +374,10 @@ void SpectrumWorxCLAP::deactivate() noexcept
 
     drainEngineEvents();
 
-    restartRequested_ = false;
+    /// \note Before the setup is applied rather than after: this is the restart
+    /// that was asked for, so anything asking again from here on is asking about
+    /// a change made after it.
+    restartRequested_.store(false, std::memory_order_release);
     if (spectralSetupPending())
     {
         applyPendingSpectralSetup();
@@ -1329,11 +1332,8 @@ void SpectrumWorxCLAP::drainCommands()
     /// FFT size and the overlap factor together is one restart, not two. And
     /// `clap_host::request_restart` is `[thread-safe]`, which is what makes this
     /// legal from here at all.
-    if (spectralSetupPending() && !restartRequested_)
-    {
-        restartRequested_ = true;
+    if (spectralSetupPending() && !restartRequested_.exchange(true, std::memory_order_acq_rel))
         _host.requestRestart();
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1756,11 +1756,9 @@ void SpectrumWorxCLAP::HostProxy::presetChangeEnd() const
     /// route through the queue -- both, because a preset load does not go
     /// through the queue and a knob does.
     ///                                       (02.08.2026.) (SW port)
-    if (plugin.spectralSetupPending() && !plugin.restartRequested_)
-    {
-        plugin.restartRequested_ = true;
+    if (plugin.spectralSetupPending() &&
+        !plugin.restartRequested_.exchange(true, std::memory_order_acq_rel))
         plugin._host.requestRestart();
-    }
 }
 
 bool SpectrumWorxCLAP::HostProxy::reportNewLatencyInSamples(unsigned int const latency) const

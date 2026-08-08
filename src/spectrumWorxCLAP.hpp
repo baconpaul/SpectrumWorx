@@ -603,11 +603,29 @@ class SpectrumWorxCLAP final
     bool engineRunning_{false};
     bool loadLastSession_{false};
 
-    /// \note One outstanding `request_restart` at a time. A preset that moves
-    /// the FFT size and the overlap factor is two parameter changes and one
-    /// restart, and a host that has not got round to it yet does not need to be
-    /// asked again. Cleared in deactivate(), which is where the restart lands.
-    bool restartRequested_{false};
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief One outstanding `request_restart` at a time.
+    ///
+    ///   A preset that moves the FFT size and the overlap factor is two parameter
+    /// changes and one restart, and a host that has not got round to it yet does
+    /// not need to be asked again. Cleared in deactivate(), which is where the
+    /// restart lands.
+    ///
+    /// \note Atomic, and read through `exchange` at both sites, because "test it
+    /// and set it" on a plain `bool` is not one operation. Both routes to a
+    /// spectral parameter can run it -- `drainCommands()` on the audio thread and
+    /// `HostProxy::automatedParameterChanged` on the main thread, which is where
+    /// a preset load arrives -- so two threads could both read false and both ask,
+    /// or, with the compiler free to reorder a racy read, neither could. The
+    /// second is the one that costs: the restart is what applies the pending
+    /// setup, so a dropped request leaves the engine running one FFT size while
+    /// the parameter reads another, for as long as nothing else asks.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    std::atomic<bool> restartRequested_{false};
 
     /// \brief A `ToUI::ChainChanged` waiting to be acted on. \see drainEngineEvents().
     bool chainChangedPending_{false};

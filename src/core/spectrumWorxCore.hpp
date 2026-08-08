@@ -25,6 +25,8 @@
 #include "le/utility/intrinsics.hpp"
 #include "le/utility/platformSpecifics.hpp"
 
+#include <atomic>
+
 namespace LE::SW
 {
 
@@ -238,7 +240,18 @@ class SpectrumWorxCore : public Host2PluginInteropControler,
     ///                                       (02.08.2026.) (SW port)
     ///
     ////////////////////////////////////////////////////////////////////////////
-    bool spectralSetupPending() const { return spectralSetupPending_; }
+    ///
+    /// \note Acquire against the release in `deferOrApplySpectralSetup()`. The
+    /// flag is read by a thread that did not write it -- the audio thread sets it
+    /// from `drainCommands()` and `deactivate()` is where it is acted on -- and
+    /// what has to be visible with it is the *parameter* the setter moved just
+    /// before, which is what `applyPendingSpectralSetup()` then reads. A relaxed
+    /// pair would order the flag and say nothing about the value behind it.
+    ///                                       (08.08.2026.) (SW port)
+    bool spectralSetupPending() const
+    {
+        return spectralSetupPending_.load(std::memory_order_acquire);
+    }
     bool applyPendingSpectralSetup();
 
   public:
@@ -406,12 +419,33 @@ class SpectrumWorxCore : public Host2PluginInteropControler,
     InputBuffers const &buffers() const { return buffers_; }
 
   protected:
-    bool blockAutomation() const
-    {
-        //...mrmlj...
-        LE_ASSERT(Host2PluginInteropControler::blockAutomation() == false);
-        return false;
-    }
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Whether a host's automation write should be refused right now.
+    ///
+    /// \note Never, and it always answered never -- but it used to assert
+    /// `Host2PluginInteropControler::blockAutomation() == false` on the way past,
+    /// and that is not true. The flag is raised for the length of a preset load,
+    /// on the main thread; this is reached from
+    /// `Host2PluginInteropImpl::setParameter()`, which for a host automation event
+    /// is the audio thread inside `process()`. A lane driving a parameter while
+    /// the user clicks a preset satisfies both at once, so a checked build aborted
+    /// in the audio callback on an ordinary pair of user actions -- and no shipped
+    /// build did anything at all, `LE_ASSERT` being a no-op there.
+    ///
+    ///   It was also the only thing reading that flag from off the main thread,
+    /// so the flag is the interface's own again and needs no synchronisation.
+    ///
+    ///   Blocking is 2016's answer to a VST 2.4 problem: hosts that echoed a
+    /// parameter change back as automation while the load which caused it was
+    /// still running. Nothing echoes anything here. A preset writes every
+    /// parameter it names, so an automation event arriving during one is either
+    /// overwritten by the load or lands after it -- and landing after it is what a
+    /// running lane is supposed to do.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    bool blockAutomation() const { return false; }
 
   private:
     bool isEngineSetupUpToDate() const;
@@ -491,7 +525,24 @@ class SpectrumWorxCore : public Host2PluginInteropControler,
     /// structural change is applied here and now or handed to the audio thread.
     bool suspended_;
 
-    bool spectralSetupPending_{false};
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The FFT size, overlap factor or window function the engine is not
+    /// running yet.
+    ///
+    /// \note Atomic because both threads write it. A knob or a host automation
+    /// event reaches `setGlobalParameter` from `drainCommands()`, which is the
+    /// audio thread; a preset load reaches the same setter from the main thread
+    /// (`GlobalParameterUpdater`, presetLoading.cpp) with audio running. It was a
+    /// plain `bool`, which is a data race in the language's own terms and
+    /// therefore a licence for the compiler to keep the read in a register --
+    /// exactly what the flag must not permit, since the whole point of it is to
+    /// be noticed by the *other* thread.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    std::atomic<bool> spectralSetupPending_{false};
 
     Engine::StorageFactors currentStorageFactors_;
     Engine::HeapSharedStorage sharedStorage_;

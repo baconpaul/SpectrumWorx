@@ -17,6 +17,7 @@
 #include "core/parameterID.hpp"
 
 #include "le/spectrumworx/engine/configuration.hpp"
+#include "le/utility/assert.hpp"
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/span.hpp"
 
@@ -41,7 +42,7 @@ class Host2PluginInteropControler
     using WindowFunction = GlobalParameters::WindowFunction;
 
   protected:
-    Host2PluginInteropControler() : blockAutomation_(false) {}
+    Host2PluginInteropControler() = default;
 
   public:
     class AutomationBlocker;
@@ -50,7 +51,23 @@ class Host2PluginInteropControler
     bool presetLoadingInProgress() const { return blockAutomation(); } //...mrmlj...
 
   private:
-    mutable bool blockAutomation_;
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Whether a preset load is putting values into this program right
+    /// now. `[main-thread]`
+    ///
+    /// \note The interface's own, and only the interface's: what asks is a
+    /// widget deciding whether a write without a mouse behind it is expected
+    /// (`SharedModuleControls::FrequencyRange::canUseWriteAccessIndex`). It was
+    /// also read from the audio thread, by an assertion in
+    /// `SpectrumWorxCore::blockAutomation()` which claimed the flag could not be
+    /// raised there -- see the note on that function for why it could, and why the
+    /// answer was to delete the claim rather than to synchronise it.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    mutable bool blockAutomation_{false};
 }; // Host2PluginInteropControler
 
 class Host2PluginInteropControler::AutomationBlocker
@@ -59,15 +76,21 @@ class Host2PluginInteropControler::AutomationBlocker
     AutomationBlocker(AutomationBlocker const &) = delete; // makes non-copyable
     AutomationBlocker &operator=(AutomationBlocker const &) = delete;
 
+    /// \note `LE_ASSERT` where both of these were `LE_ASSUME`. `__builtin_assume`
+    /// is a promise to the optimiser that the condition *holds*, not a check that
+    /// it does -- so a load that nests would be undefined behaviour rather than a
+    /// caught bug, which is the wrong way round for a guard whose whole job is to
+    /// notice one.
+    ///                                       (08.08.2026.) (SW port)
     AutomationBlocker(Host2PluginInteropControler const &effect)
         : pBlockAutomation_(&effect.blockAutomation_)
     {
-        LE_ASSUME(*pBlockAutomation_ == false);
+        LE_ASSERT(*pBlockAutomation_ == false);
         *pBlockAutomation_ = true;
     }
     ~AutomationBlocker()
     {
-        LE_ASSUME(*pBlockAutomation_ == true);
+        LE_ASSERT(*pBlockAutomation_ == true);
         *pBlockAutomation_ = false;
     }
 

@@ -373,7 +373,7 @@ Engine::Setup const &SpectrumWorxCore::engineSetup() const
     /// *supposed* to disagree. Making that legal is a change to this assertion's
     /// contract rather than to any of the call sites that reach it.
     ///                                       (02.08.2026.) (SW port)
-    LE_ASSERT(isEngineSetupUpToDate() || spectralSetupPending_ ||
+    LE_ASSERT(isEngineSetupUpToDate() || spectralSetupPending() ||
               !currentStorageFactors().complete());
     return uncheckedEngineSetup();
 }
@@ -562,9 +562,11 @@ void SpectrumWorxCore::swapModuleChain(AutomatedModuleChain &chain)
 bool SpectrumWorxCore::applyPendingSpectralSetup()
 {
     LE_ASSERT_MSG(!engineIsRunning(), "The spectral setup may only be applied with audio stopped.");
-    if (!spectralSetupPending_)
+    /// \note Cleared before the work rather than after it, and with an exchange
+    /// rather than a store: this is the only consumer, but it runs with the
+    /// engine stopped and the pair reads as the test-and-clear it is.
+    if (!spectralSetupPending_.exchange(false, std::memory_order_acq_rel))
         return true;
-    spectralSetupPending_ = false;
     return updateEngineSetup();
 }
 
@@ -578,7 +580,9 @@ bool SpectrumWorxCore::applyPendingSpectralSetup()
 ///                                           (02.08.2026.) (SW port)
 bool SpectrumWorxCore::deferOrApplySpectralSetup()
 {
-    spectralSetupPending_ = true;
+    /// \note Release: the parameter this is recording was written immediately
+    /// before, and whoever sees the flag has to see the value too.
+    spectralSetupPending_.store(true, std::memory_order_release);
     return engineIsRunning() ? true : applyPendingSpectralSetup();
 }
 
