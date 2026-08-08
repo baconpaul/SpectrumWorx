@@ -348,12 +348,31 @@ torn down before the state it reads.
   Also `stateLoad` can pop a modal dialog during unattended restore.
 - **Unbounded module count** in a preset/state (`presets.cpp:562-596`, only a
   debug assert); `ModuleChainBase::size()` truncates to `uint8_t` at 256.
-- **Locale-dependent float I/O** (`%.9g`/`strtod`, no `"C"` imbue) — a
+- ✅ **Locale-dependent float I/O** (`%.9g`/`strtod`, no `"C"` imbue) — a
   comma-decimal host writes unreadable presets and reads every factory float as
-  its integer part. `CLAP_PARAM_REQUIRES_PROCESS` used for a "meta" meaning the
-  flag doesn't have. Failed `updateEngineSetup()` rolls back only the engine
-  copy, leaving `programMain_`/state disagreeing. `readWholeStream` uncapped.
-  Save-As uniquifier can spin at ≥100 same-named presets.
+  its integer part.
+  **Done — `5b1e1576`.** Both halves, and the reading half is the one that loses
+  a user's work: reproduced under `de_DE.UTF-8`, `0.75` read back as **0** and a
+  1234.5678 round trip came back as 1.0, silently, because stopping at the point
+  is not an error. Writing goes through a stream imbued with
+  `std::locale::classic()`; reading keeps `strtod` and hands it a `"C"` locale
+  (`strtod_l`/`_strtod_l`), because `num_get`'s character set is specified
+  without `i` or `n` in it and this plugin prints `inf` for a gate minimum, so
+  `>>` was not an option. `std::to_chars` was the first answer and is not
+  available: its floating point half is a libc++ dylib symbol introduced in
+  macOS 13.3 and this ships to 10.15 — the integer overloads do use it. Text is
+  byte-identical, verified across the magnitudes and both infinities before the
+  change, and the corpus digests did not move.
+  *The test harness had the same bug*: `presetCorpus.txt`'s digests are hashed
+  from `%.6g`, so all 303 committed rows were a statement about the locale of the
+  machine that generated them.
+  Three cases: the conversions, the whole corpus read under such a host, and a
+  preset saved under one and read back outside it.
+- ☐ The rest of what this bullet had swept together, none of it locale: · a
+  `CLAP_PARAM_REQUIRES_PROCESS` used for a "meta" meaning the flag doesn't have ·
+  a failed `updateEngineSetup()` rolling back only the engine copy, leaving
+  `programMain_`/state disagreeing · a Save-As uniquifier that can spin at ≥100
+  same-named presets. (`readWholeStream` uncapped was closed by `7b09e809`.)
 
 ---
 

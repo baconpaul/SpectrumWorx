@@ -22,6 +22,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #include "presets/presetHarness.hpp"
+#include "utility/localeHarness.hpp"
 
 #include "core/modules/factory.hpp"
 
@@ -521,6 +522,75 @@ TEST_CASE("A preset saved to a file loads back from it", "[preset-roundtrip]")
     CHECK(comment == "through a file");
 
     std::filesystem::remove(file);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// The host's locale
+// -----------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The writing half of what presetFileTests.cpp checks on the reading
+/// side, and the half that leaves the damage on disk. A comma-decimal host made
+/// the writer spell every fraction with a comma -- `In="0,7000"` -- so the file
+/// was unreadable by the same plugin on any other machine, and unreadable by
+/// this one after the host's locale changed.
+///
+///   Saved under the locale and read back *outside* it, because a writer and a
+/// reader that are wrong in the same direction agree with each other. The
+/// comparison that catches this is against text produced by neither.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A preset saved under the host's locale is a preset anywhere else",
+          "[preset-roundtrip][locale]")
+{
+    constexpr std::int8_t effect{3};
+
+    std::string original;
+    std::string saved;
+    {
+        SWTest::CommaDecimalHost const host;
+        if (!host)
+            SKIP("No comma-decimal locale is installed on this machine.");
+
+        Fixture fixture;
+        auto &engine(fixture.engine());
+        driveGlobals(engine);
+
+        REQUIRE(engine.program()
+                    .moduleChain()
+                    .setParameter(0, effect, engine.moduleInitialiser())
+                    .second == effect);
+
+        engine.program().moduleChain().forEach<ModuleParameters>(
+            [&](ModuleParameters const &module) {
+                driveModule(const_cast<ModuleParameters &>(module), effect);
+            });
+
+        original = dump(engine).text;
+        saved = savePreset({}, "written abroad", engine.program());
+        REQUIRE_FALSE(saved.empty());
+    }
+
+    INFO("saved preset:\n" << saved);
+
+    /// The direct statement of it, before any of it is parsed.
+    CHECK(saved.find(',') == std::string::npos);
+
+    Fixture reloaded;
+    auto &engine(reloaded.engine());
+    std::vector<char> parseBuffer(saved.begin(), saved.end());
+    parseBuffer.push_back('\0');
+
+    SWTest::clearPresetProblems();
+    {
+        ScopedProblemCounter const counting;
+        REQUIRE(LE::SW::loadPreset(parseBuffer.data(), true, nullptr, PresetConsumer{engine}));
+    }
+    CHECK(SWTest::presetProblems().missingParameter == 0);
+    CHECK(dump(engine).text == original);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

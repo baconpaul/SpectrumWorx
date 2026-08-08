@@ -33,6 +33,8 @@
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
+#include "utility/localeHarness.hpp"
+
 #include "le/utility/lexicalCast.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -115,6 +117,63 @@ std::string renderedSafely(double const value, std::uint8_t const decimalPlaces)
 //------------------------------------------------------------------------------
 } // anonymous namespace
 //------------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The locale is the host's and the numbers are the plugin's. Every one of
+/// these read or wrote a comma before the classic-locale imbue and the `_l`
+/// strtod: the displays showed one, the preset files got one, and -- the half
+/// that loses a user's work -- reading back a point that this plugin itself
+/// wrote stopped at it, so "0.75" loaded as 0 and every factory preset came
+/// apart into its integer parts.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A host's locale does not reach the numbers the plugin reads and writes",
+          "[utility][lexical-cast][locale]")
+{
+    SWTest::CommaDecimalHost const host;
+    if (!host)
+        SKIP("No comma-decimal locale is installed on this machine.");
+
+    SECTION("what it writes")
+    {
+        CHECK(renderedSafely<displayBuffer>(1.5, 2) == "1.5");
+        CHECK(renderedSafely<displayBuffer>(-12.5, 1) == "-12.5");
+        CHECK(renderedSafely<displayBuffer>(0.75, 4) == "0.75");
+
+        // ...including the value too wide for the buffer, which takes the other
+        // rendering path.
+        CHECK(renderedSafely<displayBuffer>(1e300, 9).find(',') == std::string::npos);
+    }
+
+    SECTION("what it reads")
+    {
+        CHECK(LE::Utility::lexical_cast<double>("0.75") == 0.75);
+        CHECK(LE::Utility::lexical_cast<float>("0.75") == 0.75f);
+        CHECK(LE::Utility::parseNumber("0.75") == 0.75);
+
+        // A display's own text, suffix and all.
+        CHECK(LE::Utility::parseNumber("-12.5 dB") == -12.5);
+
+        // Both of these have to survive: an infinity is what a gate minimum
+        // prints as, and text that is not a number at all has to stay refused.
+        CHECK(LE::Utility::parseNumber("-inf") == -std::numeric_limits<double>::infinity());
+        CHECK(!LE::Utility::parseNumber("off"));
+    }
+
+    SECTION("and the two agree with each other")
+    {
+        for (double const value : {0.1, 0.75, -12.5, 1234.5678, 1e-7})
+        {
+            INFO("value: " << value);
+            auto const printed(renderedSafely<fullBuffer>(value, 9));
+            auto const readBack(LE::Utility::parseNumber(printed.c_str()));
+            REQUIRE(readBack);
+            CHECK(*readBack == Catch::Approx(value));
+        }
+    }
+}
 
 TEST_CASE("An ordinary value prints the way it always did", "[utility][lexical-cast]")
 {

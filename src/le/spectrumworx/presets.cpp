@@ -30,7 +30,10 @@
 #include <algorithm>
 #include <cctype>
 #include <ctime>
+#include <iomanip>
+#include <locale>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <string_view>
 //------------------------------------------------------------------------------
@@ -492,16 +495,24 @@ template <> std::string PresetHandler::makeString<bool>(bool const binarySource)
     return binarySource ? "1" : "0";
 }
 
-/// \note %.9g rather than std::to_chars' shortest round-trip: nine significant
-/// figures round-trips every float too, it is two lines instead of a
-/// <charconv> availability question across three toolchains, and
-/// parameterTableTests.cpp already prints its defaults exactly this way for
-/// exactly this reason.
+/// \note Nine significant figures rather than std::to_chars' shortest
+/// round-trip: nine round-trips every float too, and the availability question
+/// that made that a wary choice has since been answered -- `to_chars` for a
+/// floating point type is a libc++ dylib symbol introduced in macOS 13.3, and
+/// this ships to 10.15. parameterTableTests.cpp prints its defaults exactly this
+/// way for the same reason.
+///
+/// \note Through a stream imbued with the classic locale rather than `snprintf`,
+/// which spells the point whichever way the *host's* locale says. That put a
+/// comma in this file -- the one number in it that has to be read back by
+/// something other than the machine that wrote it. \see lexicalCast.cpp.
+///                                           (08.08.2026.) (SW port)
 template <> std::string PresetHandler::makeString<float>(float const binarySource)
 {
-    std::array<char, 32> buffer{};
-    std::snprintf(buffer.data(), buffer.size(), "%.9g", static_cast<double>(binarySource));
-    return buffer.data();
+    std::ostringstream value;
+    value.imbue(std::locale::classic());
+    value << std::setprecision(9) << static_cast<double>(binarySource);
+    return value.str();
 }
 
 /// \note A preset with no `<Global>` node used to throw from this constructor,
