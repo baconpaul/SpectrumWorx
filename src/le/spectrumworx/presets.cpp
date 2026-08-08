@@ -678,28 +678,55 @@ class LFODataLoader
     }
 
   private:
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The range check is the same one `ParametersLoader::operator()`
+    /// makes for every other parameter in a preset, and it was missing here.
+    /// `Parameter::setValue`'s own is an assertion, so in a release build
+    /// whatever `lexical_cast` produced -- 0 to 255 for the enumerated ones,
+    /// any double for the rest -- was simply stored.
+    ///
+    ///   `wfrm` is the sharp one: it indexes `lfoFunctions[]`, eleven entries of
+    /// function pointer, once per block for as long as the LFO is enabled and
+    /// with no bound of its own (lfoImpl.cpp:357). A `.swp` or a session naming
+    /// `wfrm="200"` was an indirect call through whatever followed that table,
+    /// on the audio thread, on the first block after the load. `ph`, `lbnd` and
+    /// `ubnd` out of range make `LE_ASSUME(position >= 0 && <= 1)` false inside
+    /// the waveform functions, which is undefined behaviour by construction.
+    ///
+    ///   An out-of-range value is treated exactly as a missing one -- the
+    /// parameter goes to its default -- rather than clamped: there is no
+    /// meaningful nearest waveform, and the two cases are the same statement
+    /// about the file, which is that it does not say what this parameter is.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
     template <class LFOParameter>
     void doLoad(char const *const elementName, LFOParameter &element) const
     {
         auto const *const pElementValue(parameterNode_.Attribute(elementName));
         if (pElementValue)
         {
-            element = lfo_.adjustValueFromPreset<LFOParameter>(
+            auto const value(lfo_.adjustValueFromPreset<LFOParameter>(
                 static_cast<typename LFOParameter::value_type>(
-                    Utility::lexical_cast<typename LFOParameter::binary_type>(pElementValue)));
+                    Utility::lexical_cast<typename LFOParameter::binary_type>(pElementValue))));
+            if (element.isValidValue(value))
+            {
+                element = value;
+                return;
+            }
         }
-        else
-        {
-            /// \note If the preset does not specify a specific LFO
-            /// parameter we need to explicitly reset it to default in order
-            /// to properly handle reused module instances (which might have
-            /// the particular parameter set to a non-default value). This
-            /// also covers the case of old/pre-synced-LFOs presets (for
-            /// which the sync type parameter needs to be set to the default
-            /// 'free' value).
-            ///                           (09.10.2014.) (Domagoj Saric)
-            element = LFOParameter::default_();
-        }
+
+        /// \note If the preset does not specify a specific LFO
+        /// parameter we need to explicitly reset it to default in order
+        /// to properly handle reused module instances (which might have
+        /// the particular parameter set to a non-default value). This
+        /// also covers the case of old/pre-synced-LFOs presets (for
+        /// which the sync type parameter needs to be set to the default
+        /// 'free' value).
+        ///                               (09.10.2014.) (Domagoj Saric)
+        element = LFOParameter::default_();
     }
 
   private:
