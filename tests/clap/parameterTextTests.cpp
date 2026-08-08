@@ -127,26 +127,33 @@ TEST_CASE("Every parameter reads back what it displays", "[clap][text]")
     // and the five slot selectors are real, and every other one of the ~1500 is
     // a parameter no effect owns.
     //
-    // Every one of them, and no exception for the hidden ones, because
+    // Every one of them, and no exception for the absent ones, because
     // clap-validator's param-conversions allows no exception either: text_to_value
     // has to work for all the automatable parameters or for none, and every ID
     // here is automatable so that a host's lane survives an effect swap. What an
     // absent parameter displays as, and reads back from, is "N/A".
     ////////////////////////////////////////////////////////////////////////////
-    std::uint32_t hidden{0}, shown{0};
+
+    /// \note Which parameters those are is read off the *id*, not off a flag.
+    /// CLAP_PARAM_IS_HIDDEN used to mark them and is no longer set on anything
+    /// (see paramsInfo), and asking the type is the better oracle anyway: on an
+    /// instance with nothing in any slot, exactly the module and LFO parameters
+    /// are the ones no effect owns, and the globals and the five slot selectors
+    /// are the ones that are real.
+    std::uint32_t absent{0}, present{0};
     for (auto const &info : allParameterInfo(*plugin, params))
     {
         INFO("parameter '" << info.name << "' in '" << info.module << "'");
         CHECK(roundTrips(plugin, params, info.id));
 
-        bool const isHidden(info.flags & CLAP_PARAM_IS_HIDDEN);
-        CHECK(displayOf(*plugin, params, info.id).starts_with("N/A") == isHidden);
-        (isHidden ? hidden : shown)++;
+        bool const ownedByNoEffect(isNormalisedType(info.id));
+        CHECK(displayOf(*plugin, params, info.id).starts_with("N/A") == ownedByNoEffect);
+        (ownedByNoEffect ? absent : present)++;
     }
 
     // Both arms exercised, which is what makes the CHECKs above mean something.
-    CHECK(shown > 0);
-    CHECK(hidden > 0);
+    CHECK(present > 0);
+    CHECK(absent > 0);
 }
 
 TEST_CASE("Every effect's own parameters read back what they display", "[clap][text]")

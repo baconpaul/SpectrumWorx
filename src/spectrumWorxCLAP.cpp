@@ -578,15 +578,33 @@ bool SpectrumWorxCLAP::paramsInfo(std::uint32_t const index,
     info->cookie = nullptr;
     info->flags = CLAP_PARAM_IS_AUTOMATABLE;
 
-    /// \note A parameter belonging to a slot whose effect does not have it --
-    /// most of the list on an empty instance. The model spells that as an empty
-    /// range and "not automatable", which was enough while the list was dynamic
-    /// and such a parameter was simply absent from it. This list is fixed, so
-    /// the host sees them, and CLAP_PARAM_IS_HIDDEN says just what is meant:
-    /// "not shown, because it is currently not used". It is a RESCAN_INFO flag,
-    /// so it may come and go as slots are filled.
-    if (!live.isAutomatable() || !CLAPEdge::isPresent(live))
-        info->flags |= CLAP_PARAM_IS_HIDDEN;
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note **Nothing here is ever CLAP_PARAM_IS_HIDDEN.** Every parameter in
+    /// the list is shown, whether or not a slot's effect currently owns it.
+    ///
+    ///   It used to be flagged hidden while unowned -- "not shown, because it is
+    /// currently not used" -- which is what the flag means and would have been
+    /// right if hosts re-read it. The shipped clap-wrapper maps flags once, at
+    /// construction, and a VST3 RESCAN_INFO re-reads only the name; flags come
+    /// back only under RESCAN_ALL, which a plugin may not send while active. So
+    /// in every VST3 host the flags captured on an *empty* instance were the
+    /// flags forever: an automation list of eleven rows -- six globals and five
+    /// slot selectors -- out of 388, for the life of the instance, with no way to
+    /// automate anything a user then loaded.
+    ///
+    ///   Not worked around, dropped. A flag whose whole value is that it changes
+    /// is not worth having when a format this ships in cannot see it change, and
+    /// the failure it causes is the worst kind: a lane a user cannot find at all.
+    /// The cost of showing everything is a long list on an empty instance, which
+    /// a user can read past; the cost of hiding was a parameter that did not
+    /// exist as far as their DAW was concerned. An unowned parameter is still
+    /// perfectly answerable -- `paramsValueToText` reads it as `N/A` and writing
+    /// to it is refused -- so what a host has is a row that does nothing yet,
+    /// rather than a row that is missing.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
 
     /// \note A "meta" parameter is one whose value changes what the other
     /// parameters *are* -- which effect a slot holds, chiefly. Telling the host
