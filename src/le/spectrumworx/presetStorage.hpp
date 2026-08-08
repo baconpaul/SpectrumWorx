@@ -31,9 +31,27 @@
 namespace LE::SW
 {
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief The largest thing this reader will treat as a preset.
+///
+///   A preset is a page of XML. The largest of the 303 shipped is 2,240 bytes
+/// and the format has no element that grows with anything but the module count,
+/// which is capped at five -- so this is about seven thousand times the real
+/// worst case and exists only to bound what a file can ask to be allocated.
+///
+/// \note Session state is read by the other reader, `readWholeStream`, and is
+/// held to the same number for the same reason: it is the same grammar, and the
+/// sample is a filename in it rather than the audio.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+inline constexpr std::uintmax_t maximumPresetSize{16u << 20};
+
 /// \brief Reads a preset file into the writable, NUL-terminated buffer that the
 /// destructive parse in Preset::loadFrom() requires.
-/// \return an empty pointer if the file cannot be read.
+/// \return an empty pointer if the file cannot be read, or is larger than
+/// \ref maximumPresetSize.
 Preset::InMemoryPreset readPresetFile(std::filesystem::path const &);
 
 /// \brief Replaces a preset file's contents, creating the file if it is absent.

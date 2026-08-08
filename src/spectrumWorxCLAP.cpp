@@ -39,6 +39,7 @@
 // of it. See doc/tech/streaming_format.md.
 #include "gui/editor/presetLoading.hpp"
 #include "le/spectrumworx/presetFile.hpp"
+#include "le/spectrumworx/presetStorage.hpp" // maximumPresetSize
 
 #include "le/math/vector.hpp" // Math::copy(), for the sample's wrap
 
@@ -121,6 +122,15 @@ std::optional<std::vector<char>> readWholeStream(clap_istream const *const strea
     std::size_t used(0);
     for (;;)
     {
+        /// \note Bounded, because the loop's only exit was the stream saying it
+        /// was done. A host that hands over a stream which never does -- a
+        /// corrupt project, a pipe nothing closes -- grew this until the
+        /// allocation threw, and `stateLoad` is `noexcept`. The number is the
+        /// preset reader's, for the reason given where it is declared.
+        ///                                   (08.08.2026.) (SW port)
+        if (used >= maximumPresetSize)
+            return std::nullopt;
+
         buffer.resize(used + chunk);
         auto const read(stream->read(stream, buffer.data() + used, chunk));
         if (read < 0)

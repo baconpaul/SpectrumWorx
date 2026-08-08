@@ -601,3 +601,52 @@ TEST_CASE("A preset whose LFO values are all legal keeps every one of them",
     CHECK(lfo.lowerBound() == 0.1f);
     CHECK(lfo.upperBound() == 0.9f);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// A file that is too big to be a preset
+// -------------------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note `readPresetFile` narrowed `std::filesystem::file_size`'s `uintmax_t` to
+/// an `unsigned int` before doing anything with it, so a file over 4 GiB was
+/// read as `size mod 2^32` and parsed as a complete preset -- and at exactly
+/// 4 GiB - 1 the `presetSize + 1` allocation wrapped to zero, giving a
+/// zero-length buffer a 4 GiB read.
+///
+///   Neither needs a crafted file. Any large file renamed to `.swp`, or picked
+/// in the browser, is one.
+///
+/// \note Sized just past the cap rather than past 4 GiB. `resize_file` makes a
+/// sparse file in a millisecond here, but it is a real allocation on NTFS and
+/// this has to run on a CI runner's disk. The cap is what makes the narrowing
+/// unreachable, so the cap is what is worth pinning.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A file too large to be a preset is refused before it is read", "[preset-file][hostile]")
+{
+    auto const path(outputDirectory() / "much too large.swp");
+
+    // Something that would parse, so that "refused" cannot be confused with
+    // "did not parse".
+    {
+        std::string const preset("<SpectrumWorxPreset Format=\"3\" Version=\"3.0\" "
+                                 "LastModified=\"\" Comment=\"\"><Global /><Modules />"
+                                 "</SpectrumWorxPreset>");
+        std::ofstream stream(path, std::ios::binary | std::ios::trunc);
+        REQUIRE(stream.write(preset.data(), static_cast<std::streamsize>(preset.size())));
+    }
+    REQUIRE(readPresetFile(path)); // it reads at this size
+
+    std::error_code error;
+    std::filesystem::resize_file(path, LE::SW::maximumPresetSize + 1, error);
+    REQUIRE(!error);
+    REQUIRE(std::filesystem::file_size(path) == LE::SW::maximumPresetSize + 1);
+
+    // The same bytes at the front, and now it is not a preset.
+    CHECK(!readPresetFile(path));
+
+    std::filesystem::remove(path, error);
+}
