@@ -74,8 +74,16 @@ void publishModuleMove(SpectrumWorxCore &core, ToEngineQueue &toEngine, std::uin
         core.moveModule(from, to);
         return;
     }
-    LE_ASSERT_MSG(toEngine.push(moveModule(from, to)),
-                  "The command queue is full; a module move was dropped.");
+    if (toEngine.push(moveModule(from, to)))
+        return;
+
+    /// \note Nothing to undo, unlike its two neighbours -- a move owns nothing --
+    /// so the drop is the whole of it. Written this way round regardless, because
+    /// the push was inside the assert and `LE_ASSERT_MSG` is
+    /// `static_cast<void>(0)` under NDEBUG: every shipped build reordered the
+    /// rack and the saved state and left the engine playing the old order.
+    ///                                       (08.08.2026.) (SW port)
+    LE_ASSERT_MSG(false, "The command queue is full; a module move was dropped.");
 }
 
 void publishChain(SpectrumWorxCore &core, ToEngineQueue &toEngine, AutomatedModuleChain &newChain)
