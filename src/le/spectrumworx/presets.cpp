@@ -455,6 +455,9 @@ void defaultPresetProblemReporter(PresetProblem const problem, std::string_view 
     case PresetProblem::SampleNotLoaded:
         ++report_.samplesNotLoaded;
         return;
+    case PresetProblem::TooManyModules:
+        ++report_.modulesDropped;
+        return;
     }
 }
 
@@ -569,17 +572,43 @@ void ParametersLoader::loadModuleChain(ModuleChain &newChain)
                            : pModuleParameters->FirstChildElement();
     }
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The chain this build can hold is five modules and the file says how
+    /// many it wants, so the two have to be reconciled here -- and this only
+    /// *asserted* that they matched, which is a release build with no bound at
+    /// all on a number a file supplies.
+    ///
+    ///   What a longer chain then reaches is not a longer chain. Every index in
+    /// the addressing scheme is a byte (`ParameterID`), the parameter list is
+    /// built once for `maxNumberOfModules` slots and a module past the fifth has
+    /// no id for a host to reach it by; the rack has five strips. And
+    /// `ModuleChainBase::size()` is a `std::uint8_t`, so the 256th module makes a
+    /// full chain report itself as **empty** -- one of the two truncations in
+    /// this finding, the other being right here.
+    ///
+    ///   So the extra modules are refused rather than built, and said so. A
+    /// preset that wants more slots than this build has is a legitimate thing for
+    /// a *later* version to have written, which is why it reads as a report about
+    /// the file rather than a failure to load it: everything up to the fifth
+    /// module loads and plays.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
     std::int8_t const noModule(-1);
-    /// \note Counted for the assert at the bottom and nothing else, so in a
-    /// release build it is set and never read.
-    [[maybe_unused]] std::uint8_t moduleIndex(0);
+    std::uint8_t moduleIndex(0);
     while (pParameters_)
     {
         using namespace Effects;
         auto const [effectIndex, effectName](currentEffect());
         bool const foundEffect(effectIndex != noModule);
         bool const effectEnabled(foundEffect && includedEffects[effectIndex]);
-        if (foundEffect && effectEnabled)
+        if (moduleIndex >= SW::Constants::maxNumberOfModules)
+        {
+            reportPresetProblem(PresetProblem::TooManyModules, effectName);
+        }
+        else if (foundEffect && effectEnabled)
         {
             LE_ASSUME(effectIndex >= 0);
             using namespace Engine;
@@ -605,8 +634,7 @@ void ParametersLoader::loadModuleChain(ModuleChain &newChain)
                                                  : pParameters_->NextSiblingElement();
     }
 
-    LE_ASSERT_MSG(moduleIndex <= SW::Constants::maxNumberOfModules,
-                  "Preset loaded too many modules?");
+    LE_ASSERT(moduleIndex <= SW::Constants::maxNumberOfModules);
 }
 
 bool ParametersLoader::switchedToModuleParameters() const

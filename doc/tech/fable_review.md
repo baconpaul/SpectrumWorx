@@ -373,8 +373,15 @@ torn down before the state it reads.
   file menu. `GUI::loadPreset`'s own summary still can, when a window happens to
   be open during a restore. That is asserted against (`GUI::UnattendedLoad`) and
   recorded in `tech_debt.md`, per Paul's "make that an assert for now".
-- **Unbounded module count** in a preset/state (`presets.cpp:562-596`, only a
+- ✅ **Unbounded module count** in a preset/state (`presets.cpp:562-596`, only a
   debug assert); `ModuleChainBase::size()` truncates to `uint8_t` at 256.
+  **Done.** The extra modules are refused rather than built, and reported: a file
+  wanting more slots than this build has is something a *later* version could
+  legitimately have written, so everything up to the fifth module loads and plays
+  and the rest is a statement about the file. `size()` saturates instead of
+  wrapping — a chain of 256 reported itself **empty**, and every caller of it asks
+  a question where "empty" is an answer they act on. A seven-module preset went
+  `7 == 5` in release and aborted on the debug assert; both are green now.
 - ✅ **Locale-dependent float I/O** (`%.9g`/`strtod`, no `"C"` imbue) — a
   comma-decimal host writes unreadable presets and reads every factory float as
   its integer part.
