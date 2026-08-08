@@ -168,7 +168,6 @@ TEST_CASE("The supported formats wildcard names what can be loaded", "[external-
     CHECK(wildcards.containsIgnoreCase("*.wav"));
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Headers that describe audio nobody has
@@ -337,8 +336,7 @@ TEST_CASE("A mono file is still duplicated into both channels", "[external-audio
     CHECK(sample.channel2()[0] == sample.channel1()[0]);
 }
 
-TEST_CASE("A resample that would run past the length guard is refused",
-          "[external-audio][hostile]")
+TEST_CASE("A resample that would run past the length guard is refused", "[external-audio][hostile]")
 {
     ////////////////////////////////////////////////////////////////////////////
     ///
