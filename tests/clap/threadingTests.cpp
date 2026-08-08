@@ -39,6 +39,7 @@
 #include "le/spectrumworx/presetStorage.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <algorithm>
 #include <atomic>
@@ -153,6 +154,27 @@ class AudioThread
         thread_.join();
     }
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Waits until \p count further blocks have been rendered.
+    ///
+    /// \note For anything that asserts about what the audio thread *did* with
+    /// something the main thread queued. Stopping the thread does not drain the
+    /// queue -- `join()` sets the flag and the block in flight finishes -- so a
+    /// case that queues and then joins is asserting on whether the scheduler
+    /// happened to fit another block in. Three, not one: a block already under
+    /// way when the push landed did not see it.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    void waitForMoreBlocks(unsigned int const count = 3) const
+    {
+        auto const target(blocks_.load(std::memory_order_acquire) + count);
+        while (blocks_.load(std::memory_order_acquire) < target)
+        {
+        }
+    }
+
     /// \note Only after join(), which is what makes reading them ordered.
     bool failed() const { return failed_.load(std::memory_order_acquire); }
     unsigned int blocks() const { return blocks_.load(std::memory_order_acquire); }
@@ -240,6 +262,10 @@ TEST_CASE("A preset that changes the FFT size while audio runs still gets its re
         REQUIRE(LE::SW::GUI::loadPreset(editorHostOf(*plugin), nullptr, presetData.get(),
                                         true /*ignore external samples*/, nullptr, "Whistle"));
 
+        /// \note The preset's parameters are queued, so the audio thread has to
+        /// be given blocks in which to pick them up. \see waitForMoreBlocks.
+        audio.waitForMoreBlocks();
+
         audio.join();
         CHECK_FALSE(audio.failed());
     }
@@ -305,8 +331,24 @@ TEST_CASE("A chain queued behind a restart is resized before it is played",
     ////////////////////////////////////////////////////////////////////////////
     CHECK(engine.moduleChain().size() == 0);
     CHECK(runningFFTSize(*plugin) != 8192);
-    CHECK(host.restartRequests >= 1);
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note What the plugin asks for is a *flush*, not a restart -- and this
+    /// host declines to give it one, which is the whole point of the case. The
+    /// preset's parameters and its chain are both in the queue; nothing has
+    /// drained them, so nothing has yet noticed that the FFT size moved, so
+    /// there is nothing to ask the host to restart *for*. A host that honoured
+    /// the flush would drain both and ask on the spot -- that is the case above,
+    /// where an audio thread does the draining.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    CHECK(host.flushRequests >= 1);
+    CHECK(host.restartRequests == 0);
+
+    /// \note So the restart here is one this host does of its own accord, which
+    /// it is always free to do. `deactivate()` is where both queues are emptied
+    /// and where the setup lands.
     plugin.restartIfAsked();
 
     // The restart is where both halves land, and they have to land together.
@@ -515,4 +557,104 @@ TEST_CASE("A module the host displaces is freed on the main thread", "[clap][thr
     plugin.process(leftIn, rightIn, leftOut, rightOut, nullptr, &*empty);
     CHECK(engine.moduleChain().size() == 0);
     plugin.pumpMainThread();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note T2.3. A preset load is `[main-thread]` and it was writing the six
+/// global parameters straight into the engine -- the ones `process()` reads on
+/// every block, from the other thread, with nothing between them. A user
+/// browsing presets with the transport rolling is not an exotic case; it is the
+/// case. Thread sanitizer names it as a write/read race on the parameter itself.
+///
+///   They travel by queue now, which is what makes the timing visible and worth
+/// asserting: for the length of one drain the engine is legitimately still
+/// running the previous preset's gain. That is exactly the arrangement the
+/// module chain has always been in -- `publishChain()` queues it too -- and the
+/// two now arrive together instead of one going round the other.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A preset's global parameters reach a running engine through the queue",
+          "[clap][threading][presets]")
+{
+    using LE::SW::GlobalParameters::OutputGain;
+
+    Entry const entry;
+
+    TestHost host(TestHost::everything());
+    ActivePlugin plugin(sampleRate, blockSize, host);
+
+    auto &engine(editorHostOf(*plugin).core());
+
+    /// \note The preset's output gain is 2, and the default is 1 -- a global
+    /// that is not spectral, so what is being watched is the parameter itself
+    /// rather than the setup it triggers.
+    REQUIRE_THAT(float(engine.parameters().get<OutputGain>()),
+                 Catch::Matchers::WithinAbs(1.0, 0.001));
+
+    auto presetData(LE::SW::readPresetFile(presetWithABiggerFFT()));
+    REQUIRE(presetData);
+    REQUIRE(LE::SW::GUI::loadPreset(editorHostOf(*plugin), nullptr, presetData.get(),
+                                    true /*ignore external samples*/, nullptr, "Whistle"));
+
+    // Queued, not written: the audio thread has not been given a chance yet.
+    CHECK_THAT(float(engine.parameters().get<OutputGain>()),
+               Catch::Matchers::WithinAbs(1.0, 0.001));
+
+    /// \note And the plugin asked to be drained, which is the half a parked host
+    /// depends on: with no block coming, `params.flush()` is the only thing that
+    /// will ever apply this preset.
+    CHECK(host.flushRequests >= 1);
+
+    plugin.flush();
+
+    CHECK_THAT(float(engine.parameters().get<OutputGain>()),
+               Catch::Matchers::WithinAbs(2.0, 0.001));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note And the encoding those edits cross in, which T2.3 turned up rather than
+/// caused. `EditorHost::editParameter` takes the value the *host automation
+/// edge* speaks, and `FullRangeAutomatedParameter` carries a power-of-two
+/// parameter as its exponent -- so an FFT size crosses as 11, not as 2048.
+/// Everything on the interface side holds 2048.
+///
+///   Nothing converted. The settings page handed `queueGlobalParameter` a raw
+/// 2048, which in a checked build asserted inside
+/// `convertLinearRange2PowerOfTwo` -- its six-wide source range is 7 to 13 --
+/// and in a shipped build produced whatever that arithmetic makes of a number
+/// two orders of magnitude outside it. The three *knobs* were fine, being
+/// linear, which is why it survived: the fault was in the three combo boxes
+/// nothing drives headlessly.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A global parameter crosses to the engine in the units the edge speaks",
+          "[clap][threading]")
+{
+    using LE::SW::GlobalParameters::FFTSize;
+    using LE::SW::GlobalParameters::Parameters;
+
+    Entry const entry;
+
+    ActivePlugin plugin(sampleRate, blockSize);
+    auto &engine(editorHostOf(*plugin).core());
+
+    REQUIRE(unsigned(engine.parameters().get<FFTSize>()) != 1024u);
+
+    // What the settings page does when the user picks 1024 from the list.
+    editorHostOf(*plugin).editGlobalParameter(LE::Parameters::IndexOf<Parameters, FFTSize>::value,
+                                              1024);
+
+    std::vector<float> leftIn(blockSize, 0.0f), rightIn(blockSize, 0.0f);
+    std::vector<float> leftOut(blockSize), rightOut(blockSize);
+    plugin.process(leftIn, rightIn, leftOut, rightOut);
+
+    // 1024, and not the 2048 an unconverted value would have left in place.
+    CHECK(unsigned(engine.parameters().get<FFTSize>()) == 1024u);
+
+    plugin.restartIfAsked();
+    CHECK(runningFFTSize(*plugin) == 1024);
 }

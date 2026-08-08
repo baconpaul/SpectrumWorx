@@ -19,6 +19,7 @@
 //------------------------------------------------------------------------------
 #include "core/automatedModuleChain.hpp"
 #include "core/spectrumWorxCore.hpp"
+#include "core/threading/threadCheck.hpp"
 
 #include "le/spectrumworx/effects/configuration/constants.hpp"
 #include "le/spectrumworx/engine/moduleParameters.hpp"
@@ -57,8 +58,23 @@ class Engine : public LE::SW::SpectrumWorxCore
 
     Program &program() { return program_; }
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief One global parameter, straight into the engine.
+    ///
+    /// \note In the audio thread's role, which is what a test standing in for a
+    /// host parameter event actually is: `setGlobalParameter` asserts that the
+    /// calling thread owns the engine, and while this one is running that means
+    /// the audio thread. Saying so is the same discipline `TestHost::AudioCallback`
+    /// imposes on the CLAP cases -- a harness that mutates a running engine
+    /// without declaring which role it is playing is not reproducing anything a
+    /// host does.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
     template <class Parameter> bool set(typename Parameter::param_type const value)
     {
+        LE::SW::Threading::ScopedAudioThreadEntry const audioThread;
         return Core::setGlobalParameter<Parameter>(*this, value);
     }
 

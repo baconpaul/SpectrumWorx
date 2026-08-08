@@ -1790,13 +1790,17 @@ void SpectrumWorxEditor::pumpModulatedValues()
     });
 }
 
+/// \note `editGlobalParameter` rather than `editParameter`, which is what this
+/// built the ParameterID for and called directly. The value here is in the
+/// parameter's own units -- that is what every caller holds and what this
+/// function's declaration has always said -- and `editParameter` takes the
+/// automation edge's, which for a power-of-two parameter is the exponent. So the
+/// three knobs worked, being linear, and the settings page's FFT size, overlap
+/// factor and window function did not.
+///                                           (08.08.2026.) (SW port)
 void SpectrumWorxEditor::queueGlobalParameter(std::uint8_t const index, float const value) const
 {
-    ParameterID parameterID;
-    parameterID.value.type = ParameterID::GlobalParameter;
-    parameterID.value._.global = {ParameterID::Zero, ParameterID::Zero, index};
-
-    editorHost().editParameter(parameterID, value);
+    editorHost().editGlobalParameter(index, value);
 }
 
 void SpectrumWorxEditor::updateModuleParameterAndNotifyHost(ModuleUI &moduleUI,

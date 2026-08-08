@@ -1880,6 +1880,25 @@ void SpectrumWorxCLAP::HostProxy::presetChangeEnd() const
     if (plugin.spectralSetupPending() &&
         !plugin.restartRequested_.exchange(true, std::memory_order_acq_rel))
         plugin._host.requestRestart();
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note And "come and collect it", because since the six global parameters
+    /// stopped being written straight into a running engine they travel by queue
+    /// like every other edit -- and a queue nobody drains is a preset that never
+    /// arrives. A knob gets this for free from `automatedParameterChanged`; a
+    /// preset makes no per-parameter notification, by design, so it asks once
+    /// here, at the end, for all of them.
+    ///
+    ///   It matters most for the host that has no audio thread to drain them:
+    /// the transport is parked, no block is coming, and `params.flush()` is what
+    /// CLAP offers instead. Without it a preset that changes the FFT size would
+    /// wait for the next block to ask for the restart that applies it, and there
+    /// is no next block.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    plugin_.requestParameterFlush();
 }
 
 bool SpectrumWorxCLAP::HostProxy::reportNewLatencyInSamples(unsigned int const latency) const

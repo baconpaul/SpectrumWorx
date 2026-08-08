@@ -125,7 +125,7 @@ TEST_CASE("A host that answers the thread check is marked dirty where it stands"
     LE::SW::ParameterID target;
     target.binaryValue = global.id;
 
-    auto const callbacksBefore(host.mainThreadCallbacks);
+    unsigned const callbacksBefore(host.mainThreadCallbacks);
 
     editorHostOf(*plugin).automation().automatedParameterChanged(
         target,
@@ -197,7 +197,7 @@ TEST_CASE("A knob drag reaches the host as a balanced gesture around its value",
     target.binaryValue = global.id;
 
     auto &automation(editorHostOf(*plugin).automation());
-    auto const flushRequestsBefore(host.flushRequests);
+    unsigned const flushRequestsBefore(host.flushRequests);
 
     automation.automatedParameterBeginEdit(target);
     automation.automatedParameterChanged(

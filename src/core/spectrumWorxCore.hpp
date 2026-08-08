@@ -363,6 +363,21 @@ class SpectrumWorxCore : public Host2PluginInteropControler,
     template <class Parameter, class SWImpl> //...mrmlj...ugly duplication workaround...
     static bool setGlobalParameter(SWImpl &swImpl, typename Parameter::param_type const newValue)
     {
+        ////////////////////////////////////////////////////////////////////////
+        ///
+        /// \note The check the other engine mutators all have and this one did
+        /// not, which is how a preset load came to write the six parameters
+        /// `process()` reads every block, from the main thread, with audio
+        /// running. Every route in is covered by it: a host automation event and
+        /// a drained command arrive on the audio thread, a preset with no audio
+        /// running arrives on the main thread owning the engine outright, and a
+        /// preset *with* audio running now queues instead (presetLoading.cpp).
+        ///                                   (08.08.2026.) (SW port)
+        ///
+        ////////////////////////////////////////////////////////////////////////
+        LE_ASSERT_MSG(swImpl.currentThreadMayMutateEngineState(),
+                      "A global parameter written by a thread that does not own the engine.");
+
         Parameter &parameter(swImpl.parameters().template get<Parameter>());
         typename Parameter::value_type const oldValue(parameter);
         if (newValue == oldValue)

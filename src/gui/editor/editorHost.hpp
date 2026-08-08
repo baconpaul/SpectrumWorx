@@ -92,6 +92,33 @@ class EditorHost
     ////////////////////////////////////////////////////////////////////////////
     virtual void editParameter(ParameterID, float value) const = 0;
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief One of the six global parameters, by its index in
+    /// `GlobalParameters::Parameters` and **in its own units**. `[main-thread]`
+    ///
+    /// \note Which is what distinguishes it from `editParameter()`, whose value
+    /// is in the units the host automation edge speaks -- and those are not the
+    /// same numbers. `FullRangeAutomatedParameter` carries a power-of-two
+    /// parameter as its *exponent*, so the FFT size crosses that edge as 11 and
+    /// not as 2048, and an enumerated parameter crosses as its ordinal.
+    ///
+    ///   Everything on this side holds the value the user sees, so the
+    /// conversion belongs at the boundary. It was at neither end: the settings
+    /// page handed `queueGlobalParameter` a raw 2048, which the edge then read
+    /// as an exponent far outside the six it has -- an assertion in a checked
+    /// build and a meaningless size in a shipped one, on all three of the FFT
+    /// size, the overlap factor and the window function.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    /// \note Not virtual, and defined once in terms of `editParameter()` above:
+    /// the conversion is a property of the protocol, not of whoever is hosting
+    /// the editor, and three implementations of it would be three chances to
+    /// disagree.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    void editGlobalParameter(std::uint8_t index, float value) const;
+
     /// \brief Puts \p effectIndex in \p slot, in both copies. `[main-thread]`
     /// \return false when the effect is not in this build, which is the one
     /// failure a caller can still be told about synchronously.

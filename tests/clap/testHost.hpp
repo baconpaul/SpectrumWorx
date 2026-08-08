@@ -165,15 +165,28 @@ class TestHost
     // What it was asked
     ////////////////////////////////////////////////////////////////////////////
 
-    clap_param_rescan_flags rescanFlags{0};
-    unsigned flushRequests{0};
-    unsigned mainThreadCallbacks{0};
-    unsigned restartRequests{0};
-    unsigned processRequests{0};
-    unsigned dirtyMarks{0};
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Atomic, because a real host is counting these from whichever of its
+    /// threads called in and so is this one. `request_restart`, `request_flush`
+    /// and `params.rescan` are all reachable from `process()`, and the cases in
+    /// threadingTests.cpp have an audio thread of their own -- so a plain
+    /// `unsigned` here is a data race in the *harness*, which tsan reports at
+    /// length while saying nothing about the plugin. It said exactly that about
+    /// `restartRequests` the first time anything drove two threads at it.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    std::atomic<clap_param_rescan_flags> rescanFlags{0};
+    std::atomic<unsigned> flushRequests{0};
+    std::atomic<unsigned> mainThreadCallbacks{0};
+    std::atomic<unsigned> restartRequests{0};
+    std::atomic<unsigned> processRequests{0};
+    std::atomic<unsigned> dirtyMarks{0};
     /// How often the plugin asked which thread it was on, which is the evidence
     /// that it asks at all rather than always taking the deferral.
-    unsigned threadChecks{0};
+    std::atomic<unsigned> threadChecks{0};
 
     ////////////////////////////////////////////////////////////////////////////
     ///

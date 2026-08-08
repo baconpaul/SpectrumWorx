@@ -19,11 +19,13 @@
 #include "core/host_interop/plugin2Host.hpp"
 #include "core/modules/finalImplementations.hpp"
 #include "core/modules/moduleDSPAndGUI.hpp"
+#include "core/parameterID.hpp"
 #include "core/spectrumWorxCore.hpp"
 #include "core/threading/publish.hpp"
 
 #include "gui/gui.hpp" // warningMessageBox()
 
+#include "le/math/conversion.hpp"
 #include "le/parameters/parametersUtilities.hpp"
 #include "le/spectrumworx/presetFile.hpp"
 
@@ -37,23 +39,54 @@ namespace
 {
 //------------------------------------------------------------------------------
 
-/// \brief Pushes a whole GlobalParameters::Parameters through the engine's own
-/// setter, one parameter at a time.
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Puts a whole GlobalParameters::Parameters into the engine, one
+/// parameter at a time.
 ///
 /// \note This was `SpectrumWorx::resetForGlobalParameters()`, and it is not the
 /// same as assigning the struct: FFT size, overlap factor and window function
 /// each reconfigure the engine, so a preset that changes one has to go through
 /// `setGlobalParameter` rather than land in the field behind its back.
+///
+/// \note By which route depends on who owns the engine, which is the whole of
+/// §2 rules 1 and 2 and is what this got wrong. A preset load runs on the main
+/// thread and a user browsing presets with the transport rolling is the ordinary
+/// case, so `setGlobalParameter` was writing the six parameters that `process()`
+/// reads every block, from the other thread, with nothing between them. Thread
+/// sanitizer names it as a write/read race on the parameter itself.
+///
+///   With audio running they go the way every other edit goes: applied to this
+/// thread's copy and queued for the engine, which picks them up at the top of
+/// its next block. That defers them, and the deferral is not new -- the chain
+/// this same load publishes has always been queued the same way, and lands at
+/// the same points (a block, a `params.flush()`, or `deactivate()`).
+///                                           (08.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
 struct GlobalParameterUpdater
 {
     using result_type = void;
 
-    SpectrumWorxCore &core;
+    EditorHost &host;
 
     template <class Parameter> result_type operator()(Parameter const &parameter) const
     {
+        if (host.core().engineIsRunning())
+        {
+            host.editGlobalParameter(
+                LE::Parameters::IndexOf<GlobalParameters::Parameters, Parameter>::value,
+                Math::convert<float>(parameter.getValue()));
+            return;
+        }
+
+        /// \note Nothing is processing, so the main thread owns the engine and
+        /// may simply do it -- and has to: with no audio thread there is nothing
+        /// to drain the queue, and this is the arrangement a session is restored
+        /// in.
         LE_VERIFY((SpectrumWorxCore::setGlobalParameter<Parameter, SpectrumWorxCore>(
-            core, parameter.getValue())));
+            host.core(), parameter.getValue())));
     }
 }; // struct GlobalParameterUpdater
 
@@ -190,7 +223,7 @@ struct Loader
 
     bool setNewGlobalParameters(GlobalParameters::Parameters const &newParameters) const
     {
-        LE::Parameters::forEach(newParameters, GlobalParameterUpdater{host.core()});
+        LE::Parameters::forEach(newParameters, GlobalParameterUpdater{host});
         return true;
     }
 
