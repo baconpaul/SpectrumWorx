@@ -30,6 +30,7 @@
 #include "le/parameters/parametersUtilities.hpp"
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
 #include "le/spectrumworx/presetFile.hpp"
+#include "le/spectrumworx/presetStorage.hpp" // maximumPresetSize
 
 /// \note For ScopedProblemCounter, which swaps the default preset-problem
 /// reporter -- a `juce::AlertWindow` per problem -- for a counter. Without it a
@@ -834,4 +835,65 @@ TEST_CASE("State naming an effect this build does not have loads the rest", "[cl
               .parameters()
               .get<LE::SW::GlobalParameters::InputGain>()
               .getValue() == Catch::Approx(0.25f));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// A stream that never ends
+// ------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note `readWholeStream`'s only exit was the stream saying it had no more, so
+/// a host handing over one that never does -- a corrupt project, a pipe nobody
+/// closes -- grew the buffer until the allocation threw. `stateLoad` is
+/// `noexcept`, so that throw is `std::terminate` and the host dies opening a
+/// project.
+///
+///   Held to the preset reader's cap, which is the same grammar and about seven
+/// thousand times the largest thing the format can produce.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+/// \brief A `clap_istream` that answers every read in full, forever.
+class EndlessStream
+{
+  public:
+    EndlessStream()
+    {
+        stream_.ctx = this;
+        stream_.read = [](clap_istream const *const stream, void *const buffer,
+                          std::uint64_t const size) -> std::int64_t {
+            auto &self(*static_cast<EndlessStream *>(stream->ctx));
+            std::memset(buffer, ' ', size);
+            self.handed_ += size;
+            return static_cast<std::int64_t>(size);
+        };
+    }
+
+    EndlessStream(EndlessStream const &) = delete;
+    EndlessStream &operator=(EndlessStream const &) = delete;
+
+    clap_istream const *operator&() const { return &stream_; }
+
+    std::uint64_t handed() const { return handed_; }
+
+  private:
+    clap_istream stream_{};
+    std::uint64_t handed_{0};
+}; // class EndlessStream
+} // anonymous namespace
+
+TEST_CASE("A state stream that never ends is given up on", "[clap][state][hostile]")
+{
+    Plugin const plugin;
+
+    EndlessStream stream;
+    CHECK(!plugin.state().load(&*plugin, &stream));
+
+    // It stopped, and it stopped near the cap rather than at whatever the
+    // allocator happened to refuse.
+    CHECK(stream.handed() <= LE::SW::maximumPresetSize + (1u << 12));
 }

@@ -46,6 +46,23 @@ Preset::InMemoryPreset readPresetFile(std::filesystem::path const &file)
     if (error)
         return {};
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The size is checked before it is narrowed, which it was not.
+    /// `static_cast<unsigned int>(fileSize)` on a file over 4 GiB kept
+    /// `size mod 2^32` and then parsed that prefix as a whole preset; at exactly
+    /// 4 GiB - 1 the `presetSize + 1` below wrapped to zero, so a zero-length
+    /// allocation was handed a 4 GiB read.
+    ///
+    ///   Neither needs a hostile file to reach -- any large file renamed to
+    /// `.swp`, or picked in the browser, is one.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    if (fileSize > maximumPresetSize)
+        return {};
+
     auto const presetSize(static_cast<unsigned int>(fileSize));
 
     std::ifstream stream(file, std::ios::binary);
