@@ -1712,7 +1712,34 @@ void SpectrumWorxCLAP::markCurrentProgramAsModified() const
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note A function-try-block on both halves of `clap_plugin_state`, because
+/// both are `noexcept` and neither could promise it.
+///
+///   Every CLAP entry point is `noexcept`, so an exception crossing one is
+/// `std::terminate` rather than a failed call -- the host dies instead of saying
+/// it could not read the project. These two are where that is reachable: between
+/// them they buffer a stream a host supplies, build the whole module chain out
+/// of it, and decode whatever audio file the state names, and all of that
+/// allocates. `Sample::load` is the sharpest -- a session naming a long file
+/// asks for hundreds of megabytes on the way through, from inside `stateLoad`.
+///
+///   CLAP already has an answer for a state that will not load: return false,
+/// and the host reports it. That is better than the process ending, whatever the
+/// reason -- and there is nothing this plugin could usefully do about
+/// `bad_alloc` anyway.
+///
+/// \note A function-try-block rather than a wrapper so that the bodies stay
+/// where they are and this stays legible as one guarantee about two entry
+/// points. Falling off the end of the handler is what `return false` is for; for
+/// a non-void function it would otherwise be undefined.
+///                                           (08.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
 bool SpectrumWorxCLAP::stateSave(clap_ostream const *const stream) noexcept
+try
 {
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -1750,8 +1777,13 @@ bool SpectrumWorxCLAP::stateSave(clap_ostream const *const stream) noexcept
     /// nothing after it.
     return writeFully(stream, state.c_str(), state.size() + 1);
 }
+catch (...)
+{
+    return false;
+}
 
 bool SpectrumWorxCLAP::stateLoad(clap_istream const *const stream) noexcept
+try
 {
     auto state(readWholeStream(stream));
     if (!state)
@@ -1781,6 +1813,10 @@ bool SpectrumWorxCLAP::stateLoad(clap_istream const *const stream) noexcept
     ///                                       (06.08.2026.) (SW port)
     requestRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT | CLAP_PARAM_RESCAN_VALUES);
     return true;
+}
+catch (...)
+{
+    return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
