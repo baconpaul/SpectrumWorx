@@ -310,6 +310,31 @@ bool SpectrumWorxCLAP::init() noexcept
 bool SpectrumWorxCLAP::activate(double const sampleRate, std::uint32_t,
                                 std::uint32_t const maxFrames) noexcept
 {
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note A host that activates an already-active plugin is misbehaving, and
+    /// clap-helpers catches only half of it. At this build's checking level it
+    /// says so, and when the sample rate *differs* it simulates a deactivation
+    /// first -- but when the rate is the same it says so and calls this anyway.
+    /// The `assert( !_isActive )` standing between the two is `assert`, so in
+    /// every shipped build there is nothing there at all (plugin.hxx:349-401).
+    ///
+    ///   `initialise()` below reallocates the entire spectral working set, and
+    /// the audio thread may be inside `process()` reading it at that moment:
+    /// `start_processing` was called for the first activation and nothing has
+    /// cancelled it. That is a use-after-free of the shared storage, off the one
+    /// entry point a host is most likely to get wrong.
+    ///
+    ///   Answering "yes, active" is not a lie, and it is the only answer that
+    /// does not free something out from under a live callback. The rate asked for
+    /// here is the rate already running -- clap-helpers has dealt with the case
+    /// where it is not, and that path arrives with `engineRunning_` already false.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    if (engineRunning_)
+        return true;
+
     /// \note Whatever the audio thread handed back and nobody has collected yet.
     /// A host that restarts the plugin need not call `on_main_thread` in between,
     /// and every one of these is a live allocation.

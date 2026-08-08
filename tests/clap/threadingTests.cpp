@@ -331,3 +331,86 @@ TEST_CASE("A chain queued behind a restart is resized before it is played",
                             [](float const sample) { return std::isfinite(sample); }));
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note T2.6. `activate()` is `[main-thread & !active]`, and a host that ignores
+/// the second half of that gets the whole spectral working set reallocated under
+/// a `process()` that is reading it.
+///
+///   clap-helpers is not the backstop it looks like. It reports the double
+/// activation, and when the sample rate differs it simulates a deactivation
+/// first -- but at the *same* rate it reports and calls through, with only an
+/// `assert` in between, which no shipped build compiles.
+///
+/// \note Against `nullHost()` deliberately, where every other case here uses a
+/// `TestHost`. Offering `clap.thread-check` would turn clap-helpers' own contract
+/// checking on, and this harness cannot answer it truthfully with two threads
+/// live: `TestHost` tracks one audio-callback window for the whole host, so while
+/// the audio thread is inside `process()` it answers "not the main thread" to the
+/// main thread as well. That is the harness's limit, not the plugin's, and
+/// borrowing it here would only produce a misbehaviour report about the test.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A second activate while the first is still processing changes nothing",
+          "[clap][threading]")
+{
+#ifndef NDEBUG
+    SKIP("A checked build cannot reach the plugin at all: clap-helpers' own "
+         "`assert( !_isActive )` aborts first. That assertion is exactly what a shipped build "
+         "does not have, which is what this is about.");
+#endif // NDEBUG
+
+    Entry const entry;
+
+    ActivePlugin plugin(sampleRate, blockSize);
+    auto const fftSizeBefore(runningFFTSize(*plugin));
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note An input gain that is not unity, delivered with every block, and it
+    /// is what makes the reallocation observable rather than merely wrong.
+    /// `SpectrumWorxCore::process()` passes the host's own pointers straight
+    /// through while the gain is 1 and copies into `buffers_` only when it is
+    /// not -- so at the default gain the buffers `setBlockSize()` frees are
+    /// buffers nothing is reading.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    auto const inputGain(infoFor(*plugin, parameterID(globalType, 0, 0)));
+    OneParameterEvent const loud(inputGain.id, inputGain.max_value);
+
+    {
+        AudioThread audio(plugin, &*loud);
+
+        ////////////////////////////////////////////////////////////////////////
+        ///
+        /// \note The same sample rate and a *different* maximum block size, which
+        /// is the arrangement with something to reallocate. clap-helpers keys its
+        /// simulated deactivation on the sample rate alone, so this walks
+        /// straight through it -- and at an unchanged rate and block size
+        /// `resize()` finds nothing to do, which is why activating twice with
+        /// identical arguments is harmless and proves nothing.
+        ///
+        ///   Many, not one: the window in which a reallocation overlaps a block
+        /// is the length of a `process()` call.
+        ///
+        ////////////////////////////////////////////////////////////////////////
+        for (unsigned int attempt(0); attempt < 256; ++attempt)
+            CHECK(plugin->activate(&*plugin, sampleRate, 1,
+                                   (attempt % 2) ? blockSize * 8 : blockSize));
+
+        audio.join();
+        CHECK_FALSE(audio.failed());
+        CHECK(audio.blocks() > 0);
+    }
+
+    // Still the plugin it was, and still able to render.
+    CHECK(runningFFTSize(*plugin) == fftSizeBefore);
+
+    std::vector<float> leftIn(blockSize, 0.25f), rightIn(blockSize, 0.25f);
+    std::vector<float> leftOut(blockSize), rightOut(blockSize);
+    plugin.process(leftIn, rightIn, leftOut, rightOut);
+    CHECK(std::all_of(leftOut.begin(), leftOut.end(),
+                      [](float const sample) { return std::isfinite(sample); }));
+}
