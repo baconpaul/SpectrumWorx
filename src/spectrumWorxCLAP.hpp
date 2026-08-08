@@ -385,6 +385,17 @@ class SpectrumWorxCLAP final
     /// `[audio-thread]` \see the definition.
     void retire(Threading::ToUI::Retired, void *pObject);
 
+  public:
+    /// \brief The one reference \p module carries, handed back for the main
+    /// thread to release. `[audio-thread]`
+    ///
+    /// \note Public, and named, because `host2PluginImpl.inl` is what calls it --
+    /// a header that knows nothing of this plugin or of the protocol, only that
+    /// its `Impl` can be given a module it has taken out of the chain.
+    /// \see AutomatedModuleChain::setParameter.
+    void retireModule(Module &module) { retire(Threading::ToUI::Retired::Module, &module); }
+
+  private:
     /// \brief Says the chain changed shape, and asks the host to re-read the
     /// parameters that describe it. `[audio-thread]`
     void chainChanged();

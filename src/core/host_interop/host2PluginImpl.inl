@@ -144,8 +144,20 @@ template <class Impl, class Protocol> class Host2PluginInteropImpl<Impl, Protoco
             /// other route builds its module on the main thread and hands the
             /// engine a pointer. See tech_debt.md.
             ///                               (02.08.2026.) (SW port)
-            auto const result(
-                moduleChain.setParameter(moduleIndex, effectIndex, pImpl->moduleInitialiser()));
+            typename Impl::Module *pDisplaced(nullptr);
+            auto const result(moduleChain.setParameter(moduleIndex, effectIndex,
+                                                       pImpl->moduleInitialiser(), &pDisplaced));
+
+            /// \note Handed back rather than dropped. This runs inside
+            /// `process()`, and letting the last reference to the module that
+            /// came out expire here is a `delete` plus a `HeapSharedStorage`
+            /// free on the audio thread -- which is what the retire protocol
+            /// exists to prevent, and which every other route into the chain
+            /// already goes through. \see AutomatedModuleChain::setParameter.
+            ///                               (08.08.2026.) (SW port)
+            if (pDisplaced)
+                pImpl->retireModule(*pDisplaced);
+
             if (result.second == effectIndex)
             {
                 //...mrmlj...http://lists.apple.com/archives/coreaudio-api/2005/Oct/msg00164.html

@@ -104,13 +104,41 @@ class AutomatedModuleChain final : public Engine::ModuleChainImpl
                    : nullptr;
     }
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Puts the effect \p newValue names into slot \p moduleIndex.
+    ///
+    /// \param ppDisplaced receives whatever this call took out of circulation --
+    ///        the module that was in the slot, or, when the new one could not be
+    ///        built or initialised, the new one -- carrying **one reference,
+    ///        transferred**. Set to null when there was nothing.
+    ///
+    /// \note That parameter is not optional, and it is the whole point of this
+    /// function's shape. Unlinking a node drops the chain's reference to it, and
+    /// when nothing else holds one -- a slot the *host* changed, with the window
+    /// shut and no strip on screen -- that was the last, so the unlink ran the
+    /// deleter: a `delete` and a `HeapSharedStorage` free, **inside `process()`**,
+    /// going around the retire protocol that exists so that nothing is ever
+    /// destroyed on the audio thread (threading_model.md §5).
+    ///
+    ///   `installModuleInSlot()` has taken the reference first and handed it back
+    /// for as long as that protocol has existed; this is the same three lines at
+    /// the one route into the chain that never got them. A caller that owns the
+    /// engine outright -- either copy on the main thread -- may simply release
+    /// what it is given.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
     template <class ModuleInitialiser>
     std::pair<LE::Utility::IntrusivePtr<typename ModuleInitialiser::Module>, std::int8_t>
     setParameter(std::uint8_t const moduleIndex, std::int8_t const newValue,
-                 ModuleInitialiser const &initialise)
+                 ModuleInitialiser const &initialise,
+                 typename ModuleInitialiser::Module **const ppDisplaced)
     {
         using Module = typename ModuleInitialiser::Module;
         using Engine::actualModule;
+
+        *ppDisplaced = nullptr;
 
         auto const effectIndex(newValue);
 
@@ -126,6 +154,7 @@ class AutomatedModuleChain final : public Engine::ModuleChainImpl
         }
         else if (effectIndex == noModule)
         {
+            takeOutOfCirculation(pCurrentModule, ppDisplaced);
             this->remove(*pCurrentModuleNode);
             return std::make_pair(nullptr, noModule);
         }
@@ -134,11 +163,53 @@ class AutomatedModuleChain final : public Engine::ModuleChainImpl
 
         if (pNewModule && initialise(*pNewModule, moduleIndex))
         {
+            takeOutOfCirculation(pCurrentModule, ppDisplaced);
             insertAtAndReplace(pCurrentModuleNode, Engine::node(*pNewModule));
             return std::make_pair(pNewModule, effectIndex);
         }
 
+        /// \note And a module that was built and could not be initialised leaves
+        /// by the same door. The chain never saw it, so the local pointer above
+        /// holds the only reference and letting it expire is the same free() on
+        /// the same thread.
+        takeOutOfCirculation(pNewModule.get(), ppDisplaced);
+
         return std::make_pair(pCurrentModule, currentEffect);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The same, destroying the displaced module on the spot.
+    ///
+    /// \note **Never from `process()`.** For a caller that owns the chain
+    /// outright and is on a thread where a `free()` is allowed: either `Program`
+    /// on the main thread, and the test harnesses driving an engine of their own.
+    /// The engine's chain, while the plugin is activated, is not such a caller --
+    /// see the overload above, which is the one it uses.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    template <class ModuleInitialiser>
+    std::pair<LE::Utility::IntrusivePtr<typename ModuleInitialiser::Module>, std::int8_t>
+    setParameter(std::uint8_t const moduleIndex, std::int8_t const newValue,
+                 ModuleInitialiser const &initialise)
+    {
+        typename ModuleInitialiser::Module *pDisplaced(nullptr);
+        auto result(setParameter(moduleIndex, newValue, initialise, &pDisplaced));
+        if (pDisplaced)
+            intrusive_ptr_release(&Engine::node(*pDisplaced));
+        return result;
+    }
+
+  private:
+    /// \brief Adds a reference to \p pModule and hands it to \p ppDisplaced, so
+    /// that whatever happens to the chain next cannot be the thing that frees it.
+    template <class Module>
+    static void takeOutOfCirculation(Module *const pModule, Module **const ppDisplaced)
+    {
+        if (!pModule)
+            return;
+        intrusive_ptr_add_ref(&Engine::node(*pModule));
+        *ppDisplaced = pModule;
     }
 }; // class AutomatedModuleChain
 

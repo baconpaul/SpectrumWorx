@@ -99,6 +99,9 @@ template <class Protocol> class ProgramParameterSetter
         auto const effectIndex(
             AutomatedParameter::template convertAutomationToParameterValue<ModuleChainParameter>(
                 value_));
+        /// \note The destroying overload, deliberately: this is the main thread's
+        /// Program, and the main thread is where things are destroyed.
+        /// \see AutomatedModuleChain::setParameter.
         pProgram->moduleChain().setParameter(parameterID.moduleIndex, effectIndex,
                                              ParametersOnlyModuleInitialiser{});
     }

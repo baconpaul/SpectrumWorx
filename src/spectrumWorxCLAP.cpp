@@ -1677,6 +1677,8 @@ bool SpectrumWorxCLAP::editSlot(std::uint8_t const slot, std::int8_t const effec
     if ((effectIndex != AutomatedModuleChain::noModule) && !pModule)
         return false;
 
+    /// \note This thread's copy, so the destroying overload is the right one.
+    /// \see AutomatedModuleChain::setParameter.
     programMain_.moduleChain().setParameter(slot, effectIndex, ParametersOnlyModuleInitialiser{});
     pushed(Threading::publishSlot(*this, toEngine_, slot, effectIndex, pModule),
            "The command queue is full; a slot change reached the interface and not the engine.");

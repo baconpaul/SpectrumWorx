@@ -33,6 +33,7 @@
 //------------------------------------------------------------------------------
 #include "clap/testHost.hpp"
 
+#include "core/modules/moduleDSPAndGUI.hpp" // the engine's own Module, to count references to one
 #include "core/spectrumWorxCore.hpp"
 #include "gui/editor/presetLoading.hpp"
 #include "le/spectrumworx/presetStorage.hpp"
@@ -77,6 +78,16 @@ std::filesystem::path presetWithABiggerFFT()
 unsigned int runningFFTSize(clap_plugin const &plugin)
 {
     return editorHostOf(plugin).core().uncheckedEngineSetup().fftSize<unsigned int>();
+}
+
+/// \brief How many references \p module is being held by.
+///
+/// \note Widened, because the count is a `std::uint8_t` and Catch2 prints one as
+/// a character -- so a failed comparison reads "  == 2", with the value it
+/// actually found rendered as an unprintable byte.
+unsigned int references(LE::SW::Module const &module)
+{
+    return LE::SW::Engine::node(module).referenceCount_;
 }
 
 /// \brief The description of one parameter, found by the id a host addresses it
@@ -413,4 +424,95 @@ TEST_CASE("A second activate while the first is still processing changes nothing
     plugin.process(leftIn, rightIn, leftOut, rightOut);
     CHECK(std::all_of(leftOut.begin(), leftOut.end(),
                       [](float const sample) { return std::isfinite(sample); }));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note T2.2, and the one route into the module chain that never joined the
+/// retire protocol.
+///
+///   A slot selector is a parameter, so a host can write one, and a host writes
+/// parameters inside `process()`. `AutomatedModuleChain::setParameter` unlinked
+/// the module that was there and let the chain's reference go -- and with no
+/// strip on screen holding one of its own, that was the last: `delete`, and a
+/// `HeapSharedStorage` free, on the audio thread. Every other way a module leaves
+/// the chain hands it to `retire()` and the main thread frees it (§5).
+///
+/// \note The case holds a reference of its own, which is what makes the
+/// difference measurable rather than merely fatal: with one outstanding, the
+/// unlink is not the last release either way, so what is left to observe is
+/// whether anybody *else* took the module up. Retired, the count is ours and the
+/// queue's; freed on the spot it would have been ours alone.
+///
+///   The other half of it is a realtime-sanitizer run, where the free inside the
+/// callback is reported directly:
+///
+///     cmake -B build-rtsan -D SW_SANITIZER=realtime -D SW_BUILD_PLUGIN_BUNDLES=OFF \
+///           -D CMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A module the host displaces is freed on the main thread", "[clap][threading]")
+{
+    Entry const entry;
+
+    TestHost host(TestHost::everything());
+    ActivePlugin plugin(sampleRate, blockSize, host);
+
+    auto &editorHost(editorHostOf(*plugin));
+    auto &engine(editorHost.core());
+
+    std::vector<float> leftIn(blockSize, 0.0f), rightIn(blockSize, 0.0f);
+    std::vector<float> leftOut(blockSize), rightOut(blockSize);
+
+    // A filled slot, put there the way the interface fills one.
+    REQUIRE(editorHost.editSlot(0, 0));
+    plugin.process(leftIn, rightIn, leftOut, rightOut);
+    plugin.pumpMainThread();
+    REQUIRE(engine.moduleChain().size() == 1);
+
+    /// \note Ours, and it has to be taken while the module is still in the chain
+    /// -- afterwards there may be nothing left to take one to.
+    auto const keep(engine.moduleChain().moduleAs<LE::SW::Module>(0));
+    REQUIRE(keep);
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note And the host empties it. `min_value` rather than a literal -1: the
+    /// selector's "no module" is the bottom of its advertised range, and a host
+    /// writing the bottom of the range is what this is.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    auto const selector(infoFor(*plugin, parameterID(moduleChainType, 0, 0)));
+    OneParameterEvent const empty(selector.id, selector.min_value);
+    plugin.process(leftIn, rightIn, leftOut, rightOut, nullptr, &*empty);
+
+    REQUIRE(engine.moduleChain().size() == 0);
+
+    // The chain let go, and the retire queue took it up: ours, and one more.
+    CHECK(references(*keep) == 2);
+
+    // ...which the main thread collects, and only then is the module gone.
+    plugin.pumpMainThread();
+    CHECK(references(*keep) == 1);
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note And once more holding nothing, which is the arrangement a user
+    /// actually has: no window, no strip, the host's own lane moving the
+    /// selector. Nothing in an ordinary build can tell the two apart -- freed by
+    /// the drain or freed inside the `process()` above, the chain that is left
+    /// is the same -- so this round is here for the realtime sanitizer, which
+    /// sees the `free()` itself and reports the call that made it.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    REQUIRE(editorHost.editSlot(0, 0));
+    plugin.process(leftIn, rightIn, leftOut, rightOut);
+    plugin.pumpMainThread();
+    REQUIRE(engine.moduleChain().size() == 1);
+
+    plugin.process(leftIn, rightIn, leftOut, rightOut, nullptr, &*empty);
+    CHECK(engine.moduleChain().size() == 0);
+    plugin.pumpMainThread();
 }
