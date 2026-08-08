@@ -207,8 +207,10 @@ void warningOkCancelBox(TCHAR const *const title, TCHAR const *const question,
 
 juce::File const &rootPath()
 {
-    static juce::File const path(
-        sst::plugininfra::paths::bestDocumentsFolderPathFor("SpectrumWorx").u8string().c_str());
+    static juce::File const path(sst::plugininfra::paths::bestDocumentsVendorFolderPathFor(
+                                     "Surge Synth Team", "SpectrumWorx")
+                                     .u8string()
+                                     .c_str());
     return path;
 }
 

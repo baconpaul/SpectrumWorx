@@ -30,22 +30,32 @@ union ParameterID
 {
 #pragma warning(push)
 #pragma warning(disable : 4480) // Nonstandard extension used: specifying underlying type for enum.
-    /// \note Deliberately not zero-based. The discriminator is the high byte of
-    /// the packed value, so a zero-based first type made the first global
-    /// parameter's ID `0x00000000` -- legal as a `clap_id`, since only
-    /// `CLAP_INVALID_ID` is reserved, but indistinguishable from an
-    /// uninitialised one in a log, a debugger or a host's saved session.
+    ////////////////////////////////////////////////////////////////////////////
     ///
-    ///   Starting at one buys the property outright rather than special-casing
-    /// the first parameter: no valid ID can be zero, so the default constructor
-    /// below yields a value that means "no parameter" and cannot be confused
-    /// with In's. Changing this renumbers every automation lane a host has
-    /// saved, which is why it happened before the first release and cannot
-    /// happen after one.
+    /// \note **Zero-based, and it stays that way.** The discriminator is the high
+    /// byte of the packed value, so the first global parameter's ID is
+    /// `0x00000000` -- legal as a `clap_id`, since only `CLAP_INVALID_ID` is
+    /// reserved, but indistinguishable from an uninitialised one in a log or a
+    /// debugger.
+    ///
+    ///   That is a real annoyance and it is the lesser one. Starting the enum at
+    /// one was tried on 07.08.2026 and reverted the same day: it makes the
+    /// discriminator disagree with every other index in this system, all of which
+    /// count from zero, and the value a default-constructed ParameterID holds
+    /// stops being a parameter at all -- so `invokeFunctorOnIdentifiedParameter`
+    /// takes its unreachable default, and a zero ID goes from meaning "In" to
+    /// meaning undefined behaviour in a release build.
+    ///
+    ///   Living with `In == 0x00000000` costs a moment's confusion at a debugger.
+    /// The alternative costs an off-by-one in the one field that says what a
+    /// packed ID *is*.
     ///                                       (07.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
     enum Type : std::uint8_t
     {
-        GlobalParameter = 1,
+        GlobalParameter,
         ModuleChainParameter,
         ModuleParameter,
         LFOParameter

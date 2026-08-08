@@ -458,9 +458,12 @@ bool SpectrumWorxCLAP::isValidParamId(clap_id const id) const noexcept
     /// for a slot whose effect does not have that parameter rather than
     /// pretending the ID is unknown, which is what keeps a host's automation
     /// lane attached across an effect swap.
+    ///
+    /// \note An upper bound only. The discriminator is zero-based -- see
+    /// ParameterID -- so `>= GlobalParameter` is `>= 0` on an unsigned byte,
+    /// which is a tautology the compiler is right to reject.
     ParameterID const parameterID{Plugins::ParameterID{id}};
-    return (parameterID.type() >= ParameterID::GlobalParameter) &&
-           (parameterID.type() <= ParameterID::LFOParameter);
+    return parameterID.type() <= ParameterID::LFOParameter;
 }
 
 std::uint32_t SpectrumWorxCLAP::paramsCount() const noexcept

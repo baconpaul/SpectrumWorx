@@ -240,12 +240,19 @@ TEST_CASE("A typed value is read in display units, not storage units", "[clap][t
     CHECK(displayOf(*plugin, params, inputGain) == "0dB");
 }
 
-TEST_CASE("A typed value out of range is clamped rather than stored", "[clap][text]")
+TEST_CASE("A typed value out of range is refused, not clamped", "[clap][text]")
 {
-    // `Parameter::setValue` answers an out-of-range value with an assertion --
-    // in a release build, by storing it -- so what a host is handed here has to
-    // already be inside the range. clap-validator's param-range-robustness makes
-    // the same point about the value entry points.
+    ////////////////////////////////////////////////////////////////////////////
+    // Refused, because clamping answers a question nobody asked: "what value of
+    // the input gain displays as 999 dB" has no answer when the gain stops at
+    // +6, and a host handed the maximum has been told the text was understood --
+    // so it commits the edit and a typo silently becomes a real parameter change.
+    //
+    // The line between "out of range" and "the maximum, printed rounded and read
+    // back" is measured rather than assumed: parse() prints the bound with this
+    // parameter's own printer and reads it back, and accepts anything no further
+    // out than that. \see Parameters::Detail::displayRounding.
+    ////////////////////////////////////////////////////////////////////////////
     Entry const entry;
     ActivePlugin plugin(48000, 512);
     auto const &params(parameters(*plugin));
@@ -258,16 +265,27 @@ TEST_CASE("A typed value out of range is clamped rather than stored", "[clap][te
             info = candidate;
     REQUIRE(info.max_value > info.min_value);
 
-    double tooLoud{0}, tooQuiet{0};
-    REQUIRE(params.text_to_value(&*plugin, inputGain, "999 dB", &tooLoud));
-    REQUIRE(params.text_to_value(&*plugin, inputGain, "-999 dB", &tooQuiet));
-    CHECK(tooLoud == info.max_value);
-    CHECK(tooQuiet == info.min_value);
+    double value{-1};
+    for (char const *const outOfRange : {"999 dB", "-999 dB", "inf", "-inf", "40 dB"})
+    {
+        INFO("'" << outOfRange << "'");
+        CHECK_FALSE(params.text_to_value(&*plugin, inputGain, outOfRange, &value));
+    }
 
-    // An infinity is text strtod reads happily, and clamps the same way.
-    double infinite{0};
-    REQUIRE(params.text_to_value(&*plugin, inputGain, "inf", &infinite));
-    CHECK(infinite == info.max_value);
+    // The bounds themselves, as the plugin prints them, are inside. That is the
+    // half of the contract a refusal-only rule would break: the maximum shows as
+    // "6dB", and 6 dB is 1.9953 -- a shade under 2.0 here, but a parameter whose
+    // maximum rounds the other way would read back *past* its own maximum.
+    for (double const bound : {info.min_value, info.max_value})
+    {
+        write(plugin, inputGain, bound);
+        auto const shown(displayOf(*plugin, params, inputGain));
+        INFO("bound " << bound << " shows as '" << shown << "'");
+        double readBack{-1};
+        REQUIRE(params.text_to_value(&*plugin, inputGain, shown.c_str(), &readBack));
+        CHECK(readBack >= info.min_value);
+        CHECK(readBack <= info.max_value);
+    }
 }
 
 TEST_CASE("A slot selector reads back the effect a user names", "[clap][text]")
