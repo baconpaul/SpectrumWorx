@@ -2,9 +2,10 @@
 
 ## Status as of 08.08.2026
 
-Tier 0 and Tier 1 are done, on branch `respond-to-fable`, one commit per finding
-with a reproduction in each. Tests went 333 → 357, green in `build/` and
-`build-release/`; the goldens and the 303-preset corpus digests did not move.
+Tier 0, Tier 1 and Tier 4 are done — Tier 4 out of order, at Paul's direction —
+one commit per finding with a reproduction in each. Tests went 333 → 364, green
+in `build/` and `build-release/`; the goldens and the 303-preset corpus digests
+did not move.
 
 | | Finding | |
 |---|---|---|
@@ -17,8 +18,24 @@ with a reproduction in each. Tests went 333 → 357, green in `build/` and
 | ✅ | T1.2 unchecked ring pushes | `5f4da9f3` |
 | ☐ | T2.1 – T2.6 threading and lifetime | |
 | ☐ | T3.1 – T3.3 GUI use-after-free | |
-| ☐ | T4 host protocol | |
+| ✅ | T4 locale-dependent number I/O | `99d74bc1` |
+| ✅ | T4 VST3 `IS_HIDDEN` — decided: never used | `efcf1978` |
+| ✅ | T4 sample rate re-read, and the sample a session keeps | `469f51e9` |
+| ✅ | T4 unbounded module count | `c64a7050` |
+| ☐ | T4 leftovers | `REQUIRES_PROCESS`, `updateEngineSetup` rollback, Save-As spin |
 | ☐ | doc drift | partly — see below |
+
+Two things Tier 4 turned up that the review did not have:
+
+- **`std::to_chars` is not available to this project.** Its floating point half
+  is a libc++ dylib symbol introduced in macOS 13.3 and the deployment target is
+  10.15. `presets.cpp` had already guessed as much ("a `<charconv>` availability
+  question across three toolchains") without knowing the answer; it is written
+  down now, in both files that reach for it. The integer half is header-only and
+  is used.
+- **The test harness had the locale bug too**, in the function `presetCorpus.txt`
+  hashes — so all 303 committed digests were a statement about the locale of the
+  machine that generated them.
 
 **Two of the review's claims did not survive contact**, both marked below:
 
@@ -463,19 +480,24 @@ SPSCQueue + ValueMailbox memory ordering; intrusive refcount atomicity
 path except the recorded slot-selector exception (+ T2.2's frees); sample-swap
 single-ownership (modulo T1); stack buffers FFT-bounded; publishSlot/publishChain
 refusal handling; MissingParameter handling (nothing stale survives except the
-sample); all five rescan routes; format-version detection and legacy-name repair;
-round-trip with spectral-pending; the effect inventory and streaming grammar.
+sample — and now not that either); all five rescan routes; format-version
+detection and legacy-name repair; round-trip with spectral-pending; the effect
+inventory and streaming grammar.
 
 ---
 
 ## Suggested order for the Opus sessions
 
-~~1–3 are done~~ — see the status table at the top. What is left, renumbered so
-the next session can start at the top:
+~~1–3 are done~~, and so is Tier 4 — see the status table at the top. Tier 4 was
+taken out of order at Paul's direction, and the `IS_HIDDEN` decision it turned on
+was his to make: the review concluded there was no plugin-side fix, and declining
+to use the flag is one.
 
-1. **T2.5** — atomics for the two or three flags. Moved up from 6: it is
-   mechanical, and doing it first means the tsan run that validates the rest of
-   Tier 2 is not reporting the flags instead of the races.
+What is left, renumbered so the next session can start at the top:
+
+1. **T2.5** — atomics for the two or three flags. Moved up: it is mechanical, and
+   doing it first means the tsan run that validates the rest of Tier 2 is not
+   reporting the flags instead of the races.
 2. **T2.1 + T2.4** — drain `toEngine_` in `deactivate()`; closes the corruption
    window and the shutdown leak together. Add the FFT-change-while-running test.
 3. **T2.6** — the `activate()` re-entry guard. One line.
@@ -484,12 +506,15 @@ the next session can start at the top:
 6. **T3.1 + T3.2** — the two GUI UAF classes; add the deferred-teardown ASan test
    the suite is missing.
 7. **T3.3** — the smaller GUI guards.
-8. **T4 + doc drift** — the VST3 `IS_HIDDEN` question is a *decision* and not a
-   commit: the review concludes there is no plugin-side fix, but declining to use
-   the flag dynamically is one, with a real cost (a VST3 automation list of 388
-   rows against 11). It also rests on a claim about the pinned clap-wrapper that
-   nobody has re-checked. Then the sample-rate re-read, stale-sample-on-load, and
-   the doc-sync pass last so it describes the fixed tree.
+8. **The Tier 4 leftovers and the doc-sync pass.** Three things the locale bullet
+   had swept in with it are still open — `CLAP_PARAM_REQUIRES_PROCESS` used for a
+   "meta" meaning the flag does not have, a failed `updateEngineSetup()` rolling
+   back only the engine copy, and the Save-As uniquifier's spin at ≥100 same-named
+   presets — and the docs should be synced last, so they describe the fixed tree.
+   Note that `threading_model.md` and `parameter_system.md` now also owe an
+   account of what Tier 4 changed: nothing is hidden from a host, a preset load
+   reports two new problem kinds, and `EditorHost::setNewSample` answers rather
+   than interrupts.
 
 The original order, for the record:
 
