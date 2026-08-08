@@ -361,6 +361,22 @@ bool loadPreset(EditorHost &host, SpectrumWorxEditor *const pEditor, char *const
                 bool const ignoreExternalSample, juce::String *const comment,
                 char const *const presetName, DawExtraState const *const pDawExtraState)
 {
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note A preset replaces every parameter, the whole chain and the sample,
+    /// so anything a menu is standing over is about to be describing something
+    /// that has gone -- the module combo boxes most of all, since the strips
+    /// themselves are rebuilt.
+    ///
+    /// \note Only with a window open. `dismissAllActiveMenus()` is process-wide,
+    /// and a session being restored into an instance that has no editor has no
+    /// business closing a menu the user has open in a different one.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    if (pEditor)
+        juce::PopupMenu::dismissAllActiveMenus();
+
     Consumer const consumer{host, pEditor, false};
 
     // Whatever a previous load left uncollected is not this load's.

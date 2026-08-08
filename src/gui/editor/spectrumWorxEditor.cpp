@@ -1632,6 +1632,25 @@ void SpectrumWorxEditor::resyncModuleRack()
 {
     LE_ASSERT(isThisTheGUIThread());
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Before any strip is destroyed, and for the same reason
+    /// `~SpectrumWorxEditor` does it: a menu opened from a module strip -- its
+    /// effect combo box, its LFO type -- is asynchronous, and this is where the
+    /// strip under it can go. A module ejected, a preset with fewer modules than
+    /// the rack has, a resync arriving because the engine caught up: all three
+    /// come through here.
+    ///
+    /// \note It is queued rather than immediate. `dismissAllActiveMenus()` ends
+    /// the modal state, and `ModalComponentManager` delivers the result through
+    /// `triggerAsyncUpdate()` -- so the menu stops taking input here and answers
+    /// "dismissed" a message-loop turn later, rather than answering with a choice
+    /// made against a module that has since left the chain.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    juce::PopupMenu::dismissAllActiveMenus();
+
     auto &chain(moduleChain());
 
     for (auto &pRegion : moduleRegions_)
