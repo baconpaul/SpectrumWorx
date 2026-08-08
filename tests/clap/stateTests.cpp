@@ -897,3 +897,71 @@ TEST_CASE("A state stream that never ends is given up on", "[clap][state][hostil
     // allocator happened to refuse.
     CHECK(stream.handed() <= LE::SW::maximumPresetSize + (1u << 12));
 }
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// An exception on the way through
+// -------------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note `stateSave` and `stateLoad` are `noexcept`, like every CLAP entry
+/// point, and between them they buffer a host-supplied stream, build the whole
+/// module chain out of it and decode whatever audio file the state names. All of
+/// that allocates; `Sample::load` asks for hundreds of megabytes for a long
+/// file, from inside `stateLoad`. An exception out of any of it was
+/// `std::terminate` -- the host dying while opening a project rather than being
+/// told the project would not open.
+///
+/// \note The throw is injected through the host's own `read`, which is not where
+/// a real one would come from -- a host does not throw through a C callback.
+/// It is a way to raise an exception at a point genuinely inside the entry
+/// point's body, which is the thing being pinned; `bad_alloc` from the real
+/// allocation sites cannot be provoked on demand and would prove the same
+/// property. Without the handler this case does not fail, it aborts the run.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+/// \brief A `clap_istream` that throws on the first read.
+class ThrowingStream
+{
+  public:
+    ThrowingStream()
+    {
+        stream_.ctx = this;
+        stream_.read = [](clap_istream const *, void *, std::uint64_t) -> std::int64_t {
+            throw std::bad_alloc();
+        };
+    }
+
+    ThrowingStream(ThrowingStream const &) = delete;
+    ThrowingStream &operator=(ThrowingStream const &) = delete;
+
+    clap_istream const *operator&() const { return &stream_; }
+
+  private:
+    clap_istream stream_{};
+}; // class ThrowingStream
+} // anonymous namespace
+
+TEST_CASE("An exception inside stateLoad is answered rather than fatal", "[clap][state][hostile]")
+{
+    Plugin const plugin;
+
+    ThrowingStream stream;
+    CHECK(!plugin.state().load(&*plugin, &stream));
+
+    // ...and the instance is still usable afterwards, which is the other half of
+    // "the call failed" as against "the plugin is now wreckage".
+    InStream good(asBuffer(std::string(
+        "<SpectrumWorxPreset Format=\"3\" Version=\"3.0\" LastModified=\"\" Comment=\"\">"
+        "<Global><p n=\"In\" v=\"0.25\" /></Global><Modules /></SpectrumWorxPreset>")));
+    CHECK(plugin.state().load(&*plugin, &good));
+    CHECK(plugin.implementation()
+              .program()
+              .parameters()
+              .get<LE::SW::GlobalParameters::InputGain>()
+              .getValue() == Catch::Approx(0.25f));
+}
