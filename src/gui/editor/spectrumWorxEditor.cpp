@@ -1287,8 +1287,32 @@ void SpectrumWorxEditor::detachFrom(ModuleUI &region)
 {
     LE_ASSERT(isThisTheGUIThread());
 
-    bool const activeControlIsRegions(pActiveControl_ && (&pActiveControl_->moduleUI() == &region));
-    bool const sharedControlsAreRegions(sharedModuleControls_ && (pSelectedModule_ == &region));
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Each of the three asks whether **it** points into the strip, which
+    /// is the question, and is not the question the first two used to ask.
+    ///
+    ///   `lfoDisplay_` was guarded on `pActiveControl_` and the shared controls
+    /// on `pSelectedModule_` -- the editor's record of what is *current*, not of
+    /// what these two are pointing at. Deactivation is deferred: it clears those
+    /// records and leaves the widgets alive, still parented to the editor, still
+    /// holding a raw `ModuleUI *` into the strip. So a control deactivated before
+    /// the strip was dropped made both guards false and both widgets survived,
+    /// pointing into freed memory -- and painting one reads
+    /// `ModuleControlBase::isLFOEnabled()` -> `module()` -> `moduleUI().pModule_`
+    /// straight through it.
+    ///
+    ///   `drainEngineEvents()` resynchronises the rack synchronously from
+    /// `on_main_thread()`, so the window between the deactivation and the strip
+    /// being freed is as long as the host's callback interval.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    bool const activeControlIsRegions(pActiveControl_ && pActiveControl_->pointsInto(region));
+    bool const lfoDisplayIsRegions(lfoDisplay_ && lfoDisplay_->pointsInto(region));
+    bool const sharedControlsAreRegions(sharedModuleControls_ &&
+                                        sharedModuleControls_->pointsInto(region));
 
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -1331,7 +1355,7 @@ void SpectrumWorxEditor::detachFrom(ModuleUI &region)
     ///
     ////////////////////////////////////////////////////////////////////////////
 
-    if (activeControlIsRegions)
+    if (lfoDisplayIsRegions)
     {
         retireLFODisplay(); // for the focus handling it does on the way out
         lfoDisplay_ = std::nullopt;

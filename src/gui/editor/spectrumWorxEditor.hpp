@@ -858,6 +858,14 @@ class SpectrumWorxEditor final : private SkinLifetime,
             return *pModuleControl_;
         }
 
+      public:
+        /// \brief Whether this display is set up for a control in \p region.
+        /// \see ModuleControlBase::pointsInto().
+        bool pointsInto(ModuleUI const &region) const
+        {
+            return pModuleControl_ && pModuleControl_->pointsInto(region);
+        }
+
       private:
         BitmapButton switch_;
         TextButton quarter_;

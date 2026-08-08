@@ -155,6 +155,13 @@ class SharedModuleControls : public WidgetBase<>
 
     ModuleControlBase &controlForParameter(std::uint8_t parameterIndex);
 
+    /// \brief Whether these controls are pointing into \p region.
+    ///
+    /// \note All three are reassigned together by `updateForActiveModule()`, so
+    /// one of them is the answer for all of them.
+    /// \see ModuleControlBase::pointsInto().
+    bool pointsInto(ModuleUI const &region) const { return gain_.pointsInto(region); }
+
   private:
     SpectrumWorxEditor &editor();
     SpectrumWorxEditor const &editor() const;

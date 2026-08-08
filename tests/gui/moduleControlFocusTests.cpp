@@ -337,3 +337,84 @@ TEST_CASE("An LFO switches every gesture that would move the knob under it", "[g
     CHECK(control.getValue() == valueBefore);
     CHECK(knob.isEnabled());
 }
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note T3.2. The LFO display and the shared module controls are children of
+/// the *editor*, not of the strip, and each holds a raw `ModuleUI *` into one.
+/// `detachFrom()` is what drops them before the strip is freed -- and it used to
+/// decide by asking the editor which control was *active* and which module was
+/// *selected*, rather than asking those two widgets what they were pointing at.
+///
+///   The two are not the same the moment a control is deactivated: deactivation
+/// clears the editor's records and leaves the widgets alive, deliberately, so
+/// that moving between controls does not destroy and rebuild them. So a control
+/// that lost focus before its module was removed left both widgets behind,
+/// pointing into freed memory, still parented and still painted --
+/// `ModuleKnob::paint` reads `moduleUI().pModule_` straight through the hole.
+///
+///   This is the 608f0773 bug class over again: a guard keyed on the wrong
+/// pointer. An `-fsanitize=address` build reports the paint below as a
+/// heap-use-after-free on a freed `ModuleUI`.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A strip removed after its control was deactivated leaves nothing pointing at it",
+          "[gui][modules][lfo]")
+{
+    SWTest::HostSideJuce const juceIsUp;
+
+    if (!aWindowCanBeMade())
+        SKIP(noWindow);
+
+    SWTest::Instance instance;
+    DesktopEditor const window(instance);
+    if (!window.tookTheKeyboard())
+        SKIP(keyboardRefused);
+
+    auto &editor(window.editor());
+
+    // Two modules, so that removing one leaves a rack to go on painting.
+    editor.addUserAddedModule(0);
+    editor.addUserAddedModule(0);
+    editor.resyncModuleRack();
+    auto *const pFirstStrip(editor.regionInSlot(0));
+    REQUIRE(pFirstStrip != nullptr);
+    REQUIRE(editor.regionInSlot(1) != nullptr);
+
+    // Selecting a control is what builds the LFO display and points the shared
+    // controls at this strip.
+    auto *const pControl(firstKnob(*pFirstStrip));
+    REQUIRE(pControl != nullptr);
+    pControl->widget().grabKeyboardFocus();
+    REQUIRE(pControl->widget().hasKeyboardFocus(false));
+    REQUIRE(editor.activeControl() == pControl);
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note And then deselecting it, which is the step that made the old guards
+    /// answer no. The editor forgets which control was active and which module
+    /// was selected; the widgets pointing into the strip are only *disabled*,
+    /// their destruction deferred in case the user is on their way to another
+    /// control.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    editor.grabKeyboardFocus();
+    REQUIRE(editor.activeControl() == nullptr);
+
+    // The strip goes. detachFrom() runs from in here.
+    editor.removeModule(*pFirstStrip);
+    editor.resyncModuleRack();
+    CHECK(editor.regionInSlot(1) == nullptr);
+
+    /// \note And the paint that used to read the freed strip. Into an image
+    /// rather than to a screen, which is what makes it something a test can do
+    /// at all -- and it reaches the same `paint()` on the same components.
+    juce::Image canvas(juce::Image::ARGB, editor.getWidth(), editor.getHeight(), true);
+    {
+        juce::Graphics graphics(canvas);
+        editor.paintEntireComponent(graphics, true);
+    }
+
+    CHECK(editor.regionInSlot(0) != nullptr);
+}

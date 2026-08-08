@@ -162,6 +162,19 @@ class ModuleControlBase
     ModuleUI const &moduleUI() const { return const_cast<ModuleControlBase &>(*this).moduleUI(); }
     SpectrumWorxEditor &editor() const;
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Whether this control's back-pointer is into \p region.
+    ///
+    /// \note A comparison and not a dereference, which is the point: it is asked
+    /// while \p region is being torn down, of controls that may already be
+    /// pointing at freed memory. `moduleUI()` would assert and then hand out a
+    /// reference to it.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    bool pointsInto(ModuleUI const &region) const { return pModuleUI_ == &region; }
+
     static ModuleControlBase &controlForWidget(juce::Component &);
 
     static bool isActive(juce::Component const &);
