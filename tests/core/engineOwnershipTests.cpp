@@ -354,6 +354,46 @@ TEST_CASE("A displaced module may outlive the chain it came out of", "[core][own
     CHECK(engine.moduleChain().size() == 1);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note What `SpectrumWorxCLAP::editSlot` does to `programMain_`, which is the
+/// chain the editor's strips are built from -- `SpectrumWorxEditor::moduleChain()`
+/// is `editorHost_.programMain().moduleChain()`. The engine's copy is a different
+/// chain holding different module objects, so the retire ring cannot be what a
+/// strip is looking at: whatever frees a strip's module has to happen here.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+struct ParametersOnly
+{
+    using Module = LE::SW::Module;
+    bool operator()(Module &, std::uint8_t) const { return true; }
+}; // struct ParametersOnly
+
+TEST_CASE("Emptying a slot leaves the strip drawing it alive", "[core][ownership]")
+{
+    LE::SW::Program programMain;
+
+    programMain.moduleChain().setParameter(0, 0, ParametersOnly{});
+    REQUIRE(programMain.moduleChain().size() == 1);
+
+    /// \note A strip's reference: ModuleUI holds an IntrusivePtr to the module it
+    /// draws, for its whole life.
+    LE::Utility::IntrusivePtr<LE::SW::Module> const pStripsModule(
+        programMain.moduleChain().moduleAs<LE::SW::Module>(0));
+    REQUIRE(pStripsModule);
+
+    programMain.moduleChain().setParameter(0, LE::SW::noModule, ParametersOnly{});
+    CHECK(programMain.moduleChain().size() == 0);
+
+    /// \note The strip outlives the slot: it is dropped by a *posted* message
+    /// (`refreshModuleRackAsync`), so between the edit and the rebuild it is still
+    /// parented and still painted -- and painting a knob reads exactly this.
+    CHECK(pStripsModule->effectTypeIndex() == 0);
+    CHECK(pStripsModule->numberOfParameters() > 0);
+    CHECK(pStripsModule->numberOfLFOControledParameters() > 0);
+}
+
 TEST_CASE("A slot change while running is a command rather than a mutation", "[core][ownership]")
 {
     // With audio running the same call queues instead, and nothing happens to

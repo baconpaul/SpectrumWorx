@@ -1277,11 +1277,58 @@ void SpectrumWorxEditor::detachFrom(ModuleUI &region)
 {
     LE_ASSERT(isThisTheGUIThread());
 
-    if (!pActiveControl_ || (&pActiveControl_->moduleUI() != &region))
-        return;
+    bool const activeControlIsRegions(pActiveControl_ && (&pActiveControl_->moduleUI() == &region));
+    bool const sharedControlsAreRegions(sharedModuleControls_ && (pSelectedModule_ == &region));
 
-    retireLFODisplay();
-    pActiveControl_ = nullptr;
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The pointer first, before anything is destroyed. Destroying a
+    /// component moves the keyboard focus and JUCE delivers the loss
+    /// *synchronously* to whichever control had it, which comes back here through
+    /// `ModuleControlBase::reportInactiveControl()`. That guards on `isActive()`,
+    /// so a cleared `pActiveControl_` makes the re-entry a no-op -- and a live one
+    /// takes it into `moduleControlDectivated()`, which is what the note above
+    /// says must not happen on this path.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    if (activeControlIsRegions)
+        pActiveControl_ = nullptr;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note And then both of these are destroyed **now**, where
+    /// `retireLFODisplay()` and `moduleDeactivated()` only disable them and post
+    /// a message to do it later. That deferral is an optimisation for the case
+    /// they were written for -- a user moving between controls, or between
+    /// modules, where the strip they point into survives -- and it is not
+    /// available here, because here the strip is about to be freed.
+    ///
+    ///   Both are children of the *editor* rather than of the strip
+    /// (`moduleControl.cpp:145-148` says so of the shared controls) and both hold
+    /// a raw `ModuleUI *`. So a deferred cleanup leaves them in the component
+    /// tree, still painted, pointing at freed memory -- and painting one reads
+    /// `ModuleControlBase::isLFOEnabled()` -> `module()` -> `moduleUI().pModule_`,
+    /// straight through the hole.
+    ///
+    ///   Found with ASan under Bitwig, deleting a module: heap-use-after-free
+    /// reading a freed 1496-byte `ModuleUI`, freed by `resyncModuleRack()`'s
+    /// `pRegion.reset()` a moment earlier, read by `ModuleKnob::paint`. Both on
+    /// the main thread -- this is a lifetime bug and not a race. It needs a host
+    /// that resyncs the rack from `clap_plugin::on_main_thread` while CoreAnimation
+    /// can paint in between, which is why the standalone never showed it.
+    ///                                       (07.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    if (activeControlIsRegions)
+    {
+        retireLFODisplay(); // for the focus handling it does on the way out
+        lfoDisplay_ = std::nullopt;
+    }
+
+    if (sharedControlsAreRegions)
+        sharedModuleControls_ = std::nullopt;
 }
 
 void SpectrumWorxEditor::mainKnobDragStarted(std::uint8_t const index) const
