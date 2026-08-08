@@ -1218,10 +1218,20 @@ void SpectrumWorxCLAP::drainCommands()
 /// it here -- freeing on this thread is the one thing the ring exists to prevent.
 /// 1024 deep against one entry per structural change, so it is a checked-build
 /// assertion rather than a policy.
+///
+/// \note The push is the statement and the assert only reports on it. It was
+/// written the other way round -- inside `LE_ASSERT_MSG`, which is
+/// `static_cast<void>(0)` under NDEBUG -- so no shipped build retired anything
+/// at all: every module a slot change displaced, every chain a preset load
+/// replaced and every swapped-out sample was leaked, and the checked build the
+/// suite runs in was the only one where the protocol existed.
+///                                           (08.08.2026.) (SW port)
 void SpectrumWorxCLAP::retire(Threading::ToUI::Retired const what, void *const pObject)
 {
-    LE_ASSERT_MSG(toUI_.push(Threading::retire(what, pObject)),
-                  "The retire queue is full; something will be leaked.");
+    if (toUI_.push(Threading::retire(what, pObject)))
+        return;
+
+    LE_ASSERT_MSG(false, "The retire queue is full; something will be leaked.");
 }
 
 /// \note And marks the state dirty, which `presetChangeEnd()` used to do for
