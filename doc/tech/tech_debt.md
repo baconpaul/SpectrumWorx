@@ -126,27 +126,29 @@ New entries go at the top of their area.
   disagreement. `tests/checkODRHeaderScope.cmake` is the only thing standing
   there, and it only runs under the Ninja and Makefile generators.
 
-- **`RequiredStringStorage<T>` is the contract for every `lexical_cast` buffer
-  and nothing had ever checked it.** (02.08.2026, from the warnings pass)
-  The three `lexical_cast(value, char *)` overloads take a bare pointer, so when
-  their `sprintf`s became `snprintf`s the only bound available was the size the
-  interface tells callers to allocate — `2 + digits * 3010 / 10000`. Two values
-  of it look short on paper:
+- **`RequiredStringStorage<T>` is the contract for every `lexical_cast` buffer,
+  and it is a constant rather than a parameter.** (08.08.2026)
+  The `lexical_cast(value, char *)` overloads take a bare pointer, so the only
+  bound any of them has is the size the interface tells callers to allocate —
+  `2 + digits * 3010 / 10000`, which is 17 for a `double`. The `double` arm no
+  longer trusts it: it renders into a scratch buffer of its own and copies back
+  only what fits, falling back to `%g` for a value `%f` cannot express in 17
+  characters. `tests/utility/lexicalCastTests.cpp` holds it to that with guard
+  bytes behind the buffer.
 
-  | | constant | worst case |
-  |---|---:|---|
-  | `std::int32_t` | 11 | `-2147483648` is 11 characters **plus** the null |
-  | `double`, `%.9f` | 17 | `1000000.000000000` is 17 characters plus the null |
+  What is left is the shape of the interface. `std::int32_t`'s constant is 11
+  and `-2147483648` is 11 characters plus the null, so that arm is still one
+  short on paper — unreachable from anything the plugin prints, and the assert
+  on the return is all that says so. The fix for the family is to give the
+  overloads a size parameter and delete the constant; there are 13 call sites
+  and every one has a `std::array` or a `_countof` in hand already.
 
-  Neither is reachable from anything the plugin prints — parameter values, LFO
-  periods, module indices — and the 192 cases and the 303 factory presets all
-  pass with the new `LE_ASSERT` on the return live. So this is not a bug report:
-  it is that the guard is an assert in a debug build, which is the *first* thing
-  that has ever checked the constant, and the release build still truncates
-  rather than overruns. Either widen the constant by one for the sign and give
-  the `double` arm a real bound, or give the overloads a size parameter and
-  delete the constant. There are 13 call sites and they all have a `std::array`
-  or a `_countof` in hand already.
+  The `%g` fallback also means a value wider than the constant round-trips
+  through a preset at six significant digits rather than nine. Nothing in the
+  shipping banks is that wide — the corpus digests did not move — but the
+  `makeString` buffer in `presets.hpp` is sized by the same constant, so a
+  parameter that ever grows that large needs the size parameter above rather
+  than a wider constant.
 
 - **MP3 decoding is a different decoder on macOS than on Windows and Linux, and
   which one answers is decided by registration order.** (01.08.2026)
