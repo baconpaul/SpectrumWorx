@@ -441,3 +441,163 @@ TEST_CASE("A preset that omits a parameter reports it and uses the default", "[p
     CHECK(loaded.modules == 1);
     CHECK(loaded.effects == "Gain");
 }
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// A preset whose LFO values are not values
+// ----------------------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The one family of preset attributes that was read straight into a
+/// parameter without asking whether it was in range. Every ordinary parameter
+/// goes through `ParametersLoader::operator()`, which checks `isValidValue()`
+/// before `setValue()`; the seven LFO sub-parameters went through
+/// `LFODataLoader::doLoad()`, which checked nothing, and `Parameter::setValue`'s
+/// own range check is an assertion -- absent in a release build.
+///
+///   `wfrm` is the sharp one. It is an EnumeratedParameter<11> and it indexes
+/// `lfoFunctions[]`, an eleven-entry table of function pointers, every block for
+/// as long as the LFO is enabled -- `lfoFunctions[waveForm()](…)` with no bound
+/// (lfoImpl.cpp:357). A preset carrying `wfrm="200"` is an indirect call through
+/// whatever sits 189 entries past that table, on the audio thread, on the first
+/// block after the load. `ph`, `lbnd` and `ubnd` are the same shape one step
+/// further on: out of [0,1] they make `LE_ASSUME(position >= 0 && <= 1)` a false
+/// assumption, which is undefined behaviour by construction.
+///
+///   Reachable from a double-clicked `.swp` and from session state, which take
+/// the same reader.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+/// An "Ah-ah" whose LFO'd parameter carries \p lfoAttributes.
+std::string presetWithLFO(std::string_view const lfoAttributes)
+{
+    return std::string("<SpectrumWorxPreset Format=\"3\" Version=\"3.0\" LastModified=\"\" "
+                       "Comment=\"\">"
+                       "<Global>"
+                       "<p n=\"In\" v=\"1\" /><p n=\"Out\" v=\"1\" /><p n=\"Mix\" v=\"1\" />"
+                       "<p n=\"FFT size\" v=\"2048\" /><p n=\"Overlap factor\" v=\"4\" />"
+                       "<p n=\"Window type\" v=\"1\" />"
+                       "</Global><Modules><Module effect=\"Ah-ah\">"
+                       "<p n=\"Bypass\" v=\"0\" />"
+                       "<p n=\"Gain\" v=\"0\" sync=\"0\" />"
+                       "<p n=\"Wet\" v=\"100\" sync=\"0\" />"
+                       "<p n=\"Start frequency\" v=\"0\" sync=\"0\" />"
+                       "<p n=\"Stop frequency\" v=\"1\" sync=\"0\" />"
+                       "<p n=\"Center (LFO me!)\" v=\"3000\" ") +
+           std::string(lfoAttributes) +
+           " />"
+           "<p n=\"Width\" v=\"750\" sync=\"0\" />"
+           "<p n=\"Strength\" v=\"9999\" sync=\"0\" />"
+           "</Module></Modules></SpectrumWorxPreset>";
+}
+
+/// \brief Every LFO in \p engine's chain, checked against its own parameters'
+/// ranges.
+///
+/// \note The whole chain rather than the one that was tampered with: what has to
+/// be true after *any* load is that nothing in the engine is out of range, and a
+/// case that looked only where it put the bad value would not notice it landing
+/// somewhere else.
+void requireEveryLFOInRange(SWTest::Engine &engine)
+{
+    using LE::Parameters::LFO;
+
+    auto &chain(engine.program().moduleChain());
+    for (std::uint8_t slot(0); slot < chain.size(); ++slot)
+    {
+        auto const pModule(chain.moduleAs<LE::SW::Module>(slot));
+        REQUIRE(pModule);
+
+        for (std::uint8_t index(0); index < pModule->numberOfLFOControledParameters(); ++index)
+        {
+            auto const &lfo(pModule->lfo(index));
+            INFO("slot " << unsigned(slot) << ", LFO " << unsigned(index));
+
+            // The one that is an indirect call rather than a wrong number.
+            CHECK(lfo.waveForm() < LFO::NumberOfWaveforms);
+
+            CHECK(lfo.phase() >= -0.5f);
+            CHECK(lfo.phase() <= 0.5f);
+            CHECK(lfo.lowerBound() >= 0.0f);
+            CHECK(lfo.lowerBound() <= 1.0f);
+            CHECK(lfo.upperBound() >= 0.0f);
+            CHECK(lfo.upperBound() <= 1.0f);
+        }
+    }
+}
+} // anonymous namespace
+
+TEST_CASE("A preset carrying an impossible LFO waveform does not keep it", "[preset-file][hostile]")
+{
+    Fixture fixture;
+    REQUIRE(fixture.load(presetBytes(fileHolding(
+        "hostile lfo.swp",
+        presetWithLFO("on=\"1\" T=\"500\" ph=\"0.25\" lbnd=\"0.1\" ubnd=\"0.9\" sync=\"0\" "
+                      "wfrm=\"200\"")))));
+
+    // The preset still loads -- one bad attribute is not a reason to refuse a
+    // whole rack -- and the waveform is one the table has.
+    auto const loaded(fixture.dump());
+    CHECK(loaded.modules == 1);
+    CHECK(loaded.effects == "Ah-ah");
+
+    requireEveryLFOInRange(fixture.engine());
+}
+
+TEST_CASE("A preset carrying out-of-range LFO bounds does not keep them", "[preset-file][hostile]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note `ph="1e30"` is also what reaches `lexical_cast(double, 1, char *)`
+    /// through the editor's phase display, where a value that wide overruns the
+    /// caller's buffer. That is its own fix; here it only has to not be stored.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    Fixture fixture;
+    REQUIRE(fixture.load(presetBytes(fileHolding(
+        "hostile lfo bounds.swp",
+        presetWithLFO("on=\"1\" T=\"500\" ph=\"1e30\" lbnd=\"-5\" ubnd=\"7\" sync=\"99\" "
+                      "wfrm=\"0\"")))));
+
+    auto const loaded(fixture.dump());
+    CHECK(loaded.modules == 1);
+
+    requireEveryLFOInRange(fixture.engine());
+}
+
+TEST_CASE("A preset whose LFO values are all legal keeps every one of them",
+          "[preset-file][hostile]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The direction the two above cannot fail in. A gate that threw away
+    /// every LFO attribute would satisfy both of them and quietly flatten every
+    /// preset in the shipping banks, so what the values *are* is pinned here.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    Fixture fixture;
+    REQUIRE(fixture.load(presetBytes(fileHolding(
+        "legal lfo.swp",
+        presetWithLFO("on=\"1\" T=\"500\" ph=\"0.25\" lbnd=\"0.1\" ubnd=\"0.9\" sync=\"0\" "
+                      "wfrm=\"4\"")))));
+
+    requireEveryLFOInRange(fixture.engine());
+
+    auto &chain(fixture.engine().program().moduleChain());
+    REQUIRE(chain.size() == 1);
+    auto const pModule(chain.moduleAs<LE::SW::Module>(0));
+    REQUIRE(pModule);
+
+    /// The LFO on "Center (LFO me!)", which is the module's sixth parameter and
+    /// so its fifth LFO -- the first parameter, Bypass, has none.
+    auto const &lfo(pModule->lfo(4));
+    CHECK(lfo.enabled());
+    CHECK(lfo.waveForm() == LE::Parameters::LFO::Square);
+    CHECK(lfo.phase() == 0.25f);
+    CHECK(lfo.lowerBound() == 0.1f);
+    CHECK(lfo.upperBound() == 0.9f);
+}
