@@ -14,6 +14,8 @@
 
 #include "le/utility/assert.hpp"
 
+#include <algorithm>
+#include <limits>
 #include <utility>
 
 namespace LE::SW::Engine
@@ -280,9 +282,29 @@ void ModuleChainBase::resetRoot()
 
 bool ModuleChainBase::empty() const { return this->next_.get() == this; }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Saturating rather than truncating, which is what the bare cast was: a
+/// chain of 256 counted as **empty**, and every caller of this asks a question
+/// where "empty" is an answer it will act on. 255 is a lie too, but it is a lie
+/// in the direction of "there are more of these than you expected" rather than
+/// "there are none".
+///
+///   The chain cannot get that long from anything this build does -- the slot
+/// model stops at `maxNumberOfModules` and the preset loader refuses the rest
+/// as of 08.08.2026 -- so this is the second guard on a number that has one. It
+/// is here anyway because the type is what makes the truncation possible, and
+/// the assert is what names it if the bound above is ever the thing that broke.
+///                                           (08.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
 std::uint8_t ModuleChainBase::size() const
 {
-    return static_cast<std::uint8_t>(node_algorithms::count(&rootNode()) - 1);
+    auto const modules(node_algorithms::count(&rootNode()) - 1);
+    constexpr auto mostThatFits{std::numeric_limits<std::uint8_t>::max()};
+    LE_ASSERT_MSG(modules <= mostThatFits, "More modules in the chain than a size can express.");
+    return static_cast<std::uint8_t>(std::min<decltype(modules)>(modules, mostThatFits));
 }
 
 namespace Detail

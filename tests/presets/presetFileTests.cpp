@@ -397,6 +397,50 @@ TEST_CASE("A preset naming an effect this build does not have loads the rest", "
     CHECK(SWTest::presetProblems().unknownEffect == 1);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The module count a file supplies had no bound in a release build --
+/// only `LE_ASSERT_MSG(moduleIndex <= maxNumberOfModules)`, which is not a check.
+/// Past the fifth slot there is nothing for a module to be: `ParameterID` packs
+/// its indices into bytes and the parameter list was built once for five slots,
+/// so the sixth module's parameters have no id a host can name; the rack has five
+/// strips. And `ModuleChainBase::size()` is a `std::uint8_t`, so a chain of 256
+/// reports itself **empty** -- the truncation this finding is named for, and the
+/// reason a bound is worth more than an assert.
+///
+/// \note Seven, not 256. What is being pinned is the rule, and a preset carrying
+/// two modules more than there are slots exercises it exactly as a preset
+/// carrying 251 more would -- while staying a document a person can read.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A preset with more modules than there are slots loads the ones that fit",
+          "[preset-file][hostile]")
+{
+    std::string preset(
+        "<SpectrumWorxPreset Format=\"3\" Version=\"3.0\" LastModified=\"\" Comment=\"\">"
+        "<Global><p n=\"In\" v=\"0.25\" /></Global>"
+        "<Modules>");
+    constexpr unsigned int modulesInTheFile{7};
+    static_assert(modulesInTheFile > LE::SW::Constants::maxNumberOfModules);
+    for (unsigned int module{0}; module < modulesInTheFile; ++module)
+        preset += "<Module effect=\"Ah-ah\"><p n=\"Bypass\" v=\"0\" /></Module>";
+    preset += "</Modules></SpectrumWorxPreset>";
+
+    Fixture fixture;
+    REQUIRE(fixture.load(presetBytes(fileHolding("too many modules.swp", preset))));
+
+    auto const loaded(fixture.dump());
+    CHECK(loaded.modules == LE::SW::Constants::maxNumberOfModules);
+
+    // ...and the chain says so too, rather than counting past its own type.
+    CHECK(fixture.engine().program().moduleChain().size() == LE::SW::Constants::maxNumberOfModules);
+
+    // Refused rather than dropped: one report per module that did not fit.
+    CHECK(SWTest::presetProblems().other ==
+          (modulesInTheFile - LE::SW::Constants::maxNumberOfModules));
+}
+
 TEST_CASE("A preset that omits a parameter reports it and uses the default", "[preset-file]")
 {
     ////////////////////////////////////////////////////////////////////////////

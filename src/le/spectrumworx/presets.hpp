@@ -131,7 +131,19 @@ enum struct PresetProblem : std::uint8_t
     ///                                       (08.08.2026.) (SW port)
     ///
     ////////////////////////////////////////////////////////////////////////////
-    SampleNotLoaded
+    SampleNotLoaded,
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The preset holds more modules than this build has slots for, and
+    /// the ones past the last slot were not loaded.
+    ///
+    /// \note Legitimately a *later* version's file rather than a damaged one, and
+    /// reported for that reason: everything up to the last slot loads and plays,
+    /// and what is missing is nameable. \see ParametersLoader::loadModuleChain.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    TooManyModules
     /// \note A `TempoSyncedLFOWithoutTempo` stood here, for a preset with
     /// tempo-synced LFOs loaded into a host that reports no transport. That is
     /// not a problem: such a host gets 120 BPM in four four, which is a defined
@@ -180,6 +192,7 @@ struct PresetLoadReport
     unsigned int unavailableEffects{0};
     unsigned int failures{0};         ///< LoadFailed, SaveFailed, FutureFormat
     unsigned int samplesNotLoaded{0}; ///< the audio file it names is not loadable
+    unsigned int modulesDropped{0};   ///< more modules in it than there are slots
 
     /// The first `detail` seen, so a summary can name one thing rather than none.
     std::string firstDetail;
@@ -187,7 +200,7 @@ struct PresetLoadReport
     unsigned int total() const
     {
         return missingParameters + unknownParameters + unknownEffects + unavailableEffects +
-               failures + samplesNotLoaded;
+               failures + samplesNotLoaded + modulesDropped;
     }
 
     explicit operator bool() const { return total() != 0; }
@@ -217,11 +230,12 @@ struct PresetLoadReport
     ///
     ////////////////////////////////////////////////////////////////////////////
     /// \note `samplesNotLoaded` is told: the file has a name, and going and
-    /// finding it is something only the user can do.
+    /// finding it is something only the user can do. So is `modulesDropped`, for
+    /// the plainer reason that the preset is not playing what it says it does.
     bool worthTellingTheUser() const
     {
         return (failures + unknownParameters + unknownEffects + unavailableEffects +
-                samplesNotLoaded) != 0;
+                samplesNotLoaded + modulesDropped) != 0;
     }
 }; // struct PresetLoadReport
 

@@ -316,6 +316,10 @@ void reportToTheUser(PresetLoadReport const &report)
     if (report.samplesNotLoaded)
         message << "The audio file it names could not be loaded ("
                 << juce::String(report.firstDetail) << ").\n";
+    if (report.modulesDropped)
+        message << static_cast<int>(report.modulesDropped)
+                << " module(s) in it did not fit this build's "
+                << static_cast<int>(SW::Constants::maxNumberOfModules) << " slots.\n";
 
     GUI::warningMessageBox(MB_WARNING, message.toRawUTF8(), false);
 }
