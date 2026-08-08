@@ -452,18 +452,82 @@ void SpectrumWorxCLAP::rebuildParameterIDs()
     LE_ASSERT(parameterIDs_.size() == ParameterCounts::maxNumberOfParameters);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Every field, not just the discriminator, and this is the only place it
+/// happens. All four host entry points that take a raw `clap_id` come through
+/// here -- paramsValue, paramsValueToText and paramsTextToValue on the main
+/// thread, handleEvent on the audio thread -- and everything downstream is
+/// written on the assumption that they did: the indices reach
+/// `invokeFunctorOnIndexedParameter`, whose jump tables are `cases[index]`
+/// guarded by nothing stronger than LE_ASSUME. That is a `__builtin_assume` in a
+/// release build, so an index one past the end is an out-of-bounds read followed
+/// by an indirect call through whatever it found -- on the audio thread, for the
+/// event route.
+///
+///   A `clap_id` is host-supplied data. A stale automation lane in an old
+/// project, a host rescanning against a parameter list that has moved, or a
+/// validator sweeping the id space all deliver one that decodes to nothing.
+///
+/// \note The padding bytes are checked for the types that have them, so that two
+/// different `clap_id`s cannot name one parameter. `parameterIDFromIndex()`
+/// zero-initialises, so nothing the plugin itself advertises is refused by this
+/// -- `hostileParameterIDTests.cpp` holds both halves.
+///
+/// \note Every ParameterID that *decodes* is still valid: the model answers
+/// "N/A" for a slot whose effect does not have that parameter rather than
+/// pretending the id is unknown, which is what keeps a host's automation lane
+/// attached across an effect swap.
+///                                           (08.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
 bool SpectrumWorxCLAP::isValidParamId(clap_id const id) const noexcept
 {
-    /// \note Every ParameterID that decodes is valid: the model answers "N/A"
-    /// for a slot whose effect does not have that parameter rather than
-    /// pretending the ID is unknown, which is what keeps a host's automation
-    /// lane attached across an effect swap.
-    ///
-    /// \note An upper bound only. The discriminator is zero-based -- see
-    /// ParameterID -- so `>= GlobalParameter` is `>= 0` on an unsigned byte,
-    /// which is a tautology the compiler is right to reject.
     ParameterID const parameterID{Plugins::ParameterID{id}};
-    return parameterID.type() <= ParameterID::LFOParameter;
+
+    auto const isPadding([](ParameterID::Padding const byte) { return byte == ParameterID::Zero; });
+
+    switch (parameterID.type())
+    {
+    case ParameterID::GlobalParameter:
+    {
+        auto const &global(parameterID.value._.global);
+        return (global.index < GlobalParameters::Parameters::static_size) &&
+               isPadding(global.padding0) && isPadding(global.padding1);
+    }
+
+    case ParameterID::ModuleChainParameter:
+    {
+        auto const &moduleChain(parameterID.value._.moduleChain);
+        return (moduleChain.moduleIndex < Constants::maxNumberOfModules) &&
+               isPadding(moduleChain.padding0) && isPadding(moduleChain.padding1);
+    }
+
+    case ParameterID::ModuleParameter:
+    {
+        auto const &module(parameterID.value._.module);
+        return (module.moduleIndex < Constants::maxNumberOfModules) &&
+               (module.moduleParameterIndex < Constants::maxNumberOfParametersPerModule) &&
+               isPadding(module.padding0);
+    }
+
+    case ParameterID::LFOParameter:
+    {
+        /// \note One fewer than a module has parameters: the first is Bypass and
+        /// no LFO drives it. \see parameterIDFromIndex().
+        auto const &lfo(parameterID.value._.lfo);
+        return (lfo.moduleIndex < Constants::maxNumberOfModules) &&
+               (lfo.moduleParameterIndex < Constants::maxNumberOfParametersPerModule - 1) &&
+               (lfo.lfoParameterIndex < ParameterCounts::lfoExportedParameters);
+    }
+    }
+
+    /// \note No LE_DEFAULT_CASE_UNREACHABLE() here, which is the whole point:
+    /// the discriminator is a byte off the wire and four of its 256 values are
+    /// parameters. Telling the optimiser the other 252 cannot happen is what
+    /// this function exists to stop.
+    return false;
 }
 
 std::uint32_t SpectrumWorxCLAP::paramsCount() const noexcept
