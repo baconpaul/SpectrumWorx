@@ -15,12 +15,17 @@
 
 #include "core/modules/moduleDSPAndGUI.hpp"
 #include "le/parameters/parametersUtilities.hpp"
+#include "le/parameters/parser.hpp" //...mrmlj...required only for ParameterParser...
 #include "le/parameters/runtimeInformation.hpp"
+#include "le/spectrumworx/effects/configuration/effectNames.hpp"
 #include "le/spectrumworx/engine/moduleParameters.hpp"
 #include "le/spectrumworx/effects/baseParameters.hpp" //...mrmlj...required only for getParameterProperties()...
 
 #include "le/utility/polymorphicDowncast.hpp"
 #include "le/utility/span.hpp"
+
+#include <cstring>
+#include <optional>
 
 namespace LE::SW
 {
@@ -112,6 +117,165 @@ struct ParameterGetter : ParameterGetterBase<AutomatedParameter>
                        : result_type();
     }
 }; // struct ParameterGetter : ParameterGetterBase<AutomatedParameter>
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \class ParameterParser
+///
+/// \brief ParameterGetter backwards: the value a parameter would have to hold
+/// for it to display as this text, in the same automation units ParameterGetter
+/// answers in -- or nothing, when no value of it displays as that.
+///
+/// \note One struct where the getter is a base and a derived, because there is
+/// no caller for the half of it that does not know the module type.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+#pragma warning(push)
+#pragma warning(disable : 4510) // Default constructor could not be generated.
+#pragma warning(disable                                                                            \
+                : 4610) // Class can never be instantiated - user-defined constructor required.
+
+template <class ActualModule, class AutomatedParameter> struct ParameterParser
+{
+    using result_type = std::optional<Plugins::AutomatedParameterValue>;
+
+    ////////////////////////////////////////////////////////////////////////////
+    /// \internal
+    /// \brief The one arm that has a compile time parameter list *and* needs the
+    /// protocol's own units: a global's automation value is its own value put
+    /// through the protocol's range mapping, which only the parameter's type
+    /// knows how to do.
+    ////////////////////////////////////////////////////////////////////////////
+
+    struct AutomationValueParser
+    {
+        using result_type = ParameterParser::result_type;
+
+        template <class Parameter> result_type operator()() const
+        {
+            auto const value(parser.template operator()<Parameter>());
+            if (!value)
+                return {};
+            return AutomatedParameter::template convertParameterValueToAutomationValue<Parameter>(
+                Math::convert<typename Parameter::value_type>(*value));
+        }
+
+        LE::Parameters::ParameterValueParser const parser;
+    }; // struct AutomationValueParser
+
+    result_type operator()(ParameterID::Global const parameterID, Program const *) const
+    {
+        return LE::Parameters::invokeFunctorOnIndexedParameter<GlobalParameters::Parameters>(
+            parameterID.index, AutomationValueParser{parser});
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    /// \note By title, because a title is what the slot selector displays -- see
+    /// ParameterValueStringGetter's ModuleChain arm, which prints
+    /// `Effects::effectName()` or `emptySlot`.
+    ///
+    /// \note The empty slot is answered before the lookup rather than after it,
+    /// because `effectIndex()` says -1 both for "the empty slot" and for "no
+    /// effect has that title" -- and those are the two opposite answers.
+    ////////////////////////////////////////////////////////////////////////////
+
+    result_type operator()(ParameterID::ModuleChain, Program const *) const
+    {
+        if (!parser.text)
+            return {};
+
+        std::int8_t effectIndex{AutomatedModuleChain::noModule};
+        if (std::strcmp(parser.text, emptySlot) != 0)
+        {
+            effectIndex = Effects::effectIndex(parser.text);
+            if (effectIndex == AutomatedModuleChain::noModule)
+                return {};
+        }
+
+        return AutomatedParameter::template convertParameterValueToAutomationValue<
+            ModuleChainParameter>(effectIndex);
+    }
+
+    result_type operator()(ParameterID::Module const parameterID,
+                           Program const *LE_RESTRICT const pProgram) const
+    {
+        return (*this)(
+            parameterID,
+            pProgram->moduleChain().template moduleAs<ActualModule>(parameterID.moduleIndex).get());
+    }
+
+    result_type operator()(ParameterID::Module const parameterID,
+                           ActualModule const *LE_RESTRICT const pModule) const
+    {
+        if (!pModule)
+            return {};
+
+        auto const value(
+            Automation::parseParameterValue(parameterID.moduleParameterIndex, parser, *pModule));
+        if (!value)
+            return {};
+        return Automation::internal2AutomatedValue(parameterID.moduleParameterIndex, *value,
+                                                   AutomatedParameter::normalised, *pModule);
+    }
+
+    result_type operator()(ParameterID::LFO const parameterID,
+                           Program const *LE_RESTRICT const pProgram) const
+    {
+        return (*this)(parameterID, pProgram->moduleChain().module(parameterID.moduleIndex).get());
+    }
+
+    result_type
+    operator()(ParameterID::LFO const parameterID,
+               Plugin2HostInteropControler::Module const *LE_RESTRICT const pModule) const
+    {
+        using LFO = LE::Parameters::LFOImpl;
+        using LE::Parameters::IndexOf;
+
+        if (!pModule ||
+            (parameterID.moduleParameterIndex >= pModule->numberOfLFOControledParameters()))
+            return {};
+
+        switch (parameterID.lfoParameterIndex)
+        {
+        default:
+            break;
+
+        ////////////////////////////////////////////////////////////////////////
+        /// \note The two bounds are shown in the units of the parameter they
+        /// modulate rather than as the normalised numbers they are -- see
+        /// ParameterValueStringGetter's LFO arm, which prints them through the
+        /// module parameter. So they are read back the same way round: parse in
+        /// the module parameter's units, normalise, and that is the bound.
+        ////////////////////////////////////////////////////////////////////////
+        case IndexOf<LFO::Parameters, LFO::LowerBound>::value:
+        case IndexOf<LFO::Parameters, LFO::UpperBound>::value:
+        {
+            auto const moduleParameterIndex(
+                static_cast<std::uint8_t>(parameterID.moduleParameterIndex + 1U /*Bypass*/));
+            auto const value(
+                Automation::parseParameterValue(moduleParameterIndex, parser, *pModule));
+            if (!value)
+                return {};
+            auto const bound(
+                Automation::internal2AutomatedValue(moduleParameterIndex, *value, true, *pModule));
+            return LFO::internal2AutomatedValue(parameterID.lfoParameterIndex, bound,
+                                                AutomatedParameter::normalised);
+        }
+        }
+
+        auto const value(LE::Parameters::invokeFunctorOnIndexedParameter<LFO::Parameters>(
+            parameterID.lfoParameterIndex, parser));
+        if (!value)
+            return {};
+        return LFO::internal2AutomatedValue(parameterID.lfoParameterIndex, *value,
+                                            AutomatedParameter::normalised);
+    }
+
+    LE::Parameters::ParameterValueParser const parser;
+}; // struct ParameterParser
+
+#pragma warning(pop)
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -257,6 +421,16 @@ Plugin2HostPassiveInteropImpl<Impl, Protocol>::getParameter(ParameterID const pa
 {
     return invokeFunctorOnIdentifiedParameter(
         parameterID, ParameterGetter<typename Impl::Module, AutomatedParameter>(), &program);
+}
+
+template <class Impl, class Protocol>
+std::optional<Plugins::AutomatedParameterValue>
+Plugin2HostPassiveInteropImpl<Impl, Protocol>::getParameterFromDisplay(
+    ParameterID const parameterID, char const *const display, Program const &program) const
+{
+    using Parser = ParameterParser<typename Impl::Module, AutomatedParameter>;
+    return invokeFunctorOnIdentifiedParameter(parameterID, Parser{{display, impl().engineSetup()}},
+                                              &program);
 }
 
 template <class Impl, class Protocol>

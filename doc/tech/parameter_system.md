@@ -8,16 +8,17 @@ Written against commit `6e09d15` (post-restructure: `source/` → `src/`,
 [`streaming_format.md`](streaming_format.md), which is what happens to a
 parameter once it reaches a file.
 
-> **Still accurate as of 04.08.2026**, and the only document about this layer.
+> **Still accurate as of 07.08.2026**, and the only document about this layer.
 > The port did not change the parameter system: the skeleton, the addressing and
 > the runtime re-meaning are what they were. Two things it does not know about,
 > both additive — the base value now travels separately from the LFO's output
 > (`threading_model.md` §4), and `tests/parameters/data/parameterTable.txt` pins
 > the whole 286-row enumeration.
 >
-> One thing about *where* a parameter's name lives did change, on 04.08.2026, and
-> §9 is it: a name is written beside the parameter it names, in the header, and
-> not in a `.cpp`.
+> Two things did change and have sections of their own. **§7** is *where* a
+> parameter's name lives (04.08.2026): beside the parameter it names, in the
+> header, not in a `.cpp`. **§8** is a parameter's display text, which now goes
+> both ways (07.08.2026).
 
 ---
 
@@ -348,7 +349,72 @@ Two things follow, and both are what §7 above is about:
 
 ---
 
-## 8. The edition axis (the build-time one)
+## 8. Display text, both ways
+
+A parameter's value becomes text through `Parameters::print` and text becomes a
+value again through `Parameters::parse` (`src/le/parameters/{printer,parser}.hpp`).
+The two are mirror images: one file per parameter tag, dispatched on
+`Parameter::Tag`, and the units they meet in are supplied by the same
+`DisplayValueTransformer<Parameter>` — `transform` outbound, `inverse` back. Five
+parameters have a transform: the two gains (dB), the mix and the overlap factor
+(%), the two effect frequencies (Hz, and the only one that needs the engine's
+`Setup`), and the ExImPloder gate (dB, with `-inf` for "off").
+
+Three properties are worth stating, because each is a bug that was actually
+shipped:
+
+- **`parse` answers `std::optional`.** A display transform is not onto: `""`,
+  `"off"` and `"M3.Wet"` are text no value corresponds to, and `strtod` answers
+  `0` for all three — a value every one of these parameters can hold. The first
+  `text_to_value` here did exactly that and, worse, read the display units as
+  storage units: clap-validator caught the input gain going `0.001` → `"-60dB"`
+  → `-60.0` → `"nandB"`.
+- **`parse` answers a value the parameter could hold** — clamped to its range,
+  whole where it is integral, snapped where it must be a power of two. Typing
+  "999 dB" is not an error; storing 999 in a ±20 dB parameter is, and
+  `Parameter::setValue` answers that with an assertion in a checked build and by
+  storing it in a release one.
+- **An unseen `inverse` is silent**, exactly as §7's second bullet says about an
+  unseen `transform`: the primary template is the identity, so a translation unit
+  that cannot see the specialisation parses dB as a linear gain and says nothing.
+  The specialisations live in the header beside the parameter for that reason.
+
+Power-of-two parameters print *through* the transformer like everything else as
+of 07.08.2026. They used to be the one exception — the note said they "do not
+currently support/use the DisplayValueTransformer functionality" and the overlap
+factor's percentage came from an explicit `print<>` specialisation instead. That
+specialisation named two overloads that did not exist, so from 2011 to 08.2026
+the overlap factor displayed as the raw factor with a `%` after it: "4%" for a
+75% overlap, in the host's generic panel and in the settings window's own combo
+box, whose comment says it exists to show the percentage.
+
+### What the host sees
+
+`SpectrumWorxCLAP::params{ValueToText,TextToValue}` are the edge, and two things
+about them are policy rather than mechanism:
+
+- `value_to_text` renders the parameter's **own** value and ignores the one it is
+  handed. The `\todo` above it has the argument; the short version is that
+  rendering a supplied value means default-constructing a parameter, and a
+  dynamic range finds its bounds by walking to the LFO that owns it. `parse` has
+  no such problem and takes no parameter object at all.
+- A parameter no effect currently owns displays as **`notAvailable`** — the same
+  `"N/A"` `paramsInfo` names it — and reads back as the default `paramsValue`
+  answers with. Not cosmetic: clap-validator's `param-conversions` requires
+  `text_to_value` for *all* the automatable parameters or for none, and every ID
+  in the fixed list is automatable so that a host's automation lane survives an
+  effect swap. An empty string, which is what these used to display as, is not
+  something a parser can honestly read back.
+
+`tests/clap/parameterTextTests.cpp` holds every parameter of every one of the 57
+effects to the round trip, and does it by re-printing rather than by comparing
+values: print, parse, write the parsed value back, print again, and require the
+two strings to be equal. That is what "within the display's own precision" means,
+and it needs no per-parameter idea of how many decimal places that is.
+
+---
+
+## 9. The edition axis (the build-time one)
 
 There is no longer a build-time edition axis: every one of the 57 effects is
 compiled in, and the cmake that used to select a subset was deleted on
@@ -380,7 +446,7 @@ the *framework*. This repo builds one plugin.
 
 ---
 
-## 9. Why this drives the format decision
+## 10. Why this drives the format decision
 
 Restating [`old/initial_scan.md`](old/initial_scan.md) §1.6.2 with the mechanism
 attached:
@@ -411,7 +477,7 @@ not just a notification — which is what `ToEngine::SetSlot` and
 
 ---
 
-## 10. Reading order
+## 11. Reading order
 
 For anyone touching this:
 

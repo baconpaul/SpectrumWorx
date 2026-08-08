@@ -14,6 +14,7 @@
 #include "moduleNode.hpp"
 
 #include "le/parameters/lfoImpl.hpp"
+#include "le/parameters/parser_fwd.hpp"  //...mrmlj...ParseParameterValue
 #include "le/parameters/printer_fwd.hpp" //...mrmlj...GetParameterValueString
 #include "le/parameters/runtimeInformation.hpp"
 #include "le/spectrumworx/effects/baseParameters.hpp"
@@ -190,6 +191,7 @@ class ModuleParameters : public ModuleNode
 
   public: //...mrmlj...AutomatedModuleImpl & getParameterValueString...
     using ParameterPrinter = LE::Parameters::AutomatedParameterPrinter;
+    using ParameterParser = LE::Parameters::ParameterValueParser;
     struct EffectMetaData;
     EffectMetaData const &metaData() const { return metaData_; }
 
@@ -214,10 +216,18 @@ class ModuleParameters : public ModuleNode
         typedef char const *(GetParameterValueString)(std::uint8_t index,
                                                       ParameterPrinter const &)/*noexcept*/;
 
+        /// \brief GetParameterValueString backwards, and here for the same
+        /// reason: an effect's parameters are a compile time list this class
+        /// deliberately does not know, so the one thing that does -- the effect's
+        /// own instantiation -- leaves a function behind.
+        typedef LE::Parameters::ParsedValue(ParseParameterValue)(
+            std::uint8_t index, ParameterParser const &) /*noexcept*/;
+
         std::uint8_t const numberOfExtraParameters;
         std::uint8_t const typeIndex_;
         ParameterInfo const *LE_RESTRICT const pParameterInfos;
         GetParameterValueString &getParameterValueString;
+        ParseParameterValue &parseParameterValue;
 
         /// \note `EffectMetaData( EffectMetaData const & ) = delete;` used to
         /// stand here to make it non-copyable. C++20 counts a user-*declared*

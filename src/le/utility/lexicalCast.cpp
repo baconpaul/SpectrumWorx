@@ -23,10 +23,11 @@
 // rather than bringing Spirit back.
 //                                        (28.07.2026.) (SW port)
 
+#include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #ifndef NDEBUG
 #include <cctype>
-#include <cmath>
 #endif // NDEBUG
 #include <cstring>
 
@@ -106,6 +107,31 @@ LE_NOINLINE unsigned int lexical_cast(double const value, std::uint8_t const dec
     {
         LE_ASSERT(std::isalnum(buffer[totalCharactersWritten - 1]));
     }
+
+    ////////////////////////////////////////////////////////////////////////////
+    /// \note And "-0" is "0". A value that rounds to zero at the precision being
+    /// shown *is* zero as far as this string is concerned, and the sign in front
+    /// of it is noise a user has to interpret: a module gain sitting at exactly
+    /// 0 dB reads as "-0 dB" the moment a host normalises the value and writes it
+    /// back, because -48 + (48/72) * 72 is -7e-15 rather than 0.
+    ///
+    ///   Here rather than at that subtraction, because the subtraction is not
+    /// wrong -- it is as close to zero as a float gets -- and because every other
+    /// route to a tiny negative lands here too.
+    ///                                       (07.08.2026.) (SW port)
+    ////////////////////////////////////////////////////////////////////////////
+    if (buffer[0] == '-')
+    {
+        char const *pCharacter(buffer + 1);
+        while ((*pCharacter == '0') || (*pCharacter == '.'))
+            ++pCharacter;
+        if (*pCharacter == '\0')
+        {
+            std::memmove(buffer, buffer + 1, totalCharactersWritten); // the terminator too
+            --totalCharactersWritten;
+        }
+    }
+
     LE_ASSERT_MSG((std::abs(lexical_cast<float>(buffer) - static_cast<float>(value)) <
                    (1 / std::pow(10.0f, decimalPlaces))) ||
                       !std::isfinite(value),
@@ -158,6 +184,26 @@ template <> float lexical_cast<float>(char const *valueString)
 template <> double lexical_cast<double>(char const *valueString)
 {
     return lexical_cast_double_worker(valueString);
+}
+
+std::optional<double> parseNumber(char const *const text)
+{
+    if (!text)
+        return {};
+
+    char *pEnd;
+    double const value(std::strtod(text, &pEnd));
+
+    /// \note The two answers the lexical_cast<> above cannot give. `strtod`
+    /// leaves pEnd where it started when it read nothing at all, which is the
+    /// only way to tell "" and "off" from "0"; and it happily reads "nan", which
+    /// is a value nothing downstream may be handed.
+    if (pEnd == text)
+        return {};
+    if (std::isnan(value))
+        return {};
+
+    return value;
 }
 
 } // namespace LE::Utility

@@ -60,6 +60,10 @@ template <> struct DisplayValueTransformer<SW::GlobalParameters::InputGain>
     {
         return Math::normalisedLinear2dB(value);
     }
+    static float inverse(float const dB, SW::Engine::Setup const &)
+    {
+        return Math::dB2NormalisedLinear(dB);
+    }
     using Suffix = UnitString<"dB">;
 };
 
@@ -76,6 +80,10 @@ template <> struct DisplayValueTransformer<SW::GlobalParameters::MixPercentage>
     {
         return Math::normalisedLinear2Percentage(value);
     }
+    static float inverse(float const percentage, SW::Engine::Setup const &)
+    {
+        return Math::percentage2NormalisedLinear(percentage);
+    }
     using Suffix = UnitString<"%">;
 };
 
@@ -86,6 +94,20 @@ template <> struct DisplayValueTransformer<SW::GlobalParameters::OverlapFactor>
         float const value(Math::convert<float>(parameterValue));
         float const percentage((value - 1) * 100 / value);
         return percentage;
+    }
+
+    /// \note The overlap *factor* that overlaps by this much: transform() is
+    /// (f - 1) / f, so this is 1 / (1 - percentage/100). Not a power of two in
+    /// general -- 93.8%, which is what a factor of 16 prints as at one decimal
+    /// place, comes back as 16.13 -- and it does not have to be: the power-of-two
+    /// parser snaps whatever this answers to the nearest representable factor.
+    /// A hundred percent or more is not reachable by any factor, so it is the
+    /// largest one.
+    static float inverse(float const percentage, SW::Engine::Setup const &)
+    {
+        if (percentage >= 100)
+            return static_cast<float>(SW::Engine::OverlapFactor::maximum());
+        return 100 / (100 - percentage);
     }
     using Suffix = UnitString<"%">;
 };

@@ -16,6 +16,7 @@
 #include "le/parameters/lfo.hpp"
 #include "le/plugins/plugin.hpp" //...ugh...mrmlj...for Plugins::*AutomatedParameter usage in printer.hpp...clean this up...
 #include "le/parameters/parametersUtilities.hpp"
+#include "le/parameters/parser.hpp"  // parsers for module parameters
 #include "le/parameters/printer.hpp" // printers for module parameters
 #include "le/parameters/uiElements.hpp"
 #include "le/parameters/parametersUtilities.hpp"
@@ -358,6 +359,17 @@ template <class Parameters> struct EffectParameterPrinter
     }
 }; // class EffectParameterPrinter
 
+/// \note The other direction, and the same shape. \see EffectMetaData.
+template <class Parameters> struct EffectParameterParser
+{
+    static LE::Parameters::ParsedValue parse(std::uint8_t const parameterIndex,
+                                             LE::Parameters::ParameterValueParser const &parser)
+    {
+        LE_ASSUME(parameterIndex < Parameters::static_size);
+        return LE::Parameters::invokeFunctorOnIndexedParameter<Parameters>(parameterIndex, parser);
+    }
+}; // class EffectParameterParser
+
 template <class Effect, typename TypeIndex> struct MakeEffectMetaData
 {
     static ModuleParameters::EffectMetaData const data;
@@ -367,7 +379,8 @@ template <class Effect, typename TypeIndex>
 ModuleParameters::EffectMetaData const MakeEffectMetaData<Effect, TypeIndex>::data = {
     Effect::Parameters::static_size, TypeIndex::value,
     &ParametersInformation<typename Effect::Parameters>::data[0],
-    EffectParameterPrinter<typename Effect::Parameters>::print};
+    EffectParameterPrinter<typename Effect::Parameters>::print,
+    EffectParameterParser<typename Effect::Parameters>::parse};
 
 ////////////////////////////////////////////////////////////////////////////
 // EffectParameterOffsets<Effect>

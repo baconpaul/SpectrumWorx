@@ -20,8 +20,8 @@ cannot be held to a number off the machine that minted their fixtures.
 |---|---|
 | Builds | CLAP, VST3, AUv2, standalone, on every push: macOS universal, Windows x64 under MSVC 19.51, Linux x64 under GCC 12.4, and again in an Ubuntu 20 / GCC 11 container for the glibc a released binary needs. |
 | Runs | **In DAWs, on macOS, Windows and Linux, driven by testers rather than by us** (07.08.2026). The deadlocks that motivated the threading redesign are gone, and the plugin works. That closes the question the redesign was an argument about: it is an observation now. |
-| Tests | **Green on 06.08.2026** — 109 plugin cases and 142 dsp cases, Debug and Release. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`, plus 66 `sw-show-ui` renders. Goldens run in Release only. |
-| Validators | **All three clean on 06.08.2026** — `auval` 5 runs of 5, `vst3-validator` 47/47, and `clap-cpp-validator` **22 of 22 with zero failures**, `state-reproducibility-flush` included. The one `scan-time` warning comes and goes with the page cache (below). All three by hand on this machine; CI runs none of them. |
+| Tests | **Green on 07.08.2026** — 119 plugin cases and 143 dsp cases, Debug and Release. Two binaries, `sw-dsp-tests` and `sw-plugin-tests`, plus 66 `sw-show-ui` renders. Goldens run in Release only. |
+| Validators | `clap-cpp-validator` **22 of 22 with zero failures** and `vst3-validator` **47/47**, both re-run on 07.08.2026 against `text_to_value`. `auval` was 5 runs of 5 on 06.08.2026 and **has not been re-run since**: it reads `~/Library/Audio/Plug-Ins/Components`, so running it means installing over whatever is there. The one `scan-time` warning comes and goes with the page cache (below). All by hand on this machine; CI runs none of them. |
 | CI | `.github/workflows/build-plugin.yml`. **Green on 06.08.2026** — ten jobs (gates, five test legs, four builds) over three platforms, run `31112026299`. Windows Debug is the sixth test leg and is excluded; `tech_debt.md` says why. |
 | Warnings | **Two**, both deliberate `#pragma message` build banners. Our own sources compile under `-Wall -Wextra -Werror` on Apple Clang, GCC 12.4 and GCC 11 — CI passes `-DSW_WERROR=ON` to every leg. MSVC gets nothing and compiles warning-blind — `tech_debt.md`. |
 | Sanitizers | **tsan clean over both binaries as of 06.08.2026** — zero reports across 101 plugin cases and 106 dsp cases, including the case that reproduced the preset-swap race. The earlier clean run, on 02.08.2026, is what that race shows the limit of: nothing then drove a host reading parameters against a running engine, so tsan had nothing to see. `reset()` and `paramsFlush()` entered the realtime region on 03.08.2026 and **have not been run under rtsan since** — below. |
@@ -71,33 +71,24 @@ signed, notarised, stapled build without hand-holding. What is left here:
 
 None of these blocks anything, and most are under a day.
 
-### `text_to_value` returns false
+### Let a user type a value into a knob
 
-A host that lets a user *type* a value gets nothing from us:
-`SpectrumWorxCLAP::paramsTextToValue` is `return false`
-(`spectrumWorxCLAP.cpp:684`), and the `\todo` above it says why. The 2016 code
-never needed the inverse — neither VST 2.4 nor AU asks a plugin to parse a typed
-value — so `Parameters::DisplayValueTransformer` has `transform` and no
-counterpart, and the effect printers go the same one way.
+The plugin can read its own display back now: `DisplayValueTransformer` has an
+`inverse` beside its `transform`, `Parameters::parse` mirrors
+`Parameters::print` tag for tag, and `SpectrumWorxCLAP::paramsTextToValue`
+answers. `parameter_system.md` §8 is the mechanism, and
+`tests/clap/parameterTextTests.cpp` holds every parameter of every one of the 57
+effects to the round trip.
 
-Returning false is the *honest* answer rather than a lazy one, and the previous
-implementation shows why: it ran `strtod` and treated display units as storage
-units, which clap-validator caught taking input gain `0.001` → `"-60dB"` →
-`-60.0` → `"nandB"`, a NaN written straight into the engine.
+So a **host's** generic panel can be typed into. The plugin's own editor still
+cannot: right-click a knob and type a value, which is what the whole inverse was
+wanted for. That is `EditorKnob` and the module parameter widgets, and it needs
+nothing new underneath — `Plugin2HostPassiveInteropImpl::getParameterFromDisplay`
+is the call, and it takes the `Program` the caller owns.
 
-The work, in order:
-
-1. Give `DisplayValueTransformer` an `inverse` alongside `transform` — four
-   specialisations, two dB and two percentage — and teach the effect-specific
-   printers the same.
-2. **Test it as a round trip**, which is the only way this stays honest:
-   for every parameter, `value_to_text` then `text_to_value` must return where it
-   started, within the display's own precision. The suite already walks the whole
-   parameter list calling `value_to_text` (`pluginTests.cpp:472`), so the walk
-   exists and wants the second half.
-3. Add it to the test host's parameter API and re-run clap-validator, which is
-   what found the NaN.
-4. Then the GUI can offer it: right-click a knob and type a value.
+Worth doing beside it: the knob's own value display already goes through
+`Parameters::print`, so typing and showing would finally be the same pair of
+functions rather than two spellings of the same table.
 
 ### Consider the cpputils ring buffer
 

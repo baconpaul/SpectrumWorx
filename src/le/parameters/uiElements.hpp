@@ -218,6 +218,31 @@ template <class Parameter> struct DisplayValueTransformer
         return value;
     }
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief transform() run backwards: what a user typed, in display units,
+    /// back into the units the parameter is stored in.
+    ///
+    /// \note Not a template, unlike transform(): a display value has been through
+    /// a decimal string by the time it gets here, so it is a float whatever the
+    /// parameter's own type is, and le/parameters/parser.hpp puts it back into
+    /// that type once -- for every parameter -- rather than here, five times.
+    ///
+    /// \note Every specialisation of this template owes an inverse as well as a
+    /// transform, and the pair is what makes text_to_value honest. Until 08.2026
+    /// there was no inverse at all and the CLAP entry point declined to parse
+    /// anything; what it had done before that was read the display units as if
+    /// they were storage units, which clap-validator caught turning an input gain
+    /// of 0.001 into a NaN.
+    ///                                       (07.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    static float inverse(float const displayValue, SW::Engine::Setup const &)
+    {
+        return displayValue;
+    }
+
     using Suffix = typename Detail::GetTraitDefaulted<Traits::Tag::Unit, typename Parameter::Traits,
                                                       typename Parameter::Defaults>::type;
 }; // struct DisplayValueTransformer

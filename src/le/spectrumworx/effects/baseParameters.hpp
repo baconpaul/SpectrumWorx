@@ -101,6 +101,7 @@ namespace LE::Parameters
 template <> struct DisplayValueTransformer<SW::Effects::BaseParameters::StartFrequency>
 {
     static float transform(float const &value, SW::Engine::Setup const &);
+    static float inverse(float hz, SW::Engine::Setup const &);
 
     using Suffix = UnitString<" Hz">;
 };

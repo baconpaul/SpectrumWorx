@@ -20,6 +20,8 @@
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/span.hpp"
 
+#include <optional>
+
 namespace LE::SW
 {
 
@@ -137,6 +139,24 @@ class Plugin2HostPassiveInteropImpl : public Plugin2HostPassiveInteropController
             parameterID, std::forward<ParameterValueStringGetter const>(getter), &program));
         copyToBuffer(pValueString, text);
     }
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief getParameterDisplay() backwards: the automation value that would
+    /// display as \p display, or nothing when no value of this parameter does.
+    ///
+    /// \note The value, on the protocol's own edge -- the same one getParameter()
+    /// answers on -- so that a caller can hand the two to the same host without
+    /// knowing which parameter it is holding.
+    ///
+    /// \note \p program for the same reason getParameterDisplay() takes one: the
+    /// answer depends on which effect the slot holds, and the two copies of that
+    /// are owned by two different threads. doc/tech/threading_model.md §2 rule 2.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    std::optional<Plugins::AutomatedParameterValue>
+    getParameterFromDisplay(ParameterID, char const *display, Program const &) const;
 
     /* </Parameters> */
 

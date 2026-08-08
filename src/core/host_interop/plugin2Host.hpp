@@ -31,26 +31,11 @@ namespace Parameters
 {
 //...mrmlj...required to be in the header only for getParameterProperties() and EditorKnob::paint()...
 
-// Implementation note:
-//   PowerOfTwo parameters do not currently support/use the
-// DisplayValueTransformer functionality so we use a direct print()
-// specialization to print the overlap amount in percentages.
-//                                        (03.05.2011.) (Domagoj Saric)
-namespace Detail
-{
-template <class Parameter>
-char const *print(unsigned int parameterValue, SW::Engine::Setup const &, PrintBuffer const &,
-                  PowerOfTwoParameterTag);
-template <>
-char const *print<SW::Engine::OverlapFactor>(unsigned int parameterValue, SW::Engine::Setup const &,
-                                             PrintBuffer const &, PowerOfTwoParameterTag);
-template <class Parameter>
-char const *print(float const &parameterValue, SW::Engine::Setup const &, PrintBuffer const &,
-                  PowerOfTwoParameterTag);
-template <>
-char const *print<SW::Engine::OverlapFactor>(float const &parameterValue, SW::Engine::Setup const &,
-                                             PrintBuffer const &, PowerOfTwoParameterTag);
-} // namespace Detail
+/// \note The overlap factor's "print the overlap percentage rather than the
+/// factor" specialisation stood here from 2011 to 08.2026, and named two
+/// overloads that did not exist -- so it never printed anything. The percentage
+/// comes from DisplayValueTransformer now, like every other display transform;
+/// see the note on the power-of-two printer.
 } // namespace Parameters
 
 namespace SW
@@ -67,6 +52,22 @@ namespace GUI
 {
 bool isThisTheGUIThread();
 }
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief What a parameter no effect currently owns is called, and displays as.
+///
+/// \note One spelling, because the two have to agree: a host that is told a
+/// parameter is named this and shows a value of something else has been told two
+/// different things about the same absent parameter. SpectrumWorxCLAP also reads
+/// it back -- see paramsTextToValue.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+inline constexpr char notAvailable[]{"N/A"};
+
+/// \brief What a slot with no effect in it displays as, and reads back from.
+inline constexpr char emptySlot[]{"<empty>"};
 
 ////////////////////////////////////////////////////////////////////////////////
 ///

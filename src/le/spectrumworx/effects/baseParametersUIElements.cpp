@@ -26,4 +26,10 @@ float DisplayValueTransformer<SW::Effects::BaseParameters::StartFrequency>::tran
 {
     return engineSetup.normalisedFrequencyToHz(value);
 }
+
+float DisplayValueTransformer<SW::Effects::BaseParameters::StartFrequency>::inverse(
+    float const hz, SW::Engine::Setup const &engineSetup)
+{
+    return engineSetup.hzToNormalisedFrequency(hz);
+}
 } // namespace LE::Parameters

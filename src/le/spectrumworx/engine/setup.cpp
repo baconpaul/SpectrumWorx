@@ -146,6 +146,15 @@ float Setup::normalisedFrequencyToHz(float const normalisedFrequency) const
     return normalisedFrequency * sampleRate<float>() / 2;
 }
 
+/// \note Clamped where the forward direction asserts, because the two have
+/// different callers: normalisedFrequencyToHz() is handed a stored parameter,
+/// which is in range by construction, and this one is handed a number a user
+/// typed. "40000 Hz" at 44.1 kHz is Nyquist, not an assertion.
+float Setup::hzToNormalisedFrequency(float const hz) const
+{
+    return Math::clamp(hz * 2 / sampleRate<float>(), 0.0f, 1.0f);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Setup::milliSecondsToSteps()

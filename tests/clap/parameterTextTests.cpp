@@ -1,0 +1,301 @@
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \file parameterTextTests.cpp
+/// ----------------------------
+///
+///   `text_to_value`, held to `value_to_text` as its inverse.
+///
+///   A round trip is the only honest way to test this pair, and the reason is
+/// the bug that made the plugin decline to parse anything at all for a week: the
+/// first implementation ran `strtod` over the text and returned the result as if
+/// display units were storage units, which reads back an input gain of 0.001 as
+/// -60 -- a number in the right *shape* and the wrong *units*. Nothing that
+/// checks either direction on its own catches that. Printing a value, reading it
+/// back, and printing it again does, for every parameter at once, without a
+/// table of expected strings that would rot.
+///
+/// \note The re-print, rather than a tolerance on the value. "Within the
+/// display's own precision" is exactly what a re-print asserts, and it needs no
+/// per-parameter idea of how many decimal places that is: a gain shown at one
+/// decimal place in dB and an FFT size shown as an integer are the same
+/// assertion here.
+///
+/// Copyright (c) 2026 the SpectrumWorx contributors.
+/// SPDX-License-Identifier: GPL-3.0-or-later
+///
+////////////////////////////////////////////////////////////////////////////////
+//------------------------------------------------------------------------------
+#include "testHost.hpp"
+
+#include "le/spectrumworx/effects/configuration/constants.hpp"
+#include "le/spectrumworx/effects/configuration/effectNames.hpp"
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <array>
+#include <cstdint>
+#include <cstring>
+#include <string>
+#include <vector>
+//------------------------------------------------------------------------------
+namespace
+{
+//------------------------------------------------------------------------------
+
+using namespace SWTest;
+
+namespace Effects = LE::SW::Effects;
+
+/// What the host would show for \p id right now.
+std::string displayOf(clap_plugin const &plugin, clap_plugin_params const &params, clap_id const id)
+{
+    double value{0};
+    REQUIRE(params.get_value(&plugin, id, &value));
+
+    std::array<char, CLAP_NAME_SIZE> text{};
+    REQUIRE(params.value_to_text(&plugin, id, value, text.data(), text.size()));
+    return text.data();
+}
+
+/// \brief Writes \p value the way a host does, and lets the main thread catch up.
+///
+/// \note Through the event queue rather than through anything private, because
+/// what is being checked is that a parsed value is one the plugin will actually
+/// take: a number that cannot be written back is not an answer to
+/// "what value displays as this".
+void write(ActivePlugin const &plugin, clap_id const id, double const value)
+{
+    OneParameterEvent const event(id, value);
+    plugin.flush(&*event);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Prints \p id, reads the print back, writes what it read, and prints
+/// again. The two prints must agree.
+///
+/// \returns whether the plugin agreed to parse its own display at all. Every
+/// parameter should -- `text_to_value` may decline text in general, but its own
+/// display is not text in general -- and the callers assert it; the bool is what
+/// lets the failure name the parameter rather than the helper.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+bool roundTrips(ActivePlugin const &plugin, clap_plugin_params const &params, clap_id const id)
+{
+    auto const before(displayOf(*plugin, params, id));
+
+    double parsed{0};
+    if (!params.text_to_value(&*plugin, id, before.c_str(), &parsed))
+        return false;
+
+    // A value a host would refuse to carry is not a value.
+    REQUIRE(parsed == parsed); // NaN
+    CHECK(parsed >= -1e9);
+    CHECK(parsed <= 1e9);
+
+    write(plugin, id, parsed);
+
+    CHECK(displayOf(*plugin, params, id) == before);
+    return true;
+}
+
+/// Every parameter of slot \p slot -- its own and its LFOs' -- in id order.
+std::vector<clap_param_info> slotParameters(clap_plugin const &plugin,
+                                            clap_plugin_params const &params, unsigned const slot)
+{
+    std::vector<clap_param_info> mine;
+    std::string const path("Slot " + std::to_string(slot + 1));
+    for (auto const &info : allParameterInfo(plugin, params))
+        if ((path == info.module) || (path + "/LFO" == info.module))
+            mine.push_back(info);
+    return mine;
+}
+
+//------------------------------------------------------------------------------
+} // anonymous namespace
+//------------------------------------------------------------------------------
+
+TEST_CASE("Every parameter reads back what it displays", "[clap][text]")
+{
+    Entry const entry;
+    ActivePlugin plugin(48000, 512);
+    auto const &params(parameters(*plugin));
+
+    ////////////////////////////////////////////////////////////////////////////
+    // The whole fixed list, on an instance with nothing in any slot: the globals
+    // and the five slot selectors are real, and every other one of the ~1500 is
+    // a parameter no effect owns.
+    //
+    // Every one of them, and no exception for the hidden ones, because
+    // clap-validator's param-conversions allows no exception either: text_to_value
+    // has to work for all the automatable parameters or for none, and every ID
+    // here is automatable so that a host's lane survives an effect swap. What an
+    // absent parameter displays as, and reads back from, is "N/A".
+    ////////////////////////////////////////////////////////////////////////////
+    std::uint32_t hidden{0}, shown{0};
+    for (auto const &info : allParameterInfo(*plugin, params))
+    {
+        INFO("parameter '" << info.name << "' in '" << info.module << "'");
+        CHECK(roundTrips(plugin, params, info.id));
+
+        bool const isHidden(info.flags & CLAP_PARAM_IS_HIDDEN);
+        CHECK(displayOf(*plugin, params, info.id).starts_with("N/A") == isHidden);
+        (isHidden ? hidden : shown)++;
+    }
+
+    // Both arms exercised, which is what makes the CHECKs above mean something.
+    CHECK(shown > 0);
+    CHECK(hidden > 0);
+}
+
+TEST_CASE("Every effect's own parameters read back what they display", "[clap][text]")
+{
+    // The coverage that matters: the base parameters are five, and the other
+    // ~400 belong to the 57 effects and are reached only by putting each one in
+    // a slot. Every display transform in the tree except the globals' is down
+    // here -- the two frequencies' Hz, the ExImPloder gate's "-inf dB", every
+    // enumerated parameter's value strings.
+    Entry const entry;
+    ActivePlugin plugin(48000, 512);
+    auto const &params(parameters(*plugin));
+
+    auto const slotSelector(parameterID(moduleChainType, 0));
+
+    for (std::uint8_t effect(0); effect < Effects::Constants::numberOfEffects; ++effect)
+    {
+        INFO("effect " << unsigned(effect) << " '" << Effects::effectName(effect) << "'");
+        write(plugin, slotSelector, effect);
+
+        // The slot selector itself: its display is the effect's title.
+        CHECK(displayOf(*plugin, params, slotSelector) == Effects::effectName(effect));
+        CHECK(roundTrips(plugin, params, slotSelector));
+
+        for (auto const &info : slotParameters(*plugin, params, 0))
+        {
+            INFO("parameter '" << info.name << "'");
+            CHECK(roundTrips(plugin, params, info.id));
+        }
+    }
+}
+
+TEST_CASE("Text that is not a value is declined rather than guessed", "[clap][text]")
+{
+    // The whole reason parse() answers std::optional. strtod answers 0 for all
+    // of these, and 0 is a value every one of these parameters can hold -- so a
+    // parser that cannot say "no" silently writes one.
+    Entry const entry;
+    ActivePlugin plugin(48000, 512);
+    auto const &params(parameters(*plugin));
+
+    auto const inputGain(parameterID(globalType, 0));
+
+    for (char const *const nonsense : {"", "  ", "off", "N/A", "dB", "nan", "-nan", "+"})
+    {
+        INFO("'" << nonsense << "'");
+        double value{-1};
+        CHECK_FALSE(params.text_to_value(&*plugin, inputGain, nonsense, &value));
+    }
+
+    // And an enumerated parameter is not an index: the window type displays a
+    // word, so a number is not one of its values.
+    auto const windowType(parameterID(globalType, 5));
+    REQUIRE(std::string(displayOf(*plugin, params, windowType)) == "Hann");
+    double value{-1};
+    CHECK_FALSE(params.text_to_value(&*plugin, windowType, "3", &value));
+    CHECK(params.text_to_value(&*plugin, windowType, "Blackman", &value));
+    CHECK(value == 2);
+}
+
+TEST_CASE("A typed value is read in display units, not storage units", "[clap][text]")
+{
+    // The 2016 regression, named: the input gain is stored as a linear 0.001..2
+    // and shown in dB, and the implementation this replaces returned the dB
+    // number as the stored value. -60 is not in 0.001..2, and what a host then
+    // read back was "nandB".
+    Entry const entry;
+    ActivePlugin plugin(48000, 512);
+    auto const &params(parameters(*plugin));
+
+    auto const inputGain(parameterID(globalType, 0));
+
+    double value{0};
+    REQUIRE(params.text_to_value(&*plugin, inputGain, "-60dB", &value));
+    CHECK(value > 0.0009);
+    CHECK(value < 0.0011);
+
+    // The unit is optional, and a space before it is too.
+    double withSpace{0}, without{0};
+    REQUIRE(params.text_to_value(&*plugin, inputGain, "-6 dB", &withSpace));
+    REQUIRE(params.text_to_value(&*plugin, inputGain, "-6", &without));
+    CHECK(withSpace == without);
+
+    // Unity gain, both ways round.
+    double unity{0};
+    REQUIRE(params.text_to_value(&*plugin, inputGain, "0", &unity));
+    CHECK(unity > 0.999);
+    CHECK(unity < 1.001);
+
+    write(plugin, inputGain, unity);
+    CHECK(displayOf(*plugin, params, inputGain) == "0dB");
+}
+
+TEST_CASE("A typed value out of range is clamped rather than stored", "[clap][text]")
+{
+    // `Parameter::setValue` answers an out-of-range value with an assertion --
+    // in a release build, by storing it -- so what a host is handed here has to
+    // already be inside the range. clap-validator's param-range-robustness makes
+    // the same point about the value entry points.
+    Entry const entry;
+    ActivePlugin plugin(48000, 512);
+    auto const &params(parameters(*plugin));
+
+    auto const inputGain(parameterID(globalType, 0));
+
+    clap_param_info info{};
+    for (auto const &candidate : allParameterInfo(*plugin, params))
+        if (candidate.id == inputGain)
+            info = candidate;
+    REQUIRE(info.max_value > info.min_value);
+
+    double tooLoud{0}, tooQuiet{0};
+    REQUIRE(params.text_to_value(&*plugin, inputGain, "999 dB", &tooLoud));
+    REQUIRE(params.text_to_value(&*plugin, inputGain, "-999 dB", &tooQuiet));
+    CHECK(tooLoud == info.max_value);
+    CHECK(tooQuiet == info.min_value);
+
+    // An infinity is text strtod reads happily, and clamps the same way.
+    double infinite{0};
+    REQUIRE(params.text_to_value(&*plugin, inputGain, "inf", &infinite));
+    CHECK(infinite == info.max_value);
+}
+
+TEST_CASE("A slot selector reads back the effect a user names", "[clap][text]")
+{
+    Entry const entry;
+    ActivePlugin plugin(48000, 512);
+    auto const &params(parameters(*plugin));
+
+    /// \note Slot 0, not slot 1. The chain is a list rather than an array -- see
+    /// ModuleChainBase::module(), which walks and stops at the end -- so filling
+    /// "slot 1" while slot 0 is empty puts the effect in slot 0 and leaves slot
+    /// 1's selector reading "<empty>".
+    auto const slotSelector(parameterID(moduleChainType, 0));
+
+    // Empty is a value the selector holds and displays, so it has to read back.
+    REQUIRE(displayOf(*plugin, params, slotSelector) == "<empty>");
+    double empty{0};
+    REQUIRE(params.text_to_value(&*plugin, slotSelector, "<empty>", &empty));
+    CHECK(empty == -1);
+
+    double named{0};
+    REQUIRE(params.text_to_value(&*plugin, slotSelector, Effects::effectName(3), &named));
+    CHECK(named == 3);
+
+    write(plugin, slotSelector, named);
+    CHECK(displayOf(*plugin, params, slotSelector) == Effects::effectName(3));
+
+    // A title no effect has is not an effect.
+    double unknown{0};
+    CHECK_FALSE(params.text_to_value(&*plugin, slotSelector, "Not An Effect", &unknown));
+}
