@@ -318,6 +318,27 @@ New entries go at the top of their area.
   is why what is left here is smaller than it looks, and why nothing new depends
   on it.
 
+- **A load problem has nowhere to go but a modal box.** (08.08.2026) A session
+  restore is a load nobody asked for: the host is opening a project, there may be
+  no window yet, and a modal dialog in the middle of it stops the host to ask a
+  question about something the user has not finished opening. `PresetProblem`
+  exists so the preset layer reports rather than interrupts and the *caller*
+  decides — and `GUI::loadPreset` still decides by asking whether an editor is
+  open, which says who is watching only by accident. A host restoring a session
+  while the window happens to be open still gets `reportToTheUser`'s summary.
+
+  Marked rather than fixed: `GUI::UnattendedLoad` is a scope `stateLoad` enters
+  and `warningMessageBox` asserts against, so a checked build says so and a
+  release build behaves as before. Two things are wanted before it can be more
+  than an assert. The load needs to carry *who asked* rather than infer it —
+  which is a parameter through both `loadPreset` overloads — and a plugin needs
+  somewhere non-modal to put "the audio file this project names is missing", the
+  honest answer to which is a line in the editor rather than a dialog at all.
+
+  The sample's own dialog is gone as of this entry's date: `setNewSample` returns
+  the reason it failed instead of showing it, and the only caller that raises a
+  box is the editor's file menu, where a user picked the file a moment ago.
+
 - **Host automation of the six global parameters does not move the editor's
   knobs.** (01.08.2026) `updateGlobalParameterWidget<>` and
   `updateForGlobalParameterChange()` have no callers — their only caller was the

@@ -292,6 +292,8 @@ bool SpectrumWorxCLAP::activate(double const sampleRate, std::uint32_t,
     if (!initialise())
         return false;
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
     /// \note A sample is decoded to the engine's rate, and a session can be
     /// restored -- sample and all -- before the host has said what that rate is.
     /// Re-read it here when they disagree; the 2016 build did not, and played
@@ -300,8 +302,35 @@ bool SpectrumWorxCLAP::activate(double const sampleRate, std::uint32_t,
     /// \note Before resume(), so that the swap is the direct one rather than a
     /// command waiting for a block that has not been asked for yet.
     ///                                       (01.08.2026.) (SW port)
-    if ((decodedSampleRate_ != 0) && (decodedSampleRate_ != static_cast<unsigned int>(sampleRate)))
-        setNewSample(sampleFile_);
+    ///
+    /// \note This read `(decodedSampleRate_ != 0) && (decodedSampleRate_ !=
+    /// rate)`, which is dead in exactly the case it was written for. Zero is not
+    /// "no sample": it is what `Sample::load` records when it was given no rate
+    /// to resample to, which is precisely the construct -> stateLoad -> activate
+    /// order every host restores a session in. So the guard skipped the one
+    /// arrival that needs it, and the 2016 bug it was added to fix was still
+    /// there -- a restored session played its sample at the file's rate for the
+    /// life of the instance, while a sample loaded from the *menu* was fine.
+    ///
+    ///   What decides it is whether a sample is loaded at all, and then whether
+    /// what it was decoded for is what the engine now runs at. Zero answers that
+    /// question the same way any other mismatching rate does.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    if ((sampleFile_ != juce::File()) &&
+        (decodedSampleRate_ != static_cast<unsigned int>(sampleRate)))
+    {
+        /// \note No dialog on a failure here, unlike the menu's load. Nothing
+        /// asked for this -- the host is opening a session -- and there is no
+        /// user standing in front of it to answer one; a modal box in `activate`
+        /// stops the host mid-restore. What is already loaded stays loaded, at
+        /// the wrong rate, which is what happened before this ran at all.
+        /// \see tech_debt.md, "A load problem has nowhere to go but a modal box".
+        [[maybe_unused]] auto const *const pErrorMessage(decodeAndPublishSample(sampleFile_));
+        LE_ASSERT_MSG(!pErrorMessage, "A sample that loaded once did not load again.");
+    }
 
     resume();
     engineRunning_ = true;
@@ -1883,6 +1912,10 @@ try
     if (!state)
         return false;
 
+    /// \note Nobody asked for this load, so nothing under it may stop to ask the
+    /// user anything. \see GUI::UnattendedLoad.
+    GUI::UnattendedLoad const unattended;
+
     /// \note `pEditor_`, which is null unless a window happens to be open. A
     /// host restores state before it ever shows an editor, and with the window
     /// shut for the rest of the session; the same call serves both because the
@@ -2044,14 +2077,14 @@ bool SpectrumWorxCLAP::requestEditorSize(int const width, int const height)
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-void SpectrumWorxCLAP::setNewSample(juce::File const &newSampleFile)
+char const *SpectrumWorxCLAP::decodeAndPublishSample(juce::File const &sampleFile)
 {
     LE_ASSERT(Threading::isMainThread() || !Threading::isAudioThread());
 
-    if (newSampleFile == juce::File())
+    if (sampleFile == juce::File())
     {
         publishSample(nullptr);
-        return;
+        return nullptr;
     }
 
     /// \note This plugin's own rate rather than the engine's, and zero is a
@@ -2060,17 +2093,20 @@ void SpectrumWorxCLAP::setNewSample(juce::File const &newSampleFile)
     /// it is given no other. activate() then re-reads it. Refusing would be the
     /// alternative, and it would silently lose the sample.
     auto const rate(static_cast<unsigned int>(sampleRate_));
-    auto *const pNewSample(new Sample);
-    auto const *const pErrorMessage(pNewSample->load(newSampleFile, rate));
+    auto pNewSample(std::make_unique<Sample>());
+    auto const *const pErrorMessage(pNewSample->load(sampleFile, rate));
     if (pErrorMessage)
-    {
-        delete pNewSample;
-        GUI::warningMessageBox("SpectrumWorx: error loading selected sample file.", pErrorMessage,
-                               false);
-        return;
-    }
+        return pErrorMessage;
 
-    publishSample(pNewSample);
+    publishSample(pNewSample.release());
+    return nullptr;
+}
+
+char const *SpectrumWorxCLAP::setNewSample(juce::File const &newSampleFile)
+{
+    auto const *const pErrorMessage(decodeAndPublishSample(newSampleFile));
+    if (pErrorMessage)
+        return pErrorMessage;
 
     /// \note And now it *is* dirty. This said "deliberately no
     /// markCurrentProgramAsModified()" until 02.08.2026, because the state was
@@ -2079,6 +2115,7 @@ void SpectrumWorxCLAP::setNewSample(juce::File const &newSampleFile)
     /// could not. State is the preset serialisation now and `<p n="Sample">` has
     /// been in that since 2011, so the promise is one this can keep.
     markCurrentProgramAsModified();
+    return nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

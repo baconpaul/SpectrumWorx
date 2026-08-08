@@ -347,16 +347,32 @@ torn down before the state it reads.
   outright that nothing is hidden, and another that a slot being filled does not
   move any flag at all — because a flag that moves is one a VST3 host was never
   told about.
-- **`activate()`'s sample-rate re-read is dead in the case it was written for** —
-  VERIFIED. `Sample::load` stores the *requested* rate, and the ordinary
+- ✅ **`activate()`'s sample-rate re-read is dead in the case it was written for**
+  — VERIFIED. `Sample::load` stores the *requested* rate, and the ordinary
   construct→stateLoad→activate order loads with `sampleRate_==0`, so
   `decodedSampleRate_` stays 0 and the `!=0` re-read guard never fires
   (`spectrumWorxCLAP.cpp:285-294`, `sample.cpp:128`). Sample plays at the wrong
   rate — the exact 2016 bug the note claims fixed.
-- **A session naming a missing sample keeps the previous one and re-saves it**;
+  **Done.** What decides it is whether a sample is loaded at all and then whether
+  what it was decoded for is what the engine now runs at; zero answers that the
+  same way any other mismatching rate does. Pinned by a case that restores state
+  into an *inactive* plugin and then activates — the order every host uses and
+  the one nothing tested — which reports `0 == 48000` against the old guard.
+- ✅ **A session naming a missing sample keeps the previous one and re-saves it**;
   a session with no `<p n="Sample">` doesn't clear the sample (the one global
   that doesn't reset) (`spectrumWorxCLAP.cpp:1850`, `presetLoading.cpp:130`).
   Also `stateLoad` can pop a modal dialog during unattended restore.
+  **Done.** Both cases clear the sample, so nothing of the previous session
+  survives into this one or into the next save — the review's "re-saves it" is
+  the sharper half, and both new cases check the re-saved bytes for the old name.
+  A file that will not load is reported as a `PresetProblem` rather than shown,
+  which is the channel this project already built for "something is wrong with a
+  preset, and the caller decides whether to interrupt".
+  The dialog is *half* fixed, deliberately: `setNewSample` returns its error
+  instead of raising a box, so the only caller that raises one is the editor's
+  file menu. `GUI::loadPreset`'s own summary still can, when a window happens to
+  be open during a restore. That is asserted against (`GUI::UnattendedLoad`) and
+  recorded in `tech_debt.md`, per Paul's "make that an assert for now".
 - **Unbounded module count** in a preset/state (`presets.cpp:562-596`, only a
   debug assert); `ModuleChainBase::size()` truncates to `uint8_t` at 256.
 - ✅ **Locale-dependent float I/O** (`%.9g`/`strtod`, no `"C"` imbue) — a

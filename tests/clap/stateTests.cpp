@@ -250,6 +250,15 @@ class Plugin
     Plugin(Plugin const &) = delete; // makes non-copyable
     Plugin &operator=(Plugin const &) = delete;
 
+    /// \brief The second half of that order: a rate arrives only now, after the
+    /// session has already been restored.
+    void activate(double const rate = sampleRate)
+    {
+        REQUIRE(!active_);
+        REQUIRE(pPlugin_->activate(pPlugin_, rate, 1, blockSize));
+        active_ = true;
+    }
+
     clap_plugin const &operator*() const { return *pPlugin_; }
     clap_plugin const *operator->() const { return pPlugin_; }
 
@@ -555,6 +564,144 @@ TEST_CASE("The loaded sample survives a session", "[clap][state]")
     /// \note The bug the 3.0 state format was written to close: a session that
     /// restored everything except which audio file was loaded.
     CHECK(restored.editorHost().currentSampleFile().getFileName() == "Carrier.mp3");
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The order every host restores a session in, and the one the sample's
+/// rate handling was blind to: create, load state, *then* activate. `Sample::load`
+/// is given the plugin's own rate, which is zero until activate() -- so a
+/// restored sample is decoded at the file's own rate and records zero.
+///
+///   `activate()` re-decodes when the rate it is given is not the one the sample
+/// was decoded for, and used to skip that whenever the recorded rate was zero --
+/// which is every restored session. The sample then played at the file's rate
+/// against an engine running at another, for the life of the instance: the exact
+/// 2016 bug the re-read was added to fix, still there, and reachable only through
+/// the path nothing tested.
+///
+///   A sample loaded from the *menu* never had it, because by then the plugin has
+/// a rate. That is why this needs the inactive constructor.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A sample restored before the host names a rate is decoded again for it", "[clap][state]")
+{
+    Entry const entry;
+
+    juce::File const sample(juce::File::createFileWithoutCheckingPath("Carrier.mp3"));
+
+    OutStream saved;
+    {
+        Plugin const plugin(nullHost(), true /*active*/);
+        plugin.editorHost().setNewSample(sample);
+        REQUIRE(plugin.editorHost().currentSampleFile() != juce::File());
+        REQUIRE(plugin.state().save(&*plugin, &saved));
+    }
+
+    Plugin restored; // inactive, as a host creates one
+    InStream stream(saved.data());
+    REQUIRE(restored.state().load(&*restored, &stream));
+
+    // Decoded at the file's own rate, because there is no engine rate to decode
+    // for yet. This is what the old guard read as "there is no sample".
+    REQUIRE(restored.editorHost().currentSampleFile().getFileName() == "Carrier.mp3");
+    REQUIRE(restored.implementation().decodedSampleRate() == 0);
+
+    restored.activate();
+
+    CHECK(restored.implementation().decodedSampleRate() == static_cast<unsigned int>(sampleRate));
+    // ...and it is still the same sample, not one dropped by a failed re-read.
+    CHECK(restored.editorHost().currentSampleFile().getFileName() == "Carrier.mp3");
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The sample was the one thing a session could carry that loading another
+/// session did not replace. `setSample` returned early on an empty name and did
+/// nothing on a name it could not load, so in both cases the *previous* session's
+/// audio file went on playing -- and `stateSave` writes `sampleFile_`, so the
+/// next save then claimed a file this session had never named. A user's project
+/// quietly acquired the sample from whatever they had open before it.
+///
+///   Both cases below are a session restore, which is where it matters: nobody is
+/// watching, and the wrong answer is one that persists into the file.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A session that names no sample clears the one that was loaded", "[clap][state]")
+{
+    Entry const entry;
+
+    // A session with a sample in it, and one without.
+    OutStream withASample, withNone;
+    {
+        Plugin const plugin(nullHost(), true /*active*/);
+        REQUIRE(plugin.state().save(&*plugin, &withNone));
+
+        plugin.editorHost().setNewSample(juce::File::createFileWithoutCheckingPath("Carrier.mp3"));
+        REQUIRE(plugin.editorHost().currentSampleFile() != juce::File());
+        REQUIRE(plugin.state().save(&*plugin, &withASample));
+    }
+
+    Plugin const restored(nullHost(), true /*active*/);
+
+    InStream first(withASample.data());
+    REQUIRE(restored.state().load(&*restored, &first));
+    REQUIRE(restored.editorHost().currentSampleFile().getFileName() == "Carrier.mp3");
+
+    // ...and now one that says nothing about a sample, on top of it.
+    InStream second(withNone.data());
+    REQUIRE(restored.state().load(&*restored, &second));
+
+    CHECK(restored.editorHost().currentSampleFile() == juce::File());
+    CHECK(restored.implementation().decodedSampleRate() == 0);
+
+    /// \note And the session it saves from here says so too, which is the half a
+    /// user would have found later: the name goes into the file.
+    OutStream resaved;
+    REQUIRE(restored.state().save(&*restored, &resaved));
+    CHECK(resaved.text().find("Carrier.mp3") == std::string::npos);
+}
+
+TEST_CASE("A session naming a sample that will not load does not keep the previous one",
+          "[clap][state]")
+{
+    Entry const entry;
+
+    OutStream withASample;
+    {
+        Plugin const plugin(nullHost(), true /*active*/);
+        plugin.editorHost().setNewSample(juce::File::createFileWithoutCheckingPath("Carrier.mp3"));
+        REQUIRE(plugin.state().save(&*plugin, &withASample));
+    }
+
+    /// \note The same session with the file name replaced by one that is neither
+    /// on this machine nor embedded -- a project moved between machines, which is
+    /// the case this is really about. Same length, so nothing else in the
+    /// document moves.
+    std::string named(withASample.text());
+    auto const nameAt(named.find("Carrier.mp3"));
+    REQUIRE(nameAt != std::string::npos);
+    named.replace(nameAt, std::strlen("Carrier.mp3"), "Missing.wav");
+    std::vector<char> const missing(named.begin(), named.end() + 1); // the terminator too
+
+    Plugin const restored(nullHost(), true /*active*/);
+
+    InStream present(withASample.data());
+    REQUIRE(restored.state().load(&*restored, &present));
+    REQUIRE(restored.editorHost().currentSampleFile().getFileName() == "Carrier.mp3");
+
+    InStream absent(missing);
+    REQUIRE(restored.state().load(&*restored, &absent));
+
+    // Not Carrier.mp3, which is what the engine would still have been playing.
+    CHECK(restored.editorHost().currentSampleFile() == juce::File());
+    CHECK(restored.implementation().decodedSampleRate() == 0);
+
+    OutStream resaved;
+    REQUIRE(restored.state().save(&*restored, &resaved));
+    CHECK(resaved.text().find("Carrier.mp3") == std::string::npos);
 }
 
 TEST_CASE("Loading a sample marks the session dirty", "[clap][state]")

@@ -278,6 +278,41 @@ template <class BaseComponent = juce::Component> class WidgetBase : public BaseC
 
 void warningMessageBox(std::string_view title, std::string_view message, bool canBlock);
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \class UnattendedLoad
+///
+/// \brief Marks a load nobody asked for -- a host restoring a session -- for as
+/// long as one of these is alive.
+///
+/// \note It exists to be asserted against, and `warningMessageBox` is where.
+/// Nothing may put a modal dialog in front of a user during a session restore:
+/// they did not ask for the load, the answer they would have to give is about a
+/// project they may not have finished opening, and a host that restores state
+/// before showing any window has nowhere to put the box in the first place.
+///
+///   An assert rather than a refusal, because what is *missing* is a place for
+/// such a message to go. `PresetProblem` is that place for everything the preset
+/// layer runs into, and `GUI::loadPreset` still raises its one summary from
+/// inside a load whenever a window happens to be open -- which for a session
+/// restore is a window that was open for some other reason.
+/// \see tech_debt.md, "A load problem has nowhere to go but a modal box".
+///                                           (08.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+class UnattendedLoad
+{
+  public:
+    UnattendedLoad();
+    ~UnattendedLoad();
+
+    UnattendedLoad(UnattendedLoad const &) = delete; // makes non-copyable
+
+    /// \brief Whether any is in progress. `[main-thread]`
+    static bool inProgress();
+}; // class UnattendedLoad
+
 /// \note Was `bool warningOkCancelBox(title, question)`, answered synchronously.
 /// It cannot be: JUCE 8 defaults JUCE_MODAL_LOOPS_PERMITTED to 0, so
 /// showOkCancelBox returns immediately and delivers the answer to a callback.

@@ -910,9 +910,18 @@ void SpectrumWorxEditor::setSampleLoadingStatus()
     updateSampleName("Loading...");
 }
 
+/// \note The dialog is raised here rather than by the loader, and this is the
+/// only call site that raises one: a user picked this file out of a browser a
+/// moment ago and is owed an answer about it. Every other caller of
+/// `setNewSample` is a preset or a session being loaded, where there is nobody to
+/// answer a modal box and possibly no window to put one in.
+///                                           (08.08.2026.) (SW port)
 void SpectrumWorxEditor::newSampleFileSelected(juce::File const &file)
 {
-    editorHost_.setNewSample(file);
+    auto const *const pErrorMessage(editorHost_.setNewSample(file));
+    if (pErrorMessage)
+        GUI::warningMessageBox("SpectrumWorx: error loading selected sample file.", pErrorMessage,
+                               false);
     updateSampleNameAsync();
 }
 
