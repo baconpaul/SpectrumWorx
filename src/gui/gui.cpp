@@ -125,9 +125,24 @@ SkinLifetime::~SkinLifetime()
 /// simply posts.
 ///                                       (28.07.2026.) (SW port)
 
+namespace
+{
+/// \note One counter, not a flag: `[main-thread]` throughout, and a nested load
+/// is not a case worth being wrong about.
+unsigned int unattendedLoads{0};
+} // anonymous namespace
+
+UnattendedLoad::UnattendedLoad() { ++unattendedLoads; }
+UnattendedLoad::~UnattendedLoad() { --unattendedLoads; }
+bool UnattendedLoad::inProgress() { return unattendedLoads != 0; }
+
 void warningMessageBox(std::string_view const title, std::string_view const message,
                        bool const /*canBlock*/)
 {
+    /// \note The invariant, and for now only asserted. \see UnattendedLoad.
+    LE_ASSERT_MSG(!UnattendedLoad::inProgress(),
+                  "A modal box in front of a host restoring a session.");
+
     //...mrmlj...canBlock no longer means anything and should come off the ~15
     //...mrmlj...call sites once they are ported.
     JUCE_AUTORELEASEPOOL

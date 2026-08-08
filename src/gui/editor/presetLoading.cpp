@@ -127,10 +127,41 @@ struct Loader
 
     bool wantsSampleFile() const { return !ignoreSampleFile && !onlySetParameters(); }
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The sample is the one thing a preset can name that a preset failing
+    /// to name did not clear. Every other parameter a file omits goes back to its
+    /// default -- that is what makes loading a preset a statement about all of
+    /// them rather than a merge -- and this returned early on an empty name, so
+    /// the *previous* preset's audio file went on playing under the new one. It
+    /// then went into the next `stateSave`, because `sampleFile_` is what that
+    /// writes: a session that ended up naming a file the user had loaded two
+    /// presets ago.
+    ///
+    ///   A named file that will not load lands in the same place for the same
+    /// reason, and is worse: the load is a no-op, so the engine keeps the old
+    /// sample and the session claims the new name. Cleared here rather than kept,
+    /// which is the honest answer -- this preset does not use that audio, and
+    /// nothing else the loader does leaves the previous preset's anything behind.
+    ///
+    /// \note And reported rather than shown. It used to raise a modal box from
+    /// inside the load, which is a dialog nobody asked for in front of a host
+    /// restoring a session. `PresetProblem` is where everything else wrong with a
+    /// preset goes, and the caller decides: `GUI::loadPreset` folds it into the
+    /// one summary a user who opened a preset gets, and `stateLoad` drops it.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
     void setSample(std::string_view const sampleFileName) const
     {
         if (sampleFileName.empty())
+        {
+            host.setNewSample(juce::File());
+            if (pEditor)
+                pEditor->updateSampleNameAsync();
             return;
+        }
 
         // Implementation note:
         //   Workaround for relative sample paths and Windows paths on OS X.
@@ -147,7 +178,12 @@ struct Loader
 #endif // _WIN32
         );
 
-        host.setNewSample(juce::File::createFileWithoutCheckingPath(path));
+        if (host.setNewSample(juce::File::createFileWithoutCheckingPath(path)))
+        {
+            host.setNewSample(juce::File());
+            reportPresetProblem(PresetProblem::SampleNotLoaded, sampleFileName);
+        }
+
         if (pEditor)
             pEditor->updateSampleNameAsync();
     }
@@ -274,6 +310,12 @@ void reportToTheUser(PresetLoadReport const &report)
     if (report.missingParameters)
         message << static_cast<int>(report.missingParameters)
                 << " parameter(s) it does not mention were left at their defaults.\n";
+    /// \note Named, for the same reason an unknown parameter is: the name is the
+    /// only part of this a user can act on, and a moved audio file is something
+    /// they can go and find.
+    if (report.samplesNotLoaded)
+        message << "The audio file it names could not be loaded ("
+                << juce::String(report.firstDetail) << ").\n";
 
     GUI::warningMessageBox(MB_WARNING, message.toRawUTF8(), false);
 }

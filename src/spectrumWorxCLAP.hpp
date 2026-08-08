@@ -229,6 +229,22 @@ class SpectrumWorxCLAP final
         return droppedMessages_.load(std::memory_order_relaxed);
     }
 
+    /// \brief The rate the loaded sample was decoded *for*, or 0 when there is no
+    /// sample.
+    ///
+    /// \note The main thread's record, and what `activate()` compares the host's
+    /// rate against to decide whether the sample has to be decoded again. Zero
+    /// *with* a file loaded is not "no sample": it means the file was read at its
+    /// own rate because there was no engine rate yet, which is the ordinary
+    /// session-restore order and the case reading it as "nothing to do" got
+    /// wrong.
+    ///
+    /// \note Public for the same reason `droppedMessages()` is: it is the only
+    /// way to ask whether the sample the engine holds is the one it should have,
+    /// and a rate the plugin merely intended to decode at is not observable
+    /// anywhere else.
+    unsigned int decodedSampleRate() const { return decodedSampleRate_; }
+
   protected: // GUI::EditorHost
     /// \note All four are trivial: the engine and the notification layer are
     /// both bases of this class. The interface exists because sw-impl links
@@ -264,7 +280,7 @@ class SpectrumWorxCLAP final
     ////////////////////////////////////////////////////////////////////////////
 
     juce::File currentSampleFile() const override { return sampleFile_; }
-    void setNewSample(juce::File const &) override;
+    char const *setNewSample(juce::File const &) override;
     /// \note Always false while the load above is synchronous: by the time
     /// anything can ask, it has finished. See the note on the interface.
     bool isSampleLoadInProgress() const override { return false; }
@@ -371,6 +387,12 @@ class SpectrumWorxCLAP final
     /// \brief Installs \p pNewSample (owned, null clears) as the side channel's
     /// source. `[main-thread]` \see the definition.
     void publishSample(Sample *pNewSample);
+
+    /// \brief Decodes \p sampleFile for the engine's current rate and installs
+    /// it. `[main-thread]`
+    /// \return the reason it did not, or null. Nothing is disturbed on a failure:
+    /// whatever was loaded stays loaded.
+    char const *decodeAndPublishSample(juce::File const &sampleFile);
 
     ////////////////////////////////////////////////////////////////////////////
     ///

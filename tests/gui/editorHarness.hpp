@@ -175,7 +175,7 @@ class Instance final : public GUI::EditorHost
     bool grantResizes{true};
 
     juce::File currentSampleFile() const override { return {}; }
-    void setNewSample(juce::File const &) override {}
+    char const *setNewSample(juce::File const &) override { return nullptr; }
     bool isSampleLoadInProgress() const override { return false; }
     void registerSampleLoadedListener(GUI::SpectrumWorxEditor &) override {}
     void deregisterSampleLoadedListener(GUI::SpectrumWorxEditor const &) override {}

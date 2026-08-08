@@ -114,7 +114,24 @@ enum struct PresetProblem : std::uint8_t
     ///                                       (02.08.2026.) (SW port)
     ///
     ////////////////////////////////////////////////////////////////////////////
-    UnknownParameter
+    UnknownParameter,
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The preset names an audio file for the side channel that could not
+    /// be loaded -- missing, moved, or in a format this build cannot read.
+    ///
+    /// \note The user's business, and nameable, which is what makes it worth
+    /// reporting: the file has a name, and finding it again is something only
+    /// they can do. The sample is cleared rather than left as whatever the
+    /// previous preset loaded (presetLoading.cpp).
+    ///
+    ///   It raised a modal box of its own until 08.08.2026, from inside the
+    /// load, which is how a host restoring a session came to be stopped by a
+    /// dialog nobody had asked for.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    SampleNotLoaded
     /// \note A `TempoSyncedLFOWithoutTempo` stood here, for a preset with
     /// tempo-synced LFOs loaded into a host that reports no transport. That is
     /// not a problem: such a host gets 120 BPM in four four, which is a defined
@@ -161,7 +178,8 @@ struct PresetLoadReport
     unsigned int unknownParameters{0};
     unsigned int unknownEffects{0};
     unsigned int unavailableEffects{0};
-    unsigned int failures{0}; ///< LoadFailed, SaveFailed, FutureFormat
+    unsigned int failures{0};         ///< LoadFailed, SaveFailed, FutureFormat
+    unsigned int samplesNotLoaded{0}; ///< the audio file it names is not loadable
 
     /// The first `detail` seen, so a summary can name one thing rather than none.
     std::string firstDetail;
@@ -169,7 +187,7 @@ struct PresetLoadReport
     unsigned int total() const
     {
         return missingParameters + unknownParameters + unknownEffects + unavailableEffects +
-               failures;
+               failures + samplesNotLoaded;
     }
 
     explicit operator bool() const { return total() != 0; }
@@ -198,9 +216,12 @@ struct PresetLoadReport
     ///                                       (02.08.2026.) (SW port)
     ///
     ////////////////////////////////////////////////////////////////////////////
+    /// \note `samplesNotLoaded` is told: the file has a name, and going and
+    /// finding it is something only the user can do.
     bool worthTellingTheUser() const
     {
-        return (failures + unknownParameters + unknownEffects + unavailableEffects) != 0;
+        return (failures + unknownParameters + unknownEffects + unavailableEffects +
+                samplesNotLoaded) != 0;
     }
 }; // struct PresetLoadReport
 

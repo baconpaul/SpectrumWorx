@@ -182,7 +182,23 @@ class EditorHost
     ////////////////////////////////////////////////////////////////////////////
 
     virtual juce::File currentSampleFile() const = 0;
-    virtual void setNewSample(juce::File const &) = 0;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Loads \p file as the side channel's source; an empty file clears
+    /// it.
+    ///
+    /// \return the reason it could not, or null. **The caller decides what to do
+    /// about that**, which is the whole point of it being returned rather than
+    /// shown: a user who picked a file from the menu gets a dialog, and a preset
+    /// naming an audio file that is not on this machine reports a preset problem
+    /// like every other thing wrong with a preset. This used to raise the dialog
+    /// itself, so restoring a session -- which nobody asked for, possibly with no
+    /// window yet -- stopped the host with a modal box.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    virtual char const *setNewSample(juce::File const &) = 0;
     virtual bool isSampleLoadInProgress() const = 0;
     virtual void registerSampleLoadedListener(SpectrumWorxEditor &) = 0;
     virtual void deregisterSampleLoadedListener(SpectrumWorxEditor const &) = 0;

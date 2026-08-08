@@ -452,6 +452,9 @@ void defaultPresetProblemReporter(PresetProblem const problem, std::string_view 
     case PresetProblem::UnknownParameter:
         ++report_.unknownParameters;
         return;
+    case PresetProblem::SampleNotLoaded:
+        ++report_.samplesNotLoaded;
+        return;
     }
 }
 
