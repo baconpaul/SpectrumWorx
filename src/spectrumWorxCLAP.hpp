@@ -377,6 +377,11 @@ class SpectrumWorxCLAP final
     /// destructor. `[main-thread]` \see the definition.
     void discardQueuedCommands();
 
+    /// \brief Puts the main thread's spectral parameters back to what the engine
+    /// settled on, for when it declined them. `[main-thread]`
+    /// \see the definition.
+    void resyncSpectralParametersToEngine();
+
     /// \brief Applies everything the audio thread has reported, on the main
     /// thread. `[main-thread]`
     void drainEngineEvents();

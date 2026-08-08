@@ -371,7 +371,12 @@ bool SpectrumWorxCLAP::activate(double const sampleRate, std::uint32_t,
     setBlockSize(maxFrames);
 
     if (!initialise())
+    {
+        /// \note Whatever the engine rolled back to is what the rest of the
+        /// world has to be told. \see resyncSpectralParametersToEngine().
+        resyncSpectralParametersToEngine();
         return false;
+    }
 
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -491,7 +496,13 @@ void SpectrumWorxCLAP::deactivate() noexcept
     restartRequested_.store(false, std::memory_order_release);
     if (spectralSetupPending())
     {
-        applyPendingSpectralSetup();
+        /// \note And what it answers, which was dropped. `updateEngineSetup()`
+        /// puts the FFT size and the overlap factor back when the working set
+        /// cannot be allocated -- in the *engine's* Program, the only one it can
+        /// see. \see resyncSpectralParametersToEngine().
+        if (!applyPendingSpectralSetup())
+            resyncSpectralParametersToEngine();
+
         auto const newLatency(engineSetup().latencyInSamples());
         if (newLatency != latencyInSamples_)
         {
@@ -749,12 +760,26 @@ bool SpectrumWorxCLAP::paramsInfo(std::uint32_t const index,
     ///
     ////////////////////////////////////////////////////////////////////////////
 
-    /// \note A "meta" parameter is one whose value changes what the other
-    /// parameters *are* -- which effect a slot holds, chiefly. Telling the host
-    /// its value requires a rescan is exactly what this flag is for. Taken from
-    /// the fixed description so that filling a slot does not flip it.
-    if (fixed.isMeta())
-        info->flags |= CLAP_PARAM_REQUIRES_PROCESS;
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note **And nothing is ever CLAP_PARAM_REQUIRES_PROCESS either.** A slot
+    /// selector used to carry it, on the reading that the flag says "this one
+    /// needs a rescan afterwards". It does not. It says "any change to this
+    /// parameter affects the output and must be done via `process()` if the
+    /// plugin is active" (ext/params.h:196) -- a DC offset is the example given.
+    /// It is a statement about *which call the host may use*, and the answer it
+    /// gives is the wrong one here: it forbids the route a slot change most
+    /// needs.
+    ///
+    ///   `paramsFlush()` applies a slot selector properly -- it drains the
+    /// command queue and runs `handleEvent()`, the same two things `process()`
+    /// does, on the same thread with the same ownership -- so there is nothing
+    /// this flag protects. What it cost is the host with the transport parked,
+    /// which has no `process()` to offer and is exactly the host that reaches
+    /// for `flush()`.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
 
     if (CLAPEdge::isNormalised(parameterID))
     {
@@ -2132,6 +2157,44 @@ DawExtraState SpectrumWorxCLAP::sessionState() const
 std::unique_ptr<juce::Component> SpectrumWorxCLAP::createEditor()
 {
     return std::make_unique<GUI::ZoomedEditor>(std::make_unique<GUI::SpectrumWorxEditor>(*this));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Brings the main thread's copy of the three spectral parameters back to
+/// what the engine actually settled on, and says so. `[main-thread]`
+///
+/// \note For the one path where the engine declines a value it was given.
+/// `updateEngineSetup()` reallocates the whole spectral working set, and when
+/// that fails it puts the FFT size and the overlap factor back the way they
+/// were -- in the Program it can reach, which is the engine's. The main thread's
+/// copy and the host went on holding the value the user asked for, so a size the
+/// machine could not allocate read back as though it had been applied: the
+/// parameter said 8192, the engine ran 2048, `stateSave` wrote 8192, and
+/// reopening the session tried the same allocation again.
+///
+/// \note A rescan rather than a message box. The user asked for something and
+/// did not get it, which is worth showing -- the interface shows it, by reading
+/// the value that is really in force -- but it is not worth interrupting a host
+/// for, and this can run inside `deactivate()`.
+///                                           (08.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxCLAP::resyncSpectralParametersToEngine()
+{
+    using namespace GlobalParameters;
+
+    auto const &engineParameters(parameters());
+    auto &mainParameters(programMain_.parameters());
+
+    mainParameters.set<FFTSize>(engineParameters.get<FFTSize>());
+    mainParameters.set<OverlapFactor>(engineParameters.get<OverlapFactor>());
+    mainParameters.set<WindowFunction>(engineParameters.get<WindowFunction>());
+
+    requestRescan(CLAP_PARAM_RESCAN_VALUES | CLAP_PARAM_RESCAN_TEXT);
+    if (pEditor_)
+        pEditor_->updateForGlobalParameterChange();
 }
 
 void SpectrumWorxCLAP::editorOpened(GUI::SpectrumWorxEditor &editor) { pEditor_ = &editor; }

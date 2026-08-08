@@ -562,22 +562,37 @@ void PresetBrowser::buttonClicked(juce::Button *const pButton)
     }
     else if (pButton == &saveAs_)
     {
-        juce::String newPreset(editor().currentProgramName());
-        unsigned int const newPresetNameLength(newPreset.length());
+        ////////////////////////////////////////////////////////////////////////
+        ///
+        /// \note A name the user is *offered*, so it is allowed to be imperfect;
+        /// what it is not allowed to do is take forever, and it did.
+        ///
+        ///   The suffix used to be measured by hand -- `1 + 1 + 2 + counter/100
+        /// + 1` -- and written with `snprintf` straight into `juce::String`'s
+        /// buffer. The arithmetic is off by one number: at the round where
+        /// `counter` reads 99 the width is still computed for two digits, and
+        /// the three-digit " (100)" is truncated to " (100" with the closing
+        /// bracket dropped. The name that comes out is not the name the next
+        /// round makes either, so the search stops converging and spins -- with
+        /// the user's finger on Save As and a hundred presets of the same name,
+        /// which is a real state for a bank built by duplicating one preset.
+        ///
+        ///   Built as a string now, with a bound. Running out of numbers offers a
+        /// name that is already taken, which is the same thing this offered on
+        /// the very first round when nothing collided: the edit box is up and the
+        /// user types over it.
+        ///                                   (08.08.2026.) (SW port)
+        ///
+        ////////////////////////////////////////////////////////////////////////
 
-        Item const *pPreset;
-        Item const *const pPresetsEnd(files_.end());
-        unsigned int counter(0);
-        while ((pPreset = findPreset(newPreset)) != pPresetsEnd)
-        {
-            unsigned int const suffixLength(1 + 1 + 2 + counter / 100 + 1);
-            newPreset.preallocateBytes((newPresetNameLength + suffixLength) * sizeof(char_t));
-            char_t *const pSuffix(newPreset.getCharPointer().getAddress() + newPresetNameLength);
-            // preallocateBytes() reserves the terminating null over and above
-            // what it is asked for, so the suffix gets suffixLength + 1.
-            LE_VERIFY(std::snprintf(pSuffix, suffixLength + 1, " (%02u)", ++counter) <=
-                      signed(suffixLength));
-        }
+        constexpr unsigned int mostNamesToTry{1000};
+
+        juce::String const baseName(editor().currentProgramName());
+        juce::String newPreset(baseName);
+
+        for (unsigned int counter(1);
+             (findPreset(newPreset) != files_.end()) && (counter <= mostNamesToTry); ++counter)
+            newPreset = baseName + juce::String::formatted(" (%02u)", counter);
 
         // Implementation note:
         //   Creating a new preset is done asynchronously (as it waits for
