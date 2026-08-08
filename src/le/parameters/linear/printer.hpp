@@ -23,28 +23,35 @@ namespace LE::Parameters::Detail
 {
 template <class TraitTag, class Traits, class... DefaultTraits> struct GetTraitDefaulted;
 
+/// \note The buffer travels as a `PrintBuffer` rather than as its `begin()`.
+/// `print()` was handed one -- a span, which knows how big it is -- and passed
+/// only the pointer down, so the size was thrown away at exactly the layer that
+/// needed it and `lexical_cast` was left guessing with a constant.
+///                                           (08.08.2026.) (SW port)
 template <typename Source>
-char const *printLinear(char *const buffer, Source const &parameterValue,
+char const *printLinear(PrintBuffer const &buffer, Source const &parameterValue,
                         LinearFloatParameterTag const &)
 {
     Utility::lexical_cast(parameterValue, 1, buffer);
-    return buffer;
+    return buffer.begin();
 }
 
 template <typename Source>
 std::enable_if_t<std::is_integral_v<Source>, char const *> LE_FORCEINLINE
-printLinear(char *const buffer, Source const parameterValue, LinearIntegerParameterTag const &)
+printLinear(PrintBuffer const &buffer, Source const parameterValue,
+            LinearIntegerParameterTag const &)
 {
     Utility::lexical_cast(parameterValue, buffer);
-    return buffer;
+    return buffer.begin();
 }
 
 template <typename Source>
 std::enable_if_t<std::is_floating_point_v<Source>, char const *>
-printLinear(char *const buffer, Source const &parameterValue, LinearIntegerParameterTag const &)
+printLinear(PrintBuffer const &buffer, Source const &parameterValue,
+            LinearIntegerParameterTag const &)
 {
     Utility::lexical_cast(parameterValue, 0, buffer);
-    return buffer;
+    return buffer.begin();
 }
 
 template <class Parameter, typename Source>
@@ -53,7 +60,7 @@ char const *print(Source const &parameterValue, SW::Engine::Setup const &engineS
 {
     typedef DisplayValueTransformer<Parameter> ValueTransformer;
 
-    return printLinear(buffer.begin(), ValueTransformer::transform(parameterValue, engineSetup),
+    return printLinear(buffer, ValueTransformer::transform(parameterValue, engineSetup),
                        typename Parameter::Tag());
 }
 } // namespace LE::Parameters::Detail

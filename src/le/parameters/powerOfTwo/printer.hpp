@@ -60,9 +60,9 @@ char const *print(Source const parameterValue, SW::Engine::Setup const &engineSe
         Math::convert<typename Parameter::value_type>(parameterValue), engineSetup));
 
     if constexpr (std::is_floating_point_v<std::remove_cvref_t<decltype(displayValue)>>)
-        return printLinear(buffer.begin(), displayValue, LinearFloatParameterTag());
+        return printLinear(buffer, displayValue, LinearFloatParameterTag());
     else
-        return printLinear(buffer.begin(), displayValue, LinearIntegerParameterTag());
+        return printLinear(buffer, displayValue, LinearIntegerParameterTag());
 }
 
 } // namespace LE::Parameters::Detail

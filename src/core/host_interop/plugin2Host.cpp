@@ -604,8 +604,14 @@ void Plugin2HostPassiveInteropController::ParameterNameGetter::operator()(
     std::uint8_t const uiModuleIndex(parameterID.moduleIndex + 1);
 
     char *LE_RESTRICT pPosition(buffer_.begin());
+
+    /// \note What is left of the buffer, which is what `copyToBuffer` below was
+    /// already being handed and what these two were not -- they got a bare
+    /// `pPosition` and a promise that the caller had allocated enough.
+    auto const remaining([&]() { return LE::Utility::Span<char>(pPosition, buffer_.end()); });
+
     *pPosition++ = 'M';
-    pPosition += Utility::lexical_cast(uiModuleIndex, pPosition);
+    pPosition += Utility::lexical_cast(uiModuleIndex, remaining());
     *pPosition++ = '.';
 
     using Module = Plugin2HostInteropControler::Module;
@@ -615,7 +621,8 @@ void Plugin2HostPassiveInteropController::ParameterNameGetter::operator()(
     {
         *pPosition++ = 'P';
         pPosition += Utility::lexical_cast(
-            Module::effectSpecificParameterIndex(parameterID.moduleParameterIndex) + 1, pPosition);
+            Module::effectSpecificParameterIndex(parameterID.moduleParameterIndex) + 1,
+            remaining());
         LE_ASSERT(pPosition <= buffer_.end());
     }
     else

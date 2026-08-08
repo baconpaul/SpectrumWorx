@@ -416,13 +416,31 @@ class PresetHandler
     friend class LFODataSaver;
 
     static std::string makeString(std::string_view const source) { return std::string(source); }
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The buffer goes to `lexical_cast` whole, so the size it is written
+    /// against is the size that was declared. It used to hand over
+    /// `buffer.data()` and trust `RequiredStringStorage` to have been the bound
+    /// the writer used -- and the length that came back could exceed the array,
+    /// which this then built a `std::string` from. That read past the end of the
+    /// buffer and into the saved preset.
+    ///
+    /// \note `RequiredStringStorage` still sizes the array, and is now big enough
+    /// to mean it: a `double` gets 321 rather than 17, which is what `%.9f` of one
+    /// actually needs. This is the one caller where that matters -- it writes the
+    /// file, so a value falling back to `%g` would lose precision on disk rather
+    /// than merely in a display.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
     template <typename T> static std::string makeString(T const binarySource)
     {
         std::array<char, Utility::RequiredStringStorage<T>::value> buffer;
         auto const numberOfCharacters(Utility::lexical_cast(
             std::is_enum<T>::value ? static_cast<std::uint8_t>(binarySource) : binarySource,
-            buffer.data()));
-        LE_ASSERT(numberOfCharacters <= buffer.size());
+            buffer));
+        LE_ASSERT(numberOfCharacters < buffer.size());
         return std::string(buffer.data(), numberOfCharacters);
     }
 
