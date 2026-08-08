@@ -24,6 +24,9 @@
 
 #include <array>
 #include <cstdio>
+#include <iomanip>
+#include <locale>
+#include <sstream>
 
 namespace SWTest
 {
@@ -177,11 +180,23 @@ void clearPresetProblems() { problems = {}; }
 ScopedProblemCounter::ScopedProblemCounter() : previous_(setPresetProblemReporter(&countProblem)) {}
 ScopedProblemCounter::~ScopedProblemCounter() { setPresetProblemReporter(previous_); }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Imbued, for the same reason the plugin's own writer is: this text is
+/// what `presetCorpus.txt` hashes, and `snprintf` spells the point whichever way
+/// the machine's locale says. So every committed digest was a statement about
+/// the locale of the machine that generated it -- 303 rows that would all move
+/// on a German developer's checkout, saying "these presets load differently"
+/// about presets that load identically.
+///
+////////////////////////////////////////////////////////////////////////////////
+
 std::string number(float const value)
 {
-    std::array<char, 64> buffer{};
-    std::snprintf(buffer.data(), buffer.size(), "%.6g", static_cast<double>(value));
-    return buffer.data();
+    std::ostringstream text;
+    text.imbue(std::locale::classic());
+    text << std::setprecision(6) << static_cast<double>(value);
+    return text.str();
 }
 
 Loaded dump(Engine &engine)

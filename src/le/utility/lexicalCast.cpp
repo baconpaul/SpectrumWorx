@@ -22,14 +22,30 @@
 // platforms now take the CRT path; if the size ever matters again, hand roll it
 // rather than bringing Spirit back.
 //                                        (28.07.2026.) (SW port)
+//   And then off the plain-CRT path again, for a reason that is not size:
+// `snprintf` and `strtod` read the *global* locale, which the host owns and the
+// plugin does not. See the note above renderInCLocale.
+//                                        (08.08.2026.) (SW port)
 
+#include <charconv>
+#include <clocale>
 #include <cmath>
-#include <cstdio>
 #include <cstdlib>
 #ifndef NDEBUG
 #include <cctype>
 #endif // NDEBUG
 #include <cstring>
+#include <iomanip>
+#include <locale>
+#include <sstream>
+#include <string>
+#include <system_error>
+
+/// \note macOS keeps the POSIX 2008 per-locale entry points in their own header;
+/// glibc declares them in <locale.h> and <stdlib.h>.
+#if defined(__APPLE__)
+#include <xlocale.h>
+#endif
 
 namespace LE::Utility
 {
@@ -42,53 +58,121 @@ namespace
 {
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \brief `snprintf` into \p buffer, answering how much of it was used and
-/// leaving the empty string behind when the result did not fit.
+/// \brief \p value as text spelled the way this plugin's files and displays
+/// spell it, whatever locale the host has set.
+///
+/// \note The point of the file, and what `snprintf` could not do. Number
+/// formatting reads the *global* locale, and a plugin does not own that: the
+/// host sets it, or inherits it from the desktop, and a comma-decimal one made
+/// this write "1,5" into preset files and into every parameter display. Each of
+/// those files then read back as 1 -- `strtod` stops at the comma -- so the
+/// plugin corrupted its own presets on the way out and could not read a factory
+/// one on the way in, because those were written with a point. The user sees a
+/// plugin that loses every fractional value it saves.
+///
+///   `imbue( std::locale::classic() )` is the fix in one line: a stream carries
+/// its own locale, so nothing global reaches this. `std::to_chars` would have
+/// been the other answer and is not available -- its floating point half is a
+/// libc++ dylib symbol introduced in macOS 13.3 and this ships to 10.15. The
+/// integer overloads below do use it, being header only.
+///
+/// \note Same text as before, to the byte. `num_put` is specified to format
+/// through `printf("%.*f")` with the imbued locale's numpunct, so the classic
+/// locale gives what `%.*f` gave -- verified across the magnitudes, both
+/// infinities and a NaN before this was written, because a preset corpus digest
+/// depends on it.
+///                                           (08.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+std::string renderInCLocale(double const value, std::ios_base &(&notation)(std::ios_base &),
+                            unsigned int const precision)
+{
+    std::ostringstream stream;
+    stream.imbue(std::locale::classic());
+    stream << notation << std::setprecision(static_cast<int>(precision)) << value;
+    return stream.str();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief \p text into \p buffer, answering how much of it was used and leaving
+/// the empty string behind when it did not fit.
 ///
 /// \note The whole of what these overloads had to get right and did not.
 /// `snprintf` bounds its *write* and then returns the length it would have
 /// wanted, so a caller that takes the return value as "characters written" has a
 /// number pointing past the end of its own buffer -- which the editor then
-/// indexes with, to `strcpy` a suffix on.
+/// indexes with, to `strcpy` a suffix on. A length that came from a string that
+/// is already known to fit cannot be that number.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-template <typename... Arguments>
-unsigned int printInto(std::span<char> const buffer, char const *const format,
-                       Arguments const... arguments)
+unsigned int copyInto(std::span<char> const buffer, std::string_view const text)
 {
     if (buffer.empty()) [[unlikely]]
         return 0;
 
-    auto const charactersWanted(std::snprintf(buffer.data(), buffer.size(), format, arguments...));
+    /// \note `>=` rather than `>`: the terminator needs the last byte.
+    if (text.size() >= buffer.size()) [[unlikely]]
+    {
+        /// \note Still a string a caller may use.
+        buffer[0] = '\0';
+        return 0;
+    }
 
-    /// \note Both arms leave a string a caller may use. A negative return is an
-    /// encoding failure, which `snprintf` is not obliged to have terminated.
-    if ((charactersWanted < 0) || (static_cast<std::size_t>(charactersWanted) >= buffer.size()))
+    std::memcpy(buffer.data(), text.data(), text.size());
+    buffer[text.size()] = '\0';
+    return static_cast<unsigned int>(text.size());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief The integer overloads' half of the above: `to_chars` is header only
+/// for these, and locale independent by definition.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+template <typename Value> unsigned int printInto(std::span<char> const buffer, Value const value)
+{
+    if (buffer.empty()) [[unlikely]]
+        return 0;
+
+    /// \note One byte held back: `to_chars` does not terminate, so the byte it
+    /// stops on is the one this writes the terminator into.
+    auto const [pEnd,
+                error](std::to_chars(buffer.data(), buffer.data() + buffer.size() - 1, value));
+
+    if (error != std::errc{}) [[unlikely]]
     {
         buffer[0] = '\0';
         return 0;
     }
 
-    return static_cast<unsigned int>(charactersWanted);
+    *pEnd = '\0';
+    return static_cast<unsigned int>(pEnd - buffer.data());
 }
+
+/// \note What `%g` printed, and the width the fallback below is reasoned about
+/// with: six significant digits.
+unsigned int constexpr generalPrecision{6};
 } // anonymous namespace
 
 unsigned int lexical_cast(std::int32_t const value, std::span<char> const buffer)
 {
-    return printInto(buffer, "%d", value);
+    return printInto(buffer, value);
 }
 unsigned int lexical_cast(std::int64_t const value, std::span<char> const buffer)
 {
-    return printInto(buffer, "%lld", static_cast<long long>(value));
+    return printInto(buffer, value);
 }
 unsigned int lexical_cast(std::uint32_t const value, std::span<char> const buffer)
 {
-    return printInto(buffer, "%u", value);
+    return printInto(buffer, value);
 }
 unsigned int lexical_cast(std::uint64_t const value, std::span<char> const buffer)
 {
-    return printInto(buffer, "%llu", static_cast<unsigned long long>(value));
+    return printInto(buffer, value);
 }
 
 unsigned int lexical_cast(float const value, std::span<char> const buffer)
@@ -106,26 +190,29 @@ unsigned int lexical_cast(float const value, std::uint8_t const decimalPlaces,
 }
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \note Rendered into a scratch buffer of its own and copied back, rather than
-/// straight into the caller's.
+/// \note Rendered on its own and copied back, rather than straight into the
+/// caller's buffer.
 ///
-///   `%f` has no bound the caller's buffer can be trusted to satisfy: `%.1f` of
-/// 1e30 wants thirty-three characters and a display hands over thirty-two. The
-/// snprintf was bounded and so truncated safely, but the trailing-zero trim below
-/// took its cursor from snprintf's *return*, which is the length it wanted rather
-/// than the length it wrote -- so it walked past the end of the caller's array,
-/// wrote its terminator there, and handed the same out-of-range length back.
+///   Fixed notation has no bound the caller's buffer can be trusted to satisfy:
+/// `%.1f` of 1e30 wants thirty-three characters and a display hands over
+/// thirty-two. The snprintf this used to be was bounded and so truncated safely,
+/// but the trailing-zero trim below took its cursor from snprintf's *return*,
+/// which is the length it wanted rather than the length it wrote -- so it walked
+/// past the end of the caller's array, wrote its terminator there, and handed the
+/// same out-of-range length back.
 ///
 ///   So the trim runs over a rendering that cannot have been truncated, and the
 /// caller sees a result only once it is known to fit *its* buffer. What does not
-/// fit is printed with `%g` instead of truncated: fewer significant digits than
-/// were asked for, but the right number, inside the buffer, and something
-/// `strtod` reads back. Truncating `%f` would have been none of those -- 1e30
-/// would read "1000000000000000". A buffer too small for even that gets the empty
-/// string and a length of zero, which is the one answer no caller can misuse.
+/// fit is printed in general notation instead of truncated: fewer significant
+/// digits than were asked for, but the right number, inside the buffer, and
+/// something `strtod` reads back. Truncating would have been none of those --
+/// 1e30 would read "1000000000000000". A buffer too small for even that gets the
+/// empty string and a length of zero, which is the one answer no caller can
+/// misuse.
 ///
-/// \note `RequiredStringStorage<double>` sizes the scratch and nothing else. It
-/// is no longer a claim about the caller.
+/// \note `RequiredStringStorage<double>` sizes nothing here any more -- the
+/// rendering brings its own storage -- and is no longer a claim about the caller
+/// either. It is what a caller that wants every digit should declare.
 ///                                           (08.08.2026.) (SW port)
 ///
 ////////////////////////////////////////////////////////////////////////////////
@@ -136,19 +223,10 @@ LE_NOINLINE unsigned int lexical_cast(double const value, std::uint8_t const dec
     if (buffer.empty()) [[unlikely]]
         return 0;
 
-    /// Enough for `%f` of any double: DBL_MAX is 309 integer digits, plus the
-    /// sign, the point, the decimals and the terminator.
-    static constexpr auto scratchSize{RequiredStringStorage<double>::value};
-    char scratch[scratchSize];
-
     LE_ASSERT_MSG(decimalPlaces <= maximumDecimalPlaces,
-                  "One digit is all the format below has room for.");
-    char const format[] = {'%', '.', static_cast<char>('0' + decimalPlaces), 'f', '\0'};
-
-    auto const charactersWanted(std::snprintf(scratch, scratchSize, format, value));
-    LE_ASSERT(charactersWanted > 0);
-    LE_ASSERT(static_cast<std::size_t>(charactersWanted) < scratchSize);
-    unsigned int totalCharactersWritten(static_cast<unsigned int>(charactersWanted));
+                  "Wider than RequiredStringStorage is computed for.");
+    std::string rendered(renderInCLocale(value, std::fixed, decimalPlaces));
+    auto totalCharactersWritten(static_cast<unsigned int>(rendered.size()));
 
     /// \note `length > decimalPlaces` and not merely `decimalPlaces`: infinity
     /// and NaN print as three characters whatever the precision asked for, and
@@ -157,7 +235,8 @@ LE_NOINLINE unsigned int lexical_cast(double const value, std::uint8_t const dec
     {
         /// \note Trim trailing zeros.
         ///                                   (15.12.2011.) (Domagoj Saric)
-        char *pEnd(scratch + totalCharactersWritten);
+        char *const pStart(rendered.data());
+        char *pEnd(pStart + totalCharactersWritten);
         char const *const pDot(pEnd - decimalPlaces - 1);
         LE_ASSERT(*pEnd == '\0');
         LE_ASSERT(*pDot == '.' || !std::isfinite(value));
@@ -166,25 +245,23 @@ LE_NOINLINE unsigned int lexical_cast(double const value, std::uint8_t const dec
         }
         pEnd += (pEnd != pDot);
         LE_ASSERT(*pEnd == '0' || *pEnd == '.' || *pEnd == '\0');
-        *pEnd = '\0';
-        totalCharactersWritten = static_cast<unsigned int>(pEnd - scratch);
+        totalCharactersWritten = static_cast<unsigned int>(pEnd - pStart);
+        rendered.resize(totalCharactersWritten);
     }
     else
     {
-        LE_ASSERT(std::isalnum(scratch[totalCharactersWritten - 1]));
+        LE_ASSERT(std::isalnum(rendered[totalCharactersWritten - 1]));
     }
 
-    if (totalCharactersWritten < buffer.size())
-    {
-        std::memcpy(buffer.data(), scratch, totalCharactersWritten + 1);
-    }
-    else
+    totalCharactersWritten = copyInto(buffer, rendered);
+    if (totalCharactersWritten == 0) [[unlikely]]
     {
         /// \note Six significant digits and a three-digit exponent is thirteen
         /// characters at the widest, so this fits anything but a very small
-        /// buffer -- and `printInto` answers zero and an empty string for one of
+        /// buffer -- and `copyInto` answers zero and an empty string for one of
         /// those rather than half a number.
-        totalCharactersWritten = printInto(buffer, "%g", value);
+        totalCharactersWritten =
+            copyInto(buffer, renderInCLocale(value, std::defaultfloat, generalPrecision));
         if (totalCharactersWritten == 0)
             return 0;
     }
@@ -250,6 +327,63 @@ template <> unsigned int lexical_cast<unsigned int>(char const *const valueStrin
 
 namespace
 {
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief `strtod`, reading the point this plugin writes rather than the one the
+/// host's locale happens to name.
+///
+/// \note The other half of the locale problem, and the half that loses data: a
+/// comma-decimal locale makes `strtod` stop at the point in "0.75" and answer
+/// **0**. Every factory preset and every file this plugin has ever written spells
+/// a fraction that way, so under such a host they all load as their integer
+/// parts -- silently, since stopping early is not an error.
+///
+/// \note Not the stream extraction the printing side uses. `num_get`'s accepted
+/// character set is specified without `i` or `n` in it, so `>> value` is not
+/// required to read "inf" -- and this plugin prints exactly that, for the
+/// ExImPloder gate's minimum. `strtod` reads it, always has, and taking the
+/// locale as an argument is the only thing it was missing.
+///                                           (08.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+#if defined(_MSC_VER) && !defined(__clang__)
+using CLocale = ::_locale_t;
+#else
+using CLocale = ::locale_t;
+#endif
+
+CLocale cLocale()
+{
+    /// \note Created once and never freed. It is a raw handle with no destructor
+    /// to order against whatever the host runs after main, and one per process is
+    /// not a leak that grows.
+    static CLocale const locale{
+#if defined(_MSC_VER) && !defined(__clang__)
+        ::_create_locale(LC_ALL, "C")
+#else
+        ::newlocale(LC_ALL_MASK, "C", nullptr)
+#endif
+    };
+    return locale;
+}
+
+double toDouble(char const *const text, char **const ppEnd)
+{
+    auto const locale(cLocale());
+
+    /// \note A locale this platform could not create leaves the global one, which
+    /// is what this had before and is right whenever the host has not moved it.
+    if (!locale) [[unlikely]]
+        return std::strtod(text, ppEnd);
+
+#if defined(_MSC_VER) && !defined(__clang__)
+    return ::_strtod_l(text, ppEnd, locale);
+#else
+    return ::strtod_l(text, ppEnd, locale);
+#endif
+}
+
 double lexical_cast_double_worker(char const *&pValueString);
 
 float lexical_cast_float_worker(char const *&pValueString)
@@ -260,7 +394,7 @@ float lexical_cast_float_worker(char const *&pValueString)
 double lexical_cast_double_worker(char const *&pValueString)
 {
     char *pEnd;
-    double const result(std::strtod(pValueString, &pEnd));
+    double const result(toDouble(pValueString, &pEnd));
     pValueString = pEnd;
     return result;
 }
@@ -281,7 +415,7 @@ std::optional<double> parseNumber(char const *const text)
         return {};
 
     char *pEnd;
-    double const value(std::strtod(text, &pEnd));
+    double const value(toDouble(text, &pEnd));
 
     /// \note The two answers the lexical_cast<> above cannot give. `strtod`
     /// leaves pEnd where it started when it read nothing at all, which is the

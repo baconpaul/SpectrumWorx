@@ -30,6 +30,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 #include "presets/presetHarness.hpp"
+#include "utility/localeHarness.hpp"
 
 #include "core/modules/factory.hpp"
 
@@ -649,4 +650,47 @@ TEST_CASE("A file too large to be a preset is refused before it is read", "[pres
     CHECK(!readPresetFile(path));
 
     std::filesystem::remove(path, error);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// The host's locale
+// -----------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The whole committed corpus, read twice: once in the C locale and once
+/// under a host that has set a comma-decimal one. Every float in every one of
+/// these files is written with a point, and `strtod` in such a locale stops at
+/// it -- so `In="0.7000"` came back as 0.7 on one machine and **0** on another,
+/// for the same bytes. Not a parse failure and not reported: a preset that had
+/// been a filter sweep just quietly became silence.
+///
+///   Whole files rather than a value or two, because what the locale reaches is
+/// every number in the format at once -- gains, mix, frequencies, LFO bounds --
+/// and the interesting failures are the ones where the wrong value is still a
+/// legal one. The dump compares them all.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A host's locale does not change what a preset file loads as", "[preset-file][locale]")
+{
+    auto const files(corpus());
+    REQUIRE(files.size() >= 300);
+
+    std::vector<Loaded> asWritten;
+    asWritten.reserve(files.size());
+    for (auto const &[key, path] : files)
+        asWritten.push_back(intoAFreshEngine(path));
+
+    SWTest::CommaDecimalHost const host;
+    if (!host)
+        SKIP("No comma-decimal locale is installed on this machine.");
+
+    for (std::size_t index{0}; index < files.size(); ++index)
+    {
+        INFO("preset " << files[index].first);
+        auto const underTheHostsLocale(intoAFreshEngine(files[index].second));
+        CHECK(underTheHostsLocale.text == asWritten[index].text);
+    }
 }
