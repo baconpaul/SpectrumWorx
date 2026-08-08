@@ -1151,12 +1151,36 @@ void SpectrumWorxEditor::moduleDeactivated()
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief The ID a host knows \p control's parameter by.
+///
+/// \note `+ 1 /*Bypass*/`, because `ModuleControlBase::moduleParameterIndex()`
+/// is the **LFO-able** index -- Bypass is not LFO-able and is not counted -- and
+/// a `ParameterID::Module` carries the module parameter index, which counts it.
+/// The two differ by one and every other reader of that getter says so
+/// (`moduleControl.cpp`, three times).
+///
+///   This did not, so the gesture that brackets a knob drag named the parameter
+/// *before* the one being dragged: touching a module's Gain announced a gesture
+/// on its Bypass, and the values that followed were Gain's. A host that binds its
+/// automation gutter to the last touched parameter -- Bitwig does -- then bound
+/// it to Bypass, and dragging that lane moved nothing on screen because the knob
+/// it moved was not the one the user had touched. The *values* were always right:
+/// they go through updateModuleParameterAndNotifyHost(), whose callers add the
+/// one. Only the gesture was wrong, which is why this survived the automation
+/// tests.
+///                                           (07.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
 ParameterID SpectrumWorxEditor::moduleControlID(ModuleControlBase const &control) const
 {
     ParameterID parameterID;
     parameterID.value.type = ParameterID::ModuleParameter;
     parameterID.value._.module.moduleIndex = moduleChain().getIndexForModule(control.module());
-    parameterID.value._.module.moduleParameterIndex = control.moduleParameterIndex();
+    parameterID.value._.module.moduleParameterIndex =
+        static_cast<std::uint8_t>(control.moduleParameterIndex() + 1 /*Bypass*/);
     return parameterID;
 }
 
