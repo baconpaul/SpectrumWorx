@@ -9,19 +9,19 @@ did not move.
 
 | | Finding | |
 |---|---|---|
-| ✅ | T0.1 preset LFO waveform | `3bffb1cd` |
-| ✅ | T0.2 `isValidParamId` | `667ae7ba` |
-| ✅ | T0.3 `lexical_cast` overrun, and the interface behind it | `e91fecc3` + |
-| ✅ | T0.4 preset file size | `7b09e809` |
-| ✅ | T0.5 sample decode bounds | `473da6ee`, `baf18233` |
-| ✅ | T1.1 side effects in `LE_ASSERT_MSG` | `76148ce5`, gate in `bcec76e9` |
-| ✅ | T1.2 unchecked ring pushes | `5f4da9f3` |
+| ✅ | T0.1 preset LFO waveform | `b40f784c` |
+| ✅ | T0.2 `isValidParamId` | `c2112a1e` |
+| ✅ | T0.3 `lexical_cast` overrun, and the interface behind it | `ffbc3399` + |
+| ✅ | T0.4 preset file size | `fce0d58f` |
+| ✅ | T0.5 sample decode bounds | `422de402`, `495fd3e6` |
+| ✅ | T1.1 side effects in `LE_ASSERT_MSG` | `72ae3c1b`, gate in `f250206a` |
+| ✅ | T1.2 unchecked ring pushes | `1e571acf` |
 | ☐ | T2.1 – T2.6 threading and lifetime | |
 | ☐ | T3.1 – T3.3 GUI use-after-free | |
-| ✅ | T4 locale-dependent number I/O | `99d74bc1` |
-| ✅ | T4 VST3 `IS_HIDDEN` — decided: never used | `efcf1978` |
-| ✅ | T4 sample rate re-read, and the sample a session keeps | `469f51e9` |
-| ✅ | T4 unbounded module count | `c64a7050` |
+| ✅ | T4 locale-dependent number I/O | `5c0845e1` |
+| ✅ | T4 VST3 `IS_HIDDEN` — decided: never used | `c2f4abbc` |
+| ✅ | T4 sample rate re-read, and the sample a session keeps | `86bd3028` |
+| ✅ | T4 unbounded module count | `ae0f892d` |
 | ☐ | T4 leftovers | `REQUIRES_PROCESS`, `updateEngineSetup` rollback, Save-As spin |
 | ☐ | doc drift | partly — see below |
 
@@ -100,7 +100,7 @@ in the waveform functions → false `__builtin_assume` → UB.
 gate for the enumerated/bounded sub-parameters). Add tests writing out-of-range
 `wfrm/ph/lbnd/ubnd/sync`.
 
-**Done — `3bffb1cd`.** Gated in `LFODataLoader::doLoad`, which is the check
+**Done — `b40f784c`.** Gated in `LFODataLoader::doLoad`, which is the check
 `ParametersLoader::operator()` already made for every *other* parameter in a
 preset. An out-of-range value is treated as an absent one and the parameter goes
 to its default rather than being clamped: there is no nearest waveform, and both
@@ -123,7 +123,7 @@ automation id in a project or a fuzzing/validating host.
 **Fix:** validate the sub-indices in `isValidParamId` (it is the one choke point
 before all four entry points; everything downstream assumes it happened).
 
-**Done — `667ae7ba`.** Every field, padding bytes included, and no unreachable
+**Done — `c2112a1e`.** Every field, padding bytes included, and no unreachable
 default on the type switch — telling the optimiser that 252 of 256 discriminators
 cannot occur is the thing being fixed. Two corrections to the finding: the worked
 example has its bytes reversed (`0x00FF0000`, not `0x000000FF`, which is a padding
@@ -145,7 +145,7 @@ not the snprintf. Same latent shape at `presets.hpp:419-427` (`makeString` build
 a `std::string` from the *wanted* length → over-read into the saved file).
 **Fix:** clamp the cursor to the actually-written length; use `std::to_chars`.
 
-**Done — `e91fecc3`.** The rendering goes into a scratch buffer wide enough for
+**Done — `ffbc3399`.** The rendering goes into a scratch buffer wide enough for
 `%f` of any double, so the trim runs over something that cannot have been
 truncated, and the caller sees a result only once it is known to fit. Measured in
 Release before the fix: a returned length of **312** against a string of 16, and
@@ -165,7 +165,7 @@ file → `new char[0]` + a 4 GiB read = heap overflow; any file >4 GiB is silent
 read as `size mod 2³²` and parsed as complete. Browser file path only (stateLoad
 uses `readWholeStream`). **Fix:** keep `uintmax_t`, reject sizes over a sane cap.
 
-**Done — `7b09e809`.** Checked before the narrowing, against a 16 MiB cap — the
+**Done — `fce0d58f`.** Checked before the narrowing, against a 16 MiB cap — the
 largest of the 303 shipped presets is 2,240 bytes and the format has no element
 that grows with anything but a module count capped at five. `readWholeStream`, the
 session half that the review filed under Tier 4, is held to the same number: its
@@ -182,7 +182,7 @@ header × 100 M frames = a 400 GB `juce::AudioBuffer` → `bad_alloc`) and bound
 and `sampleRate`, compute `targetFrames` in double and reject before the cast,
 and wrap the load body so `stateLoad` cannot terminate.
 
-**Done — `473da6ee` (bounds) and `baf18233` (the `noexcept` boundary).** Channels
+**Done — `422de402` (bounds) and `495fd3e6` (the `noexcept` boundary).** Channels
 are bounded to the two that are actually read, which is a bound rather than a cap
 and so has no number to tune wrong. The reachable arm turned out to be a
 *legitimate* file rather than a hostile one: the length guard ran before
@@ -209,7 +209,7 @@ never happen. Consequences while the plugin is active:
 effects inside `LE_ASSERT*`. (The review's grep found exactly these two in
 `src/`; make it a CI check.)
 
-**Done — `76148ce5`, with the CI gate in `bcec76e9`.** Both pushes hoisted out of
+**Done — `72ae3c1b`, with the CI gate in `f250206a`.** Both pushes hoisted out of
 the assertion, following the `if (push(...)) return;` idiom `publishSlot` and
 `publishChain` beside them already used. The gate scans 799 assertions in about
 two seconds and names both originals, at their exact lines, when run against the
@@ -228,7 +228,7 @@ sample the engine never got). `programMain_` (which answers `paramsValue`/
 engine" flag; move `publishSample`'s bookkeeping after the push (publishSlot/
 publishChain already undo correctly).
 
-**Done — `5f4da9f3`.** Every push goes through one place and every drop is
+**Done — `1e571acf`.** Every push goes through one place and every drop is
 counted; the three `publish*` functions answer whether the engine got the change
 rather than answering nothing. `publishSample`'s bookkeeping moved after the
 handover — it recorded `sampleFile_` first, so a dropped sample load left the
@@ -402,7 +402,7 @@ torn down before the state it reads.
 - ✅ **Locale-dependent float I/O** (`%.9g`/`strtod`, no `"C"` imbue) — a
   comma-decimal host writes unreadable presets and reads every factory float as
   its integer part.
-  **Done — `99d74bc1`.** Both halves, and the reading half is the one that loses
+  **Done — `5c0845e1`.** Both halves, and the reading half is the one that loses
   a user's work: reproduced under `de_DE.UTF-8`, `0.75` read back as **0** and a
   1234.5678 round trip came back as 1.0, silently, because stopping at the point
   is not an error. Writing goes through a stream imbued with
@@ -423,7 +423,7 @@ torn down before the state it reads.
   `CLAP_PARAM_REQUIRES_PROCESS` used for a "meta" meaning the flag doesn't have ·
   a failed `updateEngineSetup()` rolling back only the engine copy, leaving
   `programMain_`/state disagreeing · a Save-As uniquifier that can spin at ≥100
-  same-named presets. (`readWholeStream` uncapped was closed by `7b09e809`.)
+  same-named presets. (`readWholeStream` uncapped was closed by `fce0d58f`.)
 
 ---
 
@@ -454,7 +454,7 @@ load.
 
 tech_debt.md `RequiredStringStorage` entry's "release truncates rather than
 overruns" is false (T0.3, and the `makeString` over-read).
-✅ **Done — `e91fecc3`, completed in the commit after it.** The overrun was fixed
+✅ **Done — `ffbc3399`, completed in the commit after it.** The overrun was fixed
 first; then the interface itself: every binary-to-string overload takes a
 `std::span<char>` rather than a bare pointer, so the bound is the caller's real
 buffer and the constant is no longer a contract anybody can fail to honour. All
@@ -462,10 +462,10 @@ buffer and the constant is no longer a contract anybody can fail to honour. All
 property left, which is that a value too wide for a *display* prints compactly.
 
 ✅ Two more tech_debt.md entries moved with this branch. *An out-of-range LFO
-sub-parameter index asserts instead of being dropped* is **closed** by `667ae7ba`
+sub-parameter index asserts instead of being dropped* is **closed** by `c2112a1e`
 — that id is refused at the choke point now — and is deleted rather than
 annotated, per the file's own rule. *`UIEdits` drops on full* is amended: the drop
-is counted as of `5f4da9f3`, so it is no longer silent; not dropping it is what is
+is counted as of `1e571acf`, so it is no longer silent; not dropping it is what is
 still owed. A new entry records that a counted drop is not a repaired one.
 
 effect_contract.md §3 inventory (57 effects, order, groups, cmake) — **all
