@@ -46,6 +46,7 @@ add_executable(sw-dsp-tests
         presets/presetRoundTripTests.cpp
         utility/buffersTests.cpp
         utility/circularListTests.cpp
+        utility/lexicalCastTests.cpp
         utility/spanTests.cpp
 )
 
