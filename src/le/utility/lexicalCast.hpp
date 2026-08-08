@@ -19,6 +19,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <type_traits>
 
 namespace LE::Utility
@@ -98,6 +99,27 @@ template <> inline std::uint16_t lexical_cast<std::uint16_t>(char const *const v
 {
     return static_cast<std::uint16_t>(lexical_cast<std::uint32_t>(valueString));
 }
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief The number \p text begins with, or nothing at all when it does not
+/// begin with one.
+///
+/// \note The distinction the lexical_cast<> above cannot make, and the reason
+/// this exists beside it: `strtod` answers 0 for text it could not read a number
+/// out of, so a caller that only takes the value cannot tell "0" from "off" from
+/// "". That is not hypothetical -- it is how a typed value first reached this
+/// plugin's engine, and how a "nan" round tripped through it.
+///
+///   A trailing unit is not an error: "-12.5 dB" is the number this returns and
+/// the suffix the display added. Leading whitespace is skipped, `nan` is
+/// refused outright, and an infinity is answered as one -- it is what the
+/// ExImPloder gate's minimum prints as, and every caller clamps to a range
+/// anyway.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+std::optional<double> parseNumber(char const *text);
 
 } // namespace LE::Utility
 

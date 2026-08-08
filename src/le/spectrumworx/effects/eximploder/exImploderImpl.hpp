@@ -99,6 +99,17 @@ template <> struct DisplayValueTransformer<SW::Effects::Detail::ExImPloder::Gate
             return -std::numeric_limits<float>::infinity();
         return static_cast<float>(value);
     }
+
+    /// \note The minimum prints as "-inf dB" -- the gate off -- so that is what
+    /// has to read back as the minimum. Anything else is already in dB and is its
+    /// own inverse; the parser clamps, which is what puts a typed "-200" back on
+    /// the minimum as well.
+    static float inverse(float const dB, SW::Engine::Setup const &)
+    {
+        if (dB == -std::numeric_limits<float>::infinity())
+            return static_cast<float>(SW::Effects::Detail::ExImPloder::Gate::minimum());
+        return dB;
+    }
     using Suffix = LE::Parameters::UnitString<" dB">;
 }; // struct DisplayValueTransformer<SW::Effects::Detail::ExImPloder::Gate>
 

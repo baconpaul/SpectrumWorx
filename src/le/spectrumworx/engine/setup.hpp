@@ -82,6 +82,9 @@ class Setup
 
     std::uint16_t frequencyInHzToBin(std::uint32_t frequency) const;
     float normalisedFrequencyToHz(float normalisedFrequency) const;
+    /// \brief normalisedFrequencyToHz() backwards, clamped: what a user types is
+    /// not obliged to be inside Nyquist.
+    float hzToNormalisedFrequency(float hz) const;
     std::uint16_t normalisedFrequencyToBin(float normalisedFrequency) const;
     std::uint16_t frequencyPercentageToBin(float percentage) const;
     std::uint16_t frequencyPercentageToBin(std::uint8_t percentage) const;

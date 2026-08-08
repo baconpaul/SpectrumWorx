@@ -23,34 +23,6 @@ namespace LE
 template <typename Char>
 char *copyToBuffer(Char const *string, LE::Utility::Span<char> const &buffer);
 
-namespace Parameters::Detail
-{
-namespace Engine = SW::Engine;
-
-template <>
-char const *print<Engine::OverlapFactor>(unsigned int const parameterValue,
-                                         Engine::Setup const &engineSetup,
-                                         PrintBuffer const &buffer, PowerOfTwoParameterTag)
-{
-    typedef DisplayValueTransformer<Engine::OverlapFactor> ValueTransformer;
-    Utility::lexical_cast(ValueTransformer::transform(parameterValue, engineSetup), 1,
-                          buffer.begin());
-    return buffer.begin();
-}
-
-template <class Parameter>
-char const *print(float const &parameterValue, Engine::Setup const &, PrintBuffer const &,
-                  PowerOfTwoParameterTag);
-template <>
-char const *print<Engine::OverlapFactor>(float const &parameterValue,
-                                         Engine::Setup const &engineSetup,
-                                         PrintBuffer const &buffer, PowerOfTwoParameterTag)
-{
-    return print<Engine::OverlapFactor>(Math::convert<unsigned int>(parameterValue), engineSetup,
-                                        buffer, PowerOfTwoParameterTag());
-}
-} // namespace Parameters::Detail
-
 namespace SW
 {
 
@@ -507,7 +479,7 @@ char const *Plugin2HostPassiveInteropController::ParameterValueStringGetter::ope
         LE_DEFAULT_CASE_UNREACHABLE();
     }
 
-    return (parameter.getValue() != noModule) ? Effects::effectName(parameter) : "<empty>";
+    return (parameter.getValue() != noModule) ? Effects::effectName(parameter) : emptySlot;
 }
 
 #if 0
@@ -625,7 +597,7 @@ void Plugin2HostPassiveInteropController::ParameterNameGetter::operator()(
     if (pProgram &&
         (!pModule || (parameterID.moduleParameterIndex >= pModule->numberOfParameters())))
     {
-        std::strcpy(&buffer_[0], "N/A");
+        std::strcpy(&buffer_[0], notAvailable);
         return;
     }
 
@@ -667,7 +639,7 @@ void Plugin2HostPassiveInteropController::ParameterNameGetter::operator()(
     if (pProgram && (!pModule || (parameterID.moduleParameterIndex + 1U /*Bypass*/ >=
                                   pModule->numberOfParameters())))
     {
-        std::strcpy(&buffer_[0], "N/A");
+        std::strcpy(&buffer_[0], notAvailable);
         return;
     }
 

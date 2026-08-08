@@ -15,6 +15,7 @@
 
 #include "le/parameters/conversion.hpp"
 #include "le/parameters/lfoImpl.hpp"
+#include "le/parameters/parser_fwd.hpp"
 #include "le/parameters/printer_fwd.hpp"
 #include "le/parameters/parametersUtilities.hpp"
 #include "le/plugins/plugin.hpp"                       // for Plugins::AutomatedParameterValue
@@ -49,6 +50,7 @@ namespace Automation
 
 using LFO = Parameters::LFOImpl;
 using ParameterPrinter = Parameters::AutomatedParameterPrinter;
+using ParameterParser = Parameters::ParameterValueParser;
 using ModuleParameters = Engine::ModuleParameters;
 using AutoAdjustedLFOParameter = std::pair<std::uint8_t, LFO::value_type>;
 
@@ -88,6 +90,21 @@ float effectAutomated2InternalValue(std::uint8_t effectParameterIndex,
 
 char const *getParameterValueString(std::uint8_t parameterIndex, ParameterPrinter const &,
                                     ModuleParameters const &);
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief getParameterValueString() backwards: the parameter's own value, read
+/// out of the text it displays as -- or nothing, when that text is not one.
+///
+/// \note In the module's own units, not in automation units. Which of the two a
+/// caller wants depends on the protocol, and internal2AutomatedValue() below is
+/// what turns one into the other -- as it does for every other reader.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+Parameters::ParsedValue parseParameterValue(std::uint8_t parameterIndex, ParameterParser const &,
+                                            ModuleParameters const &);
+
 char const *getParameterUnit(std::uint8_t parameterIndex, ModuleParameters const *);
 
 namespace Detail

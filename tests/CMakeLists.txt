@@ -60,6 +60,7 @@ add_executable(sw-plugin-tests
         clap/hostInteropTests.cpp
         clap/identityTests.cpp
         clap/parameterModelTests.cpp
+        clap/parameterTextTests.cpp
         clap/pluginTests.cpp
         clap/stateTests.cpp
         # Drives a real clap_plugin through its C entry point.

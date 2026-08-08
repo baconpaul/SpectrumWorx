@@ -651,9 +651,30 @@ bool SpectrumWorxCLAP::paramsValueToText(clap_id const id, double const value, c
     /// rendering the current value, and it cannot assert.
     ///
     /// \todo Give the printer an arm that takes the value *and* the live
-    /// parameter, so a dynamic range has an owner to ask. That is the same
-    /// machinery paramsTextToValue needs below, and worth doing once for both.
+    /// parameter, so a dynamic range has an owner to ask.
     ///                                       (30.07.2026.) (SW port)
+    ///
+    /// \note This used to say the same machinery was what paramsTextToValue
+    /// needed. It was not: parsing never constructs a parameter, so it never had
+    /// the problem, and it went in on 07.08.2026 without touching this.
+    ///                                       (07.08.2026.) (SW port)
+
+    /// \note A parameter no effect currently owns reads as `notAvailable`, which
+    /// is the name paramsInfo gives it and the only true thing there is to say
+    /// about its value: it has no effect to give it units and no range to be a
+    /// point in. It used to be the empty string, which says the same thing less
+    /// well and, once paramsTextToValue existed, could not be read back --
+    /// clap-validator's `param-conversions` requires text_to_value for all the
+    /// automatable parameters or for none, and every ID here is automatable so
+    /// that a host's lane survives an effect swap.
+    ///                                       (07.08.2026.) (SW port)
+    Plugins::ParameterInformation<Protocol> ranges;
+    if (!liveRanges(parameterID, ranges, programMain_))
+    {
+        std::snprintf(display, size, "%s", notAvailable);
+        return true;
+    }
+
     std::array<char, 128> text{};
     getParameterDisplay(parameterID, {text.data(), text.size()}, nullptr, programMain_);
 
@@ -664,25 +685,56 @@ bool SpectrumWorxCLAP::paramsValueToText(clap_id const id, double const value, c
     return true;
 }
 
-/// \brief Declined, deliberately, until the printers can be run backwards.
+/// \brief paramsValueToText run backwards.
 ///
 /// \note The 2016 code never needed this -- neither VST 2.4 nor AU asks a plugin
-/// to parse a typed-in value -- so nothing in the parameter system inverts a
-/// display transform. `Parameters::DisplayValueTransformer` has `transform` and
-/// no counterpart, and the effect-specific printers go through
-/// `AutomatedParameterPrinter` the same one way.
-///
-///   The previous implementation here ran `strtod` over the text and returned the
-/// result as if display units were storage units. For anything with a transform
-/// that is simply a wrong value: clap-validator caught the input gain going
+/// to parse a typed-in value -- so until 08.2026 nothing in the parameter system
+/// inverted a display transform and this declined outright. What it had done
+/// before *that* is why declining was the honest answer rather than a lazy one:
+/// it ran `strtod` over the text and returned the result as if display units were
+/// storage units, which clap-validator caught taking the input gain
 /// `0.001` -> `"-60dB"` -> `-60.0` -> `"nandB"`, a NaN written straight into the
-/// engine. Returning false is the honest answer -- `text_to_value` is optional,
-/// and a host falls back to its own editing -- and it cannot corrupt state.
+/// engine.
 ///
-/// \todo Give `DisplayValueTransformer` an `inverse` alongside `transform` (four
-/// specialisations: two dB, two percentage) and teach the effect-specific
-/// printers the same, then parse here and invert per parameter.
-bool SpectrumWorxCLAP::paramsTextToValue(clap_id, char const *, double *) noexcept { return false; }
+///   Both halves of that are now somebody's job.
+/// `Parameters::DisplayValueTransformer::inverse` undoes the transform per
+/// parameter, `Parameters::parse` answers `nothing` for text that is not a value
+/// -- rather than the zero `strtod` answers -- and clamps what it does answer to
+/// the parameter's own range. tests/clap/parameterTextTests.cpp holds every
+/// parameter to the round trip.
+///
+/// \note `programMain_`, and the *live* ranges over it, because the units the
+/// text is in belong to whichever effect the slot currently holds. Same pair of
+/// reads as paramsValue().
+bool SpectrumWorxCLAP::paramsTextToValue(clap_id const id, char const *const display,
+                                         double *const value) noexcept
+{
+    if (!isValidParamId(id) || !display)
+        return false;
+
+    ParameterID const parameterID{Plugins::ParameterID{id}};
+
+    Plugins::ParameterInformation<Protocol> ranges;
+
+    /// \note A parameter no effect currently owns has one display and one value
+    /// -- `notAvailable` and the default paramsValue answers with -- and reading
+    /// the one back as the other is what keeps text_to_value answerable for
+    /// *every* automatable parameter. \see paramsValueToText.
+    if (!liveRanges(parameterID, ranges, programMain_))
+    {
+        if (std::strcmp(display, notAvailable) != 0)
+            return false;
+        *value = CLAPEdge::defaultToHost(parameterID, ranges);
+        return true;
+    }
+
+    auto const natural(getParameterFromDisplay(parameterID, display, programMain_));
+    if (!natural)
+        return false;
+
+    *value = CLAPEdge::toHost(parameterID, ranges, *natural);
+    return true;
+}
 
 bool SpectrumWorxCLAP::handleEvent(clap_event_header const *const header)
 {

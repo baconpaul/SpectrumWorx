@@ -14,6 +14,7 @@
 
 #include "le/parameters/conversion.hpp"
 #include "le/parameters/parametersUtilities.hpp"
+#include "le/parameters/parser.hpp"  // BaseParameters parsers
 #include "le/parameters/printer.hpp" // BaseParameters printers
 #include "le/plugins/plugin.hpp" //...ugh...mrmlj...for Plugins::*AutomatedParameter usage in printer.hpp...clean this up...
 #include "le/spectrumworx/effects/baseParameters.hpp" // BaseParameters printers
@@ -39,6 +40,18 @@ char const *getParameterValueString(std::uint8_t const index, ParameterPrinter c
                      index, std::forward<ParameterPrinter const>(printer))
                : module.metaData().getParameterValueString(
                      module.effectSpecificParameterIndex(index), printer);
+}
+
+Parameters::ParsedValue parseParameterValue(std::uint8_t const index, ParameterParser const &parser,
+                                            ModuleParameters const &module)
+{
+    if (index >= module.numberOfParameters())
+        return {};
+
+    return (index < BaseParameters::static_size)
+               ? LE::Parameters::invokeFunctorOnIndexedParameter<BaseParameters>(index, parser)
+               : module.metaData().parseParameterValue(module.effectSpecificParameterIndex(index),
+                                                       parser);
 }
 
 char const *getParameterUnit(std::uint8_t const parameterIndex,

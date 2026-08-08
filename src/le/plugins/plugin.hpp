@@ -470,12 +470,21 @@ struct AutomatedParameter
 
 using AutomatedParameterValue = AutomatedParameter::value_type;
 
+/// \note convertParameterValueToAutomationValue() is convertParameterToAutomationValue()
+/// given a bare value instead of a parameter object, and it exists because
+/// text_to_value has nothing else to give it: a parsed value is a number, and
+/// constructing a parameter to hold it is exactly what the printer's own
+/// \todo in spectrumWorxCLAP.cpp warns against for a dynamic range.
+///                                           (07.08.2026.) (SW port)
 struct NormalisedAutomatedParameter : AutomatedParameter
 {
     static bool const normalised = true;
 
     template <class Parameter>
     static AutomatedParameterValue convertParameterToAutomationValue(Parameter const &);
+    template <class Parameter>
+    static AutomatedParameterValue
+        convertParameterValueToAutomationValue(typename Parameter::value_type);
     template <class Parameter>
     static
         typename Parameter::value_type convertAutomationToParameterValue(AutomatedParameterValue);
@@ -491,6 +500,9 @@ struct FullRangeAutomatedParameter : AutomatedParameter
 
     template <class Parameter>
     static AutomatedParameterValue convertParameterToAutomationValue(Parameter const &);
+    template <class Parameter>
+    static AutomatedParameterValue
+        convertParameterValueToAutomationValue(typename Parameter::value_type);
     template <class Parameter>
     static
         typename Parameter::value_type convertAutomationToParameterValue(AutomatedParameterValue);
@@ -527,6 +539,14 @@ NormalisedAutomatedParameter::convertParameterToAutomationValue(Parameter const 
 }
 
 template <class Parameter>
+AutomatedParameterValue NormalisedAutomatedParameter::convertParameterValueToAutomationValue(
+    typename Parameter::value_type const parameterValue)
+{
+    return LE::Parameters::convertParameterValueToLinearValue<AutomatedParameterValue, 0, 1, 1,
+                                                              Parameter>(parameterValue);
+}
+
+template <class Parameter>
 typename Parameter::value_type NormalisedAutomatedParameter::convertAutomationToParameterValue(
     AutomatedParameterValue const automationValue)
 {
@@ -558,6 +578,17 @@ FullRangeAutomatedParameter::convertParameterToAutomationValue(Parameter const &
         AutomatedParameterValue, Range::unscaledMinimum,
         Range::unscaledMaximum - Range::unscaledMinimum, Parameter::rangeValuesDenominator>(
         parameter);
+}
+
+template <class Parameter>
+AutomatedParameterValue FullRangeAutomatedParameter::convertParameterValueToAutomationValue(
+    typename Parameter::value_type const parameterValue)
+{
+    using Range = AutomationRange<Parameter, typename Parameter::Tag>;
+    return LE::Parameters::convertParameterValueToLinearValue<
+        AutomatedParameterValue, Range::unscaledMinimum,
+        Range::unscaledMaximum - Range::unscaledMinimum, Parameter::rangeValuesDenominator,
+        Parameter>(parameterValue);
 }
 
 template <class Parameter>
