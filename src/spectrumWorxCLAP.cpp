@@ -231,11 +231,67 @@ SpectrumWorxCLAP::SpectrumWorxCLAP(clap_host const *const host) : PluginHelper(d
 
 SpectrumWorxCLAP::~SpectrumWorxCLAP()
 {
+    /// \note And anything the main thread asked for that no block will now
+    /// carry out. `deactivate()` empties this queue, but an editor open on a
+    /// deactivated plugin goes on filling it -- a knob moved with the transport
+    /// stopped -- and a plugin that was created and destroyed without ever being
+    /// activated never saw a `deactivate()` at all. Every `SetSlot`, `SwapChain`
+    /// and `SwapSample` still in there owns what it carries.
+    ///                                       (08.08.2026.) (SW port)
+    discardQueuedCommands();
+
     /// \note Anything the audio thread handed back and nobody collected. There
     /// is no audio thread by now -- a host destroys a deactivated plugin -- so
     /// this is the last chance to free it.
     drainEngineEvents();
     delete pSample_;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Frees what the command queue still carries, without applying any of
+/// it. `[main-thread]`
+///
+/// \note Discarded rather than drained, which is the difference between this and
+/// `drainCommands()`. Applying a slot change to an engine that is being destroyed
+/// buys nothing, and the two things applying it *does* -- `chainChanged()`'s
+/// rescan request and its `mark_dirty` -- are calls into a host that is midway
+/// through `clap_plugin::destroy`. What is owed here is the memory and only that.
+///                                           (08.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxCLAP::discardQueuedCommands()
+{
+    Threading::ToEngine command;
+    while (toEngine_.pop(command))
+    {
+        switch (command.kind)
+        {
+        /// \note One reference, transferred with the message; null empties a slot
+        /// and carries nothing.
+        case Threading::ToEngine::Kind::SetSlot:
+            if (command.setSlot.pModule)
+                intrusive_ptr_release(
+                    &Engine::node(*static_cast<Module *>(command.setSlot.pModule)));
+            break;
+
+        case Threading::ToEngine::Kind::SwapChain:
+            delete static_cast<AutomatedModuleChain *>(command.swapChain.pChain);
+            break;
+
+        case Threading::ToEngine::Kind::SwapSample:
+            delete static_cast<Sample *>(command.swapSample.pSample);
+            break;
+
+        // Values, and nothing to free.
+        case Threading::ToEngine::Kind::None:
+        case Threading::ToEngine::Kind::SetBaseParameter:
+        case Threading::ToEngine::Kind::MoveModule:
+        case Threading::ToEngine::Kind::SetUnexportedLFOParameter:
+            break;
+        }
+    }
 }
 
 bool SpectrumWorxCLAP::init() noexcept
@@ -372,6 +428,36 @@ void SpectrumWorxCLAP::deactivate() noexcept
         engineRunning_ = false;
     }
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Whatever the main thread asked for and no block ever came to carry
+    /// out. `suspend()` is above it, so this thread owns the engine and the
+    /// commands apply here and now, exactly as `process()` would have applied
+    /// them.
+    ///
+    ///   Both halves of this matter, and the first is a heap overrun. A preset
+    /// that changes the FFT size builds its chain against the storage factors in
+    /// force *when it is parsed* and hands it over through `publishChain()`,
+    /// which with audio running queues it. The restart it then asks for used to
+    /// arrive here and resize only the chain that was already live -- the
+    /// preset's was still sitting in the ring -- so the first `process()` after
+    /// the restart spliced in modules sized for the old FFT and nothing ever
+    /// resized them. A larger FFT then writes per-bin channel state past the end
+    /// of its block. Draining before `applyPendingSpectralSetup()` is what puts
+    /// the new chain where the resize can see it.
+    ///
+    ///   The second is quieter: a command left in the ring is not merely late,
+    /// it is *stale*. `activate()` drained nothing either, so a queued SetSlot or
+    /// SwapChain replayed on top of whatever the main thread had since applied
+    /// directly -- the two Program copies disagreeing with no way to notice.
+    ///
+    ///   A host is not obliged to call `on_main_thread` between deactivate and
+    /// activate, which is why the collection below is here as well.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    drainCommands();
     drainEngineEvents();
 
     /// \note Before the setup is applied rather than after: this is the restart
@@ -1332,7 +1418,15 @@ void SpectrumWorxCLAP::drainCommands()
     /// FFT size and the overlap factor together is one restart, not two. And
     /// `clap_host::request_restart` is `[thread-safe]`, which is what makes this
     /// legal from here at all.
-    if (spectralSetupPending() && !restartRequested_.exchange(true, std::memory_order_acq_rel))
+    ///
+    /// \note Only while there is an audio thread to defer on behalf of.
+    /// `deactivate()` drains through here too, and there the pending setup is
+    /// applied a few lines later rather than deferred -- asking the host for a
+    /// restart in the middle of the one it is already performing would earn a
+    /// second, pointless, deactivate/activate cycle.
+    ///                                       (08.08.2026.) (SW port)
+    if (engineIsRunning() && spectralSetupPending() &&
+        !restartRequested_.exchange(true, std::memory_order_acq_rel))
         _host.requestRestart();
 }
 

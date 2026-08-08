@@ -39,7 +39,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <thread>
@@ -240,4 +242,92 @@ TEST_CASE("A preset that changes the FFT size while audio runs still gets its re
     /// lost on the way.
     plugin.restartIfAsked();
     CHECK(runningFFTSize(*plugin) == 8192);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note T2.1, and it needs no second thread at all -- only a host that does not
+/// render between the preset and the restart it asks for. Logic with the
+/// transport parked is the reported one; every host does it while a track is
+/// muted or the plugin is offline.
+///
+///   A preset is parsed into a chain built against the storage factors in force
+/// at the time, and handed over through `Threading::publishChain()`, which with
+/// audio running *queues* it. The restart the preset's FFT size then asks for
+/// lands in `deactivate()`, which resized the live chain -- and the preset's was
+/// still in the ring. So the first `process()` after the restart spliced in
+/// modules sized for 2048 and ran them at 8192, writing per-bin channel state
+/// past the end of the block each of them owns.
+///
+///   The case is written around the *observable* half of that: which chain ends
+/// up live and at what size. The overrun itself needs a sanitizer to see, and an
+/// `-fsanitize=address` build reports it here as a heap-buffer-overflow inside
+/// the first block.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A chain queued behind a restart is resized before it is played",
+          "[clap][threading][presets]")
+{
+    Entry const entry;
+
+    TestHost host(TestHost::everything());
+    ActivePlugin plugin(sampleRate, blockSize, host);
+
+    auto &engine(editorHostOf(*plugin).core());
+    REQUIRE(runningFFTSize(*plugin) != 8192);
+    REQUIRE(engine.moduleChain().size() == 0);
+
+    auto presetData(LE::SW::readPresetFile(presetWithABiggerFFT()));
+    REQUIRE(presetData);
+
+    REQUIRE(LE::SW::GUI::loadPreset(editorHostOf(*plugin), nullptr, presetData.get(),
+                                    true /*ignore external samples*/, nullptr, "Whistle"));
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Not one block between the load and the restart, which is the whole
+    /// case. The plugin is active, so `publishChain()` queued the chain instead
+    /// of installing it, and nothing has drained the ring: the engine is still
+    /// running the previous, empty chain at the previous FFT size.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    CHECK(engine.moduleChain().size() == 0);
+    CHECK(runningFFTSize(*plugin) != 8192);
+    CHECK(host.restartRequests >= 1);
+
+    plugin.restartIfAsked();
+
+    // The restart is where both halves land, and they have to land together.
+    CHECK(runningFFTSize(*plugin) == 8192);
+    CHECK(engine.moduleChain().size() == 3);
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note And then the blocks that used to run the old modules at the new
+    /// size. Enough of them to reach a spectral frame, which is the part that
+    /// took some finding: at 8192 with an overlap factor of 4 a hop is 2048
+    /// samples and a block here is 64, so **no module runs at all for the first
+    /// 32 blocks**. One block after the restart looks perfectly healthy.
+    ///
+    ///   What it looks like when it is not: `Math::multiply` reports "Buffer
+    /// sizes mismatch" from inside `PitchShifter::process`, an input of the new
+    /// FFT's width against an output sized for the old one -- and then writes the
+    /// input's length anyway. Only the engine's own bounds assertion sees it.
+    /// ASan does not: modules are suballocated out of one `HeapSharedStorage`
+    /// arena, so running off the end of a module's range lands in the next
+    /// module's, which is a live part of an allocation the sanitizer knows to be
+    /// live. In a shipped build the assertion is not compiled and the write is
+    /// simply made.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    std::vector<float> leftIn(blockSize, 0.25f), rightIn(blockSize, 0.25f);
+    std::vector<float> leftOut(blockSize), rightOut(blockSize);
+    for (unsigned int block(0); block < 64; ++block)
+    {
+        plugin.process(leftIn, rightIn, leftOut, rightOut);
+        REQUIRE(std::all_of(leftOut.begin(), leftOut.end(),
+                            [](float const sample) { return std::isfinite(sample); }));
+    }
 }

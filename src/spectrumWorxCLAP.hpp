@@ -369,8 +369,13 @@ class SpectrumWorxCLAP final
     bool pushed(bool wasPushed, char const *what) const;
 
     /// \brief Applies everything the main thread has asked for, at the top of
-    /// process(). `[audio-thread]`
+    /// process() -- and at `deactivate()`, where this thread owns the engine
+    /// instead. `[audio-thread, or main-thread with the engine stopped]`
     void drainCommands();
+
+    /// \brief Frees what the command queue carries without applying it, for the
+    /// destructor. `[main-thread]` \see the definition.
+    void discardQueuedCommands();
 
     /// \brief Applies everything the audio thread has reported, on the main
     /// thread. `[main-thread]`
