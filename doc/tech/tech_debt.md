@@ -281,12 +281,36 @@ New entries go at the top of their area.
   been run in has one tempo at a time. See
   [`how-lfo-rates-work.md`](how-lfo-rates-work.md) §7.
 
-- **`UIEdits` drops on full, and that is wrong for gestures.** (01.08.2026) The
-  ring is otherwise correct. Dropping a `Kind::Value` is right — the next one
-  supersedes it. Dropping a `GestureBegin` whose `GestureEnd` survives leaves the
-  host holding an unbalanced gesture, which some hosts never recover from.
-  Recorded when the ring was audited as "worth a follow-up, not a blocker", and
-  nothing took it.
+- **`UIEdits` drops on full, and that is wrong for gestures.** (01.08.2026,
+  amended 08.08.2026) The ring is otherwise correct. Dropping a `Kind::Value` is
+  right — the next one supersedes it. Dropping a `GestureBegin` whose
+  `GestureEnd` survives leaves the host holding an unbalanced gesture, which some
+  hosts never recover from. The drop is at least *counted* now —
+  `SpectrumWorxCLAP::droppedMessages()` — so it is no longer silent; what is
+  still owed is not dropping it.
+
+- **A dropped ring message is counted and cannot be repaired.** (08.08.2026)
+  `SpectrumWorxCLAP::pushed()` records every message a full ring throws away,
+  which is what makes the failure sayable rather than silent. It is not a fix.
+  Each of these pushes happens *after* the same change has been applied to the
+  other side, so a drop is a divergence — the main thread's `Program` behind the
+  engine, the engine behind the interface, or the host not told about an edit —
+  and the ring was where the information to undo it would have been.
+
+  The design answer for the *echo* leg specifically is a second `ValueMailbox`
+  rather than a ring: a mailbox cannot overflow, and coalescing is correct for
+  an echo because its job is to make the two copies equal rather than to replay
+  a sequence. `parameterIDFromIndex`'s layout even orders a sweep the right way
+  round — slot selectors sort before the parameters of those slots. The note on
+  `valueMailbox.hpp` argues the opposite for base values and would need amending,
+  which is why this is a decision rather than a patch. The other legs — a slot
+  change, a chain, a move, a sample — are commands with an order and a mailbox is
+  wrong for them; those want either a deeper ring or backpressure, and
+  backpressure on the main thread is what the 2016 lock was.
+
+  Nothing has been observed above zero. `tests/clap/publishProtocolTests.cpp`
+  fills each ring on purpose and pins what a drop costs, so the cost is now
+  measured rather than assumed.
 
 ## Host interface
 
@@ -357,19 +381,6 @@ New entries go at the top of their area.
   numerator changes, so the same class of bug exists there. But **nothing in the
   suite drives a meter other than 4/4**, so that arm is unexercised in both
   directions. A case at 3/4 would settle it.
-
-- **An out-of-range LFO sub-parameter index asserts instead of being dropped.**
-  (03.08.2026) `ParameterCounts::lfoExportedParameters` is 5, so a
-  host sees Enabled, PeriodScale, Phase, LowerBound and UpperBound; SyncTypes and
-  Waveform are internal. Writing index 5 anyway reaches
-  `Automation::Detail::autoAdjustedLFOParameter` and trips
-  `LE_ASSUME(lfoParameterIndex < lfoExportedParameters)`
-  (`automatedModule.cpp:140`) — in a release build, an index past the end. No
-  conforming host can reach it, since the id is not exported; neither could a
-  conforming host send an out-of-range parameter *value*, and that one is now
-  clamped at the edge rather than trusted. This is the same guard and the same
-  argument. Found by accident, writing the id by hand while chasing the entry
-  above.
 
 ## DSP and effects
 
