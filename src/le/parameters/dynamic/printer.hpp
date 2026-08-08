@@ -28,7 +28,10 @@ template <class Parameter>
 char const *print(typename Parameter::value_type const parameterValue, SW::Engine::Setup const &,
                   PrintBuffer const &buffer, DynamicRangeParameterTag)
 {
-    LE_VERIFY(Utility::lexical_cast(parameterValue, buffer.begin()) < unsigned(buffer.size()));
+    /// \note The whole buffer rather than its `begin()`, so the bound is the one
+    /// the caller declared. The `LE_VERIFY` that stood here checked the length
+    /// afterwards, which is a check made one write too late.
+    Utility::lexical_cast(parameterValue, buffer);
     return buffer.begin();
 }
 } // namespace Detail

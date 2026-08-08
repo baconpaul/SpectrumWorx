@@ -126,29 +126,19 @@ New entries go at the top of their area.
   disagreement. `tests/checkODRHeaderScope.cmake` is the only thing standing
   there, and it only runs under the Ninja and Makefile generators.
 
-- **`RequiredStringStorage<T>` is the contract for every `lexical_cast` buffer,
-  and it is a constant rather than a parameter.** (08.08.2026)
-  The `lexical_cast(value, char *)` overloads take a bare pointer, so the only
-  bound any of them has is the size the interface tells callers to allocate —
-  `2 + digits * 3010 / 10000`, which is 17 for a `double`. The `double` arm no
-  longer trusts it: it renders into a scratch buffer of its own and copies back
-  only what fits, falling back to `%g` for a value `%f` cannot express in 17
-  characters. `tests/utility/lexicalCastTests.cpp` holds it to that with guard
-  bytes behind the buffer.
+- **A `%g` fallback means a very wide value does not round-trip at full
+  precision.** (08.08.2026) `lexical_cast` takes the buffer it may write to now,
+  so the size it is bounded by is the size the caller actually has. A value too
+  wide for that buffer at the precision asked for prints as `%g` — the right
+  number, but six significant digits rather than nine.
 
-  What is left is the shape of the interface. `std::int32_t`'s constant is 11
-  and `-2147483648` is 11 characters plus the null, so that arm is still one
-  short on paper — unreachable from anything the plugin prints, and the assert
-  on the return is all that says so. The fix for the family is to give the
-  overloads a size parameter and delete the constant; there are 13 call sites
-  and every one has a `std::array` or a `_countof` in hand already.
-
-  The `%g` fallback also means a value wider than the constant round-trips
-  through a preset at six significant digits rather than nine. Nothing in the
-  shipping banks is that wide — the corpus digests did not move — but the
-  `makeString` buffer in `presets.hpp` is sized by the same constant, so a
-  parameter that ever grows that large needs the size parameter above rather
-  than a wider constant.
+  For a display that is the correct answer. For `presets.hpp`'s `makeString`,
+  which writes the number into a file, it would be a loss, so that one sizes its
+  buffer with `RequiredStringStorage` — 321 bytes for a `double`, which is what
+  `%.9f` of one actually needs. Nothing in the shipping banks is anywhere near
+  that wide and the corpus digests did not move, so this is a property to keep in
+  mind rather than a defect: a parameter whose values ever reach 1e300 wants its
+  own printer, not a wider buffer.
 
 - **MP3 decoding is a different decoder on macOS than on Windows and Linux, and
   which one answers is decided by registration order.** (01.08.2026)

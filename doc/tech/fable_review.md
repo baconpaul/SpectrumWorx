@@ -3,14 +3,14 @@
 ## Status as of 08.08.2026
 
 Tier 0 and Tier 1 are done, on branch `respond-to-fable`, one commit per finding
-with a reproduction in each. Tests went 333 → 353, green in `build/` and
+with a reproduction in each. Tests went 333 → 357, green in `build/` and
 `build-release/`; the goldens and the 303-preset corpus digests did not move.
 
 | | Finding | |
 |---|---|---|
 | ✅ | T0.1 preset LFO waveform | `3bffb1cd` |
 | ✅ | T0.2 `isValidParamId` | `667ae7ba` |
-| ✅ | T0.3 `lexical_cast` overrun | `e91fecc3` |
+| ✅ | T0.3 `lexical_cast` overrun, and the interface behind it | `e91fecc3` + |
 | ✅ | T0.4 preset file size | `7b09e809` |
 | ✅ | T0.5 sample decode bounds | `473da6ee`, `baf18233` |
 | ✅ | T1.1 side effects in `LE_ASSERT_MSG` | `76148ce5`, gate in `bcec76e9` |
@@ -384,10 +384,12 @@ load.
 
 tech_debt.md `RequiredStringStorage` entry's "release truncates rather than
 overruns" is false (T0.3, and the `makeString` over-read).
-✅ **Done — `e91fecc3`.** The entry is rewritten to what is genuinely left: the
-`double` arm no longer trusts the constant, and what remains is that the size is a
-constant rather than a parameter, across 13 call sites that all have a
-`std::array` or a `_countof` in hand.
+✅ **Done — `e91fecc3`, completed in the commit after it.** The overrun was fixed
+first; then the interface itself: every binary-to-string overload takes a
+`std::span<char>` rather than a bare pointer, so the bound is the caller's real
+buffer and the constant is no longer a contract anybody can fail to honour. All
+13 call sites hand over the buffer whole. The entry is rewritten to the one
+property left, which is that a value too wide for a *display* prints compactly.
 
 ✅ Two more tech_debt.md entries moved with this branch. *An out-of-range LFO
 sub-parameter index asserts instead of being dropped* is **closed** by `667ae7ba`

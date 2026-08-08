@@ -37,6 +37,7 @@
 #include "le/utility/ignoreUnused.hpp"
 
 #include <array>
+#include <span>
 #include <optional>
 #include <string_view>
 #include "le/utility/span.hpp"
@@ -2075,9 +2076,26 @@ juce::String periodMillisecondsString(SpectrumWorxEditor::LFODisplay const &pare
     bool const skipRatio(skipPeriodRatio(parent.period()));
     unsigned char const precision(!skipRatio * 2);
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The number is written into the buffer *less the suffix*, so that
+    /// `strcpy` at the returned offset cannot reach the end however wide the
+    /// number turns out to be.
+    ///
+    ///   Which is the shape of what went wrong here. `lexical_cast` was handed
+    /// `&buffer[0]` and a constant it had no way to check, returned the length
+    /// `snprintf` would have *wanted*, and this indexed a 32-byte stack array
+    /// with it. Handing over the room there actually is makes both halves of that
+    /// impossible rather than merely unlikely.
+    ///                                       (08.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    constexpr char suffix[]{" ms"};
     std::array<char, 32> buffer;
-    auto const charactersWritten(Utility::lexical_cast(periodScale, precision, &buffer[0]));
-    std::strcpy(&buffer[charactersWritten], " ms");
+    auto const charactersWritten(Utility::lexical_cast(
+        periodScale, precision, std::span(buffer).first(buffer.size() - sizeof(suffix))));
+    std::strcpy(&buffer[charactersWritten], suffix);
 
     return juce::String(&buffer[0]);
 }
@@ -2085,9 +2103,11 @@ juce::String periodMillisecondsString(SpectrumWorxEditor::LFODisplay const &pare
 juce::String phaseString(SpectrumWorxEditor::LFODisplay const & /*parent*/,
                          double const &periodScale)
 {
+    constexpr char suffix[]{"%"};
     std::array<char, 32> buffer;
-    auto const numberOfCharactersWritten(Utility::lexical_cast(periodScale * 100, 1, &buffer[0]));
-    std::strcpy(&buffer[numberOfCharactersWritten], "%");
+    auto const numberOfCharactersWritten(Utility::lexical_cast(
+        periodScale * 100, 1, std::span(buffer).first(buffer.size() - sizeof(suffix))));
+    std::strcpy(&buffer[numberOfCharactersWritten], suffix);
     return juce::String(&buffer[0]);
 }
 
@@ -2780,8 +2800,11 @@ void SpectrumWorxEditor::Settings::EnginePage::setNewQualityFactor(float const &
         description = "% (average)";
     else
         description = "% (poor)";
+    /// \note No `LE_VERIFY` on the length any more: the buffer goes over whole,
+    /// so staying inside it is the callee's promise rather than the caller's
+    /// hope. It was a check made one write too late in any case.
     char buffer[32];
-    LE_VERIFY(Utility::lexical_cast(qualityFactor * 100.0f, 2, buffer) < _countof(buffer));
+    Utility::lexical_cast(qualityFactor * 100.0f, 2, buffer);
     /// \note Assigned rather than truncated in place. This read
     /// `*engineQuality_.getCharPointer().getAddress() = 0;` -- a poke of a nul
     /// into the string's own buffer, to empty it while keeping the allocation.
@@ -2804,7 +2827,7 @@ void printEngineDiagnostics(juce::String &buffer, char const *const title, float
                             juce::Graphics const &graphics)
 {
     char valueStr[32];
-    LE_VERIFY(Utility::lexical_cast(value, 1, valueStr) < _countof(valueStr));
+    Utility::lexical_cast(value, 1, valueStr);
     buffer = title;
     buffer += ": ";
     buffer += valueStr;

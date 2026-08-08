@@ -1122,7 +1122,7 @@ void addPowerOfTwoValueStringsToComboBox(unsigned int const firstValue,
     unsigned int value(firstValue);
     while (value <= lastValue)
     {
-        Utility::lexical_cast(value, &buffer[0]);
+        Utility::lexical_cast(value, buffer);
         comboBox.addItem(value, &buffer[0]);
         value *= 2;
     }
