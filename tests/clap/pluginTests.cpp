@@ -474,11 +474,24 @@ TEST_CASE("The host sees the engine's own parameters, not a stand-in", "[clap]")
     CHECK(sawAGlobal);
 }
 
-TEST_CASE("A parameter no effect currently owns is hidden, not broken", "[clap]")
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The cost of declaring every slot's parameters up front: on an empty
+/// instance most of them belong to no effect. They are shown anyway.
+///
+///   They used to be flagged CLAP_PARAM_IS_HIDDEN, which is what the flag is for
+/// and would have been right if hosts re-read it. The shipped clap-wrapper maps
+/// flags once at construction and a VST3 RESCAN_INFO re-reads only the name, so
+/// in a VST3 host the flags of an *empty* instance were the flags forever: an
+/// automation list of eleven rows out of 388, permanently. Every parameter is
+/// visible now, and this is the case that says so -- it is a decision about what
+/// hosts are told, so it is worth a test that fails if someone reaches for the
+/// flag again.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A parameter no effect currently owns is shown anyway, and answers", "[clap]")
 {
-    // The cost of declaring every slot's parameters up front: on an empty
-    // instance most of them belong to no effect. They keep valid IDs and a
-    // usable range, and say so with CLAP_PARAM_IS_HIDDEN.
     Entry const entry;
     ActivePlugin plugin(48000, 512);
 
@@ -486,22 +499,30 @@ TEST_CASE("A parameter no effect currently owns is hidden, not broken", "[clap]"
         static_cast<clap_plugin_params const *>(plugin->get_extension(&*plugin, CLAP_EXT_PARAMS)));
     REQUIRE(params != nullptr);
 
-    std::uint32_t hidden{0}, shown{0};
+    std::uint32_t ownedByNoEffect{0};
     for (std::uint32_t index(0); index < params->count(&*plugin); ++index)
     {
         clap_param_info info{};
         REQUIRE(params->get_info(&*plugin, index, &info));
         INFO("parameter " << index << " '" << info.name << "'");
-        // Hidden or not, it must still be answerable.
+
+        CHECK((info.flags & CLAP_PARAM_IS_HIDDEN) == 0);
+
+        // Shown means usable: a host may write to any of these, so all of them
+        // have to answer and none may hand back a zero-width range to divide by.
         double value{0};
         CHECK(params->get_value(&*plugin, info.id, &value));
         CHECK(info.min_value < info.max_value);
-        ((info.flags & CLAP_PARAM_IS_HIDDEN) ? hidden : shown)++;
+        CHECK((info.flags & CLAP_PARAM_IS_AUTOMATABLE) != 0);
+
+        ownedByNoEffect += isNormalisedType(info.id);
     }
 
-    // The globals and the five slot selectors are real with nothing loaded.
-    CHECK(shown > 0);
-    CHECK(hidden > 0);
+    // ...and the list really does contain both kinds, or the above says nothing:
+    // the globals and the five slot selectors are real with nothing loaded, and
+    // everything else is a parameter waiting for an effect.
+    CHECK(ownedByNoEffect > 0);
+    CHECK(ownedByNoEffect < params->count(&*plugin));
 }
 
 TEST_CASE("Filling a module slot renames its parameters without adding any", "[clap]")
@@ -530,11 +551,16 @@ TEST_CASE("Filling a module slot renames its parameters without adding any", "[c
     CHECK(slotOneBefore > 0);
 
     // None of slot 1's module or LFO parameters is usable yet, and every one of
-    // them says so. The slot's *selector* is not one of them -- it is what fills
-    // the slot, so it is always live -- and "Slot 1" is its module path too.
+    // them says so -- in its *display*, which is where an unusable parameter says
+    // it now. The slot's *selector* is not one of them: it is what fills the slot,
+    // so it is always live, and "Slot 1" is its module path too.
     for (auto const &info : before)
         if (slotOne(info) && isNormalisedType(info.id))
-            CHECK((info.flags & CLAP_PARAM_IS_HIDDEN) != 0);
+        {
+            std::array<char, CLAP_NAME_SIZE> text{};
+            REQUIRE(params.value_to_text(&*plugin, info.id, 0.5, text.data(), text.size()));
+            CHECK(std::strncmp(text.data(), "N/A", 3) == 0);
+        }
 
     OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0),
                                         0 /*the first effect in the list*/);
@@ -548,19 +574,34 @@ TEST_CASE("Filling a module slot renames its parameters without adding any", "[c
     CHECK(std::count_if(after.begin(), after.end(), slotOne) == slotOneBefore);
 
     // What moved is the description, and only the parts CLAP_PARAM_RESCAN_INFO
-    // names: the parameters stopped being hidden and picked up the effect's names.
-    // Their ranges did not move, and could not have -- see the range test below.
-    std::uint32_t revealed{0}, renamed{0};
+    // names: the parameters picked up the effect's names, and became usable
+    // rather than "N/A". Their ranges did not move, and could not have -- see the
+    // range test below.
+    //
+    /// \note And the *flags* did not move either, which is a stronger statement
+    /// than it looks. They cannot: the shipped clap-wrapper reads them once, at
+    /// construction, so anything here that changed with the slot would be a
+    /// description a VST3 host was never told about. That is what the hidden flag
+    /// used to do.
+    std::uint32_t usable{0}, renamed{0};
     for (std::size_t index(0); index < after.size(); ++index)
     {
         if (!slotOne(after[index]))
             continue;
-        if ((after[index].flags & CLAP_PARAM_IS_HIDDEN) == 0)
-            ++revealed;
+
+        CHECK(after[index].flags == before[index].flags);
+
         if (std::strcmp(after[index].name, before[index].name) != 0)
             ++renamed;
+
+        if (!isNormalisedType(after[index].id))
+            continue;
+
+        std::array<char, CLAP_NAME_SIZE> text{};
+        REQUIRE(params.value_to_text(&*plugin, after[index].id, 0.5, text.data(), text.size()));
+        usable += (std::strncmp(text.data(), "N/A", 3) != 0);
     }
-    CHECK(revealed > 0);
+    CHECK(usable > 0);
     CHECK(renamed > 0);
 }
 
@@ -834,7 +875,17 @@ TEST_CASE("A normalised parameter round-trips through the host edge", "[clap]")
     std::uint32_t stable{0}, exact{0};
     for (auto const &info : allParameterInfo(*plugin, params))
     {
-        if (!isNormalisedType(info.id) || ((info.flags & CLAP_PARAM_IS_HIDDEN) != 0))
+        if (!isNormalisedType(info.id))
+            continue;
+
+        /// \note "N/A" is how a parameter no effect owns reads, and skipping
+        /// those is what the CLAP_PARAM_IS_HIDDEN flag used to do here before it
+        /// stopped being set. The display is the better test of it anyway: it is
+        /// what a *user* is shown, rather than a flag their host may have read
+        /// once and cached.
+        std::array<char, CLAP_NAME_SIZE> owned{};
+        REQUIRE(params.value_to_text(&*plugin, info.id, 0.5, owned.data(), owned.size()));
+        if (std::strncmp(owned.data(), "N/A", 3) == 0)
             continue;
 
         constexpr double wanted{0.25};
@@ -889,13 +940,20 @@ TEST_CASE("A normalised parameter still reads in the effect's own units", "[clap
     std::uint32_t checked{0}, differedFromTheEdge{0};
     for (auto const &info : allParameterInfo(*plugin, params))
     {
-        if (!isNormalisedType(info.id) || ((info.flags & CLAP_PARAM_IS_HIDDEN) != 0))
+        if (!isNormalisedType(info.id))
             continue;
 
         std::array<char, 128> text{};
         REQUIRE(params.value_to_text(&*plugin, info.id, 1.0, text.data(), text.size()));
         CAPTURE(info.id, info.name, info.module);
         CHECK(text[0] != '\0');
+
+        /// \note A parameter no effect owns reads as "N/A" -- there are no units
+        /// to convert into. What used to filter those out here was
+        /// CLAP_PARAM_IS_HIDDEN, which is no longer set on anything.
+        if (std::strncmp(text.data(), "N/A", 3) == 0)
+            continue;
+
         ++checked;
 
         // Some parameter in the slot has to read as something other than a bare

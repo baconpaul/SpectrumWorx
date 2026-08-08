@@ -327,15 +327,26 @@ torn down before the state it reads.
 
 ## Tier 4 — host-protocol correctness (visible, not unsafe)
 
-- **VST3 hides every module/LFO parameter forever** — VERIFIED. The design leans
-  on `CLAP_PARAM_IS_HIDDEN` being a live RESCAN_INFO flag
+- ✅ **VST3 hides every module/LFO parameter forever** — VERIFIED. The design
+  leaned on `CLAP_PARAM_IS_HIDDEN` being a live RESCAN_INFO flag
   (`spectrumWorxCLAP.cpp:507-515`), but the shipped clap-wrapper maps it once at
   construction and `RESCAN_INFO` re-reads only the name
   (`wrapasvst3.cpp:1253-1269`); flags re-read only under `RESCAN_ALL`, which the
   plugin can't send while active. So a VST3 host's automation list shows 6
   globals + 5 selectors and nothing else for the instance's life. CLAP and AUv2
-  are correct. No plugin-side fix short of not using `IS_HIDDEN` dynamically —
-  worth an upstream clap-wrapper issue.
+  are correct.
+  **Done — the flag is simply not used.** The review called this a decision
+  rather than a commit and Paul made it: nothing is ever hidden, so all 388 rows
+  are there whether or not a slot currently owns them. A flag whose only value is
+  that it changes is not worth having in a format that cannot see it change, and
+  the failure mode it was buying — an automation lane a user cannot find at all —
+  is far worse than a long list. An unused parameter still answers: it reads
+  `N/A` and refuses writes.
+  The tests that used the flag as their oracle for "no effect owns this" now ask
+  the id or the display instead, which is what a user sees; one of them asserts
+  outright that nothing is hidden, and another that a slot being filled does not
+  move any flag at all — because a flag that moves is one a VST3 host was never
+  told about.
 - **`activate()`'s sample-rate re-read is dead in the case it was written for** —
   VERIFIED. `Sample::load` stores the *requested* rate, and the ordinary
   construct→stateLoad→activate order loads with `sampleRate_==0`, so
@@ -351,7 +362,7 @@ torn down before the state it reads.
 - ✅ **Locale-dependent float I/O** (`%.9g`/`strtod`, no `"C"` imbue) — a
   comma-decimal host writes unreadable presets and reads every factory float as
   its integer part.
-  **Done — `5b1e1576`.** Both halves, and the reading half is the one that loses
+  **Done — `99d74bc1`.** Both halves, and the reading half is the one that loses
   a user's work: reproduced under `de_DE.UTF-8`, `0.75` read back as **0** and a
   1234.5678 round trip came back as 1.0, silently, because stopping at the point
   is not an error. Writing goes through a stream imbued with
