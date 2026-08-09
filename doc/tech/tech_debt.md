@@ -304,30 +304,35 @@ New entries go at the top of their area.
   the reason it failed instead of showing it, and the only caller that raises a
   box is the editor's file menu, where a user picked the file a moment ago.
 
-- **An unconnected side-chain port is indistinguishable from a connected one.**
-  (03.08.2026) `runEngine` falls back to the main input only when
-  `audio_inputs[1].data32` is *null* (`spectrumWorxCLAP.cpp:876`), and no real
-  host gives us null — every wrapper hands over a buffer it owns. So what an
-  unpatched side chain contains is whatever the host put there, and the plugin
-  cannot tell "silence" from "not connected" from "never written".
+- **Nothing has confirmed that any host sets `constant_mask`.** (03.08.2026,
+  narrowed 09.08.2026) `runEngine` reads it now: a second port whose every
+  channel the host declares constant, and whose constant is zero, takes the same
+  fallback as no second port at all. That is what makes the documented behaviour
+  — **an unpatched side chain is the main input, so a Blender with nothing
+  patched blends the signal with itself** — reachable for the first time, since
+  no real host hands over the null `data32` that used to be the only test.
 
-  Two consequences. The documented intended behaviour — **an unpatched side chain
-  is the main input, so a Blender with nothing patched blends the signal with
-  itself** — is therefore effectively dead code, undocumented anywhere a user
-  would look and unreachable anywhere it would matter. And it is how uninitialised
-  memory reached the FFT from an AU host: clap-wrapper handed every channel of an
-  unconnected AUv2 bus a buffer it had allocated and never zeroed, `auval` aborted
-  5 runs of 5 on a NaN in `rectangular2polar`, and the plugin had no way to know
-  the port was not really connected. Fixed upstream (clap-wrapper #498) rather
-  than here. CLAP's own mechanism is `clap_audio_buffer::constant_mask`, which
-  nothing here reads.
+  The mask is a *hint* (`audio-buffer.h` says so), and **it is not known that
+  either clap-wrapper or any given DAW sets one.** A host that sets none reads
+  exactly as it did before, which is why this costs nothing to have and why it is
+  a debt entry rather than a closed item: the arm is written and tested
+  (`pluginTests.cpp`, `[side-chain]`) and *nobody has seen it taken by a real
+  host*. Confirming it is a DAW and a breakpoint, on each of the four formats.
 
-  Still open, and not closed by the tests added on 05.08.2026 — those drive all
-  three arms `runEngine` can distinguish (no second port, a second port with no
-  `data32`, a second port with audio) and confirm the first two are the same
-  fallback. What they cannot do is give the plugin a way to tell a *connected*
-  port carrying silence from an unpatched one carrying whatever the host left
-  behind, which is the entry.
+  Two things it does not settle, both by construction rather than by omission:
+
+  - **A muted send and an unpatched port are the same thing to the mask**, and
+    they take the same arm. So a patched side chain that goes quiet audibly
+    switches to blending the signal with itself, and switches back. That is the
+    chosen behaviour rather than an oversight — "no side-chain signal is the main
+    input" is one rule — but it is the sort of thing that arrives as a bug report.
+  - **A host that sets no mask still cannot be told from one with nothing
+    patched.** That is how uninitialised memory reached the FFT from an AU host:
+    clap-wrapper handed every channel of an unconnected AUv2 bus a buffer it had
+    allocated and never zeroed, `auval` aborted 5 runs of 5 on a NaN in
+    `rectangular2polar`, and the plugin had no way to know. Fixed upstream
+    (clap-wrapper #498) rather than here, and the checked build's magnitude bound
+    below is what would now name it.
 
 - **A release build still has no magnitude bound on its input.** (03.08.2026,
   narrowed 09.08.2026) The checked build has one: `Math::Above100dB` is an

@@ -427,6 +427,15 @@ restates it: **all processing is in place, side-channel data is read only.**
 plugged in. Silence is what you get when it is not, so an effect that multiplies
 by the side chain goes silent rather than misbehaving.
 
+**What the engine is handed when the host's side-chain port is unpatched is the
+main input, not silence** — so a Blender with nothing patched blends the signal
+with itself. Three arrangements take that fallback, and the third is the only one
+a real DAW produces: no second port at all, a second port with no `data32`, and a
+second port whose channels the host declares constant and zero through
+`clap_audio_buffer::constant_mask`. The mask is a hint and a host that sets none
+is indistinguishable from one carrying real silence, which is what `tech_debt.md`
+still has an entry about.
+
 > **Nothing declares that an effect reads the side chain, and nothing should.**
 > The `process()` overload is the declaration: take a `MainSideChannelData` and
 > you read the side chain, do not and you cannot. There is no second place to

@@ -316,38 +316,45 @@ TEST_CASE("What a host puts on the side chain port reaches the engine", "[clap][
     /// \brief One run of \p blocks, with the side chain arranged by \p connect.
     ///
     /// The main input is a 440 Hz sine throughout; what changes between runs is
-    /// only what is on the other port.
-    auto const run([&](std::function<void(ActivePlugin &, std::vector<float> &,
-                                          std::vector<float> &)> const &connect) {
-        Entry const entry;
-        ActivePlugin plugin(sampleRate, blockSize);
+    /// only what is on the other port. \p carrier is what goes on it, zero
+    /// meaning "the host owns these buffers and nothing is patched into them",
+    /// which is what every real DAW hands over for an unpatched side chain.
+    auto const run(
+        [&](std::function<void(ActivePlugin &, std::vector<float> &, std::vector<float> &)> const
+                &connect,
+            float const carrier = 1100.0f) {
+            Entry const entry;
+            ActivePlugin plugin(sampleRate, blockSize);
 
-        OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), colorifer);
-        parameters(*plugin).flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
-        plugin.pumpMainThread();
+            OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), colorifer);
+            parameters(*plugin).flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+            plugin.pumpMainThread();
 
-        std::vector<float> leftIn(blockSize), rightIn(blockSize);
-        std::vector<float> sideLeft(blockSize), sideRight(blockSize);
-        std::vector<float> leftOut(blockSize), rightOut(blockSize);
+            std::vector<float> leftIn(blockSize), rightIn(blockSize);
+            std::vector<float> sideLeft(blockSize, 0.0f), sideRight(blockSize, 0.0f);
+            std::vector<float> leftOut(blockSize), rightOut(blockSize);
 
-        connect(plugin, sideLeft, sideRight);
+            connect(plugin, sideLeft, sideRight);
 
-        std::vector<float> tail;
-        for (unsigned int block(0); block < blocks; ++block)
-        {
-            fillWithSine(leftIn, sampleRate, 440.0f, block * blockSize);
-            rightIn = leftIn;
-            // 1100 Hz on the side chain: a different partial, in a different
-            // bin, so "the output moved" cannot be the main signal leaking.
-            fillWithSine(sideLeft, sampleRate, 1100.0f, block * blockSize);
-            sideRight = sideLeft;
+            std::vector<float> tail;
+            for (unsigned int block(0); block < blocks; ++block)
+            {
+                fillWithSine(leftIn, sampleRate, 440.0f, block * blockSize);
+                rightIn = leftIn;
+                // 1100 Hz on the side chain: a different partial, in a different
+                // bin, so "the output moved" cannot be the main signal leaking.
+                if (carrier > 0)
+                {
+                    fillWithSine(sideLeft, sampleRate, carrier, block * blockSize);
+                    sideRight = sideLeft;
+                }
 
-            plugin.process(leftIn, rightIn, leftOut, rightOut);
-            REQUIRE(allFinite(leftOut));
-            tail.assign(leftOut.begin(), leftOut.end());
-        }
-        return tail;
-    });
+                plugin.process(leftIn, rightIn, leftOut, rightOut);
+                REQUIRE(allFinite(leftOut));
+                tail.assign(leftOut.begin(), leftOut.end());
+            }
+            return tail;
+        });
 
     auto const noPort(run([](ActivePlugin &, std::vector<float> &, std::vector<float> &) {}));
     auto const connected(
@@ -358,8 +365,39 @@ TEST_CASE("What a host puts on the side chain port reaches the engine", "[clap][
         plugin.connectSideChainWithNoBuffers();
     }));
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The fourth arrangement, and the one every real host actually hands
+    /// over: a port with buffers the host owns and nothing patched into it. No
+    /// pointer distinguishes it from a connected one, which is why the documented
+    /// "an unpatched side chain is the main input" behaviour was unreachable
+    /// until `clap_audio_buffer::constant_mask` was read.
+    ///
+    ///   Zeroed buffers *and* a mask declaring them constant, because a host that
+    /// sets a bit has undertaken to fill the channel with the constant. Setting
+    /// only one of the two would be testing a host that does not exist.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    auto const declaredSilent(run(
+        [](ActivePlugin &plugin, std::vector<float> &left, std::vector<float> &right) {
+            plugin.connectSideChain(left, right);
+            plugin.declareSideChainConstant(0b11);
+        },
+        0.0f));
+
+    /// \note The same zeroed buffers with no claim made about them, which is
+    /// every host that does not set the mask -- the hint is optional and neither
+    /// clap-wrapper nor a given DAW is known to set it. This one has to keep
+    /// behaving exactly as it did: silence on the port is silence in the engine.
+    auto const silentButUndeclared(
+        run([](ActivePlugin &plugin, std::vector<float> &left,
+               std::vector<float> &right) { plugin.connectSideChain(left, right); },
+            0.0f));
+
     REQUIRE(noPort.size() == connected.size());
     REQUIRE(noPort.size() == emptyPort.size());
+    REQUIRE(noPort.size() == declaredSilent.size());
+    REQUIRE(noPort.size() == silentButUndeclared.size());
 
     // A carrier the engine could not have got from the main input changed what
     // came out. This is the whole case: without it, every arrangement below is
@@ -369,16 +407,26 @@ TEST_CASE("What a host puts on the side chain port reaches the engine", "[clap][
 
     ////////////////////////////////////////////////////////////////////////////
     ///
-    /// \note And both ways of not filling the port land on the *same* fallback,
-    /// bit for bit. `runEngine()` reads
-    /// `(audio_inputs_count > 1) && audio_inputs[1].data32`, so a host that
-    /// declares one port and a host that declares two and fills one have to be
-    /// indistinguishable -- the second is what a DAW hands over when the side
-    /// chain is exposed and nothing is patched into it, and it is the arm that
-    /// would have dereferenced null had the `&&` been the other way round.
+    /// \note And every way of not filling the port lands on the *same* fallback,
+    /// bit for bit. `runEngine()` reads the port count, `data32` and now the
+    /// constant mask, so a host that declares one port, a host that declares two
+    /// and fills one, and a host that declares two and says the second is a
+    /// constant zero all have to be indistinguishable. The middle one is the arm
+    /// that would have dereferenced null had the `&&` been the other way round.
     ///
     ////////////////////////////////////////////////////////////////////////////
     CHECK(emptyPort == noPort);
+    CHECK(declaredSilent == noPort);
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note And the mask is the *whole* of what distinguishes them: the same
+    /// zeroed buffers with nothing declared about them are a connected side chain
+    /// carrying silence, and that is not the main input. A host that sets no mask
+    /// therefore gets what it always got.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    CHECK(silentButUndeclared != noPort);
 }
 
 TEST_CASE("The engine reports the latency its FFT size implies", "[clap]")
