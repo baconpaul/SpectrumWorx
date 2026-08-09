@@ -1,10 +1,8 @@
 # SpectrumWorx — the tech documents
 
-Eight documents, and every one of them describes the tree **as it is now**. Five
-say how something works, one says what is left to do, one says what finished work
-left behind, one says what was deliberately not built. Nothing here is a plan
-being executed or a record of how the port got where it is; that is in
-[`old/`](old/).
+Five documents, and every one of them describes the tree **as it is now** — how
+something works, not what is left to do about it. Nothing here is a plan being
+executed or a record of how the port got where it is; that is in [`old/`](old/).
 
 ## How it works
 
@@ -16,18 +14,28 @@ being executed or a record of how the port got where it is; that is in
 | [`streaming_format.md`](streaming_format.md) | What goes into a preset and into session state: the on-disk names, the snapshot tests that pin them, and the rules for changing any of it. |
 | [`how-lfo-rates-work.md`](how-lfo-rates-work.md) | What an LFO's period holds, which bar it is a fraction of, and what tempo sync does and does not move. |
 
-## What is left
+## What is left — the issue tracker
 
-| | What it is |
-|---|---|
-| [`todo.md`](todo.md) | **The work queue.** No ordered item left — shipping was the last and is a decision now — and a page of smaller things. An item that closes comes out of the file. |
-| [`tech_debt.md`](tech_debt.md) | What finished work left behind — the half-fix, the correct-but-unsatisfying answer, the finding with no owner. An entry that is remediated comes out too. |
-| [`future_items_to_revive.md`](future_items_to_revive.md) | Capabilities deliberately deleted rather than carried, and what reviving one would cost. The cost is usually compatibility, not code. |
+**Three documents used to live here and none of them does any more.** `todo.md`
+was the work queue, `tech_debt.md` was what finished work left behind, and
+`future_items_to_revive.md` was what had been deliberately deleted rather than
+carried. All three are now
+[issues](https://github.com/surge-synthesizer/SpectrumWorx/issues), which is
+where somebody looking for something to do will actually look, and which can be
+assigned, closed and argued with.
 
-The line between the three: `todo.md` is work somebody will sit down and do;
-`tech_debt.md` is what would still be true if all of it were done exactly as
-written; `future_items_to_revive.md` is what nobody is going to do next, recorded
-so that the reasoning survives the deletion.
+So: **if it is a claim about how the tree behaves, it belongs in one of the five
+documents above. If it is something somebody should do about it, it is an
+issue.** The rule that made the old files worth reading still applies to both —
+a claim carries its date and its evidence — and the one that made them work
+still applies here: when something closes it leaves, rather than being struck
+through in place. If the reasoning behind a closed issue was worth keeping, it
+moves into whichever document owns the mechanism, stated as a property of the
+design rather than as a story.
+
+Source comments refer to issues by number (`\see issue #12`). Those numbers do
+not move, which is what makes them safe to write down and is why the file names
+they replaced were not.
 
 ## [`old/`](old/) — the path, kept for the reasoning
 
@@ -35,6 +43,13 @@ None of these describes this tree. All three are a record of how it was read —
 the first two before it built, the third against the built tree — each contains
 claims the work has since disproved, and each is kept because it is the only
 account of *why* several decisions went the way they did.
+
+They also refer to `todo.md` and `tech_debt.md`, by section and by link, and
+those files no longer exist. **The references are left as they were**: these are
+a record of what was written at the time, and repointing them at issues that did
+not exist then would make them a worse record rather than a better one. A link
+that does not resolve is the honest form of a document about a tree that has
+moved.
 
 | | Read it for |
 |---|---|
@@ -49,14 +64,15 @@ account of *why* several decisions went the way they did.
 - **A claim carries its date and its evidence.** "As of 02.08.2026" and a file
   and line, or a test name, or a measured number. A bullet with no provenance is
   unverifiable a month later, which is the same as being false.
-- **A document says what is true, not what happened.** When something closes it
-  leaves the todo list or the debt list rather than being struck through in
-  place. If the reasoning behind it was worth keeping — and often it is, because
-  several of the most useful paragraphs here are about something that turned out
-  to be wrong — it moves into whichever "how it works" document owns the
-  mechanism, stated as a property of the design rather than as a story.
+- **A document says what is true, not what happened.** If the reasoning behind a
+  closed issue was worth keeping — and often it is, because several of the most
+  useful paragraphs here are about something that turned out to be wrong — it
+  moves into whichever "how it works" document owns the mechanism, stated as a
+  property of the design rather than as a story.
 - **Test counts are stated as of a date.** They move every time a case lands, so
-  only the count in `todo.md`'s status table is meant to be current.
+  a number in one of these documents is a measurement rather than a status. CI is
+  the authority for how many tests there are; a local `ctest` number means the
+  build directory it came from was reconfigured first.
 - **The two test binaries are `sw-dsp-tests` and `sw-plugin-tests`**, and `ctest`
   runs both. There is no `sw-tests`; it split on 02.08.2026 so that the engine's
   cases could link without JUCE, which is what proves the engine does not need

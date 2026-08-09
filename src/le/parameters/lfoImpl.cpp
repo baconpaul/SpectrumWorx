@@ -579,7 +579,7 @@ LFOImpl::SnappedPeriod LFOImpl::snapPeriodScale(value_type const periodScale,
 /// survived a tempo change -- correct in what it sounded like and wrong in what
 /// it did to the number: `PeriodScale` is host-visible and automatable, so a
 /// project's automation lane, and the value saved in it, moved on their own
-/// whenever the tempo did. `tech_debt.md` asked whether a genuine tempo change
+/// whenever the tempo did. It was worth asking whether a genuine tempo change
 /// should move a host-visible parameter at all; the answer is no, and the way to
 /// get it is to measure a free period against a bar that does not change length
 /// rather than to keep rewriting the period. See `getValue()`.
@@ -733,7 +733,7 @@ LFOImpl::Timer::Timer() { reset(); }
 /// nothing to change *from* -- and the synced arm resnaps the period on a
 /// numerator change for the same reason the free arm rescales it. Nothing in the
 /// suite drives a meter other than 4/4, so that half is reasoned rather than
-/// measured; see tech_debt.md.
+/// measured; see issue #14.
 ///                                           (03.08.2026.) (SW port)
 ///
 ////////////////////////////////////////////////////////////////////////////////

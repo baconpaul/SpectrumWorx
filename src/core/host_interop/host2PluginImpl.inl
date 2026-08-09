@@ -142,7 +142,7 @@ template <class Impl, class Protocol> class Host2PluginInteropImpl<Impl, Protoco
             /// a host writing a slot selector is a parameter event like any
             /// other. The granted concession, and the only one left: every
             /// other route builds its module on the main thread and hands the
-            /// engine a pointer. See tech_debt.md.
+            /// engine a pointer. See issue #9.
             ///                               (02.08.2026.) (SW port)
             typename Impl::Module *pDisplaced(nullptr);
             auto const result(moduleChain.setParameter(moduleIndex, effectIndex,

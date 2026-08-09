@@ -359,7 +359,7 @@ LE::SW::ParameterID globalParameterID(std::uint8_t const index)
 /// "A session's parameters come back through a second plugin instance", passed
 /// while comparing one set of defaults against another.
 ///
-///   The same shape as the 303-preset case in doc/tech/todo.md item 1: a harness
+///   The same shape as the 303-preset case: a harness
 /// writing through one path and reading through the other, which a green result
 /// hides for as long as both ends agree about nothing.
 ///                                           (06.08.2026.) (SW port)

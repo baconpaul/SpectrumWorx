@@ -69,7 +69,7 @@ set(SW_OWN_SOURCE_ROOTS "${CMAKE_SOURCE_DIR}/src" "${CMAKE_SOURCE_DIR}/tests"
 # MSVC gets nothing here on purpose. Nobody can run one from this machine --
 # Windows arrives as a build log -- and a warning level nobody has ever compiled
 # with is a fault injected into somebody else's afternoon. It belongs with the CI
-# matrix (doc/tech/todo.md), where the first run is free.
+# matrix, where the first run is free. See issue #8.
 ################################################################################
 
 if (MSVC)

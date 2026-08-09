@@ -71,7 +71,7 @@
 /// nested an anonymous namespace inside the named one, so that two SDKs sharing
 /// this code could be linked into one binary without their internals clashing;
 /// otherwise they were `namespace X {` and `}`. There is no SDK build any more
-/// (doc/tech/todo.md's stage 7 settled that macro), so they were 55 obfuscated
+/// (stage 7 settled that macro), so they were 55 obfuscated
 /// namespace openings across 47 files -- and 47 files that used them without
 /// declaring where they came from, which is the whole reason this header is
 /// force-included. Both are written out as of 04.08.2026.

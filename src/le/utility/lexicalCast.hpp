@@ -61,6 +61,20 @@ namespace LE::Utility
 /// but the right number, inside the buffer, and something `strtod` reads back;
 /// a truncated `%.1f` of 1e30 would have read "1000000000000000".
 ///
+///   **So a very wide value does not round-trip at full precision, and whether
+/// that matters is the caller's to decide.** For a display it is the right
+/// answer: six significant digits rather than nine, in a buffer that is as big as
+/// the widget. For `presets.hpp`'s `makeString`, which writes the number into a
+/// file, it would be a loss -- so that one sizes its buffer with
+/// `RequiredStringStorage`, 321 bytes for a `double`, which is what `%.9f` of one
+/// actually needs.
+///
+///   Nothing in the shipping banks is anywhere near that wide and the corpus
+/// digests did not move, so this is a property to keep in mind rather than a
+/// defect. A parameter whose values ever reach 1e300 wants its own printer, not a
+/// wider buffer.
+///                                           (08.08.2026.) (SW port)
+///
 ////////////////////////////////////////////////////////////////////////////////
 
 unsigned int lexical_cast(std::int32_t, std::span<char> buffer);

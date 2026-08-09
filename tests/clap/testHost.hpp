@@ -294,7 +294,8 @@ class TestHost
     /// from `getParamInfoForParamId`'s `checkMainThread()` (plugin.hxx:1195,
     /// :2219). That one writes to `std::cerr` directly rather than through
     /// `log()`, so `clap.log` cannot see it and this filter cannot reach it.
-    /// `CapturedStandardError` above is what does; tech_debt.md carries the rest.
+    /// `CapturedStandardError` above is what does, and free-audio/clap-helpers#98
+    /// is the upstream report.
     ///                                       (03.08.2026, amended 09.08.2026.) (SW port)
     ///
     ////////////////////////////////////////////////////////////////////////////

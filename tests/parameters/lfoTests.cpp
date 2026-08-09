@@ -9,7 +9,7 @@
 /// waveforms one was exercised, of the four sync types none, and of the two
 /// bounds neither.
 ///
-///   The five things this covers, all named in doc/tech/todo.md:
+///   The five things this covers:
 ///
 ///     - **the eleven waveforms**, as a value table over one period. The three
 ///       random ones are in it too, seeded, because "it is random" is not a
@@ -21,7 +21,7 @@
 ///     - **`LowerBound > UpperBound`**, which is not an error -- the setter
 ///       drags the other bound with it and says that it did.
 ///     - **a meter that is not 4/4**, which nothing in the suite has ever driven
-///       and which `tech_debt.md` records as the unmeasured half of a landed fix.
+///       and which issue #14 records as the unmeasured half of a landed fix.
 ///
 /// \note The waveform table is a golden in the shape `parameterTableTests.cpp`
 /// established, and for the same reason: eleven small functions whose output is
@@ -30,7 +30,7 @@
 /// and read the diff -- a row that moves is an LFO shape that changed.
 ///
 /// \note `Timer`'s tempo and meter are `static` -- process wide, which
-/// `tech_debt.md` records -- so every case here states the timing it wants
+/// issue #11 records -- so every case here states the timing it wants
 /// rather than inheriting whatever ran before it.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
@@ -87,7 +87,7 @@ constexpr float twoSeconds{2.0f};
 ///
 /// \note **Every case in this file needs one**, including the ones that do not
 /// care what the tempo is, and that is not tidiness. `Timer`'s tempo and meter
-/// are `static` -- process wide, which tech_debt.md records -- and
+/// are `static` -- process wide, which issue #11 records -- and
 /// `adjustValueForPreset()` converts a Free LFO's period to milliseconds
 /// through the bar duration. So a case that leaves 140 BPM behind changes what
 /// every later preset load in the binary converts to, and 303 digests go red in
@@ -642,7 +642,7 @@ TEST_CASE("The snapped period follows the host's meter", "[lfo]")
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \note **Nothing in the suite had ever driven a meter other than 4/4**,
-    /// which `tech_debt.md` records as the unmeasured half of a landed fix. It
+    /// which issue #14 records as the unmeasured half of a landed fix. It
     /// matters here more than anywhere: `snapSyncedPeriodScale()` divides by
     /// `measureNumerator()` throughout, so a period scale is bars and the beats
     /// it can land on are the ones the meter has.

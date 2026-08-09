@@ -100,7 +100,7 @@ bool isAudioThread();
 /// `[[clang::nonblocking]]` attribute. The attribute would do the same at runtime
 /// *and* run a static analysis whose diagnostics this tree cannot answer: the one
 /// allocation `process()` still reaches is deliberate and recorded in
-/// doc/tech/tech_debt.md. The runtime region costs nothing in a build without the
+/// issue #9. The runtime region costs nothing in a build without the
 /// sanitizer, where both calls compile away.
 ///
 ////////////////////////////////////////////////////////////////////////////////

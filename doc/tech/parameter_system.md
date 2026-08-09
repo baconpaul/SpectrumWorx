@@ -93,8 +93,7 @@ Caveats on the numbers:
 - A seventh could come back: window presum would add a `WindowSizeFactor`, which
   moves this table and every automation lane a host has saved against it. That is
   why it is a decision rather than a switch, and why the option that used to hold
-  the place open was deleted rather than left off — see
-  [`future_items_to_revive.md`](future_items_to_revive.md).
+  the place open was deleted rather than left off.
 - `lfoExportedParameters` is **5**, unconditionally
   (`src/core/host_interop/parameters.hpp:31`). SyncTypes and Waveform are not
   exported for automation. It used to be 7 in a build without the GUI, behind
@@ -529,7 +528,7 @@ For anyone touching this:
   bindings — and would also move `parameterTable.txt`. It has since acquired a
   second reason to be decided: having no `ParameterID` is exactly why those two
   are the last edits written straight into the engine from the message thread.
-  See `tech_debt.md`, "Threading".
+  See issue #11.
 - **Preset compatibility.** Decided before the Boost.Fusion refactor, per
   `old/initial_scan.md` §8.3 — §7 above says the format is name-keyed, which
   gives more freedom than the index-based reading might suggest.

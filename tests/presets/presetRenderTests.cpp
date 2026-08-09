@@ -39,7 +39,7 @@
 /// finite, which is the property this file is here for -- and a real numerical
 /// weakness in the vector primitives rather than in any of these presets. A skip
 /// list would have needed a dozen names and would have grown; recorded in
-/// tech_debt.md instead.
+/// issue #10 instead.
 ///                                           (02.08.2026.) (SW port)
 #ifndef NDEBUG
 #define LE_SW_PRESET_RENDER_NEEDS_A_RELEASE_BUILD                                                  \

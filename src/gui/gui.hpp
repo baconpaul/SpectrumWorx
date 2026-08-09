@@ -300,7 +300,7 @@ void warningMessageBox(std::string_view title, std::string_view message, bool ca
 /// layer runs into, and `GUI::loadPreset` still raises its one summary from
 /// inside a load whenever a window happens to be open -- which for a session
 /// restore is a window that was open for some other reason.
-/// \see tech_debt.md, "A load problem has nowhere to go but a modal box".
+/// \see issue #12, "A load problem has nowhere to go but a modal box".
 ///                                           (08.08.2026.) (SW port)
 ///
 ////////////////////////////////////////////////////////////////////////////////

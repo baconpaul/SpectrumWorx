@@ -433,8 +433,8 @@ with itself. Three arrangements take that fallback, and the third is the only on
 a real DAW produces: no second port at all, a second port with no `data32`, and a
 second port whose channels the host declares constant and zero through
 `clap_audio_buffer::constant_mask`. The mask is a hint and a host that sets none
-is indistinguishable from one carrying real silence, which is what `tech_debt.md`
-still has an entry about.
+is indistinguishable from one carrying real silence, which is what issue #13
+is still open about.
 
 > **Nothing declares that an effect reads the side chain, and nothing should.**
 > The `process()` overload is the declaration: take a `MainSideChannelData` and
@@ -849,7 +849,7 @@ case.
 **Running sums drift.** `Math::symmetricMovingAverage` carries a sum across
 thousands of bins; over pink noise `Smoother` hands `amph2DFT()` an amplitude a
 hair below zero and asserts. Benign in the output, and the reason the golden
-suite renders only in Release. See `tech_debt.md`.
+suite renders only in Release. See issue #10.
 
 
 ---
@@ -1152,7 +1152,7 @@ The port tax and a review; the algorithm is all there.
 | `operations` | "Operations" — Add / Sub / InvSub of main and side in ReIm, with a side gain | The smallest port here. Functionally overlapped by the shipped Merger/Blender/Inserter. One `\todo`: *"Vectorize!!!"* |
 | `pv_imploder_side` | "Side Imploder (pvd)" — a two-input Imploder with independent decay and glissando per channel | No `\todo` anywhere. Its own banner names a file that does not exist (`pvAccumulator.cpp`). |
 | `sim_octaver` | "Sim Octaver" — dry + one octave down + one octave up, low-passed | Constructs **two full `ChannelData_AmPh` temporaries on the audio-thread stack inside `process()`** — the thing its own siblings' comments warn about. |
-| `sub_octaver` | "Sub Octaver" — dry + −12 and −24 semitones | Near-duplicate of `sim_octaver`, **cloned without renaming**: its include guard carries `sim_octaver`'s GUID and its `#endif` names a third file. Also bakes in the 350 Hz output low-pass that `tech_debt.md` criticises in the shipped Octaver. |
+| `sub_octaver` | "Sub Octaver" — dry + −12 and −24 semitones | Near-duplicate of `sim_octaver`, **cloned without renaming**: its include guard carries `sim_octaver`'s GUID and its `#endif` names a third file. Also bakes in the 350 Hz output low-pass that issue #15 criticises in the shipped Octaver. |
 | `mirror` | "Mirror" — reflects bands across the spectrum: `abcdefgh…` → `abbaeffe…` | **`Mode` is used but never declared.** The parameter list names it, `process()` switches on `Mode::Magnitudes`/`Phases`/`Both`, and no declaration exists — today that is `CommonParameters::Mode` + `UnpackedMagPhaseMode`. `mirror()` is also off by one and self-overlapping. |
 
 ### Complete DSP, but the author documented a problem — 5

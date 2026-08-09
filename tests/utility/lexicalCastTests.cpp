@@ -25,7 +25,7 @@
 ///
 /// \note The guard bytes are what make this a test rather than a hope. Without a
 /// sanitizer an overrun of a stack array is silent and usually harmless, which is
-/// exactly how it survived: `tech_debt.md` recorded it as "release truncates
+/// exactly how it survived: it was recorded as "release truncates
 /// rather than overruns", and the truncation was never the problem.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
@@ -356,8 +356,8 @@ TEST_CASE("The integer overloads keep the width their constant promises", "[util
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \note `RequiredStringStorage<std::int32_t>` was 11, and `-2147483648` is
-    /// eleven characters *plus* its terminator -- one short, which tech_debt.md
-    /// recorded and nothing had ever driven. It is computed from the format now.
+    /// eleven characters *plus* its terminator -- one short, which nothing had
+    /// ever driven. It is computed from the format now.
     ///
     ////////////////////////////////////////////////////////////////////////////
     {

@@ -32,7 +32,7 @@
 /// are only chosen once its 250 ms period wraps around, which a short render
 /// never reaches. So a side-chain fixture at default parameters is still a
 /// fixture that cannot fail, and `engage` below is each effect's smallest
-/// parameter change that makes it listen. See doc/tech/tech_debt.md.
+/// parameter change that makes it listen.
 ///
 /// \note **What decides is the `process()` overload**, not any declaration. An
 /// effect reads the side channel exactly when its `process()` takes a
@@ -206,7 +206,7 @@ SideChainEffect const sideChainEffects[]{
     /// \note ConvolutionType defaults to `Triggered`: the impulse response is
     /// taken from the side channel when the GrabIR button is pressed, and until
     /// then there is no response and the effect renders **silence**. Which is
-    /// three of the 25 identically-hashed golden fixtures doc/tech/todo.md
+    /// three of the 25 identically-hashed golden fixtures issue #22
     /// records -- Convolver at its defaults is not a quiet render, it is an
     /// unarmed one.
     {"Convolver",

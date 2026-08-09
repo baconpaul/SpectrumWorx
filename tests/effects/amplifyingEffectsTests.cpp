@@ -78,7 +78,7 @@ constexpr SWTest::RenderSetup standardSetup{1024, 4, channels, sampleRate, 256};
 ///   4096 is worse again for the 880 case (82 cents sharp) and not better for
 /// the others, so this is not "more bins are better" -- it is one setting where
 /// the measurement is unambiguous, chosen by measuring. That the answer is
-/// FFT-size dependent at all belongs in doc/tech/tech_debt.md, not in a wider
+/// FFT-size dependent at all belongs in issue #19, not in a wider
 /// tolerance here.
 constexpr SWTest::RenderSetup pitchSetup{2048, 4, channels, sampleRate, 256};
 
