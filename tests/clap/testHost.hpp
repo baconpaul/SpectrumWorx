@@ -48,7 +48,9 @@
 #include <cstdint>
 #include <cstring>
 #include <functional>
+#include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <utility>
@@ -56,6 +58,59 @@
 
 namespace SWTest
 {
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \class CapturedStandardError
+///
+/// \brief `std::cerr` for the length of a scope, kept rather than printed.
+///
+///   clap-helpers' `checkMainThread()` and `checkAudioThread()` write straight to
+/// `std::cerr` (plugin.hxx:2219, :2233) instead of going through
+/// `hostMisbehaving()`, so nothing routed through `clap.log` can see them --
+/// which is the same limitation `isFlushValidatingItself()` records from the
+/// other end. A case that asserts "nobody misbehaves" over the log alone is
+/// therefore asserting over the reports that *can* be intercepted, and one of
+/// them emitted such a line and passed.
+///
+/// \note A `rdbuf` swap, which is the whole implementation and is as portable as
+/// the stream is. Nesting works and is used: an inner scope takes the writes and
+/// the outer one never sees them, which is how a case separates the noise it
+/// expects from the silence it is asserting.
+///
+/// \note **One thread's worth.** `std::stringbuf` written from two threads at
+/// once is a race, and `std::cerr`'s own is process-wide -- so this is for the
+/// ordinary single-threaded case rather than for the ones in threadingTests.cpp
+/// that run an audio thread of their own. In a clean run nothing writes to it at
+/// all, which is the point.
+///                                           (09.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+class CapturedStandardError
+{
+  public:
+    CapturedStandardError() : pPrevious_(std::cerr.rdbuf(&buffer_)) {}
+    ~CapturedStandardError() { std::cerr.rdbuf(pPrevious_); }
+
+    CapturedStandardError(CapturedStandardError const &) = delete; // makes non-copyable
+    CapturedStandardError &operator=(CapturedStandardError const &) = delete;
+
+    /// Everything written so far, one entry per line and no empty tail.
+    std::vector<std::string> lines() const
+    {
+        std::vector<std::string> result;
+        std::istringstream text(buffer_.str());
+        for (std::string line; std::getline(text, line);)
+            if (!line.empty())
+                result.push_back(line);
+        return result;
+    }
+
+  private:
+    std::stringbuf buffer_;
+    std::streambuf *const pPrevious_;
+}; // class CapturedStandardError
 
 ////////////////////////////////////////////////////////////////////////////////
 // The hosts
@@ -238,10 +293,9 @@ class TestHost
     /// "thread-error: this code must be running on the main thread" per flush,
     /// from `getParamInfoForParamId`'s `checkMainThread()` (plugin.hxx:1195,
     /// :2219). That one writes to `std::cerr` directly rather than through
-    /// `log()`, so `clap.log` cannot see it and nothing here can suppress it.
-    /// It is noise on the test output and it is upstream's; tech_debt.md carries
-    /// it.
-    ///                                       (03.08.2026.) (SW port)
+    /// `log()`, so `clap.log` cannot see it and this filter cannot reach it.
+    /// `CapturedStandardError` above is what does; tech_debt.md carries the rest.
+    ///                                       (03.08.2026, amended 09.08.2026.) (SW port)
     ///
     ////////////////////////////////////////////////////////////////////////////
 

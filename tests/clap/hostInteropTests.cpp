@@ -280,21 +280,41 @@ TEST_CASE("Driven the way a DAW drives it, nobody misbehaves", "[clap][host]")
 {
     ////////////////////////////////////////////////////////////////////////////
     ///
-    /// \note This case is two assertions wearing one coat, and both are worth
-    /// having. clap-helpers reports the *plugin* misbehaving -- a callback run
-    /// off the main thread, a lifecycle call out of order -- and the *host*
+    /// \note This case is three assertions wearing one coat, and all three are
+    /// worth having. clap-helpers reports the *plugin* misbehaving -- a callback
+    /// run off the main thread, a lifecycle call out of order -- and the *host*
     /// misbehaving, which here means this harness: `ensureAudioThread` fires when
     /// `process()` was called with no TestHost::AudioCallback around it. A test
     /// harness that drives the audio entry points from nowhere in particular is
     /// not reproducing what a DAW does, and until a host answered the thread
     /// check there was no way to find out that it was not.
     ///
-    ///   All of it is invisible without `clap.log`: the reports go to `std::cerr`
+    ///   Both are invisible without `clap.log`: the reports go to `std::cerr`
     /// otherwise (host-proxy.hxx:91-107), where a green run swallows them.
+    ///
+    ///   The third is what this used to overclaim about.
+    /// `checkMainThread()`/`checkAudioThread()` do **not** go through
+    /// `hostMisbehaving()` at all -- they write to `std::cerr` directly
+    /// (plugin.hxx:2219, :2233), so `clap.log` cannot see them and neither could
+    /// this case, which said "nobody misbehaves" while emitting one of them. It
+    /// is asserted now, by capturing the stream.
+    ///                                       (09.08.2026.) (SW port)
     ///
     ////////////////////////////////////////////////////////////////////////////
     Entry const entry;
     TestHost host{TestHost::everything()};
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Two captures, and the nesting is the whole trick: the inner one
+    /// takes the writes and the outer one never sees them. So `expected` holds
+    /// the one line this run is known to produce and `unexpected` holds anything
+    /// else, and the assertion below needs no filter on the wording -- which
+    /// matters, because a *genuine* main-thread violation is worded identically
+    /// and a filter would hide it.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    CapturedStandardError const unexpected;
 
     {
         ActivePlugin plugin(48000, 512, host);
@@ -312,7 +332,31 @@ TEST_CASE("Driven the way a DAW drives it, nobody misbehaves", "[clap][host]")
 
         // An effect in a slot, a rescan collected, and audio through it.
         OneParameterEvent const fill(parameterID(moduleChainType, 0), 0);
-        plugin.flush(&*fill);
+        {
+            ////////////////////////////////////////////////////////////////////
+            ///
+            /// \note The known one, and it is clap-helpers arguing with itself
+            /// rather than anything about this plugin -- the same
+            /// self-contradiction `TestHost::isFlushValidatingItself()` filters
+            /// out of the log, seen from the side that cannot reach the log.
+            /// `clapParamsFlush` guards itself correctly as
+            /// `[active ? audio : main]` and then validates each event through
+            /// `getParamInfoForParamId`, which opens with `checkMainThread()`.
+            ///
+            ////////////////////////////////////////////////////////////////////
+            CapturedStandardError const expected;
+            plugin.flush(&*fill);
+
+            /// \note One line as of clap-helpers today, and the bound rather than
+            /// the count: a version that stops emitting it leaves this passing
+            /// and makes the inner capture redundant, which is the direction a
+            /// third-party workaround should age in. A version that emits *more*
+            /// is worth being told about.
+            INFO("what a flush wrote to stderr:" << joined(expected.lines()));
+            CHECK(expected.lines().size() <= 1);
+            for (auto const &line : expected.lines())
+                CHECK(line == "thread-error: this code must be running on the main thread");
+        }
         plugin->on_main_thread(&*plugin);
 
         std::vector<float> leftIn(512, 0.0f), rightIn(512, 0.0f);
@@ -337,6 +381,11 @@ TEST_CASE("Driven the way a DAW drives it, nobody misbehaves", "[clap][host]")
     /// the main thread against an active plugin. See TestHost::flush().
     INFO("what this harness was reported for:" << joined(host.hostMisbehaviours()));
     CHECK(host.hostMisbehaviours().empty());
+
+    /// \note And the half neither of those can see. Everything but the one flush
+    /// above, and nothing may write a word.
+    INFO("what nobody could see before:" << joined(unexpected.lines()));
+    CHECK(unexpected.lines().empty());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
