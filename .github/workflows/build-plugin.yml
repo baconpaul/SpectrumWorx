@@ -15,8 +15,12 @@
 #                  AudioUnit SDK fetches -- the test binaries link sw-dsp and
 #                  sw-impl and want none of it (verified: that configuration
 #                  writes no _deps/ at all).
+#   linux gcc15    that same Debug leg once more on the newest GCC, and Debug
+#                  only -- what a second compiler has to say it says at compile
+#                  time, and running the goldens twice would say nothing new.
 #   build_plugin   the four bundles, and on anything but a pull request the
-#                  installer as well.
+#                  installer as well. Windows builds twice, MSVC and clang-cl;
+#                  the second is compiler coverage and ships nothing.
 #
 # A pull request builds and tests but makes no installer: what a PR has to
 # answer is whether the code compiles and the suite passes on all three
@@ -168,6 +172,68 @@ jobs:
         if: runner.os == 'Linux'
         run: xvfb-run -a ctest --test-dir ./build -C ${{ matrix.config }} --output-on-failure
 
+  # The Linux -Werror default was turned on because GCC 15.2 built the tree
+  # clean -- 849 warnings over the Apple Clang baseline, five causes, all worth
+  # the edit (cmake/sw-our-sources.cmake says which). Nothing in CI held it to
+  # that afterwards: prepare-for-juce selects GCC 12 and the other Linux legs
+  # take it. This job is the compiler that measurement was made on.
+  test_gcc15:
+    name: Linux gcc15
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      # For the X11 and audio development headers JUCE needs. It also points
+      # gcc and g++ at 12, which is why the configure below names the compilers
+      # rather than trusting what is on PATH.
+      - name: Prepare for JUCE
+        uses: surge-synthesizer/sst-githubactions/prepare-for-juce@main
+        with:
+          os: ${{ runner.os }}
+
+      - name: Install Xvfb
+        run: sudo apt-get install -y xvfb
+
+      # Whether the image already has it depends on which Ubuntu ubuntu-latest
+      # points at this month, so ask the archive first and fall back to the
+      # toolchain PPA, which carries GCC 15 for the releases whose archive does
+      # not. The version is printed because "gcc15" in a job name is a claim and
+      # this is the line in the log that settles it.
+      - name: Install GCC 15
+        run: |
+          sudo apt-get update
+          if ! sudo apt-get install -y gcc-15 g++-15; then
+            sudo apt-get install -y software-properties-common
+            sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+            sudo apt-get update
+            sudo apt-get install -y gcc-15 g++-15
+          fi
+          g++-15 --version
+
+      # Same configuration as the Linux leg of `test`, compiler aside: bundles
+      # off, tools on, and see that job for why neither is optional.
+      - name: Configure
+        run: |
+          cmake -S . -B ./build -GNinja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_COMPILER=gcc-15 \
+            -DCMAKE_CXX_COMPILER=g++-15 \
+            -DSW_BUILD_PLUGIN_BUNDLES=OFF \
+            -DSW_WERROR=ON \
+            -DGITHUB_ACTIONS_BUILD=TRUE
+
+      - name: Build the test binaries
+        run: |
+          cmake --build ./build \
+            --target sw-dsp-tests sw-plugin-tests sw-show-ui --parallel 3
+
+      - name: Test under Xvfb
+        run: xvfb-run -a ctest --test-dir ./build --output-on-failure
+
   build_plugin:
     name: Build - ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
@@ -179,14 +245,41 @@ jobs:
           - os: windows-latest
             name: windows-x64
             cmake_args: -Ax64
+            target: spectrumworx-installer
+            upload: true
+
+          # The same runner, the same headers, a different front end. It reads
+          # our code the way the macOS and Linux compilers do and reports it the
+          # way MSVC's command line does, which is the combination that finds
+          # what neither side alone has found.
+          #
+          # It ships nothing: the Windows download is MSVC's, so this leg stops
+          # at the four bundles and skips the installer and the artifact.
+          #
+          # Quiet, for now. The warning baseline is empty under MSVC -- and
+          # clang-cl is MSVC as far as CMake's `if (MSVC)` is concerned -- so
+          # this is a compile check, not a warning gate. It is also the leg on
+          # which a Windows baseline could first be tried; see issue #8 and the
+          # note at the top of cmake/sw-our-sources.cmake.
+          - os: windows-latest
+            name: windows-x64-clang
+            cmake_args: -Ax64 -TClangCL
+            target: spectrumworx_clapfirst_all
+            upload: false
 
           - os: macos-latest
             name: macos
             cmake_args: -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -GNinja
+            target: spectrumworx-installer
+            upload: true
 
+          # Builds the installer and keeps it: Linux ships from the docker job
+          # below, which builds against an older glibc than this runner has.
           - os: ubuntu-latest
             name: linux-x64
             cmake_args: -GNinja
+            target: spectrumworx-installer
+            upload: false
 
     steps:
       - name: Checkout code
@@ -244,16 +337,14 @@ jobs:
             -DSW_WERROR=ON \
             -DGITHUB_ACTIONS_BUILD=TRUE
           cmake --build ./build --config Release \
-            --target spectrumworx-installer --parallel 3
+            --target ${{ matrix.target }} --parallel 3
 
       - name: Show Installer Directory
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && matrix.target == 'spectrumworx-installer'
         run: ls -l build/installer
 
-      # Linux ships from the docker job below, which builds against an older
-      # glibc than this runner has.
       - name: Upload artifact
-        if: github.event_name != 'pull_request' && runner.os != 'Linux'
+        if: github.event_name != 'pull_request' && matrix.upload
         uses: actions/upload-artifact@v4
         with:
           path: build/installer
@@ -297,7 +388,14 @@ jobs:
     name: Publish Nightly
     if: ${{ github.ref == 'refs/heads/main' && github.repository_owner == 'surge-synthesizer' }}
     runs-on: ubuntu-latest
-    needs: [gates, test, build_plugin, build_plugin_docker]
+    needs: [gates, test, test_gcc15, build_plugin, build_plugin_docker]
+
+    # Read in the `if` of the Discord step below, which the secrets context
+    # cannot be: a repository without the webhook configured -- a fork, or this
+    # one before the secret is added -- posts nothing rather than going red
+    # after a nightly it successfully published.
+    env:
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_SPECTRUMWORX_WEBHOOK }}
 
     steps:
       # create_tag is false: the Nightly tag is made by hand, once, and every
@@ -311,11 +409,25 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           release_blurb_file: assets/installer/NightlyBlurb.md
 
+      # After the upload, not before: the message links the tag, so it goes out
+      # once there is something behind the link.
+      - name: Post to Discord
+        if: env.DISCORD_WEBHOOK != ''
+        uses: surge-synthesizer/sst-githubactions/discord-release-notify@main
+        with:
+          webhook: ${{ secrets.DISCORD_SPECTRUMWORX_WEBHOOK }}
+          tag: Nightly
+          title: "A New SpectrumWorx Nightly is Available"
+          subtitle: "Still a pre-release port -- bounce to stems for anything you want to keep."
+
   publish-plugin-release:
     name: Publish Release
     if: startsWith(github.ref, 'refs/tags/v') && github.repository_owner == 'surge-synthesizer'
     runs-on: ubuntu-latest
-    needs: [gates, test, build_plugin, build_plugin_docker]
+    needs: [gates, test, test_gcc15, build_plugin, build_plugin_docker]
+
+    env:
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_SPECTRUMWORX_WEBHOOK }}
 
     steps:
       - name: Upload to Release
@@ -325,3 +437,12 @@ jobs:
           reuse_tag: false
           create_tag: true
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post to Discord
+        if: env.DISCORD_WEBHOOK != ''
+        uses: surge-synthesizer/sst-githubactions/discord-release-notify@main
+        with:
+          webhook: ${{ secrets.DISCORD_SPECTRUMWORX_WEBHOOK }}
+          tag: ${{ github.ref_name }}
+          title: "A New SpectrumWorx Release is Available"
+          subtitle: "Release ${{ github.ref_name }}"
