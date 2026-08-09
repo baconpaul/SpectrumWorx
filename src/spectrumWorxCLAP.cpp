@@ -1234,9 +1234,15 @@ void SpectrumWorxCLAP::updateLFOTiming(clap_process const *const process) noexce
     bool const usableTempo(transport && ((transport->flags & tempoAndMeter) == tempoAndMeter) &&
                            (transport->tempo > 0) && (transport->tsig_num >= 1) &&
                            (transport->tsig_num <= 255));
+    /// \note `updatePositionAndTimingInformation` rather than the
+    /// `updatePosition` that stood here: the two have the same body and only one
+    /// of them says whether anything moved. Going from a host tempo to none is a
+    /// timing change like any other -- the bar goes back to the assumed two
+    /// seconds -- so this arm reports it too.
     if (!usableTempo)
     {
-        updatePosition(process->frames_count);
+        if (updatePositionAndTimingInformation(process->frames_count).timingInfoChanged())
+            timingChanged();
         return;
     }
 
@@ -1261,9 +1267,11 @@ void SpectrumWorxCLAP::updateLFOTiming(clap_process const *const process) noexce
         positionInBars = lfoTimer().currentTimeInBars() + (seconds / barDuration);
     }
 
-    updatePositionAndTimingInformation(static_cast<float>(positionInBars),
-                                       static_cast<float>(barDuration),
-                                       static_cast<std::uint8_t>(transport->tsig_num));
+    if (updatePositionAndTimingInformation(static_cast<float>(positionInBars),
+                                           static_cast<float>(barDuration),
+                                           static_cast<std::uint8_t>(transport->tsig_num))
+            .timingInfoChanged())
+        timingChanged();
 }
 
 void SpectrumWorxCLAP::runEngine(clap_process const *const process) noexcept
@@ -1550,6 +1558,52 @@ void SpectrumWorxCLAP::chainChanged()
     markCurrentProgramAsModified();
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The half of the tempo story the interface never got. A synced LFO's
+/// period is a fraction of the *host's* bar, so a tempo or meter change makes the
+/// number the panel is showing mean a different length of time and moves the grid
+/// the period snaps to. `updateForNewTimingInfo()` has always known how to redraw
+/// that; what it did not have was a caller. Its 2016 one was
+/// `SpectrumWorx::updatePosition()`, in a host class this port deleted, and the
+/// replacement runs on the audio thread -- where touching a widget is the one
+/// thing the whole model forbids.
+///
+///   So it arrives as a message, like every other thing the audio thread has to
+/// tell the interface. Nothing travels with it: what changed is engine state the
+/// main thread may read, and the news is the whole of the payload.
+///
+/// \note Not gated on there being an editor, deliberately -- the gate is on the
+/// drain, where `pEditor_` may be read at all. Asking here would be reading a
+/// main-thread member from the audio thread to save a ring slot.
+///
+/// \note And the coalescing, which is this message's alone. \see
+/// `timingChangeQueued_` for why a tempo ramp would otherwise cost the
+/// retirements. A push that fails clears it again, so a full ring costs one
+/// missed redraw rather than every future one.
+///                                           (09.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxCLAP::timingChanged()
+{
+    if (timingChangeQueued_.exchange(true, std::memory_order_relaxed))
+        return;
+
+    if (!pushed(toUI_.push(Threading::timingChanged()),
+                "The echo queue is full; the LFO panel will not follow the tempo."))
+    {
+        timingChangeQueued_.store(false, std::memory_order_relaxed);
+        return;
+    }
+
+    /// \note `request_callback` is `[thread-safe]`, which is what makes this legal
+    /// from here -- the same argument `markCurrentProgramAsModified()` makes.
+    /// Without it the message waits for whatever else asks for a callback next,
+    /// and a tempo change on its own asks for nothing.
+    _host.requestCallback();
+}
+
 void SpectrumWorxCLAP::publishModulatedValues()
 {
     /// \note Not gated on there being an editor. The loop is five modules by ten
@@ -1589,6 +1643,8 @@ void SpectrumWorxCLAP::drainEngineEvents()
 {
     LE_ASSERT(Threading::isMainThread() || !Threading::isAudioThread());
 
+    bool timingChangedPending(false);
+
     Threading::ToUI event;
     while (toUI_.pop(event))
     {
@@ -1623,6 +1679,14 @@ void SpectrumWorxCLAP::drainEngineEvents()
             chainChangedPending_ = true;
             break;
 
+        /// \note Cleared here rather than after the redraw, so that a tempo that
+        /// moves again while this drain runs is announced rather than swallowed.
+        /// The cost of clearing early is at most one extra message.
+        case Threading::ToUI::Kind::TimingChanged:
+            timingChangeQueued_.store(false, std::memory_order_relaxed);
+            timingChangedPending = true;
+            break;
+
         ////////////////////////////////////////////////////////////////////////
         ///
         /// \note The other end of §5, and the only place any of this is
@@ -1652,6 +1716,12 @@ void SpectrumWorxCLAP::drainEngineEvents()
 
     if (std::exchange(chainChangedPending_, false) && pEditor_)
         pEditor_->resyncModuleRack();
+
+    /// \note After the rack, and only if there is a window: this is a redraw and
+    /// nothing behind the interface depends on it, which is what separates it
+    /// from the echo above.
+    if (timingChangedPending && pEditor_)
+        pEditor_->updateForNewTimingInfo();
 }
 
 ////////////////////////////////////////////////////////////////////////////////

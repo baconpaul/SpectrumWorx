@@ -30,6 +30,14 @@ The consequence worth stating on its own, because it is what the design is for:
 alters what a synced LFO sounds like and leaves its parameter alone; it alters
 neither for a free one.
 
+What it does move is what the LFO panel should be *showing*: the same period is a
+different length of time at the new tempo, and it snaps to a different grid. The
+audio thread is where a tempo change is seen and a widget is the one thing it may
+not touch, so that arrives on the main thread as `ToUI::TimingChanged` and lands
+in `SpectrumWorxEditor::updateForNewTimingInfo()`. See
+[`threading_model.md`](threading_model.md) §3, which is also where the reason
+that one message is coalesced by its sender is.
+
 `Timer::referenceBarDuration` and `Timer::referenceMeasureNumerator`
 (`le/parameters/lfoImpl.hpp`) are that constant bar. It is the same 120 BPM 4/4
 the engine already assumes when a host reports no transport, so a plugin in a

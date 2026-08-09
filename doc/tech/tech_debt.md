@@ -226,14 +226,6 @@ New entries go at the top of their area.
   artifacts and why the release run renders all 303 finite. It is a weakness in
   the vector primitives, and a skip list would need a dozen names and would grow.
 
-- **The LFO panel does not follow the host's tempo.** (02.08.2026)
-  `SpectrumWorxEditor::updateForNewTimingInfo()` is correct and unreachable: its
-  one caller was `SpectrumWorx::updatePosition()` in the 2016 host class, which
-  is deleted. The CLAP's equivalent is `updateLFOTiming()`, on the audio thread,
-  and reaching a widget from there is what the whole threading model forbids —
-  so the answer is a `ToUI` message, and the function is where it lands. Visible
-  as an LFO panel showing the old period after a tempo change.
-
 - **`LFOImpl::Timer`'s tempo is one value for every instance in the process.**
   (02.08.2026, narrowed 06.08.2026) `std::atomic`, so it is no longer a data race
   — but two tracks at two tempi still see one tempo. Making it per-instance means
