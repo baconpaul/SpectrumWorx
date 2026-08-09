@@ -470,7 +470,7 @@ result.
 | `tests/gui/twoInstanceTests.cpp` | closing one editor leaves the other's `MessageManager` alive; selection is independent; ejecting a module and then its ghost |
 | `tests/clap/hostInteropTests.cpp` | `reset()` between blocks; flush conditional on `isActive()`; both arms of every `canUseThreadCheck()` branch |
 | `tests/clap/pluginTests.cpp` | *"A full rack with LFOs running and an editor open processes cleanly"* and *"Two instances process while their editors come and go"* — the latter with **two real audio threads** and a message thread opening and closing both windows underneath them |
-| `tests/clap/threadingTests.cpp` | the cases that need two threads at once: a preset arriving while blocks are rendered, a chain queued behind a restart, a second `activate()` under a live callback, a host emptying a slot from inside `process()` |
+| `tests/clap/threadingTests.cpp` | the cases that need two threads at once: a preset arriving while blocks are rendered, a chain queued behind a restart, a second `activate()` under a live callback, a host emptying a slot from inside `process()`; and the two `[lfo]` cases that read the *engine's* copy after an interface edit |
 
 These are ordinary functional tests that *become* the acceptance test when the
 tree is built with a sanitizer, and `threadingTests.cpp` says so at the top: each
@@ -488,6 +488,25 @@ shared assertion counter and is reported as a race in
 `Catch::RunContext::handleExpr`. `ActivePlugin` has a non-asserting
 `processStatus()` for exactly this: the workers record and the main thread
 asserts.
+
+**A case that reads one copy is a case that cannot see this class of bug.** The
+display, `paramsValue`, `stateSave` and the preset writer all answer from the
+main thread's `Program`, so a test built out of any of them agrees with an edit
+the audio thread never received — and one that asserts a *message was queued*
+only moves the blind spot one step along. The LFO panel is where that was
+demonstrated: five of its seven sub-parameters go through `editParameter()`,
+which moves both copies, and the two that have no `ParameterID` take
+`ToEngine::SetUnexportedLFOParameter` — but the N/T/D buttons wrote
+`LFO::addSyncType()` on the strip's own LFO and queued nothing, so a sync-mode
+change moved the display and the saved state and nothing anybody could hear. It
+was recorded as fixed on the day the waveform popup beside it was.
+
+So an edit made in the interface is asserted **at the far end**: `[clap][lfo]` in
+`threadingTests.cpp` holds both copies of one module's LFO, checks that the
+engine's still reads the old value while the command is queued, drives a flush,
+and reads it again. Both routes, and the waveform popup too — which the GUI case
+cannot reach at all, a menu being one of the things a headless editor cannot
+drive.
 
 **And what no headless case substitutes for.** Hosts, by hand. Testers ran the
 plugin in DAWs on macOS, Windows and Linux on 07.08.2026 and the deadlocks this

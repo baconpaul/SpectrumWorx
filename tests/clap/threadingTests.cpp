@@ -658,3 +658,153 @@ TEST_CASE("A global parameter crosses to the engine in the units the edge speaks
     plugin.restartIfAsked();
     CHECK(runningFFTSize(*plugin) == 1024);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The gap a "closed" debt entry left behind. The N/T/D buttons were
+/// recorded as fixed on the day the waveform popup was, and only the waveform
+/// had a route: the sync-mode branch wrote `LFO::addSyncType()` on the strip's
+/// own LFO -- `programMain_`'s -- and queued nothing, so a sync change moved the
+/// display and the saved state and nothing anybody could hear.
+///
+///   **Nothing in the suite had ever read the engine's side of an LFO after a UI
+/// edit.** The display, `paramsValue`, `stateSave` and the preset writer all
+/// answer from the main thread's copy, so every case there was agreed with a
+/// change the audio thread never received; `lfoDisplayTests.cpp` closed half of
+/// that by asserting the *message* was queued. These two read the far end.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+using EngineLFO = LE::Parameters::LFOImpl;
+
+/// \brief The plugin with an effect in slot 0 and both copies of it in hand.
+///
+/// \note Both, and reached separately, because a case that reads only one of
+/// them is the case that missed this. `programMain()` is the editor's; `core()`
+/// is the engine's, and nothing writes it but `drainCommands()`.
+struct BothLFOs
+{
+    explicit BothLFOs(ActivePlugin const &plugin, std::uint8_t const lfoable = 0)
+    {
+        auto &editorHost(editorHostOf(*plugin));
+
+        REQUIRE(editorHost.editSlot(0, 0));
+        plugin.flush();
+
+        auto const engineModule(
+            editorHost.core().moduleChain().moduleAs<LE::SW::Module>(0));
+        auto const mainModule(
+            editorHost.programMain().moduleChain().moduleAs<LE::SW::Module>(0));
+        REQUIRE(engineModule);
+        REQUIRE(mainModule);
+        REQUIRE(engineModule.get() != mainModule.get()); // two modules, not one
+        REQUIRE(lfoable < engineModule->numberOfLFOControledParameters());
+
+        pEngine = &engineModule->lfo(lfoable);
+        pMain = &mainModule->lfo(lfoable);
+    }
+
+    EngineLFO const *pEngine{nullptr};
+    EngineLFO *pMain{nullptr};
+}; // struct BothLFOs
+} // anonymous namespace
+
+TEST_CASE("An LFO sub-parameter with no ParameterID reaches the engine",
+          "[clap][threading][lfo]")
+{
+    using LE::Parameters::IndexOf;
+    using LE::Parameters::LFO;
+
+    constexpr std::uint8_t syncTypesIndex(
+        IndexOf<EngineLFO::Parameters, EngineLFO::SyncTypes>::value);
+    constexpr std::uint8_t lfoable{0};
+
+    Entry const entry;
+    ActivePlugin plugin(sampleRate, blockSize);
+    auto &editorHost(editorHostOf(*plugin));
+
+    BothLFOs const lfos(plugin, lfoable);
+
+    // Quarter is the default, so Free is the smallest real edit -- and it is the
+    // one the N button makes.
+    REQUIRE(lfos.pEngine->syncTypes() == LFO::Quarter);
+    REQUIRE(lfos.pMain->syncTypes() == LFO::Quarter);
+
+    /// \note What `LFODisplay::queueUnexportedLFOParameter` does, and the panel's
+    /// own write of its copy alongside it. The two are separate calls in the
+    /// interface, which is exactly how they came apart.
+    lfos.pMain->parameters().set<EngineLFO::SyncTypes>(LFO::Free);
+    editorHost.publishUnexportedLFOParameter(0, lfoable, syncTypesIndex,
+                                             static_cast<float>(LFO::Free));
+
+    // Queued, not written: the audio thread has not been given a chance yet.
+    CHECK(lfos.pEngine->syncTypes() == LFO::Quarter);
+
+    plugin.flush();
+
+    CHECK(lfos.pEngine->syncTypes() == LFO::Free);
+    CHECK(lfos.pMain->syncTypes() == LFO::Free);
+
+    // And back up, through the whole mask, which is what each of N/T/D sends.
+    lfos.pMain->parameters().set<EngineLFO::SyncTypes>(LFO::All);
+    editorHost.publishUnexportedLFOParameter(0, lfoable, syncTypesIndex,
+                                             static_cast<float>(LFO::All));
+    plugin.flush();
+    CHECK(lfos.pEngine->syncTypes() == LFO::All);
+
+    ////////////////////////////////////////////////////////////////////////////
+    /// \note The waveform, which the GUI case deliberately cannot reach -- its
+    /// only entry point is a popup menu, and a menu is one of the things a
+    /// headless editor cannot drive. From here it is another index.
+    ////////////////////////////////////////////////////////////////////////////
+    constexpr std::uint8_t waveformIndex(
+        IndexOf<EngineLFO::Parameters, EngineLFO::Waveform>::value);
+
+    auto const shape(static_cast<float>(LFO::Waveform::Square));
+    REQUIRE(float(lfos.pEngine->parameters().get<EngineLFO::Waveform>()) != shape);
+    editorHost.publishUnexportedLFOParameter(0, lfoable, waveformIndex, shape);
+    plugin.flush();
+    CHECK(float(lfos.pEngine->parameters().get<EngineLFO::Waveform>()) == shape);
+}
+
+TEST_CASE("An LFO parameter the host can see reaches the engine too", "[clap][threading][lfo]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    /// The other five, which do have a `ParameterID` and so take
+    /// `EditorHost::editParameter` -- both copies in one call. Here because the
+    /// entry above is about *reading the engine's side*, and five of the seven
+    /// sub-parameters had never been read there either.
+    ////////////////////////////////////////////////////////////////////////////
+    using LE::Parameters::IndexOf;
+
+    constexpr std::uint8_t lowerBoundIndex(
+        IndexOf<EngineLFO::Parameters, EngineLFO::LowerBound>::value);
+    constexpr std::uint8_t lfoable{0};
+
+    Entry const entry;
+    ActivePlugin plugin(sampleRate, blockSize);
+    auto &editorHost(editorHostOf(*plugin));
+
+    BothLFOs const lfos(plugin, lfoable);
+
+    REQUIRE_THAT(float(lfos.pEngine->lowerBound()), Catch::Matchers::WithinAbs(0.0, 1e-6));
+
+    /// \note The ID the panel builds: an LFO parameter is addressed by the
+    /// *LFO-able* module parameter index, which is the module parameter index
+    /// minus the Bypass the list starts with. \see LFODisplay::queueLFOParameter.
+    LE::SW::ParameterID parameterID;
+    parameterID.value.type = LE::SW::ParameterID::LFOParameter;
+    parameterID.value._.lfo = {lowerBoundIndex, lfoable, 0};
+
+    editorHost.editParameter(parameterID, 0.25f);
+
+    // The interface's copy is moved by the call itself; the engine's waits.
+    CHECK_THAT(float(lfos.pMain->lowerBound()), Catch::Matchers::WithinAbs(0.25, 1e-5));
+    CHECK_THAT(float(lfos.pEngine->lowerBound()), Catch::Matchers::WithinAbs(0.0, 1e-6));
+
+    plugin.flush();
+
+    CHECK_THAT(float(lfos.pEngine->lowerBound()), Catch::Matchers::WithinAbs(0.25, 1e-5));
+}
