@@ -693,10 +693,8 @@ struct BothLFOs
         REQUIRE(editorHost.editSlot(0, 0));
         plugin.flush();
 
-        auto const engineModule(
-            editorHost.core().moduleChain().moduleAs<LE::SW::Module>(0));
-        auto const mainModule(
-            editorHost.programMain().moduleChain().moduleAs<LE::SW::Module>(0));
+        auto const engineModule(editorHost.core().moduleChain().moduleAs<LE::SW::Module>(0));
+        auto const mainModule(editorHost.programMain().moduleChain().moduleAs<LE::SW::Module>(0));
         REQUIRE(engineModule);
         REQUIRE(mainModule);
         REQUIRE(engineModule.get() != mainModule.get()); // two modules, not one
@@ -711,8 +709,7 @@ struct BothLFOs
 }; // struct BothLFOs
 } // anonymous namespace
 
-TEST_CASE("An LFO sub-parameter with no ParameterID reaches the engine",
-          "[clap][threading][lfo]")
+TEST_CASE("An LFO sub-parameter with no ParameterID reaches the engine", "[clap][threading][lfo]")
 {
     using LE::Parameters::IndexOf;
     using LE::Parameters::LFO;
@@ -807,4 +804,110 @@ TEST_CASE("An LFO parameter the host can see reaches the engine too", "[clap][th
     plugin.flush();
 
     CHECK_THAT(float(lfos.pEngine->lowerBound()), Catch::Matchers::WithinAbs(0.25, 1e-5));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The LFO panel following the host's tempo. `updateForNewTimingInfo()` has
+/// been correct and unreachable since the port began: its 2016 caller was in a
+/// host class that is in no target, and the CLAP's equivalent runs on the audio
+/// thread, where reaching a widget is the one thing the model forbids. So it is a
+/// `ToUI` message now.
+///
+///   With no window there is nothing to look at, so what these assert is the two
+/// properties the message has to have to be usable at all: it is raised when the
+/// timing moves and not when it does not, and a tempo *ramp* -- which moves it on
+/// every block -- costs one outstanding message rather than one per block. The
+/// second is not tidiness: the same ring carries the retirements, where a drop is
+/// a leak.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+/// \brief The C++ object behind the C entry point, for the counter on it.
+LE::SW::SpectrumWorxCLAP const &implementationOfPlugin(clap_plugin const &plugin)
+{
+    auto *const pHelper(static_cast<LE::SW::PluginHelper *>(plugin.plugin_data));
+    REQUIRE(pHelper != nullptr);
+    return *static_cast<LE::SW::SpectrumWorxCLAP *>(pHelper);
+}
+} // anonymous namespace
+
+TEST_CASE("A tempo change is announced to the interface, and a steady tempo is not",
+          "[clap][threading][lfo]")
+{
+    Entry const entry;
+
+    TestHost host(TestHost::everything());
+    ActivePlugin plugin(sampleRate, blockSize, host);
+
+    std::vector<float> leftIn(blockSize, 0.0f), rightIn(blockSize, 0.0f);
+    std::vector<float> leftOut(blockSize), rightOut(blockSize);
+
+    /// \note 120 BPM in 4/4 is what the engine assumes when a host reports
+    /// nothing, so the first block at that tempo changes the timing not at all --
+    /// which makes it the right thing to settle on before measuring.
+    auto transport(transportAt(120, 0, 0));
+    plugin.process(leftIn, rightIn, leftOut, rightOut, &transport);
+    plugin.pumpMainThread();
+
+    auto const settled(host.mainThreadCallbacks.load());
+
+    // Steady: nothing to say, several blocks running.
+    for (unsigned block(0); block < 8; ++block)
+    {
+        transport = transportAt(120, block * 0.5, 0);
+        plugin.process(leftIn, rightIn, leftOut, rightOut, &transport);
+    }
+    CHECK(host.mainThreadCallbacks.load() == settled);
+
+    // And a real change asks for the callback that carries it.
+    transport = transportAt(90, 4, 0);
+    plugin.process(leftIn, rightIn, leftOut, rightOut, &transport);
+    CHECK(host.mainThreadCallbacks.load() > settled);
+
+    /// \note And the flag is cleared by the drain rather than left standing, so
+    /// the *next* change is announced too. A one-shot would have passed
+    /// everything above.
+    plugin.pumpMainThread();
+    auto const afterTheFirst(host.mainThreadCallbacks.load());
+
+    transport = transportAt(140, 8, 0);
+    plugin.process(leftIn, rightIn, leftOut, rightOut, &transport);
+    CHECK(host.mainThreadCallbacks.load() > afterTheFirst);
+
+    // None of which was a message the plugin had to throw away.
+    CHECK(implementationOfPlugin(*plugin).droppedMessages() == 0);
+}
+
+TEST_CASE("A tempo ramp does not flood the echo ring", "[clap][threading][lfo]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    // A host ramping the tempo reports a different bar duration on every block,
+    // and nothing here pumps the main thread -- a host slow to run the callback
+    // it was asked for, which is the arrangement publishProtocolTests.cpp fills
+    // the rings with. More blocks than the ring holds, and it must still be
+    // possible to retire a module through it afterwards.
+    ////////////////////////////////////////////////////////////////////////////
+    Entry const entry;
+
+    TestHost host(TestHost::everything());
+    ActivePlugin plugin(sampleRate, blockSize, host);
+
+    std::vector<float> leftIn(blockSize, 0.0f), rightIn(blockSize, 0.0f);
+    std::vector<float> leftOut(blockSize), rightOut(blockSize);
+
+    constexpr unsigned blocks{LE::SW::Threading::ToUIQueue::capacity + 16};
+    for (unsigned block(0); block < blocks; ++block)
+    {
+        auto const transport(transportAt(60 + (block % 120), block * 0.25, 0));
+        plugin.process(leftIn, rightIn, leftOut, rightOut, &transport);
+    }
+
+    CHECK(implementationOfPlugin(*plugin).droppedMessages() == 0);
+
+    // ...and the one message that was outstanding is still the one message.
+    plugin.pumpMainThread();
+    CHECK(implementationOfPlugin(*plugin).droppedMessages() == 0);
 }

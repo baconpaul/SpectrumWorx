@@ -141,6 +141,18 @@ struct ToUI
         /// swapped, a whole chain installed. The interface makes its rack a
         /// function of the chain again; see SpectrumWorxEditor::resyncModuleRack().
         ChainChanged,
+        /// The host's bar duration or meter moved, so a synced LFO's period is a
+        /// different number of seconds and its snap grid a different grid. The
+        /// interface redraws the LFO panel; see
+        /// SpectrumWorxEditor::updateForNewTimingInfo().
+        ///
+        /// \note Carries nothing: what changed is engine state the main thread
+        /// can read for itself, and the message is only the news that it did.
+        /// **Coalesced by the sender**, unlike everything else here -- a host
+        /// ramping the tempo moves it on every block, and this ring also carries
+        /// the retirements, where a drop is a leak rather than a stale reading.
+        /// \see SpectrumWorxCLAP::timingChanged().
+        TimingChanged,
         /// Something the audio thread unlinked and the main thread must delete.
         /// Dropping one of these is a leak, which is why this is a ring and not a
         /// mailbox.
@@ -265,6 +277,13 @@ inline ToUI chainChanged()
 {
     ToUI message{};
     message.kind = ToUI::Kind::ChainChanged;
+    return message;
+}
+
+inline ToUI timingChanged()
+{
+    ToUI message{};
+    message.kind = ToUI::Kind::TimingChanged;
     return message;
 }
 

@@ -224,7 +224,8 @@ SpectrumWorxEditor::~SpectrumWorxEditor()
     /// live caller at all, and `updateLFO()` is reached from
     /// `parameterChangedElsewhere()`, which is the main thread draining a
     /// message. Stage 5 removed the last route by which the audio thread could
-    /// have reached either.
+    /// have reached either. `updateForNewTimingInfo()` has a caller again as of
+    /// 09.08.2026 and it is the same kind: a `ToUI` message, drained here.
     ///
     ///   A `volatile` read is not a synchronisation primitive in any case, so
     /// this was never the guarantee it looked like; what made it work was that
@@ -1519,14 +1520,17 @@ void SpectrumWorxEditor::updateForEngineSetupChanges()
     });
 }
 
-/// \note Nothing calls this. Its one caller was `SpectrumWorx::updatePosition()`
-/// in the 2016 host class, which is in no target; the CLAP's equivalent is
-/// `updateLFOTiming()`, on the audio thread, and reaching a widget from there is
-/// what this whole redesign is about. Kept rather than deleted because the
-/// *behaviour* is missing rather than obsolete -- an LFO panel open while the
-/// host's tempo changes shows the old period -- and this is where the answer
-/// goes when it arrives as a message. Recorded in tech_debt.md.
-///                                           (02.08.2026.) (SW port)
+/// \note Where a tempo change lands. Its 2016 caller was
+/// `SpectrumWorx::updatePosition()`, in a host class that is in no target, and
+/// the CLAP's equivalent -- `updateLFOTiming()` -- runs on the audio thread,
+/// where reaching a widget is what this whole redesign is about. So it arrives as
+/// `ToUI::TimingChanged` and `drainEngineEvents()` calls this.
+///
+///   Only a *synced* LFO moves: its period is a fraction of the host's bar, so
+/// the same parameter is a different number of seconds at a new tempo and snaps
+/// to a different grid. A free one is measured against a bar that never changes
+/// length and is unaffected -- see how-lfo-rates-work.md.
+///                                           (02.08.2026, wired up 09.08.2026.) (SW port)
 void SpectrumWorxEditor::updateForNewTimingInfo()
 {
     LE_ASSERT(isThisTheGUIThread());

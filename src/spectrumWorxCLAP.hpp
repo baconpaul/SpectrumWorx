@@ -405,6 +405,11 @@ class SpectrumWorxCLAP final
     /// parameters that describe it. `[audio-thread]`
     void chainChanged();
 
+    /// \brief Says the host's tempo or meter moved, so that the LFO panel can
+    /// redraw a period that now means something else. `[audio-thread]`
+    /// \see the definition, which is where the coalescing is.
+    void timingChanged();
+
     /// \brief Installs \p pNewSample (owned, null clears) as the side channel's
     /// source. `[main-thread]` \see the definition.
     void publishSample(Sample *pNewSample);
@@ -648,6 +653,25 @@ class SpectrumWorxCLAP final
 
     /// \brief A `ToUI::ChainChanged` waiting to be acted on. \see drainEngineEvents().
     bool chainChangedPending_{false};
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief A `ToUI::TimingChanged` already in the ring and not yet drained.
+    ///
+    /// \note The one message this plugin coalesces *before* it is sent, and the
+    /// reason is the rate: a host ramping the tempo reports a different bar
+    /// duration on every block, which at 64 samples is some hundreds a second.
+    /// The ring holds a thousand and also carries the retirements, where a drop
+    /// is a leak -- so the news that the tempo moved would be paid for by
+    /// something that matters more. One outstanding message says the same thing.
+    ///
+    /// \note Raised on the audio thread and cleared by the drain, so it is an
+    /// atomic for the same reason `restartRequested_` is.
+    ///                                       (09.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    std::atomic<bool> timingChangeQueued_{false};
 
     ////////////////////////////////////////////////////////////////////////////
     ///

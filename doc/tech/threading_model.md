@@ -124,7 +124,7 @@ engine the main thread owns.
            │     (full copy)          (commands)          process(), then the engine runs
            │
            ├──◀  MainThreadModel  ◀── ToUI ring    ◀──    base changed, chain changed,
-           │                          (events)            retire this pointer
+           │                          (events)            timing changed, retire this pointer
            │
            └──◀  ValueMailbox     ◀── atomics      ◀──    modulated values, per block,
                  (const & to editor)                      coalescing, painting only
@@ -133,7 +133,7 @@ engine the main thread owns.
 | `core/threading/messages.hpp` | cases |
 |---|---|
 | `ToEngine` | `SetBaseParameter`, `SetSlot`, `MoveModule`, `SwapChain`, `SwapSample`, `SetUnexportedLFOParameter` |
-| `ToUI` | `BaseParameterChanged`, `ChainChanged`, `Retire` |
+| `ToUI` | `BaseParameterChanged`, `ChainChanged`, `TimingChanged`, `Retire` |
 
 Both are tagged unions, trivially copyable, owning nothing. Each case says which
 side is responsible for a pointer after it lands, and that is the entire
@@ -160,6 +160,24 @@ is the whole reason for having our own.
 **The mailbox sweeps with `exchange`.** `core/threading/valueMailbox.hpp` is a
 value per dense parameter index plus a bitset of what moved, so a write landing
 mid-sweep is carried into the next sweep rather than lost.
+
+**One case is coalesced before it is sent, and it is the exception that shows
+where the line is.** `TimingChanged` says the host's bar duration or meter moved,
+so that the LFO panel can redraw a period which now means a different number of
+seconds. It is news rather than data — the main thread reads the new timing off
+the engine for itself — so a second copy of it says nothing a first did not. That
+matters because the *rate* is unlike anything else on this ring: a host ramping
+the tempo reports a new bar duration on every block, some hundreds a second,
+and the ring it would fill is the one that also carries `Retire`, where a drop is
+a leak rather than a stale reading. So `SpectrumWorxCLAP::timingChanged()` keeps
+one atomic flag, raises it with the message and lets the drain clear it, and at
+most one is ever outstanding. Nothing else here may do that: every other case
+carries a value or an ownership transfer, and the second of two is not the first.
+
+That is also why a message exists at all. `updateForNewTimingInfo()` is the
+editor's redraw and it had no caller for the life of this port — its 2016 one was
+in a host class the port deleted, and the CLAP equivalent (`updateLFOTiming()`)
+runs on the audio thread, where touching a widget is exactly rule 1.
 
 **Where they are drained.** `drainCommands()` at the top of `process()`, before
 the host's own events so a block's automation wins over anything queued before
