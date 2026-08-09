@@ -93,9 +93,14 @@ void ChannelData::time2DFT(float const *const pInputData, FullChannelData_ReIm &
 
     LE_ASSERT_MSG(frameSize < dftData.size() * 2, "Buffer size incorrect.");
 
-    LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow,
+    /// \note The magnitude bound as well as the finiteness one -- this is the
+    /// frame the FFT is about to be handed, and a huge finite value passes every
+    /// check here and both of the ones on the transform's output, becoming a NaN
+    /// only when squared inside the amplitude conversion. \see
+    /// Math::hundredDecibels.
+    LE_MATH_VERIFY_VALUES(Math::ImplausibleAudio,
                           ReadOnlyDataRange(pInputData, pInputData + fft.size()), "time domain");
-    LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow, window, "window");
+    LE_MATH_VERIFY_VALUES(Math::ImplausibleAudio, window, "window");
 
     float *const windowedTimeData(dftData.jointView().begin());
 

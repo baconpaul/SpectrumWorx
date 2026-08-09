@@ -194,12 +194,16 @@ void Processor::process /// \throws nothing
 {
     auto const numberOfChannels(engineSetup().numberOfChannels());
 
-    LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow,
+    /// \note `ImplausibleAudio` rather than `InvalidOrSlow`: this is the outermost
+    /// point audio arrives from outside the engine, and it is the one place a
+    /// magnitude bound names what is wrong rather than describing what it turned
+    /// into three layers down. \see Math::hundredDecibels.
+    LE_MATH_VERIFY_VALUES(Math::ImplausibleAudio,
                           LE::Utility::makeSpan(interleavedMainInputs, samples * numberOfChannels),
                           "main input");
     if (interleavedSideInputs)
         LE_MATH_VERIFY_VALUES(
-            Math::InvalidOrSlow,
+            Math::ImplausibleAudio,
             LE::Utility::makeSpan(interleavedSideInputs, samples * numberOfChannels), "side input");
 
     LE_ASSERT_MSG(engineSetup().fftSize<std::uint16_t>() &&
@@ -317,11 +321,11 @@ void Processor::processSingleChannel(ProcessParameters const &processParameters)
 
     using namespace Math;
 
-    LE_MATH_VERIFY_VALUES(Math::InvalidOrSlow,
+    LE_MATH_VERIFY_VALUES(Math::ImplausibleAudio,
                           ReadOnlyDataRange(pCompleteNewInput, pCompleteNewInput + inputSamples),
                           "main input");
     LE_MATH_VERIFY_VALUES(
-        Math::InvalidOrSlow,
+        Math::ImplausibleAudio,
         ReadOnlyDataRange(pCompleteNewSideChannel,
                           pCompleteNewSideChannel + (pCompleteNewSideChannel ? inputSamples : 0)),
         "side input");
