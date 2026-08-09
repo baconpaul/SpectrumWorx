@@ -21,6 +21,8 @@
 
 #include <cmath>
 #include <cstdint>
+#include <iterator>
+#include <limits>
 //------------------------------------------------------------------------------
 
 using Catch::Approx;
@@ -140,4 +142,44 @@ TEST_CASE("addPolar sums two phasors", "[math][scalar]")
         CHECK(amplitude == Approx(std::sqrt(2.0f)));
         CHECK(phase == Approx(Math::Constants::pi / 4));
     }
+}
+
+TEST_CASE("The magnitude bound catches what the finiteness guards cannot", "[math][scalar]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    // Uninitialised memory read as float is overwhelmingly huge and *finite*,
+    // so every guard on the engine's input path passed it and it only became a
+    // NaN three layers later, inside the amplitude conversion -- which is why
+    // the assertion that fired named the wrong buffer. 2.9e33 is the value
+    // measured coming out of an unconnected AUv2 bus.
+    ////////////////////////////////////////////////////////////////////////////
+    using namespace LE::Math;
+
+    float const garbage[]{0.1f, -0.2f, 2.9e33f, 0.3f};
+    CHECK(has<InvalidOrSlow>(garbage, std::size(garbage)) == 0); // the whole problem
+    CHECK(has<Above100dB>(garbage, std::size(garbage)) == Above100dB);
+    CHECK((has<ImplausibleAudio>(garbage, std::size(garbage)) & Above100dB) != 0);
+
+    // Ordinary audio, including a good deal louder than full scale, is not it.
+    float const audio[]{0.0f, 1.0f, -1.0f, 31.6f /* +30 dB */, -0.5f};
+    CHECK(has<ImplausibleAudio>(audio, std::size(audio)) == 0);
+
+    // The line itself, and it is a magnitude: the sign does not save a value.
+    float const atTheLine[]{hundredDecibels, -hundredDecibels};
+    CHECK(has<Above100dB>(atTheLine, std::size(atTheLine)) == 0);
+    float const overTheLine[]{-hundredDecibels * 1.001f};
+    CHECK(has<Above100dB>(overTheLine, std::size(overTheLine)) == Above100dB);
+
+    ////////////////////////////////////////////////////////////////////////////
+    // A NaN and an infinity are not this bit's business -- they have their own,
+    // and reporting them twice would say "the magnitude is wrong" about a value
+    // that has no magnitude.
+    ////////////////////////////////////////////////////////////////////////////
+    float const notFinite[]{std::numeric_limits<float>::quiet_NaN(),
+                            std::numeric_limits<float>::infinity()};
+    CHECK(has<Above100dB>(notFinite, std::size(notFinite)) == 0);
+    CHECK(has<ImplausibleAudio>(notFinite, std::size(notFinite)) == (QuietNaN | Infinity));
+
+    // 100 dB over unity, stated as the conversion rather than as a literal.
+    CHECK(normalisedLinear2dB(hundredDecibels) == Approx(100.0f));
 }

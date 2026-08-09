@@ -355,16 +355,21 @@ New entries go at the top of their area.
   port carrying silence from an unpatched one carrying whatever the host left
   behind, which is the entry.
 
-- **The engine's guards are finiteness guards, and garbage is usually finite.**
-  (03.08.2026) Every `LE_MATH_VERIFY_VALUES` on the input path tests `Invalid`
-  (NaN/infinity) or denormals. Uninitialised memory read as float is
-  overwhelmingly *huge and finite* — the measured value was 2.9e33 — so it passes
-  `time2DFT`'s checks on the time domain, on the window and on both FFT outputs,
-  and only becomes NaN when squared inside `vDSP_zvabs`. The assert that fires is
-  therefore three layers away from where the bad data entered, which is why the
-  entry above cost a day. A magnitude bound on the incoming block would have named
-  it immediately; whether the engine should carry one in a release build is a real
-  question and not obviously yes.
+- **A release build still has no magnitude bound on its input.** (03.08.2026,
+  narrowed 09.08.2026) The checked build has one: `Math::Above100dB` is an
+  `LE_MATH_VERIFY_VALUES` class like `Invalid` and `Denormalised`, and
+  `Math::ImplausibleAudio` — the two together — is what `Processor::process`
+  and `ChannelData::time2DFT` now hold their inputs to. That is the whole of what
+  was owed for the *diagnosis*: the value that cost a day was 2.9e33, huge and
+  finite, and it passed every finiteness guard on the way in and became a NaN
+  only when squared three layers down.
+
+  What is not answered is whether a shipping build should carry it. It is one
+  comparison per sample on the audio thread, and the honest use of it would not
+  be an assert but a decision — mute the block, or let it through — which is a
+  question about what a plugin owes a host that hands it garbage. Nothing forces
+  it: the AU case that produced the 2.9e33 was fixed upstream (clap-wrapper
+  #498). See the side-chain entry above.
 
 ## Parameters and LFOs
 

@@ -240,6 +240,26 @@ UnsignedInteger roundUpUnsignedIntegerDivision(UnsignedInteger const dividend,
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief The magnitude `Above100dB` draws the line at: 100 dB over unity.
+///
+/// \note A bound rather than a class, and the one thing every other enumerator
+/// here cannot see. Uninitialised memory read as float is overwhelmingly *huge
+/// and finite* -- the value that reached the FFT from an unconnected AUv2 bus
+/// measured 2.9e33 -- so it passes every finiteness guard on the input path and
+/// only becomes a NaN three layers later, inside `vDSP_zvabs`, where the
+/// assertion that finally fires names the wrong thing. That cost a day.
+///
+/// \note 100 dB is chosen to be far above anything a signal path produces and
+/// far below what garbage reads as. A host may legitimately hand a plugin
+/// something well over 0 dBFS; it will not hand it 1e5.
+///                                           (09.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+float constexpr hundredDecibels{1e5f};
+
 enum FPClass
 {
     SignalingNaN = 1 << 0,
@@ -250,10 +270,16 @@ enum FPClass
     Normalised = 1 << 6,
     Denormalised = 1 << 7,
     Zero = 1 << 8,
+    /// \note Spelled as the violation, like every other enumerator here: a mask
+    /// is the list of things the range must *not* contain, so "no value is above
+    /// 100 dB" is the same statement as "all values are within +/- 100 dB".
+    Above100dB = 1 << 9,
 
     NaN = SignalingNaN | QuietNaN,
     Invalid = NaN | Infinity,
-    InvalidOrSlow = Invalid | Denormalised
+    InvalidOrSlow = Invalid | Denormalised,
+    /// \brief What a buffer arriving from outside the engine has to be.
+    ImplausibleAudio = InvalidOrSlow | Above100dB
 };
 
 template <unsigned FPClasses>
@@ -335,6 +361,13 @@ unsigned int LE_NOINLINE has(float const *LE_RESTRICT pRange, std::size_t rangeS
         else
             result |= (FPClasses & Positive);
 #endif // _MSC_VER
+        /// \note Finite values only. A NaN and an infinity have their own bits
+        /// and every guard on the input path already carries them; this one is
+        /// for the value that passes all of those, which is the whole reason it
+        /// exists.
+        if constexpr (FPClasses & Above100dB)
+            if (std::isfinite(value) && (std::fabs(value) > hundredDecibels))
+                result |= Above100dB;
     }
 
     return result;
@@ -373,6 +406,8 @@ void verifyFPValues(
         LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, "Denormalised value found", location);
     if (fpClasses & FPClasses & Zero)
         LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, "Zero value found", location);
+    if (fpClasses & FPClasses & Above100dB)
+        LE_AUX_VERIFY_FP_VALUES_FAILURE(valueName, "Value beyond +/- 100 dB found", location);
 #undef LE_AUX_VERIFY_FP_VALUES_FAILURE
 #endif // NDEBUG
 }
