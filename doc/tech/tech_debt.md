@@ -200,24 +200,6 @@ New entries go at the top of their area.
 
 ## Threading
 
-- **A "closed" entry can be closed for one of the two things it named.**
-  (06.08.2026) Kept as the shape of a mistake rather than as an open debt. The
-  Waveform/SyncTypes routing was recorded closed earlier the same day, on
-  `ca9029d`, whose message says "an LFO's waveform **and sync mode**". Only the
-  waveform had a route: the waveform popup goes through
-  `updateParameterAndNotifyHost<>`, which queues
-  `ToEngine::SetUnexportedLFOParameter`, and the N/T/D branch of
-  `LFODisplay::buttonClicked()` called `LFO::addSyncType()` on the strip's own
-  LFO — `programMain_`'s — and queued nothing. So a sync-mode change stayed
-  silently inaudible for the rest of the day, under an entry that said it was
-  fixed.
-
-  Both halves are routed now and `tests/gui/lfoDisplayTests.cpp` covers them.
-  What is worth keeping is why nothing caught it: **no case in the suite had ever
-  read the engine's side of an LFO after a UI edit.** The display, `paramsValue`,
-  `stateSave` and the preset writer all answer from the main thread's copy, so
-  every existing case agreed with a change the audio thread never received.
-
 - **A host writing a slot selector allocates on the audio thread.** (02.08.2026,
   narrowed 08.08.2026) The one exception to "modules are built on the main
   thread" (`threading_model.md` §5). Every other route — the interface, a preset,
