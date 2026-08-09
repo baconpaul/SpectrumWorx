@@ -19,7 +19,12 @@
 #include "assert.hpp"
 //------------------------------------------------------------------------------
 
-#if defined(_MSC_VER) && !defined(__clang__)
+/// \note `!defined(__GNUC__)` rather than `!defined(__clang__)`, and abi.hpp
+/// says why: the arms are dialects, and clang-cl speaks the first one.
+/// __forceinline, __declspec(noinline), __declspec(selectany) and __assume are
+/// all accepted by it -- measured, not assumed.
+///                                       (09.08.2026.) (SW port)
+#if defined(_MSC_VER) && !defined(__GNUC__)
 
 #define LE_FORCEINLINE __forceinline
 #define LE_NOINLINE __declspec(noinline)

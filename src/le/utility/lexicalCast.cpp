@@ -347,7 +347,12 @@ namespace
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-#if defined(_MSC_VER) && !defined(__clang__)
+/// \note These three ask which C runtime is underneath, not which dialect the
+/// compiler speaks, and the answer is _MSC_VER on its own: clang-cl links the
+/// same MSVC CRT that cl.exe does, so `!defined(__clang__)` sent it to POSIX
+/// newlocale/strtod_l, which that CRT does not have.
+///                                           (09.08.2026.) (SW port)
+#if defined(_MSC_VER)
 using CLocale = ::_locale_t;
 #else
 using CLocale = ::locale_t;
@@ -359,7 +364,7 @@ CLocale cLocale()
     /// to order against whatever the host runs after main, and one per process is
     /// not a leak that grows.
     static CLocale const locale{
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER)
         ::_create_locale(LC_ALL, "C")
 #else
         ::newlocale(LC_ALL_MASK, "C", nullptr)
@@ -377,7 +382,7 @@ double toDouble(char const *const text, char **const ppEnd)
     if (!locale) [[unlikely]]
         return std::strtod(text, ppEnd);
 
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER)
     return ::_strtod_l(text, ppEnd, locale);
 #else
     return ::strtod_l(text, ppEnd, locale);

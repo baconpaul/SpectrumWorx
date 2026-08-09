@@ -40,7 +40,13 @@ template <class T> struct DummyStorage
     using Storage = typename std::aligned_storage<sizeof(T), std::alignment_of<T>::value>::type;
     DummyStorage() {}
     DummyStorage(DummyStorage const &);
-#ifdef __GNUC__
+    /// \note Was `#ifdef __GNUC__`, which put clang-cl on the const arm and
+    /// broke it. What decides this one is the language rather than the dialect --
+    /// a const member left uninitialised by a constructor is ill-formed, and
+    /// -fms-compatibility does not excuse it -- so the question is which
+    /// compilers enforce the rule, and Clang does under every driver it has.
+    ///                                   (09.08.2026.) (SW port)
+#if defined(__GNUC__) || defined(__clang__)
     Storage storage_; // const on MSVC only: GCC/Clang reject an uninitialised const member
 #else
     Storage const storage_;

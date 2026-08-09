@@ -24,7 +24,17 @@
 /// states the real floor -- MSVC 19.29 -- so a 2010 one only ever answered a
 /// question nobody can ask any more.
 ///                                           (07.08.2026.) (SW port)
-#if defined(_MSC_VER) && !defined(__clang__)
+///
+/// \note `!defined(__GNUC__)`, where this said `!defined(__clang__)`. What the
+/// arms hold is a dialect -- MSVC's keywords or GNU's -- and clang-cl writes
+/// neither answer to the question that was being asked: it defines `__clang__`
+/// and `_MSC_VER` but not `__GNUC__`, so it missed the first arm on the name of
+/// its front end and the second on a macro it does not define, and landed on the
+/// #error. Asked about `__GNUC__` the cascade sorts every compiler by the
+/// dialect it actually speaks, which is what both arms are for. A clang driving
+/// a GNU target still answers `__GNUC__` and still takes the second arm.
+///                                           (09.08.2026.) (SW port)
+#if defined(_MSC_VER) && !defined(__GNUC__)
 
 #define LE_RESTRICT __restrict
 
