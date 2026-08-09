@@ -185,8 +185,8 @@ juce::String ModuleControlBase::getValueString(float const *LE_RESTRICT const pV
     std::array<char, 20> buffer;
     using Printer = Engine::ModuleParameters::ParameterPrinter;
     Printer const printer = {
-        pValue ? *pValue : 0,
-        pValue ? Printer::Unchanged : Printer::Internal,
+        pValue ? std::optional<LE::Plugins::AutomatedParameterValue>(*pValue) : std::nullopt,
+        Printer::Unchanged,
         {LE::Utility::makeSpan(&buffer[0], buffer.size()), moduleUI().editor().engineSetup()}};
     std::uint8_t const parameterIndex(moduleParameterIndex() + 1 /*Bypass*/);
     char const *const pValueString(module().getParameterValueString(parameterIndex, printer));

@@ -309,20 +309,6 @@ New entries go at the top of their area.
 
 ## Host interface
 
-- **`paramsValueToText` ignores the value it is given.** (01.08.2026) It prints
-  the parameter's *current* value whatever it was asked about, which is visible
-  in every automation-lane tooltip in every host — a host asking "what would 0.25
-  read as" is told what the knob reads as now. The fix is an
-  `AutomatedParameterPrinter` arm that takes a value *and* the live parameter, so
-  that a dynamic range has an owner to ask; the source `\todo` has the argument.
-
-  This used to be half of an entry that also covered `paramsTextToValue`
-  returning false. That half closed on 07.08.2026 — `parameter_system.md` §8 —
-  and it closed *without* needing this: parsing never constructs a parameter, so
-  it never had the dynamic-range problem that keeps the printer one-armed. Which
-  is why what is left here is smaller than it looks, and why nothing new depends
-  on it.
-
 - **A load problem has nowhere to go but a modal box.** (08.08.2026) A session
   restore is a load nobody asked for: the host is opening a project, there may be
   no window yet, and a modal dialog in the middle of it stops the host to ask a

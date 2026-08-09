@@ -75,10 +75,6 @@ class Plugin2HostPassiveInteropImpl : public Plugin2HostPassiveInteropController
         result_type operator()(ParameterID::Module const parameterID,
                                Program const *LE_RESTRICT const pProgram) const
         {
-#if defined(_WIN32)
-            LE_ASSUME(baseGetter.printer.valueSource ==
-                      Parameters::AutomatedParameterPrinter::Internal);
-#endif // _WIN32 && ! FMOD
             auto const pModule(
                 pProgram->moduleChain().moduleAs<typename Impl::Module>(parameterID.moduleIndex));
             if (pModule)
@@ -116,6 +112,48 @@ class Plugin2HostPassiveInteropImpl : public Plugin2HostPassiveInteropController
         getParameterDisplay(parameterID, text, pValue, impl().program());
     }
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Which edge a supplied value sits on, by ID type.
+    ///
+    ///   One answer per protocol is what this used to be, and it was wrong for
+    /// two of the four: getParameter() does not answer in the same units for
+    /// every ID type, and a printer told the wrong one silently prints the wrong
+    /// number rather than failing. Read against ParameterGetter and
+    /// ParameterParser, which are the same three-way agreement seen from the
+    /// other two sides.
+    ///
+    ///   A module or LFO parameter's automation value *is* the engine's stored
+    /// value when the protocol is not normalised -- see
+    /// Automation::internal2AutomatedValue, whose whole body for that case is
+    /// `return internalValue` -- so it wants no conversion at all. A global's
+    /// and a slot selector's went out through the protocol's range mapping and
+    /// have to come back through it.
+    ///
+    /// \note It cost nothing until 08.2026 because nothing ever supplied a
+    /// value: `paramsValueToText` passed a null and rendered the parameter's own.
+    ///                                       (09.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    static LE::Parameters::AutomatedParameterPrinter::ValueSource
+    valueSourceFor(ParameterID const parameterID)
+    {
+        using Printer = LE::Parameters::AutomatedParameterPrinter;
+        if (AutomatedParameter::normalised)
+            return Printer::NormalisedLinear;
+        switch (parameterID.type())
+        {
+        case ParameterID::ModuleParameter:
+        case ParameterID::LFOParameter:
+            return Printer::Unchanged;
+        case ParameterID::GlobalParameter:
+        case ParameterID::ModuleChainParameter:
+            break;
+        }
+        return Printer::Linear;
+    }
+
     void getParameterDisplay(ParameterID const parameterID, LE::Utility::Span<char> const text,
                              Plugins::AutomatedParameterValue const *LE_RESTRICT const pValue,
                              Program const &program) const
@@ -124,16 +162,9 @@ class Plugin2HostPassiveInteropImpl : public Plugin2HostPassiveInteropController
         //...mrmlj...(printing required both in the DSP and UI)...
 
         // http://www.juce.com/forum/topic/juce-module-automatically-handle-plugin-parameters
-#if defined(_WIN32)
-        LE_ASSUME(pValue == nullptr);
-#endif // _WIN32 && !FMOD
-        using AutomatedParameter = typename Plugins::AutomatedParameterFor<Protocol>::type;
         ParameterValueStringGetter const getter = {
-            {pValue ? *pValue : 0,
-             pValue ? std::is_same<AutomatedParameter, Plugins::FullRangeAutomatedParameter>::value
-                          ? LE::Parameters::AutomatedParameterPrinter::Linear
-                          : LE::Parameters::AutomatedParameterPrinter::NormalisedLinear
-                    : LE::Parameters::AutomatedParameterPrinter::Internal,
+            {pValue ? std::optional<Plugins::AutomatedParameterValue>(*pValue) : std::nullopt,
+             valueSourceFor(parameterID),
              {text, impl().engineSetup()}}};
         char const *const pValueString(invokeFunctorOnIdentifiedParameter(
             parameterID, std::forward<ParameterValueStringGetter const>(getter), &program));

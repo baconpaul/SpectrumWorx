@@ -91,12 +91,15 @@ char const *AutomatedModuleImpl<Impl>::getParameterValueString(
     if (index >= impl().numberOfParameters())
         return nullptr;
 
-    if (printer.valueSource == LE::Parameters::AutomatedParameterPrinter::Internal)
+    /// \note An effect's parameters are reached by index through a static
+    /// invoker, which has the type and no object, so the printer has to be given
+    /// a value. Asked about the parameter's own, that value is read here -- this
+    /// is the level that knows where a module keeps it.
+    if (!printer.forValue)
     {
-        printer.automationValue =
-            (index < Engine::ModuleParameters::BaseParameters::static_size)
-                ? impl().getBaseParameter(index)
-                : impl().getEffectParameter(impl().effectSpecificParameterIndex(index));
+        printer.forValue = (index < Engine::ModuleParameters::BaseParameters::static_size)
+                               ? impl().getBaseParameter(index)
+                               : impl().getEffectParameter(impl().effectSpecificParameterIndex(index));
         printer.valueSource = LE::Parameters::AutomatedParameterPrinter::Unchanged;
     }
 
