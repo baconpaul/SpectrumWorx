@@ -1274,6 +1274,46 @@ void SpectrumWorxCLAP::updateLFOTiming(clap_process const *const process) noexce
         timingChanged();
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Does the host say every channel of \p buffer is a constant, and is
+/// every one of those constants zero?
+///
+/// \note `constant_mask` is a *hint* -- `audio-buffer.h` says so -- and a host
+/// that sets none reads as "no", which is the behaviour that was here before it
+/// was consulted at all. A host that sets one has undertaken to fill the buffer
+/// with the constant as well ("this implies that the buffer must be filled with
+/// the constant value"), which is what makes reading sample 0 the right question
+/// rather than a guess.
+///
+/// \note Every channel, and no partial arm. A port with one constant channel and
+/// one carrying audio is carrying audio; substituting the constant for the quiet
+/// half would be a third behaviour to explain and nothing has been observed
+/// producing one.
+///                                           (09.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+bool isDeclaredSilent(clap_audio_buffer const &buffer) noexcept
+{
+    /// \note `constant_mask` is 64 bits wide, so a channel past the 64th has no
+    /// bit and cannot be declared anything.
+    if (!buffer.data32 || (buffer.channel_count == 0) || (buffer.channel_count > 64))
+        return false;
+
+    for (std::uint32_t channel(0); channel < buffer.channel_count; ++channel)
+    {
+        if ((buffer.constant_mask & (std::uint64_t(1) << channel)) == 0)
+            return false;
+        if (!buffer.data32[channel] || (buffer.data32[channel][0] != 0))
+            return false;
+    }
+    return true;
+}
+} // anonymous namespace
+
 void SpectrumWorxCLAP::runEngine(clap_process const *const process) noexcept
 {
     if ((process->audio_inputs_count == 0) || (process->audio_outputs_count == 0))
@@ -1295,12 +1335,46 @@ void SpectrumWorxCLAP::runEngine(clap_process const *const process) noexcept
     if (!engineRunning_)
         return;
 
-    // The engine reads a side channel whenever the input mode calls for one, and
-    // does not check that the host actually connected the port.
-    float const *const *sideChannels(
-        ((process->audio_inputs_count > 1) && process->audio_inputs[1].data32)
-            ? process->audio_inputs[1].data32
-            : input.data32);
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The engine reads a side channel whenever the input mode calls for
+    /// one, and does not check that the host connected the port. Three
+    /// arrangements fall back to the main input, which is the documented
+    /// behaviour for an unpatched side chain -- a Blender with nothing patched
+    /// blends the signal with itself:
+    ///
+    ///   - no second port in the count at all;
+    ///   - a second port with no `data32`;
+    ///   - a second port the host declares constant and zero.
+    ///
+    ///   The third is `clap_audio_buffer::constant_mask` and is new as of
+    /// 09.08.2026. Before it the first two were the whole test, and **no real
+    /// host takes either**: every wrapper hands over a buffer it owns. So what an
+    /// unpatched side chain contained was whatever the host left there, the
+    /// documented behaviour was unreachable, and it is how uninitialised memory
+    /// reached the FFT from an AUv2 bus.
+    ///
+    /// \note What the mask cannot say is *why* a channel is constant. An
+    /// unpatched port and a patched send that has gone quiet are both a constant
+    /// zero, and they take the same arm here: a side chain carrying no signal is
+    /// the main input, whichever of the two it is. That is a real consequence and
+    /// it is the chosen one -- a muted send audibly switches to blending with
+    /// itself and switches back when it un-mutes.
+    ///
+    /// \note And it is a *hint*: `audio-buffer.h` says so in as many words, and
+    /// neither clap-wrapper nor a given DAW is known to set it. Nothing here
+    /// depends on it. A mask of zero is exactly the behaviour that was here
+    /// before, so a host that never sets one loses nothing and a host that does
+    /// gets the behaviour that was intended in 2016.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    bool const sideChainCarriesSignal((process->audio_inputs_count > 1) &&
+                                      process->audio_inputs[1].data32 &&
+                                      !isDeclaredSilent(process->audio_inputs[1]));
+
+    float const *const *sideChannels(sideChainCarriesSignal ? process->audio_inputs[1].data32
+                                                            : input.data32);
 
     ////////////////////////////////////////////////////////////////////////////
     // An external audio file, when one is loaded, in place of the port.
