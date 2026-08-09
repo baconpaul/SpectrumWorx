@@ -489,7 +489,7 @@ TEST_CASE("A second activate while the first is still processing changes nothing
 ///   The other half of it is a realtime-sanitizer run, where the free inside the
 /// callback is reported directly:
 ///
-///     cmake -B build-rtsan -D SW_SANITIZER=realtime -D SW_BUILD_PLUGIN_BUNDLES=OFF \
+///     cmake -B build-rtsan -D SW_SANITIZER=realtime -D SW_BUILD_PLUGIN_BUNDLES=OFF
 ///           -D CMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++
 ///
 ////////////////////////////////////////////////////////////////////////////////
