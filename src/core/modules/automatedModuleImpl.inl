@@ -97,9 +97,10 @@ char const *AutomatedModuleImpl<Impl>::getParameterValueString(
     /// is the level that knows where a module keeps it.
     if (!printer.forValue)
     {
-        printer.forValue = (index < Engine::ModuleParameters::BaseParameters::static_size)
-                               ? impl().getBaseParameter(index)
-                               : impl().getEffectParameter(impl().effectSpecificParameterIndex(index));
+        printer.forValue =
+            (index < Engine::ModuleParameters::BaseParameters::static_size)
+                ? impl().getBaseParameter(index)
+                : impl().getEffectParameter(impl().effectSpecificParameterIndex(index));
         printer.valueSource = LE::Parameters::AutomatedParameterPrinter::Unchanged;
     }
 
