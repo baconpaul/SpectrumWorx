@@ -592,9 +592,12 @@ New entries go at the top of their area.
   Upstream's, and it is only visible to a host that answers `clap.thread-check`,
   which is why nothing had seen it. `TestHost` filters the two `clap.log`
   messages by exact wording; the third — `getParamInfoForParamId`'s own
-  `checkMainThread()` — goes straight to `std::cerr` and cannot be intercepted at
-  all, so it is one line of noise per flush on the test output. Worth a
-  clap-helpers issue; worth nothing local.
+  `checkMainThread()` — goes straight to `std::cerr`, which
+  `SWTest::CapturedStandardError` takes for the length of a scope (09.08.2026),
+  so the noise is off the test output and the one case that asserts about it says
+  which line it expects. Worth a clap-helpers issue; the local half is a
+  workaround rather than a fix, and it is written to go red if the wording ever
+  changes.
 
 - **`ActivePlugin` is the only harness that flushes on the thread CLAP says to.**
   (03.08.2026) `params.flush()` is `[active ? audio-thread :
@@ -607,15 +610,25 @@ New entries go at the top of their area.
   Converting them to `plugin.flush(…)` is mechanical and would put the whole
   parameter-event path on the audio thread under tsan and rtsan, where it belongs.
 
-- **A `checkMainThread()` failure is invisible to `TestHost`, and one case
-  overclaims because of it.** (03.08.2026) clap-helpers'
+- **A `checkMainThread()` failure is asserted in one case and invisible in every
+  other.** (03.08.2026, narrowed 09.08.2026) clap-helpers'
   `checkMainThread`/`checkAudioThread` write to `std::cerr` directly
   (plugin.hxx:2219, 2233) rather than through `hostMisbehaving`, so nothing that
   routes through `clap.log` can see them — which is the same limitation the flush
-  entry above records, seen from the other end. The consequence is that
-  `hostInteropTests.cpp`'s "Driven the way a DAW drives it, **nobody
-  misbehaves**" asserts only over the reports that *can* be intercepted: that
-  case emits one such line to stderr and passes. Either capture stderr in
-  `TestHost` for the duration of a case and assert on it too, or rename the case
-  to what it actually checks. The first is worth more and is not hard.
+  entry above records, seen from the other end.
+
+  `SWTest::CapturedStandardError` is the answer to that, and it is fifteen lines:
+  a `std::cerr.rdbuf()` swap for the length of a scope. `hostInteropTests.cpp`'s
+  "Driven the way a DAW drives it, nobody misbehaves" now says so — it captures
+  the whole case, with a *nested* capture around the one flush that is known to
+  emit upstream's line, so the outer assertion needs no filter on the wording.
+  That matters: a genuine violation is worded identically, and a filter would
+  hide exactly what the case is for.
+
+  What is left is that **no other case does it**, so the guarantee is one case
+  wide. Making it every case means capturing in `TestHost` itself, and that costs
+  something the standalone class does not: `std::cerr` is process-wide and a
+  `std::stringbuf` written from two threads at once is a race, so a case with an
+  audio thread of its own (`threadingTests.cpp`) could not have one. Whether that
+  is worth a mutex in the harness is the open question.
 
