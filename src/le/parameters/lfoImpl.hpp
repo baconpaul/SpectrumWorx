@@ -257,7 +257,7 @@ class LFOImpl : public LFO
         /// they are read by `snapPeriodScale()`, `clampFreePeriod()` and the two
         /// period-scale bounds, all *static* and all called from the parameter
         /// layer and the editor, so a per-instance timer means threading one
-        /// through the LFO parameter interface. Recorded in tech_debt.md.
+        /// through the LFO parameter interface. Recorded in issue #11.
         ///                                   (02.08.2026.) (SW port)
         ///
         /// \note There used to be a third, `hasTempoInformation_`, and it was the

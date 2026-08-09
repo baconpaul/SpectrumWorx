@@ -3,8 +3,7 @@
 /// presetFileTests.cpp
 /// -------------------
 ///
-///   Two holes, both on the *file* side of loading a preset, and both recorded
-/// in doc/tech/todo.md.
+///   Two holes, both on the *file* side of loading a preset.
 ///
 ///   **Loading one preset on top of another.** `presetCorpusTests.cpp` uses a
 /// fresh engine per preset, deliberately and correctly -- a snapshot in which

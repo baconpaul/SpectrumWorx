@@ -184,7 +184,7 @@ asking the question in August 2026.
 
 `Timer`'s bar duration and measure numerator are **process-wide statics** —
 `std::atomic`, so not a data race, but two tracks at two tempi still see one
-tempo. `tech_debt.md` has it. The parameter layer no longer reads them for
+tempo. Issue #11 has it. The parameter layer no longer reads them for
 anything but the snap grid, which is what made the corpus digests order-dependent
 and is the half that mattered most.
 

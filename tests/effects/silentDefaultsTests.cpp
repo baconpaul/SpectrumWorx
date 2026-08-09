@@ -8,7 +8,7 @@
 /// those 25 rows agree with every build ever made and say nothing about any of
 /// them. `goldenTests.cpp`'s own drift report counts them for that reason.
 ///
-///   doc/tech/todo.md offered an explanation and a fix -- that the sample loader
+///   An explanation and a fix were once offered -- that the sample loader
 /// used to be compiled out, and that a fixture could now load a factory sample
 /// by name. Neither survives contact:
 ///

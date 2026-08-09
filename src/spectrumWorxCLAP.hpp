@@ -518,7 +518,7 @@ class SpectrumWorxCLAP final
     ///     `presetLoading.cpp`'s `Loader::mainThreadCopy`.
     ///
     /// \note One thing the two copies still disagree about, and it is filed under
-    /// item 1 of doc/tech/todo.md: a module built here is built at a different
+    /// issue #11: a module built here is built at a different
     /// *moment* than the engine's, and `LFOImpl::SyncTypes::default_()` reads
     /// process-global tempo state, so a slot filled either side of the transport
     /// becoming known defaults its LFOs differently.

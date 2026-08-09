@@ -6,7 +6,7 @@ parameters are addressed, and [`streaming_format.md`](streaming_format.md),
 which is what reaches a file.
 
 Everything described here is in the tree and has tests naming it. What the model
-deliberately does *not* solve is in [`tech_debt.md`](tech_debt.md).
+deliberately does *not* solve is in the issue tracker.
 
 ---
 
@@ -290,7 +290,7 @@ working without a message pump, and what makes the preset loader one code path.
 does the allocation and the audio thread only links the result. The one
 exception is a *host* writing a slot selector: that arrives as a parameter event
 inside `process()`, and deferring it would mean a round trip to the main thread
-and back — so it still allocates. Recorded in `tech_debt.md`. It is an
+and back — so it still allocates. Recorded as issue #9. It is an
 allocation and **only** an allocation: the module it displaces leaves by the
 retire route like every other, and a realtime-sanitizer run over
 `tests/clap/threadingTests.cpp` reports the one and not the other.
@@ -355,7 +355,7 @@ chain in `activate()`.
 > the FFT size from the host's own generic panel while audio runs. A host that
 > ignores the request leaves that parameter reading one thing and the engine
 > running another — visible, harmless, and not what anyone asked for. It is on
-> `todo.md`'s by-hand checklist for that reason.
+> the by-hand checklist for that reason.
 
 ---
 
@@ -416,7 +416,7 @@ The inventory the model is measured by.
 | `PopupMenu::menuActive_` | a member, per menu and therefore per editor; menus are dismissed before a strip, a chain or a program is replaced | ✅ |
 | `Host2PluginInteropControler::blockAutomation_` | the interface's own, main thread only, since the assertion that read it from the audio thread went | ✅ |
 | The editor pointer the plugin holds | `pEditor_`, set and cleared by the editor naming itself, so an unparented editor's teardown cannot clear a live one's | ✅ |
-| **`LFOImpl::Timer`'s tempo** | three process-wide statics, `std::atomic` — no longer a race, still shared between instances | `tech_debt.md` |
+| **`LFOImpl::Timer`'s tempo** | three process-wide statics, `std::atomic` — no longer a race, still shared between instances | issue #11 |
 | `SkinLifetime::liveEditors_` | a process-wide count, main thread only — every editor is built and destroyed there | ✅ |
 | `PresetLoadReport` | a file-scope report the loader counts into and the caller takes; main thread only, and `stateLoad` drops it | ✅ |
 | `Theme::settings()` | process-wide, and arguably correct: these are application preferences | not addressed |

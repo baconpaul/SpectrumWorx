@@ -1314,7 +1314,7 @@ TEST_CASE("A playing transport drives the LFO from song position", "[clap][lfo]"
 ///
 /// \note The slots are filled through the *host's* parameter route, which is the
 /// one remaining path that allocates inside the callback -- the granted
-/// concession, recorded in tech_debt.md. So they are filled before the measured
+/// concession, recorded in issue #9. So they are filled before the measured
 /// blocks, not during them, and a `SW_SANITIZER=realtime` run that reports
 /// `ModuleFactory::create` here would be reporting a known one.
 ///

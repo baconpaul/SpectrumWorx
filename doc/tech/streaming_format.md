@@ -3,7 +3,7 @@
 What goes into a `.swp` file and into the session state a host hands back, how it
 is keyed, and what may and may not be renamed. Companion to
 [`parameter_system.md`](parameter_system.md), which is how a parameter is
-addressed before it reaches a file, and [`tech_debt.md`](tech_debt.md).
+addressed before it reaches a file.
 
 Written 01–02.08.2026, as the work happened. Everything described here is in the
 tree and has tests naming it.
@@ -149,7 +149,7 @@ same preset in three four genuinely produces a different period.
 `snapSyncedPeriodScale()` reads `Timer::measureNumerator()`, which is still a
 process-global static. Nothing in either binary drives a meter other than 4/4
 outside the scope guard in `lfoTests.cpp`, so this is a hazard rather than a
-symptom — see `tech_debt.md`.
+symptom — see issue #14.
 
 ---
 

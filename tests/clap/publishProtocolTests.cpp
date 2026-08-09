@@ -194,8 +194,8 @@ TEST_CASE("A module the engine displaces is released rather than leaked", "[clap
 ///   They deliberately assert the *divergence* as well as the count. The counter
 /// is not a repair and pretending otherwise would be the same mistake in a
 /// different place -- what is lost is lost, because the ring is where the
-/// information to put it back would have been. `tech_debt.md` carries the
-/// lossless-echo design that would make this unreachable.
+/// information to put it back would have been. A lossless echo would make this
+/// unreachable, and is a bigger change than a bug fix.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 

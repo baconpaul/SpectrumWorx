@@ -1786,7 +1786,7 @@ void SpectrumWorxEditor::parameterChangedElsewhere(ParameterID const parameterID
     case ParameterID::GlobalParameter:
         /// \note The six global knobs. `updateForGlobalParameterChange()` and
         /// `updateGlobalParameterWidget<>` have had no callers since the 2016
-        /// plugin class was deleted -- `tech_debt.md` records that host automation
+        /// plugin class was deleted -- so host automation
         /// of a global never moved the editor -- and this is the route that gives
         /// them one back, without the audio-thread write the naive fix would have
         /// recreated.

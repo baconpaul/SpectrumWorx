@@ -86,7 +86,7 @@ The knob film strips (`02`, `03`, `12`, `63`, `64`) are converted too, by
 `run_knobs.py`, keeping the 127-frame layout the widgets index into. Each frame
 is one `<use>` of a knob defined once, so 415 KB of PNG comes to 121 KB of SVG.
 That the strips *should not be* 127 frames at all is a separate matter, recorded
-in `doc/tech/tech_debt.md`; converting them does not address it.
+in issue #20; converting them does not address it.
 
 Three JUCE facts shape those files, and any other use of `<use>` here:
 

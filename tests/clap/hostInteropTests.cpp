@@ -507,8 +507,8 @@ TEST_CASE("Flushing is an audio-thread call only while the plugin is active", "[
     /// predicate lie. What would catch it is rtsan, which the scope also opens:
     /// under `-fsanitize=realtime` an inactive flush that took the scope would
     /// report every allocation on the main thread. That is a sanitizer build's
-    /// job, not this one's, and it is recorded in tech_debt.md rather than
-    /// pretended at here. What is pinned below is the half that *is* visible:
+    /// job, not this one's, and it is not pretended at here. What is pinned
+    /// below is the half that *is* visible:
     /// both flushes are legal, neither is reported, and neither leaks the scope.
     ///
     ////////////////////////////////////////////////////////////////////////////

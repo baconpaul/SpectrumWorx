@@ -413,7 +413,7 @@ bool SpectrumWorxCLAP::activate(double const sampleRate, std::uint32_t,
         /// user standing in front of it to answer one; a modal box in `activate`
         /// stops the host mid-restore. What is already loaded stays loaded, at
         /// the wrong rate, which is what happened before this ran at all.
-        /// \see tech_debt.md, "A load problem has nowhere to go but a modal box".
+        /// \see issue #12, "A load problem has nowhere to go but a modal box".
         [[maybe_unused]] auto const *const pErrorMessage(decodeAndPublishSample(sampleFile_));
         LE_ASSERT_MSG(!pErrorMessage, "A sample that loaded once did not load again.");
     }
@@ -1195,7 +1195,7 @@ clap_process_status SpectrumWorxCLAP::process(clap_process const *const process)
 /// editor's N/T/D sync buttons, printed the period in milliseconds rather than
 /// note ratios, and defaulted every new LFO to Free. The first two no longer ask
 /// -- there is always a tempo, the host's or an assumed 120 BPM 4/4 -- and the
-/// third is the flag's last reader; see tech_debt.md.
+/// third is the flag's last reader; see issue #11.
 ///
 ///   Three cases where 2016 had two, because a CLAP transport can be present and
 /// parked:
@@ -1573,7 +1573,7 @@ void SpectrumWorxCLAP::drainCommands()
 /// \note A lossless echo is the design answer if this is ever seen above zero
 /// in the field, and it is a bigger change than a bug fix: `ValueMailbox` cannot
 /// overflow and coalesces, and the note on it explains why base values were put
-/// in the ring instead. `tech_debt.md` carries that.
+/// in the ring instead.
 ///
 /// \note A counter and **not** an assertion, which is a deliberate departure
 /// from the `LE_ASSERT_MSG(false, ...)` that stood at the two publish.cpp sites.
@@ -2263,7 +2263,7 @@ catch (...)
 ///     state a host hands back is a better home for it than the settings file
 ///     this plugin does not have;
 ///   - the preset browser's location and selection -- it does not remember where
-///     it was, doc/tech/todo.md, for the session case;
+///     it was, for the session case;
 ///   - the interface settings (opacity, mouse-over reaction, LFO update
 ///     behaviour, hide-cursor-on-knob-drag), which the CLAP build persists
 ///     nowhere at all. Those are arguably user preferences rather than session
