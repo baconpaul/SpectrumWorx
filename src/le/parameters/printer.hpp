@@ -26,6 +26,8 @@
 #include "le/utility/platformSpecifics.hpp"
 #include "le/utility/tchar.hpp"
 
+#include <optional>
+
 namespace LE::Parameters
 {
 
@@ -91,33 +93,70 @@ struct Printer
     PrinterBase printer;
 }; // struct Printer
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \struct AutomatedParameterPrinter
+///
+/// \brief Renders either a parameter's own value or a value somebody is asking
+/// a what-if question about.
+///
+/// \note `forValue` engaged is the what-if: a host's automation lane asking
+/// "what would 0.25 read as" rather than "what does this read as now". Nothing
+/// but an optional distinguishes the two -- an `Internal` enumerator used to,
+/// and it meant exactly "the value member is not a value", which is what
+/// `std::nullopt` says without a second thing to keep in step.
+///
+/// \note Disengaged is not a value of `valueSource`, so a caller that has no
+/// value to give still has to name the edge it *would* be on. That costs
+/// nothing and keeps the two questions from sharing a spelling.
+///                                           (09.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
 struct AutomatedParameterPrinter
 {
     using result_type = ParameterPrinter::result_type;
 
+    /// \brief Which edge \p forValue is expressed on.
     enum ValueSource : std::uint8_t
     {
         NormalisedLinear,
         Linear,
-        Unchanged,
-        Internal
+        Unchanged
     };
 
     template <class Parameter> result_type operator()(Parameter const &parameter) const
     {
-        switch (valueSource)
-        {
-        case Internal:
+        if (!forValue)
             return printer.operator()<Parameter>(parameter.getValue());
-        default:
-            return this->operator()<Parameter>();
-        }
+        return this->operator()<Parameter>();
     }
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The arm for a caller that has no parameter object to offer.
+    ///
+    ///   Every module and effect parameter goes through here: they are reached
+    /// by index through a static invoker (EffectParameterPrinter), which knows
+    /// the *type* and never has an instance. So the value has to have been
+    /// supplied.
+    ///
+    /// \note The converted value is printed directly rather than assigned to a
+    /// `Parameter` first. That temporary was the reason `paramsValueToText`
+    /// could not honour the value it was given: default-constructing one runs
+    /// `isValidValue` on a detached object, and a dynamic range finds its limits
+    /// by walking from its own address to the owner that has none -- so a
+    /// perfectly ordinary what-if question aborted a checked build. Nothing
+    /// needed the object; `print()` takes a value.
+    ///                                       (09.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
 
     template <class Parameter> result_type operator()() const
     {
-        float const automationValue(this->automationValue);
-        Parameter parameterValue;
+        LE_ASSERT_MSG(forValue, "Nothing to print: no parameter object and no value.");
+        auto const automationValue(*forValue);
+        typename Parameter::value_type parameterValue{};
         /// \note An ad hoc double-dispatch implementation to account for both
         /// the different automation/parameter marshaling ABIs as well as for
         /// different parameter types (with different printing logic).
@@ -126,25 +165,26 @@ struct AutomatedParameterPrinter
         switch (valueSource)
         {
         case NormalisedLinear:
-            parameterValue.setValue(
+            parameterValue =
                 Plugins::NormalisedAutomatedParameter::convertAutomationToParameterValue<Parameter>(
-                    automationValue));
+                    automationValue);
             break;
         case Linear:
-            parameterValue.setValue(
+            parameterValue =
                 Plugins::FullRangeAutomatedParameter ::convertAutomationToParameterValue<Parameter>(
-                    automationValue));
+                    automationValue);
             break;
         case Unchanged:
-            parameterValue.setValue(Math::convert<typename Parameter::value_type>(automationValue));
+            parameterValue = Math::convert<typename Parameter::value_type>(automationValue);
             break;
-            //return printer.operator()<Parameter>( automationValue );
             LE_DEFAULT_CASE_UNREACHABLE();
         }
-        return printer.operator()<Parameter>(parameterValue.getValue());
+        return printer.operator()<Parameter>(parameterValue);
     }
 
-    mutable float automationValue;
+    /// \brief The value to answer about, or nothing to answer about the
+    /// parameter's own.
+    mutable std::optional<Plugins::AutomatedParameterValue> forValue;
     mutable ValueSource valueSource;
     PrinterBase printer;
 }; // struct AutomatedParameterPrinter

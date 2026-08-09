@@ -652,10 +652,10 @@ TEST_CASE("Every parameter accepts the bounds it advertises", "[clap]")
 
                 /// \note And asked to render it, which is the other half of what
                 /// a host does when it rescans -- get_info, get_value,
-                /// value_to_text over the whole list. The renderer builds a
-                /// throwaway parameter and assigns the value to it, so a value it
-                /// considers invalid asserts there rather than anywhere that
-                /// matters (printer.hpp's AutomatedParameterPrinter).
+                /// value_to_text over the whole list. The renderer used to build
+                /// a throwaway parameter and assign the value to it, and a
+                /// detached parameter is what asserted; it prints the converted
+                /// value now (printer.hpp's AutomatedParameterPrinter).
                 std::array<char, 128> text{};
                 CHECK(params.value_to_text(&*plugin, info.id, value, text.data(), text.size()));
             }
@@ -922,12 +922,15 @@ TEST_CASE("A normalised parameter still reads in the effect's own units", "[clap
     // the enumerated module parameters keep their names, too, now that they can
     // no longer advertise a step count.
     //
-    /// \note What is checked is that the text is in the effect's units, not that
-    /// it answers about the value passed in. paramsValueToText deliberately
-    /// renders the parameter's own value and ignores the argument -- see the note
-    /// there on the printer and dynamic ranges -- so asking about a particular
-    /// value would be asserting the opposite of what the code does. The value
-    /// below is arbitrary for that reason.
+    /// \note What is checked here is that the text is in the effect's units.
+    /// That it is the *asked-about* value's text rather than the parameter's own
+    /// is parameterTextTests.cpp's, which is where the pair of them is held to
+    /// being each other's inverse.
+    ///
+    ///   The edge asked about is 1.0, the top of the normalised range, and that
+    /// is what makes the count below mean something: a parameter converting into
+    /// its own units reads as its maximum in those units, so a text of "1" says
+    /// nothing was converted.
     Entry const entry;
     ActivePlugin plugin(48000, 512);
 

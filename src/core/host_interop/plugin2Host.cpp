@@ -444,42 +444,41 @@ Plugin2HostPassiveInteropController::ParameterLabelGetter::operator()(
 char const *Plugin2HostPassiveInteropController::ParameterValueStringGetter::operator()(
     ParameterID::Global const parameterID, Program const *LE_RESTRICT const pProgram) const
 {
-#if defined(_WIN32)
-    LE_ASSUME(printer.valueSource == Parameters::AutomatedParameterPrinter::Internal);
-#endif // _WIN32 && ! FMOD
     return LE::Parameters::invokeFunctorOnIndexedParameter(
         pProgram->parameters(), parameterID.index,
         std::forward<Parameters::AutomatedParameterPrinter const>(printer));
 }
 
+/// \note The three `#if defined(_WIN32) LE_ASSUME( ... == Internal )` lines that
+/// stood in this file are gone. They recorded that on Windows -- VST 2.4, which
+/// never asks a plugin what some *other* value would read as -- the printer was
+/// only ever asked about the parameter's own. CLAP does ask, on every platform,
+/// so they had become false facts handed to the optimiser.
+///                                           (09.08.2026.) (SW port)
 char const *Plugin2HostPassiveInteropController::ParameterValueStringGetter::operator()(
     ParameterID::ModuleChain const parameterID, Program const *LE_RESTRICT const pProgram) const
 {
-#if defined(_WIN32)
-    LE_ASSUME(printer.valueSource == Parameters::AutomatedParameterPrinter::Internal);
-#endif // _WIN32 && ! FMOD
-
-    ModuleChainParameter parameter;
-    switch (printer.valueSource)
-    {
-    case Parameters::AutomatedParameterPrinter::NormalisedLinear:
-        parameter = Plugins::NormalisedAutomatedParameter::convertAutomationToParameterValue<
-            ModuleChainParameter>(printer.automationValue);
-        break;
-    case Parameters::AutomatedParameterPrinter::Linear:
-        parameter = Plugins::FullRangeAutomatedParameter ::convertAutomationToParameterValue<
-            ModuleChainParameter>(printer.automationValue);
-        break;
-    case Parameters::AutomatedParameterPrinter::Unchanged:
-        parameter = Math::convert<ModuleChainParameter::value_type>(printer.automationValue);
-        break;
-    case Parameters::AutomatedParameterPrinter::Internal:
+    ModuleChainParameter::value_type parameter(noModule);
+    if (!printer.forValue)
         parameter = pProgram->moduleChain().getParameterForIndex(parameterID.moduleIndex);
-        break;
-        LE_DEFAULT_CASE_UNREACHABLE();
-    }
+    else
+        switch (printer.valueSource)
+        {
+        case Parameters::AutomatedParameterPrinter::NormalisedLinear:
+            parameter = Plugins::NormalisedAutomatedParameter::convertAutomationToParameterValue<
+                ModuleChainParameter>(*printer.forValue);
+            break;
+        case Parameters::AutomatedParameterPrinter::Linear:
+            parameter = Plugins::FullRangeAutomatedParameter ::convertAutomationToParameterValue<
+                ModuleChainParameter>(*printer.forValue);
+            break;
+        case Parameters::AutomatedParameterPrinter::Unchanged:
+            parameter = Math::convert<ModuleChainParameter::value_type>(*printer.forValue);
+            break;
+            LE_DEFAULT_CASE_UNREACHABLE();
+        }
 
-    return (parameter.getValue() != noModule) ? Effects::effectName(parameter) : emptySlot;
+    return (parameter != noModule) ? Effects::effectName(parameter) : emptySlot;
 }
 
 #if 0
@@ -499,10 +498,6 @@ char const * Plugin2HostPassiveInteropController::ParameterValueStringGetter::op
 char const *Plugin2HostPassiveInteropController::ParameterValueStringGetter::operator()(
     ParameterID::LFO const parameterID, Program const *LE_RESTRICT const pProgram) const
 {
-#if defined(_WIN32)
-    LE_ASSUME(printer.valueSource == Parameters::AutomatedParameterPrinter::Internal);
-#endif // _WIN32 && ! FMOD
-
     auto const pModule(pProgram->moduleChain().module(parameterID.moduleIndex));
     if (!pModule || (parameterID.moduleParameterIndex >= pModule->numberOfLFOControledParameters()))
         return nullptr;
@@ -533,20 +528,28 @@ char const *Plugin2HostPassiveInteropController::ParameterValueStringGetter::ope
         break;
     }
 
-    if (printer.valueSource == Parameters::AutomatedParameterPrinter::Internal)
+    if (!printer.forValue)
     {
-        printer.valueSource = Parameters::AutomatedParameterPrinter::NormalisedLinear;
         switch (lfoParameterIndex)
         {
         case lowerBoundIndex:
-            printer.automationValue = lfo.lowerBound();
+            printer.forValue = lfo.lowerBound();
             break;
         case upperBoundIndex:
-            printer.automationValue = lfo.upperBound();
+            printer.forValue = lfo.upperBound();
             break;
             LE_DEFAULT_CASE_UNREACHABLE();
         }
     }
+
+    /// \note Whichever side supplied it. A bound is shown in the units of the
+    /// parameter it modulates -- that is what the delegation on the next line is
+    /// -- and its own range is 0..1, so it is a normalised position across that
+    /// parameter whether it came from the LFO or from a host asking about one.
+    /// The edge the caller named was the edge of the *LFO* parameter and does
+    /// not survive the change of subject. ParameterParser's LFO arm reads them
+    /// back the same way round.
+    printer.valueSource = Parameters::AutomatedParameterPrinter::NormalisedLinear;
 
     return Automation::getParameterValueString(moduleParameterIndex, printer, *pModule);
 }

@@ -399,11 +399,28 @@ box, whose comment says it exists to show the percentage.
 `SpectrumWorxCLAP::params{ValueToText,TextToValue}` are the edge, and two things
 about them are policy rather than mechanism:
 
-- `value_to_text` renders the parameter's **own** value and ignores the one it is
-  handed. The `\todo` above it has the argument; the short version is that
-  rendering a supplied value means default-constructing a parameter, and a
-  dynamic range finds its bounds by walking to the LFO that owns it. `parse` has
-  no such problem and takes no parameter object at all.
+- `value_to_text` answers about **the value it is handed**, which is the question
+  a host's automation lane asks. It ignored the argument and rendered the
+  parameter's own value until 09.08.2026, and the reason was one line:
+  `AutomatedParameterPrinter`'s arms for a supplied value default-constructed a
+  `Parameter` to assign it to, and a *detached* parameter is not a valid one —
+  construction runs `isValidValue`, and a dynamic range finds its limits by
+  walking from its own address to an owner a temporary does not have. Nothing
+  needed the object; `print()` takes a value, so the converted value goes
+  straight to it. `AutomatedParameterPrinter::forValue` is a `std::optional`
+  where an `Internal` enumerator used to say the same thing in two members.
+
+  **The units a supplied value arrives in depend on the ID type**, and that is
+  the part that is easy to get wrong: `getParameter` answers a module's and an
+  LFO's parameters in the engine's own stored value (see
+  `Automation::internal2AutomatedValue`, whose non-normalised body is
+  `return internalValue`) and a global's and a slot selector's through the
+  protocol's range mapping. `Plugin2HostPassiveInteropImpl::valueSourceFor` is
+  the one place that decides, and it has to agree with `ParameterGetter` and
+  `ParameterParser`. The exception is an LFO **bound**, which is printed in the
+  units of the parameter it modulates rather than its own, so its arm overrides
+  the choice with `NormalisedLinear` — a bound is a 0..1 position across that
+  parameter whichever side supplied it.
 - A parameter no effect currently owns displays as **`notAvailable`** — the same
   `"N/A"` `paramsInfo` names it — and reads back as the default `paramsValue`
   answers with. Not cosmetic: clap-validator's `param-conversions` requires
@@ -417,6 +434,12 @@ effects to the round trip, and does it by re-printing rather than by comparing
 values: print, parse, write the parsed value back, print again, and require the
 two strings to be equal. That is what "within the display's own precision" means,
 and it needs no per-parameter idea of how many decimal places that is.
+
+The same file runs that round trip **without writing anything** — print a value
+the parameter does not hold, parse it, print again — over the whole list at three
+values each. That is the case a printer ignoring its argument passes for the
+current value and fails everywhere else, and it is why the two round trips are
+separate cases rather than one.
 
 ---
 

@@ -100,6 +100,37 @@ bool roundTrips(ActivePlugin const &plugin, clap_plugin_params const &params, cl
     return true;
 }
 
+/// What the host would show for \p id if it held \p value -- without writing it.
+std::string displayOf(clap_plugin const &plugin, clap_plugin_params const &params, clap_id const id,
+                      double const value)
+{
+    std::array<char, CLAP_NAME_SIZE> text{};
+    REQUIRE(params.value_to_text(&plugin, id, value, text.data(), text.size()));
+    return text.data();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief `roundTrips` for a value the parameter does *not* hold: print \p value,
+/// read the print back, print that. The two prints must agree.
+///
+/// \note Nothing is written, which is the whole point -- a printer that ignored
+/// its argument and answered about the parameter's own value would pass the
+/// written round trip and fail this one for every value but the current one.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void roundTripsUnwritten(ActivePlugin const &plugin, clap_plugin_params const &params,
+                         clap_id const id, double const value)
+{
+    auto const shown(displayOf(*plugin, params, id, value));
+    INFO("asked about " << value << ", shows '" << shown << "'");
+
+    double parsed{0};
+    REQUIRE(params.text_to_value(&*plugin, id, shown.c_str(), &parsed));
+    CHECK(displayOf(*plugin, params, id, parsed) == shown);
+}
+
 /// Every parameter of slot \p slot -- its own and its LFOs' -- in id order.
 std::vector<clap_param_info> slotParameters(clap_plugin const &plugin,
                                             clap_plugin_params const &params, unsigned const slot)
@@ -323,4 +354,122 @@ TEST_CASE("A slot selector reads back the effect a user names", "[clap][text]")
     // A title no effect has is not an effect.
     double unknown{0};
     CHECK_FALSE(params.text_to_value(&*plugin, slotSelector, "Not An Effect", &unknown));
+}
+
+TEST_CASE("value_to_text answers about the value it is asked about", "[clap][text]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    // What a host's automation lane actually asks. This ignored its argument and
+    // rendered the parameter's own value until 09.08.2026, so every tooltip over
+    // every lane in every host read the same number wherever the pointer was.
+    //
+    // Named values rather than a sweep, because the failure this replaces was
+    // not "the number is a bit off" -- it was "the number is the wrong one
+    // entirely", which one contrast pins.
+    ////////////////////////////////////////////////////////////////////////////
+    Entry const entry;
+    ActivePlugin plugin(48000, 512);
+    auto const &params(parameters(*plugin));
+
+    auto const inputGain(parameterID(globalType, 0));
+
+    // The gain sits at unity and is asked about something else.
+    REQUIRE(displayOf(*plugin, params, inputGain) == "0dB");
+
+    double minusSix{0};
+    REQUIRE(params.text_to_value(&*plugin, inputGain, "-6dB", &minusSix));
+    CHECK(displayOf(*plugin, params, inputGain, minusSix) == "-6dB");
+
+    // And asking did not move it.
+    CHECK(displayOf(*plugin, params, inputGain) == "0dB");
+
+    // An enumerated global: the answer is a different name, not a number.
+    auto const windowType(parameterID(globalType, 5));
+    REQUIRE(displayOf(*plugin, params, windowType) == "Hann");
+    CHECK(displayOf(*plugin, params, windowType, 2) == "Blackman");
+    CHECK(displayOf(*plugin, params, windowType) == "Hann");
+
+    // A slot selector reads as the effect the *value* names.
+    auto const slotSelector(parameterID(moduleChainType, 0));
+    REQUIRE(displayOf(*plugin, params, slotSelector) == "<empty>");
+    CHECK(displayOf(*plugin, params, slotSelector, 3) == Effects::effectName(3));
+}
+
+TEST_CASE("Every parameter answers about a value it does not hold", "[clap][text]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    // The whole list, and a checked build is half the point: the reason the
+    // argument was ignored was that rendering it default-constructed a
+    // `Parameter` to hold it, and a detached parameter with a dynamic range
+    // asserts on construction. An LFO's period is one -- so is every module
+    // parameter, through the LFO bounds that print in its units -- and this case
+    // walks all of them with a value that is not the current one.
+    ////////////////////////////////////////////////////////////////////////////
+    Entry const entry;
+    ActivePlugin plugin(48000, 512);
+    auto const &params(parameters(*plugin));
+
+    // Something in slot 0, so the module and LFO parameters are real ones.
+    write(plugin, parameterID(moduleChainType, 0), 0);
+
+    for (auto const &info : allParameterInfo(*plugin, params))
+    {
+        INFO("parameter '" << info.name << "' in '" << info.module << "'");
+
+        double held{0};
+        REQUIRE(params.get_value(&*plugin, info.id, &held));
+
+        auto const before(displayOf(*plugin, params, info.id));
+
+        for (double const asked :
+             {info.min_value, info.max_value, (info.min_value + info.max_value) / 2})
+            roundTripsUnwritten(plugin, params, info.id, asked);
+
+        // Asking about the value it holds is the same question as asking it.
+        CHECK(displayOf(*plugin, params, info.id, held) == before);
+        // And none of the asking was an edit.
+        CHECK(displayOf(*plugin, params, info.id) == before);
+    }
+}
+
+TEST_CASE("An LFO's bounds read as the two ends of what they modulate", "[clap][text]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    // A bound is a 0..1 position across the parameter it modulates and is shown
+    // in *that* parameter's units, so its two ends have to read as that
+    // parameter's two ends -- which is the one place the edge a value arrives on
+    // is not the edge it is printed on. \see ParameterValueStringGetter's LFO arm.
+    ////////////////////////////////////////////////////////////////////////////
+    Entry const entry;
+    ActivePlugin plugin(48000, 512);
+    auto const &params(parameters(*plugin));
+
+    write(plugin, parameterID(moduleChainType, 0), 0);
+
+    std::uint32_t checked{0};
+    for (auto const &info : slotParameters(*plugin, params, 0))
+    {
+        std::string const name(info.name);
+        std::string const suffix(".LFO.lbnd");
+        if (!name.ends_with(suffix))
+            continue;
+
+        // The module parameter this LFO modulates: an LFO parameter is named
+        // for it. \see ParameterNameGetter's LFO arm.
+        std::string const modulated(name.substr(0, name.size() - suffix.size()));
+        clap_param_info target{};
+        for (auto const &candidate : slotParameters(*plugin, params, 0))
+            if (modulated == candidate.name)
+                target = candidate;
+        if (target.name[0] == '\0')
+            continue;
+
+        INFO("'" << name << "' modulating '" << target.name << "'");
+        CHECK(displayOf(*plugin, params, info.id, 0) ==
+              displayOf(*plugin, params, target.id, target.min_value));
+        CHECK(displayOf(*plugin, params, info.id, 1) ==
+              displayOf(*plugin, params, target.id, target.max_value));
+        ++checked;
+    }
+    CHECK(checked > 0);
 }

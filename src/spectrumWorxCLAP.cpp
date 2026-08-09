@@ -890,37 +890,25 @@ bool SpectrumWorxCLAP::paramsValueToText(clap_id const id, double const value, c
 
     ParameterID const parameterID{Plugins::ParameterID{id}};
 
-    /// \note Renders the parameter's *own* value and ignores \p value, which is
-    /// not what CLAP asks for and is deliberate until the printer can do better.
+    /// \note Answers about \p value, which is what CLAP asks for: the caller is
+    /// usually an automation lane's tooltip asking "what would 0.25 read as"
+    /// rather than "what does this read as now".
     ///
-    ///   Asking it to render a supplied value means
-    /// AutomatedParameterPrinter's `Linear` arm, and that arm default-constructs
-    /// the parameter to assign the value to: `Parameter parameterValue;`
-    /// (printer.hpp). Some of these parameters do not have a range of their own to
-    /// be valid against -- an LFO's bounds and its period scale are
-    /// DynamicRangeParameterTag, and find their limits by walking from their own
-    /// address to the LFO that owns them (LFOImpl::snapPeriodScaleFromAutomation
-    /// does it explicitly). A detached temporary has no owner, so it validates
-    /// against whatever that walk lands on. Assigning the lower bound of a
-    /// 20..2000 Hz target then asserts, in a throwaway object, having corrupted
-    /// nothing -- but in a checked build the assertion ends the host, which is
-    /// what a debug plugin did as soon as a rescan made a host read the list.
+    ///   It rendered the parameter's own value and ignored the argument until
+    /// 09.08.2026, and the reason was one line in the printer. Its arms for a
+    /// supplied value default-constructed a `Parameter` to assign it to --
+    /// `Parameter parameterValue;` -- and a detached parameter is not a valid
+    /// one: construction runs `isValidValue`, and a dynamic range finds its
+    /// limits by walking from its own address to the owner a temporary does not
+    /// have (LFOImpl::snapPeriodScaleFromAutomation does that walk explicitly).
+    /// So an ordinary what-if question asserted, in a throwaway object, having
+    /// corrupted nothing -- and in a checked build an assertion ends the host,
+    /// which is what a debug plugin did as soon as a rescan made a host read the
+    /// list. Nothing needed the object; `print()` takes a value.
     ///
-    ///   The `Internal` arm has none of that: it prints `parameter.getValue()` on
-    /// the real parameter, which is the arm every other format has always used --
-    /// Windows asserts outright that this is the only one it ever takes. So a host
-    /// asking "what would 0.25 read as" is told what the parameter reads as now.
-    /// Wrong for an automation lane's tooltip, right for the common case of
-    /// rendering the current value, and it cannot assert.
-    ///
-    /// \todo Give the printer an arm that takes the value *and* the live
-    /// parameter, so a dynamic range has an owner to ask.
-    ///                                       (30.07.2026.) (SW port)
-    ///
-    /// \note This used to say the same machinery was what paramsTextToValue
-    /// needed. It was not: parsing never constructs a parameter, so it never had
-    /// the problem, and it went in on 07.08.2026 without touching this.
-    ///                                       (07.08.2026.) (SW port)
+    /// \note `fromHost` rather than the raw double, so what the printer is given
+    /// is a natural value on the same edge `paramsValue` answers on -- and
+    /// clamped, because a host may ask about anything. \see CLAPEdge.
 
     /// \note A parameter no effect currently owns reads as `notAvailable`, which
     /// is the name paramsInfo gives it and the only true thing there is to say
@@ -938,8 +926,10 @@ bool SpectrumWorxCLAP::paramsValueToText(clap_id const id, double const value, c
         return true;
     }
 
+    auto const natural(CLAPEdge::fromHost(parameterID, ranges, value));
+
     std::array<char, 128> text{};
-    getParameterDisplay(parameterID, {text.data(), text.size()}, nullptr, programMain_);
+    getParameterDisplay(parameterID, {text.data(), text.size()}, &natural, programMain_);
 
     std::array<char, 32> unit{};
     getParameterLabel(parameterID, {unit.data(), unit.size()}, &programMain_);
