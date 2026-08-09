@@ -38,15 +38,34 @@ target_include_directories(sw-impl PUBLIC .)
 target_link_libraries(sw-impl PUBLIC clap)
 
 # The engine, by way of the module layer that its factory's vtables point at.
-# PUBLIC because spectrumWorxCLAP.hpp derives from SpectrumWorxCore and holds a
-# Program by value.
+#
+# PRIVATE, and it is the link line's usage requirements that decide it rather
+# than ours: sw-gui-resources links juce::juce_gui_basics PUBLIC, a JUCE module
+# target carries its own .cpp files as INTERFACE_SOURCES, and a PUBLIC chain
+# hands those sources to every target downstream to compile again. That chain
+# ended at the bundles, so each of them compiled the whole of JUCE a second time
+# on top of the copy already inside sw-impl, and then linked both. It is not only
+# the bundles that pay: one Windows build log counts fifteen compilations of
+# juce_core.cpp, and this change removes the ones nothing could use.
+#
+#   Three linkers had been quietly covering for it. ld and link.exe take an
+# archive member only when it resolves something still missing, so the second
+# copy was never pulled and nobody paid for it twice at run time; lld-link takes
+# it and reports every symbol in it as a duplicate, which is what a clang-cl
+# build failed on. PRIVATE still puts sw-gui on the bundles' link line -- CMake
+# records it as $<LINK_ONLY:sw-gui> -- while keeping the sources on this side of
+# it. The bundles link one JUCE and compile none.
+#
+#   What this costs: a consumer that wants sw-gui's headers has to say so.
+# tests/CMakeLists.txt does, and tools/show-ui always did.
+#                                           (09.08.2026.) (SW port)
 #
 # \note It used to carry the force-include across this link line as well, which
 # is how clap-wrapper's sources came to be compiled with a header of ours. They
 # are not, now: sw_force_include_odr_header() above names sw-impl's own sources.
 # The entry stubs in clap-first/ include swClapEntryImpl.hpp, which is written to
 # need nothing from it.
-target_link_libraries(sw-impl PUBLIC sw-gui)
+target_link_libraries(sw-impl PRIVATE sw-gui)
 
 target_link_libraries(sw-impl PRIVATE
         clap-helpers
