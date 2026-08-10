@@ -18,10 +18,11 @@ sw_force_include_odr_header(sw-gui-resources)
 
 target_include_directories(sw-gui-resources PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-# juce_gui_basics rather than juce_graphics: Theme is a LookAndFeel_V2. The
-# other four modules come transitively.
+# sw-juce rather than juce::juce_gui_basics -- Theme is a LookAndFeel_V2, so
+# juce_graphics is not enough, and naming a module target here is what used to
+# make this target compile JUCE. See libs/CMakeLists.txt.
 target_link_libraries(sw-gui-resources
-        PUBLIC juce::juce_gui_basics
+        PUBLIC sw-juce
         # assertionHandler.cpp prints a stack trace with the message.
         PRIVATE sw::assets sst-plugininfra
 )

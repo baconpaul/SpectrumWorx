@@ -68,6 +68,99 @@ target_compile_definitions(juce_core INTERFACE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=
 # one this whole tree is already built with.
 target_compile_definitions(juce_audio_formats INTERFACE JUCE_USE_MP3AUDIOFORMAT=1)
 
+################################################################################
+# sw-juce -- the one target that compiles JUCE.
+#
+#   A JUCE module target is an INTERFACE library carrying its own .cpp files as
+# INTERFACE_SOURCES, so linking one does not link a library: it hands those
+# sources to the *consumer*, which compiles them itself. Every target that named
+# a module compiled JUCE, and a PUBLIC link passed the sources on to compile
+# again -- 72 JUCE translation units in a build that needs ten of them.
+#
+#   This target compiles them once and gives everyone else the same modules'
+# usage requirements with the sources left behind. The link below is PRIVATE,
+# which CMake records as $<LINK_ONLY:juce::...>: it stays on a consumer's link
+# line -- so the macOS frameworks, Linux's -latomic and the pkg-config packages
+# still arrive -- while the sources, include paths and defines that would come
+# with it do not. The three a consumer does need are copied across explicitly.
+#
+#   Per module rather than just the two at the root of the dependency graph:
+# $<TARGET_PROPERTY:tgt,INTERFACE_X> reads that one target's property and does
+# not walk its dependencies, so juce_gui_extra alone would forward none of
+# juce_core's -- which is where JUCE_USE_CURL, JUCE_MODULE_AVAILABLE_* and the
+# DEBUG/NDEBUG pair live. Copying them keeps one source of truth for the
+# settings above: a consumer's headers and this target's objects cannot disagree
+# about them, which is the ODR bug in the note above waiting to happen again.
+#
+# \note Two targets keep compiling their own copy, and neither is an oversight:
+#
+#   - clap_juce_shim, which is upstream in sst-clap-helpers, and which compiles
+#     its nine modules with four settings of its own -- JUCE_MODAL_LOOPS_PERMITTED,
+#     JUCE_COREGRAPHICS_DRAW_ASYNC, JUCE_REPORT_APP_USAGE and JUCE_USE_CAMERA.
+#     Those it has, and this target does not, are what remains of the divergence
+#     the note above describes. It changes nothing about what ships: the bundle
+#     resolves all nine from libclap_juce_shim.a, exactly as it did when the
+#     alternative was sw-impl's copy (which took the four from the shim's PUBLIC
+#     link), and takes only juce_audio_basics and juce_audio_formats from here --
+#     two modules the shim does not build and that read none of the four.
+#     `nm -pa <bundle> | grep OSO` is what answers this, per build.
+#   - sw-show-ui, which defines _CONSOLE. juce_ApplicationBase.cpp compiles
+#     JUCEApplicationBase::main( argc, argv ) only outside the WinMain arm that
+#     macro selects between, and tools/show-ui/main.cpp calls it directly, so a
+#     copy built without it would not link on Windows.
+#
+#   JUCE_STANDALONE_APPLICATION is *not* what separates those two from this
+# target, whatever the settings on sw-impl and sw-show-ui suggest: no module in
+# JUCE 8.0.12 reads it. It is left where it is rather than deleted here.
+#
+# \note What this widens: a consumer sees all eight modules' headers rather than
+# the closure of the one it used to name. The boundary that matters is sw-dsp,
+# which links no JUCE at all and does not link this either --
+# tests/checkNoJuceInDSP.cmake fails the build if that changes.
+################################################################################
+
+set(swJuceModules
+        juce_core juce_events juce_data_structures juce_graphics
+        juce_gui_basics juce_gui_extra juce_audio_basics juce_audio_formats)
+
+# One translation unit of its own, so the target has a source of a language
+# CMake can name. JUCE's arrive through the link below. file(CONFIGURE) rather
+# than file(WRITE) because it leaves the file alone when the content has not
+# changed, and rewriting it would recompile JUCE on every configure.
+set(swJuceUnit "${CMAKE_CURRENT_BINARY_DIR}/swJuceUnit.cpp")
+file(CONFIGURE OUTPUT "${swJuceUnit}"
+     CONTENT "// JUCE is compiled here. See sw-juce in libs/CMakeLists.txt.\n")
+
+add_library(sw-juce STATIC "${swJuceUnit}")
+
+foreach (swJuceModule IN LISTS swJuceModules)
+    target_link_libraries(sw-juce PRIVATE juce::${swJuceModule})
+
+    target_include_directories(sw-juce INTERFACE
+            $<TARGET_PROPERTY:juce::${swJuceModule},INTERFACE_INCLUDE_DIRECTORIES>)
+    target_compile_definitions(sw-juce INTERFACE
+            $<TARGET_PROPERTY:juce::${swJuceModule},INTERFACE_COMPILE_DEFINITIONS>)
+    target_compile_options(sw-juce INTERFACE
+            $<TARGET_PROPERTY:juce::${swJuceModule},INTERFACE_COMPILE_OPTIONS>)
+
+    # A module's Linux pkg-config packages are a target of their own, hung off
+    # the module's link interface -- and its include paths and cflags are on the
+    # compile side of the line the PRIVATE link draws, so they need the same
+    # treatment one hop further out. Only juce_graphics has any (freetype2 and
+    # fontconfig), and only on Linux, which is why the existence test: the
+    # target is created by juce_add_module() or not at all. The libraries
+    # themselves come through the link interface and need nothing here.
+    #
+    # Untested from this machine -- macOS creates none of these -- so if a Linux
+    # build fails on a missing freetype header, this is the line to read first.
+    if (TARGET juce::pkgconfig_${swJuceModule}_LINUX_DEPS)
+        target_include_directories(sw-juce INTERFACE
+                $<TARGET_PROPERTY:juce::pkgconfig_${swJuceModule}_LINUX_DEPS,INTERFACE_INCLUDE_DIRECTORIES>)
+        target_compile_options(sw-juce INTERFACE
+                $<TARGET_PROPERTY:juce::pkgconfig_${swJuceModule}_LINUX_DEPS,INTERFACE_COMPILE_OPTIONS>)
+    endif ()
+endforeach ()
+
 add_subdirectory(sst/sst-cpputils)
 add_subdirectory(sst/sst-basic-blocks)
 add_subdirectory(sst/sst-plugininfra)
