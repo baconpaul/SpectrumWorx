@@ -23,9 +23,13 @@
 #ifndef presetLoading_hpp__5E29B7D4_1A63_4C08_B7F2_9D4E60C381AB
 #define presetLoading_hpp__5E29B7D4_1A63_4C08_B7F2_9D4E60C381AB
 
+/// `fs`, for the preset file. \see io/jucePath.hpp -- a forward declaration of
+/// `juce::File` stood beside `juce::String` here and is not needed by anything
+/// any more.
+#include "filesystem/import.h"
+
 namespace juce
 {
-class File;
 class String;
 } // namespace juce
 
@@ -68,7 +72,7 @@ class SpectrumWorxEditor;
 
 /// \param pDawExtraState null for a preset the user opened; the session's own,
 /// for state a host restored. See SW::DawExtraState.
-bool loadPreset(EditorHost &, SpectrumWorxEditor *pEditor, juce::File const &presetFile,
+bool loadPreset(EditorHost &, SpectrumWorxEditor *pEditor, fs::path const &presetFile,
                 bool ignoreExternalSample, juce::String *comment, char const *presetName,
                 DawExtraState const *pDawExtraState = nullptr);
 

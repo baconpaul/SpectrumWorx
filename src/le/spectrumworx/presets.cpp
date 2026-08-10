@@ -1067,12 +1067,17 @@ void ParametersSaver::setSampleFileName(std::string_view const &sampleFileName)
     saveParameter(sampleAttributeName_, std::string(sampleFileName));
 }
 
-/// \note It took a `juce::File` and a `juce::String` and converted both to UTF-8
-/// here, under a `JUCE_STRING_UTF_TYPE` switch with an `_alloca` in one arm. The
+/// \note It took JUCE's file and string types and converted both to UTF-8 here,
+/// under a `JUCE_STRING_UTF_TYPE` switch with an `_alloca` in one arm. The
 /// conversion belongs at the interface's edge rather than in the format layer,
-/// and putting it there is what takes JUCE off `sw-dsp`: presetFile.hpp has the
-/// overload that speaks `juce::File`.
+/// and putting it there is what takes JUCE off `sw-dsp`.
 ///                                           (02.08.2026.) (SW port)
+///
+/// \note The path half of that conversion is gone rather than moved: everything
+/// above speaks `fs::path` now, and `presetStorage.hpp`'s `savePreset()` calls
+/// this with `u8string()`. Only the comment still arrives as a `juce::String`,
+/// and it is converted by the editor. \see tests/checkNoJuceFile.cmake.
+///                                           (09.08.2026.) (SW port)
 std::string savePreset(std::string_view const externalSampleFilePath,
                        std::string_view const comment, Program const &program,
                        DawExtraState const *const pDawExtraState)

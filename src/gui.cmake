@@ -46,8 +46,10 @@ add_library(sw-gui-widgets STATIC
 target_link_libraries(sw-gui-widgets PUBLIC sw-gui-resources sw-io)
 
 # Where the user's presets live -- ~/Documents/SpectrumWorx and its platform
-# equivalents, XDG included. PRIVATE: gui.cpp answers with a juce::File, so
-# nothing above it needs to know where the answer came from.
+# equivalents, XDG included. PRIVATE: gui.cpp answers with the fs::path
+# sst-plugininfra handed it, so nothing above needs to know where it came from --
+# and, as of 09.08.2026, nothing has to convert it either. See the note on
+# rootPath() and tests/checkNoJuceFile.cmake.
 target_link_libraries(sw-gui-widgets PRIVATE sst-plugininfra)
 
 # \note gui/gui.mm and "-framework Cocoa" stood here. The .mm held one function,

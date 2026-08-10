@@ -17,6 +17,15 @@
 /// create a directory in someone's Documents folder, which is why creating it is
 /// `createUserPresetsFolder()` and why this test does not call it.
 ///
+/// \note **Issue #28's regression test is not here any more; it is
+/// tests/io/jucePathTests.cpp.** It was here because `rootPath()` ended in a
+/// `juce::File` conversion and that conversion was the bug. The getters answer
+/// with an `fs::path` now and convert nothing, which makes "byte for byte what
+/// sst-plugininfra answered" true by construction -- a tautology dressed as
+/// coverage. What is left of that hazard is io/jucePath.hpp, and the byte
+/// sequence and the character count went with it.
+///                                       (09.08.2026.) (SW port)
+///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later
 ///
@@ -27,24 +36,12 @@
 #include <sst/plugininfra/paths.h>
 
 #include <catch2/catch_test_macros.hpp>
-
-#include <string>
 //------------------------------------------------------------------------------
 namespace
 {
 //------------------------------------------------------------------------------
 
 using namespace LE::SW;
-
-/// \note "Documents" in Japanese -- the reporter's locale in issue #28 -- written
-/// as the bytes rather than as the characters. The rest of this tree is ASCII
-/// but for an em dash and an acute accent, the case is about the bytes anyway,
-/// and this way it does not depend on the encoding of the file it is in. Six
-/// code points, three bytes each: `U+30C9 U+30AD U+30E5 U+30E1 U+30F3 U+30C8`.
-constexpr char const japaneseDocuments[]{"\xE3\x83\x89\xE3\x82\xAD\xE3\x83\xA5"
-                                         "\xE3\x83\xA1\xE3\x83\xB3\xE3\x83\x88"};
-
-constexpr int japaneseDocumentsCharacters{6};
 
 //------------------------------------------------------------------------------
 } // anonymous namespace
@@ -56,9 +53,10 @@ TEST_CASE("The user preset paths answer without an initialisation step", "[paths
     /// has to run before it is the bug this file is about.
     auto const &root(GUI::rootPath());
 
-    INFO("root " << root.getFullPathName());
-    CHECK(root != juce::File());
-    CHECK(root.isAbsolutePath(root.getFullPathName()));
+    INFO("root " << root);
+    CHECK(!root.empty());
+    CHECK(root.is_absolute());
+
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \note Either name, and only on Linux is there a second one. The folder
@@ -74,7 +72,7 @@ TEST_CASE("The user preset paths answer without an initialisation step", "[paths
     ///                                       (05.08.2026.) (SW port)
     ///
     ////////////////////////////////////////////////////////////////////////////
-    auto const rootName(root.getFileName());
+    auto const rootName(root.filename());
 #ifdef __linux__
     CHECK((rootName == "SpectrumWorx" || rootName == ".SpectrumWorx"));
 #else
@@ -83,13 +81,12 @@ TEST_CASE("The user preset paths answer without an initialisation step", "[paths
 
     auto const &presets(GUI::presetsFolder());
 
-    INFO("presets " << presets.getFullPathName());
-    CHECK(presets != juce::File());
-    CHECK(presets.isAChildOf(root));
+    INFO("presets " << presets);
+    CHECK(!presets.empty());
 
-    /// \note Idempotent, and the same object each time -- the browser holds the
-    /// reference across its own lifetime and writes the most-recently-used
-    /// folder back into it.
+    /// \note Idempotent, and the same object each time -- both are function-local
+    /// statics, and the browser compares against `presetsFolder()` on every
+    /// `goToParent()`.
     CHECK(&GUI::rootPath() == &root);
     CHECK(&GUI::presetsFolder() == &presets);
 
@@ -97,92 +94,33 @@ TEST_CASE("The user preset paths answer without an initialisation step", "[paths
     /// says where the presets go without asking the filesystem anything, so it
     /// neither creates a directory in the Documents folder of whoever runs it
     /// nor passes or fails depending on whether one is already there.
-    CHECK(presets.getFileName() == "Presets");
-    CHECK(presets.getParentDirectory() == root);
+    ///
+    /// \note `parent_path()`, which is exact, rather than the `isAChildOf()` this
+    /// read as a `juce::File`: `fs::path` composes and decomposes losslessly, so
+    /// "the presets folder is `<root>/Presets`" can be stated rather than
+    /// approximated by a containment check that a sibling named `PresetsOld`
+    /// would also have satisfied.
+    CHECK(presets.filename() == "Presets");
+    CHECK(presets.parent_path() == root);
+    CHECK(presets == root / "Presets");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \note Issue #28, and the reason this file gained a second case. On a
-/// `ja_JP.UTF-8` desktop the plugin created `~/<mojibake>/SpectrumWorx` instead
-/// of finding the localised Documents folder XDG had correctly pointed it at.
-/// Nothing was wrong with the XDG lookup -- `paths_linux.cpp` parses
-/// `user-dirs.dirs` a byte at a time and hands the bytes back untouched. What
-/// was wrong was one conversion at the end of `rootPath()`: `juce::String`'s
-/// `char const *` constructor reads through `CharPointer_ASCII`, which widens
-/// each *byte* into its own code point and re-encodes the result as UTF-8. The
-/// long note in gui.cpp has why the `char8_t` overload that would have saved it
-/// is not there (`-fno-char8_t`, from sst-plugininfra's `filesystem` target --
-/// and this translation unit is built with it too, so what is checked here is
-/// what ships).
-///
-/// \note The character count is the assertion that actually bites. Byte
-/// equality catches it as well, but "six characters, not eighteen" is the
-/// difference between the two constructors stated directly: `CharPointer_ASCII`
-/// cannot produce six out of eighteen bytes, whatever else it does.
-///
-/// \note Still no side effect, in keeping with the case above -- these paths are
-/// built and parsed, never created, and none of them needs to exist. The last
-/// section is the one that would have failed on the reporter's machine and
-/// passes everywhere else, which is precisely why the first two are here: they
-/// fail on any machine, in any locale, the moment the conversion goes back.
-///                                       (09.08.2026.) (SW port)
+/// \note The end-to-end invariant, kept even though it can no longer fail the way
+/// it once did: whatever the platform waterfall picks, `rootPath()` hands back
+/// *those* bytes. It is one `==` now rather than a conversion round trip, and it
+/// is here so that putting a conversion back into `rootPath()` -- which is what
+/// issue #28 was -- fails something.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-TEST_CASE("A non-ASCII documents folder survives the trip into juce::File", "[paths]")
+TEST_CASE("rootPath() is what sst-plugininfra answered, untouched", "[paths]")
 {
-    SECTION("UTF-8 bytes decode as characters rather than as Latin-1")
-    {
-        std::string const documents(japaneseDocuments);
-        auto const decoded(juce::String::fromUTF8(documents.c_str()));
+    auto const answered(sst::plugininfra::paths::bestDocumentsVendorFolderPathFor(
+        "Surge Synth Team", "SpectrumWorx"));
 
-        INFO("decoded " << decoded);
-        CHECK(decoded.length() == japaneseDocumentsCharacters);
-        CHECK(decoded.toStdString() == documents);
-
-        /// \note The length parameter is a count of *bytes* -- which is what the
-        /// preset browser passes it, having measured a file name -- and not a
-        /// count of characters. Getting that wrong would truncate mid-sequence.
-        auto const counted(
-            juce::String::fromUTF8(documents.c_str(), static_cast<int>(documents.size())));
-        CHECK(counted == decoded);
-    }
-
-#ifndef _WIN32
-    SECTION("The whole of rootPath()'s conversion, on a path that has to be built")
-    {
-        /// \note The expression below is `rootPath()`'s, with a hand-made path
-        /// standing in for the one XDG answers with: a machine that runs this
-        /// almost certainly has an ASCII home directory, and ASCII is a fixed
-        /// point of the widening that was wrong. The bug only shows on bytes
-        /// above 0x7F, so the test has to bring its own.
-        std::string const expected(std::string("/home/tester/") + japaneseDocuments +
-                                   "/SpectrumWorx");
-
-        juce::File const file(juce::String::fromUTF8(fs::path{expected}.u8string().c_str()));
-
-        INFO("file " << file.getFullPathName());
-        CHECK(file.getFullPathName().toStdString() == expected);
-        CHECK(file.getFileName() == "SpectrumWorx");
-        CHECK(file.getParentDirectory().getFileName().length() == japaneseDocumentsCharacters);
-    }
-#endif // _WIN32
-
-#ifndef _WIN32
-    SECTION("rootPath() is byte for byte what sst-plugininfra answered")
-    {
-        /// \note The end-to-end invariant, and the one the reporter's machine
-        /// broke: whatever the waterfall picks, `rootPath()` must hand back those
-        /// bytes and no others. It says nothing on an ASCII machine, which is the
-        /// whole reason the two sections above exist -- but it is the only check
-        /// here that would have caught the bug in situ.
-        auto const answered(sst::plugininfra::paths::bestDocumentsVendorFolderPathFor(
-                                "Surge Synth Team", "SpectrumWorx")
-                                .u8string());
-
-        INFO("answered " << answered);
-        CHECK(GUI::rootPath().getFullPathName().toStdString() == answered);
-    }
-#endif // _WIN32
+    INFO("answered " << answered);
+    CHECK(GUI::rootPath() == answered);
+    CHECK(GUI::rootPath().u8string() == answered.u8string());
 }

@@ -12,10 +12,11 @@
 
 #include "configuration/versionConfiguration.hpp"
 #include "gui/editor/spectrumWorxEditor.hpp"
+#include "io/jucePath.hpp"
 
 #include "le/parameters/uiElements.hpp"
 #include "le/spectrumworx/factoryPresets.hpp"
-#include "le/spectrumworx/presetFile.hpp"
+#include "le/spectrumworx/presetStorage.hpp"
 #include "le/spectrumworx/presets.hpp"
 #include "le/utility/countof.hpp"
 #include "le/utility/tchar.hpp"
@@ -34,8 +35,9 @@ namespace
 {
 typedef juce::String::CharPointerType::CharType char_t;
 
+/// \note The length went with the byte arithmetic in refreshUserDirectory();
+/// `fs::path::extension()` compares the whole thing.
 static char_t const presetExtension[] = _T( ".swp" );
-unsigned int const presetExtensionLength = _countof(presetExtension) - 1;
 } // namespace
 
 #pragma warning(push)
@@ -171,7 +173,7 @@ void PresetBrowser::restoreLastPlace()
         return setFactoryBank(place.factoryBank);
 
     case Location::User:
-        if (place.folder.isDirectory())
+        if (std::error_code error; std::filesystem::is_directory(place.folder, error))
             return setNewFolder(place.folder);
         break;
     }
@@ -254,8 +256,14 @@ unsigned int PresetBrowser::selectedIndex() const
 PresetBrowser::Item const &PresetBrowser::item(unsigned int const index) const
 {
     Item const &item(files_.getReference(index));
+    /// \note Hoisted, and ignored in a shipping build: LE_ASSERT does not
+    /// evaluate its argument under NDEBUG, so the code this fills in is unread
+    /// there. The `std::error_code` overload all the same -- the throwing one
+    /// would be reachable from a paint.
+    std::error_code error;
+    LE::Utility::ignoreUnused(error);
     LE_ASSERT((location_ != Location::User) || item.isDirectory() ||
-              currentDirectory_.getChildFile(item.name + presetExtension).exists());
+              std::filesystem::exists(file(index), error));
     return item;
 }
 
@@ -263,8 +271,8 @@ PresetBrowser::Item const &PresetBrowser::selectedItem() const { return item(sel
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \brief The row's file, or an empty `juce::File` when the row does not have
-/// one. See selectedPresetData(), which is what the load path uses.
+/// \brief The row's file, or an empty path when the row does not have one. See
+/// selectedPresetData(), which is what the load path uses.
 ///
 /// \note The two conditions were `LE_ASSERT`s, which a shipped build does not
 /// compile -- so what stood between a factory bank and a delete or an overwrite
@@ -277,7 +285,7 @@ PresetBrowser::Item const &PresetBrowser::selectedItem() const { return item(sel
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-juce::File PresetBrowser::file(unsigned int const index) const
+fs::path PresetBrowser::file(unsigned int const index) const
 {
     if (location_ != Location::User)
         return {};
@@ -286,10 +294,10 @@ juce::File PresetBrowser::file(unsigned int const index) const
     if (item.isDirectory())
         return {};
 
-    return currentDirectory_.getChildFile(item.name + presetExtension);
+    return currentDirectory_ / LE::IO::juceStringToPath(item.name + presetExtension);
 }
 
-juce::File PresetBrowser::selectedFile() const { return file(selectedIndex()); }
+fs::path PresetBrowser::selectedFile() const { return file(selectedIndex()); }
 
 PresetBrowser::Item const *PresetBrowser::findPreset(juce::String const &presetName) const
 {
@@ -314,7 +322,7 @@ void PresetBrowser::listBoxItemDoubleClicked(int const row, juce::MouseEvent con
         if (inFactory())
             return setFactoryBank(factoryBank_.isEmpty() ? item.name
                                                          : factoryBank_ + "/" + item.name);
-        return setNewFolder(currentDirectory_.getChildFile(item.name));
+        return setNewFolder(currentDirectory_ / LE::IO::juceStringToPath(item.name));
 
     case Item::Kind::Preset:
         /// \note Renaming is the double-click action on a preset, and a factory
@@ -429,9 +437,15 @@ void PresetBrowser::textEditorReturnKeyPressed(juce::TextEditor &editor)
     if (userEntry.isEmpty())
         return;
 
-    juce::File const targetFile(currentDirectory_.getChildFile(userEntry + presetExtension));
+    fs::path const targetFile(currentDirectory_ /
+                              LE::IO::juceStringToPath(userEntry + presetExtension));
 
     juce::Component::SafePointer<PresetBrowser> const self(this);
+
+    /// \note One `error_code` for the two probes below rather than one each: both
+    /// ask the same question of the same path, neither reads the answer, and the
+    /// point of it is only that they cannot throw.
+    std::error_code error;
 
     if (newPresetPending_)
     {
@@ -443,22 +457,29 @@ void PresetBrowser::textEditorReturnKeyPressed(juce::TextEditor &editor)
             self->saveCurrentPreset(userEntry, targetFile);
         });
 
-        if (!targetFile.exists())
+        if (!std::filesystem::exists(targetFile, error))
             return save();
 
         askForOverwrite([save, targetFile](bool const overwrite) {
             if (!overwrite)
                 return;
-            targetFile.deleteFile();
+            std::error_code ignored;
+            std::filesystem::remove(targetFile, ignored);
             save();
         });
         return;
     }
 
-    juce::File const sourceFile(selectedFile());
+    fs::path const sourceFile(selectedFile());
     /// \note An empty source is a row with no file behind it -- a factory
     /// preset, or the root's two section entries. Nothing to rename.
-    if ((sourceFile == juce::File()) || (sourceFile == targetFile))
+    ///
+    /// \note `==` on two paths is a lexical compare where `juce::File`'s was
+    /// case-insensitive off Linux. Both of these are built from the same
+    /// `currentDirectory_` and a name the file system just reported, so the
+    /// comparison is between two spellings of the same origin -- which is the
+    /// case lexical equality answers correctly.
+    if (sourceFile.empty() || (sourceFile == targetFile))
         return;
 
     auto const rename([self, sourceFile, targetFile, userEntry] {
@@ -466,7 +487,7 @@ void PresetBrowser::textEditorReturnKeyPressed(juce::TextEditor &editor)
             self->renameTo(sourceFile, targetFile, userEntry);
     });
 
-    if (!targetFile.exists())
+    if (!std::filesystem::exists(targetFile, error))
         return rename();
 
     askForOverwrite([rename](bool const overwrite) {
@@ -478,10 +499,15 @@ void PresetBrowser::textEditorReturnKeyPressed(juce::TextEditor &editor)
 /// \note Was the body of a `while` loop whose condition asked the user whether
 /// to retry. It calls itself from the dialog's callback instead -- one live
 /// attempt at a time, and the stack unwinds between them.
-void PresetBrowser::renameTo(juce::File const &sourceFile, juce::File const &targetFile,
+void PresetBrowser::renameTo(fs::path const &sourceFile, fs::path const &targetFile,
                              juce::String const &newName)
 {
-    if (sourceFile.moveFileTo(targetFile))
+    /// \note `rename()`, which is what `juce::File::moveFileTo` came down to for
+    /// two paths on the same volume -- and both of these are children of
+    /// `currentDirectory_`, so they always are.
+    std::error_code error;
+    std::filesystem::rename(sourceFile, targetFile, error);
+    if (!error)
     {
         hideFilenameEditBox();
         refreshAndSelectPreset(newName);
@@ -558,11 +584,11 @@ void PresetBrowser::saveDirtyComment()
         return;
     }
 
-    juce::File const dirtyPreset(this->file(dirtyCommentPresetIndex_));
+    fs::path const dirtyPreset(this->file(dirtyCommentPresetIndex_));
 
     dirtyCommentPresetIndex_ = -1;
 
-    if (dirtyPreset.existsAsFile())
+    if (std::error_code error; std::filesystem::is_regular_file(dirtyPreset, error))
     {
         juce::String const newComment(comment().getText());
 
@@ -590,9 +616,10 @@ void PresetBrowser::saveDirtyComment()
     }
 }
 
-void PresetBrowser::saveCurrentPreset(juce::String const &presetName, juce::File const &targetFile)
+void PresetBrowser::saveCurrentPreset(juce::String const &presetName, fs::path const &targetFile)
 {
-    bool const shouldRefresh(!targetFile.exists());
+    std::error_code error;
+    bool const shouldRefresh(!std::filesystem::exists(targetFile, error));
 
     originalComment_ = comment().getText();
     editor().savePreset(targetFile, ignoreExternalSamples_.getToggleState(), originalComment_);
@@ -608,16 +635,17 @@ void PresetBrowser::buttonClicked(juce::Button *const pButton)
         /// \note Asked rather than assumed. These two used to run on the
         /// strength of the button being enabled; `file()` says why that is not
         /// the same thing.
-        juce::File const target(selectedFile());
-        if (target != juce::File())
+        fs::path const target(selectedFile());
+        if (!target.empty())
             saveCurrentPreset(selectedItem().name, target);
     }
     else if (pButton == &delete_)
     {
-        juce::File const target(selectedFile());
-        if (target != juce::File())
+        fs::path const target(selectedFile());
+        if (!target.empty())
         {
-            target.deleteFile();
+            std::error_code ignored;
+            std::filesystem::remove(target, ignored);
             refresh();
             delete_.setEnabled(false);
             deselectAllRows();
@@ -681,24 +709,34 @@ void PresetBrowser::buttonClicked(juce::Button *const pButton)
         /// at `User` -- from the root or a factory bank it is stale or empty,
         /// which starts a native dialog wherever that resolves to.
         ///                                   (08.08.2026.) (SW port)
-        juce::File const startFrom((location_ == Location::User) && currentDirectory_.isDirectory()
-                                       ? currentDirectory_
-                                       : GUI::presetsFolder());
+        ///
+        /// \note **One of the two places in `src/` that may name `juce::File`**,
+        /// the other being the editor's audio file chooser;
+        /// tests/checkNoJuceFile.cmake allowlists both. `juce::FileChooser` is
+        /// handed one and answers with one, so the conversion happens on the way
+        /// in and on the way out and the type reaches nothing else --
+        /// `setNewFolder()` takes an `fs::path`.
+        std::error_code error;
+        bool const haveCurrent((location_ == Location::User) &&
+                               std::filesystem::is_directory(currentDirectory_, error));
+        juce::File const startFrom(
+            LE::IO::pathToJuceFile(haveCurrent ? currentDirectory_ : GUI::presetsFolder()));
         folderChooser_ = std::make_unique<juce::FileChooser>(
             "Please select a folder with SW presets...", startFrom);
-        folderChooser_->launchAsync(juce::FileBrowserComponent::openMode |
-                                        juce::FileBrowserComponent::canSelectDirectories,
-                                    [self = juce::Component::SafePointer<PresetBrowser>(this)](
-                                        juce::FileChooser const &chooser) {
-                                        auto const chosen(chooser.getResult());
-                                        /// \note A cancelled chooser reports an
-                                        /// empty file, and a directory that has
-                                        /// gone away between the dialog opening
-                                        /// and closing reports one that is not
-                                        /// there.
-                                        if (self && chosen.isDirectory())
-                                            self->setNewFolder(chosen);
-                                    });
+        folderChooser_->launchAsync(
+            juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+            [self = juce::Component::SafePointer<PresetBrowser>(this)](
+                juce::FileChooser const &chooser) {
+                auto const chosen(LE::IO::juceFileToPath(chooser.getResult()));
+                /// \note A cancelled chooser reports an
+                /// empty file, and a directory that has
+                /// gone away between the dialog opening
+                /// and closing reports one that is not
+                /// there.
+                std::error_code ignored;
+                if (self && std::filesystem::is_directory(chosen, ignored))
+                    self->setNewFolder(chosen);
+            });
     }
 
     // Implementation note:
@@ -761,7 +799,7 @@ void PresetBrowser::askForOverwrite(std::function<void(bool)> onAnswer)
     GUI::warningOkCancelBox(_T( "File already exists." ), _T( "Overwrite?" ), std::move(onAnswer));
 }
 
-void PresetBrowser::setNewFolder(juce::File const &file)
+void PresetBrowser::setNewFolder(fs::path const &file)
 {
     location_ = Location::User;
     factoryBank_.clear();
@@ -826,7 +864,7 @@ void PresetBrowser::goToParent()
         /// nothing a preset browser should be showing.
         if (currentDirectory_ == GUI::presetsFolder())
             return setRoot();
-        return setNewFolder(currentDirectory_.getParentDirectory());
+        return setNewFolder(currentDirectory_.parent_path());
     }
 }
 
@@ -947,16 +985,22 @@ void PresetBrowser::refreshFactory()
 //
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \note `fromUTF8()`, for the same reason `rootPath()` needs it -- see the long
-/// note in gui.cpp. What `directory_iterator` hands back is whatever bytes the
-/// file system holds, and `juce::String( char const *, size_t )` would read them
-/// through `CharPointer_ASCII` and widen each one into its own code point. A
-/// preset named in anything but ASCII would list under a mangled name here, and
-/// then fail to be found again by it.
+/// \note **The `juce::File` hop is gone from the front of this**, and it was a
+/// bug on Windows: `currentDirectory_.getFullPathName().getCharPointer()` handed
+/// `directory_iterator` a narrow `char const *`, which `fs::path` decodes with
+/// the active code page there rather than as UTF-8. `currentDirectory_` is an
+/// `fs::path` now and goes in as itself.
 ///
-///   `nameLength` stays as it is: it is a count of bytes, and `bufferSizeBytes`
-/// is what the second parameter of `fromUTF8()` wants too. It is only the
-/// *interpretation* of those bytes that changes.
+/// \note What comes back still needs `pathToJuceString()`, for the reason the
+/// long note in gui.cpp gives: `juce::String( char const *, size_t )` reads bytes
+/// through `CharPointer_ASCII` and widens each one into its own code point, so a
+/// preset named in anything but ASCII would list under a mangled name and then
+/// fail to be found again by it. `.u8string()` is what the bytes are; the
+/// conversion is io/jucePath.hpp's.
+///
+/// \note `stem()` and `extension()` in place of the byte arithmetic and the
+/// `std::_tcscmp` that stood here. `stem()` on `a.b.swp` is `a.b`, which is what
+/// subtracting four bytes did.
 ///                                       (09.08.2026.) (SW port)
 ///
 ////////////////////////////////////////////////////////////////////////////////
@@ -967,25 +1011,16 @@ void PresetBrowser::refreshUserDirectory()
 
     std::error_code listingError;
     Item item;
-    for (auto const &entry : std::filesystem::directory_iterator(
-             currentDirectory_.getFullPathName().getCharPointer().getAddress(), listingError))
+    for (auto const &entry : std::filesystem::directory_iterator(currentDirectory_, listingError))
     {
-        auto const fileName(entry.path().filename().string());
-        if (fileName == "." || fileName == "..")
+        bool const isDirectory(entry.is_directory(listingError));
+        if (!isDirectory && (entry.path().extension() != presetExtension))
             continue;
 
-        bool const isDirectory(entry.is_directory(listingError));
-        auto const fullNameLength(static_cast<unsigned int>(fileName.size()));
-        unsigned int const nameLength(
-            isDirectory ? fullNameLength
-                        : (fullNameLength - std::min(fullNameLength, presetExtensionLength)));
-
-        if (isDirectory || std::_tcscmp(fileName.c_str() + nameLength, presetExtension) == 0)
-        {
-            item.kind = isDirectory ? Item::Kind::Folder : Item::Kind::Preset;
-            item.name = juce::String::fromUTF8(fileName.c_str(), static_cast<int>(nameLength));
-            files_.add(item);
-        }
+        item.kind = isDirectory ? Item::Kind::Folder : Item::Kind::Preset;
+        item.name =
+            LE::IO::pathToJuceString(isDirectory ? entry.path().filename() : entry.path().stem());
+        files_.add(item);
     }
 }
 
@@ -1044,7 +1079,7 @@ void PresetBrowser::deselectAllRows()
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \note `currentDirectory_.getFullPathName()`, unconditionally. That member
+/// \note `currentDirectory_`, unconditionally. That member
 /// only means anything at `User`: at `Root` it is whatever the last visited
 /// folder was -- empty on a fresh browser -- and at `Factory` it names a
 /// directory the list is not showing, so the strip described somewhere the user
@@ -1065,7 +1100,7 @@ juce::String PresetBrowser::locationLabel() const
                                       : _T( "Factory/" ) + factoryBank_;
 
     case Location::User:
-        return currentDirectory_.getFullPathName();
+        return LE::IO::pathToJuceString(currentDirectory_);
     }
     LE_UNREACHABLE_CODE();
 }

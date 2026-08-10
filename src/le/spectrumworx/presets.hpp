@@ -918,10 +918,11 @@ bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignoreExterna
 
 class Program;
 
-/// \note The `juce::File` overloads of these two -- and the `loadPreset` that
-/// reads a file before parsing it -- are in presetFile.hpp. This translation
-/// unit opens no files, which is what `LE_NO_PRESETS` used to stand in for, and
-/// as of stage 7 it names no JUCE type either.
+/// \note The file-opening half of this -- and the `loadPreset` that reads one
+/// before parsing it -- is presetStorage.hpp, beside this in `sw-dsp` and over
+/// `fs::path` and `<fstream>`. This translation unit opens no files, which is
+/// what `LE_NO_PRESETS` used to stand in for, and as of stage 7 it names no JUCE
+/// type either.
 ///
 /// \param externalSampleFilePath empty when no sample is loaded.
 /// \param pDawExtraState null for a `.swp`, which carries only what the plugin

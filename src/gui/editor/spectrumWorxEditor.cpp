@@ -20,11 +20,12 @@
 #include "core/threading/publish.hpp"
 #include "gui/editor/editorHost.hpp"
 #include "gui/editor/presetLoading.hpp"
+#include "io/jucePath.hpp"
 
 #include "le/parameters/lfo.hpp"
 #include "le/parameters/printer.hpp"
 #include "le/parameters/uiElements.hpp"
-#include "le/spectrumworx/presetFile.hpp"
+#include "le/spectrumworx/presetStorage.hpp"
 #include "le/spectrumworx/presets.hpp"
 #include "le/utility/countof.hpp"
 #include "le/utility/parentFromMember.hpp"
@@ -886,7 +887,7 @@ void SpectrumWorxEditor::updateSampleName(juce::String const &newSampleName)
 
 void SpectrumWorxEditor::updateSampleName()
 {
-    updateSampleName(editorHost_.currentSampleFile().getFileNameWithoutExtension());
+    updateSampleName(LE::IO::pathToJuceString(editorHost_.currentSampleFile().stem()));
 }
 
 /// \note "Async" is 2016's, and the branch it names is currently unreachable:
@@ -921,7 +922,7 @@ void SpectrumWorxEditor::setSampleLoadingStatus()
 /// `setNewSample` is a preset or a session being loaded, where there is nobody to
 /// answer a modal box and possibly no window to put one in.
 ///                                           (08.08.2026.) (SW port)
-void SpectrumWorxEditor::newSampleFileSelected(juce::File const &file)
+void SpectrumWorxEditor::newSampleFileSelected(fs::path const &file)
 {
     auto const *const pErrorMessage(editorHost_.setNewSample(file));
     if (pErrorMessage)
@@ -1065,7 +1066,7 @@ void SpectrumWorxEditor::addUserAddedModule(std::uint8_t const effectIndex)
     refreshModuleRackAsync();
 }
 
-bool SpectrumWorxEditor::loadPreset(juce::File const &presetFile, bool const ignoreExternalSample,
+bool SpectrumWorxEditor::loadPreset(fs::path const &presetFile, bool const ignoreExternalSample,
                                     juce::String &comment, juce::String const &presetName)
 {
     auto const pPresetName(presetName.getCharPointer().getAddress());
@@ -1081,12 +1082,15 @@ bool SpectrumWorxEditor::loadPreset(char *const inMemoryPreset, bool const ignor
                            pPresetName);
 }
 
-void SpectrumWorxEditor::savePreset(juce::File const &presetFile, bool const ignoreExternalSample,
+void SpectrumWorxEditor::savePreset(fs::path const &presetFile, bool const ignoreExternalSample,
                                     juce::String const &comment) const
 {
-    juce::File const externalSample(ignoreExternalSample ? juce::File()
-                                                         : editorHost_.currentSampleFile());
-    SW::savePreset(presetFile, externalSample, comment, program());
+    fs::path const externalSample(ignoreExternalSample ? fs::path()
+                                                       : editorHost_.currentSampleFile());
+    /// \note Where the interface's `juce::String` becomes the format's bytes, and
+    /// the last thing presetFile.cpp used to do before it was deleted.
+    SW::savePreset(presetFile, externalSample,
+                   std::string_view(comment.toRawUTF8(), comment.getNumBytesAsUTF8()), program());
 }
 
 char const *SpectrumWorxEditor::currentProgramName() const { return program().name().data(); }
@@ -2609,7 +2613,7 @@ void SpectrumWorxEditor::SampleArea::mouseUp(juce::MouseEvent const &event)
     juce::ModifierKeys const mouseButtons(event.mods);
     if (mouseButtons.isRightButtonDown())
     {
-        editor.newSampleFileSelected(juce::File());
+        editor.newSampleFileSelected({});
         return;
     }
     if (!mouseButtons.isLeftButtonDown() || menu_.menuActive())
@@ -2628,11 +2632,11 @@ void SpectrumWorxEditor::SampleArea::mouseUp(juce::MouseEvent const &event)
     menu_.addItem(browse, "Load audio file...");
     menu_.addItem(clear, "No external audio",
                   /*icon*/ nullptr,
-                  /*enabled*/ editor.editorHost().currentSampleFile() != juce::File());
+                  /*enabled*/ !editor.editorHost().currentSampleFile().empty());
     menu_.addSectionHeader("Factory samples");
     for (std::size_t sample(0); sample < factorySamples.size(); ++sample)
         menu_.addItem(static_cast<PopupMenu::ItemID>(firstFactorySample + sample),
-                      factorySamples[sample].getFileNameWithoutExtension().toRawUTF8());
+                      LE::IO::pathToUTF8(factorySamples[sample].stem()).c_str());
 
     juce::Component::SafePointer<SpectrumWorxEditor> pEditor(&editor);
     menu_.showCenteredBelow(*this, [this, pEditor, factorySamples](PopupMenu::OptionalID chosen) {
@@ -2643,7 +2647,7 @@ void SpectrumWorxEditor::SampleArea::mouseUp(juce::MouseEvent const &event)
         case browse:
             return browseForFile();
         case clear:
-            return pEditor->newSampleFileSelected(juce::File());
+            return pEditor->newSampleFileSelected({});
         default:
             return pEditor->newSampleFileSelected(factorySamples[*chosen - firstFactorySample]);
         }
@@ -2654,12 +2658,26 @@ void SpectrumWorxEditor::SampleArea::browseForFile()
 {
     SpectrumWorxEditor &editor(this->editor());
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note **One of the two places in `src/` that may name `juce::File`**, the
+    /// other being the preset browser's folder chooser; tests/checkNoJuceFile.cmake
+    /// allowlists both. `juce::FileChooser` is handed one to start from and
+    /// answers with one, so the conversion happens here and the type goes no
+    /// further -- `newSampleFileSelected()` takes an `fs::path`.
+    ///
     /// \note Only a real file is a place to start from: a factory sample is a
     /// bare name and no directory, and JUCE would resolve it against whatever
-    /// the host's working directory happens to be.
+    /// the host's working directory happens to be. `getSpecialLocation()` stays
+    /// a `juce::File` because it feeds the constructor on the next line and
+    /// never leaves the expression.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
     auto const currentFile(editor.editorHost().currentSampleFile());
-    auto const startingFile(currentFile.existsAsFile()
-                                ? currentFile
+    std::error_code error;
+    auto const startingFile(fs::is_regular_file(currentFile, error)
+                                ? LE::IO::pathToJuceFile(currentFile)
                                 : juce::File::getSpecialLocation(juce::File::userMusicDirectory));
 
     /// \note Held rather than stack-allocated: launchAsync() returns
@@ -2667,14 +2685,15 @@ void SpectrumWorxEditor::SampleArea::browseForFile()
     fileChooser_ = std::make_unique<juce::FileChooser>("Choose external audio file", startingFile,
                                                        Sample::supportedFormats(), true);
     juce::Component::SafePointer<SpectrumWorxEditor> pEditor(&editor);
-    fileChooser_->launchAsync(
-        juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-        [pEditor](juce::FileChooser const &chooser) {
-            if (!pEditor || chooser.getResults().isEmpty())
-                return;
-            LE_ASSERT(chooser.getResults().size() == 1);
-            pEditor->newSampleFileSelected(chooser.getResults().getReference(0));
-        });
+    fileChooser_->launchAsync(juce::FileBrowserComponent::openMode |
+                                  juce::FileBrowserComponent::canSelectFiles,
+                              [pEditor](juce::FileChooser const &chooser) {
+                                  if (!pEditor || chooser.getResults().isEmpty())
+                                      return;
+                                  LE_ASSERT(chooser.getResults().size() == 1);
+                                  pEditor->newSampleFileSelected(
+                                      LE::IO::juceFileToPath(chooser.getResults().getReference(0)));
+                              });
 }
 
 SpectrumWorxEditor &SpectrumWorxEditor::SampleArea::editor()
@@ -3075,8 +3094,10 @@ void SpectrumWorxEditor::Settings::buttonClicked(juce::Button *const pButton)
     }
     else if (pButton == &aboutPage_.showUsersGuide_)
     {
+        /// \note openDocument() wants a `juce::String`, so the path never
+        /// becomes a `juce::File` on the way there.
         LE_VERIFY(juce::Process::openDocument(
-            rootPath().getChildFile("Documents/User's Guide.PDF").getFullPathName(),
+            LE::IO::pathToJuceString(rootPath() / "Documents" / "User's Guide.PDF"),
             juce::String()));
     }
 }

@@ -159,8 +159,8 @@ class HarnessHost final : public GUI::EditorHost
     /// \note The external audio file, declined: the harness has no engine to
     /// feed one to and renders a still image, so the sample area draws its empty
     /// state. Loading one is what sampleTests.cpp covers.
-    juce::File currentSampleFile() const override { return {}; }
-    char const *setNewSample(juce::File const &) override { return nullptr; }
+    fs::path currentSampleFile() const override { return {}; }
+    char const *setNewSample(fs::path const &) override { return nullptr; }
     bool isSampleLoadInProgress() const override { return false; }
     void registerSampleLoadedListener(GUI::SpectrumWorxEditor &) override {}
     void deregisterSampleLoadedListener(GUI::SpectrumWorxEditor const &) override {}

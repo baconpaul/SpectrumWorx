@@ -30,6 +30,10 @@
 #include "resources.hpp"
 #include "theme.hpp"
 
+/// `fs`, for the two path getters below. \see io/jucePath.hpp for the conversion
+/// to and from JUCE's own file type, which is what the editor's edges want.
+#include "filesystem/import.h"
+
 /// \note Individual JUCE 8 headers have no include guards and open
 /// `namespace juce {` mid-file; they may only be reached through the module
 /// umbrella header. The old "juce/..." prefix was the deleted fork's layout.
@@ -157,9 +161,18 @@ float displayScale();
 /// defined. These two answer on demand.
 ///                                       (31.07.2026.) (SW port)
 
+/// \note **`fs::path`, not `juce::File`**, and that is what closed issue #28.
+/// `sst::plugininfra::paths` answers with an `fs::path`; this used to convert it
+/// into a `juce::File`, and getting that conversion wrong created a mojibake
+/// Documents folder on a `ja_JP.UTF-8` desktop. There is no conversion here any
+/// more -- the bytes the platform gave us are handed on untouched, and whoever
+/// needs them as a `juce::String` converts at the edge that needs it, through
+/// io/jucePath.hpp.
+///                                       (09.08.2026.) (SW port)
+
 /// The user's SpectrumWorx folder: `~/Documents/SpectrumWorx` or the platform
 /// equivalent. Nothing is created by asking.
-juce::File const &rootPath();
+fs::path const &rootPath();
 
 /// \brief The browser's most-recently-used preset folder, which starts at the
 /// user's preset directory and which the browser writes back when it closes.
@@ -167,7 +180,7 @@ juce::File const &rootPath();
 /// last was. The browser used to assign to it, which moved the anchor
 /// `goToParent()` stops at and the folder `createUserPresetsFolder()` makes;
 /// where it was is its own business now (`PresetBrowser::Place`).
-juce::File const &presetsFolder();
+fs::path const &presetsFolder();
 
 /// \brief Creates the user preset directory if it is not there.
 /// \note Not done by presetsFolder(); see the note at the definition.

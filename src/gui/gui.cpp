@@ -17,6 +17,8 @@
 
 #include <sst/plugininfra/paths.h>
 #include <algorithm>
+#include <filesystem>
+#include <system_error>
 
 #include <array>
 #include <cstdio>
@@ -220,44 +222,41 @@ void warningOkCancelBox(TCHAR const *const title, TCHAR const *const question,
 /// "too early".
 ///                                       (31.07.2026.) (SW port)
 ///
-/// \note **fromUTF8(), not the `char const *` constructor**, and that one word is
-/// the whole of issue #28. `u8string()` ought to be unambiguous -- JUCE has a
-/// `String( char8_t const * )` overload that decodes UTF-8 -- but sst-plugininfra's
-/// `filesystem` target carries `-fno-char8_t` in its INTERFACE compile options
-/// (libs/sst/sst-plugininfra/libs/filesystem/CMakeLists.txt), and it propagates
-/// here. So `std::u8string` *is* `std::string`, `.c_str()` is a plain
-/// `char const *`, the `char8_t` overload does not exist to be chosen, and the
-/// call lands on `String( char const * )` -- which builds through
-/// `CharPointer_ASCII`, widening every *byte* to a code point before re-encoding
-/// the lot as UTF-8.
+/// \note **No conversion at all, which is how issue #28 was closed.** This read
+/// `juce::File( juce::String::fromUTF8( ... .u8string().c_str() ) )`, and the
+/// `fromUTF8` was load bearing: sst-plugininfra's `filesystem` target carries
+/// `-fno-char8_t` in its INTERFACE compile options and it propagates here, so
+/// `std::u8string` *is* `std::string`, the `String( char8_t const * )` overload
+/// that decodes UTF-8 does not exist to be chosen, and the plain `char const *`
+/// constructor -- which widens every *byte* to a code point through
+/// `CharPointer_ASCII` -- is what the call lands on instead.
 ///
 ///   ASCII is a fixed point of that widening, which is why it survived to a
 /// release: it takes a home directory whose localised Documents folder is not
 /// ASCII. Under `ja_JP.UTF-8` the XDG answer came back as its own mojibake --
-/// `e3 83 89 ...` in, `c3 a3 c2 83 c2 89 ...` out -- which then matched no
-/// directory that existed, so the plugin helpfully created that one instead. The
-/// XDG lookup is byte-exact and was never at fault; only this conversion was.
+/// `e3 83 89 ...` in, `c3 a3 c2 83 c2 89 ...` out -- which matched no directory
+/// that existed, so the plugin helpfully created that one instead. The XDG lookup
+/// is byte-exact and was never at fault; only the conversion was.
 ///
-///   Note that `String( char const * )` carries a `jassert` for precisely this,
-/// so a debug build on such a machine would have said so outright. Nobody had one.
+///   So there is no conversion here to get wrong. `sst::plugininfra::paths`
+/// answers with an `fs::path` and that is what this hands back. The hazard has
+/// not vanished -- it has moved to the edges that genuinely need a `juce::String`
+/// or a JUCE file object, which is five functions in io/jucePath.hpp with a test
+/// file to themselves.
 ///                                       (09.08.2026.) (SW port)
 
-juce::File const &rootPath()
+fs::path const &rootPath()
 {
-    static juce::File const path(
-        juce::String::fromUTF8(sst::plugininfra::paths::bestDocumentsVendorFolderPathFor(
-                                   "Surge Synth Team", "SpectrumWorx")
-                                   .u8string()
-                                   .c_str()));
+    static fs::path const path(sst::plugininfra::paths::bestDocumentsVendorFolderPathFor(
+        "Surge Synth Team", "SpectrumWorx"));
     return path;
 }
 
-/// \note Mutable, and by reference: this is the browser's most-recently-used
-/// folder, which it writes back when it closes. It starts at the user's preset
-/// directory.
-juce::File const &presetsFolder()
+/// \note By reference, and const: this is where the user's presets live. Where
+/// the browser last was is its own business -- see PresetBrowser::Place.
+fs::path const &presetsFolder()
 {
-    static juce::File folder(rootPath().getChildFile("Presets"));
+    static fs::path const folder(rootPath() / "Presets");
     return folder;
 }
 
@@ -287,10 +286,20 @@ juce::File const &presetsFolder()
 bool createUserPresetsFolder()
 {
     auto const &folder(presetsFolder());
-    if (folder.isDirectory())
+
+    /// \note The `std::error_code` overloads throughout, never the throwing ones:
+    /// this runs when the editor's preset button is pressed, on the host's
+    /// message thread and behind the CLAP C entry points, where an escaping
+    /// exception is undefined behaviour rather than a `false`. Which is also
+    /// exactly what `juce::File::createDirectory()` answered with, so the shape
+    /// of the function is unchanged.
+    std::error_code error;
+    if (std::filesystem::is_directory(folder, error))
         return true;
 
-    return folder.createDirectory().wasOk();
+    /// \note create_directories(), plural: the root above it may not be there
+    /// either, and JUCE's createDirectory() made the whole chain.
+    return std::filesystem::create_directories(folder, error) && !error;
 }
 
 void paintImage(juce::Graphics &graphics, Artwork const &artwork)

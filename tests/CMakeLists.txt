@@ -83,6 +83,7 @@ add_executable(sw-plugin-tests
         gui/pathsTests.cpp
         gui/skinTests.cpp
         gui/twoInstanceTests.cpp
+        io/jucePathTests.cpp
 )
 
 # sw-impl brings sw-dsp with it, and brings the CLAP entry point the plugin
@@ -187,6 +188,16 @@ add_test(NAME asserts-have-no-side-effects
         COMMAND ${CMAKE_COMMAND}
         -D "SOURCE_DIR=${CMAKE_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/checkNoAssertSideEffects.cmake")
+
+# And the path type. `fs::path` from the engine to the editor, with juce::File
+# confined to io/jucePath.hpp and the two juce::FileChoosers that are handed one
+# and answer with one -- because every conversion between the two is a chance to
+# get the encoding wrong, which is what issue #28 was. Also a source scan, so it
+# runs under every generator.
+add_test(NAME no-juce-file-outside-the-edge
+        COMMAND ${CMAKE_COMMAND}
+        -D "SOURCE_DIR=${CMAKE_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/checkNoJuceFile.cmake")
 
 # \note check_gui_flag_parity.py was wired in here, to compile every sw-dsp
 # source at both settings of LE_SW_GUI and compare the objects. It did its job:

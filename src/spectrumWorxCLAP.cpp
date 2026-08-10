@@ -38,7 +38,8 @@
 // that this can call it with none, and savePreset() is the writer at the far end
 // of it. See doc/tech/streaming_format.md.
 #include "gui/editor/presetLoading.hpp"
-#include "le/spectrumworx/presetFile.hpp"
+#include "io/jucePath.hpp"
+#include "le/spectrumworx/presetStorage.hpp"
 #include "le/spectrumworx/presetStorage.hpp" // maximumPresetSize
 
 #include "le/math/vector.hpp" // Math::copy(), for the sample's wrap
@@ -405,8 +406,7 @@ bool SpectrumWorxCLAP::activate(double const sampleRate, std::uint32_t,
     ///
     ////////////////////////////////////////////////////////////////////////////
 
-    if ((sampleFile_ != juce::File()) &&
-        (decodedSampleRate_ != static_cast<unsigned int>(sampleRate)))
+    if (!sampleFile_.empty() && (decodedSampleRate_ != static_cast<unsigned int>(sampleRate)))
     {
         /// \note No dialog on a failure here, unlike the menu's load. Nothing
         /// asked for this -- the host is opening a session -- and there is no
@@ -2190,7 +2190,10 @@ try
     /// \note `programMain_`, this being `[main-thread]`: a host saves a session
     /// while the audio thread is running, and walking the engine's chain to do it
     /// is the same read that crashed `paramsInfo`.
-    auto const state(savePreset(currentSampleFile(), juce::String(), programMain_, &dawExtraState));
+    /// \note `u8string()`, and the format's own `std::string_view` overload: the
+    /// sample path goes into `<p n="Sample">` as UTF-8 bytes on every platform,
+    /// which is what makes a session written on one openable on another.
+    auto const state(savePreset(LE::IO::pathToUTF8(sampleFile_), {}, programMain_, &dawExtraState));
 
     /// \note The terminator goes into the stream, because loadFrom() parses a
     /// C string and a host is free to hand back exactly what it was given with
@@ -2431,11 +2434,11 @@ bool SpectrumWorxCLAP::requestEditorSize(int const width, int const height)
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-char const *SpectrumWorxCLAP::decodeAndPublishSample(juce::File const &sampleFile)
+char const *SpectrumWorxCLAP::decodeAndPublishSample(fs::path const &sampleFile)
 {
     LE_ASSERT(Threading::isMainThread() || !Threading::isAudioThread());
 
-    if (sampleFile == juce::File())
+    if (sampleFile.empty())
     {
         publishSample(nullptr);
         return nullptr;
@@ -2456,7 +2459,7 @@ char const *SpectrumWorxCLAP::decodeAndPublishSample(juce::File const &sampleFil
     return nullptr;
 }
 
-char const *SpectrumWorxCLAP::setNewSample(juce::File const &newSampleFile)
+char const *SpectrumWorxCLAP::setNewSample(fs::path const &newSampleFile)
 {
     auto const *const pErrorMessage(decodeAndPublishSample(newSampleFile));
     if (pErrorMessage)
@@ -2503,7 +2506,7 @@ char const *SpectrumWorxCLAP::setNewSample(juce::File const &newSampleFile)
 void SpectrumWorxCLAP::publishSample(Sample *const pNewSample)
 {
     auto const recordWhatTheEngineHasNow([&] {
-        sampleFile_ = pNewSample ? pNewSample->sampleFile() : juce::File();
+        sampleFile_ = pNewSample ? pNewSample->sampleFile() : fs::path();
         decodedSampleRate_ = pNewSample ? pNewSample->sampleRate() : 0;
     });
 

@@ -22,6 +22,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <string>
+#include <system_error>
 #include <vector>
 //------------------------------------------------------------------------------
 
@@ -46,24 +50,26 @@ TEST_CASE("The factory samples are embedded", "[external-audio]")
 
     for (auto const &sample : samples)
     {
-        UNSCOPED_INFO(sample.getFileName());
-        // A bare name and no directory: see the note on factorySamples().
-        CHECK(sample.getFileName() == sample.getFullPathName());
-        CHECK(!sample.getFileNameWithoutExtension().isEmpty());
+        UNSCOPED_INFO(sample);
+        /// \note A bare name and no directory: see the note on factorySamples().
+        /// As an `fs::path` that is one statement -- the whole path *is* its own
+        /// last component -- where it used to take two accessors to say.
+        CHECK(sample.filename() == sample);
+        CHECK(!sample.is_absolute());
+        CHECK(!sample.stem().empty());
         CHECK(Sample::isFactorySample(sample));
     }
 
-    CHECK(std::ranges::is_sorted(samples, [](juce::File const &l, juce::File const &r) {
-        return l.getFileName() < r.getFileName();
-    }));
+    /// \note Plain, because `fs::path` is totally ordered and every entry is a
+    /// single component -- so ordering by the whole path is ordering by name.
+    CHECK(std::ranges::is_sorted(samples));
 }
 
 TEST_CASE("A file that is neither on disk nor embedded fails to load", "[external-audio]")
 {
     Sample sample;
 
-    CHECK(sample.load(juce::File::createFileWithoutCheckingPath("no such sample.mp3"), 48000) !=
-          nullptr);
+    CHECK(sample.load("no such sample.mp3", 48000) != nullptr);
     CHECK(!sample);
     CHECK(sample.sampleRate() == 0);
 }
@@ -74,7 +80,7 @@ TEST_CASE("Every factory sample decodes to two equal channels", "[external-audio
 
     for (auto const &file : Sample::factorySamples())
     {
-        UNSCOPED_INFO(file.getFileName());
+        UNSCOPED_INFO(file);
 
         Sample sample;
         REQUIRE(sample.load(file, rate) == nullptr);
@@ -153,7 +159,7 @@ TEST_CASE("Clearing a sample forgets the file", "[external-audio]")
     sample.clear();
 
     CHECK(!sample);
-    CHECK(sample.sampleFile() == juce::File());
+    CHECK(sample.sampleFile().empty());
     CHECK(sample.sampleRate() == 0);
 }
 
@@ -262,12 +268,23 @@ std::vector<char> wavFile(unsigned const channels, std::uint32_t const sampleRat
     return bytes;
 }
 
-juce::File fileHolding(juce::String const &name, std::vector<char> const &bytes)
+/// \note `<fstream>` and `create_directories`, where this was
+/// `juce::File::createDirectory()` and `replaceWithData()`. The same shape lives
+/// in tests/presets/presetFileTests.cpp as `outputDirectory()`/`fileHolding()`;
+/// the two are in different test binaries -- sw-plugin-tests and sw-dsp-tests --
+/// so the idiom is shared rather than the symbol.
+fs::path fileHolding(std::string const &name, std::vector<char> const &bytes)
 {
-    juce::File const directory(juce::String(SW_TEST_OUTPUT_DIR));
-    REQUIRE(directory.createDirectory().wasOk());
-    auto const file(directory.getChildFile(name));
-    REQUIRE(file.replaceWithData(bytes.data(), bytes.size()));
+    fs::path const directory(SW_TEST_OUTPUT_DIR);
+    std::error_code error;
+    std::filesystem::create_directories(directory, error);
+    REQUIRE(std::filesystem::is_directory(directory, error));
+
+    auto const file(directory / name);
+    {
+        std::ofstream stream(file, std::ios::binary | std::ios::trunc);
+        REQUIRE(stream.write(bytes.data(), static_cast<std::streamsize>(bytes.size())));
+    }
     return file;
 }
 } // anonymous namespace

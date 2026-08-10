@@ -114,7 +114,7 @@ class PresetBrowser final : public BackgroundImage,
     void setFactoryBank(juce::String const &bank);
 
   private:
-    void setNewFolder(juce::File const &);
+    void setNewFolder(fs::path const &);
     void setRoot();
 
     /// \brief Up one level, wherever "up" is from here.
@@ -147,7 +147,7 @@ class PresetBrowser final : public BackgroundImage,
     {
         Location location{Location::Root};
         juce::String factoryBank; ///< when location is Factory
-        juce::File folder;        ///< when location is User
+        fs::path folder;          ///< when location is User
     };
 
     static Place &lastPlace();
@@ -168,11 +168,11 @@ class PresetBrowser final : public BackgroundImage,
     void showFilenameEditBox(juce::String const &presetName, unsigned int atRow);
     void hideFilenameEditBox();
 
-    void saveCurrentPreset(juce::String const &presetName, juce::File const &targetFile);
+    void saveCurrentPreset(juce::String const &presetName, fs::path const &targetFile);
 
     /// \note Retries itself from the dialog's callback rather than from a loop;
     /// see the definition.
-    void renameTo(juce::File const &sourceFile, juce::File const &targetFile,
+    void renameTo(fs::path const &sourceFile, fs::path const &targetFile,
                   juce::String const &newName);
 
     void saveDirtyComment();
@@ -194,8 +194,8 @@ class PresetBrowser final : public BackgroundImage,
 
     Item const &item(unsigned int index) const;
     Item const &selectedItem() const;
-    juce::File file(unsigned int index) const;
-    juce::File selectedFile() const;
+    fs::path file(unsigned int index) const;
+    fs::path selectedFile() const;
 
     Item const *findPreset(juce::String const &presetName) const;
 
@@ -224,7 +224,7 @@ class PresetBrowser final : public BackgroundImage,
     /// means the top of the factory tree.
     juce::String factoryBank_;
 
-    juce::File currentDirectory_;
+    fs::path currentDirectory_;
     juce::Array<Item> files_;
 
     juce::String originalComment_;

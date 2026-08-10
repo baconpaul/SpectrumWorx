@@ -23,7 +23,12 @@
 //------------------------------------------------------------------------------
 #include "le/utility/span.hpp"
 
+/// \note `juce::String` for supportedFormats(), which is a wildcard filter for a
+/// `juce::FileChooser` rather than anything to do with a path. The paths
+/// themselves are `fs::path`; \see io/jucePath.hpp.
 #include <juce_core/juce_core.h>
+
+#include "filesystem/import.h"
 
 #include <memory>
 #include <vector>
@@ -54,14 +59,20 @@ class Sample
     //
     // \note Compiled into the binary (assets/CMakeLists.txt), so they are known
     // by file name rather than by path -- which is also the only name a preset
-    // can carry that survives being opened on another machine. A juce::File
-    // built from one is deliberately not a path to anything: load() looks on
-    // disk first and falls back to the embedded set by name, which is what the
-    // 2016 build did with <install>/Samples.
+    // can carry that survives being opened on another machine. The path built
+    // from one is deliberately not a path to anything: one component, unrooted.
+    // load() looks on disk first and falls back to the embedded set by name,
+    // which is what the 2016 build did with <install>/Samples.
+    //
+    // \note This is the one thing `fs::path` models that `juce::File` had to be
+    // talked into: a bare name needed `createFileWithoutCheckingPath()` to stop
+    // JUCE resolving it against the working directory, and the resulting object
+    // was a File that was not a file. A relative path is just a relative path.
+    //                                        (09.08.2026.) (SW port)
     ////////////////////////////////////////////////////////////////////////////
 
-    static std::vector<juce::File> factorySamples();
-    static bool isFactorySample(juce::File const &);
+    static std::vector<fs::path> factorySamples();
+    static bool isFactorySample(fs::path const &);
 
   public:
     /// \param desiredSampleRate what to resample to, or zero for the file's own
@@ -76,7 +87,7 @@ class Sample
     /// and publishes it, and the one it displaces is destroyed on the main
     /// thread. See doc/tech/threading_model.md §5.
     ///                                       (02.08.2026.) (SW port)
-    char const *load(juce::File const &sampleFile, unsigned int desiredSampleRate);
+    char const *load(fs::path const &sampleFile, unsigned int desiredSampleRate);
 
     void clear();
 
@@ -89,8 +100,7 @@ class Sample
     unsigned int samplePosition() const { return samplePosition_; }
     void restart();
 
-    juce::File const &sampleFile() const { return sampleFile_; }
-    juce::String const &sampleFileName() const { return sampleFile().getFullPathName(); }
+    fs::path const &sampleFile() const { return sampleFile_; }
 
     /// The rate the data was resampled to, i.e. the engine's at the time of the
     /// load. Zero when nothing is loaded.
@@ -114,7 +124,7 @@ class Sample
     };
 
   private:
-    static char const *doLoad(juce::File const &, unsigned int desiredSampleRate, DataHolder &);
+    static char const *doLoad(fs::path const &, unsigned int desiredSampleRate, DataHolder &);
 
   private:
     DataHolder data_;
@@ -122,7 +132,7 @@ class Sample
     unsigned int samplePosition_{0};
     unsigned int sampleRate_{0};
 
-    juce::File sampleFile_;
+    fs::path sampleFile_;
 
     static unsigned int const fixedNumberOfChannels = 2;
 }; // class Sample
