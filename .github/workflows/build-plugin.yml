@@ -14,9 +14,10 @@
 #                  out the per-format wrapping and with it the VST3 and
 #                  AudioUnit SDK fetches -- the test binaries link sw-dsp and
 #                  sw-impl and want none of it (verified: that configuration
-#                  writes no _deps/ at all). Linux runs a third leg, the Debug
-#                  one again under GCC 15, which is a compiler and not a
-#                  configuration and so costs one matrix entry rather than a job.
+#                  writes no _deps/ at all). Two of the legs are a compiler
+#                  rather than a configuration, and so cost a matrix entry
+#                  rather than a job: Linux Debug again under GCC 15, and
+#                  Windows Release again under clang-cl.
 #   build_plugin   the four bundles, and on anything but a pull request the
 #                  installer as well. Windows builds twice, MSVC and clang-cl;
 #                  the second is compiler coverage and ships nothing.
@@ -118,6 +119,22 @@ jobs:
             os: windows-latest
             config: Release
             cmake_args: -Ax64
+            use_gcc15: false
+
+          # The same runner and the same configuration, a different front end.
+          # clang-cl already builds the bundles in build_plugin below; what it
+          # has never done is *run* anything, so a codegen difference between the
+          # two Windows compilers -- the goldens are the part that would notice
+          # one -- has had nowhere to show up. It has to before clang-cl can be
+          # considered for the shipping binary.
+          #
+          #   Release only, for both of the reasons the MSVC leg is: the Debug
+          # hang noted above is a property of this runner and not of MSVC, and
+          # Release is the configuration that renders the goldens anyway.
+          - name: windows-x64-clang
+            os: windows-latest
+            config: Release
+            cmake_args: -Ax64 -TClangCL
             use_gcc15: false
 
           # Host architecture only. The bundles are universal; the tests are not
@@ -240,7 +257,9 @@ jobs:
           # what neither side alone has found.
           #
           # It ships nothing: the Windows download is MSVC's, so this leg stops
-          # at the four bundles and skips the installer and the artifact.
+          # at the four bundles and skips the installer and the artifact. The
+          # suite runs under clang-cl too, but in the test job above -- this one
+          # is the per-format wrapping, which that one turns off.
           #
           # Quiet, for now. The warning baseline is empty under MSVC -- and
           # clang-cl is MSVC as far as CMake's `if (MSVC)` is concerned -- so
