@@ -62,7 +62,24 @@ constexpr int japaneseDocumentsBytes{18};
 /// `juce::File` asserts otherwise -- and built off the build tree's own output
 /// directory because that is the one absolute path every platform's test run
 /// agrees on. It is never created.
-fs::path awkwardPath() { return fs::path(SW_TEST_OUTPUT_DIR) / japaneseDocuments / "SpectrumWorx"; }
+///
+/// \note **`utf8ToPath()` for the Japanese component, not `operator/` on the
+/// bytes**, and this file's first Windows run is what said so. It read
+/// `fs::path(SW_TEST_OUTPUT_DIR) / japaneseDocuments / "SpectrumWorx"`, and
+/// `fs::path`'s narrow constructor decodes with the *active code page* on
+/// Windows -- so the fixture was already mojibake before a single conversion had
+/// been tested, and three sections failed against production code that was
+/// right. On POSIX the narrow constructor is byte-transparent, which is why it
+/// passed everywhere it was written.
+///
+///   That is the very trap io/jucePath.hpp exists to close, sprung inside the
+/// test for it. The base stays a plain construction because it is ASCII, and
+/// ASCII is a fixed point of every ANSI code page.
+///                                       (10.08.2026.) (SW port)
+fs::path awkwardPath()
+{
+    return fs::path(SW_TEST_OUTPUT_DIR) / utf8ToPath(japaneseDocuments) / "SpectrumWorx";
+}
 
 //------------------------------------------------------------------------------
 } // anonymous namespace
@@ -94,6 +111,24 @@ TEST_CASE("UTF-8 bytes become characters rather than Latin-1", "[paths]")
 TEST_CASE("A path with a non-ASCII component survives the trip through JUCE", "[paths]")
 {
     auto const path(awkwardPath());
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The fixture, asserted before anything is asked of it. When this file
+    /// first ran on Windows it failed three times over -- and every one of those
+    /// failures was in production code that was correct, because `awkwardPath()`
+    /// had built a mojibake path to begin with. A `REQUIRE` here says "the
+    /// fixture is wrong" in one line instead.
+    ///
+    ///   Note which assertions did *not* catch it: all three round trips
+    /// passed, because a round trip is self-consistent whatever the bytes mean.
+    /// Only the checks against the known sequence bit. \see the note in
+    /// pathsTests.cpp on the same distinction.
+    ///                                       (10.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    REQUIRE(pathToUTF8(path.parent_path().filename()) == std::string(japaneseDocuments));
 
     SECTION("through juce::String")
     {
