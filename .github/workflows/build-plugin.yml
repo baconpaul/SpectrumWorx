@@ -26,6 +26,29 @@
 # answer is whether the code compiles and the suite passes on all three
 # platforms, and packaging it answers nothing that merging will not.
 #
+# Every leg of `test` is Ninja. Windows joined them on 10.08.2026, and bought
+# much less by it than the argument for doing it said it would.
+#
+#   The argument: `cmake --build --parallel N` reaches MSBuild as /m:N, which is
+# parallelism across *projects*, and nothing in this tree sets /MP to get it
+# within one -- so sw-juce, one project holding the ten translation units that
+# are all of JUCE, compiled them strictly serially. All true, and most of the way
+# to irrelevant. The MSVC leg went from 579 s to 549 s: 5 %, and that is the
+# honest number because it is the leg where only the generator and the job count
+# moved. MSBuild was evidently getting enough parallelism across the dozen-odd
+# other projects to hide most of it.
+#
+#   The clang leg fell 545 s to 315 s over the same change and is **not** evidence
+# for the generator: leaving the Visual Studio generator also changed which
+# clang-cl gets picked, so a compiler version moved at the same time. The note on
+# "Locate Visual Studio's clang-cl" below has that story.
+#
+#   `build_plugin` stays MSBuild on Windows, and 5 % is the reason. It is the job
+# that produces the installer people download, and that is not enough to buy a
+# generator change underneath it. It did take the --parallel 4, which is a flag
+# and not a generator: MSBuild gets /m:4 and still parallelises across projects
+# only.
+#
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 name: Build Plugin
@@ -118,23 +141,29 @@ jobs:
           - name: windows-x64
             os: windows-latest
             config: Release
-            cmake_args: -Ax64
+            cmake_args: -GNinja
             use_gcc15: false
 
           # The same runner and the same configuration, a different front end.
-          # clang-cl already builds the bundles in build_plugin below; what it
-          # has never done is *run* anything, so a codegen difference between the
-          # two Windows compilers -- the goldens are the part that would notice
-          # one -- has had nowhere to show up. It has to before clang-cl can be
-          # considered for the shipping binary.
+          # It runs the whole suite and agrees with MSVC on all of it: 386 of 386,
+          # and under two different clang-cls now (22.1.3 and, for one run before
+          # the step below pinned it back, 20.1.8), so the codegen does not differ
+          # anywhere a golden can see. That is what this leg is for -- the question
+          # has to stay answered if clang-cl is ever to be the shipping compiler,
+          # and a bundle that merely compiles does not answer it.
           #
           #   Release only, for both of the reasons the MSVC leg is: the Debug
           # hang noted above is a property of this runner and not of MSVC, and
           # Release is the configuration that renders the goldens anyway.
+          #
+          # \note $SW_CLANG_CL rather than `clang-cl`, and it is a shell variable
+          # rather than a matrix one: this string is pasted into the Configure
+          # step's script, so bash expands it there. The "Locate Visual Studio's
+          # clang-cl" step below sets it, and says why PATH is the wrong answer.
           - name: windows-x64-clang
             os: windows-latest
             config: Release
-            cmake_args: -Ax64 -TClangCL
+            cmake_args: -GNinja -DCMAKE_C_COMPILER="$SW_CLANG_CL" -DCMAKE_CXX_COMPILER="$SW_CLANG_CL"
             use_gcc15: false
 
           # Host architecture only. The bundles are universal; the tests are not
@@ -186,6 +215,61 @@ jobs:
         with:
           os: ${{ runner.os }}
 
+      # What -Ax64 used to do, and the price of leaving the Visual Studio
+      # generator: a toolset is something MSBuild resolves and Ninja has no
+      # concept of, so cl.exe, clang-cl.exe and the x64 headers and libs have to
+      # be in the environment before cmake runs rather than named on its command
+      # line. This exports vcvarsall's environment to GITHUB_ENV, so the
+      # Configure, build and test steps below all inherit it.
+      #
+      # \note No install-ninja. windows-2025-vs2026 ships Ninja 1.13.2 on PATH --
+      # the same version sst-githubactions/install-ninja defaults to -- and macOS
+      # and Linux have relied on their images the same way for as long as they
+      # have passed -GNinja; prepare-for-juce above installs it on none of the
+      # three.
+      #
+      # \note `arch` and nothing else, and `vsversion` in particular. The action
+      # has not been touched since April 2024, which is before VS 2026 and so
+      # before the image this runs on -- but given no version it asks
+      # `vswhere -latest`, which does not care, and only falls back to a
+      # hard-coded list of years when vswhere is missing. The image has VSWhere
+      # 3.1.7. Naming a version here would pin the search to `<major>.0,<major>.9`
+      # and find nothing.
+      - name: Set up the MSVC environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # Which clang-cl, and it is not the one on PATH. Visual Studio ships an
+      # LLVM of its own under VC/Tools/Llvm, and `-TClangCL` selected that; the
+      # image separately installs a standalone LLVM whose bin directory *is* on
+      # PATH, and vcvarsall does not add VS's. So `-DCMAKE_CXX_COMPILER=clang-cl`
+      # silently picked a different and older compiler the first time this ran:
+      # 20.1.8 against the 22.1.3 the MSBuild leg had been using.
+      #
+      #   Which is the wrong one to test. build_plugin below still builds the
+      # Windows bundles with -TClangCL, so testing the standalone LLVM would have
+      # left the suite green on a compiler that ships nothing, and the leg exists
+      # precisely to say whether clang-cl is fit to ship. This keeps the two the
+      # same compiler; the day build_plugin moves to Ninja it needs this step too.
+      #
+      # \note vswhere bare, and -latest -prerelease to match how the action above
+      # chose its instance -- asking a second question a different way is how the
+      # two end up on different installs. Backslashes to forward slashes because
+      # CMake takes a path and bash takes a backslash for an escape.
+      - name: Locate Visual Studio's clang-cl
+        if: matrix.name == 'windows-x64-clang'
+        run: |
+          vs=$(vswhere -latest -prerelease -products '*' -property installationPath)
+          clang="${vs//\\//}/VC/Tools/Llvm/x64/bin/clang-cl.exe"
+          if [ ! -x "$clang" ]; then
+            echo "No clang-cl under the Visual Studio at '$vs'." >&2
+            exit 1
+          fi
+          "$clang" --version
+          echo "SW_CLANG_CL=$clang" >> "$GITHUB_ENV"
+
       # The runner image usually has it. "Usually" is not a thing to find out
       # from a red square six jobs into a matrix.
       - name: Install Xvfb
@@ -221,10 +305,26 @@ jobs:
             -DSW_WERROR=ON \
             -DGITHUB_ACTIONS_BUILD=TRUE
 
+      # \note --config, and -C on the two ctest steps below, are inert now that
+      # every leg is Ninja: a single-config generator takes its configuration
+      # from CMAKE_BUILD_TYPE at configure time and both flags are accepted and
+      # ignored. They are left in place rather than deleted because Windows was
+      # the multi-config leg until this change, and a leg that goes back to the
+      # Visual Studio generator needs them again -- silently building Debug and
+      # calling it Release is what their absence would buy.
+      #
+      # \note --parallel 4, moved from 3 in the same commit as the generator --
+      # so the 579 s to 549 s at the top of this file is the pair of them, not
+      # the generator alone.
+      #
+      #   Four because that is what the runners have: ubuntu-latest and
+      # windows-latest are 4 vCPU, macOS is 3 (M1). macOS is therefore one over
+      # on purpose, and it cost nothing: its Release build went 323 s to 302 s
+      # across the same change.
       - name: Build the test binaries
         run: |
           cmake --build ./build --config ${{ matrix.config }} \
-            --target sw-dsp-tests sw-plugin-tests sw-show-ui --parallel 3
+            --target sw-dsp-tests sw-plugin-tests sw-show-ui --parallel 4
 
       # sw-plugin-tests instantiates the real editor, and JUCE wants a display
       # server to do that even for a component that is never shown. macOS and
@@ -323,7 +423,7 @@ jobs:
             -DSW_WERROR=ON \
             -DGITHUB_ACTIONS_BUILD=TRUE
           cmake --build ./build --config Debug \
-            --target spectrumworx_clapfirst_all --parallel 3
+            --target spectrumworx_clapfirst_all --parallel 4
 
       - name: Build release version
         if: github.event_name != 'pull_request'
@@ -342,7 +442,7 @@ jobs:
             -DSW_WERROR=ON \
             -DGITHUB_ACTIONS_BUILD=TRUE
           cmake --build ./build --config Release \
-            --target ${{ matrix.target }} --parallel 3
+            --target ${{ matrix.target }} --parallel 4
 
       - name: Show Installer Directory
         if: github.event_name != 'pull_request' && matrix.target == 'spectrumworx-installer'
