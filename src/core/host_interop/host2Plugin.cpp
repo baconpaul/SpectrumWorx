@@ -19,8 +19,17 @@ namespace LE
 #pragma warning(disable : 4127) // Conditional expression is constant.
 
 //...mrmlj...orphan...
+/// \note `Char const *string`, not `Char const *const string`, and the const is
+/// not merely redundant here -- it made this function unlinkable under clang-cl.
+/// A top-level const on a parameter is not part of the function type
+/// ([dcl.fct]/5), so the two spellings declare the same function and the two
+/// declarations of it -- host2Plugin.hpp and the one plugin2Host.cpp keeps for
+/// itself -- write it without. MSVC agrees and mangles both as `PEBD`; clang-cl
+/// mangles the definition as `QEBD` and leaves every caller referring to a
+/// symbol nothing defines. Measured, on the two manglings, not deduced.
+///                                       (09.08.2026.) (SW port)
 template <typename Char>
-char *copyToBuffer(Char const *const string, LE::Utility::Span<char> const &buffer)
+char *copyToBuffer(Char const *string, LE::Utility::Span<char> const &buffer)
 {
     //std::strncpy( buffer.begin(), string, buffer.size() - 1 );
     Char const *LE_RESTRICT pSourceCharacter(string);

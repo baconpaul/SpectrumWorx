@@ -39,28 +39,20 @@
 #include <string>
 #include <type_traits>
 //------------------------------------------------------------------------------
-#if defined(_MSC_VER)
-namespace std
-{
-inline int isfinite(float const value) { return _finite(value); }
-inline int isfinite(double const value) { return _finite(value); }
-} // namespace std
-#elif defined(__ANDROID__) && defined(_STLPORT_VERSION)
-#undef fpclassify
-#undef isfinite
-#undef signbit
-namespace std
-{
-inline int isfinite(float const value) { return __isfinitef(value); }
-inline int isfinite(double const value) { return __isfinite(value); }
-
-inline int fpclassify(float const value) { return __fpclassifyf(value); }
-inline int fpclassify(double const value) { return __fpclassifyd(value); }
-
-inline int signbit(float const value) { return __signbitf(value); }
-inline int signbit(double const value) { return __signbit(value); }
-} // namespace std
-#endif // compiler/CRT
+/// \note Two arms stood here putting isfinite() into namespace std: one for
+/// MSVC, whose <cmath> had no C++11 std::isfinite when this was written, and one
+/// for Android with STLport. Both answer standard libraries this project no
+/// longer builds against -- the floor is MSVC 19.29, and the MS STL has had
+/// std::isfinite since 2015 -- and the MSVC arm is what stopped clang-cl: that
+/// header declares ::isfinite and then pulls it into std with a
+/// using-declaration, and a second declaration of the name there conflicts with
+/// the target of it. MSVC accepts that, Clang does not, and adding names to
+/// namespace std was never ours to do.
+///
+///   All 33 call sites spell it std::isfinite and now reach the standard one,
+/// which returns bool where these returned int. Every one of them is a
+/// condition.
+///                                           (09.08.2026.) (SW port)
 
 namespace LE::Math
 {

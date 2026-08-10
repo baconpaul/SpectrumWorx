@@ -89,11 +89,12 @@ add_executable(sw-plugin-tests
 # tests drive. No dlopen: the tests link the same static library the .clap
 # bundle does, so what they exercise is what ships.
 #
-# \note sw-gui-resources was named here as well, which the linker answered with
-# "ignoring duplicate libraries". It arrives on its own, in the right place:
-# sw-impl -> sw-gui -> sw-gui-widgets links it PUBLIC. Naming it first only put
-# a second copy ahead of the targets that need it.
-target_link_libraries(sw-plugin-tests PRIVATE sw-impl Catch2::Catch2WithMain)
+# sw-gui by name, because sw-impl links it PRIVATE: the editor cases include its
+# headers, and a LINK_ONLY dependency carries the library without them. Every
+# target that wants a JUCE header now says which one it wants, which is what
+# stops the bundles compiling JUCE a second time -- see src/CMakeLists.txt.
+#                                       (09.08.2026.) (SW port)
+target_link_libraries(sw-plugin-tests PRIVATE sw-impl sw-gui Catch2::Catch2WithMain)
 
 # clapwrapper/{auv2,vst3}.h, for the two sub-factories identityTests.cpp pins.
 # sw-impl links this PRIVATE -- it is a header-only interface target and the
