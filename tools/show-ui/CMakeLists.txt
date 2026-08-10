@@ -20,11 +20,23 @@ add_executable(sw-show-ui
 # \note sw-gui-resources -- which the skin and theme pages are made of -- was
 # named here too, and the linker answered "ignoring duplicate libraries". It
 # comes with sw-gui below, PUBLIC by way of sw-gui-widgets, headers included.
+#
+# \note juce::juce_gui_basics and juce::juce_gui_extra were named here as well,
+# and naming them is what made this tool compile its own copy of JUCE: a module
+# target is an INTERFACE library carrying its .cpp files as INTERFACE_SOURCES,
+# so linking one hands those sources to the consumer. sw-juce arrives anyway --
+# PUBLIC, along the same chain as sw-gui-resources above -- so both copies
+# reached the link line and every juce_gui_basics symbol was defined twice.
+#
+#   Nothing said so for a long time. link.exe, ld and ld64 pull an archive
+# member only to resolve a symbol that is still undefined, and this target's own
+# objects got there first, so sw-juce.lib's copies were never pulled. lld-link
+# pulls the member and then reports the collision, which is how the clang-cl CI
+# leg found it on the first run. Only juce_gui_basics is in the message; every
+# module those two drag in was being compiled twice.
 target_link_libraries(sw-show-ui PRIVATE
-        juce::juce_gui_basics
-        juce::juce_gui_extra
-
-        # The editor page, and the skin and theme pages under it.
+        # The editor page, and the skin and theme pages under it. JUCE comes
+        # with it -- compiled once, as sw-juce.
         sw-gui
 )
 
@@ -55,27 +67,19 @@ target_compile_definitions(sw-show-ui PRIVATE
         JUCE_MODAL_LOOPS_PERMITTED=0
 )
 
-# `_CONSOLE`, and PRIVATE to this executable -- the opposite of the rule above,
-# for the opposite reason. It is not a setting of the JUCE modules but a
-# statement about *this* binary: it is a console-subsystem program, which is
-# what a plain add_executable() produces and what ctest runs with `--render`.
+# \note `_CONSOLE` was defined here on Windows and is not any more. It was a
+# setting of this target's *own copy* of JUCE: juce_ApplicationBase.cpp guards
+# `JUCEApplicationBase::main( argc, argv )` with
+# `JUCE_WINDOWS && ! defined( _CONSOLE )` and offers WinMain otherwise, and
+# main.cpp names that overload directly. That copy is exactly what collided with
+# sw-juce (see the link note above), so the copy went and the macro with it.
 #
-#   JUCE reads it three times and gets all three right only if it is set.
-# juce_Initialisation.h picks `int main( argc, argv )` over `WinMain` for the
-# entry point; juce_ApplicationBase.cpp compiles the matching
-# `JUCEApplicationBase::main( argc, argv )` **only** in the same arm, and takes
-# the command line from those arguments rather than GetCommandLineW(); and it
-# skips an AttachConsole( ATTACH_PARENT_PROCESS ) that exists so a GUI app can
-# printf, which a console app has no need of.
-#
-#   main.cpp hand-expands START_JUCE_APPLICATION so that --render can run before
-# any of JUCE's application machinery, so it names that overload directly -- and
-# without this the Windows link failed on it, which is how a macro nobody reads
-# turns into an unresolved symbol. The plugin's own standalone must NOT have
-# this: clap-wrapper builds a GUI-subsystem app and wants JUCE's WinMain.
-if (WIN32)
-    target_compile_definitions(sw-show-ui PRIVATE _CONSOLE)
-endif ()
+#   This is still a console-subsystem program -- that is what a plain
+# add_executable() produces, and what ctest runs with `--render`. The macro was
+# never what made it one. main.cpp now calls the no-argument
+# `JUCEApplicationBase::main()`, which JUCE compiles outside that guard in every
+# configuration; the note there says what the argument-taking one added and why
+# none of it is missed on Windows.
 
 # Render every page offscreen. Cheap, needs no display, and it is the only
 # thing that notices a page which compiles but throws, asserts or draws

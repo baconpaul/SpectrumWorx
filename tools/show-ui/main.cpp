@@ -325,10 +325,6 @@ int render(juce::String const &pageName, juce::File const &output)
 // What START_JUCE_APPLICATION expands to, opened up so that --render can run
 // before any of it: JUCEApplicationBase::main() creates an NSApplication on
 // macOS, which offscreen rendering neither needs nor should require.
-//
-// \note Naming the overload rather than letting the macro pick it is why this
-// tool defines _CONSOLE on Windows -- JUCE compiles this one only for a console
-// subsystem binary, and offers WinMain otherwise. See tools/show-ui/CMakeLists.txt.
 juce::JUCEApplicationBase *juce_CreateApplication();
 juce::JUCEApplicationBase *juce_CreateApplication() { return new ShowUIApplication(); }
 
@@ -349,5 +345,22 @@ int main(int argc, char *argv[])
     }
 
     juce::JUCEApplicationBase::createInstance = &juce_CreateApplication;
+
+    /// \note Two overloads, and Windows takes the other one. JUCE guards
+    /// `main( argc, argv )` with `JUCE_WINDOWS && ! defined( _CONSOLE )` and
+    /// compiles it only in the arm this build is not in: JUCE is built once, in
+    /// sw-juce, which is a library and defines no such thing. The no-argument
+    /// overload sits outside that guard and exists in every configuration.
+    ///
+    ///   Nothing is lost by taking it. What the argument-taking one adds is
+    /// juce_argc / juce_argv and, on macOS, initialiseNSApplication() -- and in
+    /// this arm JUCE reads the command line from GetCommandLineW() rather than
+    /// from those two, so on Windows there is nothing left to hand it. Off
+    /// Windows the guard never applies whatever _CONSOLE says, so those
+    /// platforms keep the overload that sets them.
+#if JUCE_WINDOWS
+    return juce::JUCEApplicationBase::main();
+#else
     return juce::JUCEApplicationBase::main(argc, const_cast<char const **>(argv));
+#endif
 }

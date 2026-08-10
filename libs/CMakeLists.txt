@@ -92,24 +92,28 @@ target_compile_definitions(juce_audio_formats INTERFACE JUCE_USE_MP3AUDIOFORMAT=
 # settings above: a consumer's headers and this target's objects cannot disagree
 # about them, which is the ODR bug in the note above waiting to happen again.
 #
-# \note Two targets keep compiling their own copy, and neither is an oversight:
+# \note One target keeps compiling its own copy, and it is not an oversight:
+# clap_juce_shim, which is upstream in sst-clap-helpers, and which compiles its
+# nine modules with four settings of its own -- JUCE_MODAL_LOOPS_PERMITTED,
+# JUCE_COREGRAPHICS_DRAW_ASYNC, JUCE_REPORT_APP_USAGE and JUCE_USE_CAMERA. Those
+# it has, and this target does not, are what remains of the divergence the note
+# above describes. It changes nothing about what ships: the bundle resolves all
+# nine from libclap_juce_shim.a, exactly as it did when the alternative was
+# sw-impl's copy (which took the four from the shim's PUBLIC link), and takes
+# only juce_audio_basics and juce_audio_formats from here -- two modules the
+# shim does not build and that read none of the four. `nm -pa <bundle> | grep
+# OSO` is what answers this, per build.
 #
-#   - clap_juce_shim, which is upstream in sst-clap-helpers, and which compiles
-#     its nine modules with four settings of its own -- JUCE_MODAL_LOOPS_PERMITTED,
-#     JUCE_COREGRAPHICS_DRAW_ASYNC, JUCE_REPORT_APP_USAGE and JUCE_USE_CAMERA.
-#     Those it has, and this target does not, are what remains of the divergence
-#     the note above describes. It changes nothing about what ships: the bundle
-#     resolves all nine from libclap_juce_shim.a, exactly as it did when the
-#     alternative was sw-impl's copy (which took the four from the shim's PUBLIC
-#     link), and takes only juce_audio_basics and juce_audio_formats from here --
-#     two modules the shim does not build and that read none of the four.
-#     `nm -pa <bundle> | grep OSO` is what answers this, per build.
-#   - sw-show-ui, which defines _CONSOLE. juce_ApplicationBase.cpp compiles
-#     JUCEApplicationBase::main( argc, argv ) only outside the WinMain arm that
-#     macro selects between, and tools/show-ui/main.cpp calls it directly, so a
-#     copy built without it would not link on Windows.
+# \note sw-show-ui was the second such target, and the reason it was one did not
+# survive being looked at. It defined _CONSOLE so that its own copy would
+# compile JUCEApplicationBase::main( argc, argv ) rather than the WinMain arm --
+# but it also links sw-gui, which brings this target along PUBLIC, so both
+# copies were on its link line and every symbol in the shared modules was
+# defined twice. Three linkers never said so; lld-link did, on the first
+# clang-cl CI run. The tool takes JUCE from here now and calls the no-argument
+# overload, which is compiled outside that guard. See tools/show-ui.
 #
-#   JUCE_STANDALONE_APPLICATION is *not* what separates those two from this
+#   JUCE_STANDALONE_APPLICATION is *not* what separated those two from this
 # target, whatever the settings on sw-impl and sw-show-ui suggest: no module in
 # JUCE 8.0.12 reads it. It is left where it is rather than deleted here.
 #
