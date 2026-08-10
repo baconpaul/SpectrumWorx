@@ -24,13 +24,16 @@
 #include "core/threading/publish.hpp"
 
 #include "gui/gui.hpp" // warningMessageBox()
+#include "io/jucePath.hpp"
 
 #include "le/math/conversion.hpp"
 #include "le/parameters/parametersUtilities.hpp"
-#include "le/spectrumworx/presetFile.hpp"
+#include "le/spectrumworx/presetStorage.hpp"
 
 #include "le/utility/assert.hpp"
 
+#include <algorithm>
+#include <string>
 #include <string_view>
 
 namespace LE::SW::GUI
@@ -190,7 +193,7 @@ struct Loader
     {
         if (sampleFileName.empty())
         {
-            host.setNewSample(juce::File());
+            host.setNewSample({});
             if (pEditor)
                 pEditor->updateSampleNameAsync();
             return;
@@ -202,18 +205,27 @@ struct Loader
         /// \note And the reason a factory sample is stored by bare name: that
         /// is the one spelling no separator can spoil, and Sample::load()
         /// resolves it against the embedded set when there is nothing on disk.
-        auto const path(
-            juce::String::fromUTF8(sampleFileName.data(), static_cast<int>(sampleFileName.size()))
+        ///
+        /// \note On the bytes, before they become a path, and that ordering is
+        /// the point: `fs::path` does not normalise separators the way
+        /// `juce::File` did, so this is now the only thing standing between a
+        /// preset written on the other platform and a path with the wrong ones
+        /// in it. It used to be a belt-and-braces fixup in front of something
+        /// that would have coped anyway.
+        ///                                   (09.08.2026.) (SW port)
+        std::string spelling(sampleFileName);
 #ifdef _WIN32
-                .replaceCharacter('/', '\\')
+        std::ranges::replace(spelling, '/', '\\');
 #else
-                .replaceCharacter('\\', '/')
+        std::ranges::replace(spelling, '\\', '/');
 #endif // _WIN32
-        );
 
-        if (host.setNewSample(juce::File::createFileWithoutCheckingPath(path)))
+        /// \note utf8ToPath(), not `fs::path( std::string )`: what a preset
+        /// carries is UTF-8 and the latter decodes with the active code page on
+        /// Windows. \see io/jucePath.hpp.
+        if (host.setNewSample(LE::IO::utf8ToPath(spelling)))
         {
-            host.setNewSample(juce::File());
+            host.setNewSample({});
             reportPresetProblem(PresetProblem::SampleNotLoaded, sampleFileName);
         }
 
@@ -466,7 +478,7 @@ bool loadPreset(EditorHost &host, SpectrumWorxEditor *const pEditor, char *const
     return succeeded;
 }
 
-bool loadPreset(EditorHost &host, SpectrumWorxEditor *const pEditor, juce::File const &presetFile,
+bool loadPreset(EditorHost &host, SpectrumWorxEditor *const pEditor, fs::path const &presetFile,
                 bool const ignoreExternalSample, juce::String *const comment,
                 char const *const presetName, DawExtraState const *const pDawExtraState)
 {

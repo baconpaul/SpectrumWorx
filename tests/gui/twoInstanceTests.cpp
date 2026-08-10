@@ -39,7 +39,7 @@
 
 #include "gui/theme.hpp"
 
-#include "le/spectrumworx/presetFile.hpp"
+#include "le/spectrumworx/presetStorage.hpp"
 #include "le/spectrumworx/presets.hpp"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -286,7 +286,7 @@ TEST_CASE("A preset load counts its problems instead of raising dialogs",
         if (entry.path().extension() != ".swp")
             continue;
 
-        auto const presetData(readPresetFile(juce::File(entry.path().string())));
+        auto const presetData(readPresetFile(entry.path()));
         REQUIRE(presetData);
         std::string_view const text(presetData.get());
         std::vector<char> buffer(text.begin(), text.end());

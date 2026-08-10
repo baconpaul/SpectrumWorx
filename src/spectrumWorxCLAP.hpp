@@ -279,8 +279,8 @@ class SpectrumWorxCLAP final
     // setNewSample.
     ////////////////////////////////////////////////////////////////////////////
 
-    juce::File currentSampleFile() const override { return sampleFile_; }
-    char const *setNewSample(juce::File const &) override;
+    fs::path currentSampleFile() const override { return sampleFile_; }
+    char const *setNewSample(fs::path const &) override;
     /// \note Always false while the load above is synchronous: by the time
     /// anything can ask, it has finished. See the note on the interface.
     bool isSampleLoadInProgress() const override { return false; }
@@ -418,7 +418,7 @@ class SpectrumWorxCLAP final
     /// it. `[main-thread]`
     /// \return the reason it did not, or null. Nothing is disturbed on a failure:
     /// whatever was loaded stays loaded.
-    char const *decodeAndPublishSample(juce::File const &sampleFile);
+    char const *decodeAndPublishSample(fs::path const &sampleFile);
 
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -614,7 +614,7 @@ class SpectrumWorxCLAP final
     ////////////////////////////////////////////////////////////////////////////
 
     Sample *pSample_{nullptr};
-    juce::File sampleFile_;
+    fs::path sampleFile_;
     unsigned int decodedSampleRate_{0};
 
     /// \note Owned by the shim, which destroys it before this. Cleared in the

@@ -188,13 +188,12 @@ class SpectrumWorxEditor final : private SkinLifetime,
     AutomatedModuleChain &moduleChain();
     AutomatedModuleChain const &moduleChain() const;
 
-    bool loadPreset(juce::File const &, bool ignoreExternalSample, juce::String &comment,
+    bool loadPreset(fs::path const &, bool ignoreExternalSample, juce::String &comment,
                     juce::String const &presetName);
     /// \note A factory preset has no file; it comes out of the binary.
     bool loadPreset(char *inMemoryPreset, bool ignoreExternalSample, juce::String &comment,
                     juce::String const &presetName);
-    void savePreset(juce::File const &, bool ignoreExternalSample,
-                    juce::String const &comment) const;
+    void savePreset(fs::path const &, bool ignoreExternalSample, juce::String const &comment) const;
     char const *currentProgramName() const;
 
     bool presetLoadingInProgress() const;
@@ -491,7 +490,7 @@ class SpectrumWorxEditor final : private SkinLifetime,
     static constexpr unsigned short panelColumnX{estimatedWidth};
 
   private:
-    void newSampleFileSelected(juce::File const &);
+    void newSampleFileSelected(fs::path const &);
 
     /// \brief Parents \p panel to the editor, on top, wherever the placement puts
     /// it.

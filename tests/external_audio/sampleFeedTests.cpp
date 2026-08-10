@@ -65,7 +65,7 @@ constexpr unsigned int blocks{32};
 /// \note "Carrier.mp3", which is what `stateTests.cpp` uses and is named for
 /// exactly this job. A bare name with no directory is the one spelling that
 /// resolves against the embedded set -- see `Sample::load()`.
-juce::File carrier() { return juce::File::createFileWithoutCheckingPath("Carrier.mp3"); }
+fs::path carrier() { return "Carrier.mp3"; }
 
 void fillWithSine(std::vector<float> &buffer, float const frequency, std::uint32_t const startFrame)
 {
@@ -128,7 +128,7 @@ std::vector<float> run(Arrangement const arrangement)
     if (arrangement.loadSample)
     {
         editorHostOf(*plugin).setNewSample(carrier());
-        REQUIRE(editorHostOf(*plugin).currentSampleFile().getFileName() == "Carrier.mp3");
+        REQUIRE(editorHostOf(*plugin).currentSampleFile().filename() == "Carrier.mp3");
     }
 
     for (unsigned int block(0); block < blocks; ++block)
@@ -276,8 +276,8 @@ TEST_CASE("Clearing the sample gives the port back", "[external-audio][side-chai
     editorHostOf(*plugin).setNewSample(carrier());
     auto const withSample(runBlocks(blocks));
 
-    editorHostOf(*plugin).setNewSample(juce::File{});
-    CHECK(editorHostOf(*plugin).currentSampleFile() == juce::File());
+    editorHostOf(*plugin).setNewSample({});
+    CHECK(editorHostOf(*plugin).currentSampleFile().empty());
     auto const afterClearing(runBlocks(blocks));
 
     CHECK(afterClearing != withSample);

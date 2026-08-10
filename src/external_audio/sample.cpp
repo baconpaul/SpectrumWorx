@@ -11,6 +11,7 @@
 //------------------------------------------------------------------------------
 #include "sample.hpp"
 
+#include "io/jucePath.hpp"
 #include "le/math/vector.hpp" // Math::min/max, for the sanity checks in load()
 #include "le/utility/ignoreUnused.hpp"
 
@@ -20,6 +21,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <system_error>
 //------------------------------------------------------------------------------
 CMRC_DECLARE(swAssets);
 
@@ -36,9 +38,12 @@ constexpr std::string_view factoryRoot{"samples"};
 
 cmrc::embedded_filesystem assets() { return cmrc::swAssets::get_filesystem(); }
 
-std::string factoryPath(juce::File const &file)
+std::string factoryPath(fs::path const &file)
 {
-    return std::string(factoryRoot) + '/' + file.getFileName().toStdString();
+    /// \note u8string(), not string(): the resource keys are ASCII, but which of
+    /// path's five string accessors is correct is exactly the thing that gets
+    /// picked wrong, and string() is the active code page on Windows.
+    return std::string(factoryRoot) + '/' + LE::IO::pathToUTF8(file.filename());
 }
 
 bool isFactory(cmrc::embedded_filesystem const &filesystem, std::string const &path)
@@ -49,10 +54,16 @@ bool isFactory(cmrc::embedded_filesystem const &filesystem, std::string const &p
 /// Disk first, then the factory samples in the binary -- so that a preset naming
 /// a sample the user has since moved still finds the factory one, which is what
 /// the 2016 build's <install>/Samples fallback was for.
-std::unique_ptr<juce::InputStream> openSample(juce::File const &file)
+std::unique_ptr<juce::InputStream> openSample(fs::path const &file)
 {
-    if (file.existsAsFile())
-        if (auto stream(file.createInputStream()); stream && stream->openedOk())
+    /// \note The `std::error_code` overload, and it is the guard that makes the
+    /// conversion below legal as well: `juce::File` asserts on a relative path,
+    /// and a factory sample is a bare name. Nothing that is not a regular file on
+    /// disk reaches pathToJuceFile().
+    std::error_code error;
+    if (fs::is_regular_file(file, error))
+        if (auto stream(LE::IO::pathToJuceFile(file).createInputStream());
+            stream && stream->openedOk())
             return stream;
 
     auto const filesystem(assets());
@@ -85,9 +96,9 @@ juce::AudioFormatManager &formats()
 } // anonymous namespace
 //------------------------------------------------------------------------------
 
-std::vector<juce::File> Sample::factorySamples()
+std::vector<fs::path> Sample::factorySamples()
 {
-    std::vector<juce::File> found;
+    std::vector<fs::path> found;
 
     auto const filesystem(assets());
     if (!filesystem.is_directory(std::string(factoryRoot)))
@@ -95,21 +106,21 @@ std::vector<juce::File> Sample::factorySamples()
 
     for (auto const &entry : filesystem.iterate_directory(std::string(factoryRoot)))
         if (entry.is_file())
-            found.push_back(
-                juce::File::createFileWithoutCheckingPath(juce::String(entry.filename())));
+            found.push_back(LE::IO::utf8ToPath(entry.filename()));
 
-    /// \note By name, explicitly: juce::File has an operator< but not the rest
-    /// of the six, so it does not model std::totally_ordered and the default
-    /// comparator does not apply to it.
-    std::ranges::sort(found, [](juce::File const &left, juce::File const &right) {
-        return left.getFileName() < right.getFileName();
-    });
+    /// \note Plain, where this had to name a comparator: `juce::File` has an
+    /// `operator<` but not the rest of the six, so it did not model
+    /// `std::totally_ordered` and the default would not apply to it. `fs::path`
+    /// does, and every entry here is a single component, so ordering by the
+    /// whole path *is* ordering by name.
+    std::ranges::sort(found);
     return found;
 }
 
-bool Sample::isFactorySample(juce::File const &file)
+bool Sample::isFactorySample(fs::path const &file)
 {
-    return !file.existsAsFile() && isFactory(assets(), factoryPath(file));
+    std::error_code error;
+    return !fs::is_regular_file(file, error) && isFactory(assets(), factoryPath(file));
 }
 
 juce::String Sample::supportedFormats() { return formats().getWildcardForAllFormats(); }
@@ -119,7 +130,7 @@ juce::String Sample::supportedFormats() { return formats().getWildcardForAllForm
 /// it: the class knows nothing about them because there is nothing to know --
 /// what it loads into is private to the loader until it is published.
 ///                                           (02.08.2026.) (SW port)
-char const *Sample::load(juce::File const &sampleFile, unsigned int const desiredSampleRate)
+char const *Sample::load(fs::path const &sampleFile, unsigned int const desiredSampleRate)
 {
     DataHolder newData;
     char const *const pErrorString(doLoad(sampleFile, desiredSampleRate, newData));
@@ -180,7 +191,7 @@ constexpr std::int64_t maximumFrames{100'000'000};
 constexpr double maximumSampleRate{10'000'000};
 } // anonymous namespace
 
-char const *Sample::doLoad(juce::File const &sampleFile, unsigned int const desiredSampleRate,
+char const *Sample::doLoad(fs::path const &sampleFile, unsigned int const desiredSampleRate,
                            DataHolder &data)
 {
     auto stream(openSample(sampleFile));
@@ -282,7 +293,7 @@ void Sample::clear()
     data_.pBuffer.reset();
     //samplePosition_ = 0;
     sampleRate_ = 0;
-    sampleFile_ = juce::File();
+    sampleFile_.clear();
 }
 
 Sample::ChannelData Sample::channel(unsigned int const index) const

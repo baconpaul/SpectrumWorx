@@ -35,6 +35,9 @@
 
 #include <juce_core/juce_core.h>
 
+/// `fs`, for the side channel's sample file. \see io/jucePath.hpp.
+#include "filesystem/import.h"
+
 namespace LE::SW
 {
 
@@ -208,11 +211,16 @@ class EditorHost
     // load would need first.
     ////////////////////////////////////////////////////////////////////////////
 
-    virtual juce::File currentSampleFile() const = 0;
+    /// \note `fs::path`, and an empty one is "no sample". `juce::File` stood here
+    /// and made this interface the reason `Sample` and the CLAP carried JUCE's
+    /// file type at all; the conversion to one now happens at the two file
+    /// choosers that genuinely need it. \see io/jucePath.hpp.
+    ///                                       (09.08.2026.) (SW port)
+    virtual fs::path currentSampleFile() const = 0;
 
     ////////////////////////////////////////////////////////////////////////////
     ///
-    /// \brief Loads \p file as the side channel's source; an empty file clears
+    /// \brief Loads \p file as the side channel's source; an empty path clears
     /// it.
     ///
     /// \return the reason it could not, or null. **The caller decides what to do
@@ -225,7 +233,7 @@ class EditorHost
     ///                                       (08.08.2026.) (SW port)
     ///
     ////////////////////////////////////////////////////////////////////////////
-    virtual char const *setNewSample(juce::File const &) = 0;
+    virtual char const *setNewSample(fs::path const &) = 0;
     virtual bool isSampleLoadInProgress() const = 0;
     virtual void registerSampleLoadedListener(SpectrumWorxEditor &) = 0;
     virtual void deregisterSampleLoadedListener(SpectrumWorxEditor const &) = 0;

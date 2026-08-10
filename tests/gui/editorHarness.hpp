@@ -174,8 +174,8 @@ class Instance final : public GUI::EditorHost
     std::vector<juce::Point<int>> requestedSizes;
     bool grantResizes{true};
 
-    juce::File currentSampleFile() const override { return {}; }
-    char const *setNewSample(juce::File const &) override { return nullptr; }
+    fs::path currentSampleFile() const override { return {}; }
+    char const *setNewSample(fs::path const &) override { return nullptr; }
     bool isSampleLoadInProgress() const override { return false; }
     void registerSampleLoadedListener(GUI::SpectrumWorxEditor &) override {}
     void deregisterSampleLoadedListener(GUI::SpectrumWorxEditor const &) override {}

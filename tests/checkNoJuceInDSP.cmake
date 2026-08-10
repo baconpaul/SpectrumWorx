@@ -118,8 +118,10 @@ if (offenders)
 \n    ${fileList}\n\n\
 Something has put a JUCE module on sw-dsp's link line, or added a source to sw-dsp that \
 belongs above it. The engine is the layer a DSP test links on its own; anything that needs \
-juce::File, juce::String or juce::AudioFormatManager goes in sw-io or higher. See \
-doc/tech/threading_model.md and the note above sw-io in src/dsp.cmake.")
+juce::String or juce::AudioFormatManager goes in sw-io or higher. See \
+doc/tech/threading_model.md and the note above sw-io in src/dsp.cmake.\n\n\
+Paths are not among them: sw-dsp opens preset files itself, over fs::path and <fstream> -- \
+see le/spectrumworx/presetStorage.cpp and tests/checkNoJuceFile.cmake.")
 endif ()
 
 # A silent pass is also what a typo in the search string looks like.

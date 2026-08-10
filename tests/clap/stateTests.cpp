@@ -29,8 +29,7 @@
 #include "core/parameterID.hpp"
 #include "le/parameters/parametersUtilities.hpp"
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
-#include "le/spectrumworx/presetFile.hpp"
-#include "le/spectrumworx/presetStorage.hpp" // maximumPresetSize
+#include "le/spectrumworx/presetStorage.hpp" // savePreset, maximumPresetSize
 
 /// \note For ScopedProblemCounter, which swaps the default preset-problem
 /// reporter -- a `juce::AlertWindow` per problem -- for a counter. Without it a
@@ -53,8 +52,11 @@
 
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 //------------------------------------------------------------------------------
 namespace
@@ -493,8 +495,7 @@ TEST_CASE("Session state is the preset format plus a dawExtraState block", "[cla
     /// opening somebody's preset would silently overwrite where your browser was
     /// pointing and which settings you had -- the exact confusion between "what
     /// this sounds like" and "where I was" that the block exists to avoid.
-    auto const asPreset(
-        LE::SW::savePreset(juce::File(), juce::String(), plugin.implementation().program()));
+    auto const asPreset(LE::SW::savePreset({}, {}, plugin.implementation().program()));
     CHECK(asPreset.find("<SpectrumWorxPreset") != std::string::npos);
     CHECK(asPreset.find("<dawExtraState") == std::string::npos);
 }
@@ -509,15 +510,23 @@ TEST_CASE("A 2011 preset is legal session state", "[clap][state]")
     /// possible statement of "state is the preset serialisation" -- and because
     /// a host that migrates an old project by handing over a preset file is not
     /// a strange host.
-    juce::File const preset(juce::String(SW_PRESET_DATA_DIR) + "/Voices/LE Autotalk.swp");
-    REQUIRE(preset.existsAsFile());
+    fs::path const preset(fs::path(SW_PRESET_DATA_DIR) / "Voices" / "LE Autotalk.swp");
 
-    juce::MemoryBlock contents;
-    REQUIRE(preset.loadFileAsData(contents));
+    std::error_code error;
+    auto const size(std::filesystem::file_size(preset, error));
+    REQUIRE(!error);
 
-    InStream stream(
-        std::vector<char>(static_cast<char const *>(contents.getData()),
-                          static_cast<char const *>(contents.getData()) + contents.getSize()));
+    /// \note `<fstream>`, where this was `juce::File::loadFileAsData` into a
+    /// `juce::MemoryBlock`. The *exact* bytes, terminator included -- this preset
+    /// is one of the 193 that end in a NUL, and what is pinned here is that
+    /// `stateLoad` accepts a factory preset's bytes as they sit on disk.
+    std::vector<char> contents(static_cast<std::size_t>(size));
+    {
+        std::ifstream file(preset, std::ios::binary);
+        REQUIRE(file.read(contents.data(), static_cast<std::streamsize>(contents.size())));
+    }
+
+    InStream stream(std::move(contents));
     REQUIRE(plugin.state().load(&*plugin, &stream));
 
     std::vector<std::string> effects;
@@ -542,13 +551,13 @@ TEST_CASE("The loaded sample survives a session", "[clap][state]")
     /// spelling that survives a move between machines -- Sample::load() resolves
     /// a bare name against the embedded set when there is nothing on disk -- and
     /// therefore the one worth pinning here.
-    juce::File const sample(juce::File::createFileWithoutCheckingPath("Carrier.mp3"));
+    fs::path const sample("Carrier.mp3");
 
     OutStream saved;
     {
         Plugin const plugin(nullHost(), true /*active*/);
         plugin.editorHost().setNewSample(sample);
-        REQUIRE(plugin.editorHost().currentSampleFile() != juce::File());
+        REQUIRE(!plugin.editorHost().currentSampleFile().empty());
 
         REQUIRE(plugin.state().save(&*plugin, &saved));
         INFO("state:\n" << saved.text());
@@ -556,14 +565,14 @@ TEST_CASE("The loaded sample survives a session", "[clap][state]")
     }
 
     Plugin const restored(nullHost(), true /*active*/);
-    REQUIRE(restored.editorHost().currentSampleFile() == juce::File());
+    REQUIRE(restored.editorHost().currentSampleFile().empty());
 
     InStream stream(saved.data());
     REQUIRE(restored.state().load(&*restored, &stream));
 
     /// \note The bug the 3.0 state format was written to close: a session that
     /// restored everything except which audio file was loaded.
-    CHECK(restored.editorHost().currentSampleFile().getFileName() == "Carrier.mp3");
+    CHECK(restored.editorHost().currentSampleFile().filename() == "Carrier.mp3");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -589,13 +598,13 @@ TEST_CASE("A sample restored before the host names a rate is decoded again for i
 {
     Entry const entry;
 
-    juce::File const sample(juce::File::createFileWithoutCheckingPath("Carrier.mp3"));
+    fs::path const sample("Carrier.mp3");
 
     OutStream saved;
     {
         Plugin const plugin(nullHost(), true /*active*/);
         plugin.editorHost().setNewSample(sample);
-        REQUIRE(plugin.editorHost().currentSampleFile() != juce::File());
+        REQUIRE(!plugin.editorHost().currentSampleFile().empty());
         REQUIRE(plugin.state().save(&*plugin, &saved));
     }
 
@@ -605,14 +614,14 @@ TEST_CASE("A sample restored before the host names a rate is decoded again for i
 
     // Decoded at the file's own rate, because there is no engine rate to decode
     // for yet. This is what the old guard read as "there is no sample".
-    REQUIRE(restored.editorHost().currentSampleFile().getFileName() == "Carrier.mp3");
+    REQUIRE(restored.editorHost().currentSampleFile().filename() == "Carrier.mp3");
     REQUIRE(restored.implementation().decodedSampleRate() == 0);
 
     restored.activate();
 
     CHECK(restored.implementation().decodedSampleRate() == static_cast<unsigned int>(sampleRate));
     // ...and it is still the same sample, not one dropped by a failed re-read.
-    CHECK(restored.editorHost().currentSampleFile().getFileName() == "Carrier.mp3");
+    CHECK(restored.editorHost().currentSampleFile().filename() == "Carrier.mp3");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -639,8 +648,8 @@ TEST_CASE("A session that names no sample clears the one that was loaded", "[cla
         Plugin const plugin(nullHost(), true /*active*/);
         REQUIRE(plugin.state().save(&*plugin, &withNone));
 
-        plugin.editorHost().setNewSample(juce::File::createFileWithoutCheckingPath("Carrier.mp3"));
-        REQUIRE(plugin.editorHost().currentSampleFile() != juce::File());
+        plugin.editorHost().setNewSample(fs::path("Carrier.mp3"));
+        REQUIRE(!plugin.editorHost().currentSampleFile().empty());
         REQUIRE(plugin.state().save(&*plugin, &withASample));
     }
 
@@ -648,13 +657,13 @@ TEST_CASE("A session that names no sample clears the one that was loaded", "[cla
 
     InStream first(withASample.data());
     REQUIRE(restored.state().load(&*restored, &first));
-    REQUIRE(restored.editorHost().currentSampleFile().getFileName() == "Carrier.mp3");
+    REQUIRE(restored.editorHost().currentSampleFile().filename() == "Carrier.mp3");
 
     // ...and now one that says nothing about a sample, on top of it.
     InStream second(withNone.data());
     REQUIRE(restored.state().load(&*restored, &second));
 
-    CHECK(restored.editorHost().currentSampleFile() == juce::File());
+    CHECK(restored.editorHost().currentSampleFile().empty());
     CHECK(restored.implementation().decodedSampleRate() == 0);
 
     /// \note And the session it saves from here says so too, which is the half a
@@ -672,7 +681,7 @@ TEST_CASE("A session naming a sample that will not load does not keep the previo
     OutStream withASample;
     {
         Plugin const plugin(nullHost(), true /*active*/);
-        plugin.editorHost().setNewSample(juce::File::createFileWithoutCheckingPath("Carrier.mp3"));
+        plugin.editorHost().setNewSample(fs::path("Carrier.mp3"));
         REQUIRE(plugin.state().save(&*plugin, &withASample));
     }
 
@@ -690,13 +699,13 @@ TEST_CASE("A session naming a sample that will not load does not keep the previo
 
     InStream present(withASample.data());
     REQUIRE(restored.state().load(&*restored, &present));
-    REQUIRE(restored.editorHost().currentSampleFile().getFileName() == "Carrier.mp3");
+    REQUIRE(restored.editorHost().currentSampleFile().filename() == "Carrier.mp3");
 
     InStream absent(missing);
     REQUIRE(restored.state().load(&*restored, &absent));
 
     // Not Carrier.mp3, which is what the engine would still have been playing.
-    CHECK(restored.editorHost().currentSampleFile() == juce::File());
+    CHECK(restored.editorHost().currentSampleFile().empty());
     CHECK(restored.implementation().decodedSampleRate() == 0);
 
     OutStream resaved;
@@ -736,7 +745,7 @@ TEST_CASE("Loading a sample marks the session dirty", "[clap][state]")
 
     Plugin const plugin(host, true /*active*/);
 
-    plugin.editorHost().setNewSample(juce::File::createFileWithoutCheckingPath("Carrier.mp3"));
+    plugin.editorHost().setNewSample(fs::path("Carrier.mp3"));
 
     CHECK(counters.callbacks > 0);
     CHECK(counters.dirtyMarks == 0); // deferred, not skipped

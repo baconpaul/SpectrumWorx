@@ -215,21 +215,24 @@ target_link_libraries(sw-dsp PUBLIC sst-plugininfra)
 target_link_libraries(sw-dsp PRIVATE sw::assets)
 
 ################################################################################
-# sw-io -- the two things that open a file.
+# sw-io -- the audio file decoder.
 #
-#   The preset reader/writer and the audio file decoder. They are here rather
-# than in sw-dsp because both are JUCE (`juce::File`, `juce::AudioFormatManager`)
-# and sw-dsp is the layer that must not be, and here rather than in sw-gui
-# because neither draws anything: the plugin reads a session's sample without an
-# editor open.
+#   Here rather than in sw-dsp because juce::AudioFormatManager is JUCE and
+# sw-dsp is the layer that must not be, and here rather than in sw-gui because it
+# draws nothing: the plugin reads a session's sample without an editor open.
 #
-# \note This is also where the preset format's `std::string_view` interface meets
-# the interface's `juce::String` -- presetFile.cpp's savePreset() overload.
+# \note **This was "the two things that open a file"**, the other being
+# le/spectrumworx/presetFile.cpp -- the preset reader and writer with a
+# `juce::File` on them, and the point at which the format's `std::string_view`
+# interface met the editor's `juce::String`. Both halves are gone: presetStorage
+# in sw-dsp opens preset files over std::filesystem and `fs::path` goes all the
+# way up to the browser, so there was no conversion left for that file to
+# perform. What is left here needs JUCE for the *decoder*, not for the path.
+#                                         (09.08.2026.) (SW port)
 ################################################################################
 
 add_library(sw-io STATIC
         ${CMAKE_CURRENT_SOURCE_DIR}/external_audio/sample.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/le/spectrumworx/presetFile.cpp
 )
 
 sw_force_include_odr_header(sw-io)

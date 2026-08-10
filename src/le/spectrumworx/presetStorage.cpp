@@ -15,6 +15,7 @@
 #include <cstring>
 #include <fstream>
 #include <new>
+#include <system_error>
 
 namespace LE::SW
 {
@@ -128,6 +129,24 @@ void copyPresetName(char const *const name, std::span<char> const target)
         }
     }
     target[written] = '\0';
+}
+
+void savePreset(std::filesystem::path const &file, std::filesystem::path const &externalSample,
+                std::string_view const comment, Program const &program)
+{
+    std::error_code error;
+    LE_ASSERT(std::filesystem::is_directory(file.parent_path(), error));
+
+    /// \note `u8string()`, not `string()`: the sample path goes into the document
+    /// as UTF-8 bytes on every platform, and `string()` is the active code page
+    /// on Windows. This conversion used to be `getFullPathName().toRawUTF8()` a
+    /// layer up, in presetFile.cpp, and it was the only thing that file did.
+    auto const sample(externalSample.u8string());
+
+    auto const preset(savePreset(sample, comment, program));
+
+    if (!writePresetFile(file, preset.c_str(), static_cast<unsigned int>(preset.size() + 1)))
+        reportPresetProblem(PresetProblem::SaveFailed);
 }
 
 } // namespace LE::SW

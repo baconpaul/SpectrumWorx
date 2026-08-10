@@ -297,7 +297,7 @@ TEST_CASE("A sample the engine never received is not recorded as loaded",
     auto const samples(LE::Sample::factorySamples());
     REQUIRE(!samples.empty());
 
-    REQUIRE(host.currentSampleFile() == juce::File());
+    REQUIRE(host.currentSampleFile().empty());
 
     // Fill the ring so that the sample's own push cannot land.
     for (unsigned edit(0); edit < overflowing; ++edit)
@@ -310,5 +310,5 @@ TEST_CASE("A sample the engine never received is not recorded as loaded",
     // The load was dropped...
     CHECK(implementation.droppedMessages() > droppedBefore);
     // ...so the plugin must not claim to be playing it.
-    CHECK(host.currentSampleFile() == juce::File());
+    CHECK(host.currentSampleFile().empty());
 }
