@@ -75,7 +75,11 @@ target_link_libraries(sw-impl PRIVATE
         sst-plugininfra::version_information
         sst::clap_juce_shim
         sst::clap_juce_shim_headers
-        juce::juce_gui_basics
+
+        # spectrumWorxCLAP.cpp opens the editor. It reached JUCE through
+        # juce::juce_gui_basics and so compiled the module here as well; sw-juce
+        # is the same headers with the sources already built.
+        sw-juce
 )
 
 # clap_juce_shim.h is included from spectrumWorxCLAP.hpp, and the ADD_SHIM_*

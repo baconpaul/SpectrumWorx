@@ -239,10 +239,14 @@ target_link_libraries(sw-io PUBLIC sw-dsp)
 # The factory samples, which are in the binary beside the banks.
 target_link_libraries(sw-io PRIVATE sw::assets)
 
-# The audio file decoder, replacing the DirectShow and ExtAudioFile ones. PUBLIC
-# because it compiles juce_audio_basics and juce_audio_formats into whatever
-# links sw-io, and the plugin's own translation units have to agree with it.
-target_link_libraries(sw-io PUBLIC juce::juce_audio_formats)
+# The audio file decoder, replacing the DirectShow and ExtAudioFile ones.
+# PUBLIC because sample.cpp's header names juce::AudioFormatManager, so whatever
+# links sw-io has to see the same headers and the same JUCE settings it does.
+#
+# \note This read `juce::juce_audio_formats`, and that is what made every target
+# above sw-io compile juce_audio_formats and juce_audio_basics for itself. The
+# module is inside sw-juce now; see libs/CMakeLists.txt.
+target_link_libraries(sw-io PUBLIC sw-juce)
 
 # \note JUCE's module settings -- JUCE_USE_MP3AUDIOFORMAT as well as
 # JUCE_USE_CURL and JUCE_WEB_BROWSER -- were set here, PUBLIC, on the reasoning
