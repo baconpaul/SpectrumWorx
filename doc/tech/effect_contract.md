@@ -474,7 +474,7 @@ the group tuple (`effectIndexToGroupMapping.hpp:29`) and the name arrays
 > entries — `bandpass` gives `Bandpass` and `Bandstop`, `eximploder` gives four.
 >
 > The table is bracketed by `// clang-format off` / `on` for a reason worth
-> knowing: `tools/show-ui/CMakeLists.txt:136` parses it with
+> knowing: `tools/show-ui/CMakeLists.txt:140` parses it with
 > `string(REGEX MATCHALL "\n[ \t]*x\\([^\n]*\\)" …)` — the first `x(...)` after
 > each newline. Reflowed, the parse silently dropped to 40 of 57 and the UI suite
 > lost seventeen tests **without failing**. It did, on 05.08.2026. It now
