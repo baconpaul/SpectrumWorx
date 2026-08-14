@@ -1204,8 +1204,7 @@ void SpectrumWorxEditor::MainArea::mouseDown(juce::MouseEvent const &event)
         return;
     }
 
-    juce::Rectangle<int> const logoArea(12, 290, 51, 63);
-    if (logoArea.contains(event.x, event.y))
+    if (logoArea().contains(event.x, event.y))
     {
         /// \note Was 3, and there are three tabs. JUCE clamps an out of range
         /// index to -1, so clicking the logo raised the panel with *no* page

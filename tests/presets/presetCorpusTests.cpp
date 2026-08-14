@@ -3,26 +3,57 @@
 /// \file presetCorpusTests.cpp
 /// ---------------------------
 ///
-///   Every factory preset, loaded into a real engine, snapshotted.
+///   The preset format, held to two things: that a handful of **frozen
+/// fixtures** load to exactly the state they have always loaded to, and that
+/// **every shipped preset** survives the 2.x -> 3.0 translation unchanged.
 ///
 ///   Stage 8's "done when" says an unmodified 2016-era preset file still loads.
-/// There are 303 of them committed under assets/presets, written between 2009
-/// and 2016 by a plugin that no longer exists, and they are the only sample of
-/// the format nobody can rewrite. This walks all of them.
+/// The files committed under assets/presets were written between 2009 and 2016
+/// by a plugin that no longer exists, and they are the only sample of the format
+/// nobody can rewrite.
 ///
-///   It exists to be the backstop for 8.1, which replaces the XML parser. A
+///   This exists to be the backstop for 8.1, which replaces the XML parser. A
 /// parser swap that loses an attribute, mangles an entity or reads a float one
 /// ulp differently changes what a preset sounds like and nothing else in the
 /// suite would notice: the goldens render effects at their *defaults*, and the
 /// parameter table snapshot never opens a file.
 ///
-///   One row per preset rather than one per parameter -- the full dump is
-/// ~8000 lines, and a diff nobody can read is a diff nobody reads. The row
-/// carries the module count and the effect names in the clear, so the common
-/// failures (a preset losing a module, or loading the wrong effect) name
-/// themselves; everything finer is behind a hash of the canonical dump.
-/// SW_PRESET_DUMP=<substring> prints those dumps in full, which is the first
-/// thing to reach for when a hash moves.
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note **The digests are over `data/fixtures`, not over the shipping banks.**
+/// Until 14.08.2026 there was a committed row per shipped preset -- 288 of them
+/// in `presetCorpus.txt` -- and it worked exactly as long as nobody touched the
+/// content. Adding a preset was a failure, deleting one was a failure, and
+/// re-voicing one was a failure, all three reported the same way as a parser
+/// regression. The banks are now edited as ordinary work, so a snapshot of them
+/// says more about the last person to open the browser than about this tree.
+///
+///   The eight files under `data/fixtures` are copies, frozen deliberately, and
+/// chosen for the shapes a parser can break rather than for how they sound:
+///
+///   | Fixture | The shape it holds |
+///   |---|---|
+///   | `Autotune/Aeolian` | `<1>`..`<12>`, TuneWorx's semitones -- an element name no conforming parser reads, so this one only loads through `repairLegacyElementNames()` |
+///   | `Gamma Shift/Bojangles` | the other repair shape: `PVD start`, `Imploder (pvd)`, `PVD stop` -- parenthesised effect names |
+///   | `Echoes/Jumbo Jet` | four Freqverbs, four parameters the 2011 file never mentions (`HF absorb`, added later) |
+///   | `ESS/Once Upon A Time` | two modules, one missing parameter |
+///   | `Echoes/Great Escape` | three modules, Frecho's distance and a Gain |
+///   | `Voices/Robokid` | LFOs: `sync="0"` with a `T=` period, on six parameters across three modules |
+///   | `Overt Dynamics/Stalactite Rock Steady` | a full five-module chain |
+///   | `Gamma Shift/Bird Song` | five modules, 38 parameters, the widest dump here |
+///
+///   They may be added to. They may not be edited: a fixture that is refreshed
+/// to make a test pass is a fixture that has stopped testing anything.
+///                                           (14.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+///
+///   One row per fixture rather than one per parameter -- a diff nobody can read
+/// is a diff nobody reads. The row carries the module count and the effect names
+/// in the clear, so the common failures (a preset losing a module, or loading
+/// the wrong effect) name themselves; everything finer is behind a hash of the
+/// canonical dump. SW_PRESET_DUMP=<substring> prints those dumps in full, which
+/// is the first thing to reach for when a hash moves.
 ///
 ///   Values are formatted to six significant figures before hashing. They come
 /// from decimal text in the file by way of strtof, so they are the same number
@@ -80,7 +111,7 @@ using SWTest::Loaded;
 using SWTest::PresetConsumer;
 using SWTest::ScopedProblemCounter;
 
-std::string snapshotPath() { return std::string(SW_PRESET_SNAPSHOT_DIR) + "/presetCorpus.txt"; }
+std::string snapshotPath() { return std::string(SW_PRESET_SNAPSHOT_DIR) + "/presetFixtures.txt"; }
 
 //------------------------------------------------------------------------------
 // The corpus
@@ -88,9 +119,9 @@ std::string snapshotPath() { return std::string(SW_PRESET_SNAPSHOT_DIR) + "/pres
 
 /// `<bank>/<preset>`, so the key survives a change of checkout path and sorts
 /// the way the browser shows them.
-std::vector<std::pair<std::string, std::filesystem::path>> corpus()
+std::vector<std::pair<std::string, std::filesystem::path>>
+presetsUnder(std::filesystem::path const &root)
 {
-    std::filesystem::path const root(SW_PRESET_DATA_DIR);
     std::vector<std::pair<std::string, std::filesystem::path>> found;
 
     std::error_code error;
@@ -104,6 +135,18 @@ std::vector<std::pair<std::string, std::filesystem::path>> corpus()
 
     std::ranges::sort(found, {}, &std::pair<std::string, std::filesystem::path>::first);
     return found;
+}
+
+/// Everything the plugin ships, which is edited as ordinary work.
+std::vector<std::pair<std::string, std::filesystem::path>> corpus()
+{
+    return presetsUnder(SW_PRESET_DATA_DIR);
+}
+
+/// The frozen copies the digests are over. \see the note at the top of the file.
+std::vector<std::pair<std::string, std::filesystem::path>> fixtures()
+{
+    return presetsUnder(SW_PRESET_FIXTURE_DIR);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -211,15 +254,24 @@ Table readTable()
 void writeTable(Table const &table)
 {
     std::ofstream file(snapshotPath(), std::ios::trunc);
-    file << "# SpectrumWorx factory preset corpus -- generated, do not hand edit.\n"
-            "# Regenerate with SW_PRESET_CORPUS_UPDATE=1 ./sw-tests \"[preset-corpus]\"\n"
+    file << "# SpectrumWorx frozen preset fixtures -- generated, do not hand edit.\n"
+            "# Regenerate with SW_PRESET_CORPUS_UPDATE=1 ./sw-dsp-tests \"[preset-corpus]\"\n"
+            "#\n"
+            "#   Over tests/presets/data/fixtures, NOT over assets/presets. The shipped\n"
+            "#   banks are edited as ordinary work -- presets get added, removed and\n"
+            "#   re-voiced -- so a digest per shipped preset reported content changes\n"
+            "#   and parser regressions the same way, which made it useless for the\n"
+            "#   second. These eight files are frozen copies and never change.\n"
+            "#\n"
+            "#   So: regenerating this file is only ever correct when a fixture has been\n"
+            "#   *added*. If a row moved, the reader changed, and that is the finding.\n"
             "#\n"
             "# <bank>/<preset> | <modules> | <effects> | <parameters> | <missing> | <digest>\n"
             "#     what loading that file into a fresh engine produces. <missing> counts\n"
             "#     parameters the effect has and the preset never mentions -- normal for\n"
-            "#     a 2009-2011 file against a 2016 effect, and a number that must not\n"
-            "#     grow. The digest is FNV-1a over the full parameter dump, values at six\n"
-            "#     significant figures; SW_PRESET_DUMP=<substring> prints those dumps.\n";
+            "#     a 2009-2011 file against a 2016 effect. The digest is FNV-1a over the\n"
+            "#     full parameter dump, values at six significant figures;\n"
+            "#     SW_PRESET_DUMP=<substring> prints those dumps.\n";
     for (auto const &[key, row] : table)
         file << key << " | " << row << '\n';
 }
@@ -234,11 +286,11 @@ bool environmentFlag(char const *const name)
 } // anonymous namespace
 //------------------------------------------------------------------------------
 
-TEST_CASE("Every factory preset loads and produces the committed state", "[preset-corpus]")
+TEST_CASE("Every frozen fixture loads and produces the committed state", "[preset-corpus]")
 {
-    auto const files(corpus());
-    INFO("preset directory " << SW_PRESET_DATA_DIR);
-    REQUIRE(files.size() >= 288); // 288 as committed; an empty sweep is a failure, not a pass
+    auto const files(fixtures());
+    INFO("fixture directory " << SW_PRESET_FIXTURE_DIR);
+    REQUIRE_FALSE(files.empty()); // an empty sweep is a failure, not a pass
 
     auto const *const dumpFilter(std::getenv("SW_PRESET_DUMP"));
 
@@ -278,15 +330,19 @@ TEST_CASE("Every factory preset loads and produces the committed state", "[prese
     for (auto const &[key, row] : expected)
     {
         auto const found(table.find(key));
-        INFO("preset " << key);
-        REQUIRE(found != table.end()); // a preset that disappeared
+        INFO("fixture " << key);
+        REQUIRE(found != table.end()); // a fixture that disappeared
         CHECK(found->second == row);
     }
 
+    /// \note A fixture with no row is a failure rather than a warning, unlike
+    /// anything about the shipping banks: these files are added deliberately and
+    /// adding one means generating its row in the same commit. Eight of them is
+    /// not a set anybody adds to by accident.
     for (auto const &[key, row] : table)
     {
-        INFO("preset " << key << " = " << row);
-        CHECK(expected.find(key) != expected.end()); // a preset that appeared
+        INFO("fixture " << key << " = " << row);
+        CHECK(expected.find(key) != expected.end()); // a fixture with no committed row
     }
 
     CHECK(table.size() == expected.size());
@@ -301,7 +357,7 @@ TEST_CASE("Every factory preset loads and produces the committed state", "[prese
 ///
 ///   Every factory preset, read through the 2.x reader, written out by the 3.0
 /// writer, and read back through the 3.0 reader. What comes out the far end must
-/// be the row the snapshot above committed.
+/// be what went in.
 ///
 ///   This is the claim the format change rests on: that 3.0 carries everything
 /// 2.x carried. It is a different question from "does the new writer round-trip"
@@ -311,19 +367,25 @@ TEST_CASE("Every factory preset loads and produces the committed state", "[prese
 /// parameters absent because the effect grew them later, LFOs from before sync
 /// types existed, values written by a printer that is gone.
 ///
-///   It shares the committed table rather than one of its own, and that is the
-/// point: two paths into the same 303 digests, so a translation that quietly
-/// dropped an attribute cannot agree with the direct read.
+/// \note **Self-comparing**, and it did not used to be: both halves were checked
+/// against the committed row for that preset, which meant the whole shipping
+/// bank had to hold still for this case to be green. It compares the two dumps
+/// against *each other* now, so the banks may be edited freely and every file in
+/// them -- including one added this morning -- is still put through both
+/// readers and the writer.
+///
+///   What that gives up is a reader change that alters both paths *identically*:
+/// the direct read and the re-read would move together and agree. That is what
+/// the frozen fixtures above are for, and it is why they are a separate case
+/// over files that never change rather than a floor on this one.
+///                                           (14.08.2026.) (SW port)
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
 TEST_CASE("Every factory preset survives translation into the 3.0 format", "[preset-corpus]")
 {
     auto const files(corpus());
-    REQUIRE(files.size() >= 288);
-
-    auto const expected(readTable());
-    REQUIRE_FALSE(expected.empty());
+    REQUIRE_FALSE(files.empty());
 
     for (auto const &[key, path] : files)
     {
@@ -337,8 +399,8 @@ TEST_CASE("Every factory preset survives translation into the 3.0 format", "[pre
 
         /// \note Both facts about the file this build would now write: that it
         /// says which grammar it is in, and that it needs no repair pass to
-        /// parse. 25 of these 303 do need one on the way *in*; none may need one
-        /// on the way out.
+        /// parse. A good few of the shipped files do need one on the way *in*;
+        /// none may need one on the way out.
         INFO("rewritten as:\n" << rewritten);
         CHECK(rewritten.find("Format=\"3\"") != std::string::npos);
         CHECK(rewritten.find("<p n=") != std::string::npos);
@@ -350,22 +412,22 @@ TEST_CASE("Every factory preset survives translation into the 3.0 format", "[pre
         auto const reloaded(loadBuffer(std::move(parseBuffer), translated));
         REQUIRE(translated);
 
+        // The chain first, in the clear: a module lost in translation, or an
+        // effect that came back as a different one, names itself here.
+        CHECK(reloaded.modules == legacy.modules);
+        CHECK(reloaded.effects == legacy.effects);
+        CHECK(reloaded.parameters == legacy.parameters);
+
+        /// \note And then every parameter of every module, which is the claim.
+        /// Compared as text rather than as a digest: these two dumps are in the
+        /// same process and a difference is worth printing, where the fixture
+        /// case compares against a file and wants one short row.
+        CHECK(reloaded.text == legacy.text);
+
         /// \note The parameters a 2011 file never mentioned are still not
         /// mentioned after a translation -- the writer writes what the *engine*
         /// holds, so they come back as defaults and are no longer missing. That
-        /// is the one column that legitimately differs, and comparing the rest
-        /// against the committed row is what says nothing else did.
-        std::array<char, 32> digestText{};
-        std::snprintf(digestText.data(), digestText.size(), "%016llx",
-                      static_cast<unsigned long long>(digest(reloaded.text)));
-
-        auto const found(expected.find(key));
-        REQUIRE(found != expected.end());
-
-        auto const row(std::to_string(reloaded.modules) + " | " + reloaded.effects + " | " +
-                       std::to_string(reloaded.parameters) + " | " +
-                       std::to_string(legacy.missing) + " | " + digestText.data());
-        CHECK(found->second == row);
+        /// is the one thing that legitimately differs between the two dumps.
         CHECK(reloaded.missing == 0); // a file this build wrote cannot be missing a parameter
     }
 }
@@ -388,7 +450,7 @@ TEST_CASE("Every factory preset survives translation into the 3.0 format", "[pre
 TEST_CASE("The embedded factory banks are the committed files", "[preset-corpus]")
 {
     auto const files(corpus());
-    REQUIRE(files.size() >= 288);
+    REQUIRE_FALSE(files.empty());
 
     std::size_t embeddedCount{0};
     for (auto const &bank : FactoryPresets::banks())
@@ -422,8 +484,27 @@ TEST_CASE("The embedded factory banks are the committed files", "[preset-corpus]
         auto const bank(key.substr(0, separator));
         auto const name(key.substr(separator + 1, key.size() - separator - 1 - 4 /*".swp"*/));
 
+        ////////////////////////////////////////////////////////////////////////
+        ///
+        /// \note `static_cast<bool>` rather than the bare handle, and it is not
+        /// style. `InMemoryPreset` is a `std::unique_ptr<char[]>`; C++20 gave
+        /// `unique_ptr` an `operator<<` that streams `get()`, which for this
+        /// one is a `char *` and so streams as a **C string**. Catch2 stringifies
+        /// the expression when an assertion fails, so a *null* handle -- the only
+        /// case this line exists to report -- sent `strlen( nullptr )` into the
+        /// failure path and the run died with SIGSEGV before printing which
+        /// preset it was. The assertion segfaulted exactly when it was right.
+        ///
+        ///   Found by adding a preset to a bank without re-running CMake, which
+        /// is the ordinary way to meet it: the resource library is built from a
+        /// glob at configure time, so the file is on disk and not yet in the
+        /// binary. The other nine sites in tests/ were the same shape.
+        ///                                   (14.08.2026.) (SW port)
+        ///
+        ////////////////////////////////////////////////////////////////////////
         auto const embedded(FactoryPresets::load(bank, name));
-        REQUIRE(embedded); // a preset on disk that is not in the binary
+        // a preset on disk that is not in the binary -- re-run CMake, then look
+        REQUIRE(static_cast<bool>(embedded));
 
         std::ifstream file(path, std::ios::binary);
         std::string const onDisk((std::istreambuf_iterator<char>(file)),

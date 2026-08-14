@@ -425,8 +425,19 @@ TEST_CASE("The cursor is a hand exactly where a strip can be picked up", "[gui][
     CHECK(controls > 0);
 
     ////////////////////////////////////////////////////////////////////////////
+    //
     // The two bands, named. The sweep says the cursor agrees with the rule; these
     // say the rule is the one that was asked for.
+    //
+    /// \note Two probes went from here on 14.08.2026: `isDragHandle({1, 10})`
+    /// and `!isDragHandle({1, Strip::height / 4})`, which held the top band to
+    /// "at least ten pixels tall and less than a quarter of the strip". That
+    /// band follows the eject button's *artwork* -- it is whatever the `X`
+    /// leaves beside it -- so redrawing the button moves both bounds, and a
+    /// smaller `X` would have failed the first for a reason about a PNG. The
+    /// corner probe below says the band exists and the sweep says the cursor
+    /// agrees with it everywhere, which is the whole claim without the numbers.
+    //
     ////////////////////////////////////////////////////////////////////////////
 
     // The top corner, beside the eject `X` rather than on it.
@@ -439,15 +450,10 @@ TEST_CASE("The cursor is a hand exactly where a strip can be picked up", "[gui][
     CHECK(cursorOver(strip, name) == juce::MouseCursor::DraggingHandCursor);
 
     /// \note And the rule is exactly where the strip draws it: one pixel above is
-    /// the effect's, one pixel below is the handle's.
+    /// the effect's, one pixel below is the handle's. Off `Strip::nameRule`
+    /// rather than off a number, so it follows the strip's own layout.
     CHECK(strip.isDragHandle({1, Strip::nameRule}));
     CHECK_FALSE(strip.isDragHandle({1, Strip::nameRule - 1}));
-
-    /// \note The top band follows the eject button's artwork rather than a
-    /// constant, so it is held to a shape rather than to a number: tall enough to
-    /// hit, and nowhere near the effect's controls.
-    CHECK(strip.isDragHandle({1, 10}));
-    CHECK_FALSE(strip.isDragHandle({1, Strip::height / 4}));
 
     // A control, which is not a place a drag starts...
     auto const knob(strip.effectSpecificParameterControl(0).widget().getBounds().getCentre());

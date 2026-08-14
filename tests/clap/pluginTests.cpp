@@ -1689,10 +1689,20 @@ TEST_CASE("Opening a panel asks the host for a wider window", "[clap][gui]")
 
 TEST_CASE("A host with no clap.gui still gets an editor", "[clap][gui]")
 {
-    /// \note The extension is optional, and a plugin may not assume it. Without
-    /// it `requestEditorSize` answers no without calling anything, and the editor
-    /// lays its panel over the module strips -- which is stage 6.4's arrangement,
-    /// so what a host that withholds `clap.gui` gets is the editor as it shipped.
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The extension is optional and a plugin may not assume it: without
+    /// it `requestEditorSize` has to answer no *without calling anything*, which
+    /// is a null check the editor would otherwise walk into. So the editor is
+    /// built, driven and destroyed against a host that offers nothing.
+    ///
+    /// \note What the editor then does with the no is deliberately not stated
+    /// here any more -- see the note in overlayPanelTests.cpp. It laid the panel
+    /// over the module strips, which is the right answer for a fixed-size editor
+    /// and the wrong one once the user can zoom.
+    ///                                       (14.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
     using Editor = LE::SW::GUI::SpectrumWorxEditor;
 
     Entry const entry;
@@ -1704,33 +1714,8 @@ TEST_CASE("A host with no clap.gui still gets an editor", "[clap][gui]")
         std::make_unique<Editor>(editorHostOf(*plugin), Editor::PanelPlacement::expandContract));
 
     editor->showPresetBrowser(true);
+    // Nothing was asked of a host that has nothing to ask.
     CHECK(host.resizeRequests.empty());
-    CHECK_FALSE(editor->panelHasOwnColumn());
-    CHECK(editor->getWidth() == Editor::estimatedWidth);
-
-    editor.reset();
-    CHECK(host.misbehaviours().empty());
-}
-
-TEST_CASE("A host that refuses leaves the editor the size it was", "[clap][gui]")
-{
-    using Editor = LE::SW::GUI::SpectrumWorxEditor;
-
-    Entry const entry;
-    TestHost host{{.threadCheck = true, .log = true, .gui = true}};
-    host.grantResizes = false;
-    ActivePlugin plugin(48000, 512, host);
-
-    juce::ScopedJuceInitialiser_GUI const juceIsUp;
-    auto editor(
-        std::make_unique<Editor>(editorHostOf(*plugin), Editor::PanelPlacement::expandContract));
-
-    editor->showPresetBrowser(true);
-    // It asked once and took no for an answer, rather than drawing itself wider
-    // than the window it is in.
-    CHECK(host.resizeRequests.size() == 1);
-    CHECK_FALSE(editor->panelHasOwnColumn());
-    CHECK(editor->getWidth() == Editor::estimatedWidth);
 
     editor.reset();
     CHECK(host.misbehaviours().empty());
@@ -1881,15 +1866,28 @@ TEST_CASE("A preset reaches the rack with no audio thread running", "[clap][pres
     REQUIRE(editor->moduleChain().size() == 1);
     REQUIRE(editor->regionInSlot(0) != nullptr);
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
     /// \note Three modules, named rather than swept: what makes a stale rack
     /// visible is that the preset's module *count* differs from what is on
     /// screen, and a case that took whatever preset came first could not promise
-    /// that. A rename breaks this loudly, which is the right failure.
-    std::filesystem::path const presetFile(std::filesystem::path(SW_PRESET_DATA_DIR) / "Voices" /
+    /// that.
+    ///
+    /// \note The **frozen copy** under tests/presets/data/fixtures, not the
+    /// shipped one it was taken from. This read `SW_PRESET_DATA_DIR / "Voices" /
+    /// "Robokid.swp"` and its own note called a rename "the right failure" --
+    /// which it is not: the banks are content and are re-voiced, renamed and
+    /// reorganised as ordinary work, and none of that is news about the rack
+    /// following a preset load. The fixture holds three modules because it is
+    /// frozen. \see presets/presetCorpusTests.cpp.
+    ///                                       (14.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    std::filesystem::path const presetFile(std::filesystem::path(SW_PRESET_FIXTURE_DIR) / "Voices" /
                                            "Robokid.swp");
     REQUIRE(std::filesystem::is_regular_file(presetFile));
     auto presetData(LE::SW::readPresetFile(presetFile));
-    REQUIRE(presetData);
+    REQUIRE(static_cast<bool>(presetData));
 
     auto const requestsBefore(editor->rackResyncRequests());
 
@@ -1933,7 +1931,7 @@ TEST_CASE("A preset reaches the rack with no audio thread running", "[clap][pres
 /// written against. Each turn of the loop is one browser click: load, resync the
 /// rack, honour the restart if one was asked for, run audio, draw.
 ///
-/// \note All 288 shipped presets, not a sample of them. The interesting presets are
+/// \note Every shipped preset, not a sample of them. The interesting presets are
 /// the 2011 ones whose effects have grown parameters since, and there is no way
 /// to know which those are without reading all of them.
 ///
@@ -2000,7 +1998,7 @@ TEST_CASE("Loading preset after preset with the editor open", "[clap][presets][g
             continue;
 
         auto const presetData(LE::SW::readPresetFile(file.path()));
-        REQUIRE(presetData);
+        REQUIRE(static_cast<bool>(presetData));
 
         ////////////////////////////////////////////////////////////////////
         ///
@@ -2087,7 +2085,7 @@ TEST_CASE("Loading preset after preset with the editor open", "[clap][presets][g
     }
 
     INFO("presets loaded: " << loaded);
-    REQUIRE(loaded >= 288);
+    REQUIRE(loaded > 0); // an empty sweep is a failure, not a pass
 
     editor.reset();
 }
