@@ -307,11 +307,13 @@ TEST_CASE("Clicking the logo opens the About page, not an empty panel", "[gui][o
     auto &editor(overlayEditor(instance));
     REQUIRE(differenceOver(closed, rendered(editor), overlayRectangle()) == 0);
 
-    /// \note (37, 321) is the middle of the logo's hit area, which
-    /// `MainArea::mouseDown` spells as {12, 290, 51, 63} -- and the main area is
-    /// what the click goes to, because the logo is a position in the skin and the
-    /// skin is that component rather than the editor.
-    juce::Point<float> const logo(37, 321);
+    /// \note The middle of the logo's hit area, read off `MainArea::logoArea`
+    /// rather than written out here -- the skin is redrawn as ordinary work and
+    /// a coordinate copied into this file would send the click into empty space
+    /// the first time the logo moved, which passes for the wrong reason. The
+    /// main area is what the click goes to, because the logo is a position in
+    /// the skin and the skin is that component rather than the editor.
+    auto const logo(Editor::MainArea::logoArea().getCentre().toFloat());
     auto &skin(static_cast<juce::Component &>(editor.mainArea()));
     skin.mouseDown(juce::MouseEvent(juce::Desktop::getInstance().getMainMouseSource(), logo,
                                     juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier),
@@ -350,25 +352,21 @@ TEST_CASE("The two panels are mutually exclusive and land in the same place", "[
 
     ////////////////////////////////////////////////////////////////////////////
     ///
-    /// \note Neither panel paints outside its rectangle -- but swapping them is
-    /// not confined to it either, and the difference is the point. 660 pixels of
-    /// the 563 x 376 editor change out there, and they are the two buttons that
-    /// opened the panels: `showSettings()` un-toggles the presets button and the
-    /// other way about, which is what makes the exclusion visible to a user
-    /// rather than only true.
+    /// \note Swapping the panels also changes something *outside* the rectangle
+    /// -- the two buttons that opened them, since `showSettings()` un-toggles
+    /// the presets button and the other way about -- which is what makes the
+    /// exclusion visible to a user rather than only true.
     ///
-    ///   Stated as "everything that moved is in the left column", because that
-    /// is where those buttons are and it needs no constant this file does not
-    /// already have. An overlay that leaked past its own edge would land in the
-    /// module strips, which are to the right of `overlayX`.
+    /// \note Said as "something outside the rectangle moved" and no longer as
+    /// "and all of it is left of `overlayX`". Where those two buttons sit is a
+    /// layout decision and the layout is being worked on; the claim this case
+    /// is for is the exclusion, and their position is not part of it.
+    ///                                       (14.08.2026.) (SW port)
     ///
     ////////////////////////////////////////////////////////////////////////////
     auto const moved(differenceBoundsOutside(settingsAlone, browser, overlayRectangle()));
     CAPTURE(moved.toString().toStdString());
-
-    auto const leftColumn(editor.getLocalBounds().withWidth(Editor::overlayX));
     CHECK(!moved.isEmpty());
-    CHECK(leftColumn.contains(moved));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -500,31 +498,30 @@ TEST_CASE("Swapping panels in the column asks the host for nothing", "[gui][over
     CHECK(editor.getWidth() == Editor::expandedWidth);
 }
 
-TEST_CASE("A host that refuses the resize gets the overlay", "[gui][overlay]")
-{
-    SWTest::HostSideJuce const juce;
-    SWTest::Instance instance;
-    instance.grantResizes = false;
-    instance.openEditor(Editor::PanelPlacement::expandContract);
-    auto &editor(instance.editor());
-
-    auto const closed(rendered(editor));
-
-    editor.showPresetBrowser(true);
-    auto const open(rendered(editor));
-
-    // It asked, was told no, and stayed the size it was...
-    CHECK(instance.requestedSizes.size() == 1);
-    CHECK_FALSE(editor.panelHasOwnColumn());
-    CHECK(editor.getWidth() == Editor::estimatedWidth);
-
-    // ...with the panel over the module strips, which is overlay placement.
-    CHECK(differenceOver(closed, open, overlayRectangle()) > leastOfTheRectangleAPanelCovers);
-    CHECK(drawnFractionOver(open, overlayRectangle()) > 0);
-
-    editor.showPresetBrowser(false);
-    CHECK(differenceOver(closed, rendered(editor), unexpandedEditor()) == 0);
-}
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note "A host that refuses the resize gets the overlay" stood here until
+/// 14.08.2026, and its twin at the CLAP layer -- "A host that refuses leaves the
+/// editor the size it was" -- stood in pluginTests.cpp. Both pinned the same
+/// fallback: asked for a column, told no, lay the panel over the module strips
+/// instead.
+///
+///   That is the right answer for an editor with one fixed size and the wrong
+/// one for an editor the user can zoom. A host that refuses `expandedWidth` has
+/// not refused the column; it has refused *that many window units*, and the
+/// answer a zoomable editor owes it is a smaller zoom, not a different layout.
+/// Pinning the old behaviour would make the change that fixes it look like a
+/// regression, so the pin is gone ahead of the change rather than after it.
+///
+/// \note What is *not* being given up is that the editor asks and reads the
+/// answer: "A panel gets a column of its own" above still counts the requests
+/// and checks their contents, and pluginTests.cpp still holds the shim to
+/// asking in window units through `ZoomedEditor::scaled()`. Only the refusal
+/// path's consequence is unstated, and it is unstated because it is about to
+/// change.
+///                                           (14.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
 
 TEST_CASE("The always-visible column never empties", "[gui][overlay]")
 {

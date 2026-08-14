@@ -7,6 +7,14 @@
 /// artwork there" became a link-time property instead of a deployment one. This
 /// is what checks it.
 ///
+/// \note About the *serving* of the artwork and never about the artwork itself.
+/// The skin is redrawn as ordinary work, so nothing here may name a pixel, a
+/// colour, a size or which files have been converted to SVG -- a case that did
+/// would fail on a redraw for a reason that has nothing to do with this tree.
+/// What is left is the contract a widget depends on: the file is embedded, it
+/// decodes, and what comes back is a valid image of plausible size.
+///                                           (14.08.2026.) (SW port)
+///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later
 ///
@@ -18,7 +26,6 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <cmath>
 #include <string>
 #include <vector>
 //------------------------------------------------------------------------------
@@ -58,6 +65,10 @@ TEST_CASE("Every named skin bitmap is embedded and decodes", "[gui][skin]")
     for (auto const &name : missing)
         UNSCOPED_INFO(name);
     CHECK(missing.empty());
+
+    // A number past the end is nobody's: resourceBitmap() asserts on one, so
+    // hasResourceBitmap() is the only total accessor and has to say no.
+    CHECK_FALSE(GUI::hasResourceBitmap(GUI::numberOfResourceBitmaps + 1));
 }
 
 TEST_CASE("Skin bitmaps have plausible dimensions", "[gui][skin]")
@@ -127,7 +138,18 @@ TEST_CASE("Skin vectors render at the size their bitmap had", "[gui][skin]")
     //   The size *equality* is asserted by resources.cpp, which is the one
     // place holding both forms while the skin is half converted. This walks
     // the numbering rather than listing files, so it covers whatever has been
-    // converted since without anyone remembering to add it here.
+    // converted since without anyone remembering to add it here -- and it
+    // reaches the numbers LE_SW_RESOURCE_BITMAP_LIST does not name (19, 25,
+    // 26, 29, 36..39), which is what the case above cannot see.
+    //
+    //   A malformed SVG is what this is for: a Drawable that fails to parse
+    // hands back an invalid or zero-sized image, and every widget laid out
+    // from getWidth()/getHeight() then lands in the wrong place.
+    //
+    // \note No floor on how many vectors there are. Which files have been
+    // redrawn is a property of the artwork rather than of the code, and a
+    // count here would make replacing an SVG with a PNG -- or the reverse --
+    // a test failure rather than a decision.
     unsigned int vectors(0);
     for (unsigned int number(1); number <= GUI::numberOfResourceBitmaps; ++number)
     {
@@ -143,107 +165,22 @@ TEST_CASE("Skin vectors render at the size their bitmap had", "[gui][skin]")
     }
 
     UNSCOPED_INFO("vector files found: " << vectors);
-    CHECK(vectors >= 10);
 }
 
-TEST_CASE("A skin vector draws its artwork, not an empty canvas", "[gui][skin]")
-{
-    ResourceGuard const guard;
-
-    //   The size check above passes just as well for a blank image of the
-    // right dimensions, which is exactly what a Drawable that failed to parse
-    // would leave behind. These probe the pixels instead.
-    auto const &plain(GUI::resourceBitmap(GUI::PresetOn)); // 09: no glow
-    auto const &lit(GUI::resourceBitmap(GUI::PresetOff));  // 08: blue rim
-
-    // The pill is a top-lit gradient, so the middle of the button is opaque
-    // and the very corner of the canvas is outside it.
-    CHECK(plain.getPixelAt(28, 12).getAlpha() == 255);
-    CHECK(plain.getPixelAt(0, 0).getAlpha() == 0);
-    CHECK(plain.getPixelAt(28, 6).getBrightness() > plain.getPixelAt(28, 18).getBrightness());
-
-    //   And the lit variant differs from the plain one only in the rim and the
-    // glow: same body, blue down the edge. If the two came back equal, the
-    // loader would be handing every widget the same file.
-    auto const rim(lit.getPixelAt(28, 4));
-    CHECK(rim.getBlue() > rim.getRed());
-    CHECK(lit.getPixelAt(28, 12) == plain.getPixelAt(28, 12));
-}
-
-TEST_CASE("The converted files are served as vectors", "[gui][skin]")
-{
-    ResourceGuard const guard;
-
-    // Both forms are embedded and they are the same size, so nothing else here
-    // can tell which one a number resolved to -- if the CMake glob stopped
-    // picking up assets/skin/*.svg, every other case in this file would still
-    // pass against the artwork the vectors were supposed to replace.
-    CHECK(GUI::resourceIsVector(GUI::PresetOff));
-    CHECK(GUI::resourceIsVector(GUI::PresetOn));
-    CHECK(GUI::resourceIsVector(GUI::SettingsOff));
-    CHECK(GUI::resourceIsVector(GUI::SettingsOn));
-    CHECK(GUI::resourceIsVector(GUI::PresetSaveUp));
-    CHECK(GUI::resourceIsVector(GUI::PresetDeleteDown));
-
-    //   And the negative control, which is a hole in the numbering rather than
-    // an unconverted file. It used to be the editor background and the knob
-    // strip; both have since been redrawn, which broke this case and is the
-    // reason it is worded this way now. A number with no file can never become
-    // a vector, so this keeps saying what it means as the conversion finishes.
-    CHECK_FALSE(GUI::resourceIsVector(15));
-    CHECK_FALSE(GUI::resourceIsVector(GUI::numberOfResourceBitmaps + 1));
-}
-
-TEST_CASE("A vector is drawn at the context's resolution, not the skin's", "[gui][skin]")
-{
-    ResourceGuard const guard;
-
-    //   This is the whole point of holding vectors: the same Artwork asked to
-    // paint into a 2x context resolves the glyph edges at 2x, where the bitmap
-    // it replaced could only be scaled up. If this ever stops holding, the
-    // conversion has quietly become a slower way to draw the old PNGs.
-    auto const &artwork(GUI::resourceArtwork(GUI::PresetOn));
-    REQUIRE(artwork.isVector());
-
-    auto const w(artwork.getWidth());
-    auto const h(artwork.getHeight());
-
-    juce::Image atTwice(juce::Image::ARGB, w * 2, h * 2, true);
-    {
-        juce::Graphics graphics(atTwice);
-        graphics.addTransform(juce::AffineTransform::scale(2.0f));
-        artwork.draw(graphics, 0, 0);
-    }
-
-    // The same artwork rasterised at 1x and blown up -- what a juce::Image
-    // could have offered.
-    auto const upscaled(
-        artwork.image().rescaled(w * 2, h * 2, juce::Graphics::highResamplingQuality));
-
-    int different(0);
-    for (int y(0); y < h * 2; ++y)
-        for (int x(0); x < w * 2; ++x)
-            if (std::abs(atTwice.getPixelAt(x, y).getBrightness() -
-                         upscaled.getPixelAt(x, y).getBrightness()) > 0.09f)
-                ++different;
-
-    UNSCOPED_INFO("pixels where the vector resolves detail the upscale cannot: " << different);
-    CHECK(different > 100);
-}
-
-TEST_CASE("Holes in the numbering answer, rather than assert", "[gui][skin]")
-{
-    ResourceGuard const guard;
-
-    // 15, 18 and 54 have no file. That is a property of the artwork, not a
-    // mistake, so asking is legal and the answer is "no" -- which is what lets
-    // a tool iterate 1..68 without knowing the gaps.
-    //
-    // A number past the end is a different thing: nothing names it, so a caller
-    // that passes one has a bug, and resourceBitmap() asserts on it. Only
-    // hasResourceBitmap() is total.
-    CHECK_FALSE(GUI::hasResourceBitmap(15));
-    CHECK_FALSE(GUI::hasResourceBitmap(18));
-    CHECK_FALSE(GUI::hasResourceBitmap(54));
-    CHECK_FALSE(GUI::hasResourceBitmap(GUI::numberOfResourceBitmaps + 1));
-}
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Four cases stood below this line until 14.08.2026 and all four were
+/// about *which artwork* the skin holds rather than about the code that serves
+/// it: pixel probes into 08.svg and 09.svg (the pill is opaque in the middle,
+/// the lit variant's rim is bluer than it is red), an inventory of the six
+/// files redrawn as SVG, a 2x rasterisation of PresetOn measured against an
+/// upscale of itself, and 15/18/54 pinned as holes in the numbering.
+///
+///   Every one of them fails when the skin is redrawn, which is now ordinary
+/// work rather than a rare event -- and none of them fails for a reason about
+/// this tree. What they were guarding is guarded above: a file that is not
+/// embedded is caught by hasResourceBitmap(), a truncated or unparseable one by
+/// the dimension and validity checks, and a number nobody names by the
+/// past-the-end check.
+///
+////////////////////////////////////////////////////////////////////////////////

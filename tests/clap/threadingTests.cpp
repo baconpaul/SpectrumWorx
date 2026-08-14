@@ -226,7 +226,7 @@ TEST_CASE("A preset that changes the FFT size while audio runs still gets its re
     REQUIRE(runningFFTSize(*plugin) != 8192);
 
     auto presetData(LE::SW::readPresetFile(presetWithABiggerFFT()));
-    REQUIRE(presetData);
+    REQUIRE(static_cast<bool>(presetData));
 
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -316,7 +316,7 @@ TEST_CASE("A chain queued behind a restart is resized before it is played",
     REQUIRE(engine.moduleChain().size() == 0);
 
     auto presetData(LE::SW::readPresetFile(presetWithABiggerFFT()));
-    REQUIRE(presetData);
+    REQUIRE(static_cast<bool>(presetData));
 
     REQUIRE(LE::SW::GUI::loadPreset(editorHostOf(*plugin), nullptr, presetData.get(),
                                     true /*ignore external samples*/, nullptr, "Whistle"));
@@ -594,7 +594,7 @@ TEST_CASE("A preset's global parameters reach a running engine through the queue
                  Catch::Matchers::WithinAbs(1.0, 0.001));
 
     auto presetData(LE::SW::readPresetFile(presetWithABiggerFFT()));
-    REQUIRE(presetData);
+    REQUIRE(static_cast<bool>(presetData));
     REQUIRE(LE::SW::GUI::loadPreset(editorHostOf(*plugin), nullptr, presetData.get(),
                                     true /*ignore external samples*/, nullptr, "Whistle"));
 

@@ -249,8 +249,14 @@ class TestHost
     ///
     /// \note And whether this host grants them, which is not a detail: a
     /// `request_resize` is a request, and a host with a fixed-width plugin pane
-    /// really does answer no. `grantResizes = false` is that host, and what the
-    /// editor does about it is the point of testing against one.
+    /// really does answer no. `grantResizes = false` is that host.
+    ///
+    /// \note No case sets it as of 14.08.2026. What the editor did about a
+    /// refusal -- fall back to laying the panel over the module strips -- was
+    /// pinned by two cases that have gone, because it is the right answer only
+    /// while the editor has one size; a zoomable editor owes a refusing host a
+    /// smaller zoom instead. The knob stays because the host is still a model of
+    /// a real one, and because whatever replaces that fallback will want it.
     ///
     ////////////////////////////////////////////////////////////////////////////
 

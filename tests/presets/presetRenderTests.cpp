@@ -77,7 +77,7 @@ TEST_CASE("Every factory preset renders finite audio", "[presets][render]")
         REQUIRE(engine.initialise());
 
         auto const preset(LE::SW::readPresetFile(file.path()));
-        REQUIRE(preset);
+        REQUIRE(static_cast<bool>(preset));
 
         /// \note The counting reporter, so that a 2011 preset which does not
         /// mention a parameter its effect grew later does not raise a dialog in a
@@ -117,7 +117,12 @@ TEST_CASE("Every factory preset renders finite audio", "[presets][render]")
 
     // Not a spot check: the interesting presets are the ones nobody would think
     // to pick, and there is no way to know which those are without playing them.
-    REQUIRE(loaded >= 288);
+    //
+    // \note A floor of "not none" rather than of the number that happened to
+    // ship. What this has to catch is a sweep that found no files at all -- a
+    // moved directory, a broken SW_PRESET_DATA_DIR -- and adding or removing a
+    // preset is content work rather than a regression.
+    REQUIRE(loaded > 0);
 
     for (auto const &offender : offenders)
         UNSCOPED_INFO("non-finite output: " << offender);

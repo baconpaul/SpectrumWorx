@@ -159,9 +159,13 @@ class Instance final : public GUI::EditorHost
     ///
     /// \note Answering *no* is the interesting host and not a broken one -- the
     /// extension is optional and a host may refuse any particular size -- so
-    /// `grantResizes` is what a case sets to get the fallback, and the recorded
-    /// sizes are what says the editor asked at all rather than just resizing
-    /// itself behind a window that did not move.
+    /// `grantResizes` is what a case sets to make one, and the recorded sizes are
+    /// what says the editor asked at all rather than just resizing itself behind
+    /// a window that did not move.
+    ///
+    /// \note Nothing sets `grantResizes` as of 14.08.2026: what the editor did
+    /// about a refusal is about to change under user-controlled zoom, so the two
+    /// cases that pinned it have gone. \see overlayPanelTests.cpp.
     ///
     ////////////////////////////////////////////////////////////////////////////
 

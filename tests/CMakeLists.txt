@@ -137,9 +137,15 @@ foreach (testTarget sw-dsp-tests sw-plugin-tests)
             SW_GOLDEN_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/goldens/data"
             SW_PARAMETER_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/parameters/data"
             SW_PRESET_SNAPSHOT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/presets/data"
-            # \note The shipping banks themselves, not a copy: the corpus test is
-            # about *those* files, and a copy is one more thing that can rot.
+            # \note The shipping banks themselves, not a copy: what the sweeps
+            # ask is whether *those* files load, translate and render, and a copy
+            # is one more thing that can rot.
             SW_PRESET_DATA_DIR="${CMAKE_SOURCE_DIR}/assets/presets"
+            # \note And the frozen copies, which are the opposite decision for
+            # the opposite reason: a digest has to be over something that does
+            # not move, and the banks above are edited as ordinary work. \see the
+            # note at the top of presets/presetCorpusTests.cpp.
+            SW_PRESET_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/presets/data/fixtures"
             # Where a test that has to write a file writes it. The build tree,
             # not the system temporary directory: it is cleaned with the build,
             # two configurations cannot collide in it, and a sandboxed CI can

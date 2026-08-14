@@ -1,0 +1,26 @@
+# SpectrumWorx frozen preset fixtures -- generated, do not hand edit.
+# Regenerate with SW_PRESET_CORPUS_UPDATE=1 ./sw-dsp-tests "[preset-corpus]"
+#
+#   Over tests/presets/data/fixtures, NOT over assets/presets. The shipped
+#   banks are edited as ordinary work -- presets get added, removed and
+#   re-voiced -- so a digest per shipped preset reported content changes
+#   and parser regressions the same way, which made it useless for the
+#   second. These eight files are frozen copies and never change.
+#
+#   So: regenerating this file is only ever correct when a fixture has been
+#   *added*. If a row moved, the reader changed, and that is the finding.
+#
+# <bank>/<preset> | <modules> | <effects> | <parameters> | <missing> | <digest>
+#     what loading that file into a fresh engine produces. <missing> counts
+#     parameters the effect has and the preset never mentions -- normal for
+#     a 2009-2011 file against a 2016 effect. The digest is FNV-1a over the
+#     full parameter dump, values at six significant figures;
+#     SW_PRESET_DUMP=<substring> prints those dumps.
+Autotune/Aeolian.swp | 1 | TuneWorx | 18 | 0 | 25dceb7f6a39ecb2
+ESS/Once Upon A Time.swp | 2 | Freqverb,Reverser | 15 | 1 | 2877d1fbda5cfb1c
+Echoes/Great Escape.swp | 3 | Freqverb,Frecho,Gain | 22 | 1 | 08c64ce125a730d7
+Echoes/Jumbo Jet.swp | 4 | Freqverb,Freqverb,Freqverb,Freqverb | 36 | 4 | a7ee667221011e48
+Gamma Shift/Bird Song.swp | 5 | Exaggerator,Swappah,Freqverb,Bandpass,Frecho | 38 | 1 | 8eb84ca604791f0b
+Gamma Shift/Bojangles.swp | 4 | PVD start,Imploder (pvd),PVD stop,Bandstop | 25 | 0 | 157f3efa1cb2224b
+Overt Dynamics/Stalactite Rock Steady.swp | 5 | Freqverb,Slicer,Swappah,Exaggerator,Freqverb | 41 | 2 | ad1a65a1fea8477e
+Voices/Robokid.swp | 3 | Freqverb,Armonizer,Robotizer | 20 | 1 | 5646b85c45745135

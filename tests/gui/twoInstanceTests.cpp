@@ -287,7 +287,7 @@ TEST_CASE("A preset load counts its problems instead of raising dialogs",
             continue;
 
         auto const presetData(readPresetFile(entry.path()));
-        REQUIRE(presetData);
+        REQUIRE(static_cast<bool>(presetData));
         std::string_view const text(presetData.get());
         std::vector<char> buffer(text.begin(), text.end());
         buffer.push_back('\0'); // the parse is destructive and wants a terminator
@@ -306,9 +306,23 @@ TEST_CASE("A preset load counts its problems instead of raising dialogs",
     }
     REQUIRE(loaded > 0);
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note `missingParameters > 0` was checked here until 14.08.2026, to say
+    /// the run had produced a count at all. It made tidying the bank a failure:
+    /// re-save these presets from this build and every one of them mentions
+    /// every parameter its effect has, the count goes to zero, and the test
+    /// reddens for an improvement.
+    ///
+    ///   What the case is actually about is the reporter -- that a problem is
+    /// *counted* rather than raised as a dialog -- and the proof of that is the
+    /// absence of a leak at exit, which no assertion here can spell because JUCE
+    /// reports it from its own destructor. `failures == 0` is the rest.
+    ///                                       (14.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
     auto const report(takePresetLoadReport());
-    INFO("over " << loaded << " presets");
-    CHECK(report.missingParameters > 0);
+    INFO("over " << loaded << " presets, " << report.missingParameters << " missing parameters");
     CHECK(report.failures == 0);
 
     // And taking it clears it, so the next load's summary is the next load's.
