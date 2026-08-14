@@ -181,8 +181,6 @@ class Instance final : public GUI::EditorHost
     void deregisterSampleLoadedListener(GUI::SpectrumWorxEditor const &) override {}
 
     bool completelyDisableIOChanges() const override { return false; }
-    bool shouldLoadLastSessionOnStartup() const override { return false; }
-    void shouldLoadLastSessionOnStartup(bool) override {}
 
   private:
     Engine engine_;

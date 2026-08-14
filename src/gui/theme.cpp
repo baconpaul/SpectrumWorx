@@ -49,8 +49,7 @@ void paintSliderThumb(juce::Graphics &graphics, Artwork const &image, float cons
 Theme::Settings Theme::settings_;
 
 Theme::Settings::Settings()
-    : globalOpacity(0.9f), moduleUIMouseOverReaction(Never), lfoUpdateBehaviour(Always),
-      hideCursorOnKnobDrag(true)
+    : moduleUIMouseOverReaction(Never), lfoUpdateBehaviour(Always), hideCursorOnKnobDrag(true)
 {
 }
 
@@ -69,8 +68,7 @@ Theme::Theme()
     setColour(juce::PopupMenu::headerTextColourId, juce::Colours::white);
     setColour(juce::PopupMenu::highlightedBackgroundColourId, juce::Colours::transparentWhite);
     setColour(juce::PopupMenu::highlightedTextColourId, juce::Colours::white);
-    setColour(juce::PopupMenu::backgroundColourId,
-              juce::Colours::black.withAlpha(settings().globalOpacity));
+    setColour(juce::PopupMenu::backgroundColourId, juce::Colours::black);
 
     setColour(juce::TextButton::buttonColourId, juce::Colours::black);
     setColour(juce::TextButton::buttonOnColourId, blueColour());
@@ -120,7 +118,9 @@ Theme::~Theme() = default;
 
 void Theme::drawPopupMenuBackground(juce::Graphics &graphics, int const width, int const height)
 {
-    graphics.setOpacity(std::pow(settings().globalOpacity, 3));
+    /// \note The colour rather than an opacity over whatever the caller left in
+    /// the context, which is what a settings slider used to write into.
+    graphics.setColour(juce::Colours::black);
     graphics.fillRoundedRectangle(0, 0, static_cast<float>(width), static_cast<float>(height), 12);
 }
 

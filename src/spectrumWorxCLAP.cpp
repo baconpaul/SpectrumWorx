@@ -2259,19 +2259,16 @@ catch (...)
 /// is a list that will grow one bullet at a time, and guessing at it now would
 /// be inventing a schema for settings nobody has asked to persist yet.
 ///
-///   The first three candidates, all `[main-thread]` and none of them
-/// parameters:
+///   The two candidates, both `[main-thread]` and neither of them a parameter:
 ///
-///   - `loadLastSession_`, whose own note on the declaration says the session
-///     state a host hands back is a better home for it than the settings file
-///     this plugin does not have;
 ///   - the preset browser's location and selection -- it does not remember where
 ///     it was, for the session case;
-///   - the interface settings (opacity, mouse-over reaction, LFO update
-///     behaviour, hide-cursor-on-knob-drag), which the CLAP build persists
-///     nowhere at all. Those are arguably user preferences rather than session
-///     state, and sst-plugininfra's userdefaults.h is the other candidate home;
-///     the two are not exclusive and surge uses both.
+///   - the interface settings (mouse-over reaction, LFO update behaviour,
+///     hide-cursor-on-knob-drag), which the CLAP build persists nowhere at all,
+///     so they are back at their defaults every time the plugin is loaded. Those
+///     are arguably user preferences rather than session state, and
+///     sst-plugininfra's userdefaults.h is the other candidate home; the two are
+///     not exclusive and surge uses both.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 

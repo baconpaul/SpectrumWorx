@@ -437,11 +437,7 @@ juce::Font DrawableText::defaultFont()
     return font;
 }
 
-void BackgroundImage::paint(juce::Graphics &graphics)
-{
-    graphics.setOpacity(Theme::singleton().settings().globalOpacity);
-    paintImage(graphics, image());
-}
+void BackgroundImage::paint(juce::Graphics &graphics) { paintImage(graphics, image()); }
 
 Artwork const &BackgroundImage::image() const
 {

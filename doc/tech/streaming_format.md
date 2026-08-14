@@ -268,10 +268,10 @@ calls the reader only when the element is present, so loading a `.swp` into a
 live session is not a silent reset of session state.
 
 **Its payload is deliberately empty for now.** The mechanism is the deliverable;
-the payload accrues. The first candidates, all main-thread and none of them
-parameters: `loadLastSession_`, whose own note says session state is its proper
-home; the preset browser's location and selection; and the interface settings the
-CLAP build persists nowhere at all.
+the payload accrues. The candidates, both main-thread and neither of them a
+parameter: the preset browser's location and selection; and the interface
+settings the CLAP build persists nowhere at all, so they are back at their
+defaults every time the plugin is loaded.
 
 Note what does *not* need it — the loaded sample. `<Global Sample="…">` has
 carried that since 2011, so putting state on the preset serialisation restores it
