@@ -252,8 +252,11 @@ class EditorHost
     /// the host, so the plugin must not offer the user a way to change it.
     virtual bool completelyDisableIOChanges() const = 0;
 
-    virtual bool shouldLoadLastSessionOnStartup() const = 0;
-    virtual void shouldLoadLastSessionOnStartup(bool) = 0;
+    /// \note `shouldLoadLastSessionOnStartup()` was a pair here, reaching a flag
+    /// nothing ever read: the checkbox on the interface page stored it and no
+    /// session was ever reloaded from it. Restoring what was open is the host's
+    /// job and every one of them does it.
+    ///                                       (14.08.2026.) (SW port)
 
   protected:
     /// Not deleted through this.

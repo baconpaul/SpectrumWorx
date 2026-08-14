@@ -294,13 +294,6 @@ class SpectrumWorxCLAP final
     /// mode parameter.
     bool completelyDisableIOChanges() const override { return false; }
 
-    /// \note There is no settings file to persist this to yet: the 2016 one
-    /// went with the plugin class that owned it, and the session state a host
-    /// hands back through clap_plugin_state is a better home for it anyway.
-    /// Held in memory so the checkbox at least tracks itself.
-    bool shouldLoadLastSessionOnStartup() const override { return loadLastSession_; }
-    void shouldLoadLastSessionOnStartup(bool const load) override { loadLastSession_ = load; }
-
   protected:
     bool init() noexcept override;
     bool activate(double sampleRate, std::uint32_t minFrames,
@@ -625,7 +618,6 @@ class SpectrumWorxCLAP final
     double sampleRate_{0};
     std::uint32_t latencyInSamples_{0};
     bool engineRunning_{false};
-    bool loadLastSession_{false};
 
     ////////////////////////////////////////////////////////////////////////////
     ///

@@ -3007,7 +3007,6 @@ SpectrumWorxEditor::Settings::Settings() /// \throws std::bad_alloc Out of memor
                       resourceArtwork<SettingsEngineBg>().getHeight());
 
     updateEnginePage();
-    updateLoadLastSessionOnStartup();
 
     aboutPage_.showUsersGuide_.addListener(this);
 
@@ -3033,29 +3032,6 @@ SpectrumWorxEditor::Settings::~Settings()
     //getCurrentContentComponent()->fadeOutComponent( 200, 0, 0, 0.2f );
     //this->fadeOutComponent( 200, 0, 0, 0.2f );
     clearTabs();
-}
-
-void SpectrumWorxEditor::Settings::sliderValueChanged(juce::Slider *const pSlider) noexcept
-{
-    LE_ASSERT(pSlider == &interfacePage_.opacitySlider());
-    Theme::singleton().settings().globalOpacity = pSlider->getValue();
-
-    juce::Colour const tabBackground(juce::Colours::black.withAlpha(
-        static_cast<float>(std::pow(Theme::singleton().settings().globalOpacity, 14))));
-    LE_ASSERT(getTabbedButtonBar().getNumTabs() == 3);
-    for (unsigned int i(0); i < 3; ++i)
-        getTabbedButtonBar().setTabBackgroundColour(i, tabBackground);
-
-    // Force repaint
-    for (unsigned int i(0); i < static_cast<unsigned int>(juce::ComponentPeer::getNumPeers()); ++i)
-    {
-        juce::ComponentPeer &peer(*juce::ComponentPeer::getPeer(i));
-        juce::Rectangle<int> bounds(peer.getBounds());
-        bounds.setPosition(0, 0);
-        peer.repaint(bounds);
-    }
-
-    LE::Utility::ignoreUnused(pSlider);
 }
 
 #pragma warning(push)
@@ -3220,34 +3196,12 @@ void SpectrumWorxEditor::Settings::EnginePage::paint(juce::Graphics &g)
 
 SpectrumWorxEditor::Settings::InterfacePage::InterfacePage()
     : BackgroundImage(resourceArtwork<SettingsIntrfcBg>()),
-      /// \note "Side window & menu opacity" until 6.4, when the side windows
-      /// stopped being windows. It still drives exactly the same thing --
-      /// BackgroundImage::paint, whose only subclasses are this panel's three
-      /// pages and the preset browser -- and over the editor rather than over
-      /// the desktop it is more use than it was, not less.
-      ///                                   (01.08.2026.) (SW port)
-      opacityTitle_("Panel & menu opacity", xMargin + 7, yMargin + 3 * yStep + 15,
-                    opacityWidth + 40, 16, juce::Justification::left),
-      globalOpacity_(juce::String()),
       moduleUIMouseOverReaction_(*this, xMargin, yMargin + 0 * yStep, "Mouse over reaction"),
       lfoUpdateBehaviour_(*this, xMargin, yMargin + 1 * yStep, "LFO update behaviour"),
-      loadLastSessionOnStartup_(*this, xMargin - 4, yMargin + 2 * yStep,
-                                "Load last session on startup"),
-      hideCursorOnKnobDrag_(*this, xMargin - 4, yMargin + 3 * yStep - 15,
-                            "Hide cursor on knob drag")
+      hideCursorOnKnobDrag_(*this, xMargin - 4, yMargin + 2 * yStep, "Hide cursor on knob drag")
 {
     Settings &parent(
         Utility::ParentFromMember<Settings, InterfacePage, &Settings::interfacePage_>()(*this));
-
-    globalOpacity_.setBounds(xMargin + 7, yMargin + 3 * yStep + 12 + 20, opacityWidth, 16);
-    globalOpacity_.setSliderStyle(juce::Slider::LinearHorizontal);
-    globalOpacity_.setTextBoxStyle(juce::Slider::NoTextBox, true, 10, 12);
-    globalOpacity_.setRange(0.8, 1);
-    globalOpacity_.setValue(Theme::singleton().settings().globalOpacity,
-                            juce::dontSendNotification);
-    globalOpacity_.setDoubleClickReturnValue(true, 0.9);
-    //globalOpacity_.setTooltip               ( globalOpacity_.getName() );
-    globalOpacity_.addListener(&parent);
 
     moduleUIMouseOverReaction_.addItem(Theme::Never, "Never");
     moduleUIMouseOverReaction_.addItem(Theme::WhenParentModuleSelected, "Module selected");
@@ -3262,20 +3216,15 @@ SpectrumWorxEditor::Settings::InterfacePage::InterfacePage()
     lfoUpdateBehaviour_.addItem(Theme::Always, "Always");
     lfoUpdateBehaviour_.setSelectedIndex(Theme::singleton().settings().lfoUpdateBehaviour);
 
-    loadLastSessionOnStartup_.addListener(&parent);
-
     hideCursorOnKnobDrag_.setToggleState(Theme::singleton().settings().hideCursorOnKnobDrag,
                                          juce::dontSendNotification);
     hideCursorOnKnobDrag_.addListener(&parent);
-
-    addToParentAndShow(*this, globalOpacity_);
 }
 
 void SpectrumWorxEditor::Settings::InterfacePage::paint(juce::Graphics &graphics)
 {
     graphics.setColour(juce::Colours::white);
     BackgroundImage::paint(graphics);
-    opacityTitle_.draw(graphics);
 }
 
 #pragma warning(pop)
@@ -3355,12 +3304,7 @@ SpectrumWorxEditor &SpectrumWorxEditor::Settings::editor()
 
 void SpectrumWorxEditor::Settings::buttonClicked(juce::Button *const pButton)
 {
-    if (pButton == &interfacePage_.loadLastSessionOnStartup_)
-    {
-        editor().editorHost().shouldLoadLastSessionOnStartup(
-            interfacePage_.loadLastSessionOnStartup_.getToggleState());
-    }
-    else if (pButton == &interfacePage_.hideCursorOnKnobDrag_)
+    if (pButton == &interfacePage_.hideCursorOnKnobDrag_)
     {
         Theme::settings().hideCursorOnKnobDrag =
             interfacePage_.hideCursorOnKnobDrag_.getToggleState();
@@ -3373,12 +3317,6 @@ void SpectrumWorxEditor::Settings::buttonClicked(juce::Button *const pButton)
             LE::IO::pathToJuceString(rootPath() / "Documents" / "User's Guide.PDF"),
             juce::String()));
     }
-}
-
-void SpectrumWorxEditor::Settings::updateLoadLastSessionOnStartup()
-{
-    interfacePage_.loadLastSessionOnStartup_.setToggleState(
-        editor().editorHost().shouldLoadLastSessionOnStartup(), juce::dontSendNotification);
 }
 
 } // namespace LE::SW::GUI

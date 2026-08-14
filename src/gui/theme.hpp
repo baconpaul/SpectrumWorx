@@ -89,13 +89,15 @@ class Theme final : public juce::LookAndFeel_V2
         Always
     };
 
-    /// \note Serialised verbatim into SpectrumWorx.dat by spectrumWorx.cpp.
-    /// The layout is on disk; do not reorder it.
+    /// \note The "layout is on disk; do not reorder it" that stood here was about
+    /// SpectrumWorx.dat, which spectrumWorx.cpp wrote these out to verbatim.
+    /// Neither survives: the CLAP build persists none of this, and the note went
+    /// on outranking that fact.
+    ///                                       (14.08.2026.) (SW port)
     struct Settings
     {
         Settings();
 
-        float globalOpacity;
         ModuleUIMouseOverReaction moduleUIMouseOverReaction;
         LFOUpdateBehaviour lfoUpdateBehaviour;
         bool hideCursorOnKnobDrag;

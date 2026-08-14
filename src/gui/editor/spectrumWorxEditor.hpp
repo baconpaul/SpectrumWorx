@@ -1063,9 +1063,7 @@ class SpectrumWorxEditor final : private SkinLifetime,
     /// \class Settings
     ////////////////////////////////////////////////////////////////////////////
 
-    class Settings : public juce::TabbedComponent,
-                     private juce::Slider::Listener,
-                     private juce::Button::Listener
+    class Settings : public juce::TabbedComponent, private juce::Button::Listener
     {
       public:
         Settings();
@@ -1079,7 +1077,6 @@ class SpectrumWorxEditor final : private SkinLifetime,
 
       private:
         void refillFrameSize(Engine::Setup const &);
-        void updateLoadLastSessionOnStartup();
 
       private: // JUCE component overrides.
         void paint(juce::Graphics &) override {}
@@ -1087,9 +1084,6 @@ class SpectrumWorxEditor final : private SkinLifetime,
 
       private: // JUCE ButtonListener overrides.
         void buttonClicked(juce::Button *) override;
-
-      private: // JUCE SliderListener overrides.
-        void sliderValueChanged(juce::Slider *) noexcept override;
 
       private:
         class EnginePage : public BackgroundImage
@@ -1111,7 +1105,6 @@ class SpectrumWorxEditor final : private SkinLifetime,
           public:
             InterfacePage();
 
-            juce::Slider const &opacitySlider() const { return globalOpacity_; }
             TitledComboBox const &mouseOverComboBox() const { return moduleUIMouseOverReaction_; }
             TitledComboBox const &lfoUpdateComboBox() const { return lfoUpdateBehaviour_; }
 
@@ -1120,14 +1113,8 @@ class SpectrumWorxEditor final : private SkinLifetime,
 
           private:
             friend class Settings;
-            static unsigned int const opacityWidth = 136;
-
-            DrawableText opacityTitle_;
-
-            juce::Slider globalOpacity_;
             TitledComboBox moduleUIMouseOverReaction_;
             TitledComboBox lfoUpdateBehaviour_;
-            LEDTextButton loadLastSessionOnStartup_;
             LEDTextButton hideCursorOnKnobDrag_;
         }; // class InterfacePage
 
