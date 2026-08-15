@@ -212,11 +212,13 @@ Ink measure(juce::Image const &image)
 ///
 /// \note One thousandth of the canvas, which is 212 pixels of the 563 x 376
 /// editor. Deliberately far below what the pages actually measure -- theme is the
-/// thinnest at 12.0 %, skin 17.5 %, and the five editor pages 73-80 % -- because
+/// thinnest at 12.0 %, skin 13.9 %, and the five editor pages 73-81 % -- because
 /// the failure this is for is *nothing was drawn*, not "less was drawn than last
 /// time". A tighter bound would be a golden, and a golden over a whole editor is
-/// a test that fails on every legitimate change.
-///                                           (measured 03.08.2026.) (SW port)
+/// a test that fails on every legitimate change. Which is the point of the
+/// margin: skin was 17.5 % until the About page's three bitmaps left the skin on
+/// 15.08.2026, and that is a change no test should have had an opinion about.
+///                                           (measured 15.08.2026.) (SW port)
 ///
 ////////////////////////////////////////////////////////////////////////////////
 

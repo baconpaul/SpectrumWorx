@@ -75,8 +75,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # land on everything or on nothing, and which it was is not something to discover
 # from a missing conformance mode. CMAKE_CXX_FLAGS is per language by
 # construction, and /FS is valid in both languages, so neither needs one.
+#
+# /utf-8 sets both the source and the execution charset. Without it MSVC reads a
+# BOM-less source in the machine's ANSI codepage and re-encodes narrow literals
+# into it, so a string with a diacritic in it means one thing on the developer's
+# machine and another on the build agent -- while every other compiler here has
+# been UTF-8 in and UTF-8 out all along. JUCE reads `char const *` as UTF-8, and
+# gui/about.cpp has six proper names that need it.
 if (MSVC)
     string(APPEND CMAKE_CXX_FLAGS " /Zc:__cplusplus")
+    string(APPEND CMAKE_CXX_FLAGS " /utf-8")
+    string(APPEND CMAKE_C_FLAGS " /utf-8")
     add_compile_options(/FS) # belt and braces beside /Z7 above
 endif ()
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
