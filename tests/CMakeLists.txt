@@ -76,6 +76,7 @@ add_executable(sw-plugin-tests
         # sw-impl -- plugin2Host.cpp -- rather than in the engine.
         parameters/parameterTableTests.cpp
         presets/presetHarness.cpp
+        gui/aboutPageTests.cpp
         gui/buildStampTests.cpp
         gui/knobPaintingTests.cpp
         gui/lfoDisplayTests.cpp
@@ -106,6 +107,13 @@ target_link_libraries(sw-plugin-tests PRIVATE sw-impl sw-gui Catch2::Catch2WithM
 # spectrumWorxCLAP.hpp includable: several cases need the class itself rather
 # than the C vtable, to reach what a host cannot name.
 target_link_libraries(sw-plugin-tests PRIVATE clap-helpers clap-wrapper-extensions)
+
+# gui/aboutPageTests.cpp names VersionInformation directly, to check the About
+# page reports what the tree was configured as. sw-impl and sw-gui both link this
+# PRIVATE, so the archive arrives across the link line but its include directory
+# and SST_PLUGININFRA_HAS_VERSION_INFORMATION do not -- CMake records a private
+# dependency as $<LINK_ONLY:...>, which is the library without its interface.
+target_link_libraries(sw-plugin-tests PRIVATE sst-plugininfra::version_information)
 
 # X11 itself, and only here. JUCE reaches libX11 through dlopen() and a symbol
 # table, so nothing it exports puts the library on a consumer's link line --

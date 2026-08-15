@@ -72,6 +72,8 @@ sw_force_include_odr_header(sw-gui-widgets)
 ################################################################################
 
 add_library(sw-gui STATIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/gui/about.cpp
+
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/modules/moduleControl.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/modules/moduleUI.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/modules/moduleWidgets.cpp
@@ -89,7 +91,14 @@ sw_force_include_odr_header(sw-gui)
 
 target_link_libraries(sw-gui PUBLIC sw-gui-widgets)
 
-# The date, time and commit the editor draws along its bottom edge. PRIVATE: the
-# strings are named by spectrumWorxEditor.cpp and by nothing above it.
+# The date, time and commit the editor draws along its bottom edge, and that the
+# About page's "copy info" link puts on the clipboard. PRIVATE: the strings are
+# named by spectrumWorxEditor.cpp and about.cpp and by nothing above them.
 # \see src/buildStamp.cmake.
 target_link_libraries(sw-gui PRIVATE sw-build-stamp)
+
+# The release the tree was *configured* as -- version, branch, commit, toolchain
+# -- which is the other half of what the About page shows and what a bug report
+# needs. \see gui/about.cpp, and the note in configuration/buildStamp.hpp on why
+# both exist.
+target_link_libraries(sw-gui PRIVATE sst-plugininfra::version_information)

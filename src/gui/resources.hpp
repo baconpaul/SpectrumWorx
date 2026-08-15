@@ -153,7 +153,11 @@ class Artwork
     /* Settings panel */                                    \
     x(SettingsEngineBg,       17)                           \
     x(SettingsIntrfcBg,       17) /* ...same as engine... */\
-    x(SettingsAboutBg,        20)                           \
+    /* ...and so is About's, as of 15.08.2026. It had one */\
+    /* of its own -- 20, the whole page baked flat: logos, */\
+    /* credits and a gap for the version string. So the   */\
+    /* one thing on it nobody could correct was the text. */\
+    x(SettingsAboutBg,        17) /* \see gui/about.cpp   */\
     x(SettingsEngineOff,      21)                           \
     x(SettingsEngineOn,       22)                           \
     x(SettingsGUIOff,         23)                           \
@@ -162,8 +166,6 @@ class Artwork
     x(SettingsAboutOn,        28)                           \
     x(SettingsCombo,          61)                           \
     x(SettingsComboOn,        62)                           \
-    x(UsersGuideUp,           66)                           \
-    x(UsersGuideDown,         67)                           \
                                                             \
     /* Preset browser */                                    \
     x(PresetBackground,        7)                           \
@@ -200,7 +202,7 @@ enum ResourceBitmaps
 }; // enum ResourceBitmaps
 
 /// The highest number `assets/skin` holds, and the size of the cache.
-unsigned int constexpr numberOfResourceBitmaps = 67;
+unsigned int constexpr numberOfResourceBitmaps = 62;
 
 /// \brief Decodes on first use and caches; the reference stays valid until
 /// releaseCachedResources().
@@ -210,7 +212,7 @@ unsigned int constexpr numberOfResourceBitmaps = 67;
 /// they outlived the JUCE they were allocated under. This is one array, and it
 /// can be emptied.
 ///
-/// \note The numbering has holes: 2, 3, 12, 15, 18, 54, 63, 64, 65 and 68 do not
+/// \note The numbering has holes: 2, 3, 12, 15, 18, 20, 54 and 63 to 68 do not
 /// exist, and 19, 25, 26, 29 and 36 to 39 exist but no widget names them. A hole
 /// yields an invalid image rather than an assertion, so that iterating the range
 /// is legal; the check that every *named* bitmap resolves is a test
@@ -221,6 +223,10 @@ unsigned int constexpr numberOfResourceBitmaps = 67;
 /// (68) on 14.08.2026, and the editor knob's (2) on the 15th. Every one was 127
 /// frames of one drawing at a fixed size; the drawings are ModuleKnobStyle and
 /// EditorKnobStyle now. 58 stays -- TriggerButton still draws its focus ring.
+///
+/// \note Three more went with the About page on 15.08.2026: the baked page
+/// itself (20) and the two halves of the "User's guide" button (66, 67), which
+/// opened a PDF no installer has written since 2016. \see gui/about.cpp.
 juce::Image const &resourceBitmap(unsigned int number);
 
 /// \brief The same artwork, in the form that can still be a vector.

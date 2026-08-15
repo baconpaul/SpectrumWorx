@@ -3244,8 +3244,6 @@ SpectrumWorxEditor::Settings::Settings() /// \throws std::bad_alloc Out of memor
 
     updateEnginePage();
 
-    aboutPage_.showUsersGuide_.addListener(this);
-
     setOutline(0);
     setIndent(0);
     setTabBarDepth(resourceArtwork<SettingsEngineOn>().getHeight());
@@ -3465,24 +3463,8 @@ void SpectrumWorxEditor::Settings::InterfacePage::paint(juce::Graphics &graphics
 
 #pragma warning(pop)
 
-#pragma warning(push)
-#pragma warning(disable : 4355) // 'this' used in base member initializer list.
-SpectrumWorxEditor::Settings::AboutPage::AboutPage()
-    : BackgroundImage(resourceArtwork<SettingsAboutBg>()),
-      versionText_(SW_VERSION_STRING SW_EDITION_STRING, 65, 43, 107, 16),
-      showUsersGuide_(*this, resourceArtwork<UsersGuideDown>(), resourceArtwork<UsersGuideUp>())
-{
-    showUsersGuide_.setTopLeftPosition(101, 108);
-    showUsersGuide_.setClickingTogglesState(false);
-}
-#pragma warning(pop)
-
-void SpectrumWorxEditor::Settings::AboutPage::paint(juce::Graphics &graphics)
-{
-    BackgroundImage::paint(graphics);
-    graphics.setColour(juce::Colours::white);
-    versionText_.draw(graphics);
-}
+/// \note SpectrumWorxEditor::Settings::AboutPage's constructor and paint() stood
+/// here. \see gui/about.cpp.
 
 class SettingsTab : public juce::TabBarButton
 {
@@ -3538,21 +3520,18 @@ SpectrumWorxEditor &SpectrumWorxEditor::Settings::editor()
                                              &SpectrumWorxEditor::settings_, false>()(*this);
 }
 
+/// \note One button left. The other branch here opened
+/// `<user>/Documents/SpectrumWorx/Documents/User's Guide.PDF` -- a path the 2016
+/// installer wrote and nothing has written since, so the About tab's one control
+/// had been a button that could only fail. Its replacement is a link to the
+/// manual in the repository. \see gui/about.cpp.
+///                                           (15.08.2026.) (SW port)
 void SpectrumWorxEditor::Settings::buttonClicked(juce::Button *const pButton)
 {
-    if (pButton == &interfacePage_.hideCursorOnKnobDrag_)
-    {
-        Theme::settings().hideCursorOnKnobDrag =
-            interfacePage_.hideCursorOnKnobDrag_.getToggleState();
-    }
-    else if (pButton == &aboutPage_.showUsersGuide_)
-    {
-        /// \note openDocument() wants a `juce::String`, so the path never
-        /// becomes a `juce::File` on the way there.
-        LE_VERIFY(juce::Process::openDocument(
-            LE::IO::pathToJuceString(rootPath() / "Documents" / "User's Guide.PDF"),
-            juce::String()));
-    }
+    LE_ASSERT(pButton == &interfacePage_.hideCursorOnKnobDrag_);
+    (void)pButton;
+
+    Theme::settings().hideCursorOnKnobDrag = interfacePage_.hideCursorOnKnobDrag_.getToggleState();
 }
 
 } // namespace LE::SW::GUI

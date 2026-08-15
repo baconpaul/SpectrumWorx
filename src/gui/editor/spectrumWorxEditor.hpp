@@ -13,6 +13,7 @@
 //------------------------------------------------------------------------------
 #include "core/host_interop/parameters.hpp"
 #include "core/parameterID.hpp"
+#include "gui/about.hpp"
 #include "gui/gui.hpp"
 #include "gui/editor/auxiliaryComponents.hpp"
 #include "gui/editor/moduleMenuHolder.hpp"
@@ -1202,19 +1203,12 @@ class SpectrumWorxEditor final : private SkinLifetime,
             LEDTextButton hideCursorOnKnobDrag_;
         }; // class InterfacePage
 
-        class AboutPage : public BackgroundImage
-        {
-          public:
-            AboutPage();
-
-          private: // JUCE component overrides.
-            void paint(juce::Graphics &) override;
-
-          private:
-            friend class Settings;
-            DrawableText const versionText_;
-            BitmapButton showUsersGuide_;
-        }; // class AboutPage
+        /// \note The About tab used to be a third nested class here, of the same
+        /// shape as the two above: a baked bitmap with a version string drawn
+        /// over it. It is GUI::AboutPage now -- \see gui/about.hpp -- because
+        /// unlike these two it holds no editor state at all, so nothing was
+        /// keeping it inside a nested class of a 3,500-line file.
+        ///                                   (15.08.2026.) (SW port)
 
         EnginePage enginePage_;
         InterfacePage interfacePage_;
