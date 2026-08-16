@@ -544,6 +544,10 @@ jobs:
     # after a nightly it successfully published.
     env:
       DISCORD_WEBHOOK: ${{ secrets.DISCORD_SPECTRUMWORX_WEBHOOK }}
+      # Same reasoning as DISCORD_WEBHOOK above, and read the same way: a fork
+      # without the token skips the notification rather than failing a nightly
+      # it has already published.
+      WEB_TOKEN: ${{ secrets.WEB }}
 
     steps:
       # create_tag is false: the Nightly tag is made by hand, once, and every
@@ -567,6 +571,76 @@ jobs:
           tag: Nightly
           title: "A New SpectrumWorx Nightly is Available"
           subtitle: "Still a pre-release port -- bounce to stems for anything you want to keep."
+
+      ##########################################################################
+      # Tell surge-synth-team.org what just shipped.
+      #
+      #   The website has one workflow listening on a bare repository_dispatch;
+      # it writes src/content/generated/<event_type>.json and commits. So the
+      # event type *is* the filename, and nothing on that side needs changing
+      # for a new project. Nothing renders spectrumworx-build-nightly.json yet
+      # -- the page and the project descriptor are a separate change over
+      # there -- and the file being there first is the point.
+      ##########################################################################
+
+      # The action harvests the last few commits itself, with git, and this job
+      # has no checkout of its own -- it only moves artifacts. Depth 5 is what
+      # `git log -5` needs and no more.
+      - name: Check out for the commit log
+        if: env.WEB_TOKEN != ''
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 5
+
+      ##########################################################################
+      # \note **Read off the assets rather than recomputed.** The installer
+      # names its files `<date>-${GIT_COMMIT_HASH}` and that hash is a plain
+      # `git rev-parse --short`, whose length git chooses: the live Nightly says
+      # `cd87910` and a local configure of the same tree has said `86a575f3`.
+      # Recomputing it here would therefore be a coin toss that spends its
+      # losses on 404 download links, which nothing in CI would notice -- the
+      # notification succeeds either way and the breakage is on a web page.
+      #
+      #   Taking the string back out of the file that was just uploaded cannot
+      # drift, whatever git decides to do with abbreviation lengths.
+      ##########################################################################
+      - name: Read the version the assets were built with
+        if: env.WEB_TOKEN != ''
+        id: nightly
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          asset=$(gh release view Nightly --repo "$GITHUB_REPOSITORY" \
+                    --json assets --jq '.assets[].name | select(endswith(".dmg"))' | head -1)
+          version=${asset#spectrumworx-macOS-}
+          version=${version%.dmg}
+          # Fail loudly rather than send links built from an empty version.
+          if [ -z "$version" ]; then
+            echo "No macOS nightly asset to take a version from." >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Notify surge-synth-team.org
+        if: env.WEB_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ secrets.WEB }}
+        uses: surge-synthesizer/sst-githubactions/send-web-notification@main
+        with:
+          web_repo: "surge-synth-team.org"
+          event_type: "spectrumworx-build-nightly"
+          name: "spectrumworx"
+          # The branch, which is what the other projects send for a nightly.
+          version: ${{ github.ref_name }}
+          releases: |
+            {
+                "macos": "${{ github.server_url }}/${{ github.repository }}/releases/download/Nightly/spectrumworx-macOS-${{ steps.nightly.outputs.version }}.dmg",
+                "win64": "${{ github.server_url }}/${{ github.repository }}/releases/download/Nightly/spectrumworx-Windows-${{ steps.nightly.outputs.version }}.exe",
+                "win64zip": "${{ github.server_url }}/${{ github.repository }}/releases/download/Nightly/spectrumworx-Windows-${{ steps.nightly.outputs.version }}.zip",
+                "linux64": "${{ github.server_url }}/${{ github.repository }}/releases/download/Nightly/spectrumworx-Linux-${{ steps.nightly.outputs.version }}.zip",
+                "other": "${{ github.server_url }}/${{ github.repository }}/releases/tag/Nightly"
+            }
 
   publish-plugin-release:
     name: Publish Release
