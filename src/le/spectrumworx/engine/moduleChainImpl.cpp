@@ -381,9 +381,16 @@ void ModuleChainImpl::preProcessAll(Parameters::LFOImpl::Timer const &timer,
     forEach<Module>([&](Module &module) { module.preProcess(timer, engineSetup); });
 }
 
-void ModuleChainImpl::resetAll()
+void ModuleChainImpl::resetAll(Math::Rng &seedSource)
 {
-    forEach<ModuleDSP>([](ModuleDSP &module) { module.reset(); });
+    /// \note Seed before reset, not after: an effect's reset() may draw from the
+    /// generator it has just been given (Synth's used to, to randomise its
+    /// oscillator phases), and a draw from an unseeded stream is the bug this
+    /// whole arrangement exists to remove.
+    forEach<ModuleDSP>([&seedSource](ModuleDSP &module) {
+        module.seedRandomState(seedSource);
+        module.reset();
+    });
 }
 
 namespace

@@ -132,6 +132,34 @@ class SpectrumWorxCore : public Host2PluginInteropControler,
     void reset();
     void uninitialise();
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Pins this instance's randomness, so that a render can be repeated.
+    ///
+    ///   Every generator in the engine -- one per LFO, one per channel of each
+    /// effect that draws -- is dealt its stream from a single per-instance
+    /// source at `reset()`. That source normally takes the clock and a stack
+    /// address, which is what keeps two instances on two tracks from producing
+    /// the same noise; this replaces it with a value, and everything downstream
+    /// follows deterministically because the deal is a fixed walk of the chain.
+    ///
+    /// \param seed zero restores the clock, which is the default.
+    ///
+    /// \note **Sticky, and takes effect at the next `reset()`** -- which
+    /// `resume()` performs, so a caller sets this once during setup and every
+    /// pass thereafter repeats. Re-dealing here instead would have been the
+    /// wrong shape twice over: a seed the next transport stop silently discarded
+    /// would be useless to a user, and mutating the chain from whichever thread
+    /// set the parameter is exactly what the engine's ownership rules forbid.
+    /// \see doc/tech/threading_model.md.
+    ///
+    /// \note Used by the test harness today. Offering it to the *user*, so that
+    /// an offline bounce can be made reproducible, is issue #105.
+    ///                                       (17.08.2026.)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    void setRandomSeed(std::uint64_t seed);
+
   public: // VST2.4 effect interface:
     void resume();
     void suspend();
@@ -574,6 +602,27 @@ class SpectrumWorxCore : public Host2PluginInteropControler,
 
     Engine::StorageFactors currentStorageFactors_;
     Engine::HeapSharedStorage sharedStorage_;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Where every generator in this instance gets its stream from.
+    ///
+    ///   Per instance, and that is the whole reason it exists as a member rather
+    /// than as the file-static it replaced: two plugins on two tracks drew from
+    /// one set of globals, which was a data race as well as a shared sequence.
+    /// \see Math::Rng and issue #86.
+    ///
+    /// \note Only ever read at `reset()` and `setRandomSeed()`, never from the
+    /// audio path -- the dealt streams are what the audio path touches, and each
+    /// of those belongs to exactly one channel of one module.
+    ///                                       (17.08.2026.)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    Math::Rng seedSource_;
+
+    /// \brief What to seed `seedSource_` with at the next reset, or zero for the
+    /// clock. \see setRandomSeed().
+    std::uint64_t fixedSeed_{0};
 }; // class SpectrumWorxCore
 
 } // namespace LE::SW

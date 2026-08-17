@@ -142,11 +142,16 @@ void SpectrumWorxCore::resume()
 
 void SpectrumWorxCore::reset()
 {
-    Math::rngSeed();
-    moduleChain().resetAll();
+    if (fixedSeed_)
+        seedSource_.seed(fixedSeed_);
+    else
+        seedSource_.seedFromEntropy();
+    moduleChain().resetAll(seedSource_);
     resetChannelBuffers();
     Engine::Processor::reset();
 }
+
+void SpectrumWorxCore::setRandomSeed(std::uint64_t const seed) { fixedSeed_ = seed; }
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -478,7 +483,10 @@ bool SpectrumWorxCore::initialise()
     bool success(true);
     success &= updateEngineSetup();
 
-    Math::rngSeed();
+    /// \note The seed source, not the modules: resume() calls reset(), which is
+    /// what actually deals the streams out, and a module inserted after this
+    /// point would be missed by any dealing done here.
+    seedSource_.seedFromEntropy();
 
     return success;
 }

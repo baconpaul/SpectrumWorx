@@ -227,15 +227,14 @@ void SynthImpl::setup(IndexRange const &workingRange, Engine::Setup const &engin
 
 void SynthImpl::ChannelState::reset()
 {
-    /// \note Randomize initial phases for a more 'spacey' effect. To be further
-    /// investigated...
-    ///                                       (22.10.2015.) (Domagoj Saric)
-#if 0
-    for ( auto & oscillatorPhases : phases )
-        for ( auto & phase : oscillatorPhases ) { phase = Math::rangedRand( Math::Constants::pi ); }
-#else
+    /// \note The disabled branch here randomised the initial phases "for a more
+    /// 'spacey' effect. To be further investigated..." (22.10.2015., Domagoj
+    /// Saric) and drew from the process-global RNG. It is gone with that RNG
+    /// rather than left pointing at a deleted function; reviving it means giving
+    /// this ChannelState a `Math::Rng` of its own, which is what every effect
+    /// that does draw now has. \see issue #86.
+    ///                                       (17.08.2026.)
     Math::clear(phases.front().begin(), phases.back().end());
-#endif // initial phases generation
 }
 
 void SynthImpl::ChannelState::resize(Engine::StorageFactors const &factors,

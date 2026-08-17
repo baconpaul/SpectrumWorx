@@ -14,6 +14,7 @@
 #include "lfo.hpp"
 
 #include "le/math/conversion.hpp"
+#include "le/math/math.hpp"
 #include "le/parameters/boolean/parameter.hpp"
 #include "le/parameters/dynamic/tag.hpp"
 #include "le/parameters/factoryMacro.hpp"
@@ -314,9 +315,32 @@ class LFOImpl : public LFO
     }; // class Timer
 
   public:
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief What a waveform function carries between calls: two scratch values
+    /// and, for the three random waveforms, the generator they draw from.
+    ///
+    /// \note The generator is per LFO and deliberately **not** per channel -- an
+    /// LFO modulates a parameter, and a parameter has no channel. That also
+    /// means a random waveform still moves with the number of `process()` calls,
+    /// because it is evaluated once per call from `ModuleDSP::preProcess()`;
+    /// making that motion per chunk is issue #78 and is a separate question from
+    /// issue #86, which is what put this generator here.
+    ///                                       (17.08.2026.)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    struct WaveformState
+    {
+        value_type values[2];
+        Math::Rng rng;
+    }; // struct WaveformState
+
     LFOImpl();
 
     value_type getValue(Timer const &) const;
+
+    /// \brief Gives this LFO its own random stream. \see ModuleDSP::seedRandomState().
+    void seed(std::uint64_t seed);
 
     /// \todo These synchronization type altering functions do not automatically
     /// cause period scale resnapping. Reconsider this.
@@ -377,7 +401,7 @@ class LFOImpl : public LFO
   private:
     friend class LFO;
     Parameters parameters_;
-    mutable value_type state_[2];
+    mutable WaveformState state_;
 }; // class LFOImpl
 
 template <>

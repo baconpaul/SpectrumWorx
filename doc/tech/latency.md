@@ -236,10 +236,22 @@ Two consequences worth knowing:
 
 ---
 
-## 6. What is still not constant
+## 6. The call count, which was a separate quantity
 
-Two effects — **Freqverb** and **Whisperer** — still render differently depending
-on how many times `process()` was called, even with every call a whole hop.
-`ModuleDSP::preProcess()` runs the LFO update and `setup()` once per call, and
-chunking multiplies the call count. That is issue #86, and it is a different
-quantity from anything above: not the block *length*, the call *count*.
+Three effects — **Freqverb**, **Whisperer** and **Burrito** — used to render
+differently depending on how many times `process()` was called, even with every
+call a whole hop. Not the block *length*, which is everything above, but the call
+*count*.
+
+It was never `preProcess()`, which was the standing guess. All three draw random
+numbers, and those came from one process-global generator; the engine finishes
+every hop of channel 0 before channel 1 begins, so cutting a block into hop-sized
+pieces left the number of draws untouched and changed **which channel received
+which**. Rendering in mono was bit-identical throughout, which is what identified
+it.
+
+Each effect now holds a `Math::Rng` per channel and the engine deals the streams
+at `reset()`, so a channel's sequence is advanced only by that channel's own hops
+and the call count cannot reach it. `tests/core/chunkTransparencyTests.cpp` covers
+every effect with no exclusions. See issue #86, and `doc/tech/effect_contract.md`
+§1.7 for where an effect's randomness belongs.

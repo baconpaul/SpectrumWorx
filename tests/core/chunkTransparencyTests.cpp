@@ -292,48 +292,6 @@ TEST_CASE("The engine's own WOLA path does not care how the block was cut up", "
                            SWTest::Signal::Sweep);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \brief The two effects whose output moves when the *number of calls* moves,
-/// even with every call a whole hop.
-///
-///   Measured, 512/4, hop 128, a 1024-sample block handed over whole against the
-/// same block as eight calls of 128:
-///
-///     Freqverb    differs from sample 259, worst 4.30
-///     Whisperer   differs from sample 3,   worst 0.90
-///
-///   Every other effect is bit-identical, so this is **not** #83 and it survived
-/// #83's fix: the engine's WOLA bookkeeping is pinned above and passes, at whole
-/// hops and at partial ones. These two move with the *number of `process()`
-/// calls*, which is a different quantity. `ModuleDSP::preProcess()`
-/// (`module.cpp:27`) runs `updateBaseParametersFromLFOs`,
-/// `updateEffectParametersFromLFOs` and `setup()` once per call, and chunking
-/// multiplies the number of calls by the number of chunks. For an effect whose
-/// `setup()` merely samples its parameters that is free; for one with per-call
-/// state behind it, it is not. Which of the three it is has not been established.
-/// \see issue #86.
-///
-///   Both renders are deterministic -- the same render run twice is bit-identical
-/// for both effects -- so this is a real property of the engine and not an
-/// uninitialised-state artefact of the harness.
-///
-/// \note Excluded by name rather than by a wider tolerance. A bound loose enough
-/// to admit a peak difference of 4.3 would admit anything, and naming them keeps
-/// the sweep below a bit-exact claim about the other sixty-odd.
-///                                           (16.08.2026.)
-///
-////////////////////////////////////////////////////////////////////////////////
-
-/// \note Compared against the *streaming* name, here and below, so that a
-/// retitle cannot quietly empty the exclusion list and turn these cases green
-/// for the wrong reason. \see SWTest::effectByStreamingName().
-bool callCountDependent(std::uint8_t const effect)
-{
-    std::string_view const name(Effects::effectStreamingName(effect));
-    return (name == "Freqverb") || (name == "Whisperer");
-}
-
 /// \brief Skipped for a reason that has nothing to do with chunking: Smoother
 /// writes a negative amplitude, and the engine's own `Negative` check on
 /// `amPhData.amps()` (`channelData.cpp:125`) aborts a Debug run the moment
@@ -344,6 +302,51 @@ bool callCountDependent(std::uint8_t const effect)
 bool tripsTheEngineInDebug(std::uint8_t const effect)
 {
     return std::string_view(Effects::effectStreamingName(effect)) == "Smoother";
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief **A seeded render repeats**, for every effect, on a fresh engine.
+///
+///   Which is what `SpectrumWorxCore::setRandomSeed()` promises, what every
+/// fixture in this repository quietly depends on, and what issue #105 would
+/// offer to a user. It is also the only thing that catches an effect whose
+/// generator is never *dealt* to: `callSeed()` finds a ChannelState's `seed()`
+/// with a `requires`, so an effect that holds a `Math::Rng` and forgets to
+/// expose one is not a compile error -- it silently keeps whatever state it
+/// constructed with, and the bug is "two instances sound identical" rather than
+/// anything a build says out loud.
+///
+/// \note Caught exactly that during the #86 fix, once `Math::Rng` started
+/// constructing from entropy: three effects held a generator, none of them
+/// declared `seed()`, and every fixture passed regardless because an unseeded
+/// generator was then a shared constant. Two renders that must agree, on two
+/// engines, is the shape that has an opinion about it.
+///                                           (17.08.2026.)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("The same seed renders the same samples", "[chunking][seed]")
+{
+    for (std::uint8_t effect(0); effect < Effects::Constants::numberOfEffects; ++effect)
+    {
+        if (tripsTheEngineInDebug(effect))
+            continue;
+        INFO("effect " << unsigned(effect) << " (" << Effects::effectName(effect) << ')');
+        SWTest::Slot const slots[]{{static_cast<std::int8_t>(effect), {}}};
+
+        auto const &configuration(configurations[0]);
+        SWTest::RenderSetup const setup{
+            configuration.fftSize, configuration.overlapFactor, channels, sampleRate, 1024, 0};
+
+        /// Two separate engines: renderChain() builds one per call, so a repeat
+        /// that agreed only within one instance would prove nothing.
+        auto const first(SWTest::renderChain(setup, slots, SWTest::Signal::Sweep, renderedFrames));
+        auto const again(SWTest::renderChain(setup, slots, SWTest::Signal::Sweep, renderedFrames));
+
+        REQUIRE(first.size() == again.size());
+        CHECK(firstDifference(first, again) == -1);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -360,7 +363,7 @@ TEST_CASE("No effect can tell how the block was cut up", "[chunking]")
 {
     for (std::uint8_t effect(0); effect < Effects::Constants::numberOfEffects; ++effect)
     {
-        if (callCountDependent(effect) || tripsTheEngineInDebug(effect))
+        if (tripsTheEngineInDebug(effect))
             continue;
         INFO("effect " << unsigned(effect) << " (" << Effects::effectName(effect) << ')');
         SWTest::Slot const slots[]{{static_cast<std::int8_t>(effect), {}}};
@@ -369,18 +372,67 @@ TEST_CASE("No effect can tell how the block was cut up", "[chunking]")
     }
 }
 
-/// \brief The two above, so the exclusion carries its own reproduction. \see #86.
-TEST_CASE("Freqverb and Whisperer depend on the number of calls", "[.][chunking-known-bad]")
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief The effect the sweep above could not see, and the reason it could not.
+///
+///   Burrito draws from a generator, so it belongs to the same family as
+/// Freqverb and Whisperer -- but it passed the sweep for two reasons that have
+/// nothing to do with being correct. Its default 250 ms period puts its first
+/// draw past the end of a half-second render, so it drew *nothing*; and the
+/// sweep feeds the side chain the main signal, under which Burrito's default
+/// `Replace` at 0 dB copies the input onto itself and which bins it chose cannot
+/// be observed at any period.
+///
+///   Both have to go for the case to mean anything: a short period so it draws
+/// more than once, a side chain that is not the main signal so the draws reach
+/// the output, and a host block big enough to hold *several* draws -- which is
+/// the shape of the bug. One draw event per call preserves its own order (the
+/// engine finishes channel 0 before starting channel 1, so a single event lands
+/// in the same relative place either way); two or more inside one call do not.
+/// Measured before the fix: identical at a 1024-sample block, differing from
+/// sample 2051 at 4096.
+///
+/// \note Which is to say a fixture at default settings is blind here, and was.
+/// \see issue #86.
+///                                           (17.08.2026.)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A random effect cannot tell how the block was cut up either", "[chunking]")
 {
-    for (std::uint8_t effect(0); effect < Effects::Constants::numberOfEffects; ++effect)
-    {
-        if (!callCountDependent(effect))
-            continue;
-        INFO("effect " << unsigned(effect) << " (" << Effects::effectName(effect) << ')');
-        SWTest::Slot const slots[]{{static_cast<std::int8_t>(effect), {}}};
-        requireTransparent(slots, configurations[0], 1024, configurations[0].hop(),
-                           SWTest::Signal::Sweep);
-    }
+    // Mode 0, Range 1, Period 2, SideGain 3.
+    constexpr std::uint8_t burritoPeriod{2};
+
+    auto const hostBlock(GENERATE(std::uint32_t{1024}, 4096, 16384));
+
+    std::vector<float> main(renderedFrames), side(renderedFrames);
+    SWTest::generate(SWTest::Signal::Sweep, main, static_cast<float>(sampleRate));
+    SWTest::generate(SWTest::Signal::PinkNoise, side, static_cast<float>(sampleRate));
+
+    SWTest::Slot const slots[]{
+        {SWTest::effectByStreamingName("Burrito"), [](LE::SW::Engine::ModuleParameters &module) {
+             module.setEffectParameter(burritoPeriod, 10);
+         }}};
+
+    auto const &configuration(configurations[0]);
+    SWTest::RenderSetup const asOneCall{
+        configuration.fftSize, configuration.overlapFactor, channels, sampleRate, hostBlock, 0};
+    SWTest::RenderSetup const inChunks{
+        configuration.fftSize, configuration.overlapFactor, channels, sampleRate, hostBlock,
+        configuration.hop()};
+
+    auto const whole(SWTest::renderChain(asOneCall, slots, main, side));
+    auto const chunked(SWTest::renderChain(inChunks, slots, main, side));
+
+    REQUIRE(whole.size() == chunked.size());
+    INFO("Burrito at a 10 ms period, host block " << hostBlock << " in one call against "
+                                                  << configuration.hop() << "-sample calls");
+    auto const difference(firstDifference(whole, chunked));
+    if (difference >= 0)
+        UNSCOPED_INFO("first differs at sample " << difference << ", worst difference "
+                                                 << worstDifference(whole, chunked));
+    CHECK(difference == -1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

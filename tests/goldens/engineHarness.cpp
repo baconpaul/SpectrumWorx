@@ -230,13 +230,25 @@ std::vector<float> renderChain(RenderSetup const &setup, std::span<Slot const> c
             slots[slot].configure(*inserted.first);
     }
 
-    engine.resume();
-
-    /// \note After resume(), because initialise() and reset() both call the
-    /// clock-and-stack-address rngSeed(). Freqverb and Whisperer draw from the
-    /// RNG, and without this their renders differ every run.
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note **Before resume(), and after the modules are in the chain.** The
+    /// seed is what `reset()` deals every generator in the engine from, and
+    /// `resume()` is the reset that does the dealing -- so a module inserted
+    /// after this point would still be seeded, but a seed set after it would
+    /// not have reached the ones already there.
+    ///
+    ///   Without it the engine takes the clock and a stack address, which is
+    /// what keeps two instances apart in a session and what makes a render
+    /// unrepeatable. Freqverb, Whisperer and Burrito draw, as does any random
+    /// LFO waveform.
     ///                                   (28.07.2026.) (SW port)
-    LE::Math::rngSeed(0xA5A5C3C3u);
+    ///                                   (17.08.2026.) seeds the engine, not a global
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    engine.setRandomSeed(0xA5A5C3C3u);
+
+    engine.resume();
 
     auto const channels(setup.numberOfChannels);
 
