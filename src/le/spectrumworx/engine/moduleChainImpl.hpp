@@ -393,7 +393,9 @@ class ModuleChainImpl : public ModuleChainBase
 
     void preProcessAll(Parameters::LFOImpl::Timer const &, Setup const &);
 
-    void resetAll();
+    /// \brief Resets every module, and on the way gives each of them the random
+    /// streams they own. \see ModuleDSP::seedRandomState().
+    void resetAll(Math::Rng &seedSource);
 
     bool resizeAll(StorageFactors const &newfactors, StorageFactors const &currentFactors);
 }; // class ModuleChainImpl

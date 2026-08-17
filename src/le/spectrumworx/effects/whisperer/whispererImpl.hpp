@@ -13,6 +13,8 @@
 //------------------------------------------------------------------------------
 #include "whisperer.hpp"
 
+#include "le/math/math.hpp"
+#include "le/spectrumworx/effects/channelStateStatic.hpp"
 #include "le/spectrumworx/effects/effects.hpp"
 
 namespace LE::SW::Effects
@@ -20,13 +22,36 @@ namespace LE::SW::Effects
 
 class WhispererImpl : public NoParametersEffectImpl<Whisperer>
 {
-  public: // LE::Effect interface.
+  public: // LE::Effect required interface.
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief One phase-randomising stream per channel, and the only reason this
+    /// effect has a ChannelState at all.
+    ///
+    ///   The draws used to come from a process-global generator, which made the
+    /// output depend on how many times `process()` was called: the engine runs
+    /// every hop of channel 0 before channel 1 starts, so cutting a host block
+    /// into hop-sized pieces left the draw *count* untouched and changed which
+    /// channel received which number. \see issue #86.
+    ///                                       (17.08.2026.)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    struct ChannelState : StaticChannelState
+    {
+        Math::Rng rng;
+
+        /// \note Not a reseed -- see Math::Rng. The stream simply carries on.
+        static void reset() {}
+
+        void seed(std::uint64_t const seed) { rng.seed(seed); }
+    }; // struct ChannelState
+
     ////////////////////////////////////////////////////////////////////////////
     // setup() and process()
     ////////////////////////////////////////////////////////////////////////////
 
     static void setup(IndexRange const &, Engine::Setup const &) {}
-    void process(Engine::ChannelData_AmPh, Engine::Setup const &) const;
+    void process(ChannelState &, Engine::ChannelData_AmPh, Engine::Setup const &) const;
 };
 
 } // namespace LE::SW::Effects

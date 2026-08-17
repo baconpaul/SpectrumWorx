@@ -231,11 +231,10 @@ Table currentTable()
     {
         /// \note Seeded per row, so the three random waveforms are reproducible
         /// and so a row that moves is the *waveform* rather than whatever drew
-        /// from the RNG before it. `Math::rngSeed()` with no argument takes a
-        /// clock and a stack address, which is what the engine does on reset.
-        LE::Math::rngSeed(0x10F0u + waveform);
-
+        /// before it. An unseeded LFO takes whatever the engine dealt it, which
+        /// in a session is derived from the clock.
         LFOImpl lfo;
+        lfo.seed(0x10F0u + waveform);
         withWaveform(lfo, static_cast<LFO::Waveform>(waveform));
         table.emplace(std::string(waveformNames[waveform]),
                       row(overTwoPeriods(lfo, samplesOverTwoPeriods)));
@@ -387,8 +386,8 @@ TEST_CASE("The waveforms are eleven different shapes", "[lfo]")
     std::vector<std::vector<float>> shapes;
     for (std::uint8_t waveform(0); waveform < LFO::NumberOfWaveforms; ++waveform)
     {
-        LE::Math::rngSeed(0x10F0u + waveform);
         LFOImpl lfo;
+        lfo.seed(0x10F0u + waveform);
         withWaveform(lfo, static_cast<LFO::Waveform>(waveform));
         shapes.push_back(overTwoPeriods(lfo, 64));
     }
@@ -413,8 +412,8 @@ TEST_CASE("Every LFO waveform stays inside the unit interval", "[lfo]")
     for (std::uint8_t waveform(0); waveform < LFO::NumberOfWaveforms; ++waveform)
     {
         INFO(waveformNames[waveform]);
-        LE::Math::rngSeed(0x5A5Au + waveform);
         LFOImpl lfo;
+        lfo.seed(0x5A5Au + waveform);
         withWaveform(lfo, static_cast<LFO::Waveform>(waveform));
         for (auto const value : overTwoPeriods(lfo, 256))
         {
@@ -442,8 +441,8 @@ TEST_CASE("A held random waveform holds and a sliding one slides", "[lfo]")
 
     /// How many of the second period's 32 steps differ from the one before it.
     auto const movesWithinAPeriod([](LFO::Waveform const waveform) {
-        LE::Math::rngSeed(0xBEEFu);
         LFOImpl lfo;
+        lfo.seed(0xBEEFu);
         withWaveform(lfo, waveform);
         auto const values(overTwoPeriods(lfo, steps));
         std::size_t moves{0};
@@ -463,8 +462,8 @@ TEST_CASE("A held random waveform holds and a sliding one slides", "[lfo]")
     /// \note And the pair that separates Hold from Slide, which the count above
     /// cannot: the slide is *monotone* across its period and the hold is flat.
     /// Two waveforms that both "changed 31 times" could still be the same one.
-    LE::Math::rngSeed(0xBEEFu);
     LFOImpl sliding;
+    sliding.seed(0xBEEFu);
     withWaveform(sliding, LFO::RandomSlide);
     auto const slide(overTwoPeriods(sliding, steps));
     std::vector<float> const secondPeriod(slide.begin() + steps / 2 + 1, slide.end());

@@ -13,6 +13,7 @@
 //------------------------------------------------------------------------------
 #include "burrito.hpp"
 
+#include "le/math/math.hpp"
 #include "le/spectrumworx/effects/channelStateDynamic.hpp"
 #include "le/spectrumworx/effects/effects.hpp"
 #include "le/spectrumworx/effects/indexRange.hpp"
@@ -32,6 +33,16 @@ class BurritoImpl : public EffectImpl<Burrito>
     {
         Engine::HalfFFTBuffer<bool> positions;
         auto members() { return std::tie(positions); }
+
+        /// \note Outside members(): no engine storage, and reset() must not
+        /// restart the stream. \see Math::Rng and issue #86 -- which this effect
+        /// escaped only because its default period is longer than the test
+        /// render and its default mode is a no-op when side == main.
+        Math::Rng rng;
+
+        /// \note Reached through the CompoundChannelState below: only this half
+        /// declares a seed(), so the name resolves unambiguously.
+        void seed(std::uint64_t const seed) { rng.seed(seed); }
     };
 
     using ChannelState = CompoundChannelState<ModuloCounterChannelState, DynamicChannelState>;

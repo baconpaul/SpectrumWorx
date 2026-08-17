@@ -33,12 +33,12 @@ char const Whisperer::description[] = "Whispering sound.";
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void WhispererImpl::process(Engine::ChannelData_AmPh data, Engine::Setup const &) const
+void WhispererImpl::process(ChannelState &cs, Engine::ChannelData_AmPh data,
+                            Engine::Setup const &) const
 {
-    using namespace Math;
     for (auto &phase : data.phases())
     {
-        phase = rangedRand(Math::Constants::twoPi);
+        phase = cs.rng.ranged(Math::Constants::twoPi);
     }
 }
 

@@ -33,6 +33,18 @@ void ModuleDSP::preProcess(LFO::Timer const &timer, Setup const &engineSetup)
     setup(engineSetup);
 }
 
+void ModuleDSP::seedRandomState(Math::Rng &source)
+{
+    /// \note The LFOs first and then the channels, in that order, every time --
+    /// the walk *is* the identity, so it has to be the same walk on every reset
+    /// or the same patch would seed differently on two runs of the same session.
+    auto const lfoRange(lfos());
+    for (auto &lfo : lfoRange)
+        lfo.seed(source.next());
+
+    doSeedChannelStates(source);
+}
+
 void ModuleDSP::setup(Setup const &engineSetup)
 {
     using namespace Effects::BaseParameters;

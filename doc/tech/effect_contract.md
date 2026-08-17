@@ -432,6 +432,44 @@ vocoder state does).
 together; `Burrito` uses `CompoundChannelState<ModuloCounterChannelState, DynamicChannelState>`.
 `PitchShifterBasedEffect` assembles one for you.
 
+### Randomness lives here too
+
+**An effect that draws random numbers holds a `Math::Rng` in its `ChannelState`,
+and nowhere else.** There is no global generator to call; `Math::rangedRand()`
+and friends are gone.
+
+```cpp
+struct ChannelState : StaticChannelState
+{
+    Math::Rng rng;
+    static void reset() {}
+    void seed( std::uint64_t const seed ) { rng.seed( seed ); }
+};
+```
+— `whispererImpl.hpp`, which grew a `ChannelState` for exactly this and nothing
+else. Declare `seed( std::uint64_t )` and the engine finds it: `callSeed()`
+(`moduleImpl.hpp`) detects it with a `requires` and deals one stream per channel
+out of the instance's seed source at every `reset()`, so nothing else is asked to
+grow an empty override.
+
+Two rules follow from where it sits:
+
+- **Keep it out of `members()`.** It owns no engine storage, so a dynamic state
+  declares it as a plain member beside the tie. `Freqverb` and `Burrito` both do.
+- **`reset()` must not reseed.** A stream that restarted from the top on every
+  transport stop is a repeating noise pattern, not a reset one. Seeding is the
+  engine's, at a moment it chooses.
+
+Why it is per channel rather than per effect: the engine finishes every hop of
+channel 0 before channel 1 begins, so one generator shared between them makes the
+output depend on **how many times `process()` was called** — which is the host's
+block size, not anything a listener asked for. That was a real bug in Freqverb,
+Whisperer and Burrito. `tests/core/chunkTransparencyTests.cpp` is what holds it
+shut; issue #86 is the history.
+
+The same reasoning puts one on each `LFOImpl` (`LFOImpl::WaveformState::rng`),
+because an LFO modulates a parameter and a parameter has no channel.
+
 > **`reset()` means "the transport moved"**, not "construct". It is called on
 > resize and on engine reset, and it must leave the state as if no audio had ever
 > been seen. A state that leaks the previous session's spectrum through a
@@ -947,7 +985,7 @@ detector. **SC** = reads the side chain, per the measured set in
 | # | Title | Folder | P | State | SC | What it does |
 |---:|---|---|---:|---|:-:|---|
 | 24 | Robotizer | `robotizer` | 0 | — | | `Math::clear( data.phases() )`. One line. |
-| 25 | Whisperer | `whisperer` | 0 | — | | Randomises every phase. Three lines. **The `NoParametersEffectImpl` skeleton.** |
+| 25 | Whisperer | `whisperer` | 0 | S | | Randomises every phase. Three lines. **The smallest `ChannelState` there is: a `Math::Rng` and nothing else.** |
 | 26 | Phasevolution | `phasevolution` | 1 | S | | An accelerating phase ramp added to every bin. The clean `StaticChannelState`. |
 | 27 | Phlip | `phlip` | 1 | — | | Negates the phase of every, every even, or every odd bin — one strided call, parity computed in `setup()`. |
 
@@ -976,7 +1014,7 @@ Ten effects, nine of which read the side chain.
 | 39 | Merger | `merger` | 2 | — | ✔ | Six conditions collapsed to two range pointers and one branchless loop. |
 | 40 | Blender | `blender` | 1 | — | ✔ | One `Math::mix` over a `jointView()` of the ReIm pair. §2.4. |
 | 41 | Inserter | `inserter` | 4 | — | ✔ | Blits a band of the side spectrum into main at a chosen destination. |
-| 42 | Burrito | `burrito` | 4 | MC+D | ✔ | Replaces or sums side bins at randomly chosen positions, re-rolled every `Period`. **The positions only change once the period wraps.** |
+| 42 | Burrito | `burrito` | 4 | MC+D | ✔ | Replaces or sums side bins at randomly chosen positions, re-rolled every `Period`. **The positions only change once the period wraps** — and at the default `Period` of 250 ms and `Replace` mode, a fixture shorter than that with side == main sees nothing at all. |
 
 ### Phase Vocoder — indices 43–51
 

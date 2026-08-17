@@ -287,6 +287,31 @@ struct MakeChannelStateHolder
                 channelState.reset();
         }
 
+        ////////////////////////////////////////////////////////////////////////
+        ///
+        /// \brief One seed per channel, for the effects that hold a generator.
+        ///
+        /// \note Detected rather than required: an effect declares
+        /// `void seed( std::uint64_t )` on its ChannelState if it draws, and the
+        /// fifty-odd that do not are not asked to grow an empty override.
+        ///
+        /// \note The source is drawn from either way, so that giving an existing
+        /// effect a generator does not shift what a *later* module in the chain
+        /// receives. What a module consumes depends on its shape -- how many LFOs,
+        /// how many channels -- and not on whether it happens to want the numbers.
+        ///                                   (17.08.2026.)
+        ///
+        ////////////////////////////////////////////////////////////////////////
+        LE_FORCEINLINE void callSeed(Math::Rng &source)
+        {
+            for (auto &channelState : channelStates_)
+            {
+                auto const seed(source.next());
+                if constexpr (requires { channelState.seed(seed); })
+                    channelState.seed(seed);
+            }
+        }
+
         static std::uint16_t const sizeOfChannelState = sizeof(ChannelState);
         static std::uint32_t channelStateRequiredStorage(Engine::StorageFactors const &factors)
         {
@@ -331,6 +356,10 @@ struct MakeEmptyChannelStateHolder
         }
 
         static void callReset() {}
+
+        /// \note Nothing drawn, because there are no channel states to seed --
+        /// see the note on the other holder about why the count matters.
+        static void callSeed(Math::Rng &) {}
 
         static std::uint8_t const sizeOfChannelState = 0;
         static std::uint8_t channelStateRequiredStorage(Engine::StorageFactors const &)
@@ -493,6 +522,12 @@ template <class EffectParam, class Base> class ModuleEffectImpl : public Base
 
   public: //...mrmlj...
     LE_NOINLINE void reset() override final { channelStatesHolder_.callReset(); }
+
+  private:
+    LE_NOINLINE void doSeedChannelStates(Math::Rng &source) override final
+    {
+        channelStatesHolder_.callSeed(source);
+    }
 
   private:
     bool resize(StorageFactors const &factors) override final

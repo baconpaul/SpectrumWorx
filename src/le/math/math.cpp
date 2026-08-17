@@ -31,7 +31,6 @@
 
 #include <cmath>
 #include <chrono>
-#include <cstdlib>
 
 namespace LE::Math
 {
@@ -641,15 +640,9 @@ bool isPowerOfTwo(float const value)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-// rangedRand()
-// ------------
+// Rng
+// ---
 //
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \brief Calculates a random number in the [0, maximum) interval.
-///
-/// \throws nothing
-///
 ////////////////////////////////////////////////////////////////////////////////
 
 namespace
@@ -675,8 +668,6 @@ namespace
 
 // http://security.stackexchange.com/questions/47446/can-the-xor-of-two-rng-outputs-ever-be-less-secure-than-one-of-them
 
-alignas(16) static std::uint64_t rng_state[2];
-
 /// \note The 64 bit RNG is much slower in 32bit builds so we 'reduce'/limit
 /// its output width for those builds so that at least the ranged and
 /// floating point wrapper functions don't have to go through the slow
@@ -684,166 +675,70 @@ alignas(16) static std::uint64_t rng_state[2];
 ///                                       (06.10.2015.) (Domagoj Saric)
 using rand_t = std::size_t;
 
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable : 4127) // Conditional expression is constant.
-#endif                          // _MSC_VER
-LE_NOINLINE rand_t xorshift128pRNG()
+/// \note The width the float conversion below divides by. Named here because it
+/// is the one thing `next()` returning a full 64 bits took away: the narrowing
+/// is now the *caller's*, so the scale has to match what the caller narrowed to.
+rand_t narrow(std::uint64_t const wideResult)
 {
-    LE_ASSERT_MSG(rng_state[0] && rng_state[1], "RNG not seeded.");
-
-    std::uint64_t s1(rng_state[0]);
-    std::uint64_t const s0(rng_state[1]);
-
-    s1 ^= s1 << 23;                         // a
-    s1 = s1 ^ s0 ^ (s1 >> 17) ^ (s0 >> 26); // b, c
-
-    rng_state[0] = s0;
-    rng_state[1] = s1;
-
-    std::uint64_t const wideResult(s1 + s0);
-    if (sizeof(std::size_t) >= sizeof(rand_t))
-        return wideResult;
+    if constexpr (sizeof(std::size_t) >= sizeof(std::uint64_t))
+        return static_cast<rand_t>(wideResult);
     else
-    {
-        std::uint32_t const result(static_cast<std::uint32_t>(wideResult) + (wideResult >> 32));
-        return result;
-    }
-}
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif // _MSC_VER
-
-template <typename T> T rangedRand(T const maximum)
-{
-#if 0 // std::rand() is usually slow and of poor quality
-      // Implementation note:
-      //   On some platforms (e.g. OS X) RAND_MAX is equal to INT_MAX which
-      // makes it unsafe to implement this function simply as
-      // return std::rand() * maximum / ( RAND_MAX + 1 );
-      // because the intermediate result could overflow the int range.
-      //                                    (16.05.2011.) (Domagoj Saric)
-        using work_t = typename boost::uint_value_t<boost::integer_traits<T>::const_max * static_cast<std::uint64_t>( RAND_MAX )>::fast;
-
-        work_t const randomMaximum( RAND_MAX );
-        work_t const randomNumber( static_cast<unsigned>( std::rand() ) );
-        LE_ASSUME( randomNumber >= 0 );
-        LE_ASSUME( randomNumber <= randomMaximum );
-
-        return static_cast<T>( randomNumber * maximum / ( randomMaximum + 1 ) );
-#else
-    /// \note For now we intentionally go with the naive modulo approach
-    /// because of the small ranges of random number we require vs the large
-    /// value range of the RNG.
-    /// http://c-faq.com/lib/randrange.html
-    ///                                   (05.10.2015.) (Domagoj Saric)
-    return static_cast<T>(xorshift128pRNG() % maximum);
-#endif
+        return static_cast<rand_t>(static_cast<std::uint32_t>(wideResult) + (wideResult >> 32));
 }
 
 } // anonymous namespace
 
-void rngSeed()
+std::uint64_t Rng::next() noexcept
 {
-    char stack;
-    rng_state[0] = std::chrono::system_clock::now().time_since_epoch().count();
-    rng_state[1] = reinterpret_cast<std::size_t>(&stack);
+    LE_ASSERT_MSG(state_[0] && state_[1], "RNG state is all zero.");
 
-    //include the CRT version for 3rd party code?
-    //std::srand( static_cast<unsigned int>( std::time( 0 ) ) );
+    std::uint64_t s1(state_[0]);
+    std::uint64_t const s0(state_[1]);
+
+    s1 ^= s1 << 23;                         // a
+    s1 = s1 ^ s0 ^ (s1 >> 17) ^ (s0 >> 26); // b, c
+
+    state_[0] = s0;
+    state_[1] = s1;
+
+    return s1 + s0;
 }
 
-void rngSeed(std::uint64_t const seed)
+void Rng::seed(std::uint64_t const seed) noexcept
 {
     // splitmix64, so that a small seed still fills both words. Neither may be
     // zero: xorshift128+ cannot leave the all-zero state.
-    auto next([state = seed]() mutable {
+    auto mix([state = seed]() mutable {
         state += 0x9E3779B97F4A7C15ull;
         auto z(state);
         z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
         z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
         return z ^ (z >> 31);
     });
-    rng_state[0] = next() | 1;
-    rng_state[1] = next() | 1;
+    state_[0] = mix() | 1;
+    state_[1] = mix() | 1;
 }
 
-std::uint32_t rangedRand(std::uint32_t const maximum) { return rangedRand<std::uint32_t>(maximum); }
-std::uint16_t rangedRand(std::uint16_t const maximum) { return rangedRand<std::uint16_t>(maximum); }
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// rangedRand()
-// ------------
-//
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \brief Calculates a random number in the [minimum, maximum] interval.
-///
-/// \throws nothing
-///
-////////////////////////////////////////////////////////////////////////////////
-
-float rangedRand(float const minimum, float const maximum)
+void Rng::seedFromEntropy() noexcept
 {
-    LE_ASSUME(maximum >= minimum);
-    auto const result(minimum + rangedRand(maximum - minimum));
-    LE_ASSUME(result >= minimum);
-    LE_ASSUME(result <= maximum);
-    return result;
+    /// \note This object's address rather than a stack address, which is what
+    /// the process-global version took. A stack address is the same for every
+    /// iteration of the loop that constructs a module's channel states, so two
+    /// channels seeded microseconds apart could have collided on it; `this` is
+    /// distinct among live generators by definition. The clock separates runs,
+    /// and reused addresses across them.
+    ///                                       (17.08.2026.)
+    seed(static_cast<std::uint64_t>(std::chrono::system_clock::now().time_since_epoch().count()) ^
+         reinterpret_cast<std::uintptr_t>(this));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-//
-// rangedRand()
-// ------------
-//
-////////////////////////////////////////////////////////////////////////////////
 ///
-/// \brief Calculates a random number in the [minimum, maximum) interval.
-///
-/// \throws nothing
+/// \brief A random number in the [0, 1] interval.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-std::int32_t rangedRand(std::int32_t const minimum, std::uint32_t const maximum)
-{
-    LE_ASSUME(static_cast<signed>(maximum) > minimum);
-    std::int32_t const result(minimum + rangedRand(maximum - minimum));
-    LE_ASSUME(result >= minimum);
-    LE_ASSUME(result <= static_cast<signed>(maximum));
-    return result;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// rangedRand()
-// ------------
-//
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \brief Calculates a random number in the [0, maximum] interval.
-///
-/// \throws nothing
-///
-////////////////////////////////////////////////////////////////////////////////
-
-float rangedRand(float const maximum) { return normalisedRand() * maximum; }
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// normalisedRand()
-// ----------------
-//
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \brief Calculates a random number in the [0, 1] interval.
-///
-/// \throws nothing
-///
-////////////////////////////////////////////////////////////////////////////////
-
-float normalisedRand()
+float Rng::normalised() noexcept
 {
     /// \note The divisor used to be std::numeric_limits<rand_t>::max(), which no
     /// double can hold: it converts to one more than it is -- 2^digits -- and
@@ -852,9 +747,54 @@ float normalisedRand()
     ///                                       (02.08.2026.) (SW port)
     constexpr double scale(1 /
                            (static_cast<double>((std::numeric_limits<rand_t>::max() / 2) + 1) * 2));
-    auto const result(static_cast<float>(static_cast<double>(xorshift128pRNG()) * scale));
+    auto const result(static_cast<float>(static_cast<double>(narrow(next())) * scale));
     LE_ASSUME(result >= 0);
     LE_ASSUME(result <= 1);
+    return result;
+}
+
+/// \brief A random number in the [0, maximum] interval.
+float Rng::ranged(float const maximum) noexcept { return normalised() * maximum; }
+
+/// \brief A random number in the [minimum, maximum] interval.
+float Rng::ranged(float const minimum, float const maximum) noexcept
+{
+    LE_ASSUME(maximum >= minimum);
+    auto const result(minimum + ranged(maximum - minimum));
+    LE_ASSUME(result >= minimum);
+    LE_ASSUME(result <= maximum);
+    return result;
+}
+
+namespace
+{
+/// \note For now we intentionally go with the naive modulo approach because of
+/// the small ranges of random number we require vs the large value range of the
+/// RNG. http://c-faq.com/lib/randrange.html
+///                                       (05.10.2015.) (Domagoj Saric)
+template <typename T> T moduloOf(std::uint64_t const draw, T const maximum)
+{
+    return static_cast<T>(narrow(draw) % maximum);
+}
+} // anonymous namespace
+
+/// \brief A random number in the [0, maximum) interval.
+std::uint32_t Rng::ranged(std::uint32_t const maximum) noexcept
+{
+    return moduloOf(next(), maximum);
+}
+std::uint16_t Rng::ranged(std::uint16_t const maximum) noexcept
+{
+    return moduloOf(next(), maximum);
+}
+
+/// \brief A random number in the [minimum, maximum) interval.
+std::int32_t Rng::ranged(std::int32_t const minimum, std::uint32_t const maximum) noexcept
+{
+    LE_ASSUME(static_cast<signed>(maximum) > minimum);
+    std::int32_t const result(minimum + ranged(maximum - minimum));
+    LE_ASSUME(result >= minimum);
+    LE_ASSUME(result <= static_cast<signed>(maximum));
     return result;
 }
 

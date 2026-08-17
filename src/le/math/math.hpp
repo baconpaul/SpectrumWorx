@@ -185,21 +185,76 @@ struct IsPowerOfTwo : std::integral_constant<bool, (1 << LE::Utility::staticLog2
 
 inline bool isNormalisedValue(float const value) { return (value >= 0) && (value <= 1); }
 
-void rngSeed();
-/// \brief Seeds deterministically. Five shipped effects draw from this RNG, so
-/// a reproducible render -- a golden fixture, a bug report, an A/B against a
-/// reference build -- needs the sequence pinned. rngSeed() itself takes the
-/// clock and a stack address.
-///                                       (28.07.2026.) (SW port)
-void rngSeed(std::uint64_t seed);
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \class Rng
+///
+/// \brief xorshift128+, as a value rather than as a hidden global.
+///
+///   These were free functions over a file-static `rng_state[2]`, and the
+/// global was two bugs. The audible one: the engine runs every hop of channel 0
+/// before channel 1 starts (`Processor::process`), so cutting a host block into
+/// hop-sized calls does not change how many numbers are drawn but does change
+/// *which channel gets which*. Freqverb and Whisperer therefore rendered
+/// differently depending on the host's block size, for no reason a listener
+/// could name. \see issue #86 and core/chunkTransparencyTests.cpp.
+///
+///   The other: two plugin instances on two audio threads read-modify-wrote
+/// those two words with nothing between them, which is a data race and not
+/// merely a shared sequence.
+///
+/// \note An instance per *channel* is what fixes the first -- one stream per
+/// channel of one effect, advanced only by that channel's own hops, so the
+/// number of `process()` calls cannot reach it. They live in the effects'
+/// ChannelState objects, which is the per-channel thing an effect is already
+/// handed. \see Engine::ModuleDSP::seedRandomState().
+///
+/// \note **Constructs seeded, from entropy.** A fixed default state would have
+/// been the quiet version of the bug this class exists to remove: the engine
+/// deals streams at `reset()`, and a module inserted into a running chain is
+/// resized and reset without one -- so every instance that did that would have
+/// been drawing the same "random" numbers as every other. An unseeded generator
+/// must never be a shared constant. Deal over it whenever determinism is wanted;
+/// that is what `seed()` is for.
+///                                           (17.08.2026.)
+///
+////////////////////////////////////////////////////////////////////////////////
 
-float normalisedRand();
+class Rng
+{
+  public:
+    Rng() noexcept { seedFromEntropy(); }
 
-float rangedRand(float maximum);
-std::uint32_t rangedRand(std::uint32_t maximum);
-std::uint16_t rangedRand(std::uint16_t maximum);
-float rangedRand(float minimum, float maximum);
-std::int32_t rangedRand(std::int32_t minimum, std::uint32_t maximum);
+    /// \brief splitmix64, so that a small seed still fills both words.
+    void seed(std::uint64_t seed) noexcept;
+
+    /// \brief The clock and this object's own address -- distinct per generator
+    /// by construction, and distinct per run. Seeding from the clock is what has
+    /// always kept two instances on two tracks from producing the same noise.
+    /// \see issue #105, which is about offering the other choice.
+    void seedFromEntropy() noexcept;
+
+    /// \brief A raw draw, which is also what one generator uses to seed another.
+    std::uint64_t next() noexcept;
+
+    float normalised() noexcept; ///< [0, 1]
+
+    float ranged(float maximum) noexcept;                 ///< [0, maximum]
+    float ranged(float minimum, float maximum) noexcept;  ///< [minimum, maximum]
+    std::uint32_t ranged(std::uint32_t maximum) noexcept; ///< [0, maximum)
+    std::uint16_t ranged(std::uint16_t maximum) noexcept; ///< [0, maximum)
+    std::int32_t ranged(std::int32_t minimum, std::uint32_t maximum) noexcept;
+
+    /// \note A ChannelState holding one of these declares it as a plain member
+    /// and leaves it out of `members()`: it owns no engine storage, and a
+    /// stream that restarted from the top on every transport stop would be a
+    /// repeating noise pattern rather than a reset one. Seeding is the engine's
+    /// job, at a moment it chooses.
+    ///                                       (17.08.2026.)
+
+  private:
+    std::uint64_t state_[2];
+}; // class Rng
 
 template <class UnsignedInteger>
 UnsignedInteger roundUpUnsignedIntegerDivision(UnsignedInteger const dividend,

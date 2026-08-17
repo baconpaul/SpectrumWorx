@@ -163,7 +163,7 @@ void FreqverbImpl::process(ChannelState &cs, Engine::ChannelData_ReIm data,
         //...mrmlj...could be done with reim...http://en.wikipedia.org/wiki/Rotation_(mathematics)#Complex_numbers
         for (auto &phase : DataRange(data2.phases()).subspan(1))
         {
-            phase = rangedRand(Math::Constants::twoPi);
+            phase = cs.rng.ranged(Math::Constants::twoPi);
         }
 
         amph2ReIm(data2.full().amps().begin(), data2.full().phases().begin(),

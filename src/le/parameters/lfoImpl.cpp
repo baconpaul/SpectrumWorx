@@ -219,7 +219,7 @@ lfo_value_t convertToLFORange(Input const inputvalue)
                                     inputMinimum, inputMaximum - inputMinimum, 1>(inputvalue);
 }
 
-using LFOState = lfo_value_t[2];
+using LFOState = LFOImpl::WaveformState;
 
 lfo_value_t sine(lfo_value_t const position, LFOState &, bool /*newPeriodBegun*/)
 {
@@ -279,18 +279,18 @@ lfo_value_t exponent(lfo_value_t const position, LFOState &, bool /*newPeriodBeg
         result, 1.0f, e);
 }
 
-lfo_value_t randomWhacko(lfo_value_t /*position*/, LFOState &, bool /*newPeriodBegun*/)
+lfo_value_t randomWhacko(lfo_value_t /*position*/, LFOState &state, bool /*newPeriodBegun*/)
 {
-    return Math::normalisedRand();
+    return state.rng.normalised();
 }
 
 lfo_value_t randomHold(lfo_value_t const position, LFOState &state, bool const newPeriodBegun)
 {
     if (newPeriodBegun)
     {
-        state[0] = randomWhacko(position, state, newPeriodBegun);
+        state.values[0] = randomWhacko(position, state, newPeriodBegun);
     }
-    return state[0];
+    return state.values[0];
 }
 
 lfo_value_t randomSlide(lfo_value_t const position, LFOState &state, bool const newPeriodBegun)
@@ -299,13 +299,13 @@ lfo_value_t randomSlide(lfo_value_t const position, LFOState &state, bool const 
     LE_ASSUME(position <= 1);
     if (newPeriodBegun)
     {
-        lfo_value_t const oldTarget(state[0] + state[1]);
+        lfo_value_t const oldTarget(state.values[0] + state.values[1]);
         lfo_value_t const newTarget(randomWhacko(position, state, newPeriodBegun));
-        state[0] = newTarget - oldTarget;
-        state[1] = oldTarget;
+        state.values[0] = newTarget - oldTarget;
+        state.values[1] = oldTarget;
     }
 
-    return position * state[0] + state[1];
+    return position * state.values[0] + state.values[1];
 }
 
 lfo_value_t dirac(lfo_value_t /*position*/, LFOState &, bool const newPeriodBegun)
@@ -347,9 +347,11 @@ GetWaveformAmplitudeForPosition const lfoFunctions[] = {
 
 LFOImpl::LFOImpl()
 {
-    state_[0] = minimumValue;
-    state_[1] = 0;
+    state_.values[0] = minimumValue;
+    state_.values[1] = 0;
 }
+
+void LFOImpl::seed(std::uint64_t const seed) { state_.rng.seed(seed); }
 
 LFOImpl::value_type LFOImpl::getWaveformAmplitudeForPosition(value_type const position,
                                                              bool const newPeriodBegun) const

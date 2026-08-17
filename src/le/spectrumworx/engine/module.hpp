@@ -14,6 +14,7 @@
 //------------------------------------------------------------------------------
 #include "channelData_fwd.hpp"
 
+#include "le/math/math.hpp"
 #include "le/spectrumworx/effects/indexRange.hpp"
 #include "le/spectrumworx/engine/buffers.hpp"
 #include "le/spectrumworx/engine/moduleParameters.hpp"
@@ -91,6 +92,27 @@ class ModuleDSP : public LE::SW::Engine::ModuleParameters
     virtual void reset() = 0;
     virtual bool resize(StorageFactors const &) = 0;
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Gives every generator this module owns -- one per LFO, one per
+    /// channel of the effect -- its own stream, drawn from `source`.
+    ///
+    ///   Identity comes from the *order of the walk* rather than from anything a
+    /// module knows about itself: `ModuleChainImpl::resetAll()` visits the chain
+    /// in slot order and each module seeds its LFOs and then its channels, so
+    /// every (slot, channel) pair gets a different stream and no module has to be
+    /// told which slot it is in. Two Freqverbs in one chain therefore do not
+    /// share a tail, and channel 0 and channel 1 do not share a whisper.
+    ///
+    /// \note Before the block, never during it. What made Freqverb and Whisperer
+    /// depend on the host's block size was one generator shared by both channels,
+    /// advanced in whatever order the engine happened to visit them in. \see
+    /// issue #86 and Math::Rng.
+    ///                                       (17.08.2026.)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    void seedRandomState(Math::Rng &source);
+
   protected:
     ModuleDSP(ModuleParameters::EffectMetaData const &metaData, LFOPlaceholder *const pLFOs,
               float *const pUnmodulatedValues, std::uint8_t const *const pParameterOffsets,
@@ -114,6 +136,10 @@ class ModuleDSP : public LE::SW::Engine::ModuleParameters
   private:
     virtual void doPreProcess(Setup const &) = 0;
     virtual void doProcess(std::uint8_t channel, ChannelDataProxy, Setup const &) const = 0;
+
+    /// \brief The effect-specific half of seedRandomState(): one seed per
+    /// channel, for the effects whose ChannelState holds a generator.
+    virtual void doSeedChannelStates(Math::Rng &source) = 0;
 
   private:
     friend class LE::SW::Engine::ModuleParameters;

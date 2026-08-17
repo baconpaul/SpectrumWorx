@@ -13,6 +13,7 @@
 //------------------------------------------------------------------------------
 #include "freqverb.hpp"
 
+#include "le/math/math.hpp"
 #include "le/spectrumworx/effects/channelStateDynamic.hpp"
 #include "le/spectrumworx/effects/effects.hpp"
 #include "le/spectrumworx/effects/phase_vocoder/shared.hpp"
@@ -32,6 +33,13 @@ class FreqverbImpl : public EffectImpl<Freqverb>
         Engine::HalfFFTBuffer<> feedbackSumImags;
         PhaseVocoderShared::PitchShifter::ChannelState ps;
         auto members() { return std::tie(feedbackSumReals, feedbackSumImags, ps); }
+
+        /// \note Outside members(): it owns no engine storage, and reset() must
+        /// not restart the stream. The draws were global, which made the echo
+        /// depend on the host's block size. \see Math::Rng and issue #86.
+        Math::Rng rng;
+
+        void seed(std::uint64_t const seed) { rng.seed(seed); }
     };
 
     ////////////////////////////////////////////////////////////////////////////

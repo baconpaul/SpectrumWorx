@@ -63,12 +63,12 @@ void BurritoImpl::process(ChannelState &channelState, Engine::MainSideChannelDat
             channelState.positions.clear();
 
             // Random number of new replacements (limited to range_):
-            IndexRange::value_type const range(Math::rangedRand(range_));
+            IndexRange::value_type const range(channelState.rng.ranged(range_));
             IndexRange::value_type const numBins(data.numberOfBins());
             for (IndexRange::value_type k(0); k < range; ++k)
             {
                 // Random replacement positions:
-                IndexRange::value_type const x(Math::rangedRand(numBins));
+                IndexRange::value_type const x(channelState.rng.ranged(numBins));
                 channelState.positions[x] = true;
             }
         }
