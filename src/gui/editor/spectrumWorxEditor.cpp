@@ -203,6 +203,11 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost, PanelPlacement co
     /// \note Whatever the mailbox has been accumulating with no editor open is
     /// not this editor's news: it starts from what the widgets were built with.
     editorHost_.modulatedValues().discardChanges();
+
+    /// \note Likewise: the bar is about to be painted from the engine, so record
+    /// what it will say rather than letting the first tick call it a change.
+    engineState_ = currentEngineState();
+
     startTimerHz(modulationRefreshHz);
 
     // Last: nothing may reach a half-built editor.
@@ -1287,20 +1292,55 @@ juce::String SpectrumWorxEditor::buildStampText()
     return juce::String(BuildStamp::date) + "  " + BuildStamp::time + "  " + BuildStamp::commit;
 }
 
+SpectrumWorxEditor::EngineState SpectrumWorxEditor::currentEngineState() const
+{
+    auto const &core(editorHost().core());
+    return {core.getSampleRate(), core.numberOfInputChannels(), core.numberOfSideChannels(),
+            core.numberOfOutputChannels()};
+}
+
+/// \see the note on the declaration.
+juce::String SpectrumWorxEditor::engineStateText() const
+{
+    auto const state(currentEngineState());
+
+    /// \note "no rate" rather than "0 Hz": before a host has activated the
+    /// plugin there is no answer, and a zero would read as one.
+    juce::String rate("no rate");
+    if (state.sampleRate > 0)
+        rate = juce::String(state.sampleRate,
+                            (state.sampleRate == std::floor(state.sampleRate)) ? 0 : 1) +
+               " Hz";
+
+    return rate + "  " + juce::String(int{state.mainChannels}) + "main," +
+           juce::String(int{state.sideChannels}) + "side in, " +
+           juce::String(int{state.outputChannels}) + "main out";
+}
+
+juce::Rectangle<int> SpectrumWorxEditor::buildStampBar() const
+{
+    return {0, artworkHeight, getWidth(), buildStampHeight};
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \note Painted rather than a juce::Label, and painted from the editor rather
-/// than by a child component, because it has no behaviour at all: it never
-/// changes for the life of the process, takes no mouse, and must not be able to
-/// take focus away from a knob. Everything a child would add here is a thing
-/// that can go wrong.
+/// than by a child component, because it has no behaviour at all: it takes no
+/// mouse and must not be able to take focus away from a knob. Everything a child
+/// would add here is a thing that can go wrong.
 ///                                           (06.08.2026.) (SW port)
+///
+/// \note Two readouts, and they answer different questions. The build stamp on
+/// the left is fixed for the life of the process; the engine state on the right
+/// is whatever the plugin currently believes it is running at, and a host can
+/// move it under an open editor. `timerCallback()` is what notices.
+///                                           (17.08.2026.)
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
 void SpectrumWorxEditor::paintBuildStamp(juce::Graphics &graphics) const
 {
-    juce::Rectangle<int> const bar(0, artworkHeight, getWidth(), buildStampHeight);
+    auto const bar(buildStampBar());
 
     graphics.setColour(juce::Colours::black);
     graphics.fillRect(bar);
@@ -1310,7 +1350,10 @@ void SpectrumWorxEditor::paintBuildStamp(juce::Graphics &graphics) const
     /// readable when looked for and quiet when not.
     graphics.setColour(Theme::blueColour());
     graphics.setFont(juce::Font(juce::FontOptions(regularTypeface()).withHeight(11.0f)));
-    graphics.drawText(buildStampText(), bar.reduced(8, 0), juce::Justification::centredLeft);
+
+    auto const text(bar.reduced(8, 0));
+    graphics.drawText(buildStampText(), text, juce::Justification::centredLeft);
+    graphics.drawText(engineStateText(), text, juce::Justification::centredRight);
 }
 
 void SpectrumWorxEditor::buttonClicked(juce::Button *const pButton)
@@ -2296,7 +2339,19 @@ void SpectrumWorxEditor::parameterChangedElsewhere(ParameterID const parameterID
     }
 }
 
-void SpectrumWorxEditor::timerCallback() { pumpModulatedValues(); }
+void SpectrumWorxEditor::timerCallback()
+{
+    pumpModulatedValues();
+
+    /// \note Compared as numbers rather than as the formatted line, so the common
+    /// case -- nothing moved -- costs three loads and no allocation. Only the bar
+    /// is repainted; the skin above it has not changed.
+    if (auto const state(currentEngineState()); state != engineState_)
+    {
+        engineState_ = state;
+        repaint(buildStampBar());
+    }
+}
 
 void SpectrumWorxEditor::pumpModulatedValues()
 {

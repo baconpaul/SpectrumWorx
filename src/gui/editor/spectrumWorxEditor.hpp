@@ -567,10 +567,63 @@ class SpectrumWorxEditor final : private SkinLifetime,
     ////////////////////////////////////////////////////////////////////////////
     static juce::String buildStampText();
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The other end of the same bar: what the engine currently believes
+    /// it is running at -- sample rate, and how many channels in and out.
+    ///
+    ///   Reads `2main,0side in, 2main out`. The side count is spelt out rather
+    /// than folded into a total, because it is the interesting one and a sum
+    /// hides it: `4 in` could be four main channels or two and a side chain, and
+    /// those are different plugins.
+    ///
+    ///   Whether the host actually *patched* anything into that port is a
+    /// different question and a per-block one -- `SpectrumWorxCLAP::runEngine()`
+    /// decides it from `clap_audio_buffer::constant_mask` every callback and
+    /// falls back to the main input -- so it is deliberately not claimed here.
+    /// What this says is what the engine is *configured* for.
+    ///
+    /// \note Live, where buildStampText() is fixed for the life of the process:
+    /// a host can change the sample rate or the layout under an open editor, so
+    /// `timerCallback()` watches for it. \see currentEngineState().
+    ///                                       (17.08.2026.)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    juce::String engineStateText() const;
+
   private:
-    /// \brief Fills the buildStampHeight strip under the artwork and writes
-    /// buildStampText() into it. \see artworkHeight.
+    /// \brief Fills the buildStampHeight strip under the artwork with
+    /// buildStampText() to the left and engineStateText() to the right.
+    /// \see artworkHeight.
     void paintBuildStamp(juce::Graphics &) const;
+
+    /// \brief The strip itself, so that a repaint can name it rather than the
+    /// whole editor. \see artworkHeight.
+    juce::Rectangle<int> buildStampBar() const;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief What engineStateText() is drawn from, as numbers -- so the timer
+    /// can ask "has this moved" without formatting a string thirty times a
+    /// second.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    struct EngineState
+    {
+        float sampleRate{0};
+        std::uint8_t mainChannels{0};
+        std::uint8_t sideChannels{0};
+        std::uint8_t outputChannels{0};
+
+        bool operator==(EngineState const &) const = default;
+    }; // struct EngineState
+
+    EngineState currentEngineState() const;
+
+    /// What the bar was last repainted for. Only ever compared, never drawn --
+    /// paintBuildStamp() reads the engine, so a repaint from any other cause
+    /// still shows the truth rather than this.
+    EngineState engineState_;
 
   private: // JUCE Component overrides.
     /// \note Only what is outside the skin: the panel column's chrome and the

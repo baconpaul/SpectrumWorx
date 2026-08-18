@@ -37,6 +37,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <set>
+#include <string>
 //------------------------------------------------------------------------------
 namespace
 {
@@ -136,4 +137,45 @@ TEST_CASE("The stamp names a date, a time and a commit", "[gui][buildstamp]")
     CHECK(line.contains(date));
     CHECK(line.contains(time));
     CHECK(line.contains(commit));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief The other end of the bar: what the plugin believes it is running at.
+///
+/// \note The channel count is the reason this is worth drawing, and the side
+/// count is spelt out rather than summed into the input total: `4 in` could be
+/// four main channels or two and a side chain, and those are different plugins.
+///
+/// \note What the readout deliberately does not claim is whether the host
+/// patched anything into that port. `runEngine()` decides that per block from
+/// `clap_audio_buffer::constant_mask` and falls back to the main input, so it is
+/// not a property of the configuration at all -- which is also why this case
+/// asserts against the engine rather than against a literal.
+///                                           (17.08.2026.)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("The bar says the rate and the channel layout", "[gui][buildstamp]")
+{
+    SWTest::HostSideJuce const juce;
+    SWTest::Instance instance;
+    instance.openEditor(Editor::PanelPlacement::overlay);
+
+    auto const line(instance.editor().engineStateText());
+    INFO("engine state line: " << line);
+
+    /// The harness configures 48 kHz, and a whole rate is drawn without a
+    /// decimal point -- "48000 Hz" rather than "48000.0 Hz".
+    CHECK(line.contains("48000 Hz"));
+
+    /// \note Built from the engine rather than written out, so this says "the
+    /// bar reports the configuration" rather than "the harness is stereo" --
+    /// which is the claim worth making and the one that survives the harness
+    /// being reconfigured.
+    auto const &core(instance.core());
+    auto const layout(std::to_string(core.numberOfInputChannels()) + "main," +
+                      std::to_string(core.numberOfSideChannels()) + "side in, " +
+                      std::to_string(core.numberOfOutputChannels()) + "main out");
+    CHECK(line.contains(layout.c_str()));
 }
