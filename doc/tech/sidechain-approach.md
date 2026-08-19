@@ -32,24 +32,32 @@ lives, and it is deliberately *not* a parameter — see §5.
 
 ```
 File, and a sample is loaded?     -> the sample's chunks
-Host, and the port carries signal -> process->audio_inputs[ 1 ]
+Host, and there is a port to read -> process->audio_inputs[ 1 ]
 otherwise                         -> the main input
 ```
 
-**Every fallback is the main input, never silence.** A Blender with nothing
-patched blends the signal with itself; that is the documented behaviour and
-`effect_contract.md` §1.8 is where an effect author meets it. An effect cannot
-tell the three apart — `data.side()` is the same span whichever filled it — which
-is what makes the selection a routing decision rather than a DSP one.
+**Every fallback is the main input, never silence** — and there are exactly two
+of them, both structural: no second port in the count at all, and a second port
+with no `data32`. A Blender in a host that offers no side chain blends the signal
+with itself; that is the documented behaviour and `effect_contract.md` §1.8 is
+where an effect author meets it. An effect cannot tell the three sources apart —
+`data.side()` is the same span whichever filled it — which is what makes the
+selection a routing decision rather than a DSP one.
 
-`Host` has three ways to carry no signal, and the third is the only one a real
-DAW produces: no second port in the count, a second port with no `data32`, and a
-second port whose channels the host declares constant and zero through
-`clap_audio_buffer::constant_mask`. The mask is a *hint* and a host that sets none
-is indistinguishable from one carrying real silence — issue #13 is still open on
-whether any host sets one at all. **That unreliability is now confined to one
-arm.** It decides between the port and the main input, and it can no longer
-decide against a file the user loaded, which is what it did until 18.08.2026.
+**Past those two the port is read, whatever is in it.** A user who selects `Host`
+in a host that offers a port and patches nothing into it hears the silence that
+host handed over, not the main input. That is a real consequence and it is the
+chosen one: the plugin infers nothing about routing from the samples it is given.
+
+A third arm read `clap_audio_buffer::constant_mask` between 09.08.2026 and
+19.08.2026, taking a port declared constant and zero as unpatched. It is gone
+(issue #117). The mask is a *hint*, no host was found setting one (issue #13,
+measured in a DAW — so the arm was never once taken), and it cannot tell an
+unpatched port from a patched send that has gone quiet: both are a constant zero,
+so a muted send audibly swapped the side chain for the main input and swapped
+back when it un-muted. Whether a port is connected is a fact for the host to
+state — `audio-ports-activation` is where it does — and until the plugin asks for
+that, it does not guess. Issue #115 is where the user gets told.
 
 ### Two states that cannot occur
 

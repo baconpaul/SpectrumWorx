@@ -750,25 +750,10 @@ class ActivePlugin
         sideChainPortPresent_ = true;
     }
 
-    ////////////////////////////////////////////////////////////////////////////
-    ///
-    /// \brief What the host declares about the side-chain port's channels, as a
-    /// `clap_audio_buffer::constant_mask`.
-    ///
-    /// \note Zero -- no claim at all -- is the default, and is what most hosts
-    /// and the shipped clap-wrapper are assumed to hand over: the mask is a hint
-    /// and nothing obliges anyone to set it. A case that sets one is testing the
-    /// arm that reads it. Note that a host setting a bit has undertaken to fill
-    /// the channel with the constant, so a case must fill the buffer to match.
-    ///
-    ////////////////////////////////////////////////////////////////////////////
-    void declareSideChainConstant(std::uint64_t const mask) { sideChainConstantMask_ = mask; }
-
     void disconnectSideChain()
     {
         pSideChainLeft_ = pSideChainRight_ = nullptr;
         sideChainPortPresent_ = false;
-        sideChainConstantMask_ = 0;
     }
 
     /// Runs one block of stereo audio through, in place of a host's callback.
@@ -812,7 +797,7 @@ class ActivePlugin
         /// nonsense one.
         clap_audio_buffer inputs[]{
             {&inputChannels[0], nullptr, 2, 0, 0},
-            {pSideChainLeft_ ? &sideChannels[0] : nullptr, nullptr, 2, 0, sideChainConstantMask_}};
+            {pSideChainLeft_ ? &sideChannels[0] : nullptr, nullptr, 2, 0, 0}};
         clap_audio_buffer output{&outputChannels[0], nullptr, 2, 0, 0};
 
         clap_process process{};
@@ -964,7 +949,6 @@ class ActivePlugin
     std::vector<float> *pSideChainLeft_{nullptr};
     std::vector<float> *pSideChainRight_{nullptr};
     bool sideChainPortPresent_{false};
-    std::uint64_t sideChainConstantMask_{0};
 }; // class ActivePlugin
 
 inline clap_plugin_params const &parameters(clap_plugin const &plugin)

@@ -397,36 +397,25 @@ TEST_CASE("What a host puts on the side chain port reaches the engine", "[clap][
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \note The fourth arrangement, and the one every real host actually hands
-    /// over: a port with buffers the host owns and nothing patched into it. No
-    /// pointer distinguishes it from a connected one, which is why the documented
-    /// "an unpatched side chain is the main input" behaviour was unreachable
-    /// until `clap_audio_buffer::constant_mask` was read.
+    /// over: a port with buffers the host owns and nothing patched into them. No
+    /// pointer distinguishes it from a connected one and **nothing here tries
+    /// to** -- a port carrying zeroes is a side chain carrying silence, which is
+    /// all the host has said about it.
     ///
-    ///   Zeroed buffers *and* a mask declaring them constant, because a host that
-    /// sets a bit has undertaken to fill the channel with the constant. Setting
-    /// only one of the two would be testing a host that does not exist.
+    ///   `clap_audio_buffer::constant_mask` was read here until 19.08.2026, to
+    /// make this arrangement land on the main input the way the two structural
+    /// ones do. \see issue #117 for why a hint no host sets cannot answer a
+    /// routing question.
     ///
     ////////////////////////////////////////////////////////////////////////////
-    auto const declaredSilent(run(
-        [](ActivePlugin &plugin, std::vector<float> &left, std::vector<float> &right) {
-            plugin.connectSideChain(left, right);
-            plugin.declareSideChainConstant(0b11);
-        },
-        0.0f));
-
-    /// \note The same zeroed buffers with no claim made about them, which is
-    /// every host that does not set the mask -- the hint is optional and neither
-    /// clap-wrapper nor a given DAW is known to set it. This one has to keep
-    /// behaving exactly as it did: silence on the port is silence in the engine.
-    auto const silentButUndeclared(
+    auto const silentPort(
         run([](ActivePlugin &plugin, std::vector<float> &left,
                std::vector<float> &right) { plugin.connectSideChain(left, right); },
             0.0f));
 
     REQUIRE(noPort.size() == connected.size());
     REQUIRE(noPort.size() == emptyPort.size());
-    REQUIRE(noPort.size() == declaredSilent.size());
-    REQUIRE(noPort.size() == silentButUndeclared.size());
+    REQUIRE(noPort.size() == silentPort.size());
 
     // A carrier the engine could not have got from the main input changed what
     // came out. This is the whole case: without it, every arrangement below is
@@ -436,26 +425,26 @@ TEST_CASE("What a host puts on the side chain port reaches the engine", "[clap][
 
     ////////////////////////////////////////////////////////////////////////////
     ///
-    /// \note And every way of not filling the port lands on the *same* fallback,
-    /// bit for bit. `runEngine()` reads the port count, `data32` and now the
-    /// constant mask, so a host that declares one port, a host that declares two
-    /// and fills one, and a host that declares two and says the second is a
-    /// constant zero all have to be indistinguishable. The middle one is the arm
-    /// that would have dereferenced null had the `&&` been the other way round.
+    /// \note Both *structural* ways of having no port land on the same fallback,
+    /// bit for bit. `runEngine()` reads the port count and `data32` and nothing
+    /// else, so a host that declares one port and a host that declares two and
+    /// hands over no buffers for the second have to be indistinguishable. The
+    /// second is the arm that would have dereferenced null had the `&&` been the
+    /// other way round.
     ///
     ////////////////////////////////////////////////////////////////////////////
     CHECK(emptyPort == noPort);
-    CHECK(declaredSilent == noPort);
 
     ////////////////////////////////////////////////////////////////////////////
     ///
-    /// \note And the mask is the *whole* of what distinguishes them: the same
-    /// zeroed buffers with nothing declared about them are a connected side chain
-    /// carrying silence, and that is not the main input. A host that sets no mask
-    /// therefore gets what it always got.
+    /// \note And a port that *is* there, carrying silence, is not the main input.
+    /// That is the whole of what this plugin infers about routing from the
+    /// samples it was handed: nothing. Whether an unpatched port ought to sound
+    /// like the main input is a question for `audio-ports-activation`, where the
+    /// host answers it instead of being guessed at. \see issues #115 and #117.
     ///
     ////////////////////////////////////////////////////////////////////////////
-    CHECK(silentButUndeclared != noPort);
+    CHECK(silentPort != noPort);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
