@@ -133,11 +133,20 @@ std::uint16_t Setup::frequencyPercentageToBin(std::uint8_t const percentage) con
     return static_cast<std::uint16_t>(result);
 }
 
+/// \note Clamped rather than asserted, for the same reason hzToNormalisedFrequency()
+/// below is. A parameter's range is fixed in Hz -- Octaver's `Low pass` reaches
+/// 16 kHz -- and the sample rate is the host's to choose, so a parameter at rest
+/// can sit above Nyquist without anybody having done anything wrong. Every caller
+/// already clamped the result into its working range; the assertion was the only
+/// thing that minded.
+///                                           (19.08.2026.) (SW port)
 std::uint16_t Setup::frequencyInHzToBin(std::uint32_t const frequency) const
 {
     auto const maximumFrequency(sampleRate<unsigned int>() / 2);
-    LE_ASSERT_MSG(frequency <= maximumFrequency, "Frequency out of range.");
-    return static_cast<std::uint16_t>((numberOfBins() - 1) * frequency / maximumFrequency);
+    auto const lastBin(numberOfBins() - 1);
+    if (frequency >= maximumFrequency) // also the not-yet-configured sample rate of zero
+        return static_cast<std::uint16_t>(lastBin);
+    return static_cast<std::uint16_t>(lastBin * frequency / maximumFrequency);
 }
 
 float Setup::normalisedFrequencyToHz(float const normalisedFrequency) const

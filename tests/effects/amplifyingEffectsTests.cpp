@@ -550,10 +550,11 @@ enum Octave : int
     twoUp = 4
 };
 
-/// \note The cutoff is a low pass over the *output*, and it defaults to 350 Hz
-/// -- so an Octaver left alone removes everything above 350 Hz including the
-/// octave it just added. Every case here opens it, which is the only way to
-/// measure what the effect does rather than what its default filter does.
+/// \note The cutoff is a low pass over the *output*, so an Octaver whose cutoff
+/// sits below the octave it just added removes it again. It defaulted to 350 Hz
+/// until 19.08.2026 and every case below had to open it to measure the effect
+/// rather than the filter; they still set it, explicitly, because a property
+/// about the octave should not silently become a property about the default.
 constexpr float openCutoff{16000};
 } // anonymous namespace
 
@@ -630,10 +631,11 @@ TEST_CASE("An octaver's gain decides how much octave there is", "[effects][prope
 
 TEST_CASE("An octaver's cutoff is a low pass on what comes out", "[effects][property][octave]")
 {
-    /// \note Worth its own case because the parameter is called "Low pass" in
-    /// the editor and `CutoffFrequency` in the source, and because its default
-    /// of 350 Hz silently removes most of what the effect produces -- which is
-    /// the sort of thing that reads as "the octaver is broken".
+    /// \note Worth its own case because the parameter is called "Lowpass" in the
+    /// editor, "Low pass" in a preset and `CutoffFrequency` in the source, and
+    /// because it is the one control here that can silently remove everything the
+    /// effect produces. It defaulted low enough to do exactly that until
+    /// 19.08.2026 -- issue #15 -- so this pins the direction rather than a value.
     constexpr double input{220};
     auto const signal(tone(input, oneSecond));
 
@@ -648,6 +650,37 @@ TEST_CASE("An octaver's cutoff is a low pass on what comes out", "[effects][prop
 
     // 300 Hz is below the added octave at 440 and below the input at 220.
     CHECK(withCutoff(300) < (0.1 * withCutoff(openCutoff)));
+}
+
+TEST_CASE("An octaver renders where its cutoff is above Nyquist",
+          "[effects][property][octave][issue-15]")
+{
+    /// \note The one case here that renders at *default* parameters, and it is
+    /// here for the checked build specifically. `Low pass` reaches 16 kHz and
+    /// since 19.08.2026 rests there, while Nyquist at 22.05 kHz is 11 kHz -- so
+    /// an Octaver nobody has touched now asks for a cutoff above the spectrum it
+    /// is filtering. `Setup::frequencyInHzToBin()` asserted that this could not
+    /// happen; every caller already clamped the bin into its own working range,
+    /// so a release build was unaffected and a checked one aborted on a module
+    /// doing nothing wrong. Reproduced by reverting the clamp before it was
+    /// written: this case aborts, and the golden suite -- which skips in a
+    /// checked build -- could not have caught it.
+    ///
+    /// \note 22.05 kHz rather than a contrived rate: it is an ordinary host
+    /// setting, and the other eight callers of frequencyInHzToBin() reach the
+    /// same edge from their own defaults at a low enough rate.
+    constexpr SWTest::RenderSetup lowRate{1024, 4, channels, 22050, 256};
+
+    /// The tone is generated at the file's 44.1 kHz and played out at half that,
+    /// so it sounds an octave high. Irrelevant here -- what is being asked is
+    /// whether the render happens at all, and whether the cutoff at the top of
+    /// the range still passes the signal rather than clamping to nothing.
+    auto const input(tone(220, oneSecond / 4));
+    auto const rendered(renderOne("Octaver", input, {}, lowRate));
+
+    REQUIRE_FALSE(rendered.empty());
+    CHECK(allFinite(rendered));
+    CHECK(rms(rendered) > 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

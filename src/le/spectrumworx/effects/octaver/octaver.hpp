@@ -46,7 +46,7 @@ struct Octaver
     LE_DEFINE_PARAMETER(GainOctave2, LinearFloat, Minimum<-48>, Maximum<+24>, Default<0>,
                         Unit<" dB">);
     LE_DEFINE_PARAMETER(CutoffFrequency, LinearUnsignedInteger, Minimum<0>, Maximum<16000>,
-                        Default<350>, Unit<" Hz">);
+                        Default<16000>, Unit<" Hz">);
     LE_DEFINE_PARAMETERS(Octave1, GainOctave1, Octave2, GainOctave2, CutoffFrequency);
 
     /// \typedef Octave1
@@ -70,7 +70,13 @@ struct Octaver
     /// \typedef GainOctave2
     /// \brief Controls the second octave's gain.
     /// \typedef CutoffFrequency
-    /// \brief Controls the cut-off frequency for both octaves.
+    /// \brief Low passes the module's *output* -- the added octaves and the
+    ///        signal they were mixed into alike, rather than the octaves alone.
+    /// \note Defaulted to 350 Hz until 19.08.2026, which meant an Octaver
+    ///       dropped into a slot removed most of what it had just added: the
+    ///       up-octave of anything above F3 was cut. It now rests at its maximum.
+    ///       No 2.x preset moves with it -- that grammar writes every parameter
+    ///       an effect has, so a file naming an Octaver names this too. Issue #15.
 
     static char const title[];
     static char const description[];

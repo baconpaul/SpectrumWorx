@@ -223,7 +223,7 @@ effect/Octaver/05 | enum | 0 | 4 | 0 ;; Octave 1 | [] | -2;-1;0;+1;+2
 effect/Octaver/06 | float | -48 | 24 | 0 ;; Gain 1 | [ dB]
 effect/Octaver/07 | enum | 0 | 4 | 0 ;; Octave 2 | [] | -2;-1;0;+1;+2
 effect/Octaver/08 | float | -48 | 24 | 0 ;; Gain 2 | [ dB]
-effect/Octaver/09 | int | 0 | 16000 | 350 ;; Lowpass | [ Hz]
+effect/Octaver/09 | int | 0 | 16000 | 16000 ;; Lowpass | [ Hz]
 effect/PVD_start/00 | bool | 0 | 1 | 0 ;; Bypass | []
 effect/PVD_start/01 | float | -20 | 20 | 0 ;; Gain | [ dB]
 effect/PVD_start/02 | float | 0 | 100 | 100 ;; Wet | [ %]
@@ -364,7 +364,7 @@ effect/Slicer/03 | float | 0 | 1 | 0 ;; Start frequency | [ Hz]
 effect/Slicer/04 | float | 0 | 1 | 1 ;; Stop frequency | [ Hz]
 effect/Slicer/05 | int | 10 | 1000 | 250 ;; On Time | [ ms]
 effect/Slicer/06 | int | 10 | 1000 | 100 ;; Slice Time | [ ms]
-effect/Slicer/07 | enum | 0 | 2 | 0 ;; Slice Content | [] | S&H;Silence;Sidechain
+effect/Slicer/07 | enum | 0 | 2 | 0 ;; Slice Content | [] | Sample&Hold;Silence;Sidechain
 effect/Smoother/00 | bool | 0 | 1 | 0 ;; Bypass | []
 effect/Smoother/01 | float | -20 | 20 | 0 ;; Gain | [ dB]
 effect/Smoother/02 | float | 0 | 100 | 100 ;; Wet | [ %]
