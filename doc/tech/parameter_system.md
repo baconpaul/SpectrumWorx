@@ -410,21 +410,46 @@ actually shipped:
 
 ### An enumerated parameter's rows are not its values
 
-`DiscreteValues<Parameter>::strings` maps a value to its name, and the plugin's
-own combo box is filled from it in declaration order — with one exception, and
-the exception is the rule worth knowing. Tune Worx's `Key` is declared `A` first,
-because the value **is** the index: it is what a `.swp` stores, what a host
-automates, and what the DSP adds to a note offset counted up from a 27.5 Hz A
-(`musicalScales.cpp`). Reordering the enumerators would have silently retuned
-every preset that names a key. A chromatic scale nevertheless reads from C, so
-`fillComboBoxForParameter< Key >` (`gui/modules/moduleWidgets.cpp`) lists the same
-twelve values from C, each row carrying its own — the rows move, the values do
-not (issue #89, 17.08.2026; pinned by `tests/gui/discreteParameterTests.cpp`).
+`DiscreteValues<Parameter>::strings` maps a value to its name, and a value **is**
+its own index: it is what a `.swp` stores, what a host automates and what the DSP
+switches on. So the declaration order is ABI and cannot move. The order a menu
+reads down is a different question, and `MenuOrder<Parameter>` (`uiElements.hpp`)
+is where the different answer goes:
 
-An explicit specialisation of `fillComboBoxForParameter<>` is how that is said,
-and it has to be **declared before the point of instantiation**. There is one
-such point — `WidgetInitialiser` in `moduleWidgets.cpp`, which is also where
-`ModuleKnob::QuantizationFor< PitchMagnet::Target >` lives for the same reason.
+```cpp
+EFFECT_ENUMERATED_PARAMETER_MENU_ORDER( CommonParameters, Mode,
+    Magnitudes, Phases, Both )
+```
+
+Values, not pairs — this list says nothing about what a value is called, only
+about where it sits. `MenuOrder` is empty by default and `menuOrder<Parameter>()`
+then hands back `0, 1, 2 …`, exactly as `ShortValues` / `shortValueStrings()` do
+below, so a parameter that has not been given an order is listed as declared.
+Every row carries its value as its combo box item **ID**, so nothing under the UI
+notices: the rows move, the values do not.
+
+What is checked, at compile time and by name, is that the list is a permutation
+rather than a rewrite. A repeated value costs the one it displaced — a value no
+row offers and nothing else in the build would miss — so `Detail::menuOrderValues`
+throws out of a `consteval`, in the shape `valueStrings()` uses for the same
+reason.
+
+The two that have one as of 19.08.2026:
+
+| Parameter | Declared | Listed | Why |
+|---|---|---|---|
+| `CommonParameters::Mode` | Both, Magnitudes, Phases | Magnitudes, Phases, Both | the two things a target is, then the one that is both; `Both` is zero because it is the default and because that is what every file since 2011 calls zero. Shared by Ethereal, Inserter and Swappah — one declaration, three menus |
+| `TuneWorx::Key` | A … G♯ | C … B | the value is a semitone count up from a 27.5 Hz A (`musicalScales.cpp`), so A stays zero; a musician reads a chromatic scale from C (issue #89) |
+
+`Key` was an explicit specialisation of `fillComboBoxForParameter<>` in
+`moduleWidgets.cpp` until 19.08.2026, which worked but had to be **declared
+before the point of instantiation** and so could only live in the one translation
+unit that builds module widgets. A `MenuOrder` specialisation goes in the header
+beside the parameter like every other one of these. `fillComboBoxForParameter<>`
+is still the customisation point for a combo box that is not a list of values at
+all — `Engine::OverlapFactor` in `spectrumWorxEditor.cpp` is the remaining one.
+
+Both are pinned by `tests/gui/discreteParameterTests.cpp`.
 
 ### A value may be read differently from how it is listed
 

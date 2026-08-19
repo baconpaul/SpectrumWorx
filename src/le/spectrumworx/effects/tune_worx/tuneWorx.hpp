@@ -159,9 +159,8 @@ EFFECT_PARAMETER_NAME(Detail::TuneWorxBase::Semi12, "12")
 /// \note **The order here is the parameter's, and the order the menu shows is
 /// not.** A value is an index: it is what a `.swp` stores, what a host automates
 /// and what the DSP adds to a note offset off a 27.5 Hz A
-/// (musicalScales.cpp:109), so A stays zero. What starts at C is the combo box,
-/// which lists the same twelve values in musical order --
-/// `fillComboBoxForParameter< Key >` in gui/modules/moduleWidgets.cpp.
+/// (musicalScales.cpp:109), so A stays zero. What starts at C is the menu, which
+/// is what the MENU_ORDER list below says. \see Parameters::MenuOrder.
 ///                                           (17.08.2026.)
 ///
 ////////////////////////////////////////////////////////////////////////////////
@@ -179,6 +178,10 @@ EFFECT_ENUMERATED_PARAMETER_STRINGS(Detail::TuneWorxBase, Key,
     {Fis, "F#/Gb"},
     {G, "G"},
     {Gis, "G#/Ab"})
+
+/// \note The same twelve, read down as a musician reads a chromatic scale.
+EFFECT_ENUMERATED_PARAMETER_MENU_ORDER(Detail::TuneWorxBase, Key, C, Cis, D, Dis, E, F, Fis, G, Gis,
+                                       A, Ais, B)
 
 } // namespace LE::SW::Effects
 

@@ -77,6 +77,8 @@ template <class Parameter> struct Name;
 /// \see issue #120.
 template <class Parameter>
 constexpr typename DiscreteValues<Parameter>::Strings const &shortValueStrings();
+/// \note The same, for the order the rows come in. \see MenuOrder.
+template <class Parameter> constexpr typename DiscreteValues<Parameter>::Order const &menuOrder();
 } // namespace Parameters
 
 namespace SW
@@ -1263,8 +1265,14 @@ void addPowerOfTwoValueStringsToComboBox(unsigned int firstValue, unsigned int l
 /// \note Two lists of the same length: what the menu lists each value under and
 /// what the box reads once it is chosen. They are the same array for every
 /// parameter that has not been given abbreviations. \see issue #120.
+///
+/// \note Both are indexed by *value*, and \p menuOrder says which value each row
+/// holds -- declaration order for almost every parameter, and its own list for
+/// the ones given a MenuOrder. An item carries its value as its ID, so nothing
+/// downstream reads a row number.
 void addEnumeratedParameterValueStringsToComboBox(LE::Utility::Span<char const *const> strings,
                                                   LE::Utility::Span<char const *const> shortStrings,
+                                                  LE::Utility::Span<std::uint8_t const> menuOrder,
                                                   ComboBox &comboBox);
 
 template <class Parameter>
@@ -1278,7 +1286,8 @@ void fillComboBoxForParameter(ComboBox &comboBox, LE::Parameters::EnumeratedPara
 {
     addEnumeratedParameterValueStringsToComboBox(
         LE::Utility::makeSpan(LE::Parameters::DiscreteValues<Parameter>::strings),
-        LE::Utility::makeSpan(LE::Parameters::shortValueStrings<Parameter>()), comboBox);
+        LE::Utility::makeSpan(LE::Parameters::shortValueStrings<Parameter>()),
+        LE::Utility::makeSpan(LE::Parameters::menuOrder<Parameter>()), comboBox);
 }
 } // namespace Detail
 

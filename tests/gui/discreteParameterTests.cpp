@@ -26,6 +26,7 @@
 #include "gui/modules/moduleUI.hpp"
 
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
+#include "le/spectrumworx/effects/ethereal/ethereal.hpp"
 #include "le/spectrumworx/effects/tune_worx/tuneWorx.hpp"
 #include "le/spectrumworx/effects/vaxateer/vaxateer.hpp"
 
@@ -159,6 +160,85 @@ TEST_CASE("Every black key is named both ways", "[gui][modules][combo]")
     CHECK(std::string(names[Key::E]) == "E");
     CHECK(std::string(names[Key::F]) == "F");
     CHECK(std::string(names[Key::G]) == "G");
+}
+
+TEST_CASE("A shared target is listed in the order it is chosen in", "[gui][modules][combo]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note `CommonParameters::Mode` is declared Both, Magnitudes, Phases and
+    /// listed Magnitudes, Phases, Both: the two things it can be, and then the
+    /// one that is both of them. Zero stays Both because zero is the default and
+    /// because that is what every preset and automation lane written since 2011
+    /// calls it -- so the rows move and the values do not, which is the whole of
+    /// what `MenuOrder` is for.
+    ///
+    ///   The specialisation is on the shared parameter rather than on an effect,
+    /// so it is one declaration for the three effects that take it. Ethereal is
+    /// the one asked here; Inserter and Swappah get the same menu.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    SWTest::HostSideJuce const juceIsUp;
+
+    SWTest::Instance instance;
+    instance.openEditor();
+
+    auto &strip(stripFor(instance.editor(), "Ethereal"));
+
+    using Mode = Effects::Ethereal::Mode;
+    auto &comboBox(
+        comboBoxFor(strip, Parameters::IndexOf<Effects::Ethereal::Parameters, Mode>::value));
+
+    std::vector<Mode::value_type> const expected{Mode::Magnitudes, Mode::Phases, Mode::Both};
+
+    REQUIRE(comboBox.numberOfItems() == expected.size());
+
+    auto const &names(Parameters::DiscreteValues<Mode>::strings);
+    for (unsigned int row(0); row < expected.size(); ++row)
+    {
+        INFO("row " << row);
+        auto const value(expected[row]);
+        CHECK(comboBox.getItemText(row) == juce::String(names[value]));
+
+        // The row's own value, which is what selecting it writes.
+        comboBox.setSelectedIndex(row);
+        CHECK(comboBox.getSelectedID() == value);
+    }
+
+    CHECK(comboBox.getItemText(0) == "Magnitudes");
+    CHECK(Mode::Both == 0);
+
+    /// \note The parameter still reads its own declaration order, which is what
+    /// the host, a preset and the DSP switch see. Only the menu was reordered.
+    CHECK(std::string(names[0]) == "Both");
+}
+
+TEST_CASE("A parameter with no menu order of its own is listed as declared",
+          "[gui][modules][combo]")
+{
+    /// \note The other half: `MenuOrder` is empty by default and `menuOrder()`
+    /// then hands back 0, 1, 2 ... so a row number *is* a value, which is what
+    /// all but two of the enumerated parameters want. Ethereal's swap condition
+    /// is the nearest one to ask, and it sits on the same strip as the target
+    /// above.
+    SWTest::HostSideJuce const juceIsUp;
+
+    SWTest::Instance instance;
+    instance.openEditor();
+
+    auto &strip(stripFor(instance.editor(), "Ethereal"));
+
+    using Condition = Effects::Ethereal::Condition;
+    auto &comboBox(
+        comboBoxFor(strip, Parameters::IndexOf<Effects::Ethereal::Parameters, Condition>::value));
+
+    REQUIRE(comboBox.numberOfItems() == Condition::numberOfDiscreteValues);
+    for (unsigned int row(0); row < comboBox.numberOfItems(); ++row)
+    {
+        INFO("row " << row);
+        comboBox.setSelectedIndex(row);
+        CHECK(comboBox.getSelectedID() == row);
+    }
 }
 
 TEST_CASE("A swap condition is listed in full and read abbreviated", "[gui][modules][combo]")

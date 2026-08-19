@@ -1601,18 +1601,14 @@ void addPowerOfTwoValueStringsToComboBox(unsigned int const firstValue,
 
 void addEnumeratedParameterValueStringsToComboBox(LE::Utility::Span<char const *const> strings,
                                                   LE::Utility::Span<char const *const> shortStrings,
+                                                  LE::Utility::Span<std::uint8_t const> menuOrder,
                                                   ComboBox &comboBox)
 {
     LE_ASSERT_MSG(comboBox.numberOfItems() == 0, "ComboBox already filled.");
     LE_ASSERT(strings.size() == shortStrings.size());
-    ComboBox::value_type parameterValue(0);
-    while (strings)
-    {
-        comboBox.addItem(parameterValue, strings.front(), shortStrings.front());
-        ++parameterValue;
-        strings.advance_begin(1);
-        shortStrings.advance_begin(1);
-    }
+    LE_ASSERT(strings.size() == menuOrder.size());
+    for (auto const parameterValue : menuOrder)
+        comboBox.addItem(parameterValue, strings[parameterValue], shortStrings[parameterValue]);
     comboBox.setValue(0);
 }
 } // namespace Detail

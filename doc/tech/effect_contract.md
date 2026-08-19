@@ -268,6 +268,20 @@ show, used by that box and by nothing else. Reach for it when a value string doe
 not fit — `Vaxateer::Mode` is the shipped example. `parameter_system.md`, "A value
 may be read differently from how it is listed", has the rule.
 
+`EFFECT_ENUMERATED_PARAMETER_MENU_ORDER` is the fifth and is also optional: the
+same values a third time, bare and in the order the menu should offer them.
+
+```cpp
+EFFECT_ENUMERATED_PARAMETER_MENU_ORDER( CommonParameters, Mode,
+    Magnitudes, Phases, Both )
+```
+
+Declaration order is ABI — a value is its own index, and presets and automation
+lanes are written in it — so this is the only way to move a row. Each row carries
+its own value, so nothing but the menu changes. The list must be a permutation of
+the parameter's values and a compile error says so if it is not.
+`parameter_system.md`, "An enumerated parameter's rows are not its values".
+
 ### How many parameters you get
 
 Five. `maxNumberOfParametersPerModule` is 10 (`src/configuration/constants.hpp:22`)
