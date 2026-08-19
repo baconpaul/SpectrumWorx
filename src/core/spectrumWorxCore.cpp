@@ -247,9 +247,6 @@ bool SpectrumWorxCore::ModuleInitialiser::operator()(Module &module,
     /// \note AUs can have their parameters changed while uninitialised.
     ///                                       (19.04.2013.) (Domagoj Saric)
     bool const initialised(storageFactors.complete());
-#if defined(_WIN32)
-    LE_ASSUME(initialised);
-#endif // _WIN32
     /// \note A module accepted into the chain before the engine has been set up
     /// is *not* set up here. It used to be, against whatever Setup happened to
     /// exist -- which before activate() means no sample rate, no bins and no step
@@ -461,9 +458,6 @@ void SpectrumWorxCore::updateForWindowChange(unsigned int const window)
     /// updateEngineSetup()) is called.
     ///                                       (05.03.2013.) (Domagoj Saric)
     bool const storageFactorsComplete(currentStorageFactors().complete());
-#ifdef _WIN32
-    LE_ASSUME(storageFactorsComplete);
-#endif // _WIN32
     if (storageFactorsComplete)
         Engine::Processor::changeWindowFunction(static_cast<Engine::Constants::Window>(window));
 }
