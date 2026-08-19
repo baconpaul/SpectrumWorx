@@ -69,8 +69,28 @@ class SilentNotifications final : public Plugin2HostInteropControler
 class Instance final : public GUI::EditorHost
 {
   public:
-    Instance()
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \param setUpEngine false for an engine that has never been given a
+    /// sample rate, which is what a plugin looks like before the host activates
+    /// it -- and the one state in which a case may *load a preset*.
+    ///
+    /// \note Loading reaches SpectrumWorxCore::engineSetup(), which asserts
+    /// unless the engine is already running at the FFT size the preset asks
+    /// for. Re-setting it up is the CLAP layer's job and there is no CLAP layer
+    /// here, so what makes the assertion legal is its third term: storage
+    /// factors that are not complete. \see spectrumWorxCore.cpp.
+    ///
+    /// \note show-ui's EditorPage takes the same argument as a sample rate of
+    /// zero, for the same reason.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    explicit Instance(bool const setUpEngine = true)
     {
+        if (!setUpEngine)
+            return;
+
         engine_.setNumberOfChannels(2, 2);
         engine_.setSampleRate(48000);
         engine_.setBlockSize(512);

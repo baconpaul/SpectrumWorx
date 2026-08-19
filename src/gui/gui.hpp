@@ -38,6 +38,7 @@
 #include "painters/ejectPainter.hpp"
 #include "painters/editorKnobPainter.hpp"
 #include "painters/framePainter.hpp"
+#include "painters/glyphPainter.hpp"
 #include "painters/knobPainter.hpp"
 #include "painters/panelPainter.hpp"
 
@@ -944,6 +945,46 @@ class EjectButton : public WidgetBase<juce::Button>
   private: // juce::Component overrides
     void paintButton(juce::Graphics &, bool isMouseOverButton, bool isButtonDown) override;
 }; // class EjectButton
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \class GlyphButton
+///
+////////////////////////////////////////////////////////////////////////////////
+
+/// \brief A mark that stands for a word, and says what it is by its colour.
+///
+///   The preset browser's navigation row: up a folder, the user's own presets,
+/// and the two halves of the preset jog. \see GlyphPainter for the drawings and
+/// for the sizes, which are each glyph's own.
+///
+/// \note White when off and the accent when on, which issue #44 asks for
+/// literally -- so a toggling glyph needs nothing said about it at the call
+/// site, and a glyph that does not toggle is white for its whole life. Disabled
+/// and moused-over are PointerFeedback's, as everywhere else.
+class GlyphButton : public WidgetBase<juce::Button>
+{
+  public:
+    enum struct Glyph
+    {
+        FolderUp,
+        User,
+        JogPrevious,
+        JogNext,
+        /// \note Not in that row: this one is the editor's, beside the
+        /// sidechain source. \see BackgroundPainter::sideChainLockBounds().
+        Lock
+    };
+
+    /// \param toggles false for the three that are actions rather than states.
+    GlyphButton(juce::Component &parent, Glyph, bool toggles = false);
+
+  private: // juce::Component overrides
+    void paintButton(juce::Graphics &, bool isMouseOverButton, bool isButtonDown) override;
+
+  private:
+    Glyph const glyph_;
+}; // class GlyphButton
 
 /// \brief One of those with a caption beside it.
 class LEDTextButton : public CapsuleButton

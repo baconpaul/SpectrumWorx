@@ -255,6 +255,17 @@ float constexpr lfoLabelY{161.0f};
 float constexpr sideChainSourceLabelHeight{11.0f};
 float constexpr sideChainSourceLabelY{293.f};
 
+/// \brief What the padlock beside that label leaves between itself and it.
+///
+/// \note The lock and the words are centred over the box *as one*, so the label
+/// moves right by half of what the lock and this gap take. Issue #44 moves the
+/// preset browser's "Ignore external audio" toggle here: what it says is "this
+/// preset does not get to bring its own audio file with it", which is a
+/// statement about the sidechain source and belongs beside it rather than in a
+/// row of preset navigation.
+///                                       (19.08.2026.)
+float constexpr sideChainLockGap{4.0f};
+
 float constexpr productLabelHeight{12.f};
 float constexpr productLabelCentreX{40.f};
 float constexpr productLabelY{338.f};
@@ -280,6 +291,19 @@ class BackgroundPainter
   public:
     /// \brief Draws the whole chassis into \p bounds.
     static void paint(juce::Graphics &, juce::Rectangle<float> bounds);
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Where the padlock beside the sidechain source label goes.
+    ///
+    ///   The editor places a widget there; this is what places it, because what
+    /// the pair is centred on is the label's *ink*, and how wide that is depends
+    /// on the copy and on the typeface. Asking here is what keeps the button and
+    /// the words that the button belongs to from drifting apart.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    static juce::Rectangle<float> sideChainLockBounds();
 
     /// \brief What fills the gutter an overlay panel opens beside itself.
     ///

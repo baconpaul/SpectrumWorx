@@ -960,6 +960,91 @@ void EjectButton::paintButton(juce::Graphics &graphics, bool const isMouseOverBu
                     [&](juce::Colour const tint) { EjectPainter::tint(graphics, bounds, tint); });
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// GlyphButton
+// -----------
+//
+////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+/// \brief How wide the widget holding \p glyph is; they are all one height.
+int glyphWidgetWidth(GlyphButton::Glyph const glyph)
+{
+    switch (glyph)
+    {
+    case GlyphButton::Glyph::FolderUp:
+        return GlyphStyle::upWidgetWidth;
+    case GlyphButton::Glyph::User:
+        return GlyphStyle::userWidgetWidth;
+    case GlyphButton::Glyph::JogPrevious:
+    case GlyphButton::Glyph::JogNext:
+        return GlyphStyle::jogWidgetWidth;
+    case GlyphButton::Glyph::Lock:
+        return GlyphStyle::lockWidgetWidth;
+    }
+    LE_UNREACHABLE_CODE();
+}
+} // anonymous namespace
+
+GlyphButton::GlyphButton(juce::Component &parent, Glyph const glyph, bool const toggles)
+    : glyph_(glyph)
+{
+    setWantsKeyboardFocus(false);
+    setMouseClickGrabsKeyboardFocus(false);
+
+    setSize(glyphWidgetWidth(glyph),
+            (glyph == Glyph::Lock) ? GlyphStyle::lockWidgetHeight : GlyphStyle::rowHeight);
+    setClickingTogglesState(toggles);
+
+    addToParentAndShow(parent, *this);
+}
+
+/// \note Dimmed by a transparency layer rather than by an alpha on the colour,
+/// for the reason PaintedButton gives: the up arrow is two overlapping shapes
+/// and fading each of them separately would show where they meet.
+void GlyphButton::paintButton(juce::Graphics &graphics, bool isMouseOverButton,
+                              bool const isButtonDown)
+{
+    if (!isEnabled())
+        isMouseOverButton = false;
+
+    auto opacity(isMouseOverButton ? PointerFeedback::over : PointerFeedback::normal);
+    if (!isEnabled())
+        opacity *= PointerFeedback::disabled;
+
+    bool const fade(opacity < 1.0f);
+    if (fade)
+        graphics.beginTransparencyLayer(opacity);
+
+    auto const bounds(getLocalBounds().toFloat());
+    auto const colour(ColourMap::getColour(
+        isEnabled() && (isButtonDown || getToggleState()) ? ColourMap::Accent : ColourMap::Text));
+
+    switch (glyph_)
+    {
+    case Glyph::FolderUp:
+        GlyphPainter::paintFolderUp(graphics, bounds, colour);
+        break;
+    case Glyph::User:
+        GlyphPainter::paintUser(graphics, bounds, colour);
+        break;
+    case Glyph::JogPrevious:
+        GlyphPainter::paintJog(graphics, bounds, false /*points left*/, colour);
+        break;
+    case Glyph::JogNext:
+        GlyphPainter::paintJog(graphics, bounds, true /*points right*/, colour);
+        break;
+    case Glyph::Lock:
+        GlyphPainter::paintLock(graphics, bounds, colour);
+        break;
+    }
+
+    if (fade)
+        graphics.endTransparencyLayer();
+}
+
 LEDTextButton::LEDTextButton(juce::Component &parent, unsigned int const x, unsigned int const y,
                              char const *const text)
     : CapsuleButton(parent, ledCapsule, ledWidth, ledHeight)

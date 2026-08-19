@@ -53,7 +53,10 @@ PresetBrowser::PresetBrowser()
       delete_(*this, "Delete", 54, 22, false),
       browseArrow_(*this, ArrowStyle::stepWidth, ArrowStyle::stepHeight, false,
                    ColourMap::MouseOverGlow),
-      ignoreExternalSamples_(*this, 15, 58, "Ignore external audio"), ignoreSelectionChange_(false),
+      upFolder_(*this, GlyphButton::Glyph::FolderUp),
+      userPresets_(*this, GlyphButton::Glyph::User, true /*toggles*/),
+      jogPrevious_(*this, GlyphButton::Glyph::JogPrevious),
+      jogNext_(*this, GlyphButton::Glyph::JogNext), ignoreSelectionChange_(false),
       addOneRow_(false), newPresetPending_(false), dirtyCommentPresetIndex_(-1)
 {
     listBox_.setModel(this);
@@ -61,10 +64,9 @@ PresetBrowser::PresetBrowser()
     setSizeFromPanel();
 
     /// \note All three start disabled and refresh() decides Save-As from there.
-    /// It used to be settled once, here, where location_ is still its default
-    /// Root -- so it was disabled before the browser had ever listed anything
-    /// and nothing re-enabled it. Save-As was unclickable for the life of the
-    /// plugin.
+    /// It used to be settled once, here, before the browser had ever listed
+    /// anything, and nothing re-enabled it: Save-As was unclickable for the
+    /// life of the plugin.
     ///                                       (01.08.2026.) (SW port)
     save_.setEnabled(false);
     saveAs_.setEnabled(false);
@@ -75,20 +77,35 @@ PresetBrowser::PresetBrowser()
 
     browseArrow_.addListener(this);
 
+    upFolder_.addListener(this);
+    userPresets_.addListener(this);
+    jogPrevious_.addListener(this);
+    jogNext_.addListener(this);
+
     /// \note Here rather than at the first save: an empty browser with no way
     /// to make a folder is not a usable answer to "you have no presets yet".
     GUI::createUserPresetsFolder();
 
-    /// \note Where it was last left, and the root -- "Factory" and "User" --
-    /// the first time, rather than the user's folder. A new installation's user
-    /// folder is empty, and a browser that opens on nothing while 303 presets
-    /// sit in the binary is the state this was reported in.
+    /// \note Where it was last left, and the list of factory banks the first
+    /// time, rather than the user's folder. A new installation's user folder is
+    /// empty, and a browser that opens on nothing while 303 presets sit in the
+    /// binary is the state this was reported in.
     restoreLastPlace();
 
     browseArrow_.setTopLeftPosition(174, 10);
     save_.setTopLeftPosition(14, 30);
     saveAs_.setTopLeftPosition(14 + 55, 30);
     delete_.setTopLeftPosition(14 + 55 + 55, 30);
+
+    /// \note The navigation row, in the gap the panel already had between the
+    /// Save buttons and the list. The four x positions are issue #44's mock-up
+    /// measured off it: up against the list's left frame, the user centred on
+    /// the panel, and the jog's two halves abutting against its right frame.
+    upFolder_.setTopLeftPosition(10, GlyphStyle::rowTop);
+    userPresets_.setTopLeftPosition(87, GlyphStyle::rowTop);
+    jogPrevious_.setTopLeftPosition(155, GlyphStyle::rowTop);
+    jogNext_.setTopLeftPosition(jogPrevious_.getRight() + 1, GlyphStyle::rowTop);
+
     listBox_.setBounds(11, 79, getWidth() - 22, 234);
     comment().setBounds(8, 322, getWidth() - 13, 29);
 
@@ -156,7 +173,8 @@ PresetBrowser::Place &PresetBrowser::lastPlace()
 /// \note Validated rather than trusted. A remembered folder is a path from a
 /// previous run of the host and the user may have moved or deleted it since, and
 /// a remembered bank is a name that a later build need not still ship. Either
-/// way the answer is the root, which is the one place that is always there.
+/// way the answer is the top of the factory tree, which is the one listing that
+/// is always there and never empty.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -166,9 +184,6 @@ void PresetBrowser::restoreLastPlace()
 
     switch (place.location)
     {
-    case Location::Root:
-        break;
-
     case Location::Factory:
         return setFactoryBank(place.factoryBank);
 
@@ -178,7 +193,7 @@ void PresetBrowser::restoreLastPlace()
         break;
     }
 
-    setRoot();
+    setFactoryBank({});
 }
 
 PresetBrowser::~PresetBrowser()
@@ -231,9 +246,9 @@ void PresetBrowser::presetSelectionChanged()
     delete_.setEnabled(enablePresetSaving);
 
     auto const presetData(selectedPresetData());
-    bool const succeeded(presetData && editor().loadPreset(presetData.get(),
-                                                           ignoreExternalSamples_.getToggleState(),
-                                                           originalComment_, item.name));
+    bool const succeeded(presetData &&
+                         editor().loadPreset(presetData.get(), editor().ignoreExternalSample(),
+                                             originalComment_, item.name));
 
     if (!succeeded)
     {
@@ -310,14 +325,6 @@ void PresetBrowser::listBoxItemDoubleClicked(int const row, juce::MouseEvent con
     Item const &item(this->item(row));
     switch (item.kind)
     {
-    case Item::Kind::Parent:
-        return goToParent();
-
-    case Item::Kind::Section:
-        if (item.name == "Factory")
-            return setFactoryBank({});
-        return setNewFolder(GUI::presetsFolder());
-
     case Item::Kind::Folder:
         if (inFactory())
             return setFactoryBank(factoryBank_.isEmpty() ? item.name
@@ -363,28 +370,16 @@ void PresetBrowser::paintListBoxItem(int const rowNumber, juce::Graphics &graphi
 
     unsigned int const x(isDirectory ? 16 : 4);
 
-    graphics.setColour(ColourMap::getColour(ColourMap::Ground));
-
+    /// \note Drawn rather than asked for. This was
+    /// `Theme::getDefaultFolderImage()`, which JUCE 8 answers with a Drawable,
+    /// may answer with nothing at all, and draws in its own look and feel's
+    /// colours rather than in this skin's -- so the one mark in the panel that
+    /// did not follow the palette was the folder. \see GlyphPainter.
     if (isDirectory)
-    {
-        //...mrmlj...
-        //paintImage
-        //(
-        //    graphics,
-        //    Theme::singleton().Theme::getDefaultFolderImage(),
-        //    2, 2
-        //);
-        /// \note JUCE 8's getDefaultFolderImage() returns a Drawable rather than
-        /// an Image, and may return nothing at all.
-        if (auto const *const pFolderImage = Theme::singleton().Theme::getDefaultFolderImage())
-            pFolderImage->drawWithin(
-                graphics,
-                juce::Rectangle<float>(2.0f, 2.0f, static_cast<float>(x) - 4.0f,
-                                       static_cast<float>(height) - 4.0f),
-                juce::RectanglePlacement::xLeft | juce::RectanglePlacement::xRight |
-                    juce::RectanglePlacement::onlyReduceInSize,
-                1.0f);
-    }
+        GlyphPainter::paintFolder(graphics,
+                                  juce::Rectangle<float>(2.0f, 0.0f, static_cast<float>(x) - 4.0f,
+                                                         static_cast<float>(height)),
+                                  ColourMap::getColour(ColourMap::Accent));
 
     graphics.setColour(Theme::singleton().Theme::findColour(
         juce::DirectoryContentsDisplayComponent::textColourId));
@@ -624,7 +619,7 @@ void PresetBrowser::saveCurrentPreset(juce::String const &presetName, fs::path c
     bool const shouldRefresh(!std::filesystem::exists(targetFile, error));
 
     originalComment_ = comment().getText();
-    editor().savePreset(targetFile, ignoreExternalSamples_.getToggleState(), originalComment_);
+    editor().savePreset(targetFile, editor().ignoreExternalSample(), originalComment_);
 
     if (shouldRefresh)
         refreshAndSelectPreset(presetName);
@@ -699,6 +694,28 @@ void PresetBrowser::buttonClicked(juce::Button *const pButton)
 
         showFilenameEditBox(newPreset, PresetBrowser::getNumRows());
         return;
+    }
+    else if (pButton == &upFolder_)
+    {
+        goToParent();
+    }
+    else if (pButton == &userPresets_)
+    {
+        /// \note The toggle state is already the new one -- juce::Button flips
+        /// it before it tells its listeners -- so this reads the answer rather
+        /// than deciding it, and updateNavigation() will agree with it.
+        if (userPresets_.getToggleState())
+            setNewFolder(GUI::presetsFolder());
+        else
+            setFactoryBank({});
+    }
+    else if (pButton == &jogPrevious_)
+    {
+        stepPreset(-1);
+    }
+    else if (pButton == &jogNext_)
+    {
+        stepPreset(+1);
     }
     else
     {
@@ -820,15 +837,6 @@ void PresetBrowser::setFactoryBank(juce::String const &bank)
     background().repaint();
 }
 
-void PresetBrowser::setRoot()
-{
-    location_ = Location::Root;
-    factoryBank_.clear();
-    deselectAllRows();
-    refresh();
-    background().repaint();
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // PresetBrowser::goToParent()
@@ -842,32 +850,128 @@ void PresetBrowser::setRoot()
 /// a folder was the browse arrow and a native file dialog.
 ///                                           (31.07.2026.) (SW port)
 ///
+/// \note Up out of the top of a tree is *nowhere*, where it used to be the
+/// root's two-word listing. That listing is gone (\see Location) and the
+/// button that reaches this is disabled there, so the guard below is what
+/// makes those two statements one.
+///                                           (19.08.2026.) issue #44
+///
 ////////////////////////////////////////////////////////////////////////////////
 
 void PresetBrowser::goToParent()
 {
-    switch (location_)
-    {
-    case Location::Root:
+    if (atTopOfTree())
         return;
 
+    switch (location_)
+    {
     case Location::Factory:
     {
-        if (factoryBank_.isEmpty())
-            return setRoot();
         auto const separator(factoryBank_.lastIndexOfChar('/'));
         return setFactoryBank(separator < 0 ? juce::String()
                                             : factoryBank_.substring(0, separator));
     }
 
     case Location::User:
-        /// \note Up out of the user's own preset folder is the root rather than
-        /// the rest of the filesystem. Somewhere above `~/Documents` there is
-        /// nothing a preset browser should be showing.
-        if (currentDirectory_ == GUI::presetsFolder())
-            return setRoot();
         return setNewFolder(currentDirectory_.parent_path());
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// PresetBrowser::atTopOfTree()
+// ----------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The second `User` test is for the browse arrow, which can put
+/// `currentDirectory_` anywhere on the volume: from outside the preset root
+/// the walk up never reaches it, and without a second stop the user can climb
+/// out of their home directory a click at a time. `parent_path()` of a root is
+/// that root, which is what says there is no further to go.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+bool PresetBrowser::atTopOfTree() const
+{
+    if (location_ == Location::Factory)
+        return factoryBank_.isEmpty();
+
+    return (currentDirectory_ == GUI::presetsFolder()) ||
+           (currentDirectory_.parent_path() == currentDirectory_);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// PresetBrowser::stepPreset()
+// ---------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The presets are the tail of the listing, and that is not an assumption
+/// -- `Item::operator<` sorts by kind first and `Folder` sorts before `Preset`,
+/// so one index says where the folders stop.
+///
+/// \note Selecting the row is the whole of the action: `selectedRowsChanged()`
+/// is what loads a preset, and going through it is what makes a jog step and a
+/// click the same thing as far as everything downstream is concerned.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void PresetBrowser::stepPreset(int const direction)
+{
+    if (!canStep(direction))
+        return; // and the button that reaches this is disabled there
+
+    int const next(listBox_.getLastRowSelected() + direction);
+    listBox_.selectRow(next);
+    listBox_.scrollToEnsureRowIsOnscreen(next);
+}
+
+bool PresetBrowser::presetIsSelected() const
+{
+    int const selected(listBox_.getLastRowSelected());
+
+    /// \note The upper bound is not paranoia: addOneRow_ puts a row in the list
+    /// that `files_` has no entry for while the filename edit box is up.
+    return (selected >= 0) && (selected < files_.size()) &&
+           !files_.getReference(selected).isDirectory();
+}
+
+bool PresetBrowser::canStep(int const direction) const
+{
+    if (!presetIsSelected())
+        return false;
+
+    int const next(listBox_.getLastRowSelected() + direction);
+
+    /// \note Off the end of the listing, or onto a folder -- which, because the
+    /// folders sort first, is what stepping back past the first preset is.
+    return (next >= 0) && (next < files_.size()) && !files_.getReference(next).isDirectory();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// PresetBrowser::updateNavigation()
+// ---------------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Reached from refresh(), which every move between folders comes through,
+/// and from selectedRowsChanged(), which every move within one does. The jog
+/// needs the second: where the browser is has not changed when a row is clicked,
+/// and whether the jog has anywhere to go has -- each half of it separately,
+/// because the first preset in a listing has a forward and no back.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void PresetBrowser::updateNavigation()
+{
+    upFolder_.setEnabled(!atTopOfTree());
+    userPresets_.setToggleState(location_ == Location::User, juce::dontSendNotification);
+
+    jogPrevious_.setEnabled(canStep(-1));
+    jogNext_.setEnabled(canStep(+1));
 }
 
 SpectrumWorxEditor &PresetBrowser::editor()
@@ -884,6 +988,12 @@ SpectrumWorxEditor const &PresetBrowser::editor() const
 void PresetBrowser::selectedRowsChanged(int const lastRowSelected)
 {
     saveDirtyComment();
+
+    /// \note Before the two early exits below, not after them: what the jog can
+    /// do depends on the selection whether or not this browser is the one that
+    /// asked for the change, and deselecting is exactly the case that turns it
+    /// off. \see updateNavigation().
+    updateNavigation();
 
     if (ignoreSelectionChange_ || (lastRowSelected == -1))
         return;
@@ -902,9 +1012,8 @@ int PresetBrowser::getNumRows() noexcept { return files_.size() + addOneRow_; }
 //
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \note Three listings, because there are three things to list: two fixed
-/// entries at the root, a bank out of the binary, or a directory. Only the last
-/// is what this browser used to do.
+/// \note Two listings, because there are two things to list: a bank out of the
+/// binary, or a directory. Only the second is what this browser used to do.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -914,9 +1023,6 @@ void PresetBrowser::refresh()
 
     switch (location_)
     {
-    case Location::Root:
-        refreshRoot();
-        break;
     case Location::Factory:
         refreshFactory();
         break;
@@ -929,17 +1035,13 @@ void PresetBrowser::refresh()
 
     /// \note Save-As is the one button that depends on *where* the browser is
     /// rather than on what is selected in it, so this is where it belongs: the
-    /// three location setters all come through here, and so does
+    /// two location setters both come through here, and so does
     /// refreshAndSelectPreset(). save_ and delete_ stay with the selection.
     saveAs_.setEnabled(enablePresetSaving());
 
-    listBox_.updateContent();
-}
+    updateNavigation();
 
-void PresetBrowser::refreshRoot()
-{
-    files_.add(Item{"Factory", Item::Kind::Section});
-    files_.add(Item{"User", Item::Kind::Section});
+    listBox_.updateContent();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -963,8 +1065,6 @@ void PresetBrowser::refreshRoot()
 
 void PresetBrowser::refreshFactory()
 {
-    files_.add(Item{"..", Item::Kind::Parent});
-
     juce::String const prefix(factoryBank_.isEmpty() ? juce::String() : factoryBank_ + "/");
 
     for (auto const &bank : FactoryPresets::banks())
@@ -1014,8 +1114,6 @@ void PresetBrowser::refreshFactory()
 
 void PresetBrowser::refreshUserDirectory()
 {
-    files_.add(Item{"..", Item::Kind::Parent});
-
     std::error_code listingError;
     Item item;
     for (auto const &entry : std::filesystem::directory_iterator(currentDirectory_, listingError))
@@ -1099,9 +1197,6 @@ juce::String PresetBrowser::locationLabel() const
 {
     switch (location_)
     {
-    case Location::Root:
-        return _T( "Presets" );
-
     case Location::Factory:
         return factoryBank_.isEmpty() ? juce::String(_T( "Factory" ))
                                       : _T( "Factory/" ) + factoryBank_;

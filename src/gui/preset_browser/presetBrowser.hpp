@@ -88,31 +88,38 @@ class PresetBrowser final : public PanelBackground,
     ///
     /// \enum Location
     ///
-    /// \brief Which of the three things the list is showing.
+    /// \brief Which of the two trees the list is showing.
     ///
     /// \note The browser was a directory browser: one `juce::File` and
     /// `std::filesystem` over it. The factory banks are in the binary now (8.2)
     /// and have no directory to point it at, so where it is looking became a
-    /// small sum type rather than a path. `Root` is a list of two entries and
-    /// exists so that there is somewhere `..` can go from either tree.
+    /// small sum type rather than a path.
     ///                                       (31.07.2026.) (SW port)
+    ///
+    /// \note There was a third, `Root`, whose listing was the two words
+    /// "Factory" and "User" -- so opening the browser showed a plugin with 303
+    /// presets in it two rows and no preset names, and every session began with
+    /// two clicks that told the user nothing. The trees are a *toggle* now, in
+    /// the navigation row, and the browser opens inside one of them.
+    ///                                       (19.08.2026.) issue #44
     ///
     ////////////////////////////////////////////////////////////////////////////
 
     enum struct Location : std::uint8_t
     {
-        Root,    ///< "Factory" and "User"; no storage behind it
         Factory, ///< an embedded bank, addressed by factoryBank_. Read only.
         User     ///< a real directory, addressed by currentDirectory_
     };
 
     struct Item
     {
+        /// \note `Parent` -- the ".." row -- went with `Root`: the up button
+        /// owns going up now, and a list whose first row is punctuation is a
+        /// row of preset names lost to a control that has somewhere better to
+        /// be. \see issue #44.
         enum struct Kind : std::uint8_t
         {
-            Parent,  ///< the ".." row
-            Section, ///< "Factory" or "User", only at the Root
-            Folder,  ///< a bank or a sub-directory
+            Folder, ///< a bank or a sub-directory
             Preset
         };
 
@@ -133,12 +140,51 @@ class PresetBrowser final : public PanelBackground,
 
   private:
     void setNewFolder(fs::path const &);
-    void setRoot();
 
-    /// \brief Up one level, wherever "up" is from here.
+    /// \brief Up one level, wherever "up" is from here. Does nothing at the top
+    /// of either tree, which is also where the up button is disabled.
     void goToParent();
 
-    /// \brief What the header strip says, for whichever of the three it is
+    /// \brief Whether this is the top of the tree it is in -- the bank list, or
+    /// the user's own preset folder.
+    bool atTopOfTree() const;
+
+    /// \brief Whether the selected row is a preset, which is what the jog needs
+    /// to have somewhere to step *from*. A folder row, or no row at all, is not
+    /// one. \see canStep().
+    bool presetIsSelected() const;
+
+    /// \brief Whether stepPreset( \p direction ) would move: there is a preset
+    /// selected and another one that way.
+    ///
+    /// \note One predicate for the two questions the jog asks -- "may I be
+    /// pressed" and "is there anything to do" -- so that a lit button that does
+    /// nothing is not a state this can reach. \see updateNavigation().
+    bool canStep(int direction) const;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The previous or next preset in this listing, selected as though
+    /// the user had clicked it.
+    ///
+    /// \param direction -1 or +1.
+    ///
+    /// \note Clamped rather than wrapped, and folders are not stepped onto:
+    /// what a jog is for is hearing the presets in a bank one after another,
+    /// and both of those would interrupt that. Neither is a case this has to
+    /// handle gracefully, because canStep() has already disabled the button --
+    /// at the first preset in a listing the back arrow is dead and at the last
+    /// one the forward arrow is.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    void stepPreset(int direction);
+
+    /// \brief Points the navigation row at where the browser now is. Called by
+    /// refresh(), which every move comes through.
+    void updateNavigation();
+
+    /// \brief What the header strip says, for whichever of the two it is
     /// showing. Only `User` has a path to print.
     juce::String locationLabel() const;
 
@@ -153,7 +199,7 @@ class PresetBrowser final : public PanelBackground,
     /// has to outlive it. It used to be half remembered: the destructor wrote
     /// `currentDirectory_` into `GUI::presetsFolder()` and nothing recorded
     /// `location_`, which is a member initialiser, so the browser reopened at
-    /// `Root` whatever the user had been looking at. Writing the user's
+    /// the root whatever the user had been looking at. Writing the user's
     /// wanderings into `presetsFolder()` also moved the anchor `goToParent()`
     /// stops at and the folder `createUserPresetsFolder()` makes; that global
     /// means the preset root now and nothing writes to it.
@@ -163,7 +209,7 @@ class PresetBrowser final : public PanelBackground,
 
     struct Place
     {
-        Location location{Location::Root};
+        Location location{Location::Factory};
         juce::String factoryBank; ///< when location is Factory
         fs::path folder;          ///< when location is User
     };
@@ -172,7 +218,6 @@ class PresetBrowser final : public PanelBackground,
     void restoreLastPlace();
 
     void refresh();
-    void refreshRoot();
     void refreshFactory();
     void refreshUserDirectory();
 
@@ -228,7 +273,17 @@ class PresetBrowser final : public PanelBackground,
     PaintedButton saveAs_;
     PaintedButton delete_;
     ArrowButton browseArrow_;
-    LEDTextButton ignoreExternalSamples_;
+
+    /// \name The navigation row, between the Save buttons and the list
+    ///
+    /// \note Issue #44's. The row is where "Ignore external audio" was; that
+    /// toggle is the editor's lock beside the sidechain source now.
+    ///@{
+    GlyphButton upFolder_;
+    GlyphButton userPresets_;
+    GlyphButton jogPrevious_;
+    GlyphButton jogNext_;
+    ///@}
 
     bool ignoreSelectionChange_;
     bool addOneRow_;
@@ -236,7 +291,7 @@ class PresetBrowser final : public PanelBackground,
 
     int dirtyCommentPresetIndex_;
 
-    Location location_{Location::Root};
+    Location location_{Location::Factory};
 
     /// The bank, relative to the preset root, when location_ is Factory. Empty
     /// means the top of the factory tree.
