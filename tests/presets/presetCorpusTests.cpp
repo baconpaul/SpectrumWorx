@@ -502,6 +502,90 @@ TEST_CASE("An old preset's input mode becomes the source it always meant",
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+// What a 2.x file leaves out
+// --------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Issue #15 moved the Octaver's `Low pass` from 350 Hz to its maximum,
+/// and the objection to moving it was that a 2011 preset would then sound
+/// different. It does not, and the reason is the first half below: the 2.x
+/// writer emits **every** parameter an effect has, at its default or not --
+/// `Gain 0`, `Start frequency 0` and `Stop frequency 1` are written out in all
+/// 288 shipped files -- so a preset naming an Octaver names its cutoff too and
+/// the compiled default is never reached for.
+///
+///   Hand-built rather than taken from the corpus because **no factory preset
+/// uses the Octaver at all**, which is exactly why the claim had nothing
+/// holding it: there was no file anywhere in the tree to contradict "2011
+/// presets skip their defaults" with.
+///
+///   The second half is the same claim from the other side, and it is the only
+/// route by which moving a default can move an old preset: a parameter the file
+/// genuinely does not carry -- one the effect grew afterwards -- takes *today's*
+/// default rather than the one in force when the file was written. That is
+/// `PresetProblem::MissingParameter`, it is ordinary (104 of the shipped banks
+/// raise one; \see PresetLoadReport), and it is what a table of prior defaults
+/// would exist to change. Nothing needs one yet, so this records the behaviour
+/// rather than working around it.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A 2.x preset carries its own defaults", "[preset-corpus][issue-15]")
+{
+    /// The 2011 grammar, by hand: the element name is the mangled parameter
+    /// name, the value is the element's text, and the module element is the
+    /// mangled effect title. \see streaming_format.md §4.2.
+    auto const octaverPreset([](std::string_view const cutoffElement) {
+        std::string preset(
+            "<SpectrumWorxPreset Version=\"2.6\" LastModified=\"15.12.2011 15:35\" Comment=\"\">\n"
+            "\t<Global In=\"1.0000\" Out=\"1.0000\" Mix=\"1.0000\" FFT_size=\"2048\" "
+            "Overlap_factor=\"4\" Window_type=\"0\" Input_mode=\"0\"/>\n"
+            "\t<Modules>\n"
+            "\t\t<Octaver Bypass=\"0\">\n"
+            "\t\t\t<Gain sync=\"1\">0.0000</Gain>\n"
+            "\t\t\t<Wet sync=\"1\">100.0000</Wet>\n"
+            "\t\t\t<Start_frequency sync=\"1\">0.0000</Start_frequency>\n"
+            "\t\t\t<Stop_frequency sync=\"1\">1.0000</Stop_frequency>\n"
+            "\t\t\t<Octave_1 sync=\"1\">3</Octave_1>\n"
+            "\t\t\t<Gain_1 sync=\"1\">0.0000</Gain_1>\n"
+            "\t\t\t<Octave_2 sync=\"1\">2</Octave_2>\n"
+            "\t\t\t<Gain_2 sync=\"1\">0.0000</Gain_2>\n");
+        preset += cutoffElement;
+        preset += "\t\t</Octaver>\n"
+                  "\t</Modules>\n"
+                  "</SpectrumWorxPreset>\n";
+        std::vector<char> buffer(preset.begin(), preset.end());
+        buffer.push_back('\0'); // the parse is destructive and wants a terminator
+        return buffer;
+    });
+
+    SECTION("a cutoff it wrote survives a default that has moved out from under it")
+    {
+        bool succeeded{false};
+        auto const loaded(loadBuffer(
+            octaverPreset("\t\t\t<Low_pass sync=\"1\">350.0000</Low_pass>\n"), succeeded));
+        REQUIRE(succeeded);
+        INFO(loaded.text);
+
+        CHECK(loaded.text.find("\n  Low pass = 350 |") != std::string::npos);
+        CHECK(loaded.missing == 0);
+    }
+
+    SECTION("a cutoff it never wrote takes today's default")
+    {
+        bool succeeded{false};
+        auto const loaded(loadBuffer(octaverPreset(""), succeeded));
+        REQUIRE(succeeded);
+        INFO(loaded.text);
+
+        CHECK(loaded.text.find("\n  Low pass = 16000 |") != std::string::npos);
+        CHECK(loaded.missing == 1);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
 // The embedded copy
 // -----------------
 //

@@ -373,6 +373,28 @@ simply skipped when there is nowhere to draw.
 - **Adding one.** Nothing to do. Its display name becomes its streaming name;
   regenerate `streamingNames.txt` and `parameterTable.txt` and read the diff —
   new rows only.
+- **Changing a default.** Free for any parameter that existed in 2016, and the
+  reason is §4.2's first row inverted: the 2.x writer emits *every* parameter an
+  effect has, at its default or not — `Gain 0`, `Start frequency 0` and `Stop
+  frequency 1` are written out in all 288 shipped files — so a 2.x preset naming
+  that effect names the parameter too, and the compiled default is never reached
+  for. The 3.0 writer is exhaustive as well (`savePresetParameters`), so **the
+  only file that can be missing a parameter which already existed is a 2.x file,
+  and it cannot be missing one that old.** Regenerate `parameterTable.txt`,
+  whose default column is pinned, and `goldens.txt`, which renders every effect
+  at its defaults and is the record that the effect now sounds different at rest.
+  `presetFixtures.txt` must **not** move; that is the proof.
+
+  Not free for a parameter the effect *grew* later. A file written before it
+  existed takes today's default rather than the one in force when it was
+  written — `PresetProblem::MissingParameter`, which 104 of the 303 shipped
+  banks raise, every Freqverb preset for `HF absorb` and every TuneWorx preset
+  for its vibrato section. Nothing migrates that yet; a table of prior defaults
+  keyed on `Format` is the shape it would take, and issue #15 deliberately did
+  not need one. `tests/presets/presetCorpusTests.cpp`, "A 2.x preset carries its
+  own defaults", holds both halves — the second by hand, because no factory
+  preset uses the Octaver at all and the claim had no fixture anywhere.
+
 - **Renaming a knob.** Change `EFFECT_PARAMETER_NAME`, add
   `EFFECT_PARAMETER_STREAMING_NAME` in the effect's **header** with the *old*
   string. Nothing fails: the label lives right of ` ;; ` in
