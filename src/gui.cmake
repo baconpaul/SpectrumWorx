@@ -23,6 +23,7 @@ add_library(sw-gui-resources STATIC
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/painters/editorKnobPainter.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/painters/ejectPainter.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/painters/framePainter.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/gui/painters/glyphPainter.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/painters/knobPainter.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/painters/moduleKnobPainter.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/painters/moduleStripPainter.cpp

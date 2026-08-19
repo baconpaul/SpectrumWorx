@@ -136,7 +136,8 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost, PanelPlacement co
       /// pill and the rest the room its halo needed. It is written down here
       /// now, and the two are placed three pixels apart as they were.
       ///                                       (18.08.2026.)
-      preset_(mainArea_, "PRESETS", 57, 24), settingsButton_(mainArea_, "SETTINGS", 57, 24)
+      preset_(mainArea_, "PRESETS", 57, 24), settingsButton_(mainArea_, "SETTINGS", 57, 24),
+      ignoreExternalSample_(mainArea_, GlyphButton::Glyph::Lock, true /*toggles*/)
 {
     using LE::Parameters::IndexOf;
     using namespace GlobalParameters;
@@ -181,6 +182,13 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost, PanelPlacement co
 
     preset_.setTopLeftPosition(74, 338);
     settingsButton_.setTopLeftPosition(134, 338);
+
+    /// \note Placed from the label it belongs to rather than from a constant of
+    /// its own -- the pair is centred over the sidechain source box, so where
+    /// the lock goes depends on how wide the words beside it come out.
+    ignoreExternalSample_.setCentrePosition(
+        BackgroundPainter::sideChainLockBounds().getCentre().roundToInt());
+    ignoreExternalSample_.setName("Ignore external audio");
 
     preset_.addListener(this);
     settingsButton_.addListener(this);
@@ -1626,6 +1634,11 @@ void SpectrumWorxEditor::addUserAddedModule(std::uint8_t const effectIndex)
     host().gestureEnd();
 
     refreshModuleRackAsync();
+}
+
+bool SpectrumWorxEditor::ignoreExternalSample() const
+{
+    return ignoreExternalSample_.getToggleState();
 }
 
 bool SpectrumWorxEditor::loadPreset(fs::path const &presetFile, bool const ignoreExternalSample,

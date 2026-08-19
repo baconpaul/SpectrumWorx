@@ -91,6 +91,7 @@ add_executable(sw-plugin-tests
         gui/overlayPanelTests.cpp
         gui/paletteTests.cpp
         gui/pathsTests.cpp
+        gui/presetNavigationTests.cpp
         gui/preferencesTests.cpp
         gui/sideChainSelectorTests.cpp
         gui/skinTests.cpp

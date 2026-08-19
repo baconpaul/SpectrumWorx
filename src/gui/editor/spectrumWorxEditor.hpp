@@ -201,6 +201,10 @@ class SpectrumWorxEditor final : private SkinLifetime,
     void savePreset(fs::path const &, bool ignoreExternalSample, juce::String const &comment) const;
     char const *currentProgramName() const;
 
+    /// \brief Whether the user has locked the sidechain source against presets.
+    /// \see ignoreExternalSample_, and the two calls in PresetBrowser.
+    bool ignoreExternalSample() const;
+
     bool presetLoadingInProgress() const;
 
   public:
@@ -1433,6 +1437,22 @@ class SpectrumWorxEditor final : private SkinLifetime,
 
     PaintedButton preset_;
     PaintedButton settingsButton_;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief "Ignore external audio": whether a preset gets to bring an audio
+    /// file with it, in either direction.
+    ///
+    /// \note The preset browser's, as a captioned LED, until issue #44 wanted
+    /// that row for preset navigation. It says something about the sidechain
+    /// source, so it sits beside the sidechain source -- and it outlives the
+    /// browser here, which the browser being built and destroyed with the
+    /// overlay means it did not before.
+    ///                                       (19.08.2026.)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    GlyphButton ignoreExternalSample_;
 
     // Optional/auxiliary components
     friend class SharedModuleControls;

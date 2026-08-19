@@ -139,7 +139,7 @@ otherwise (0, 2, or absent)  -> Main
 Three things worth knowing about it:
 
 - **"A sample was applied", not "the patch names one".** A patch loaded with the
-  preset browser's `Ignore external audio` on names a file and gets none, so it
+  lock beside `Sidechain Source` shut names a file and gets none, so it
   migrates to `Input_mode`'s answer instead — which is what a user who asked not
   to be given somebody else's audio meant. A named file that will not decode is
   reported and cleared, and lands in the same place.

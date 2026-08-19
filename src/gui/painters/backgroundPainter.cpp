@@ -11,6 +11,7 @@
 //------------------------------------------------------------------------------
 #include "gui/painters/backgroundPainter.hpp"
 
+#include "gui/painters/glyphPainter.hpp"
 #include "gui/resources.hpp"
 
 #include <cmath>
@@ -201,11 +202,35 @@ juce::Font regularFont(float const height)
 {
     return juce::Font(juce::FontOptions(regularTypeface()).withHeight(height));
 }
+
+/// \brief How wide \p text comes out in \p font, measured over the ink rather
+/// than over the advance -- which is what everything centred here is placed by.
+float inkWidth(juce::String const &text, juce::Font const &font)
+{
+    juce::GlyphArrangement glyphs;
+    glyphs.addLineOfText(font, text, 0, 0);
+    return glyphs.getBoundingBox(0, -1, false).getWidth();
+}
+
+/// \brief What the sidechain source label and the lock beside it take together,
+/// and where their left edge therefore falls.
+float sideChainLockLeft()
+{
+    auto const pair(GlyphStyle::lockWidth + sideChainLockGap +
+                    inkWidth(sideChainSourceLabel, boldFont(sideChainSourceLabelHeight)));
+    return rectangleOf(sideChainSourceBox).getCentreX() - pair / 2;
+}
 } // anonymous namespace
 
 juce::Colour BackgroundPainter::gutterColour()
 {
     return ColourMap::getColour(ColourMap::EditorSurround);
+}
+
+juce::Rectangle<float> BackgroundPainter::sideChainLockBounds()
+{
+    return {sideChainLockLeft(), sideChainSourceLabelY, GlyphStyle::lockWidth,
+            GlyphStyle::lockHeight};
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -266,9 +291,12 @@ void BackgroundPainter::paint(juce::Graphics &graphics, juce::Rectangle<float> c
 
     paintLabel(graphics, lfoLabel, boldFont(lfoLabelHeight), lfoLabelX, lfoLabelY, ColourMap::Text);
 
-    paintCentredLabel(graphics, sideChainSourceLabel, boldFont(sideChainSourceLabelHeight),
-                      rectangleOf(sideChainSourceBox).getCentreX(), sideChainSourceLabelY,
-                      ColourMap::Text);
+    /// \note Placed by its left edge rather than centred, because what is
+    /// centred over the box is the label *and* the lock in front of it.
+    /// \see sideChainLockBounds(), which is where the editor puts the widget.
+    paintLabel(graphics, sideChainSourceLabel, boldFont(sideChainSourceLabelHeight),
+               sideChainLockLeft() + GlyphStyle::lockWidth + sideChainLockGap,
+               sideChainSourceLabelY, ColourMap::Text);
 
     paintCentredLabel(graphics, productLabel, regularFont(productLabelHeight), productLabelCentreX,
                       productLabelY, ColourMap::Wordmark);
