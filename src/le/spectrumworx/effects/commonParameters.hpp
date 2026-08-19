@@ -69,6 +69,18 @@ EFFECT_ENUMERATED_PARAMETER_STRINGS(CommonParameters, SpringType,
     {Up, "Up"},
     {Down, "Down"})
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The two things a target is are listed before the one that is both of
+/// them. `Both` is the value zero because it is the default and because it is
+/// what every preset and automation lane since 2011 has called zero -- so it
+/// stays there, and only the menu reads down in the order a user chooses in.
+/// \see Parameters::MenuOrder.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+EFFECT_ENUMERATED_PARAMETER_MENU_ORDER(CommonParameters, Mode, Magnitudes, Phases, Both)
+
 } // namespace LE::SW::Effects
 /// @}
 

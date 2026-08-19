@@ -133,6 +133,10 @@ template <class Parameter> struct DiscreteValues
     using Strings = std::array<char const *, Parameter::numberOfDiscreteValues>;
     static Strings const strings;
 
+    /// \brief The same list read as row numbers rather than as names: the values
+    /// of \p Parameter in the order a menu offers them. \see MenuOrder.
+    using Order = std::array<std::uint8_t, Parameter::numberOfDiscreteValues>;
+
     /// \note What ParameterInfo carries, beside the nullptr a parameter with no
     /// value strings gives it. constexpr to match NonEnumeratedParameter's, now
     /// that ENUMERATED_PARAMETER_STRINGS produces a constant.
@@ -247,6 +251,95 @@ constexpr typename DiscreteValues<Parameter>::Strings const &shortValueStrings()
         return ShortValues<Parameter>::strings;
     else
         return DiscreteValues<Parameter>::strings;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \struct MenuOrder
+///
+/// \brief The order an enumerated parameter's values are *offered* in, where
+/// that is not the order they are declared in.
+///
+/// \details A value is its own index: it is what a preset stores, what a host
+/// automates and what the DSP switches on, so the declaration order is ABI and
+/// does not move. What a user reads down a menu is a different question --
+/// Ethereal's target is declared Both, Magnitudes, Phases and reads better as
+/// Magnitudes, Phases, Both -- and this is where that answer goes. Each row
+/// carries its own value, so nothing below the UI notices: the rows move, the
+/// values do not.
+///
+/// \note Empty by default and asked about with a requires-expression, as
+/// ShortValues is and for its reasons; menuOrder() below supplies declaration
+/// order for the parameters -- almost all of them -- that want it.
+///
+/// \note And, as with ShortValues, the specialisation belongs in the header that
+/// declares the parameter: a translation unit that does not see it builds the
+/// menu in declaration order rather than saying so.
+///                                           (19.08.2026.)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+template <class Parameter> struct MenuOrder
+{
+};
+
+namespace Detail ///< \internal
+{
+template <class Parameter> consteval typename DiscreteValues<Parameter>::Order identityOrder()
+{
+    typename DiscreteValues<Parameter>::Order order{};
+    for (std::size_t row{0}; row < order.size(); ++row)
+        order[row] = static_cast<std::uint8_t>(row);
+    return order;
+}
+
+/// \note A variable rather than a call, because menuOrder() hands back a
+/// reference and a consteval function's result is a temporary.
+template <class Parameter>
+inline constexpr
+    typename DiscreteValues<Parameter>::Order declarationOrder{identityOrder<Parameter>()};
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief \p values as a row order, having checked that it is a permutation of
+/// \p Parameter's values rather than merely a list of them.
+///
+///   A repeat costs the value it displaced -- one that no menu row then offers
+/// and no jog wheel then reaches -- which is a parameter a user cannot set and
+/// nothing else in the build would notice. So it is a compile error naming the
+/// parameter, in the shape valueStrings() above uses for the same reason.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+template <class Parameter, std::size_t count>
+consteval typename DiscreteValues<Parameter>::Order
+menuOrderValues(typename Parameter::value_type const (&values)[count])
+{
+    static_assert(count == Parameter::numberOfDiscreteValues,
+                  "An enumerated parameter's menu order must list every one of its values");
+
+    typename DiscreteValues<Parameter>::Order order{};
+    bool listed[count]{};
+    for (std::size_t row{0}; row < count; ++row)
+    {
+        auto const value{static_cast<std::size_t>(values[row])};
+        if (value >= count || listed[value])
+            throw "An enumerated parameter's menu order must list each value exactly once";
+        listed[value] = true;
+        order[row] = static_cast<std::uint8_t>(value);
+    }
+    return order;
+}
+} // namespace Detail
+
+/// \brief \p Parameter's menu row order if it has been given one, its
+/// declaration order if it has not.
+template <class Parameter> constexpr typename DiscreteValues<Parameter>::Order const &menuOrder()
+{
+    if constexpr (requires { MenuOrder<Parameter>::order; })
+        return MenuOrder<Parameter>::order;
+    else
+        return Detail::declarationOrder<Parameter>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -382,6 +475,39 @@ template <class Parameter> struct DisplayValueTransformer
     namespace LE::Parameters                                                                       \
     {                                                                                              \
     ENUMERATED_PARAMETER_SHORT_STRINGS(SW::Effects::parentClass, parameter, __VA_ARGS__)                                                             \
+    }                                                                                              \
+    namespace LE::SW::Effects                                                                      \
+    {
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \def ENUMERATED_PARAMETER_MENU_ORDER
+///
+/// \brief The values again, in the order a menu should offer them. \see
+/// MenuOrder.
+///
+/// \note Optional, and values rather than pairs: this list says nothing about
+/// what a value is called, only about where it sits, so an entry is just the
+/// enumerator -- named unqualified, as in the two lists above and by the same
+/// `using enum`. What is checked is that it is a permutation rather than a
+/// rewrite, which is the one mistake here that would cost a user a value.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+#define ENUMERATED_PARAMETER_MENU_ORDER(parentNameSpaceOrClass, parameter, ...)                    \
+    template <> struct MenuOrder<parentNameSpaceOrClass::parameter>                                \
+    {                                                                                              \
+        static constexpr DiscreteValues<parentNameSpaceOrClass::parameter>::Order order{[] {       \
+            using enum parentNameSpaceOrClass::parameter::value_type;                              \
+            return Detail::menuOrderValues<parentNameSpaceOrClass::parameter>({__VA_ARGS__});      \
+        }()};                                                                                      \
+    };
+
+#define EFFECT_ENUMERATED_PARAMETER_MENU_ORDER(parentClass, parameter, ...)                        \
+    }                                                                                              \
+    namespace LE::Parameters                                                                       \
+    {                                                                                              \
+    ENUMERATED_PARAMETER_MENU_ORDER(SW::Effects::parentClass, parameter, __VA_ARGS__)              \
     }                                                                                              \
     namespace LE::SW::Effects                                                                      \
     {
