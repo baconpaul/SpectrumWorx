@@ -513,13 +513,14 @@ what an old preset's `Input_mode` migrates to. Nothing about it reaches an effec
 which is the point: side-chain routing is not a DSP concern.
 
 **What the engine is handed when the selected source has nothing behind it is the
-main input, not silence** — so a Blender with nothing patched blends the signal
-with itself, and one in `Main` does so always. For the host's port that is three
-arrangements, of which the third is the only one a real DAW produces: no second
-port at all, a second port with no `data32`, and a second port whose channels the
-host declares constant and zero through `clap_audio_buffer::constant_mask`. The
-mask is a hint and a host that sets none is indistinguishable from one carrying
-real silence, which is what issue #13 is still open about.
+main input, not silence** — so a Blender in a host with no side chain blends the
+signal with itself, and one in `Main` does so always. For the host's port that is
+two arrangements, both structural: no second port at all, and a second port with
+no `data32`. Past those the port is read, whatever is in it, so a port a user has
+patched nothing into is heard as the silence the host put there. The plugin used
+to read `clap_audio_buffer::constant_mask` to guess otherwise and no longer does;
+[`sidechain-approach.md`](sidechain-approach.md) §2 says why, and issue #117 is
+where it went.
 
 > **Nothing declares that an effect reads the side chain, and nothing should.**
 > The `process()` overload is the declaration: take a `MainSideChannelData` and

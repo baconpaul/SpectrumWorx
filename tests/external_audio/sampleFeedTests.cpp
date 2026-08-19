@@ -221,8 +221,13 @@ TEST_CASE("Each of the three sources reaches the DSP, and only the selected one"
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \note What each source does when the thing it names is not there. Neither is
-/// an error and both land on the main input, which is what makes "an unpatched
-/// side chain blends the signal with itself" true of all three.
+/// an error and both land on the main input, which is what makes "a side chain
+/// with nothing behind it blends the signal with itself" true of all three.
+///
+/// \note "Not there" means the host offers no port at all, which is the only
+/// thing `Host` falls back from. A port that is present and carrying silence is
+/// silence -- the plugin stopped reading `constant_mask` to guess otherwise on
+/// 19.08.2026. \see issue #117 and doc/tech/sidechain-approach.md §2.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
