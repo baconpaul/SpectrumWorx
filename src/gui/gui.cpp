@@ -1122,7 +1122,21 @@ Knob::Knob(juce::Component &parent, unsigned int const x, unsigned int const y,
     //setPopupDisplayEnabled ( true, 0               ); //...mrmlj...for testing...
     /// \note `setPopupMenuEnabled( true )` stood here. See the note over the
     /// menu interface in the header: the right button raises ours now.
-    setMouseDragSensitivity(1200);
+    setMouseDragSensitivity(coarseDragPixels());
+
+    /// \note The trailing false is `userCanPressKeyToSwapMode`, and it is off so
+    /// that every drag is the plain linear one fineAdjusted() can reason about.
+    /// JUCE's default swaps command, control and alt into a *velocity* based
+    /// drag (juce_Slider.cpp, `isAbsoluteDragMode`) whose response is a sine of
+    /// the mouse's speed rather than of its distance. Shift is not one of those
+    /// three, so leaving this alone would not have broken the fine drag -- it
+    /// would have left the other three keys turning a knob by a rule nothing
+    /// tells the user about, and moving it barely at all at the speed someone
+    /// uses when they mean to be precise. The first three arguments are JUCE's
+    /// own defaults, restated because there is no setter for the fourth alone.
+    ///                                       (20.08.2026.)
+    setVelocityModeParameters(1.0, 1, 0.0, false);
+
     addToParentAndShow(parent, *this);
 }
 
@@ -1393,14 +1407,42 @@ void Knob::mouseDown(juce::MouseEvent const &event)
             return showParameterMenu(event);
         return passMousePressToParent(*this, event);
     }
+
+    /// \note Read here rather than in mouseDrag, so that a drag keeps the
+    /// sensitivity it started with. `handleAbsoluteDrag` works out the value as
+    /// `valueOnMouseDown + travelSoFar / sensitivity`, so changing the divisor
+    /// half way through recomputes the whole gesture at the new rate and the
+    /// knob jumps. Pressing the key first is the gesture; pressing it mid-drag
+    /// now does nothing, which is the quieter of the two answers.
+    ///
+    /// The anchor every later event measures itself against. \see fineAdjusted().
+    dragStartY_ = event.position.y;
+    lastDragY_ = event.position.y;
+    travel_ = 0;
+
     juce::Slider::mouseDown(event);
+}
+
+juce::MouseEvent Knob::fineAdjusted(juce::MouseEvent const &event)
+{
+    /// \note Shift, which is what the rest of the Surge Synth Team's plugins use
+    /// for this -- sst-jucegui, ContinuousParamEditor::mouseDrag(). Command is
+    /// not free there: it quantizes a drag to the parameter's step, so borrowing
+    /// it here would have taught two different things about one key. Shift is
+    /// also the same key on all three platforms, which command is not.
+    auto const ratio(event.mods.isShiftDown() ? fineDragRatio : 1.0f);
+
+    travel_ += (lastDragY_ - event.position.y) / ratio;
+    lastDragY_ = event.position.y;
+
+    return event.withNewPosition(juce::Point<float>(event.position.x, dragStartY_ - travel_));
 }
 
 void Knob::mouseDrag(juce::MouseEvent const &event)
 {
     if (event.mods.isPopupMenu())
         return;
-    juce::Slider::mouseDrag(event);
+    juce::Slider::mouseDrag(fineAdjusted(event));
 }
 
 void Knob::mouseUp(juce::MouseEvent const &event)
