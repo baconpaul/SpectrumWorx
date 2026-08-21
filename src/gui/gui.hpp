@@ -1072,6 +1072,48 @@ class Knob : public WidgetBase<juce::Slider>
     typedef double value_type;
     typedef float param_type;
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \name How fast a knob follows the mouse
+    ///
+    /// \note One number to turn, and it is deliberately not a preference: the
+    /// question these answer is whether the plugin tracks the mouse the way the
+    /// rest of the platform does, which is not something to ask a user. If a
+    /// platform wants a different answer, this is where it says so.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    ///@{
+    /// \brief The pixels of vertical travel a knob asked for, in 2012, before it
+    /// had moved through its whole range.
+    ///
+    /// Kept as the reference rather than edited away so that the sensitivity
+    /// below reads as a multiple of the feel this plugin shipped with.
+    static constexpr float referenceDragPixels{1200};
+
+    /// \brief The multiple of that travel a knob covers now.
+    ///
+    /// One is the 2012 feel, and a 16" laptop screen is not tall enough to drag
+    /// a knob through its range at it.
+    static constexpr float dragSensitivity{2};
+
+    /// \brief What holding shift divides the travel by.
+    ///
+    /// \note The same linear drag, only finer -- not JUCE's velocity mode, which
+    /// the constructor switches off. \see Knob::fineAdjusted().
+    ///
+    /// \note Four rather than the ten sst-jucegui uses, because this is dividing
+    /// an already brisk 600 px. Ten would put a fine sweep well past the 1200
+    /// this is getting away from.
+    static constexpr float fineDragRatio{4};
+
+    /// \brief The travel a whole range takes, as JUCE counts it: 600 px, and
+    /// four times that with shift held.
+    static constexpr int coarseDragPixels()
+    {
+        return static_cast<int>(referenceDragPixels / dragSensitivity);
+    }
+    ///@}
+
     value_type getValue() const { return static_cast<value_type>(juce::Slider::getValue()); }
     void setValue(param_type);
 
@@ -1214,6 +1256,12 @@ class Knob : public WidgetBase<juce::Slider>
     void mouseDrag(juce::MouseEvent const &) override;
     void mouseUp(juce::MouseEvent const &) override;
 
+    ////////////////////////////////////////////////////////////////////////////
+    /// \note Swallowed rather than forwarded, so that shift may be pressed in
+    /// the middle of a drag. \see fineAdjusted().
+    ////////////////////////////////////////////////////////////////////////////
+    void modifierKeysChanged(juce::ModifierKeys const &) override;
+
     void startedDragging() noexcept override;
     /// \note Was declared and defined only under !NDEBUG, but
     /// EditorKnob::stoppedDragging calls it unconditionally -- an undefined
@@ -1221,6 +1269,36 @@ class Knob : public WidgetBase<juce::Slider>
     /// it costs nothing to exist: LE_ASSERT compiles away on its own.
     ///                                       (28.07.2026.) (SW port)
     void stoppedDragging() noexcept override;
+
+  private:
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief \p event with its vertical position replaced by the one that
+    /// makes juce::Slider arrive at the value shift has earned so far.
+    ///
+    /// \note This exists because shift has to be allowed to go down and come
+    /// back up in the middle of a drag. juce::Slider works the value out afresh
+    /// on every event, as `valueOnMouseDown + travelSinceMouseDown /
+    /// sensitivity`, so simply changing the sensitivity when the key changes
+    /// rescales the travel already made and the knob jumps. Leaving the
+    /// sensitivity alone and handing it a position it would have reached is the
+    /// same arithmetic without the jump: each segment of the drag is divided by
+    /// the ratio that was in force while the mouse was covering it, and the
+    /// running total is what the slider is shown.
+    ///
+    /// \note Vertical only, because the style is RotaryVerticalDrag and
+    /// `handleAbsoluteDrag` reads nothing else.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    juce::MouseEvent fineAdjusted(juce::MouseEvent const &event);
+
+  private:
+    /// Where the press landed: what juce::Slider measures its travel from.
+    float dragStartY_{0};
+    /// Where the previous drag event was, so that a segment can be measured.
+    float lastDragY_{0};
+    /// Those segments, each divided by the ratio it was covered at.
+    float travel_{0};
 
   private:
     using juce::Slider::getMaxValueObject;
