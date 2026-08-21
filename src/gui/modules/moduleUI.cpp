@@ -72,6 +72,13 @@ void ModuleLEDTextButton::clicked() { moduleParameterChanged(); }
 
 void ModuleLEDTextButton::mouseDown(juce::MouseEvent const &event)
 {
+    /// \note The right button raises the parameter's menu rather than toggling
+    /// anything, exactly as it does on a knob -- and it does not take the
+    /// selection on the way, also as on a knob: nothing the menu offers needs
+    /// this control to be the active one. \see issue #93.
+    if (event.mods.isPopupMenu())
+        return showParameterMenu(event);
+
     if (!hasDirectFocus())
     {
         juce::Component::SafePointer<juce::Component> const self(this);
@@ -158,7 +165,9 @@ void TriggerButton::mouseDown(juce::MouseEvent const &e)
 {
     if (e.mods.isPopupMenu())
     {
-        if (!isOnFace(e.getPosition()))
+        if (isOnFace(e.getPosition()))
+            showParameterMenu(e);
+        else
             passMousePressToParent(*this, e);
         return;
     }
@@ -382,67 +391,6 @@ void ModuleKnob::updateForEngineSetupChanges(Engine::Setup const &engineSetup)
 /// \note getName(), which setupForParameter() took from the same
 /// RuntimeInformation, and *not* the host's name for it: that reads "M3.Wet",
 /// and the strip the knob is standing in already says which module this is.
-juce::String ModuleKnob::parameterName() const { return getName(); }
-
-juce::String ModuleKnob::parameterValueText() const { return control().getValueText(); }
-
-ParameterID ModuleKnob::parameterID() const
-{
-    return control().editor().moduleControlID(control());
-}
-
-bool ModuleKnob::parameterEditable() const { return !isLFOEnabled(); }
-
-bool ModuleKnob::setParameterFromText(juce::String const &text)
-{
-    auto const value(control().parseValueString(text));
-    if (!value)
-        return false;
-
-    /// \note Knob::setValue() rather than juce::Slider's notifying form, and
-    /// publishValue() rather than moduleParameterChanged(): valueChanged()
-    /// asserts the mouse is on the knob or dragging it, and it is on the menu.
-    /// \see ModuleControlBase::publishValue().
-    setValue(static_cast<param_type>(*value));
-    control().publishValue();
-    repaint();
-    return true;
-}
-
-void ModuleKnob::setParameterToDefault()
-{
-    setValue(static_cast<param_type>(control().info().default_));
-    control().publishValue();
-    repaint();
-}
-
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \note The LFO strip's own switch is the other way in, and both end up in
-/// SpectrumWorxEditor::setLFOEnabled(): turning an LFO on is an edit of an
-/// exported parameter, so it has to reach the engine and the host and not just
-/// the copy this thread draws from.
-///
-/// \note Offered whether or not the strip is up. A knob is reachable with no LFO
-/// display on screen -- the shared gain and wet pair above the rack are the
-/// obvious case -- and there is nothing about the switch that needs one.
-///
-////////////////////////////////////////////////////////////////////////////////
-
-void ModuleKnob::addParameterMenuEntries(juce::PopupMenu &menu)
-{
-    /// \note The tick is read here, when the menu is built; the toggle re-reads
-    /// when it is chosen. The two can only disagree if the host moved the LFO
-    /// while the menu was open, and then the fresh answer is the right one.
-    menu.addItem("Enable LFO", /*isEnabled*/ true, /*isTicked*/ isLFOEnabled(),
-                 [pThis = juce::Component::SafePointer<ModuleKnob>(this)] {
-                     if (!pThis)
-                         return;
-                     auto &control(pThis->control());
-                     control.editor().setLFOEnabled(control, !control.isLFOEnabled());
-                 });
-}
-
 /// \note The circle paint() draws, to the pixel: `marginForGlow` in from the top
 /// left and `diameter_` across. Everything else the widget covers -- the glow
 /// margin, and the eighteen pixels of caption below -- is the module strip
@@ -485,8 +433,14 @@ DiscreteParameter::DiscreteParameter(juce::Component &parent, unsigned int const
 /// as a button in a different shape: the first press selected the control and
 /// swallowed itself, so opening the menu took two clicks. \see issue #65.
 ///                                           (17.08.2026.) (SW port)
-void DiscreteParameter::mouseDown(juce::MouseEvent const &)
+void DiscreteParameter::mouseDown(juce::MouseEvent const &event)
 {
+    /// \note And the right button raises the *parameter's* menu rather than the
+    /// list of values, which is what it does on every other control. \see issue
+    /// #93.
+    if (event.mods.isPopupMenu())
+        return showParameterMenu(event);
+
     if (!hasDirectFocus())
     {
         juce::Component::SafePointer<juce::Component> const self(this);
@@ -538,6 +492,42 @@ void DiscreteParameter::mouseWheelMove(juce::MouseEvent const &event,
         return;
 
     ComboBox::mouseWheelMove(event, wheel);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The rows the box itself lists, in the order it lists them, ticked where
+/// the selection is. So the right button reads name, values, then whatever the
+/// host adds -- which is what the left button offers *plus* the host's entries,
+/// rather than a second way of doing something the widget already does. \see
+/// issue #93.
+///
+/// \note Disabled rather than hidden while an LFO owns the parameter, exactly as
+/// "Reset to default value" is: the user can still read what the value is, and
+/// choosing one would be overwritten by the next sweep.
+///
+/// \note `publishValue()` rather than `moduleParameterChanged()`, for the reason
+/// ModuleControlBase::setValueFromText() gives: the latter asserts the mouse is
+/// on the widget, and it is on the menu.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void DiscreteParameter::addParameterValueEntries(juce::PopupMenu &menu)
+{
+    if (!hasValidSelection())
+        return;
+
+    auto const selected(getSelectedIndex());
+    for (unsigned int row(0); row < numberOfItems(); ++row)
+    {
+        menu.addItem(getItemText(row), /*isEnabled*/ !isLFOEnabled(), /*isTicked*/ row == selected,
+                     [pThis = juce::Component::SafePointer<DiscreteParameter>(this), row] {
+                         if (!pThis)
+                             return;
+                         pThis->setSelectedIndex(row);
+                         pThis->control().publishValue();
+                     });
+    }
 }
 
 void DiscreteParameter::selectionScrolled() { moduleParameterChanged(); }

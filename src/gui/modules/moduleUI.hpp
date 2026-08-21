@@ -83,6 +83,11 @@ class ModuleKnob : public Knob, public ModuleControl<ModuleKnob>
   protected:
     ModuleKnob(juce::Component &parent, unsigned int x, unsigned int y);
 
+  private: // Knob
+    /// \note The ModuleControl half, which is where a module control's menu is
+    /// answered. \see issue #93.
+    ParameterMenu &parameterMenu() override { return static_cast<ModuleControl &>(*this); }
+
   public:
 #pragma warning(push)
 #pragma warning(                                                                                   \
@@ -136,15 +141,6 @@ class ModuleKnob : public Knob, public ModuleControl<ModuleKnob>
     void valueChanged() noexcept override;
 
     void paint(juce::Graphics &) override;
-
-  private: // Knob's menu interface
-    juce::String parameterName() const override;
-    juce::String parameterValueText() const override;
-    ParameterID parameterID() const override;
-    bool parameterEditable() const override;
-    bool setParameterFromText(juce::String const &) override;
-    void setParameterToDefault() override;
-    void addParameterMenuEntries(juce::PopupMenu &) override;
 
   public:
     /// \brief The circle, not the widget: the margin the focus halo needs and
@@ -218,6 +214,11 @@ class ModuleLEDTextButton : public LEDTextButton, public ModuleControl<ModuleLED
   private: // juce::Component overrides
     void mouseDown(juce::MouseEvent const &) override;
     void paintButton(juce::Graphics &, bool isMouseOverButton, bool isButtonDown) override;
+
+  private: // ParameterMenu
+    /// \note \see TriggerButton::parameterAcceptsText(), which carries the reason
+    /// all three of the non-knob controls answer no.
+    bool parameterAcceptsText() const override { return false; }
 
   protected: // ModuleControl interface.
     void focusChanged() { repaint(); }
@@ -302,6 +303,23 @@ class TriggerButton : public WidgetBase<juce::Button>, public ModuleControl<Trig
     void mouseDown(juce::MouseEvent const &) override;
     void mouseUp(juce::MouseEvent const &) noexcept override;
 
+  private: // ParameterMenu
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note **A knob is the only module control you type a value into.**
+    ///
+    ///   A trigger is an event rather than a number and there is no text that
+    /// says "fire"; a boolean and an enumeration are *chosen* rather than typed,
+    /// and for both of them the choice is already on the widget -- an LED you
+    /// press, a list you drop. What issue #93 asked for on these three is the
+    /// host's own entries, which is what they now have; the field a knob offers
+    /// would be a second and worse way to do what the widget does.
+    ///                                       (21.08.2026.)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    bool parameterAcceptsText() const override { return false; }
+
     void paintButton(juce::Graphics &, bool isMouseOverButton, bool isButtonDown) override;
 
   private:
@@ -337,6 +355,13 @@ class DiscreteParameter : public ComboBox, public ModuleControl<DiscreteParamete
 
     /// \note The same call the menu's own callback makes.
     void selectionScrolled() override;
+
+  private: // ParameterMenu
+    /// \note \see TriggerButton::parameterAcceptsText(). What a combo box has
+    /// instead is its values, which is the next line.
+    bool parameterAcceptsText() const override { return false; }
+
+    void addParameterValueEntries(juce::PopupMenu &) override;
 
   protected: // ModuleControl interface.
     void focusChanged();

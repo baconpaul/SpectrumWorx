@@ -1110,12 +1110,138 @@ void passMousePressToParent(juce::Component &widget, juce::MouseEvent const &eve
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
+/// \class ParameterMenu
+///
+/// \brief The right button's menu on a widget that stands for a parameter.
+///
+///   The parameter's name, somewhere to type a value, the way back to the
+/// default, whatever the widget itself adds, and then whatever the host has to
+/// add -- which is the menu the rest of the Surge Synth Team's plugins put on a
+/// parameter.
+///
+/// \note What was on a knob until 15.08.2026: `setPopupMenuEnabled( true )`, so
+/// the right button raised *juce::Slider*'s own menu -- velocity-sensitive mode
+/// and the drag direction. Two settings about the mouse, offered on the one
+/// control a user opens a menu on to reach its parameter.
+///
+/// \note A mix-in rather than something Knob owns, and that is issue #93: a knob
+/// is not the only widget standing for an automatable parameter. Tune Worx has
+/// no knobs at all -- a combo box and twelve LEDs -- so the one effect a user is
+/// most likely to want a host's menu on was the one effect that had none.
+///
+/// \note Every one of the questions below is virtual rather than a constructor
+/// argument because each is one only the concrete widget can answer, and two of
+/// them -- the value and whether it may be edited -- change under the user while
+/// the widget lives.
+///                                           (21.08.2026.)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+class ParameterMenu
+{
+  public:
+    /// \brief Raises the menu at \p event, over the widget this is mixed into.
+    ///
+    /// \note Public because the widget that raises it is not always the class
+    /// that answers for it: Knob::mouseDown() reaches whichever of its two
+    /// subclasses carries the parameter.
+    void showParameterMenu(juce::MouseEvent const &);
+
+    ////////////////////////////////////////////////////////////////////////////
+    /// \brief Whether the widget's own value is worth editing at all.
+    ///
+    /// \note False while an LFO drives the parameter: what is heard then is the
+    /// LFO's output and the widget's value is overwritten from under any edit.
+    /// The gestures that could already move the widget are blocked on the same
+    /// question, so the type-in and the default follow them rather than becoming
+    /// another answer.
+    ///
+    /// \note Public because a knob asks it about itself for a second reason --
+    /// whether there is a drag worth hiding the cursor for. \see
+    /// Knob::hidesCursorWhileDragging() and issue #82.
+    ////////////////////////////////////////////////////////////////////////////
+    virtual bool parameterEditable() const { return true; }
+
+  protected:
+    ~ParameterMenu() = default;
+
+    /// \brief The widget, for JUCE. This is a mix-in and not a Component of its
+    /// own, and a menu needs one to hang off, to place itself against and to
+    /// hand the keyboard back to.
+    virtual juce::Component &menuOwner() = 0;
+
+    /// The section header: what this parameter is called.
+    virtual juce::String parameterName() const = 0;
+    /// What the type-in field starts out holding, unit and all.
+    virtual juce::String parameterValueText() const = 0;
+    /// Which parameter this is, for the host's own entries.
+    virtual ParameterID parameterID() const = 0;
+
+    ////////////////////////////////////////////////////////////////////////////
+    /// \brief Whether typing a value into it means anything.
+    ///
+    /// \note False for a trigger, which is an event rather than a number: there
+    /// is no text that says "fire". Everything else in this plugin has a
+    /// reading, enumerated parameters included -- their value strings are what
+    /// `Parameters::parse` reads.
+    ////////////////////////////////////////////////////////////////////////////
+    virtual bool parameterAcceptsText() const { return true; }
+
+    /// \return false when \p text is not a value this parameter can hold, which
+    /// leaves the parameter where it was. \see LE::Parameters::parse().
+    virtual bool setParameterFromText(juce::String const &text) = 0;
+    virtual void setParameterToDefault() = 0;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The parameter's *values*, where a knob has its type-in field.
+    ///
+    ///   An enumerated parameter is chosen rather than typed, and what a user
+    /// right-clicking a combo box wants is the list they would otherwise have to
+    /// left-click for -- so the menu reads name, values, then whatever the host
+    /// adds. \see issue #93 and DiscreteParameter::addParameterValueEntries().
+    ///
+    /// \note Empty for everything else. A knob's values are a continuum and a
+    /// button's are two, one of which is a press away.
+    ///                                       (21.08.2026.)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    virtual void addParameterValueEntries(juce::PopupMenu &) {}
+
+    /// Entries of the widget's own, under "Set to Default": a module control's
+    /// LFO switch.
+    virtual void addParameterMenuEntries(juce::PopupMenu &) {}
+
+  private:
+    /// The type-in field, as a menu item. \see gui.cpp.
+    class ValueTypein;
+}; // class ParameterMenu
+
+////////////////////////////////////////////////////////////////////////////////
+///
 /// \class Knob
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
 class Knob : public WidgetBase<juce::Slider>
 {
+  public:
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Whichever subclass carries this knob's parameter.
+    ///
+    /// \note A hook rather than a base, because the two subclasses reach a
+    /// ParameterMenu by two different routes: the editor's own knobs answer for
+    /// themselves, and a module's answers through the ModuleControlBase every
+    /// widget on a strip shares. One ParameterMenu subobject either way, which
+    /// inheriting it here would not give.
+    ///                                       (21.08.2026.) \see issue #93.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    virtual ParameterMenu &parameterMenu() = 0;
+    ParameterMenu const &parameterMenu() const { return const_cast<Knob &>(*this).parameterMenu(); }
+
   public:
     typedef double value_type;
     typedef float param_type;
@@ -1187,56 +1313,6 @@ class Knob : public WidgetBase<juce::Slider>
     /// second paint() to keep out of the way of the virtual one.
     ///                                       (15.08.2026.) (SW port)
 
-    ////////////////////////////////////////////////////////////////////////////
-    ///
-    /// \name The right button's menu
-    ///
-    ///   The parameter's name, somewhere to type a value, the way back to the
-    /// default, whatever the knob itself adds, and then whatever the host has to
-    /// add -- which is the menu the rest of the Surge Synth Team's plugins put
-    /// on a parameter.
-    ///
-    /// \note What was here until 15.08.2026: `setPopupMenuEnabled( true )`, so
-    /// the right button raised *juce::Slider*'s own menu -- velocity-sensitive
-    /// mode and the drag direction. Two settings about the mouse, offered on the
-    /// one control a user opens a menu on to reach its parameter.
-    ///
-    /// \note Protected and virtual rather than a constructor argument because
-    /// every one of them is a question only the concrete knob can answer, and
-    /// two of them (the value and whether it may be edited) change under the
-    /// user while the knob lives.
-    ///
-    ////////////////////////////////////////////////////////////////////////////
-    ///@{
-  protected:
-    /// The section header: what this parameter is called.
-    virtual juce::String parameterName() const = 0;
-    /// What the type-in field starts out holding, unit and all.
-    virtual juce::String parameterValueText() const = 0;
-    /// Which parameter this is, for the host's own entries.
-    virtual ParameterID parameterID() const = 0;
-
-    ////////////////////////////////////////////////////////////////////////////
-    /// \brief Whether the knob's own value is worth editing at all.
-    ///
-    /// \note False while an LFO drives the parameter: what is heard then is the
-    /// LFO's output and the widget's value is overwritten from under any edit.
-    /// The two gestures that could already move a knob -- the drag and the
-    /// double click -- are blocked on the same question, so the type-in and the
-    /// default follow them rather than becoming a third answer.
-    ////////////////////////////////////////////////////////////////////////////
-    virtual bool parameterEditable() const { return true; }
-
-    /// \return false when \p text is not a value this parameter can hold, which
-    /// leaves the parameter where it was. \see LE::Parameters::parse().
-    virtual bool setParameterFromText(juce::String const &text) = 0;
-    virtual void setParameterToDefault() = 0;
-
-    /// Entries of the knob's own, under "Set to Default": the module knob's LFO
-    /// switch.
-    virtual void addParameterMenuEntries(juce::PopupMenu &) {}
-    ///@}
-
   public:
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -1261,12 +1337,6 @@ class Knob : public WidgetBase<juce::Slider>
     ///
     ////////////////////////////////////////////////////////////////////////////
     virtual bool isOnKnobFace(juce::Point<int> position) const;
-
-  private:
-    /// The type-in field, as a menu item. \see gui.cpp.
-    class ValueTypein;
-
-    void showParameterMenu(juce::MouseEvent const &);
 
   public:
     ////////////////////////////////////////////////////////////////////////////
@@ -1360,7 +1430,7 @@ class Knob : public WidgetBase<juce::Slider>
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class EditorKnob final : public Knob
+class EditorKnob final : public Knob, public ParameterMenu
 {
   public:
     /// What the film strip's frame width was.
@@ -1378,7 +1448,11 @@ class EditorKnob final : public Knob
     void startedDragging() noexcept override;
     void stoppedDragging() noexcept override;
 
-  private: // Knob's menu interface
+  private: // Knob
+    ParameterMenu &parameterMenu() override { return *this; }
+
+  private: // ParameterMenu
+    juce::Component &menuOwner() override { return *this; }
     juce::String parameterName() const override;
     juce::String parameterValueText() const override;
     ParameterID parameterID() const override;

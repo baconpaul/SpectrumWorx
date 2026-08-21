@@ -11,6 +11,10 @@
 #ifndef moduleControl_hpp__F2848AE1_5E1F_4FB9_81AB_541E17F40DD2
 #define moduleControl_hpp__F2848AE1_5E1F_4FB9_81AB_541E17F40DD2
 //------------------------------------------------------------------------------
+/// `ParameterMenu`, which every module control is one of. \see issue #93.
+#include "gui/gui.hpp"
+
+#include "core/parameterID.hpp"
 #include "le/math/conversion.hpp"
 #include "le/utility/cstdint.hpp"
 
@@ -50,10 +54,47 @@ class SpectrumWorxEditor;
 class ModuleControlBase;
 template <class ImplWidget> class ModuleControlImpl;
 
-template <class ImplWidget> class ModuleControl
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The parameter menu is answered here and not by each widget, and that is
+/// the whole of issue #93. Every control on a module strip is a widget standing
+/// for one automatable parameter, and `ModuleControlBase` *is* that parameter as
+/// the widget sees it -- its name, its reading, the value a typed string means,
+/// its default and its LFO. So the seven questions have one set of answers, and
+/// a knob, an LED, a trigger and a combo box all get the menu by being module
+/// controls rather than by being knobs.
+///                                           (21.08.2026.)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+template <class ImplWidget> class ModuleControl : public ParameterMenu
 {
   private:
     using Impl = ModuleControlImpl<ImplWidget>;
+
+  private: // ParameterMenu
+    ////////////////////////////////////////////////////////////////////////////
+    /// \note Every one of these forwards to the control, which is where the
+    /// answers are: a widget's shape has nothing to do with what its parameter
+    /// is called or what typing into it means. \see ModuleControlBase.
+    ////////////////////////////////////////////////////////////////////////////
+    juce::Component &menuOwner() override { return control().widget(); }
+
+    juce::String parameterName() const override { return control().name(); }
+    juce::String parameterValueText() const override { return control().getValueText(); }
+    ParameterID parameterID() const override { return control().parameterMenuID(); }
+
+    bool parameterEditable() const override { return !isLFOEnabled(); }
+
+    bool setParameterFromText(juce::String const &text) override
+    {
+        return control().setValueFromText(text);
+    }
+    void setParameterToDefault() override { control().setValueToDefault(); }
+    void addParameterMenuEntries(juce::PopupMenu &menu) override
+    {
+        control().addLFOMenuEntry(menu);
+    }
 
   protected: // Utility functions
     bool isLFOEnabled() const
@@ -167,6 +208,31 @@ class ModuleControlBase
     /// moduleParameterChanged() without the assertions that say the user has
     /// this control under the mouse right now. \see the definition.
     void publishValue();
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \name What the right button's menu asks of a module control
+    ///
+    ///   The three answers that are not one-liners over the getters above.
+    /// Written here rather than in `ModuleControl<>` because each of them needs
+    /// the editor, and a template in a header that the widgets include cannot
+    /// have it. \see ParameterMenu and issue #93.
+    ///                                       (21.08.2026.)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    ///@{
+    /// Which parameter this is, as the host knows it.
+    ParameterID parameterMenuID() const;
+
+    /// \return false for text no value of this parameter displays as, which
+    /// leaves the parameter where it was.
+    bool setValueFromText(juce::String const &);
+
+    void setValueToDefault();
+
+    /// The LFO switch, which is every module control's and not only a knob's.
+    void addLFOMenuEntry(juce::PopupMenu &);
+    ///@}
 
     using Module = SW::Module;
 
