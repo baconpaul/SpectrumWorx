@@ -191,12 +191,13 @@ class HarnessHost final : public GUI::EditorHost
 
     /// \note A render is a function of the build, so the page asks for its tab
     /// outright -- `SW_SHOW_UI_SETTINGS_PAGE` below -- rather than reading one
-    /// out of a session this harness has none of.
-    unsigned int settingsPage() const override { return settingsPage_; }
-    void setSettingsPage(unsigned int const page) override { settingsPage_ = page; }
+    /// out of a session this harness has none of. Left at its defaults for the
+    /// same reason: a page that started wherever the last render left it would
+    /// not be a function of the build at all.
+    GUI::PanelState &panelState() override { return panelState_; }
 
   private:
-    unsigned int settingsPage_{0};
+    GUI::PanelState panelState_;
 
     HarnessEngine engine_;
     SilentNotifications notifications_;

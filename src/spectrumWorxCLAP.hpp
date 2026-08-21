@@ -305,10 +305,9 @@ class SpectrumWorxCLAP final
     bool completelyDisableIOChanges() const override { return false; }
 
     /// \note Held here and nowhere in the editor because it has to survive both
-    /// the panel and the window. \see sessionState(), which is what puts it in
+    /// the panels and the window. \see sessionState(), which is what puts it in
     /// the project file.
-    unsigned int settingsPage() const override { return settingsPage_; }
-    void setSettingsPage(unsigned int const page) override { settingsPage_ = page; }
+    GUI::PanelState &panelState() override { return panelState_; }
 
   protected:
     bool init() noexcept override;
@@ -677,14 +676,19 @@ class SpectrumWorxCLAP final
     SideChainSource sideChainSource_{defaultSideChainSource};
     SideChainSource sideChainSourceMain_{defaultSideChainSource};
 
-    /// \brief The settings panel's tab, which is this session's answer and not
-    /// this user's. `[main-thread]` \see sessionState() and issue #129.
+    ////////////////////////////////////////////////////////////////////////////
     ///
-    /// \note Zero is the Engine page, and it is written as a number rather than
-    /// as `GUI::SpectrumWorxEditor::enginePageIndex` because this member outlives
-    /// every editor: a session restored into an instance whose window has never
-    /// been opened has to hold the value until one is.
-    unsigned int settingsPage_{0};
+    /// \brief Where the user was in the panel column, which is this session's
+    /// answer and not this user's. `[main-thread]` \see sessionState() and
+    /// issue #129.
+    ///
+    /// \note It outlives every editor, which is the point: a session restored
+    /// into an instance whose window has never been opened has to hold this
+    /// until one is opened.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    GUI::PanelState panelState_;
 
     /// \note Owned by the shim, which destroys it before this. Cleared in the
     /// editor's own destructor path so a queued notification cannot reach a

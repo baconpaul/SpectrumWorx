@@ -506,52 +506,77 @@ TEST_CASE("Session state is the preset format plus a dawExtraState block", "[cla
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \note The block's first payload, and the case that says the mechanism does
-/// what it was built for. Issue #129 asks for the settings panel's tab to be
-/// remembered; the panel does not survive the preset browser being opened and
+/// what it was built for. Issue #129 asks for where the user was in the panel
+/// column to be remembered; neither panel survives the other being opened and
 /// the editor does not survive the window shutting, so the answer lives on the
 /// plugin and rides in the session.
 ///
+/// \note All four of it, because they are not exclusive: which panel was up,
+/// which tab the settings one was on, and where the browser was pointing -- a
+/// user who leaves the settings panel up was somewhere in the browser before
+/// that and expects to be there again when they press PRESETS.
+///
 /// \note Three claims, and the third is the one that makes the block worth
-/// having at all: the value comes back, a *preset* does not carry it, and
-/// loading a preset over a live session therefore leaves the tab where the user
-/// left it rather than resetting it.
+/// having at all: the values come back, a *preset* does not carry them, and
+/// loading a preset over a live session therefore leaves the user where they
+/// were rather than resetting them.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-TEST_CASE("The settings tab rides in the dawExtraState block", "[clap][state]")
+TEST_CASE("Where the user was in the panel column rides in the dawExtraState block",
+          "[clap][state]")
 {
+    using LE::SW::GUI::PanelState;
+
     Entry const entry;
 
     constexpr unsigned int interfacePage{1};
+    auto const folder(std::filesystem::temp_directory_path());
 
     OutStream saved;
     {
         Plugin const plugin;
         driveIntoAState(plugin);
-        plugin.editorHost().setSettingsPage(interfacePage);
+
+        auto &state(plugin.editorHost().panelState());
+        state.panel = PanelState::Panel::settings;
+        state.settingsPage = interfacePage;
+        state.presetLocation = PanelState::PresetLocation::user;
+        state.presetFolder = folder;
+
         REQUIRE(plugin.state().save(&*plugin, &saved));
     }
 
     INFO("state:\n" << saved.text());
+    CHECK(saved.text().find("panel=\"settings\"") != std::string::npos);
     CHECK(saved.text().find("settingsPage=\"1\"") != std::string::npos);
+    CHECK(saved.text().find("presetLocation=\"user\"") != std::string::npos);
 
     Plugin const restored;
-    // The premise: it is not already there.
-    REQUIRE(restored.editorHost().settingsPage() != interfacePage);
+    // The premise: none of it is already there.
+    REQUIRE(restored.editorHost().panelState().panel == PanelState::Panel::presets);
+    REQUIRE(restored.editorHost().panelState().settingsPage != interfacePage);
 
     InStream stream(saved.data());
     REQUIRE(restored.state().load(&*restored, &stream));
-    CHECK(restored.editorHost().settingsPage() == interfacePage);
 
-    /// \note And a `.swp` over the top of it does not move it. The file has no
-    /// `<dawExtraState>` element, so `loadPreset` never calls the reader -- which
-    /// is the property that lets one serialisation be both documents.
+    auto const &state(restored.editorHost().panelState());
+    CHECK(state.panel == PanelState::Panel::settings);
+    CHECK(state.settingsPage == interfacePage);
+    CHECK(state.presetLocation == PanelState::PresetLocation::user);
+    CHECK(state.presetFolder == folder);
+
+    /// \note And a `.swp` over the top of it does not move any of it. The file
+    /// has no `<dawExtraState>` element, so `loadPreset` never calls the reader
+    /// -- which is the property that lets one serialisation be both documents.
     auto const asPreset(LE::SW::savePreset({}, LE::SW::defaultSideChainSource, {},
                                            restored.implementation().program()));
     auto buffer(asBuffer(asPreset));
     InStream presetStream(buffer);
     REQUIRE(restored.state().load(&*restored, &presetStream));
-    CHECK(restored.editorHost().settingsPage() == interfacePage);
+    CHECK(state.panel == PanelState::Panel::settings);
+    CHECK(state.settingsPage == interfacePage);
+    CHECK(state.presetFolder == folder);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

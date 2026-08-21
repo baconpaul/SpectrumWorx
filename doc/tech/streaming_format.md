@@ -189,7 +189,7 @@ version; both went with the parameter on 07.08.2026.
 			<p n="Center (LFO me!)" v="2000" on="1" T="500" ph="0.25" sync="0" wfrm="0" />
 		</Module>
 	</Modules>
-	<dawExtraState settingsPage="1" />
+	<dawExtraState panel="settings" settingsPage="1" presetLocation="factory" />
 </SpectrumWorxPreset>
 ```
 
@@ -285,27 +285,59 @@ The element is written even when the hook writes nothing into it, so an empty
 calls the reader only when the element is present, so loading a `.swp` into a
 live session is not a silent reset of session state.
 
-**Its payload is one attribute as of 21.08.2026**, and it accrues a bullet at a
-time. The mechanism was written empty from 02.08.2026 so that the day it carried
-something would not also be the day it started being written; the first payload
-is the settings panel's selected tab (issue #129):
+**Its payload is where the user was in the panel column** (issue #129). The
+mechanism was written empty from 02.08.2026 so that the day it carried something
+would not also be the day it started being written; it has carried this since
+21.08.2026:
 
 ```xml
-<dawExtraState settingsPage="1" />
+<dawExtraState panel="settings" settingsPage="1"
+               presetLocation="user" presetBank="" presetFolder="/…/SpectrumWorx" />
 ```
 
-`SpectrumWorxCLAP::sessionState()` is the pair of hooks and
-`SpectrumWorxCLAP::settingsPage_` is what they read and write. It is on the
-plugin rather than on the editor because nothing in the editor lives long enough
-to hold it — the panel is destroyed every time the preset browser is opened, and
-the editor every time the window shuts, which is the report in #129. **The
-attribute name is on disk: renaming it is a silent break**, exactly as §2 says
-about a parameter's streaming name. A missing attribute leaves the member where
-it was, so a state written by a build that predates it resets nothing.
+Four answers, and they are not exclusive — a user who leaves the settings panel
+up was somewhere in the browser before that, and expects to be there again when
+they press PRESETS. `GUI::PanelState` (`gui/editor/editorHost.hpp`) is the
+struct, `SpectrumWorxCLAP::panelState_` is the one instance of it, and
+`SpectrumWorxCLAP::sessionState()` is the pair of hooks. It is on the plugin
+rather than on the editor because nothing in the editor lives long enough to hold
+it — a panel is destroyed every time the other one is opened, and the editor
+every time the window shuts, which is the report in #129.
 
-The remaining candidate is the preset browser's location and selection, which is
-main-thread, is not a parameter, and today is a process-wide static
-(`PresetBrowser::lastPlace()`) rather than session state.
+Three rules the block follows, and each of them is a bug that would otherwise be
+silent:
+
+- **The attribute names are on disk: renaming one is a silent break**, exactly as
+  §2 says about a parameter's streaming name.
+- **The enumerations are streamed by name**, not by ordinal, as the preferences
+  file's are (§4.4 below): inserting a value cannot then change what an existing
+  session means, and what is in the file can be grepped for in the source. An
+  unrecognised name reads as the default rather than as a failure — the block is
+  the user's to edit.
+- **A missing attribute leaves the member where it was.** That is what makes the
+  block readable by a build that predates an attribute *and* what keeps a state
+  written by an older one from resetting anything.
+
+Neither of the browser's two answers is trusted on the way back in: a folder is a
+path from a previous run that the user may have moved, and a bank is a name a
+later build need not still ship. `PresetBrowser::restoreLastPlace()` checks both
+and falls back to the top of the factory tree.
+
+### Two places, two questions
+
+`PresetBrowser::lastPlace()` is still there and is still a process-wide static,
+and it is not the same answer as the session's:
+
+| | holds | answers |
+|---|---|---|
+| `panelState_` | per instance, in the session | where *this* instance was, restored with the project |
+| `lastPlace()` | process-wide | where this *user* was last, in any instance |
+
+A new instance's `panelState_` is seeded from `lastPlace()` at construction and a
+restored one is overwritten by `stateLoad`, so there is one place to read
+afterwards and no precedence rule to get wrong. The process-wide one is what
+makes adding a second SpectrumWorx land where the first one is rather than back
+at the factory root.
 
 The settings panel's Interface page is *not* a candidate, and it is the case that
 says where the line is — and note that it is the *page* rather than the *tab*:

@@ -208,7 +208,7 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost, PanelPlacement co
     {
         panelHasOwnColumn_ = true;
         setSize(expandedWidth, estimatedHeight);
-        openRestingPanel();
+        openRememberedPanel();
     }
 
     setOpaque(true);
@@ -496,7 +496,7 @@ void SpectrumWorxEditor::panelPlacement(PanelPlacement const placement)
 
     if ((placement == PanelPlacement::alwaysVisible) && !currentPanel())
     {
-        openRestingPanel();
+        openRememberedPanel();
         return;
     }
     layOutPanels();
@@ -530,6 +530,36 @@ void SpectrumWorxEditor::openRestingPanel()
     LE_ASSERT(!currentPanel());
 
     showPresetBrowser(true);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Fills a column that has nothing in it with whichever panel this
+/// session was last left on.
+///
+/// \note Which is *not* what pressing the lit button does, and the difference is
+/// why this is a second function rather than an argument to the one above. In
+/// `alwaysVisible` the two buttons are a two-way selector -- pressing the lit one
+/// lands on the other panel -- and a "resting" state that read the remembered
+/// panel would land back on the panel just pressed, making the button a no-op.
+///
+///   This is for the other case: a column being filled from nothing, at
+/// construction or when the placement changes under an editor that had no panel
+/// up. There the last place the user was is the right answer, and it is the whole
+/// of what issue #129 asks for.
+///                                           (21.08.2026.)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxEditor::openRememberedPanel()
+{
+    LE_ASSERT(panelPlacement_ == PanelPlacement::alwaysVisible);
+    LE_ASSERT(!currentPanel());
+
+    if (editorHost_.panelState().panel == PanelState::Panel::settings)
+        showSettings();
+    else
+        showPresetBrowser(true);
 }
 
 void SpectrumWorxEditor::hidePanels()
@@ -569,6 +599,10 @@ void SpectrumWorxEditor::showPresetBrowser(bool const show)
         showPanel(*presetBrowser_);
     }
     preset_.setToggleState(true, juce::dontSendNotification);
+
+    /// \note \see showSettings(), which records the other half of the same
+    /// answer.
+    editorHost_.panelState().panel = PanelState::Panel::presets;
 }
 
 void SpectrumWorxEditor::showFactoryBank(juce::String const &bank)
@@ -1994,6 +2028,10 @@ void SpectrumWorxEditor::showSettings(unsigned int const pageIndexToActivate)
     }
     settings_->setCurrentTabIndex(pageIndexToActivate, false);
     settingsButton_.setToggleState(true, juce::dontSendNotification);
+
+    /// \note Which panel the user is in is as much a place as which tab of it
+    /// they are on, and both are the session's. \see PanelState and issue #129.
+    editorHost_.panelState().panel = PanelState::Panel::settings;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2014,7 +2052,7 @@ void SpectrumWorxEditor::showSettings(unsigned int const pageIndexToActivate)
 
 void SpectrumWorxEditor::showSettings()
 {
-    auto const page(editorHost_.settingsPage());
+    auto const page(editorHost_.panelState().settingsPage);
     showSettings((page < numberOfSettingsPages) ? page : unsigned{enginePageIndex});
 }
 
@@ -3811,7 +3849,8 @@ void SpectrumWorxEditor::Settings::currentTabChanged(int const newCurrentTabInde
                                                      juce::String const & /*newTabName*/)
 {
     if ((newCurrentTabIndex >= 0) && (newCurrentTabIndex < int{numberOfSettingsPages}))
-        editor().editorHost().setSettingsPage(static_cast<unsigned int>(newCurrentTabIndex));
+        editor().editorHost().panelState().settingsPage =
+            static_cast<unsigned int>(newCurrentTabIndex);
 }
 
 SpectrumWorxEditor &SpectrumWorxEditor::Settings::editor()

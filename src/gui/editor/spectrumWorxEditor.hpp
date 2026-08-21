@@ -578,6 +578,10 @@ class SpectrumWorxEditor final : private SkinLifetime,
     /// for nothing: the preset browser. \see the definition.
     void openRestingPanel();
 
+    /// \brief The same, with the panel this session was last left on rather than
+    /// the browser. \see the definition, which has why they are two functions.
+    void openRememberedPanel();
+
     void updateSettings();
 
     void updateMainKnobs();

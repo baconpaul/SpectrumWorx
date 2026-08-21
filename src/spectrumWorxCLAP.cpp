@@ -2393,11 +2393,11 @@ catch (...)
 ///
 /// \brief Where session state that is not a parameter goes.
 ///
-///   One attribute as of 21.08.2026, and it is what the block was built for: the
-/// settings panel's selected tab, which is a place the user was rather than a
-/// sound the plugin makes. Issue #129. The payload accrues a bullet at a time;
-/// the remaining candidate, `[main-thread]` and not a parameter, is the preset
-/// browser's location and selection.
+///   Where the user was in the panel column, which is a place they were rather
+/// than a sound the plugin makes: which of the two panels was up, which tab the
+/// settings one was on, and where the browser was pointing. Issue #129, and
+/// `GUI::PanelState` is the struct. The payload accrues a bullet at a time and
+/// this is what it has accrued so far.
 ///
 /// \note The settings panel's Interface page was a candidate and is not one.
 /// Zoom, mouse-over reaction, LFO update behaviour and hide-cursor-on-knob-drag
@@ -2405,27 +2405,91 @@ catch (...)
 /// user likes the editor to behave rather than about this session, so they went
 /// to the user preferences file instead -- `sst::plugininfra::defaults::Provider`,
 /// \see gui/preferences.hpp. The two homes are not exclusive, and surge uses
-/// both. Which tab is showing is the *other* side of that line: two projects may
-/// have been left on two different tabs, so it is the session's.
+/// both. Where a user *is* is the other side of that line: two projects may
+/// reasonably have been left in two different places, so it is the session's.
 ///                                       (16.08.2026, amended 21.08.2026.) (SW port)
-///
-/// \note A missing attribute leaves the member where it was, which is what makes
-/// this readable by a build that predates the attribute *and* what keeps a state
-/// written by an older one from resetting anything. `QueryUnsignedAttribute`
-/// only writes through on success.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-/// The one attribute the block carries, and it is on disk: do not rename it.
-static constexpr char settingsPageAttributeName[]{"settingsPage"};
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note **These names are on disk: do not rename them.** They are the block's
+/// grammar in the same sense a parameter's streaming name is -- \see
+/// streaming_format.md §2 -- and the two enumerations are written by name rather
+/// than by ordinal so that inserting a value cannot silently change what an
+/// existing session means.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+constexpr char panelAttribute[]{"panel"};
+constexpr char settingsPageAttribute[]{"settingsPage"};
+constexpr char presetLocationAttribute[]{"presetLocation"};
+constexpr char presetBankAttribute[]{"presetBank"};
+constexpr char presetFolderAttribute[]{"presetFolder"};
+
+constexpr char presetsPanel[]{"presets"};
+constexpr char settingsPanel[]{"settings"};
+constexpr char factoryLocation[]{"factory"};
+constexpr char userLocation[]{"user"};
+
+/// \note An unrecognised name reads as the default, as the preferences file's
+/// enumerations do, rather than as a failure: the block is the user's to edit and
+/// a value this build does not know is not a corrupt session.
+template <typename Value>
+void readNamed(TiXmlElement const &element, char const *const attribute, Value &value,
+               char const *const name, Value const named)
+{
+    if (auto const *const pText = element.Attribute(attribute);
+        pText && (std::strcmp(pText, name) == 0))
+        value = named;
+}
+} // anonymous namespace
 
 DawExtraState SpectrumWorxCLAP::sessionState()
 {
     return {[this](TiXmlElement &element) {
-                element.SetAttribute(settingsPageAttributeName, static_cast<int>(settingsPage_));
+                auto const &state(panelState_);
+
+                element.SetAttribute(panelAttribute,
+                                     (state.panel == GUI::PanelState::Panel::settings)
+                                         ? settingsPanel
+                                         : presetsPanel);
+                element.SetAttribute(settingsPageAttribute, static_cast<int>(state.settingsPage));
+
+                element.SetAttribute(presetLocationAttribute,
+                                     (state.presetLocation == GUI::PanelState::PresetLocation::user)
+                                         ? userLocation
+                                         : factoryLocation);
+                element.SetAttribute(presetBankAttribute, state.presetBank.toStdString());
+                /// \note UTF-8 bytes on every platform, as the sample path is and for
+                /// the same reason: a session written on one has to open on another.
+                element.SetAttribute(presetFolderAttribute, IO::pathToUTF8(state.presetFolder));
             },
             [this](TiXmlElement const &element) {
-                element.QueryUnsignedAttribute(settingsPageAttributeName, &settingsPage_);
+                auto &state(panelState_);
+
+                readNamed(element, panelAttribute, state.panel, settingsPanel,
+                          GUI::PanelState::Panel::settings);
+                readNamed(element, panelAttribute, state.panel, presetsPanel,
+                          GUI::PanelState::Panel::presets);
+
+                /// \note A missing attribute leaves the member where it was, which is
+                /// what makes this readable by a build that predates it *and* what
+                /// keeps a state written by an older one from resetting anything.
+                /// `QueryUnsignedAttribute` only writes through on success.
+                element.QueryUnsignedAttribute(settingsPageAttribute, &state.settingsPage);
+
+                readNamed(element, presetLocationAttribute, state.presetLocation, userLocation,
+                          GUI::PanelState::PresetLocation::user);
+                readNamed(element, presetLocationAttribute, state.presetLocation, factoryLocation,
+                          GUI::PanelState::PresetLocation::factory);
+
+                if (auto const *const pBank = element.Attribute(presetBankAttribute))
+                    state.presetBank = juce::String::fromUTF8(pBank);
+                if (auto const *const pFolder = element.Attribute(presetFolderAttribute))
+                    state.presetFolder = IO::utf8ToPath(pFolder);
             }};
 }
 
