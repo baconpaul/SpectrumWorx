@@ -468,7 +468,15 @@ DiscreteParameter::DiscreteParameter(juce::Component &parent, unsigned int const
 {
     setName(control().name());
     DiscreteParameter::setTopLeftPosition(x, y);
-    LE_ASSERT(control().info().default_ == 0);
+
+    /// \note `LE_ASSERT( control().info().default_ == 0 )` stood here and was
+    /// true by construction: zero was every enumerated parameter's default
+    /// because it was the only one a declaration could express. It stopped being
+    /// true the moment one could say otherwise (issue #163), and what it was
+    /// guarding -- a box showing a value its parameter does not hold -- is
+    /// settled where the rows exist to select among, which is not here. \see
+    /// WidgetInitialiser::setup().
+    ///                                       (21.08.2026.)
 }
 
 /// \note The third of the three, and the one that was missed the first time --

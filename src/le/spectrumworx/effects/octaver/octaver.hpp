@@ -38,8 +38,24 @@ namespace LE::SW::Effects
 
 struct Octaver
 {
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Two octaves that are not the same octave, which is what an Octaver
+    /// dropped into a slot ought to be doing: both rested on `Down2` because
+    /// zero was the only default an enumerated parameter could have, so the
+    /// second one added nothing the first had not. \see issue #163 and
+    /// LE_ENUMERATED_PARAMETER_DEFAULTING_TO, which is what it asked for.
+    ///
+    /// \note The same argument as the cutoff below, and the same blast radius: a
+    /// 2.x preset writes every parameter its effect has, so no committed file
+    /// moves with this. What moves is a freshly inserted Octaver -- and the
+    /// golden fixtures, which render every effect at its defaults.
+    ///                                       (21.08.2026.)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
     LE_ENUMERATED_PARAMETER(Octave1, Down2, Down1, Off, Up1, Up2);
-    LE_ENUMERATED_PARAMETER(Octave2, Down2, Down1, Off, Up1, Up2);
+    LE_ENUMERATED_PARAMETER_DEFAULTING_TO(Octave2, Down1, Down2, Down1, Off, Up1, Up2);
 
     LE_DEFINE_PARAMETER(GainOctave1, LinearFloat, Minimum<-48>, Maximum<+24>, Default<0>,
                         Unit<" dB">);

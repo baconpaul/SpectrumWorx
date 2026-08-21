@@ -38,6 +38,7 @@
 #include "le/parameters/runtimeInformation.hpp"
 #include "le/spectrumworx/effects/configuration/constants.hpp"
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
+#include "le/spectrumworx/effects/octaver/octaver.hpp"
 #include "le/spectrumworx/engine/moduleParameters.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -202,4 +203,42 @@ TEST_CASE("Every effect parameter has storage of its own", "[parameters][layout]
             module.setEffectParameter(index, baseline[which]);
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Issue #163. An enumerated parameter's default was the constant zero --
+/// `EnumeratedParameterTraits::default_()` returned a literal -- so the only
+/// value one could rest at was whichever happened to be declared first.
+///
+/// \note Three claims, and the third is the one worth having: a parameter given
+/// a default rests at it, one not given one still rests at its first value, and
+/// the default a *host* is told is the same number. `clap_param_info` reads
+/// `default_()` through the same traits, so a mechanism that moved the object
+/// and not the metadata would show up as a DAW's "reset to default" disagreeing
+/// with the plugin's own.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("An enumerated parameter can rest at a value other than its first",
+          "[parameters][layout]")
+{
+    using LE::SW::Effects::Octaver;
+
+    // The one the issue asked for: two octaves that are not the same octave.
+    CHECK(Octaver::Octave1().getValue() == Octaver::Octave1::Down2);
+    CHECK(Octaver::Octave2().getValue() == Octaver::Octave2::Down1);
+
+    // Which is the *default*, not merely what a fresh object happens to hold.
+    CHECK(Octaver::Octave1::default_() == Octaver::Octave1::Down2);
+    CHECK(Octaver::Octave2::default_() == Octaver::Octave2::Down1);
+
+    // And the plain macro is unchanged: the first value, as it always was.
+    CHECK(Octaver::Octave1::default_() == Octaver::Octave1::minimum());
+
+    /// \note Neither of them moved its range, which is the mistake this shape
+    /// avoids: the default is a third template argument rather than a shifted
+    /// minimum, so what a preset's stored value means does not move with it.
+    CHECK(Octaver::Octave2::minimum() == 0);
+    CHECK(Octaver::Octave2::maximum() == 4);
 }

@@ -24,8 +24,21 @@ template <typename... Traits> struct TraitPack;
 
 namespace Detail ///< \internal
 {
-template <std::uint8_t numberOfValues>
-struct EnumeratedParameterTraits : LinearParameterTraitsBase<0, numberOfValues - 1, 0>
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The default is a template argument rather than a trait, and that is
+/// what makes it safe: `default_()` is read by everything that builds a
+/// parameter table, by `clap_param_info.default_value` and by the parameter's
+/// own constructor, so a specialisation written where any of those cannot see it
+/// would silently hand back zero -- the primary-template failure
+/// `parameter_system.md` §7 is about, in its quiet form. Carried on the type,
+/// there is nowhere for it to be missing. \see issue #163.
+///                                           (21.08.2026.)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+template <std::uint8_t numberOfValues, std::uint8_t defaultValue = 0>
+struct EnumeratedParameterTraits : LinearParameterTraitsBase<0, numberOfValues - 1, defaultValue>
 {
   public: // Types.
     using Tag = EnumeratedParameterTag;
@@ -42,7 +55,7 @@ struct EnumeratedParameterTraits : LinearParameterTraitsBase<0, numberOfValues -
 
     static value_type minimum() { return 0; }
     static value_type maximum() { return numberOfValues - 1; }
-    static value_type default_() { return 0; }
+    static value_type default_() { return defaultValue; }
 
     static value_type const discreteValueDistance = 1;
 
@@ -64,8 +77,9 @@ struct EnumeratedParameterTraits : LinearParameterTraitsBase<0, numberOfValues -
 /// \class EnumeratedParameter
 ////////////////////////////////////////////////////////////////////////////////
 
-template <std::uint8_t numberOfValues>
-using EnumeratedParameter = Parameter<Detail::EnumeratedParameterTraits<numberOfValues>>;
+template <std::uint8_t numberOfValues, std::uint8_t defaultValue = 0>
+using EnumeratedParameter =
+    Parameter<Detail::EnumeratedParameterTraits<numberOfValues, defaultValue>>;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -92,10 +106,12 @@ using EnumeratedParameter = Parameter<Detail::EnumeratedParameterTraits<numberOf
 // spelling is a ladder of numbered arguments with a ceiling to raise later.
 //                                            (31.07.2026.) (SW port)
 
-#define LE_ENUMERATED_PARAMETER(parameterName, ...)                                                \
+#define LE_ENUMERATED_PARAMETER_IMPL(parameterName, defaultValueExpression, ...)                   \
     enum class parameterName##Values_ : std::uint8_t{__VA_ARGS__, numberOfValues_};                \
-    class parameterName : public LE::Parameters::EnumeratedParameter<static_cast<std::uint8_t>(    \
-                              parameterName##Values_::numberOfValues_)>                            \
+    class parameterName                                                                            \
+        : public LE::Parameters::EnumeratedParameter<static_cast<std::uint8_t>(                    \
+                                                         parameterName##Values_::numberOfValues_), \
+                                                     defaultValueExpression>                       \
     {                                                                                              \
       private:                                                                                     \
         using Base = type;                                                                         \
@@ -110,6 +126,40 @@ using EnumeratedParameter = Parameter<Detail::EnumeratedParameterTraits<numberOf
         };                                                                                         \
         operator value_type() const { return static_cast<value_type>(Base::getValue()); }          \
     }
+
+#define LE_ENUMERATED_PARAMETER(parameterName, ...)                                                \
+    LE_ENUMERATED_PARAMETER_IMPL(parameterName, 0, __VA_ARGS__)
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \def LE_ENUMERATED_PARAMETER_DEFAULTING_TO
+///
+/// \brief The same, with a default that is not the first value.
+///
+///   \p defaultValue is a *name*, and it is looked up in the very list the macro
+/// is being given -- so a default that is not one of the values does not
+/// compile, and inserting a value ahead of it does not silently move it. \see
+/// issue #163.
+///
+/// \note Two thin macros over one body rather than one macro with a trait pack.
+/// An enumerated parameter's declaration has never had anywhere to put a trait:
+/// its arguments are the value list, all of it, and nothing in a variadic list
+/// of enumerators can tell an enumerator from a trait.
+///
+/// \note And the default is a template argument rather than a specialisation
+/// beside the parameter, which is where every other per-parameter answer in this
+/// tree lives. `default_()` is read by everything that builds a parameter table,
+/// by `clap_param_info.default_value` and by the parameter's own constructor; a
+/// specialisation any of those could not see would quietly hand back zero rather
+/// than fail. \see parameter_system.md §7.
+///                                           (21.08.2026.)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+#define LE_ENUMERATED_PARAMETER_DEFAULTING_TO(parameterName, defaultValue, ...)                    \
+    LE_ENUMERATED_PARAMETER_IMPL(parameterName,                                                    \
+                                 static_cast<std::uint8_t>(parameterName##Values_::defaultValue),  \
+                                 __VA_ARGS__)
 
 } // namespace LE::Parameters
 
