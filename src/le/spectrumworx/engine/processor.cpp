@@ -735,13 +735,24 @@ bool Processor::resize(StorageFactors &currentStorageFactors,
         return true;
     }
 
-    auto const currentMainStorageSize(sharedStorage.size());
-    auto const requiredStorage(Processor::requiredStorage(newStorageFactors));
+    /// \note Sized for every spectral setup this activation can reach, laid out
+    /// for the one being moved to -- and never shrunk, so that a later FFT size
+    /// or overlap factor change is pure re-layout inside a block that is already
+    /// there. That is what lets the audio thread apply one without the host
+    /// deactivating us first. \see Engine::reserveStorage() and issue #172.
+    ///
+    ///   `SharedStorageBuffer`'s own documentation calls this the common case:
+    /// buffers preallocated for their maximum size, with unused gaps between the
+    /// used regions when they are sized below it.
+    ///                                       (21.08.2026.) (SW port)
+    auto const reserve(Engine::reserveStorage(
+        newStorageFactors, [](StorageFactors const &f) { return Processor::requiredStorage(f); }));
+    LE_ASSERT(reserve >= Processor::requiredStorage(newStorageFactors));
 
     auto const currentSampleRate(engineSetup().sampleRate<float>());
     engineSetup().setSampleRate(newStorageFactors.samplerate);
 
-    bool allocationSucceeded(sharedStorage.resize(requiredStorage));
+    bool allocationSucceeded((sharedStorage.size() >= reserve) || sharedStorage.resize(reserve));
     if (allocationSucceeded)
     {
         if (modules().resizeAll(newStorageFactors, currentStorageFactors))
@@ -750,9 +761,13 @@ bool Processor::resize(StorageFactors &currentStorageFactors,
         }
         else
         {
+            /// \note The shared block is not handed back on this path any more.
+            /// It is the reserve for every setup, including the one being rolled
+            /// back to, so shrinking it would only have to be undone again -- and
+            /// `changeWOLAParameters()` below re-lays it out for
+            /// `currentStorageFactors` either way.
             allocationSucceeded = false;
             engineSetup().setSampleRate(currentSampleRate);
-            LE_VERIFY(sharedStorage.resize(currentMainStorageSize));
         }
 
         changeWOLAParameters(currentStorageFactors, window, sharedStorage);
@@ -777,9 +792,24 @@ void Processor::changeWOLAParameters(StorageFactors const &storageFactors,
                                      Setup::Window const window, Storage storage)
 {
     LE_ASSERT(storage);
+
+    [[maybe_unused]] auto const blockSize(static_cast<std::uint32_t>(storage.size()));
+    [[maybe_unused]] auto const needed(Processor::requiredStorage(storageFactors));
+    LE_ASSERT_MSG(blockSize >= needed, "The shared storage cannot hold this spectral setup.");
+
     this->resize(storageFactors, storage);
-    LE_ASSERT_MSG(unsigned(storage.size()) <= storageFactors.numberOfChannels *
-                                                  Utility::Constants::vectorAlignment, //...mrmlj...
+
+    /// \note What is left over is the reserve, not a mistake: the block is sized
+    /// for every spectral setup this activation can reach
+    /// (`Engine::reserveStorage()`), so laying it out for a smaller one leaves a
+    /// tail unused -- which is the case `SharedStorageBuffer` documents as the
+    /// common one. This asserted `<= numberOfChannels * vectorAlignment`
+    /// outright, which was the same statement back when the block was sized for
+    /// exactly one setup and reads the same now for that case.
+    ///                                       (21.08.2026.) (SW port)
+    LE_ASSERT_MSG(unsigned(storage.size()) <=
+                      (blockSize - needed) + storageFactors.numberOfChannels *
+                                                 Utility::Constants::vectorAlignment, //...mrmlj...
                   "Requested storage space not consumed.");
 
     engineSetup().setFFTSize(storageFactors.fftSize);

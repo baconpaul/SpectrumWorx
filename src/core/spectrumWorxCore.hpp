@@ -196,6 +196,13 @@ class SpectrumWorxCore : public Host2PluginInteropControler,
 
     Engine::StorageFactors const &currentStorageFactors() const { return currentStorageFactors_; }
 
+    /// \brief The one heap block every spectral buffer aliases into.
+    ///
+    /// \note Exposed so a test can assert what `Engine::reserveStorage()` is for:
+    /// that a spectral setup change re-lays this block out rather than
+    /// reallocating it. \see spectralPreallocationTests.cpp.
+    Engine::HeapSharedStorage const &sharedStorage() const { return sharedStorage_; }
+
     static SpectrumWorxCore const &fromEngineSetup(Engine::Setup const &);
 
     ////////////////////////////////////////////////////////////////////////////

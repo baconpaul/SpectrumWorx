@@ -540,8 +540,16 @@ template <class EffectParam, class Base> class ModuleEffectImpl : public Base
             return true;
         }
 
-        if (this->allocateStorage(factors, channelStatesHolder_.sizeOfChannelState,
-                                  channelStatesHolder_.channelStateRequiredStorage(factors)))
+        /// \note Reserved for every spectral setup this activation can reach and
+        /// laid out for this one, so that a later FFT size change resizes nothing
+        /// here either. \see Engine::reserveStorage() and issue #172.
+        ///                                   (21.08.2026.) (SW port)
+        auto const reserve(Engine::reserveStorage(factors, [this](StorageFactors const &f) {
+            return channelStatesHolder_.channelStateRequiredStorage(f);
+        }));
+        LE_ASSERT(reserve >= channelStatesHolder_.channelStateRequiredStorage(factors));
+
+        if (this->allocateStorage(factors, channelStatesHolder_.sizeOfChannelState, reserve))
             [[likely]]
         {
             channelStatesHolder_.resize(this->storage(), factors);

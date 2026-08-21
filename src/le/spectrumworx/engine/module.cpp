@@ -77,6 +77,15 @@ bool ModuleDSP::allocateStorage(
 
     auto const totalBytes(baseNumberOfBytes + alignmentPadding + bufferNumberOfBytes);
 
+    /// \note Grow only. The caller asks for the reserve across every reachable
+    /// spectral setup, so once this block exists a later FFT size or overlap
+    /// factor change re-lays it out rather than reallocating it -- which is what
+    /// makes such a change safe on the audio thread. Zero is the teardown case
+    /// and still releases. \see Engine::reserveStorage() and issue #172.
+    ///                                       (21.08.2026.) (SW port)
+    if (totalBytes && (storage_.size() >= totalBytes))
+        return true;
+
     return storage_.resize(totalBytes);
 }
 

@@ -26,6 +26,7 @@ add_executable(sw-dsp-tests
         core/chunkTransparencyTests.cpp
         core/engineOwnershipTests.cpp
         core/protocolTests.cpp
+        core/spectralPreallocationTests.cpp
         effects/amplifyingEffectsTests.cpp
         effects/effectsListTests.cpp
         effects/freezeTests.cpp

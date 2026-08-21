@@ -22,6 +22,7 @@
 #include "le/utility/typeTraits.hpp"
 #include "le/utility/platformSpecifics.hpp"
 
+#include <algorithm>
 #include <array>
 #include "le/utility/span.hpp"
 
@@ -70,6 +71,50 @@ struct StorageFactors
 }; // struct StorageFactors
 
 #pragma warning(pop)
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief The largest `requiredStorage` answers for any spectral setup reachable
+/// from this one without the engine being torn down.
+///
+///   The FFT size and the overlap factor are the two a user can move while audio
+/// runs, so both sweep their whole range here; the channel count and the sample
+/// rate are fixed for an activation and are taken as given.
+///
+/// \note Enumerated rather than reasoned about. Reserving "the largest FFT size"
+/// would need `requiredStorage` to be monotonic in both factors, and it is not
+/// obviously so: `OutputOLA` alone is `fftSize * (2 - 1 / overlapFactor)`, which
+/// grows with the *overlap*, and each of the fifty-seven effects sizes its own
+/// channel state however it likes. Twenty-eight combinations answered exactly
+/// costs nothing once per activation and needs no assumption to hold.
+///
+/// \note What this buys is an FFT size change that allocates nothing, and so one
+/// the audio thread may apply itself. The alternative -- asking the host to
+/// deactivate us -- depends on the host honouring `clap_host::request_restart`,
+/// and Ardour does not. \see issue #172.
+///                                           (21.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+template <class RequiredStorage>
+std::uint32_t reserveStorage(StorageFactors const &factors, RequiredStorage const &requiredStorage)
+{
+    std::uint32_t reserve(0);
+    for (std::uint16_t fftSize(Constants::minimumFFTSize); fftSize <= Constants::maximumFFTSize;
+         fftSize = static_cast<std::uint16_t>(fftSize * 2))
+    {
+        for (std::uint8_t overlap(Constants::minimumOverlapFactor);
+             overlap <= Constants::maximumOverlapFactor;
+             overlap = static_cast<std::uint8_t>(overlap * 2))
+        {
+            StorageFactors const candidate{fftSize, overlap, factors.numberOfChannels,
+                                           factors.samplerate};
+            reserve = std::max<std::uint32_t>(
+                reserve, static_cast<std::uint32_t>(requiredStorage(candidate)));
+        }
+    }
+    return reserve;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
