@@ -709,11 +709,18 @@ TEST_CASE("One press on a module combo box selects it and opens its menu", "[gui
     /// first press selected the control and swallowed itself, so the menu took
     /// two clicks.
     ///
-    /// \note `menuActive()` rather than a screenshot: the menu is asynchronous
-    /// and there is no message loop in a test binary, but the flag is set where
-    /// the menu is shown, which is the half this case is about. \see
-    /// PopupMenu::menuActive().
+    /// \note The modal component count rather than a screenshot: the menu is
+    /// asynchronous and there is no message loop in a test binary, but the
+    /// component is made and entered into a modal state where the menu is shown,
+    /// which is the half this case is about.
     ///                                       (17.08.2026.) (SW port)
+    ///
+    /// \note It read `ComboBox::menuActive()` until 21.08.2026, and the flag is
+    /// no longer set because the box no longer drops a bare list of values: both
+    /// buttons raise the *parameter's* menu, which is that list plus the LFO
+    /// switch, the default and the host's entries. \see
+    /// DiscreteParameter::mouseDown() and issue #93. What the case claims has not
+    /// moved -- one press, selected and a menu up -- only what answers it.
     ///
     ////////////////////////////////////////////////////////////////////////////
     SWTest::HostSideJuce const juceIsUp;
@@ -736,14 +743,22 @@ TEST_CASE("One press on a module combo box selects it and opens its menu", "[gui
     auto &comboBox(dynamic_cast<GUI::ComboBox &>(control.widget()));
 
     REQUIRE(editor.activeControl() != &control);
-    REQUIRE(!comboBox.menuActive());
+    REQUIRE(juce::Component::getNumCurrentlyModalComponents() == 0);
 
     comboBox.mouseDown(eventOver(comboBox, {}, false));
 
     // It selected -- which is what puts the control's LFO on screen...
     CHECK(editor.activeControl() == &control);
     // ...and the menu is up, which used to need a second press.
-    CHECK(comboBox.menuActive());
+    CHECK(juce::Component::getNumCurrentlyModalComponents() == 1);
+
+    /// \note And it is the parameter's menu rather than a bare list of values.
+    /// The parameter menu names the editor as its parent, so that the type-in
+    /// field a knob has can take the keyboard; a list of values is a desktop
+    /// window of its own. Whose child it is is which menu it is.
+    auto *const pMenu(juce::Component::getCurrentlyModalComponent(0));
+    REQUIRE(pMenu != nullptr);
+    CHECK(static_cast<juce::Component const &>(editor).isParentOf(pMenu));
 
     /// \note Before the editor goes. Its destructor dismisses menus itself, but
     /// a menu left up here would outlive the case rather than the editor.
