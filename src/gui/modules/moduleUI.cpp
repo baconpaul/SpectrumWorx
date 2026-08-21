@@ -433,15 +433,31 @@ DiscreteParameter::DiscreteParameter(juce::Component &parent, unsigned int const
 /// as a button in a different shape: the first press selected the control and
 /// swallowed itself, so opening the menu took two clicks. \see issue #65.
 ///                                           (17.08.2026.) (SW port)
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note **Both buttons, and the same menu.** The parameter's menu *is* the list
+/// of values, plus the name over it, the LFO switch, the way back to the default
+/// and whatever the host adds -- so there is nothing the plain list offered that
+/// this does not, and no reason for the two buttons to answer differently. \see
+/// issue #93 and addParameterValueEntries().
+///
+/// \note Which also settles what an LFO'd combo box does with a press. It used
+/// to do nothing at all, so the one control that could turn the LFO back off was
+/// the knob the LFO was not on; the menu comes up either way now, with the
+/// values disabled and the switch live.
+///
+/// \note The left button takes the selection first and the right does not, which
+/// is what each already did and what a knob does: a press that is going to
+/// change the value has to make this the active control, and one that is only
+/// going to open a menu about it does not.
+///                                           (21.08.2026.)
+///
+////////////////////////////////////////////////////////////////////////////////
+
 void DiscreteParameter::mouseDown(juce::MouseEvent const &event)
 {
-    /// \note And the right button raises the *parameter's* menu rather than the
-    /// list of values, which is what it does on every other control. \see issue
-    /// #93.
-    if (event.mods.isPopupMenu())
-        return showParameterMenu(event);
-
-    if (!hasDirectFocus())
+    if (!event.mods.isPopupMenu() && !hasDirectFocus())
     {
         juce::Component::SafePointer<juce::Component> const self(this);
         grabKeyboardFocus();
@@ -449,18 +465,7 @@ void DiscreteParameter::mouseDown(juce::MouseEvent const &event)
             return;
     }
 
-    if (!isLFOEnabled())
-    {
-        /// \note The menu is asynchronous now, so the notification happens in
-        /// the callback rather than on the next line. The SafePointer matters:
-        /// a module can be ejected while its menu is down.
-        ///                                   (28.07.2026.) (SW port)
-        ComboBox::showMenu([self = juce::Component::SafePointer<DiscreteParameter>(this)](
-                               bool const valueChanged) {
-            if (self && valueChanged)
-                self->moduleParameterChanged();
-        });
-    }
+    showParameterMenu(event);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
