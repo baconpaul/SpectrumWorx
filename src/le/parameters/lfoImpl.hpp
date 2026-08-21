@@ -23,7 +23,10 @@
 #include "le/parameters/uiElements.hpp" // the UIElements below
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
+#include <optional>
+#include <span>
 
 namespace LE
 {
@@ -364,6 +367,38 @@ class LFOImpl : public LFO
 
     static SnappedPeriod snapPeriodScale(value_type periodScale, std::uint8_t syncTypes);
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief What a period *reads* as, which is not the number it is stored as.
+    ///
+    ///   A synced LFO's period is a note value -- `1/4 bars`, `1/8T bars`,
+    ///   `2/1 bars` -- and a free one's is a length of time in milliseconds. The
+    /// stored value is neither: it is a multiple of a bar, from about 0.0208 to
+    /// 24, and a host asking `value_to_text` used to be handed exactly that.
+    /// \see issue #158.
+    ///
+    /// \note Here rather than in the panel that has always drawn it, because
+    /// what a host is told and what the panel says have to be the same thing and
+    /// this layer is the one both can reach -- the panel is JUCE and the
+    /// parameter edge may not link it.
+    ///                                   (21.08.2026.)
+    ///
+    /// \returns the number of characters written, not counting the terminator.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    static std::size_t printPeriodScale(value_type periodScale, std::uint8_t syncTypes,
+                                        std::span<char> buffer);
+
+    /// \brief The note value alone, without the milliseconds arm: what the panel
+    /// draws on its own line. \see printPeriodScale(), whose synced arm this is.
+    static std::size_t printSyncedPeriodScale(value_type periodScale, std::uint8_t syncTypes,
+                                              std::span<char> buffer);
+
+    /// \brief printPeriodScale() run backwards, or nothing for text that is not
+    /// a period this LFO could hold.
+    static std::optional<value_type> parsePeriodScale(char const *text, std::uint8_t syncTypes);
+
     //...mrmlj...cleanup with a new 'logarithmic' parameter/control...
     static void snapPeriodScaleFromAutomation(PeriodScale &);
 
@@ -441,6 +476,35 @@ STREAMING_NAME(LFOImpl::LowerBound, "lbnd")
 STREAMING_NAME(LFOImpl::UpperBound, "ubnd")
 STREAMING_NAME(LFOImpl::SyncTypes, "sync")
 STREAMING_NAME(LFOImpl::Waveform, "wfrm")
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The phase is stored as a fraction of a period -- plus or minus a half
+/// -- and read as a percentage, which is what the LFO panel has always drawn and
+/// what a host was not being told. \see issue #158.
+///
+/// \note `ValuesDenominator<100>` on the declaration says the same thing and
+/// says it to nobody: nothing in the printer reads that trait. The transform is
+/// where a display unit lives, and the inverse beside it is what lets a host
+/// read the percentage back.
+///                                           (21.08.2026.)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+template <> struct DisplayValueTransformer<LFOImpl::Phase>
+{
+    template <typename Source>
+    static Source transform(Source const &value, SW::Engine::Setup const &)
+    {
+        return value * 100;
+    }
+    static float inverse(float const percentage, SW::Engine::Setup const &)
+    {
+        return percentage / 100;
+    }
+    /// \note With the leading space, as every other unit in the tree has.
+    using Suffix = UnitString<" %">;
+};
 
 //...mrmlj...this does not work yet because the Window enum is not a member
 //...of the WindowFunction parameter class...fix this...

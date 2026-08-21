@@ -431,6 +431,17 @@ Plugin2HostPassiveInteropController::ParameterLabelGetter::operator()(
         break;
     case IndexOf<LFO::Parameters, LFO::UpperBound>::value:
         break;
+
+    /// \note The phase's own unit, which nothing was appending: the label getter
+    /// answered for the two bounds and `nullptr` for everything else, so the
+    /// percentage the transform now produces would have reached a host bare.
+    /// \see issue #158.
+    case IndexOf<LFO::Parameters, LFO::Phase>::value:
+        return LE::Parameters::DisplayValueTransformer<LFO::Phase>::Suffix::c_str();
+
+    /// \note The period carries its own -- `bars` or `ms`, and which of the two
+    /// depends on the sync mask rather than on the parameter. \see
+    /// ParameterValueStringGetter's LFO arm.
     default:
         return nullptr;
     }
@@ -511,6 +522,7 @@ char const *Plugin2HostPassiveInteropController::ParameterValueStringGetter::ope
     using LE::Parameters::IndexOf;
     auto const lowerBoundIndex(IndexOf<LFO::Parameters, LFO::LowerBound>::value);
     auto const upperBoundIndex(IndexOf<LFO::Parameters, LFO::UpperBound>::value);
+    auto const periodScaleIndex(IndexOf<LFO::Parameters, LFO::PeriodScale>::value);
     switch (lfoParameterIndex)
     {
     default:
@@ -521,6 +533,51 @@ char const *Plugin2HostPassiveInteropController::ParameterValueStringGetter::ope
         return LE::Parameters::invokeFunctorOnIndexedParameter(
             lfo.parameters(), lfoParameterIndex,
             std::forward<Parameters::AutomatedParameterPrinter const>(printer));
+    }
+
+        ////////////////////////////////////////////////////////////////////////////
+        ///
+        /// \note A period is a note value or a length of time, and which of the two
+        /// is the LFO's business rather than the parameter's -- so it is printed here
+        /// rather than through the generic printer, which has the number and not the
+        /// sync mask. A host was being handed the raw multiple of a bar. \see issue
+        /// #158 and LFOImpl::printPeriodScale().
+        ///
+        /// \note And the skew is undone on the way in. `PeriodScale` crosses the
+        /// normalised edge *linearised* -- `LFOParameterGetter` skews it so that a
+        /// bar sits in the middle of a host's fader -- and the generic printer's
+        /// NormalisedLinear arm does not know that, so a supplied value printed
+        /// through it named a different period from the one the same number would
+        /// set. ParameterParser's arm skews it back.
+        ///
+        ////////////////////////////////////////////////////////////////////////////
+
+    case periodScaleIndex:
+    {
+        auto periodScale(lfo.parameters().get<LFO::PeriodScale>());
+        if (printer.forValue)
+        {
+            auto automationValue(*printer.forValue);
+            switch (printer.valueSource)
+            {
+            case Parameters::AutomatedParameterPrinter::NormalisedLinear:
+                periodScale =
+                    Plugins::NormalisedAutomatedParameter::convertAutomationToParameterValue<
+                        LFO::PeriodScale>(LFO::unlinearisePeriodScale(automationValue));
+                break;
+            case Parameters::AutomatedParameterPrinter::Linear:
+                periodScale =
+                    Plugins::FullRangeAutomatedParameter::convertAutomationToParameterValue<
+                        LFO::PeriodScale>(automationValue);
+                break;
+            case Parameters::AutomatedParameterPrinter::Unchanged:
+                periodScale = Math::convert<LFO::PeriodScale::value_type>(automationValue);
+                break;
+                LE_DEFAULT_CASE_UNREACHABLE();
+            }
+        }
+        LFO::printPeriodScale(periodScale, lfo.syncTypes(), printer.printer.buffer);
+        return printer.printer.buffer.begin();
     }
 
     case lowerBoundIndex:
