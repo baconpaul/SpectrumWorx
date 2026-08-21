@@ -446,6 +446,23 @@ class SpectrumWorxEditor final : private SkinLifetime,
     ////////////////////////////////////////////////////////////////////////////
     void applyPaletteIfChanged();
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Redraws the settings panel's engine information if the engine has
+    /// caught up with what the user asked for.
+    ///
+    /// \returns whether it repainted, which is the seam a test has -- for the
+    /// reason rackResyncRequests() gives about a different one. What the bug was
+    /// is that nothing *asked* for a repaint; a headless render repaints
+    /// everything it is given whether or not anything marked it dirty, so a
+    /// picture cannot tell "asked" from "never asked" and this can.
+    ///
+    /// \note Public for the same reason applyPaletteIfChanged() is: it is what
+    /// `timerCallback()` does, and a headless test has to be the clock.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    bool updateEngineInformationIfChanged();
+
     /// \brief What the Interface page's colour scheme box does: remembers it
     /// and hands it to the map. `[main-thread]`
     void setPalette(ColourMap::Palette);
@@ -1213,6 +1230,23 @@ class SpectrumWorxEditor final : private SkinLifetime,
 
         void updateEnginePage();
 
+        ////////////////////////////////////////////////////////////////////////
+        ///
+        /// \brief Redraws the four engine information lines if what they say has
+        /// moved.
+        ///
+        /// \note Polled rather than pushed, for the reason
+        /// SpectrumWorxEditor::applyPaletteIfChanged() is: the numbers come out
+        /// of `Engine::Setup`, the setup is rebuilt on whichever thread owns the
+        /// engine some time after the user picks an FFT size, and nothing marks
+        /// a pixel of this page dirty when it happens. \see issue #142.
+        ///                                   (21.08.2026.)
+        ///
+        ////////////////////////////////////////////////////////////////////////
+
+        /// \returns whether it repainted.
+        bool updateEngineInformation();
+
         static void comboBoxValueChanged(ComboBox const &);
 
         SpectrumWorxEditor &editor();
@@ -1274,13 +1308,19 @@ class SpectrumWorxEditor final : private SkinLifetime,
           public:
             EnginePage();
 
-            void setNewQualityFactor(float const &qualityFactor);
+            /// \brief Rebuilds the four lines under the combo boxes from \p setup.
+            /// \returns whether any of them changed, which is what says whether
+            /// the page needs repainting. \see Settings::updateEngineInformation().
+            bool setEngineInformation(Engine::Setup const &setup);
 
           private: // JUCE component overrides.
             void paint(juce::Graphics &) override;
 
           private:
             juce::String engineQuality_;
+            juce::String frequencyResolution_;
+            juce::String timeResolution_;
+            juce::String latency_;
         }; // class EnginePage
 
         class InterfacePage : public PanelBackground

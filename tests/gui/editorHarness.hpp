@@ -143,6 +143,10 @@ class Instance final : public GUI::EditorHost
 
     Program &mutableProgram() const { return const_cast<Engine &>(engine_).program(); }
 
+    /// \brief The engine itself, typed, so a case can stand in for the audio
+    /// thread and apply a spectral parameter. \see SWTest::Engine::set().
+    Engine &engine() { return engine_; }
+
     /// \note Applied outright, for the same reason: with nothing processing,
     /// `Threading::publish*()` would apply them here anyway.
     void editParameter(ParameterID const parameterID, float const value) const override

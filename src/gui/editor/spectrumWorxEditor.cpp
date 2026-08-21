@@ -2365,7 +2365,18 @@ void SpectrumWorxEditor::timerCallback()
 {
     applyPaletteIfChanged();
 
+    updateEngineInformationIfChanged();
+
     pumpModulatedValues();
+}
+
+/// \note Costs four `lexical_cast`s and four string compares per tick, and only
+/// while the settings panel happens to be up. \see Settings::updateEngineInformation().
+bool SpectrumWorxEditor::updateEngineInformationIfChanged()
+{
+    LE_ASSERT(isThisTheGUIThread());
+
+    return settings_.has_value() && settings_->updateEngineInformation();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3572,7 +3583,12 @@ void SpectrumWorxEditor::Settings::comboBoxValueChanged(ComboBox const &comboBox
         LE_UNREACHABLE_CODE();
     }
 
-    settings.enginePage_.setNewQualityFactor(editor.engineSetup().wolaRippleFactor());
+    /// \note The engine has been *asked*; it has not necessarily answered. A
+    /// spectral parameter is queued and applied on whichever thread owns the
+    /// engine, so the setup this would read here is still the old one -- which
+    /// is half of issue #142, the other half being that nothing repainted the
+    /// page at all. Both are updateEngineInformation()'s, which polls.
+    settings.updateEngineInformation();
 }
 
 #pragma warning(pop)
@@ -3604,14 +3620,56 @@ void SpectrumWorxEditor::Settings::updateEnginePage()
     fftSize_->setValue(parameters.get<Engine::FFTSize>());
     overlapFactor_->setValue(parameters.get<Engine::OverlapFactor>());
     windowFunction_->setValue(parameters.get<Engine::WindowFunction>());
-    enginePage_.setNewQualityFactor(engineSetup.wolaRippleFactor());
+
+    if (enginePage_.setEngineInformation(engineSetup))
+        enginePage_.repaint();
+}
+
+bool SpectrumWorxEditor::Settings::updateEngineInformation()
+{
+    /// \note The unchecked getter, for the reason updateEnginePage() gives
+    /// above: this is called precisely while the setup and the parameters
+    /// disagree, and reading it then is the whole point.
+    if (!enginePage_.setEngineInformation(editor().effect().uncheckedEngineSetup()))
+        return false;
+    enginePage_.repaint();
+    return true;
 }
 
 SpectrumWorxEditor::Settings::EnginePage::EnginePage() : PanelBackground(SettingsPage) {}
 
-void SpectrumWorxEditor::Settings::EnginePage::setNewQualityFactor(float const &qualityFactorParam)
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note All four lines, and it answers whether any of them moved.
+///
+///   Three of them used to be built inside paint() out of the live
+/// `Engine::Setup`, which meant the page could only be right by accident: the
+/// setup is applied on whichever thread owns the engine, some time after the
+/// user picks a size, and nothing marked the page dirty when it happened. So a
+/// panel left open showed the numbers from before the change until something
+/// else repainted it -- issue #142, where the four lines describe the *previous*
+/// FFT size while the combo boxes describe the current one.
+///
+///   Held as strings and compared instead. The comparison is what lets the
+/// editor poll this at the modulation rate without repainting thirty times a
+/// second. \see Settings::updateEngineInformation().
+///
+/// \note And it takes the setup rather than reading it, so paint() no longer
+/// calls the *checked* `engineSetup()` getter -- which asserts that the setup
+/// agrees with the spectral parameters, and which is false for exactly as long
+/// as this bug was visible for.
+///                                           (21.08.2026.)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+bool SpectrumWorxEditor::Settings::EnginePage::setEngineInformation(Engine::Setup const &setup)
 {
-    float const qualityFactor(qualityFactorParam);
+    auto const previousQuality(engineQuality_);
+    auto const previousResolution(frequencyResolution_);
+    auto const previousStep(timeResolution_);
+    auto const previousLatency(latency_);
+
+    float const qualityFactor(setup.wolaRippleFactor());
     // Implementation note:
     //   In this document http://eprints.kfupm.edu.sa/21525/1/21525.pdf (at the
     // end of page 32) it is argued that a variation of 0.03% or less is
@@ -3642,48 +3700,45 @@ void SpectrumWorxEditor::Settings::EnginePage::setNewQualityFactor(float const &
     engineQuality_ = "Ripple Amount: ";
     engineQuality_ += buffer;
     engineQuality_ += description;
+
+    auto const diagnostic([](char const *const title, float const value, char const *const suffix) {
+        char valueStr[32];
+        Utility::lexical_cast(value, 1, valueStr);
+        juce::String line(title);
+        line += ": ";
+        line += valueStr;
+        line += ' ';
+        line += suffix;
+        return line;
+    });
+
+    frequencyResolution_ =
+        diagnostic("Frequency Resolution", setup.frequencyRangePerBin<float>(), "Hz");
+    timeResolution_ = diagnostic("Time Resolution", setup.stepTime() * 1000, "ms");
+    latency_ = diagnostic("Latency", setup.latencyInMilliseconds(), "ms");
+
+    return (engineQuality_ != previousQuality) || (frequencyResolution_ != previousResolution) ||
+           (timeResolution_ != previousStep) || (latency_ != previousLatency);
 }
 
-namespace
-{
-void printEngineDiagnostics(juce::String &buffer, char const *const title, float const value,
-                            char const *const suffix, unsigned int const verticalOffset,
-                            juce::Graphics const &graphics)
-{
-    char valueStr[32];
-    Utility::lexical_cast(value, 1, valueStr);
-    buffer = title;
-    buffer += ": ";
-    buffer += valueStr;
-    buffer += ' ';
-    buffer += suffix;
-    graphics.drawFittedText(buffer, SpectrumWorxEditor::Settings::xMargin + 6, verticalOffset, 213,
-                            18, juce::Justification::centred, 1);
-}
-} // anonymous namespace
-
+/// \note Four strings and nothing computed. What they say is
+/// setEngineInformation()'s question, which is also where the answer to "when
+/// does this page get repainted" lives.
 void SpectrumWorxEditor::Settings::EnginePage::paint(juce::Graphics &g)
 {
     PanelBackground::paint(g);
     g.setColour(ColourMap::getColour(ColourMap::Text));
     g.setFont(DrawableText::defaultFont());
-    g.drawFittedText(engineQuality_, xMargin + 6, yMargin + yStep * 5, 213, 18,
-                     juce::Justification::centred, 1);
 
-    Settings &settings(
-        Utility::ParentFromMember<Settings, EnginePage, &Settings::enginePage_>()(*this));
-    Engine::Setup const &engineSetup(settings.editor().engineSetup());
-    juce::String tmp;
-    tmp.preallocateBytes(sizeof(juce::String::CharPointerType::CharType) * 64);
-    printEngineDiagnostics(tmp, "Frequency Resolution", engineSetup.frequencyRangePerBin<float>(),
-                           "Hz", yMargin + yStep * 5 + 30, g);
-    printEngineDiagnostics(tmp, "Time Resolution", engineSetup.stepTime() * 1000, "ms",
-                           yMargin + yStep * 5 + 60, g);
-    printEngineDiagnostics(tmp, "Latency", engineSetup.latencyInMilliseconds(), "ms",
-                           yMargin + yStep * 5 + 90, g);
+    auto const line([&g](juce::String const &text, unsigned int const verticalOffset) {
+        g.drawFittedText(text, xMargin + 6, static_cast<int>(verticalOffset), 213, 18,
+                         juce::Justification::centred, 1);
+    });
 
-    //...mrmlj...for testing...
-    //g.drawSingleLineText( engineQuality_, xMargin - 5, yMargin + yStep * 6 + 12 );
+    line(engineQuality_, yMargin + yStep * 5);
+    line(frequencyResolution_, yMargin + yStep * 5 + 30);
+    line(timeResolution_, yMargin + yStep * 5 + 60);
+    line(latency_, yMargin + yStep * 5 + 90);
 }
 
 SpectrumWorxEditor::Settings::InterfacePage::InterfacePage()

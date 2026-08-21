@@ -433,6 +433,62 @@ TEST_CASE("The settings panel reopens on the tab it was left on", "[gui][overlay
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Issue #142. The four lines under the Engine page's combo boxes -- the
+/// ripple amount, the frequency and time resolutions and the latency -- kept
+/// describing the FFT size the user had just moved away from.
+///
+///   Two things were wrong and this covers both. The numbers come out of
+/// `Engine::Setup`, which is rebuilt on whichever thread owns the engine some
+/// time *after* a spectral parameter is queued, so reading it at the moment the
+/// combo box changes reads the old one; and nothing marked the page dirty when
+/// the rebuild did happen, so even a correct read was never drawn.
+///
+/// \note The second half is what needs the boolean rather than a picture.
+/// `paintEntireComponent()` repaints whatever it is handed whether or not
+/// anything asked, so the old code -- which recomputed the three lines inside
+/// paint() -- draws the right numbers in a render and the wrong ones on screen.
+/// A picture cannot tell those apart. `updateEngineInformationIfChanged()`
+/// answering true is the editor saying it asked. \see rackResyncRequests(),
+/// which exists for the same reason.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("The engine information follows the engine, and says when it moved",
+          "[gui][overlay][settings]")
+{
+    SWTest::HostSideJuce const juce;
+    SWTest::Instance instance;
+    auto &editor(overlayEditor(instance));
+
+    editor.showSettings(Editor::enginePageIndex);
+    auto const before(rendered(editor));
+
+    // Nothing has moved, so nothing is asked to redraw.
+    CHECK_FALSE(editor.updateEngineInformationIfChanged());
+
+    ////////////////////////////////////////////////////////////////////////////
+    /// \note Straight into the engine, in the audio thread's role, because that
+    /// is where a queued spectral parameter is actually applied -- the editor's
+    /// own `globalParameterChanged<>` only queues it, and nothing drains this
+    /// harness's queue. What the case is about is the editor noticing that the
+    /// engine moved, so the engine has to be what moves.
+    ////////////////////////////////////////////////////////////////////////////
+    using LE::SW::GlobalParameters::FFTSize;
+    auto const wasSize(instance.engine().parameters().get<FFTSize>());
+    REQUIRE(instance.engine().set<FFTSize>(wasSize / 2));
+    REQUIRE(instance.engine().parameters().get<FFTSize>() != wasSize);
+
+    // It moved, and the editor said so...
+    CHECK(editor.updateEngineInformationIfChanged());
+    // ...once. A thirty-hertz poll may not repaint thirty times a second.
+    CHECK_FALSE(editor.updateEngineInformationIfChanged());
+
+    // And the page draws the new numbers.
+    CHECK(differenceOver(before, rendered(editor), overlayRectangle()) > 0);
+}
+
 TEST_CASE("The settings tab survives the editor window closing", "[gui][overlay]")
 {
     SWTest::HostSideJuce const juce;
