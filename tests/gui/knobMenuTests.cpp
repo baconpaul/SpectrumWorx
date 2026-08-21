@@ -447,12 +447,20 @@ TEST_CASE("Every module control raises its parameter's menu", "[gui][modules][me
     /// Reading them needs a message loop; counting them does not, and what each
     /// widget shape adds to the four every control has is exactly countable.
     ///
-    ///   The four are the parameter's name, the rule under it, "Reset to default
-    /// value" and "Enable LFO". The host adds none here, having none to add.
+    ///   The four are the parameter's name, the rule under it, "Enable LFO" and
+    /// "Reset to default value". The host adds none here, having none to add --
+    /// and the rule that would have gone above them is not drawn, JUCE dropping
+    /// a separator with nothing after it.
     ///
     ////////////////////////////////////////////////////////////////////////////
 
     constexpr int shared{4};
+
+    /// \note What a middle section costs: a rule of its own, plus its rows. The
+    /// section is what a value may be *set to* -- a field to type into, or the
+    /// list of choices -- and a trigger and an LED have neither, so their menus
+    /// close up to the four above rather than drawing two rules in a row.
+    constexpr int rule{1};
 
     ////////////////////////////////////////////////////////////////////////////
     /// \note Tune Worx: a combo box for the key and twelve LEDs for the
@@ -465,15 +473,15 @@ TEST_CASE("Every module control raises its parameter's menu", "[gui][modules][me
     auto const tuneWorx(menusOf("TuneWorx"));
     CHECK(tuneWorx.size() == 13);
     CHECK(std::ranges::count(tuneWorx, shared) == 12);
-    CHECK(std::ranges::count(tuneWorx, shared + 12) == 1);
+    CHECK(std::ranges::count(tuneWorx, shared + rule + 12) == 1);
 
     ////////////////////////////////////////////////////////////////////////////
     /// \note Freeze for the other two shapes -- a trigger and a knob in one
     /// effect. A knob is the only module control with a field to type a value
-    /// into, so it is the only one of the three whose menu is one longer.
+    /// into, so it is the only one of the three with a middle section at all.
     ////////////////////////////////////////////////////////////////////////////
     auto const freeze(menusOf("Freeze"));
     REQUIRE(freeze.size() == 3);
     CHECK(std::ranges::count(freeze, shared) == 2);
-    CHECK(std::ranges::count(freeze, shared + 1) == 1);
+    CHECK(std::ranges::count(freeze, shared + rule + 1) == 1);
 }

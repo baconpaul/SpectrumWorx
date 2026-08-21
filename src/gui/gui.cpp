@@ -1423,10 +1423,31 @@ void ParameterMenu::showParameterMenu(juce::MouseEvent const &event)
 
     bool const editable(parameterEditable());
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Four sections with a rule between them, and they are the same four
+    /// whatever the widget is:
+    ///
+    ///     the parameter's name
+    ///     ----------------------------------------------------
+    ///     what its value may be set to -- a field to type into
+    ///     for a knob, the list of choices for a discrete one
+    ///     ----------------------------------------------------
+    ///     Enable LFO, Reset to default value
+    ///     ----------------------------------------------------
+    ///     whatever the host adds
+    ///
+    ///   The middle section is the only one that differs, and it is empty for a
+    /// trigger and for an LED -- one is an event and the other is one press
+    /// away. juce::PopupMenu refuses a separator that would follow another, so
+    /// an empty section closes up rather than leaving a double rule.
+    ///                                       (21.08.2026.) \see issue #93.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
     juce::PopupMenu menu;
 
     menu.addSectionHeader(parameterName());
-
     menu.addSeparator();
 
     if (editable && parameterAcceptsText())
@@ -1436,16 +1457,16 @@ void ParameterMenu::showParameterMenu(juce::MouseEvent const &event)
         /// user dismissed it".
         menu.addCustomItem(1, std::make_unique<ValueTypein>(*this));
     }
-
     addParameterValueEntries(menu);
+    menu.addSeparator();
 
+    addParameterMenuEntries(menu);
     menu.addItem("Reset to default value", editable, /*isTicked*/ false,
                  [this, pWidget = juce::Component::SafePointer<juce::Component>(&widget)] {
                      if (pWidget)
                          setParameterToDefault();
                  });
-
-    addParameterMenuEntries(menu);
+    menu.addSeparator();
 
     auto &editor(SpectrumWorxEditor::fromChild(widget));
     editor.editorHost().addHostParameterEntries(parameterID(), menu);
