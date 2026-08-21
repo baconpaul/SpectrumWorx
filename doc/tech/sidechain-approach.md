@@ -59,6 +59,26 @@ back when it un-muted. Whether a port is connected is a fact for the host to
 state — `audio-ports-activation` is where it does — and until the plugin asks for
 that, it does not guess. Issue #115 is where the user gets told.
 
+### The file's position, and the one thing that moves it
+
+A file is read forwards and wraps at its end, and its position is otherwise the
+plugin's own: nothing ties it to the song's. It is a loop of audio fed into a
+channel, not a clip on the timeline, so a locate has no position to move it to.
+
+**The transport starting takes it back to the top**, which is what the 2.x plugin
+did and what issue #143 asked for. It is a *rising edge* rather than "while
+stopped": a user auditioning with the transport parked still hears the file run
+on, which is most of what a looped side chain is for, and what pressing play
+means is "from the top". It is also what makes a bounce reproducible — the file
+is at whatever position the last few minutes of auditioning left it at, so the
+same project rendered twice did not sound the same.
+
+`Sample::restart()` had been on the class since 2011 with no caller at all;
+`SpectrumWorxCLAP::restartSampleOnTransportStart()` is the one it was missing.
+`transportWasPlaying_` is the audio thread's and `activate()` clears it, so a
+plugin brought up while the transport is already rolling counts its first block
+as a start.
+
 ### Two states that cannot occur
 
 - **`File` with no sample loaded.** Refused at both doors:

@@ -423,6 +423,11 @@ bool SpectrumWorxCLAP::activate(double const sampleRate, std::uint32_t,
     engineRunning_ = true;
     latencyInSamples_ = engineSetup().latencyInSamples();
 
+    /// \note So that a plugin brought up while the transport is already rolling
+    /// counts its first block as a start rather than as a continuation. \see
+    /// restartSampleOnTransportStart() and issue #143.
+    transportWasPlaying_ = false;
+
     /// \note An editor that opened before this point built its module knobs
     /// against an engine with no sample rate, so the ranges that quantise to a
     /// step time or a bin width could not be derived and were left alone. Now
@@ -1198,6 +1203,8 @@ clap_process_status SpectrumWorxCLAP::process(clap_process const *const process)
     /// sounded different at 128 and at 2048. A piece is one hop, which is the
     /// rate the engine samples an LFO at, so this is the finest resolution the
     /// clock can usefully have. \see issue #78 and `updateLFOTiming()`.
+    restartSampleOnTransportStart(process->transport);
+
     auto const chunk(engineChunkSize());
     for (std::uint32_t cursor(0); cursor < process->frames_count; cursor += chunk)
     {
@@ -1227,6 +1234,51 @@ clap_process_status SpectrumWorxCLAP::process(clap_process const *const process)
     publishModulatedValues();
 
     return CLAP_PROCESS_CONTINUE;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// SpectrumWorxCLAP::restartSampleOnTransportStart()
+// -------------------------------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+///   The side chain's file goes back to its start when the host's transport
+/// does, which is what the 2.x plugin did and what issue #143 asks for. It is
+/// also what makes a bounce reproducible: the file is read straight through and
+/// wrapped at its end, so by the time a user presses play it is at whatever
+/// position the last few minutes of auditioning left it at, and the same project
+/// rendered twice did not sound the same.
+///
+/// \note A **rising edge** rather than "while stopped", and the difference is
+/// what the plugin does while the transport is parked: a user auditioning with
+/// the transport stopped still hears the file run on, which is the whole point
+/// of a looped side chain. What starting the transport means is "from the top",
+/// and that is the one moment a user can point at.
+///
+/// \note And not a locate. Nothing in this model ties the file's position to the
+/// song's -- `sidechain-approach.md` §2: it is a loop of audio fed into a
+/// channel, not a clip on the timeline -- so there is no position for a locate
+/// to move it to. `restart()` has been on `Sample` since 2011 and had no caller
+/// at all until now, which is the shape of what went missing in the port.
+///                                           (21.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxCLAP::restartSampleOnTransportStart(
+    clap_event_transport const *const transport) noexcept
+{
+    bool const playing(transport && ((transport->flags & CLAP_TRANSPORT_IS_PLAYING) != 0));
+    bool const started(playing && !transportWasPlaying_);
+
+    transportWasPlaying_ = playing;
+
+    /// \note Whatever the source is, and whether or not the sample is being
+    /// heard: `pSample_` is the file the *plugin* holds, and a user who switches
+    /// back to `File` mid-song should find it where the transport left it rather
+    /// than where the last audition did.
+    if (started && pSample_)
+        pSample_->restart();
 }
 
 /// \brief Moves the LFO clock forward by one piece of the block.

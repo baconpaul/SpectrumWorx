@@ -398,3 +398,97 @@ TEST_CASE("Clearing the sample stops it being heard", "[external-audio][side-cha
     CHECK(afterClearing != withSample);
     CHECK(peak(afterClearing) > 0);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Issue #143: the 2.x plugin took the sample back to its start when the
+/// transport started and this one did not. `Sample::restart()` had been on the
+/// class since 2011 with no caller at all, which is the shape of what went
+/// missing in the port.
+///
+/// \note Measured through the audio, as the case above is and for the same
+/// reason: `pSample_` is private and belongs to the audio thread. What a restart
+/// looks like from outside is that the block after the transport starts carries
+/// the *same* side chain as the block the file was last started at.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("The sample goes back to its start when the transport does",
+          "[external-audio][side-chain]")
+{
+    juce::ScopedJuceInitialiser_GUI const juceIsUp;
+
+    Entry const entry;
+    SWTest::ScopedProblemCounter const quiet;
+
+    ActivePlugin plugin(sampleRate, blockSize);
+
+    auto const colorifer(SWTest::effectByStreamingName("Colorifer"));
+    OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), colorifer);
+    parameters(*plugin).flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+
+    editorHostOf(*plugin).setNewSample(carrier());
+
+    /// \note A steady main input, so that anything differing between two blocks
+    /// is the side channel and not the sine. \see the case above.
+    std::vector<float> leftIn(blockSize), rightIn(blockSize);
+    std::vector<float> leftOut(blockSize), rightOut(blockSize);
+    fillWithSine(leftIn, 440.0f, 0);
+    rightIn = leftIn;
+
+    auto const stopped(transportAt(120, 0, 0));
+    auto const rolling(transportAt(120, 0, CLAP_TRANSPORT_IS_PLAYING));
+
+    auto const blockWith([&](clap_event_transport const &transport) {
+        plugin.process(leftIn, rightIn, leftOut, rightOut, &transport);
+        REQUIRE(allFinite(leftOut));
+        return leftOut;
+    });
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The transport started, and the sixteen blocks after it.
+    ///
+    /// \note Sixteen because the *first* few cannot match and should not be
+    /// expected to: the engine's FIFO still holds a window of whatever was
+    /// playing before the start, and one window at the default 2048/4 is four
+    /// blocks of 512. Past that the output is a function of the file's position
+    /// alone, which is what a restart moves.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    auto const fromAStart([&] {
+        std::vector<std::vector<float>> captured;
+        for (unsigned int block(0); block < 16; ++block)
+            captured.push_back(blockWith(rolling));
+        return captured;
+    });
+
+    // Somewhere into the file, with the transport parked -- a user auditioning.
+    for (unsigned int block(0); block < 8; ++block)
+        blockWith(stopped);
+
+    auto const first(fromAStart());
+
+    // Well past where that left off, then stopped and started again.
+    for (unsigned int block(0); block < 32; ++block)
+        blockWith(rolling);
+    blockWith(stopped);
+
+    auto const second(fromAStart());
+
+    // Past the engine's own history, the two runs are the same audio.
+    for (std::size_t block(8); block < first.size(); ++block)
+    {
+        CAPTURE(block);
+        CHECK(first[block] == second[block]);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    /// \note And a *rising edge* rather than "while playing": a block that is
+    /// merely still rolling may not restart it, or the file would never advance
+    /// at all -- which is what these two say, being sixteen blocks apart in one
+    /// unbroken run.
+    ////////////////////////////////////////////////////////////////////////////
+    REQUIRE(first.front() != first.back());
+}
