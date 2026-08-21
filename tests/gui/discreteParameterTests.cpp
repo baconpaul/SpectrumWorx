@@ -499,4 +499,21 @@ TEST_CASE("A wheel does nothing while the combo box's menu is open", "[gui][comb
 
     scroll(box, -0.3f);
     CHECK(box.getValue() == opened);
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Before the editor goes, and this is the one case in the file that
+    /// needs saying. The settings panel's box is not a module strip's: its menu
+    /// has no parent component, so it is a real desktop window -- a
+    /// `LinuxComponentPeer` under Xvfb -- and leaving it up outlives the editor
+    /// rather than the other way about.
+    ///
+    ///   macOS tolerated that and Linux did not: `X_ChangeProperty` failed with
+    /// `BadAtom` on the way out and JUCE's leak detector then reported the menu,
+    /// its peer and the whole settings panel. All three Linux jobs of PR #169,
+    /// against a green macOS and a green Windows.
+    ///                                       (21.08.2026.)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    juce::PopupMenu::dismissAllActiveMenus();
 }
