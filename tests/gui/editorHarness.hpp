@@ -42,10 +42,84 @@
 #include <memory>
 #include <vector>
 
+#if JUCE_LINUX || JUCE_BSD
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Declared rather than included. <X11/Xlib.h> reaches a consumer of
+/// juce_gui_basics only behind JUCE_GUI_BASICS_INCLUDE_XHEADERS, and turning
+/// that on here would put X11's macros -- None, Status, Bool, Success, Complex
+/// -- into every translation unit that includes this harness, all of which also
+/// compile Catch2 and our own headers. Three functions and one opaque type is
+/// the whole of what aWindowCanBeMade() below needs, and libX11 is already on
+/// this target's link line through JUCE.
+///                                           (05.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+extern "C"
+{
+    struct _XDisplay;
+    _XDisplay *XOpenDisplay(char const *displayName);
+    unsigned long XInternAtom(_XDisplay *display, char const *name, int onlyIfExists);
+    int XCloseDisplay(_XDisplay *display);
+} // extern "C"
+#endif // JUCE_LINUX || JUCE_BSD
+
 namespace SWTest
 {
 using namespace LE;
 using namespace LE::SW;
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Whether a desktop window can be made here at all.
+///
+/// \note X11 only, and it is not the same question as "is there a display".
+/// `xvfb-run` gives a window server and no *window manager*, and JUCE cannot
+/// make a window on one: `XWindowSystem::createWindow` writes the WM_PROTOCOLS
+/// property unguarded --
+///
+///     xchangeProperty( windowH, atoms.protocols, XA_ATOM, 32, atoms.protocolList, 2 );
+///
+/// -- and `atoms.protocols` is `getIfExists( display, "WM_PROTOCOLS" )`, an atom
+/// that only a window manager ever interns. With none running it is None, the
+/// property written is 0, and the server answers BadAtom -- on which Xlib's
+/// default handler calls `exit( 1 )`, killing the case where it stands. The
+/// leak-detector output that follows in a CI log is that exit, not a second bug.
+///
+///   So the atom is asked for the way JUCE asks for it, and its absence is the
+/// signal. macOS and Windows have no such hole and run these cases normally.
+///                                           (05.08.2026.) (SW port)
+///
+/// \note **Any** case that puts a component on the desktop needs this, not only
+/// the ones that are about focus -- and a menu is the easy one to forget,
+/// because nothing in the case says "window". A GUI::PopupMenu is a desktop
+/// window (\see PopupMenu::showAt(), which names no parent component), so a case
+/// that so much as opens one dies here without this guard. \see issue #145's
+/// sibling, the knob's parameter menu, which is parented and does not.
+///                                           (21.08.2026.)
+///
+////////////////////////////////////////////////////////////////////////////////
+inline bool aWindowCanBeMade()
+{
+#if JUCE_LINUX || JUCE_BSD
+    /// \note Our own connection rather than JUCE's, which is not open yet the
+    /// first time this is asked. Atoms belong to the server rather than to a
+    /// connection, so the answer is the one JUCE will get.
+    auto *const pDisplay(XOpenDisplay(nullptr));
+    if (!pDisplay)
+        return false; // No window server either.
+    auto const protocols(XInternAtom(pDisplay, "WM_PROTOCOLS", 1 /* only if it exists */));
+    XCloseDisplay(pDisplay);
+    return protocols != 0; // ...which is None.
+#else
+    return true;
+#endif // JUCE_LINUX || JUCE_BSD
+}
+
+/// \brief What a case says when there is no window to put a component on.
+constexpr char noWindow[]{
+    "No window manager: JUCE cannot put a component on the desktop here, and these cases need a "
+    "real window to drive the keyboard with."};
 
 /// \note Every one of these is a notification travelling plugin -> host, and
 /// there is no host.
