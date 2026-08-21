@@ -485,3 +485,60 @@ TEST_CASE("Every module control raises its parameter's menu", "[gui][modules][me
     CHECK(std::ranges::count(freeze, shared) == 2);
     CHECK(std::ranges::count(freeze, shared + rule + 1) == 1);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The knob's menu is the one menu in the skin with a parent component,
+/// and a parented juce::PopupMenu is the only one JUCE paints
+/// LookAndFeel::drawResizableFrame() over -- a hard square in translucent black,
+/// drawn after the children and so over the rounded background the theme had
+/// just drawn. It read as a straight-edged rect showing through every corner.
+/// \see issue #145 and Theme::drawResizableFrame().
+///
+/// \note Measured at the corner because that is the only place the two shapes
+/// disagree: a round corner leaves the pixel unpainted and a square one does
+/// not. No colour is named -- what is asserted is that *nothing* is there.
+///
+////////////////////////////////////////////////////////////////////////////////
+TEST_CASE("The knob's menu keeps its rounded corners", "[gui][modules][menu]")
+{
+    /// \note The square branch of drawPopupMenuBackground(), where a corner is
+    /// meant to be filled. \see issue #149.
+    if (!juce::Desktop::canUseSemiTransparentWindows())
+        return;
+
+    SWTest::HostSideJuce const juceIsUp;
+
+    SWTest::Instance instance;
+    instance.openEditor();
+    auto &editor(instance.editor());
+
+    editor.addUserAddedModule(static_cast<std::uint8_t>(SWTest::effectByStreamingName("Freeze")));
+    editor.resyncModuleRack();
+
+    auto *const pModuleUI(editor.regionInSlot(0));
+    REQUIRE(pModuleUI != nullptr);
+
+    auto &widget(pModuleUI->effectSpecificParameterControl(0).widget());
+    widget.mouseDown(rightPressAt(widget, widget.getLocalBounds().getCentre()));
+
+    REQUIRE(juce::Component::getNumCurrentlyModalComponents() == 1);
+    auto *const pMenu(juce::Component::getCurrentlyModalComponent(0));
+    REQUIRE(pMenu != nullptr);
+    REQUIRE(static_cast<juce::Component const &>(editor).isParentOf(pMenu));
+
+    auto const menu(pMenu->createComponentSnapshot(pMenu->getLocalBounds(), false, 1.0f));
+    REQUIRE(menu.isValid());
+
+    /// The four corners are outside the arc, so nothing may have painted them.
+    CHECK(menu.getPixelAt(0, 0).isTransparent());
+    CHECK(menu.getPixelAt(menu.getWidth() - 1, 0).isTransparent());
+    CHECK(menu.getPixelAt(0, menu.getHeight() - 1).isTransparent());
+    CHECK(menu.getPixelAt(menu.getWidth() - 1, menu.getHeight() - 1).isTransparent());
+
+    /// \note And the menu was drawn at all, so that a background that stopped
+    /// painting entirely could not pass the four above.
+    CHECK(menu.getPixelAt(menu.getWidth() / 2, menu.getHeight() / 2).isOpaque());
+
+    juce::PopupMenu::dismissAllActiveMenus();
+}
