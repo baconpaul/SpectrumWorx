@@ -52,6 +52,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -973,10 +974,10 @@ inline std::vector<clap_param_info> allParameterInfo(clap_plugin const &plugin,
 // Naming a parameter the way the host addresses it
 ////////////////////////////////////////////////////////////////////////////////
 
-/// \brief An LFO period -- the `.T` of some slot's LFO.
+/// \brief An LFO period -- the `Period` of some slot's LFO.
 ///
 /// \note The family `clap-cpp-validator` fails on, every one of them: its four
-/// state cases disagree only about `M*.*.LFO.T`. Found by name rather than by a
+/// state cases disagree only about `M* * - LFO Period`. Found by name rather than by a
 /// hardcoded id because which LFO-able parameters a slot has depends on the
 /// effect in it.
 inline clap_param_info lfoPeriodParameter(clap_plugin const &plugin,
@@ -984,11 +985,11 @@ inline clap_param_info lfoPeriodParameter(clap_plugin const &plugin,
 {
     for (auto const &info : allParameterInfo(plugin, params))
     {
-        std::string const name(info.name);
-        if ((name.size() > 2) && (name.compare(name.size() - 2, 2, ".T") == 0))
+        // the whole suffix: four effects have a plain "Period" parameter of their own
+        if (std::string_view(info.name).ends_with(" - LFO Period"))
             return info;
     }
-    FAIL("no LFO period parameter -- is there an effect in slot 1?");
+    FAIL("no LFO period parameter -- is there an effect in module 1?");
     return {};
 }
 
