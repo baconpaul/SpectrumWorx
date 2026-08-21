@@ -1406,6 +1406,97 @@ TEST_CASE("A playing transport drives the LFO from song position", "[clap][lfo]"
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+///
+/// \note **The buffer size used to be the LFO's resolution.** `updateLFOTiming()`
+/// was called once for the block, above the chunk loop, and advanced the clock by
+/// the whole `frames_count` -- so every LFO in the plugin held one value for the
+/// length of a host buffer: 2.7 ms at 128 and 85 ms at 4096. Worse than coarse,
+/// it was coarse *by a number the user chose somewhere else*, so the same project
+/// sounded different at two buffer settings with no automation involved.
+///
+///   Every other LFO case in this file runs at a 512 block, which at the default
+/// 2048/4 setup **is** the hop -- the one buffer size at which per-block and
+/// per-hop are the same thing and nothing here can fail. That is why the whole
+/// group stayed green through the bug. \see issue #78.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("An LFO moves inside a block, so the buffer size does not change its sweep",
+          "[clap][lfo]")
+{
+    constexpr double tempo{120};
+    constexpr float sampleRate{48000};
+    /// defaultFFTSize / defaultOverlapFactor: the rate the engine samples an LFO.
+    constexpr std::uint32_t hop{512};
+    constexpr unsigned int hops{8};
+    constexpr std::uint32_t bigBlock{hops * hop};
+
+    /// \note A beat in, rather than from the top. The default LFO is a one-bar
+    /// sine and song position zero sits at its flattest point, where 75 ms of
+    /// motion is a quarter of a percent of the range and any of this would be an
+    /// argument about rounding. A beat in is the steepest point.
+    constexpr double startBeats{1};
+
+    Entry const entry;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Renders \p blocks blocks of \p blockSize from \p startBeats,
+    /// advancing the transport by one block each time as a playing host does, and
+    /// answers what the DSP's modulated Gain was left at.
+    ///
+    /// \note The *live* parameter -- see liveModuleParameter(). And the last
+    /// write wins, so what comes back is the LFO as of the final frame the run
+    /// produced, whichever call produced it.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    auto const gainAfter([&](std::uint32_t const blockSize, unsigned const blocks) {
+        ActivePlugin plugin(sampleRate, blockSize);
+        auto const &params(parameters(*plugin));
+
+        OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
+        params.flush(&*plugin, &*fillSlotOne, &discardedOutputEvents());
+        plugin.pumpMainThread();
+
+        OneParameterEvent const enable(lfoParameterID(0, 0, lfoEnabled), 1);
+        params.flush(&*plugin, &*enable, &discardedOutputEvents());
+        plugin.pumpMainThread();
+
+        std::vector<float> leftIn(blockSize, 0.0f), rightIn(blockSize, 0.0f);
+        std::vector<float> leftOut(blockSize), rightOut(blockSize);
+
+        for (unsigned block(0); block < blocks; ++block)
+        {
+            auto const seconds(block * static_cast<double>(blockSize) / sampleRate);
+            auto const playing(
+                transportAt(tempo, startBeats + (seconds * tempo / 60), CLAP_TRANSPORT_IS_PLAYING));
+            plugin.process(leftIn, rightIn, leftOut, rightOut, &playing);
+        }
+        return liveModuleParameter(*plugin, 0, 1 /*Gain*/);
+    });
+
+    /// Both runs cover the same span and end with a frame at the same offset --
+    /// `(hops - 1) * hop` -- so the LFO has been asked the same question twice.
+    auto const inPieces(gainAfter(hop, hops));
+    auto const wholeBlock(gainAfter(bigBlock, 1));
+    /// ...and where the span *starts*, which is all a per-block clock could ever
+    /// have answered for the whole of `bigBlock`.
+    auto const atSpanStart(gainAfter(hop, 1));
+
+    // The LFO moved inside the one big block, rather than standing still for it.
+    CHECK(wholeBlock != atSpanStart);
+
+    // And it moved by the same amount it does when the host hands the identical
+    // audio over in pieces. This is the claim the issue is actually about.
+    CHECK_THAT(wholeBlock, Catch::Matchers::WithinRel(inPieces, 1e-4f));
+
+    /// \note Named so a failure says which way round it went: if the two agreed
+    /// because the LFO did not move at all, the case above would already be red,
+    /// and if they disagreed by a rounding bit the tolerance would have taken it.
+    CHECK(inPieces != atSpanStart);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 //
 // Meters other than four four
 // ---------------------------

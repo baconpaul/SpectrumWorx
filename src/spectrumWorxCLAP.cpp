@@ -1191,16 +1191,19 @@ clap_process_status SpectrumWorxCLAP::process(clap_process const *const process)
             effectChanged |= handleEvent(events->get(events, nextEvent++));
     });
 
-    /// \note Once for the block, before any of it is rendered, exactly as it was
-    /// -- the LFO clock is the plugin's own and moving it per piece would be a
-    /// change to how LFOs sound rather than to when a host's edit lands.
-    updateLFOTiming(process);
-
+    /// \note Once per piece rather than once for the block. The clock used to be
+    /// advanced here, above the loop, by the whole `frames_count` -- so every LFO
+    /// in the plugin stepped at the host's buffer size and the same project
+    /// sounded different at 128 and at 2048. A piece is one hop, which is the
+    /// rate the engine samples an LFO at, so this is the finest resolution the
+    /// clock can usefully have. \see issue #78 and `updateLFOTiming()`.
     auto const chunk(engineChunkSize());
     for (std::uint32_t cursor(0); cursor < process->frames_count; cursor += chunk)
     {
         applyEventsDueAt(cursor);
-        runEngine(process, cursor, std::min(chunk, process->frames_count - cursor));
+        auto const piece(std::min(chunk, process->frames_count - cursor));
+        updateLFOTiming(process, cursor, piece);
+        runEngine(process, cursor, piece);
     }
 
     /// \note And whatever is left, which is every event timed at or past the end
@@ -1225,7 +1228,7 @@ clap_process_status SpectrumWorxCLAP::process(clap_process const *const process)
     return CLAP_PROCESS_CONTINUE;
 }
 
-/// \brief Moves the LFO clock forward by one block.
+/// \brief Moves the LFO clock forward by one piece of the block.
 ///
 /// \note Nothing did. Every LFO reads its phase off Engine::Processor's one
 /// LFO::Timer, and the only code that ever moved that timer was
@@ -1263,7 +1266,9 @@ clap_process_status SpectrumWorxCLAP::process(clap_process const *const process)
 /// (`SpectrumWorxSharedImpl::process()`, `SpectrumWorx::updatePosition()`), which
 /// ran the period resnap twice for one change; not repeated here.
 ///                                       (30.07.2026.) (SW port)
-void SpectrumWorxCLAP::updateLFOTiming(clap_process const *const process) noexcept
+void SpectrumWorxCLAP::updateLFOTiming(clap_process const *const process,
+                                       std::uint32_t const offset,
+                                       std::uint32_t const frames) noexcept
 {
     auto const sampleRate(getSampleRate());
     if (sampleRate <= 0) [[unlikely]]
@@ -1286,7 +1291,7 @@ void SpectrumWorxCLAP::updateLFOTiming(clap_process const *const process) noexce
     /// seconds -- so this arm reports it too.
     if (!usableTempo)
     {
-        if (updatePositionAndTimingInformation(process->frames_count).timingInfoChanged())
+        if (updatePositionAndTimingInformation(frames).timingInfoChanged())
             timingChanged();
         return;
     }
@@ -1300,15 +1305,24 @@ void SpectrumWorxCLAP::updateLFOTiming(clap_process const *const process) noexce
     double positionInBars;
     if ((transport->flags & playingOnBeats) == playingOnBeats)
     {
+        /// \note **`offset` is why this arm takes one.** `song_pos_beats` is an
+        /// absolute position and it is the position of the *block*, so without
+        /// the piece's own offset added the clock would snap back to the block's
+        /// start on every piece and the LFO would stand still inside it -- which
+        /// is the bug this change exists to remove, wearing a different hat.
         positionInBars =
             (static_cast<double>(transport->song_pos_beats) / CLAP_BEATTIME_FACTOR) / beatsPerBar;
+        positionInBars += (offset / static_cast<double>(sampleRate)) / barDuration;
         // A count-in puts the song before its own start; the timer asserts >= 0.
         if (positionInBars < 0)
             positionInBars = 0;
     }
     else
     {
-        auto const seconds(process->frames_count / static_cast<double>(sampleRate));
+        /// \note Incremental rather than absolute, so it needs no offset: it
+        /// carries on from wherever the timer already stands, and one piece is
+        /// what it carries on by.
+        auto const seconds(frames / static_cast<double>(sampleRate));
         positionInBars = lfoTimer().currentTimeInBars() + (seconds / barDuration);
     }
 

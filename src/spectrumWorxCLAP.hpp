@@ -469,9 +469,11 @@ class SpectrumWorxCLAP final
     /// which runs under `process()`.
     static bool liveRanges(ParameterID, Plugins::ParameterInformation<Protocol> &, Program const &);
 
-    /// Advances the engine's LFO timer for this block: from the host's transport
-    /// while it is playing, from the block length otherwise. See the definition.
-    void updateLFOTiming(clap_process const *) noexcept;
+    /// Advances the engine's LFO timer by one piece of the block: from the
+    /// host's transport while it is playing, from the piece's length otherwise.
+    /// \param offset where this piece starts in the block, which the transport
+    /// arm adds to the block's absolute position. See the definition.
+    void updateLFOTiming(clap_process const *, std::uint32_t offset, std::uint32_t frames) noexcept;
 
     /// Feeds the engine the sidechain port when the host has one connected, and
     /// the main input otherwise -- the engine reads a side channel whenever the
