@@ -134,6 +134,8 @@ class Theme final : public juce::LookAndFeel_V2
                                float sliderPos, float minSliderPos, float maxSliderPos,
                                juce::Slider::SliderStyle, juce::Slider &) override;
     void drawPopupMenuBackground(juce::Graphics &, int width, int height) override;
+    void drawResizableFrame(juce::Graphics &, int width, int height,
+                            juce::BorderSize<int> const &) override;
     void drawTabAreaBehindFrontButton(juce::TabbedButtonBar &, juce::Graphics &, int w,
                                       int h) override;
     /// \note Returned juce::Image in 2016 and returns const Drawable * now

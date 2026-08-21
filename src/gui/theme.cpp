@@ -222,6 +222,28 @@ void Theme::drawPopupMenuBackground(juce::Graphics &graphics, int const width, i
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Nothing, where V2 draws two square rectangles in translucent black.
+///
+///   It is reached for one thing here: a juce::PopupMenu given a parent
+/// component paints this over its children (juce_PopupMenu.cpp,
+/// MenuWindow::paintOverChildren), and a menu on the desktop does not. So the
+/// knob's parameter menu -- the one menu in the skin that names the editor as
+/// its parent, so that its type-in field can take the keyboard -- came out with
+/// a hard square frame drawn over the rounded one above, and no other menu did.
+/// \see issue #145, and PopupMenu::showAt() for the other half.
+///
+///   The outline is drawPopupMenuBackground()'s to draw, and it draws it. There
+/// is nothing else in the plugin this could be for: the editor is not resizable,
+/// so no juce::ResizableBorderComponent -- V2's only other caller -- exists.
+///
+////////////////////////////////////////////////////////////////////////////////
+void Theme::drawResizableFrame(juce::Graphics &, int /*width*/, int /*height*/,
+                               juce::BorderSize<int> const &)
+{
+}
+
 void Theme::drawTabAreaBehindFrontButton(juce::TabbedButtonBar &, juce::Graphics &, int /*w*/,
                                          int /*h*/)
 {
