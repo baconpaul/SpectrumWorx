@@ -1262,7 +1262,7 @@ void Knob::setupForParameter(char const *const title, unsigned int const diamete
 
 bool Knob::hidesCursorWhileDragging() const
 {
-    return parameterEditable() && preferences().hideCursorOnKnobDrag();
+    return parameterMenu().parameterEditable() && preferences().hideCursorOnKnobDrag();
 }
 
 void Knob::startedDragging() noexcept
@@ -1312,12 +1312,12 @@ void Knob::stoppedDragging() noexcept
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Knob::ValueTypein
-// -----------------
+// ParameterMenu::ValueTypein
+// --------------------------
 //
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \brief The "type a value here" line of a knob's menu: a juce::TextEditor
+/// \brief The "type a value here" line of a parameter's menu: a juce::TextEditor
 /// living inside a menu item.
 ///
 /// \note `CustomComponent( false )` -- not triggered automatically -- because a
@@ -1325,20 +1325,21 @@ void Knob::stoppedDragging() noexcept
 /// triggerMenuItem() when the user commits or gives up, which is also what
 /// carries the "an item was chosen" result back out of the menu.
 ///
-/// \note The knob is held through a SafePointer and every use is guarded. A menu
-/// is asynchronous, and while ~SpectrumWorxEditor dismisses whatever is open,
-/// the deferred grab below can still find itself running against a knob that has
-/// gone.
+/// \note The widget is held through a SafePointer and every use is guarded. A
+/// menu is asynchronous, and while ~SpectrumWorxEditor dismisses whatever is
+/// open, the deferred grab below can still find itself running against a widget
+/// that has gone.
 ///                                           (15.08.2026.)
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class Knob::ValueTypein final : public juce::PopupMenu::CustomComponent,
-                                private juce::TextEditor::Listener
+class ParameterMenu::ValueTypein final : public juce::PopupMenu::CustomComponent,
+                                         private juce::TextEditor::Listener
 {
   public:
-    explicit ValueTypein(Knob &knob)
-        : juce::PopupMenu::CustomComponent(/*isTriggeredAutomatically*/ false), knob_(&knob)
+    explicit ValueTypein(ParameterMenu &parameter)
+        : juce::PopupMenu::CustomComponent(/*isTriggeredAutomatically*/ false),
+          parameter_(&parameter), widget_(&parameter.menuOwner())
     {
         editor_.setWantsKeyboardFocus(true);
         editor_.setIndents(6, 0);
@@ -1372,8 +1373,8 @@ class Knob::ValueTypein final : public juce::PopupMenu::CustomComponent,
         juce::MessageManager::callAsync([pThis] {
             if (!pThis || !pThis->isVisible())
                 return;
-            pThis->editor_.setText(pThis->knob_ ? pThis->knob_->parameterValueText()
-                                                : juce::String(),
+            pThis->editor_.setText(pThis->widget_ ? pThis->parameter_->parameterValueText()
+                                                  : juce::String(),
                                    juce::dontSendNotification);
             pThis->editor_.grabKeyboardFocus();
             pThis->editor_.selectAll();
@@ -1386,8 +1387,8 @@ class Knob::ValueTypein final : public juce::PopupMenu::CustomComponent,
     /// menu simply closes with the parameter where it was.
     void textEditorReturnKeyPressed(juce::TextEditor &typedInto) override
     {
-        if (knob_)
-            knob_->setParameterFromText(typedInto.getText());
+        if (widget_)
+            parameter_->setParameterFromText(typedInto.getText());
         triggerMenuItem();
     }
     void textEditorEscapeKeyPressed(juce::TextEditor &) override { triggerMenuItem(); }
@@ -1397,19 +1398,29 @@ class Knob::ValueTypein final : public juce::PopupMenu::CustomComponent,
     static int constexpr fieldHeight{33};
 
   private:
-    juce::Component::SafePointer<Knob> knob_;
+    ////////////////////////////////////////////////////////////////////////////
+    /// \note The two are one object; the SafePointer is what says whether it is
+    /// still there. A ParameterMenu is a mix-in with no lifetime of its own, so
+    /// there is nothing to hold a weak reference to but the widget it is part
+    /// of -- and every use of the raw pointer is guarded by it.
+    ////////////////////////////////////////////////////////////////////////////
+    ParameterMenu *const parameter_;
+    juce::Component::SafePointer<juce::Component> widget_;
+
     juce::TextEditor editor_;
-}; // class Knob::ValueTypein
+}; // class ParameterMenu::ValueTypein
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Knob::showParameterMenu()
-// -------------------------
+// ParameterMenu::showParameterMenu()
+// ----------------------------------
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void Knob::showParameterMenu(juce::MouseEvent const &event)
+void ParameterMenu::showParameterMenu(juce::MouseEvent const &event)
 {
+    auto &widget(menuOwner());
+
     bool const editable(parameterEditable());
 
     juce::PopupMenu menu;
@@ -1418,22 +1429,25 @@ void Knob::showParameterMenu(juce::MouseEvent const &event)
 
     menu.addSeparator();
 
-    if (editable)
+    if (editable && parameterAcceptsText())
     {
         /// \note The result ID is unused -- the field dismisses the menu itself
         /// -- but it may not be zero, which juce::PopupMenu reserves for "the
         /// user dismissed it".
         menu.addCustomItem(1, std::make_unique<ValueTypein>(*this));
     }
+
+    addParameterValueEntries(menu);
+
     menu.addItem("Reset to default value", editable, /*isTicked*/ false,
-                 [pThis = juce::Component::SafePointer<Knob>(this)] {
-                     if (pThis)
-                         pThis->setParameterToDefault();
+                 [this, pWidget = juce::Component::SafePointer<juce::Component>(&widget)] {
+                     if (pWidget)
+                         setParameterToDefault();
                  });
 
     addParameterMenuEntries(menu);
 
-    auto &editor(SpectrumWorxEditor::fromChild(*this));
+    auto &editor(SpectrumWorxEditor::fromChild(widget));
     editor.editorHost().addHostParameterEntries(parameterID(), menu);
 
     ////////////////////////////////////////////////////////////////////////////
@@ -1458,24 +1472,24 @@ void Knob::showParameterMenu(juce::MouseEvent const &event)
     /// menu forwards key presses to and what it measures "the mouse went back
     /// to whatever opened me" against.
     ///
-    /// \note And the keyboard goes back to the knob when the menu closes,
+    /// \note And the keyboard goes back to the widget when the menu closes,
     /// because the type-in field borrowed it and JUCE does not return it: the
     /// menu enters its modal state with `takeKeyboardFocus` false, so it never
-    /// recorded what had the focus to give it back. Without this the knob is
+    /// recorded what had the focus to give it back. Without this the control is
     /// left selected with nothing focused, which the editor recovers from on the
     /// next mouse move rather than immediately.
     /// \see ModuleControlImpl::focusLost().
     ///
     ////////////////////////////////////////////////////////////////////////////
-    menu.showMenuAsync(
-        juce::PopupMenu::Options()
-            .withParentComponent(&editor)
-            .withTargetComponent(this)
-            .withTargetScreenArea(localAreaToGlobal(juce::Rectangle<int>(event.x, event.y, 1, 1))),
-        [pThis = juce::Component::SafePointer<Knob>(this)](int) {
-            if (pThis && pThis->getWantsKeyboardFocus() && pThis->isShowing())
-                pThis->grabKeyboardFocus();
-        });
+    menu.showMenuAsync(juce::PopupMenu::Options()
+                           .withParentComponent(&editor)
+                           .withTargetComponent(&widget)
+                           .withTargetScreenArea(widget.localAreaToGlobal(
+                               juce::Rectangle<int>(event.x, event.y, 1, 1))),
+                       [pWidget = juce::Component::SafePointer<juce::Component>(&widget)](int) {
+                           if (pWidget && pWidget->getWantsKeyboardFocus() && pWidget->isShowing())
+                               pWidget->grabKeyboardFocus();
+                       });
 }
 
 bool isOnRoundFace(juce::Rectangle<int> const face, juce::Point<int> const position)
@@ -1512,7 +1526,7 @@ void Knob::mouseDown(juce::MouseEvent const &event)
     if (event.mods.isPopupMenu())
     {
         if (isOnKnobFace(event.getPosition()))
-            return showParameterMenu(event);
+            return parameterMenu().showParameterMenu(event);
         return passMousePressToParent(*this, event);
     }
 

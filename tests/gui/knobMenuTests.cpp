@@ -3,15 +3,21 @@
 /// knobMenuTests.cpp
 /// -----------------
 ///
-///   The two things a knob's right button menu does that are not JUCE's: reading
-/// a typed value back into the parameter, and turning the LFO on.
+///   The two things a module control's right button menu does that are not
+/// JUCE's: reading a typed value back into the parameter, and turning the LFO
+/// on. And, since issue #93, that every control has one -- an LED, a trigger and
+/// a combo box as much as a knob.
 ///
-/// \note The menu itself is deliberately not driven here, for the reason
-/// lfoDisplayTests.cpp gives about the LFO waveform popup: a menu is a modal
-/// desktop window and a test binary has no message loop to answer one with. What
-/// is covered is everything underneath it -- the two routes the items call --
-/// which is where all of the logic is. `Knob::showParameterMenu()` itself only
-/// assembles them.
+/// \note The menu's *contents* are deliberately not driven here, for the reason
+/// lfoDisplayTests.cpp gives about the LFO waveform popup: a test binary has no
+/// message loop to answer a modal component with. What is covered is everything
+/// underneath it -- the two routes the items call -- which is where all of the
+/// logic is. `ParameterMenu::showParameterMenu()` itself only assembles them.
+///
+/// \note That one is *raised* is a different question and is checkable, because
+/// this menu is not a desktop window: it names the editor as its parent so that
+/// the type-in field can take the keyboard, so it is an ordinary modal child and
+/// `getNumCurrentlyModalComponents()` counts it.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later
@@ -39,6 +45,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <ranges>
 #include <vector>
 //------------------------------------------------------------------------------
 namespace
@@ -354,4 +361,119 @@ TEST_CASE("The menu's LFO switch moves both copies and the host", "[gui][modules
     }
     CHECK(knob.knob().isScrollWheelEnabled());
     CHECK(knob.knob().isDoubleClickReturnEnabled());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Issue #93. "As long as a parameter is exposed to host, we should get
+/// the RMB context menu" -- and three of the four module control shapes had
+/// none, because the menu was a knob's rather than a parameter's.
+///
+/// \note Tune Worx by name, because it is the effect the report names and the
+/// reason it is the one: thirteen parameters, and **not one of them is a knob**.
+/// A combo box for the key and twelve LEDs for the semitones, so a user wanting
+/// their host's own entries on any of them had nowhere to right-click.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("Every module control raises its parameter's menu", "[gui][modules][menu]")
+{
+    SWTest::HostSideJuce const juceIsUp;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief How many items each of \p effect's controls put in its menu.
+    ///
+    /// \note An instance each, because `addUserAddedModule()` fills the *next*
+    /// free slot: a second effect asked for on one editor leaves the first in
+    /// slot 0, and the case then measures the same thirteen widgets twice. Which
+    /// is what it did until the widget types were printed out.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    auto const menusOf([](char const *const effect) {
+        SWTest::Instance instance;
+        instance.openEditor();
+        auto &editor(instance.editor());
+
+        editor.addUserAddedModule(static_cast<std::uint8_t>(SWTest::effectByStreamingName(effect)));
+        editor.resyncModuleRack();
+
+        auto *const pModuleUI(editor.regionInSlot(0));
+        REQUIRE(pModuleUI != nullptr);
+
+        auto const parameters(pModuleUI->module().numberOfEffectSpecificParameters());
+        REQUIRE(parameters > 0);
+
+        std::vector<int> items;
+        for (std::uint8_t index(0); index < parameters; ++index)
+        {
+            auto &widget(pModuleUI->effectSpecificParameterControl(index).widget());
+            CAPTURE(effect, unsigned(index));
+
+            REQUIRE(juce::Component::getNumCurrentlyModalComponents() == 0);
+
+            /// \note The centre, which for the two round widgets -- a knob and a
+            /// trigger -- is the only part of them the menu belongs to. Off the
+            /// face the press is the module strip's. \see issue #92.
+            auto const centre(widget.getLocalBounds().getCentre());
+            widget.mouseDown(rightPressAt(widget, centre));
+
+            ////////////////////////////////////////////////////////////////////
+            ///
+            /// \note And it is the *parameter's* menu rather than any menu,
+            /// which for a combo box is a real distinction: the right button
+            /// used to drop its list of values, and that is modal too. The
+            /// parameter menu names the editor as its parent -- so that the
+            /// type-in field can take the keyboard -- and a list of values does
+            /// not, being a desktop window of its own. Whose child it is is
+            /// therefore which menu it is.
+            ///
+            ////////////////////////////////////////////////////////////////////
+            REQUIRE(juce::Component::getNumCurrentlyModalComponents() == 1);
+            auto *const pMenu(juce::Component::getCurrentlyModalComponent(0));
+            REQUIRE(pMenu != nullptr);
+            REQUIRE(static_cast<juce::Component const &>(editor).isParentOf(pMenu));
+
+            items.push_back(pMenu->getNumChildComponents());
+            juce::PopupMenu::dismissAllActiveMenus();
+        }
+        return items;
+    });
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Counting the items is how a headless run tells the menus apart.
+    /// Reading them needs a message loop; counting them does not, and what each
+    /// widget shape adds to the four every control has is exactly countable.
+    ///
+    ///   The four are the parameter's name, the rule under it, "Reset to default
+    /// value" and "Enable LFO". The host adds none here, having none to add.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    constexpr int shared{4};
+
+    ////////////////////////////////////////////////////////////////////////////
+    /// \note Tune Worx: a combo box for the key and twelve LEDs for the
+    /// semitones, and not one knob -- which is why it is the effect the report
+    /// names. The LEDs add nothing: a boolean is one press away and there is no
+    /// text to type at it. The combo box adds its twelve keys, because an
+    /// enumerated parameter is *chosen*, and a user who right-clicks one wants
+    /// the list they would otherwise left-click for.
+    ////////////////////////////////////////////////////////////////////////////
+    auto const tuneWorx(menusOf("TuneWorx"));
+    CHECK(tuneWorx.size() == 13);
+    CHECK(std::ranges::count(tuneWorx, shared) == 12);
+    CHECK(std::ranges::count(tuneWorx, shared + 12) == 1);
+
+    ////////////////////////////////////////////////////////////////////////////
+    /// \note Freeze for the other two shapes -- a trigger and a knob in one
+    /// effect. A knob is the only module control with a field to type a value
+    /// into, so it is the only one of the three whose menu is one longer.
+    ////////////////////////////////////////////////////////////////////////////
+    auto const freeze(menusOf("Freeze"));
+    REQUIRE(freeze.size() == 3);
+    CHECK(std::ranges::count(freeze, shared) == 2);
+    CHECK(std::ranges::count(freeze, shared + 1) == 1);
 }

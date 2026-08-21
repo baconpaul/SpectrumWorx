@@ -102,6 +102,75 @@ bool ModuleControlBase::reportInactiveControl() const
         return false;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// ModuleControlBase -- the right button's menu
+// --------------------------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+///   These were ModuleKnob's, and were the reason issue #93 existed: a knob is
+/// not the only widget standing for an automatable parameter, and the three
+/// that are not knobs -- an LED, a trigger and a combo box -- had no menu at
+/// all. Tune Worx is entirely made of the first and the last of those, so the
+/// one effect where a user most wants a host's own entries was the one effect
+/// that offered none.
+///                                           (21.08.2026.)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+ParameterID ModuleControlBase::parameterMenuID() const { return editor().moduleControlID(*this); }
+
+/// \note `setValue()` rather than a notifying form, and `publishValue()` rather
+/// than `moduleParameterChanged()`: the latter asserts the mouse is on the
+/// widget, and it is on the menu. \see publishValue().
+bool ModuleControlBase::setValueFromText(juce::String const &text)
+{
+    auto const value(parseValueString(text));
+    if (!value)
+        return false;
+
+    setValue(*value);
+    publishValue();
+    widget().repaint();
+    return true;
+}
+
+void ModuleControlBase::setValueToDefault()
+{
+    setValue(info().default_);
+    publishValue();
+    widget().repaint();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The LFO strip's own switch is the other way in, and both end up in
+/// SpectrumWorxEditor::setLFOEnabled(): turning an LFO on is an edit of an
+/// exported parameter, so it has to reach the engine and the host and not just
+/// the copy this thread draws from.
+///
+/// \note Offered whether or not the strip is up. A control is reachable with no
+/// LFO display on screen -- the shared gain and wet pair above the rack are the
+/// obvious case -- and there is nothing about the switch that needs one.
+///
+/// \note The tick is read here, when the menu is built; the toggle re-reads when
+/// it is chosen. The two can only disagree if the host moved the LFO while the
+/// menu was open, and then the fresh answer is the right one.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void ModuleControlBase::addLFOMenuEntry(juce::PopupMenu &menu)
+{
+    menu.addItem("Enable LFO", /*isEnabled*/ true, /*isTicked*/ isLFOEnabled(),
+                 [pWidget = juce::Component::SafePointer<juce::Component>(&widget())] {
+                     if (!pWidget)
+                         return;
+                     auto &control(ModuleControlBase::controlForWidget(*pWidget));
+                     control.editor().setLFOEnabled(control, !control.isLFOEnabled());
+                 });
+}
+
 void ModuleControlBase::moduleParameterChanged()
 {
     LE_ASSERT(!editor().selectedModule() || editor().selectedModule() == &moduleUI());
