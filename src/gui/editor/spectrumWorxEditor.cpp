@@ -2027,7 +2027,7 @@ void SpectrumWorxEditor::updateForEngineSetupChanges()
 ///   Only a *synced* LFO moves: its period is a fraction of the host's bar, so
 /// the same parameter is a different number of seconds at a new tempo and snaps
 /// to a different grid. A free one is measured against a bar that never changes
-/// length and is unaffected -- see how-lfo-rates-work.md.
+/// length and is unaffected -- see how-lfo-rates-and-eval-work.md.
 ///                                           (02.08.2026, wired up 09.08.2026.) (SW port)
 void SpectrumWorxEditor::updateForNewTimingInfo()
 {

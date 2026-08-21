@@ -1,13 +1,16 @@
-# SpectrumWorx — How an LFO's rate works
+# SpectrumWorx — How an LFO's rate and evaluation work
 
-What `PeriodScale` holds, what `SyncTypes` changes about it, and which of the two
-clocks an LFO reads. Companion to
+What `PeriodScale` holds, what `SyncTypes` changes about it, which of the two
+clocks an LFO reads, and — §3 — **how often it is asked and how often the clock
+moves, which are two different rates set by two different things**. Companion to
 [`parameter_system.md`](parameter_system.md), which is how the parameter is
 addressed, and [`streaming_format.md`](streaming_format.md), which is what
 reaches a file.
 
-Written 06.08.2026, when the answer changed. Everything here is in the tree and
-has cases naming it — `tests/parameters/lfoTests.cpp`.
+Written 06.08.2026, when the rate answer changed; §3 rewritten 20.08.2026 with
+issues #78 and #151, which were both that second question being answered by
+accident. Everything here is in the tree and has cases naming it —
+`tests/parameters/lfoTests.cpp` and `tests/clap/pluginTests.cpp` `[clap][lfo]`.
 
 ---
 
@@ -79,18 +82,17 @@ bounds are constants — `(2/3)/8/4` to `1.5 × 16`, about 0.0208 to 24 referenc
 bars, or 42 ms to 48 s. They used to divide by the *host's* numerator, which made
 the parameter's minimum a function of the time signature.
 
-## 3. The two clocks
+## 3. The two clocks, and the two rates
+
+### 3.1 The clocks
 
 `Timer` tracks one position, in the host's bars. The reference-bar position is
 derived (`Timer::currentTimeInReferenceBars()`), and `LFOImpl::getValue()` picks
 the pair by sync mode. There is no phase accumulator: position is recomputed
-absolutely every block as `frac( (phase·T + t) / T )`, with `t` and `T` in the
-same units, which is why an LFO follows the playhead through a locate.
+absolutely every evaluation as `frac( (phase·T + t) / T )`, with `t` and `T` in
+the same units, which is why an LFO follows the playhead through a locate.
 
-The LFO is evaluated **once per host block** — `Processor::preProcess()` — so it
-is a block-rate modulator, not a per-sample one.
-
-### Why the derived clock is a rewrite and not a change
+#### Why the derived clock is a rewrite and not a change
 
 A free LFO used to be kept honest by rescaling its *period* whenever the bar
 duration changed, so that `periodScale × barDuration` stayed constant. Its phase
@@ -105,6 +107,177 @@ was therefore
 reference bars. Same phase, same locate behaviour, same output. What stops moving
 is the number the host and the file hold. The golden fixtures render
 bit-identically across the change, which is the measured form of that argument.
+
+### 3.2 The call stack, and the two rates in it
+
+An LFO is not evaluated once per host block, and the clock does not move once per
+host block either. **They are two separate cadences, set by two different
+numbers**, and every LFO bug the plugin has had since the port has been about the
+gap between them.
+
+```
+SpectrumWorxCLAP::process(clap_process*)                   ── once per host block
+└─ for (cursor = 0; cursor < frames_count; cursor += hop)  ── hop = fftSize / overlap
+   ├─ applyEventsDueAt(cursor)
+   ├─ updateLFOTiming(process, cursor, piece) ───────────► ■ CLOCK TICK, per piece
+   │     Timer::updatePositionAndTimingInformation(...)
+   │       playing on a beats timeline: song_pos_beats + cursor/sampleRate
+   │       otherwise:                   carry on by `piece` samples
+   └─ runEngine(process, cursor, piece)
+      └─ SpectrumWorxCore::process()
+         └─ Engine::Processor::process()
+            ├─ preProcessedThisCall_ = false
+            └─ do { processSingleChannel() } while (next channel)
+               └─ while (inputSamples)
+                  ├─ FIFO += samples            (tops up to windowSize)
+                  └─ if (FIFO == windowSize)    ── only when a frame is complete
+                     ├─ preProcessForFirstFrame() ────────► ● LFO EVALUATION
+                     │    └─ preProcessAll(lfoTimer())
+                     │       └─ ModuleDSP::preProcess()
+                     │          └─ update{Base,Effect}ParametersFromLFOs(timer)
+                     │             └─ LFOImpl::getValue(timer)
+                     ├─ ... FFT / effects / IFFT ...
+                     └─ moveForwardByHopSize(stepSize)
+```
+
+- **■ the clock** ticks once per *engine chunk*. A chunk is `engineChunkSize()`,
+  which is `Setup::stepSize()` — the hop — or the whole block when the block is
+  shorter than one hop.
+- **● an evaluation** happens once per *spectral frame*, which is once per hop of
+  input **consumed**. The FIFO is pre-filled to `windowSize − stepSize`
+  (`Processor::reset`), so this is exact from the first block with no warm-up
+  irregularity.
+
+`preProcessedThisCall_` is why an evaluation is once per frame rather than once
+per channel: the channel loop is outside the frame loop, and without the flag
+channel 0's first frame would consume a `TriggerParameter` that channel 1 then
+never saw.
+
+The clock used to tick once per host **block**, by the whole `frames_count`. That
+was issue #78: an LFO's resolution was the buffer size the user had picked
+somewhere else — 2.7 ms at 128 and 85 ms at 4096 — so the same project sounded
+different at two settings with no automation anywhere. Moving the tick inside the
+chunk loop is what fixed it, and the transport arm has to take `cursor` with it,
+`song_pos_beats` being the position of the block rather than of the piece.
+
+### 3.3 What the FFT size and the buffer size do to the ratio
+
+The hop is `fftSize / overlapFactor` and both are user-facing parameters, so the
+ratio between the two cadences is chosen by the user twice over — once in the
+host's audio settings and once on the plugin's own front panel. **Clock ticks per
+LFO evaluation**, as the plugin stands today:
+
+| host buffer | 512/4 (hop 128) | 2048/4 (hop 512, default) | 8192/4 (hop 2048) |
+|---|---|---|---|
+| 64 | 2 | 8 | 32 |
+| 128 | 1 | 4 | 16 |
+| 256 | 1 | 2 | 8 |
+| 512 | 1 | 1 | 4 |
+| 1024 | 1 | 1 | 2 |
+| 2048 | 1 | 1 | 1 |
+
+Above the hop the chunk loop cuts the block into hop-sized pieces, so a tick and
+an evaluation come in pairs and the ratio is one. Below it the loop degenerates
+to a single chunk of `frames_count`, several blocks go by before the FIFO
+completes a frame, and the clock ticks several times per evaluation. A buffer
+that is not a whole multiple of the hop is ragged rather than clean: the short
+final chunk ticks the clock and completes no frame.
+
+**Nothing in the plugin can make that column read 1 everywhere**, because a host
+that hands over 64 samples at a time cannot be given a 2048-sample hop's worth of
+LFO motion per block. That is the point of §3.4: the ratio is allowed to be
+anything, and nothing may depend on it.
+
+### 3.4 A period beginning is a fact about the LFO, not about the clock
+
+Four waveforms — `Dirac`, `dIRAC`, `RandomHold`, `RandomSlide` — do all their
+work at a period boundary, and `newPeriodBegun` is what tells them one has
+arrived. It used to be derived from the clock:
+
+```cpp
+previousPeriodPosition   = modulo(periodOffset + previousTime, periodScale)
+periodEndForPreviousTime = previousTime + (periodScale - previousPeriodPosition)
+newPeriod                = currentTime > periodEndForPreviousTime
+```
+
+— *did the clock cross a boundary between its own previous tick and this one*.
+Which is a question about the interval in the table above, and that interval is
+neither the time since this LFO was last evaluated nor anything with a fixed
+relationship to it. Issue #151, in both directions:
+
+- **Ratio above one** (buffer below the hop). Boundaries falling in a tick that
+  no evaluation looked at were never noticed. The position wrapped from one back
+  to zero with the ramp's coefficients untouched, so a Sample & Glide played the
+  *identical* glide again — "getting caught in a loop and parts being repeated an
+  unpredictable amount of times", the reporter's words.
+- **Ratio below one** — which the old per-block clock also produced, several
+  frames sharing one tick. Every one of those frames answered "yes" to the same
+  question, so the waveform drew a target per frame and rendered all but the last
+  one frame apart: "straight up jumps happening periodically".
+
+The rule now is that a period beginning is decided by **which period this
+evaluation is in, against which period the last one was in**:
+
+```cpp
+auto const [periodIndex, positionInPeriod](
+    Math::splitFloat((periodOffset + currentTime) / periodScale));
+bool const newPeriod(state_.neverEvaluated || (periodIndex != state_.periodIndex));
+```
+
+`splitFloat` was already computing that integer and throwing it away. The rule is
+true exactly once per period at any ratio: evaluations sharing a clock position
+share an index, and a clock that jumps several periods still only begins the one
+it lands in. It also survives a locate, a tempo change and a period edit, none of
+which the clock-delta form did, and it took the last reader of
+`Timer::previousTimeInBars()` with it.
+
+`state_.neverEvaluated` is a flag rather than a sentinel index because
+`periodOffset` is signed in a release build — `phase()` is ±0.5 and only the
+debug branch takes `abs` — so index −1 is reachable and no value is out of band.
+**The first evaluation announces a period**, deliberately: an LFO nothing has
+asked yet is at the start of one whatever the clock reads. Before this, the whole
+first period of all four waveforms was their constructed state — Dirac never
+pulsed, RandomHold held a zero it had not drawn, and RandomSlide sat flat at zero
+instead of gliding. `tests/parameters/data/lfoWaveforms.txt` records the change:
+four rows moved and the other seven are byte-identical, which is the blast radius
+stated as a fixture.
+
+#### Why #78 was not a fix for #151
+
+Because it changes the clock's granularity and the trigger's problem was that it
+depended on the granularity at all. Measured, retriggers over 60 s of a 1000 ms
+LFO where 60 is correct, **with #78 applied and #151 not**:
+
+| fft/overlap | hop | 64 | 128 | 256 | 512 | 1024 | 2048 |
+|---|---|---|---|---|---|---|---|
+| 512/4 | 128 | 44 | 60 | 60 | 60 | 59 | 59 |
+| 1024/4 | 256 | 23 | 29 | 59 | 59 | 59 | 59 |
+| 2048/4 | 512 | 11 | 16 | 29 | 59 | 59 | 59 |
+| 2048/2 | 1024 | 5 | 7 | 16 | 30 | 59 | 59 |
+
+Below the hop, #78 is a literal no-op — `chunk` is `min(hop, frames_count)`, so
+"advance by the chunk" *is* "advance by the block", the same value on the same
+line. At the default FFT size that is every common buffer setting. The
+period-index rule reads 60 in every cell of that grid, with or without #78.
+
+#### Why the suite could not see any of it
+
+Every case in `lfoTests.cpp` drove the timer exactly once per `getValue()`, and
+every `[clap][lfo]` case ran at a 512 block — which at the default 2048/4 setup
+*is* the hop. One ratio, and the one ratio at which neither bug exists. The two
+cases that close the gap are `driven()` in `lfoTests.cpp`, which takes
+`clockTicksPerEvaluation` and `evaluationsPerTick` as arguments and so can ask
+for a ratio rather than inheriting one, and `An LFO moves inside a block, so the
+buffer size does not change its sweep` in `pluginTests.cpp`, which renders one
+span as a single 4096 block and as eight 512 ones.
+
+### 3.5 What an LFO is, then
+
+A **frame-rate** modulator: it steps once per hop, which is 2.7 ms at 512/4 and
+10.7 ms at the default 2048/4, and it is not a per-sample one. Its *phase* is
+sampled from a clock that moves at up to the same rate and never faster, and its
+*period boundaries* are counted from its own position and so are exact whatever
+either rate happens to be.
 
 ## 4. What reaches a file
 
@@ -238,8 +411,12 @@ it as behaviour rather than endorsing it.
 2. `le/parameters/lfoImpl.hpp` — the seven parameters, the traits and `Timer`
 3. `le/parameters/lfoImpl.cpp` — `getValue()`, `snapSyncedPeriodScale()`, and the
    two preset conversions
-4. `tests/parameters/lfoTests.cpp` — the waveform table, the snapping, the clock
-   and the four meters
-5. `tests/clap/pluginTests.cpp`, `[clap][lfo]` — the same clock with the meter
-   arriving as a `clap_event_transport`
-6. `tests/gui/lfoDisplayTests.cpp` — that an edit in the panel reaches the engine
+4. `spectrumWorxCLAP.cpp` — `process()` and `updateLFOTiming()`, which are the
+   chunk loop and the clock tick in §3.2
+5. `le/spectrumworx/engine/processor.cpp` — `preProcessForFirstFrame()` and the
+   frame loop, which is the other cadence
+6. `tests/parameters/lfoTests.cpp` — the waveform table, the snapping, the clock,
+   the four meters, and `driven()` for the two rates
+7. `tests/clap/pluginTests.cpp`, `[clap][lfo]` — the same clock with the meter
+   arriving as a `clap_event_transport`, and the sweep at two buffer sizes
+8. `tests/gui/lfoDisplayTests.cpp` — that an edit in the panel reaches the engine

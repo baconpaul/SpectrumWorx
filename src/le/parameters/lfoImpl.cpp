@@ -377,8 +377,6 @@ LFOImpl::value_type LFOImpl::getValue(Timer const &timer) const
     bool const freeRunning(syncTypes() == LFO::Free);
     value_type const currentTime(freeRunning ? timer.currentTimeInReferenceBars()
                                              : timer.currentTimeInBars());
-    value_type const previousTime(freeRunning ? timer.previousTimeInReferenceBars()
-                                              : timer.previousTimeInBars());
 
     //...mrmlj...
 #ifndef NDEBUG
@@ -387,17 +385,55 @@ LFOImpl::value_type LFOImpl::getValue(Timer const &timer) const
     value_type const periodOffset(periodScale * phase());
 #endif // _DEBUG
 
-    value_type const currentPeriodNormalisedPosition(
-        Math::splitFloat((periodOffset + currentTime) / periodScale).fractional);
+    auto const [periodIndex, currentPeriodNormalisedPosition](
+        Math::splitFloat((periodOffset + currentTime) / periodScale));
     LE_ASSERT(currentPeriodNormalisedPosition >= 0);
     LE_ASSERT(currentPeriodNormalisedPosition <= 1);
 
-    value_type const previousPeriodPosition(
-        Math::PositiveFloats::modulo((periodOffset + previousTime), periodScale));
-    value_type const previousTimeDifferenceToPeriodBoundary(periodScale - previousPeriodPosition);
-    value_type const periodEndForPreviousTime(previousTime +
-                                              previousTimeDifferenceToPeriodBoundary);
-    bool const newPeriod(currentTime > periodEndForPreviousTime);
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note **Which period this evaluation is in, against which one the last
+    /// was in.** Four waveforms do all their work at a boundary and this is what
+    /// tells them one has arrived, so it has to be a fact about *this LFO* and
+    /// nothing else. It used to be a fact about the clock:
+    ///
+    /// \code
+    ///     previousPeriodPosition = modulo(periodOffset + previousTime, periodScale)
+    ///     periodEndForPreviousTime = previousTime + (periodScale - previousPeriodPosition)
+    ///     newPeriod = currentTime > periodEndForPreviousTime
+    /// \endcode
+    ///
+    /// -- did the clock cross a boundary between its own previous tick and this
+    /// one. That interval is a host buffer, and it is neither the interval since
+    /// this LFO was last evaluated nor anything with a fixed relationship to it:
+    /// the clock moves once per engine chunk and an LFO is sampled once per
+    /// spectral frame, and the two rates are set by the buffer size and the FFT
+    /// size respectively. So with a buffer below the hop several ticks went by
+    /// between evaluations and every boundary inside the skipped ones was
+    /// invisible -- the position wrapped from one back to zero with the ramp's
+    /// coefficients untouched, and a Sample & Glide played the identical glide
+    /// again; and with a buffer above it several frames shared one tick and every
+    /// one of them answered "yes", so the same waveform drew a target per frame
+    /// and teleported through all but the last. \see issue #151.
+    ///
+    ///   The integer half of the split *is* the period number, and `splitFloat`
+    /// was already computing it and throwing it away. Comparing it against the
+    /// one this LFO last saw is true exactly once per period at any ratio: frames
+    /// sharing a clock position share an index, and a clock that jumps several
+    /// periods still only begins the one it lands in.
+    ///
+    /// \note `neverEvaluated` rather than a sentinel index, because `periodOffset`
+    /// is signed in a release build -- `phase()` is +/-0.5 and only the branch
+    /// above takes `abs` -- so index -1 is reachable and no value is out of band.
+    /// Announcing the first evaluation is deliberate: an LFO nothing has asked
+    /// yet is at the start of a period whatever the clock reads, and a Sample &
+    /// Glide not told so has no target and sits flat until the first boundary.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    bool const newPeriod(state_.neverEvaluated || (periodIndex != state_.periodIndex));
+    state_.neverEvaluated = false;
+    state_.periodIndex = periodIndex;
 
     value_type const newValue(
         getWaveformAmplitudeForPosition(currentPeriodNormalisedPosition, newPeriod));

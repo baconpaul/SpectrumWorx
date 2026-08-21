@@ -141,7 +141,7 @@ Run the snapshots under `ctest`. All three live in `sw-dsp-tests`, which as of
 move 153 of the 303, because `adjustValueForPreset` converted a free LFO's period
 through `LFO::Timer`'s process-global bar duration; the binary split hid that and
 fixed nothing. The conversion reads a constant reference bar since 06.08.2026 —
-[`how-lfo-rates-work.md`](how-lfo-rates-work.md) §4.
+[`how-lfo-rates-and-eval-work.md`](how-lfo-rates-and-eval-work.md) §4.
 
 **A leaked *meter* still would**, and that one is by design rather than by
 accident: a synced period snaps to the divisions the meter has, so loading the

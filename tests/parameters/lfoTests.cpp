@@ -199,6 +199,90 @@ std::vector<float> overTwoPeriods(LFOImpl const &lfo, unsigned int const steps,
     return values;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Drives an LFO the way the engine really does: a clock that moves at
+/// one rate and evaluations that happen at another.
+///
+///   `overTwoPeriods()` above advances the timer exactly once per `getValue()`,
+/// and so does every other case in this file. That is one ratio out of many and
+/// it is the one at which nothing can go wrong, which is why this file was blind
+/// to issue #151 for as long as it existed. In the plugin the two rates are set
+/// by different things -- the clock moves once per engine chunk and an LFO is
+/// sampled once per spectral *frame* -- so
+///
+///   - a host buffer smaller than the hop lets several clock ticks go by between
+///     two evaluations (`clockTicksPerEvaluation` above one), and
+///   - a buffer larger than it renders several frames from one clock position
+///     (`evaluationsPerTick` above one).
+///
+/// \param ticks the total number of clock ticks, so that the LFO time covered is
+/// the same whatever the ratio: the same period boundaries really go past in
+/// every configuration, which is the whole point of comparing them.
+///
+/// \note Half a tick in, for the reason `overTwoPeriods()` gives at length: a
+/// boundary landed on exactly is not a boundary crossed.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+std::vector<float> driven(LFO::Waveform const waveform, unsigned int const ticks,
+                          float const barsPerTick, unsigned int const clockTicksPerEvaluation,
+                          unsigned int const evaluationsPerTick,
+                          std::uint64_t const seed = 0xC0FFEEu)
+{
+    LFOImpl lfo;
+    lfo.seed(seed);
+    withWaveform(lfo, waveform);
+
+    LFOImpl::Timer timer;
+    timer.reset();
+    timer.updatePositionAndTimingInformation(0, twoSeconds, 4);
+
+    std::vector<float> values;
+    for (unsigned int tick(1); tick <= ticks; ++tick)
+    {
+        timer.updatePositionAndTimingInformation((static_cast<float>(tick) - 0.5f) * barsPerTick,
+                                                 twoSeconds, 4);
+        if ((tick % clockTicksPerEvaluation) != 0)
+            continue;
+        for (unsigned int evaluation(0); evaluation < evaluationsPerTick; ++evaluation)
+            values.push_back(lfo.getValue(timer));
+    }
+    return values;
+}
+
+/// The default LFO period is one bar, and 64 ticks across it puts a boundary
+/// between two ticks rather than on one whatever stride is sampled from it.
+constexpr unsigned int ticksPerPeriod{64};
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief How many distinct periods a `driven()` span touches.
+///
+/// \note Which is how many times a waveform should hear that a period has begun
+/// -- not the number of *boundaries crossed*, which is one fewer. The span runs
+/// from half a tick after zero to half a tick before the last period would end,
+/// so it opens already inside period 0 and never reaches the boundary at the far
+/// end. Period 0 counts: an LFO that has never been evaluated is at the start of
+/// a period whatever the clock reads, and a Sample & Glide not told so sits flat
+/// at zero until the first boundary instead of gliding towards a target.
+///
+////////////////////////////////////////////////////////////////////////////////
+constexpr unsigned int drivenPeriods{20};
+constexpr unsigned int drivenTicks{ticksPerPeriod * drivenPeriods};
+constexpr float barsPerTick{1.0f / ticksPerPeriod};
+
+/// \brief Where two runs first disagree, or their common length if they never do.
+/// A whole run in a Catch2 expansion is 1280 floats nobody can read.
+std::size_t firstDifference(std::vector<float> const &left, std::vector<float> const &right)
+{
+    auto const shared(std::min(left.size(), right.size()));
+    for (std::size_t index(0); index < shared; ++index)
+        if (left[index] != right[index])
+            return index;
+    return shared;
+}
+
 //------------------------------------------------------------------------------
 // The table
 //------------------------------------------------------------------------------
@@ -333,10 +417,13 @@ TEST_CASE("Every LFO waveform matches the committed table", "[lfo]")
                 "# ramp between two, a new value every query -- which is what makes\n"
                 "# them three different waveforms rather than three calls to rand().\n"
                 "#\n"
-                "# The first period of Dirac, RandomHold and RandomSlide is their\n"
-                "# initial state rather than a draw: nothing has crossed a boundary\n"
-                "# yet. That is the behaviour, not an artefact of the sweep -- an LFO\n"
-                "# enabled mid-bar reads its starting value until the bar ends.\n";
+                "# The first period is a period like any other: all four of the\n"
+                "# boundary waveforms announce it. Until issue #151 the first row of\n"
+                "# each was its constructed state instead -- Dirac never pulsed,\n"
+                "# RandomHold held a zero it had not drawn and RandomSlide sat flat\n"
+                "# at zero rather than gliding -- because a period beginning was read\n"
+                "# off how far the clock had moved rather than off which period the\n"
+                "# LFO was in, and at the very first evaluation it had moved nowhere.\n";
         for (auto const &[name, values] : table)
             file << name << " | " << values << '\n';
         WARN("SW_LFO_TABLE_UPDATE was set: " << table.size()
@@ -469,6 +556,110 @@ TEST_CASE("A held random waveform holds and a sliding one slides", "[lfo]")
     std::vector<float> const secondPeriod(slide.begin() + steps / 2 + 1, slide.end());
     CHECK((std::ranges::is_sorted(secondPeriod) ||
            std::ranges::is_sorted(secondPeriod, std::greater<float>{})));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// One period beginning per period
+// -------------------------------
+//
+//   Issue #151. Four waveforms -- Dirac, dIRAC, RandomHold and RandomSlide -- do
+// all their work at a period boundary, and `newPeriodBegun` is what tells them
+// one has arrived. It used to be decided by asking the *clock* how far it had
+// moved since its own previous tick, which is a question about the host's buffer
+// rather than about this LFO: the interval tested was neither the interval since
+// the LFO was last evaluated nor anything with a fixed relationship to it.
+//
+//   So a Sample & Glide got its target replaced several times at one boundary, or
+// never at all, depending on a ratio no part of the LFO knew about. Both are
+// below, and both are what the reporters heard.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A period begins once per period, however the clock is sampled", "[lfo]")
+{
+    ScopedHostTiming const timing;
+
+    /// \note Dirac is the probe rather than a waveform under test: it answers
+    /// `maximumValue` exactly when `newPeriodBegun` is set and `minimumValue`
+    /// otherwise, so counting its peaks counts period beginnings and nothing
+    /// else. What it measures is shared by all four of the waveforms above.
+    auto const beginnings(
+        [](unsigned int const clockTicksPerEvaluation, unsigned int const evaluationsPerTick) {
+            auto const values(driven(LFO::Dirac, drivenTicks, barsPerTick, clockTicksPerEvaluation,
+                                     evaluationsPerTick));
+            return static_cast<unsigned int>(
+                std::ranges::count(values, static_cast<float>(LFOImpl::maximumValue)));
+        });
+
+    // One evaluation per clock tick: the ratio every other case in this file
+    // uses, and the one that was never broken.
+    CHECK(beginnings(1, 1) == drivenPeriods);
+
+    // A host buffer smaller than the hop, so the clock moves five times between
+    // two evaluations. Four fifths of the boundaries used to fall in a tick that
+    // nothing ever looked at, and the waveform never heard about them.
+    CHECK(beginnings(5, 1) == drivenPeriods);
+
+    // A buffer larger than the hop, so five frames are rendered from one clock
+    // position. All five used to answer "a period began" -- the same question,
+    // asked five times, given five different answers.
+    CHECK(beginnings(1, 5) == drivenPeriods);
+}
+
+TEST_CASE("Sample & Glide glides once per period whatever the buffer size", "[lfo]")
+{
+    ScopedHostTiming const timing;
+
+    /// The reference: one evaluation per clock tick, which is what the plugin
+    /// does when the host's buffer happens to equal the hop.
+    auto const oncePerTick(driven(LFO::RandomSlide, drivenTicks, barsPerTick, 1, 1));
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note **Five frames from one clock position ask one question five times.**
+    /// The clock has not moved between them, so four of the five are a repeat and
+    /// have to answer what the first did. Each of them used to draw a fresh
+    /// target and start a fresh ramp instead, so the value teleported through
+    /// four random points at every boundary -- "straight up jumps happening
+    /// periodically", which is the second half of issue #151.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    auto const fiveAtATime(driven(LFO::RandomSlide, drivenTicks, barsPerTick, 1, 5));
+    REQUIRE(fiveAtATime.size() == oncePerTick.size() * 5);
+
+    std::vector<float> firstOfEachTick;
+    std::size_t movedWithoutTheClockMoving{0};
+    for (std::size_t index(0); index < fiveAtATime.size(); index += 5)
+    {
+        firstOfEachTick.push_back(fiveAtATime[index]);
+        for (std::size_t repeat(1); repeat < 5; ++repeat)
+            movedWithoutTheClockMoving += (fiveAtATime[index + repeat] != fiveAtATime[index]);
+    }
+    CHECK(movedWithoutTheClockMoving == 0);
+    CHECK(firstDifference(firstOfEachTick, oncePerTick) == oncePerTick.size());
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note **...and evaluating only every fifth tick asks a subset of the same
+    /// questions.** The LFO covers the same time and crosses the same boundaries,
+    /// so the answers it gives have to be the ones the reference gave at those
+    /// ticks. They were not: a boundary that fell in one of the four skipped
+    /// ticks was never noticed, the ramp's coefficients stayed where they were,
+    /// and the position wrapped from one back to zero -- so the identical glide
+    /// played again, "an unpredictable amount of times".
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    auto const everyFifthTick(driven(LFO::RandomSlide, drivenTicks, barsPerTick, 5, 1));
+
+    std::vector<float> referenceAtEveryFifthTick;
+    for (std::size_t index(4); index < oncePerTick.size(); index += 5)
+        referenceAtEveryFifthTick.push_back(oncePerTick[index]);
+
+    REQUIRE(everyFifthTick.size() == referenceAtEveryFifthTick.size());
+    CHECK(firstDifference(everyFifthTick, referenceAtEveryFifthTick) == everyFifthTick.size());
 }
 
 ////////////////////////////////////////////////////////////////////////////////

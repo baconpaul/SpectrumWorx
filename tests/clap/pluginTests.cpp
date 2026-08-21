@@ -1684,7 +1684,7 @@ TEST_CASE("A host that opens in five four does not move the period it was given"
     /// stored one rather than the one running -- and pinning it is what makes a
     /// decision about it visible when somebody makes one. \see
     /// `doc/tech/threading_model.md` on the two copies, and
-    /// `doc/tech/how-lfo-rates-work.md` §4 on what a meter does to a stored
+    /// `doc/tech/how-lfo-rates-and-eval-work.md` §4 on what a meter does to a stored
     /// period.
     ///
     ////////////////////////////////////////////////////////////////////////////

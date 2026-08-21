@@ -200,7 +200,6 @@ class LFOImpl : public LFO
         static constexpr std::uint8_t referenceMeasureNumerator{4};
 
         value_type const &currentTimeInBars() const { return currentTimeInBars_; }
-        value_type const &previousTimeInBars() const { return previousTimeInBars_; }
 
         ////////////////////////////////////////////////////////////////////////
         ///
@@ -225,10 +224,6 @@ class LFOImpl : public LFO
         value_type currentTimeInReferenceBars() const
         {
             return currentTimeInBars_ * basePeriod() / referenceBarDuration;
-        }
-        value_type previousTimeInReferenceBars() const
-        {
-            return previousTimeInBars_ * basePeriod() / referenceBarDuration;
         }
 
         TimingInformationChange updatePositionAndTimingInformation(float positionInBars,
@@ -286,6 +281,14 @@ class LFOImpl : public LFO
 
       private:
         value_type currentTimeInBars_;
+
+        /// \note No longer readable from outside, and the pair of accessors that
+        /// exposed it went with the last reader: `getValue()` used to ask how far
+        /// the clock had moved since its own previous tick and call the answer
+        /// "a period began", which is issue #151. What a waveform needs is a fact
+        /// about itself, so it keeps one. This stays because the asserts below
+        /// still use it -- a clock that ran backwards would be worth knowing
+        /// about -- and not because anything reads it for an answer.
         value_type previousTimeInBars_;
 
         ////////////////////////////////////////////////////////////////////////
@@ -333,6 +336,12 @@ class LFOImpl : public LFO
     {
         value_type values[2];
         Math::Rng rng;
+
+        /// \brief Which period the last evaluation fell in, and whether there
+        /// has been one. Together they are `newPeriodBegun`. \see getValue(),
+        /// which has the reason this is per LFO rather than read off the clock.
+        int periodIndex{0};
+        bool neverEvaluated{true};
     }; // struct WaveformState
 
     LFOImpl();
