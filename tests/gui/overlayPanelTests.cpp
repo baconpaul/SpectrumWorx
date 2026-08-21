@@ -50,6 +50,8 @@
 #include <cstdlib>
 #include <map>
 #include <string>
+#include <utility>
+#include <vector>
 //------------------------------------------------------------------------------
 namespace
 {
@@ -57,6 +59,50 @@ using namespace LE;
 using namespace LE::SW;
 
 using Editor = GUI::SpectrumWorxEditor;
+
+/// Every descendant of \p root that is a \p Widget, in child order.
+template <typename Widget> std::vector<Widget *> descendantsOfType(juce::Component &root)
+{
+    std::vector<Widget *> found;
+    for (auto *const pChild : root.getChildren())
+    {
+        if (auto *const pWidget(dynamic_cast<Widget *>(pChild)); pWidget)
+            found.push_back(pWidget);
+        for (auto *const pDeeper : descendantsOfType<Widget>(*pChild))
+            found.push_back(pDeeper);
+    }
+    return found;
+}
+
+/// The one button in \p root reading \p text.
+juce::Button &buttonNamed(juce::Component &root, juce::String const &text)
+{
+    std::vector<juce::Button *> matching;
+    for (auto *const pButton : descendantsOfType<juce::Button>(root))
+        if (pButton->getButtonText() == text)
+            matching.push_back(pButton);
+    REQUIRE(matching.size() == 1);
+    return *matching.front();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief What pressing \p button does, minus the mouse.
+///
+/// \note `triggerClick()` wants a message loop and a test binary has none, and a
+/// synthesised `mouseDown` never reaches a component in one either. Both of the
+/// buttons this is used on toggle, so setting the state *is* the press -- JUCE
+/// sends the click message from inside `setToggleState()` -- and that is what
+/// puts the editor's own `buttonClicked` under test rather than the function it
+/// happens to call.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void press(juce::Button &button)
+{
+    REQUIRE_FALSE(button.getToggleState());
+    button.setToggleState(true, juce::sendNotificationSync);
+}
 
 /// The rectangle a panel is given when it is laid over the module strips.
 juce::Rectangle<int> overlayRectangle()
@@ -315,6 +361,100 @@ TEST_CASE("Every settings tab paints a page and not just a tab bar", "[gui][over
 
         CHECK(differenceOver(closed, open, overlayRectangle()) > leastOfTheRectangleAPanelCovers);
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Issue #129, and the report is exactly the route this takes: select a
+/// tab, press PRESETS, press SETTINGS. The panel does not survive that -- the
+/// browser deletes it -- so the selection has to live outside it, which is what
+/// `Settings::lastPage()` is.
+///
+/// \note Two tabs in turn rather than one, for the reason the preset browser's
+/// case gives about banks: `lastPage()` is process-wide, so a case that only
+/// left it on the GUI page would pass just as happily against a panel that
+/// always opened on the GUI page. Following it in both directions says it is
+/// remembering rather than defaulting.
+///
+/// \note Through the buttons rather than through `showSettings()`, because the
+/// bug was in the handler and not in the panel: `buttonClicked` asked for page 0
+/// by name. Calling `showSettings()` here would have gone green with that line
+/// still in place.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("The settings panel reopens on the tab it was left on", "[gui][overlay]")
+{
+    SWTest::HostSideJuce const juce;
+    SWTest::Instance instance;
+    auto &editor(overlayEditor(instance));
+
+    auto &settingsButton(buttonNamed(editor, "SETTINGS"));
+
+    auto const pictureAfterLeavingItOn([&](unsigned int const page) {
+        editor.showSettings(page);
+        auto const left(rendered(editor));
+
+        /// \note The browser through `showPresetBrowser()` and the panel back
+        /// through the *button*, which is the asymmetry the bug asks for: the
+        /// handler that was wrong is the settings one, and `togglePresetBrowser`
+        /// asserts on `getPeer()` -- a headless editor has no window. All the
+        /// PRESETS press contributes here is making the panel go away, which is
+        /// what this call does.
+        editor.showPresetBrowser(true); // "you tab away back to Presets"...
+        press(settingsButton);          // ...and come back the way a user does.
+
+        return std::pair{left, rendered(editor)};
+    });
+
+    auto const [leftOnEngine, reopenedOnEngine](pictureAfterLeavingItOn(Editor::enginePageIndex));
+    auto const [leftOnInterface,
+                reopenedOnInterface](pictureAfterLeavingItOn(Editor::interfacePageIndex));
+
+    // The premise: the two pages are distinguishable at all.
+    REQUIRE(differenceOver(leftOnEngine, leftOnInterface, overlayRectangle()) > 0);
+
+    // Each reopened on the tab it was left on.
+    CHECK(differenceOver(leftOnEngine, reopenedOnEngine, overlayRectangle()) == 0);
+    CHECK(differenceOver(leftOnInterface, reopenedOnInterface, overlayRectangle()) == 0);
+
+    // Which is not the same as always opening on one fixed page.
+    CHECK(differenceOver(reopenedOnEngine, reopenedOnInterface, overlayRectangle()) > 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The other half of issue #129, and the reason the answer is the host's
+/// rather than the editor's: a window that shuts takes the whole editor with it,
+/// so a member on either the panel or the editor would forget. What holds it is
+/// the same object the DAW extra state is written out of, which is what makes
+/// the tab come back in a reopened project as well as in a reopened window.
+/// \see SpectrumWorxCLAP::sessionState() and tests/clap/stateTests.cpp.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("The settings tab survives the editor window closing", "[gui][overlay]")
+{
+    SWTest::HostSideJuce const juce;
+    SWTest::Instance instance;
+
+    juce::Image enginePage, interfacePage;
+    {
+        auto &editor(overlayEditor(instance));
+        editor.showSettings(Editor::enginePageIndex);
+        enginePage = rendered(editor);
+        editor.showSettings(Editor::interfacePageIndex);
+        interfacePage = rendered(editor);
+        instance.closeEditor();
+    }
+
+    // The premise: the two pages are distinguishable at all.
+    REQUIRE(differenceOver(enginePage, interfacePage, overlayRectangle()) > 0);
+
+    auto &reopened(overlayEditor(instance));
+    press(buttonNamed(reopened, "SETTINGS"));
+
+    CHECK(differenceOver(interfacePage, rendered(reopened), overlayRectangle()) == 0);
 }
 
 TEST_CASE("Clicking the logo opens the About page, not an empty panel", "[gui][overlay]")
