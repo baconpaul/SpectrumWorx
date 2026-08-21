@@ -1881,8 +1881,45 @@ void SpectrumWorxEditor::detachFrom(ModuleUI &region)
         lfoDisplay_ = std::nullopt;
     }
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note And the keyboard out of the shared controls before they are
+    /// destroyed, rather than leaving JUCE to move it for us.
+    ///
+    ///   JUCE answers a focused component going away by walking the focus to
+    /// the next thing that will take it, synchronously, from inside
+    /// `~Component`. These are parented to `mainArea_`, which does not want the
+    /// keyboard, so the walk goes up to it and back down its default focus
+    /// child -- **another strip**. That is `ModuleUI::focusGained` ->
+    /// `activate()` -> `moduleActivated()`, which reaches for the shared
+    /// controls -- and `std::optional::reset()` destroys the value *before* it
+    /// clears the engaged flag, so `sharedModuleControls_` still answers
+    /// `has_value()` at that moment. `updateForActiveModule()` then writes
+    /// `gain_`, whose `juce::Slider` destructor has already run and nulled its
+    /// Pimpl.
+    ///
+    ///   Reported as a crash on removing a module with the shared Gain knob
+    /// selected: two modules, a control in the second one, then Gain, then its
+    /// eject button. `grabKeyboardFocus()` is the same move
+    /// `moduleDeactivated()` makes for the same reason -- the editor wants the
+    /// keyboard, so the walk stops there -- and it leaves nothing focused inside
+    /// what is about to go.
+    ///
+    /// \note After the LFO display and not before: taking the focus out of the
+    /// shared controls deselects the module, and `moduleDeactivated()` asserts
+    /// that the module's *control* was deselected first. This path skips that
+    /// deliberately (see the note on `pActiveControl_` above), so the strip has
+    /// to be retired by hand before anything can deselect the module.
+    ///                                       (21.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
     if (sharedControlsAreRegions)
+    {
+        if (sharedModuleControls_->hasFocus())
+            grabKeyboardFocus();
         sharedModuleControls_ = std::nullopt;
+    }
 }
 
 void SpectrumWorxEditor::mainKnobDragStarted(std::uint8_t const index) const

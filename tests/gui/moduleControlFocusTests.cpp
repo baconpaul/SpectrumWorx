@@ -26,11 +26,14 @@
 /// node to it, and this is the header with the complete type.
 #include "core/modules/moduleDSPAndGUI.hpp"
 
+#include "gui/editor/auxiliaryComponents.hpp"
 #include "gui/modules/moduleControl.hpp"
 #include "gui/modules/moduleUI.hpp"
 #include "gui/preferences.hpp" // hideCursorOnKnobDrag, for the fourth LFO gesture
 
 #include "le/parameters/lfoImpl.hpp"
+#include "le/parameters/parametersUtilities.hpp"
+#include "le/spectrumworx/effects/baseParameters.hpp"
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -249,6 +252,28 @@ void clickOnce(juce::Component &widget)
 {
     widget.mouseDown(eventOver(widget, {}, false));
     widget.mouseUp(eventOver(widget, {}, false));
+}
+
+/// \brief The Gain/Wet/frequency-range strip, found in the tree rather than
+/// asked for: the editor hands it out to ModuleUI alone.
+GUI::SharedModuleControls *sharedControlsUnder(juce::Component &component)
+{
+    for (auto *const pChild : component.getChildren())
+    {
+        if (auto *const pShared = dynamic_cast<GUI::SharedModuleControls *>(pChild))
+            return pShared;
+        if (auto *const pFound = sharedControlsUnder(*pChild))
+            return pFound;
+    }
+    return nullptr;
+}
+
+/// The shared Gain knob -- the one the report's focus was in.
+juce::Component &sharedGain(GUI::SharedModuleControls &shared)
+{
+    namespace Base = Effects::BaseParameters;
+    return shared.controlForParameter(LE::Parameters::IndexOf<Base::Parameters, Base::Gain>::value)
+        .widget();
 }
 } // anonymous namespace
 
@@ -473,6 +498,99 @@ TEST_CASE("A strip removed after its control was deactivated leaves nothing poin
     }
 
     CHECK(editor.regionInSlot(0) != nullptr);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The shared controls' own version of the case above, and it crashes
+/// rather than reads freed memory. `detachFrom()` destroys them while the
+/// keyboard focus is still *inside* them, and JUCE answers a focused component
+/// going away by handing the focus to the next thing that will take it -- which,
+/// two strips down from the editor, is another `ModuleUI`. That is a synchronous
+/// `focusGained` -> `activate()` -> `moduleActivated()`, from inside
+/// `std::optional::reset()`.
+///
+///   And `reset()` destroys the value *before* it clears the engaged flag
+/// (libc++ `__optional_destruct_base::reset`), so `sharedModuleControls_` still
+/// answers `has_value()` at that moment: `moduleActivated()` takes the else
+/// branch, calls `updateForActiveModule()`, and writes `gain_` -- whose
+/// `juce::Slider` destructor has already run and nulled its Pimpl.
+///
+///     0  juce::Slider::Pimpl::setValue
+///     1  SharedModuleControls::updateForActiveModule
+///     2  SpectrumWorxEditor::moduleActivated
+///     3  ModuleUI::focusGained
+///     ...
+///     8  juce::Component::removeChildComponent
+///     9  juce::Component::~Component
+///    10  SpectrumWorxEditor::detachFrom
+///    11  SpectrumWorxEditor::resyncModuleRack
+///
+/// \note Two strips, and the *second* one removed: with one strip there is no
+/// other `ModuleUI` for the focus to land on and nothing re-enters.
+///                                           (21.08.2026.) (SW port)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("Removing the strip the shared controls are focused in activates nothing",
+          "[gui][modules][lfo]")
+{
+    SWTest::HostSideJuce const juceIsUp;
+
+    if (!aWindowCanBeMade())
+        SKIP(noWindow);
+
+    SWTest::Instance instance;
+    DesktopEditor const window(instance);
+    if (!window.tookTheKeyboard())
+        SKIP(keyboardRefused);
+
+    auto &editor(window.editor());
+
+    editor.addUserAddedModule(0);
+    editor.addUserAddedModule(0);
+    editor.resyncModuleRack();
+    auto *const pSecondStrip(editor.regionInSlot(1));
+    REQUIRE(editor.regionInSlot(0) != nullptr);
+    REQUIRE(pSecondStrip != nullptr);
+
+    // Selecting a control in the second strip is what builds the shared controls
+    // and points them at it.
+    auto *const pControl(firstKnob(*pSecondStrip));
+    REQUIRE(pControl != nullptr);
+    pControl->widget().grabKeyboardFocus();
+    REQUIRE(editor.sharedModuleControlsActive());
+
+    // ...and then the click on Gain, which moves the focus out of the strip and
+    // into the shared controls while leaving the strip selected.
+    auto *const pShared(sharedControlsUnder(editor));
+    REQUIRE(pShared != nullptr);
+    auto &gain(sharedGain(*pShared));
+    gain.grabKeyboardFocus();
+    REQUIRE(gain.hasKeyboardFocus(false));
+    REQUIRE(editor.sharedModuleControlsActiveAndFocused());
+    REQUIRE(editor.selectedModule() == pSecondStrip);
+
+    // The eject button's path, and the crash.
+    editor.removeModule(*pSecondStrip);
+    editor.resyncModuleRack();
+
+    CHECK(editor.regionInSlot(1) == nullptr);
+    CHECK(editor.regionInSlot(0) != nullptr);
+
+    // Nothing was activated on the way out: the strip that was selected is gone
+    // and no other one was made selected in its place.
+    CHECK(editor.selectedModule() == nullptr);
+    CHECK(editor.activeControl() == nullptr);
+    CHECK(!editor.sharedModuleControlsActive());
+
+    /// \note And the rack still paints, which is what the case above pins for
+    /// the deactivated-first path.
+    juce::Image canvas(juce::Image::ARGB, editor.getWidth(), editor.getHeight(), true);
+    {
+        juce::Graphics graphics(canvas);
+        editor.paintEntireComponent(graphics, true);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
