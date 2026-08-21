@@ -225,20 +225,21 @@ TEST_CASE("An enumerated parameter can rest at a value other than its first",
 {
     using LE::SW::Effects::Octaver;
 
-    // The one the issue asked for: two octaves that are not the same octave.
-    CHECK(Octaver::Octave1().getValue() == Octaver::Octave1::Down2);
-    CHECK(Octaver::Octave2().getValue() == Octaver::Octave2::Down1);
+    // The one the issue asked for: two octaves that are not the same octave, the
+    // nearer one first.
+    CHECK(Octaver::Octave1().getValue() == Octaver::Octave1::Down1);
+    CHECK(Octaver::Octave2().getValue() == Octaver::Octave2::Down2);
 
     // Which is the *default*, not merely what a fresh object happens to hold.
-    CHECK(Octaver::Octave1::default_() == Octaver::Octave1::Down2);
-    CHECK(Octaver::Octave2::default_() == Octaver::Octave2::Down1);
+    CHECK(Octaver::Octave1::default_() == Octaver::Octave1::Down1);
+    CHECK(Octaver::Octave2::default_() == Octaver::Octave2::Down2);
 
     // And the plain macro is unchanged: the first value, as it always was.
-    CHECK(Octaver::Octave1::default_() == Octaver::Octave1::minimum());
+    CHECK(Octaver::Octave2::default_() == Octaver::Octave2::minimum());
 
     /// \note Neither of them moved its range, which is the mistake this shape
     /// avoids: the default is a third template argument rather than a shifted
     /// minimum, so what a preset's stored value means does not move with it.
-    CHECK(Octaver::Octave2::minimum() == 0);
-    CHECK(Octaver::Octave2::maximum() == 4);
+    CHECK(Octaver::Octave1::minimum() == 0);
+    CHECK(Octaver::Octave1::maximum() == 4);
 }
