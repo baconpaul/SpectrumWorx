@@ -501,6 +501,39 @@ void DiscreteParameter::mouseDown(juce::MouseEvent const &)
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Takes the selection first, exactly as mouseDown() above does and for
+/// the same reason: `moduleParameterChanged()` asserts that the control being
+/// changed is the selected one, which is what puts its LFO on screen. A wheel
+/// that edited a control while a different module stayed selected would be the
+/// state those assertions exist to catch.
+///
+/// \note Which means a wheel needs a window, since focus does. That is a real
+/// cost and it is paid where the click already pays it. \see
+/// tests/gui/moduleControlFocusTests.cpp.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void DiscreteParameter::mouseWheelMove(juce::MouseEvent const &event,
+                                       juce::MouseWheelDetails const &wheel)
+{
+    if (!hasDirectFocus())
+    {
+        juce::Component::SafePointer<juce::Component> const self(this);
+        grabKeyboardFocus();
+        if (!self || !hasDirectFocus())
+            return;
+    }
+
+    if (isLFOEnabled())
+        return;
+
+    ComboBox::mouseWheelMove(event, wheel);
+}
+
+void DiscreteParameter::selectionScrolled() { moduleParameterChanged(); }
+
 void DiscreteParameter::focusChanged() { repaint(); }
 
 #pragma warning(push)

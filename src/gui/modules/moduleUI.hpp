@@ -325,6 +325,19 @@ class DiscreteParameter : public ComboBox, public ModuleControl<DiscreteParamete
   private:
     void mouseDown(juce::MouseEvent const &) override;
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Refused while the LFO is on, which is the condition the menu opens
+    /// under and the one ModuleKnob turns its own wheel off for: the LFO owns
+    /// the value, so a row the user scrolled to would be overwritten by the next
+    /// sweep. \see syncMouseWheelAndLFOState() and issue #124.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    void mouseWheelMove(juce::MouseEvent const &, juce::MouseWheelDetails const &) override;
+
+    /// \note The same call the menu's own callback makes.
+    void selectionScrolled() override;
+
   protected: // ModuleControl interface.
     void focusChanged();
 

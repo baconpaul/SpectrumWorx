@@ -815,12 +815,60 @@ class ComboBox : public WidgetBase<>, public PopupMenuWithSelection
 
     void showMenu(std::function<void(bool)> onValueChanged);
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief What a wheel notch has just done, for whoever the selection
+    /// belongs to.
+    ///
+    ///   Called after the row has already moved, and only when it did. Doing
+    /// nothing is the right default: a box nobody has wired to a parameter
+    /// changes its own display and nothing else, which is what it does when the
+    /// menu is used too.
+    ///
+    /// \note The same seam `showMenu()`'s callback is, in the shape a wheel
+    /// needs: there is no menu to outlive the widget here, so it is a virtual
+    /// rather than a SafePointer and a std::function. \see issue #124.
+    ///                                   (21.08.2026.)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    virtual void selectionScrolled() {}
+
   protected: // juce::Component overrides
     void paint(juce::Graphics &) override;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Steps the selection, as juce::ComboBox and sst-jucegui both do it:
+    /// **a notch away from the user is the row above**.
+    ///
+    /// \note Which is the opposite of what the wheel does to a knob, where away
+    /// from the user raises the value. That is not an oversight in either place
+    /// -- one is a list and the other is a number -- and it is the arrangement
+    /// every other Surge Synth Team plugin ships, `DiscreteParamEditor` against
+    /// `ContinuousParamEditor`.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    void mouseWheelMove(juce::MouseEvent const &, juce::MouseWheelDetails const &) override;
+
+  private:
+    /// The row \p rows away from the selected one that a user could have picked
+    /// off the menu, or the selected one if there is none.
+    unsigned int rowReachedBy(int rows) const;
+
+    /// Whether \p row is one a click could land on.
+    bool isSelectableRow(unsigned int row) const;
 
   private:
     FrameStyle const &frame_;
     int const boxHeight_;
+
+    /// \note Accumulated because a trackpad sends a great many small deltas
+    /// where a wheel sends one large one, and a row per delta would make the
+    /// first unusable. juce::ComboBox carries the same member for the same
+    /// reason.
+    float wheelTravel_{0};
 }; // class ComboBox
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1365,6 +1413,9 @@ class TitledComboBox : public ComboBox
   private:
     void mouseDown(juce::MouseEvent const &) override;
     void paint(juce::Graphics &) override;
+
+    /// \note The same call the menu's own callback makes. \see issue #124.
+    void selectionScrolled() override;
 
   private:
     DrawableText const title_;

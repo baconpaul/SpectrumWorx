@@ -3,7 +3,8 @@
 /// discreteParameterTests.cpp
 /// --------------------------
 ///
-///   What an enumerated module parameter's combo box lists, and in what order.
+///   What an enumerated module parameter's combo box lists, in what order, and
+/// what the mouse wheel does to the row that is showing.
 ///
 /// \note The menu is not opened: a menu is a modal window and a test binary has
 /// no message loop to answer one with (\see the note at the top of
@@ -31,6 +32,10 @@
 #include "le/spectrumworx/effects/vaxateer/vaxateer.hpp"
 
 #include "le/parameters/parametersUtilities.hpp" // IndexOf
+
+#include "core/host_interop/parameters.hpp" // GlobalParameters
+
+#include <juce_gui_basics/juce_gui_basics.h>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -87,6 +92,77 @@ GUI::ModuleUI &stripFor(GUI::SpectrumWorxEditor &editor, char const *const effec
 //------------------------------------------------------------------------------
 } // anonymous namespace
 //------------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief One wheel notch over \p component, positive being away from the user.
+///
+/// \note Handed straight to `mouseWheelMove()`, which is half a mouse -- the
+/// same half the mouseDown cases elsewhere use, and enough for the one question
+/// here. Through `juce::Component`, because the override is protected on
+/// GUI::ComboBox and public on the base.
+///
+/// \note 0.3 rather than 1: GUI::ComboBox counts five notches to a row, and a
+/// notch is what a wheel detent sends. One row per call is what makes the cases
+/// below readable.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void scroll(juce::Component &component, float const deltaY)
+{
+    juce::MouseWheelDetails wheel{};
+    wheel.deltaX = 0;
+    wheel.deltaY = deltaY;
+    wheel.isReversed = false;
+    wheel.isSmooth = false;
+    wheel.isInertial = false;
+
+    auto const centre(component.getLocalBounds().getCentre().toFloat());
+    juce::MouseEvent const event(juce::Desktop::getInstance().getMainMouseSource(), centre,
+                                 juce::ModifierKeys(), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &component,
+                                 &component, juce::Time(), centre, juce::Time(), 1, false);
+    component.mouseWheelMove(event, wheel);
+}
+
+/// Every descendant of \p root that is a \p Widget, in child order.
+template <typename Widget> std::vector<Widget *> descendantsOfType(juce::Component &root)
+{
+    std::vector<Widget *> found;
+    for (auto *const pChild : root.getChildren())
+    {
+        if (auto *const pWidget(dynamic_cast<Widget *>(pChild)); pWidget)
+            found.push_back(pWidget);
+        for (auto *const pDeeper : descendantsOfType<Widget>(*pChild))
+            found.push_back(pDeeper);
+    }
+    return found;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief The settings panel's FFT size box, open on the Engine page.
+///
+/// \note The settings panel rather than a module strip, and the reason is worth
+/// stating: the two share `GUI::ComboBox` and its wheel handling, but a module
+/// strip's box takes the module selection before it will move -- see
+/// `DiscreteParameter::mouseWheelMove()` -- and focus needs a window, which a
+/// test binary has to go out of its way to get. What is different about the
+/// module box is one guard; what is the same is everything these cases ask
+/// about. \see tests/gui/moduleControlFocusTests.cpp for the window.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+GUI::TitledComboBox &fftSizeBox(GUI::SpectrumWorxEditor &editor)
+{
+    editor.showSettings(GUI::SpectrumWorxEditor::enginePageIndex);
+
+    /// \note The three engine boxes are laid out top to bottom in declaration
+    /// order and the FFT size is the first of them. Said by asking what it holds
+    /// rather than by trusting the order.
+    auto const boxes(descendantsOfType<GUI::TitledComboBox>(editor));
+    REQUIRE(boxes.size() == 3);
+    return *boxes.front();
+}
 
 TEST_CASE("Tune Worx's scale root is listed from C, and still valued from A",
           "[gui][modules][combo]")
@@ -311,4 +387,112 @@ TEST_CASE("A parameter with no abbreviations reads the same either way", "[gui][
     }
 
     CHECK(comboBox.getItemText(RMSTarget::SideRMS) == "Sidechain");
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Issue #124. Away from the user is *up* the list, which is what
+/// juce::ComboBox and sst-jucegui's DiscreteParamEditor both do, and the
+/// opposite of what the same gesture does to a knob. One is a list and the other
+/// is a number.
+///
+/// \note The value has to reach the parameter and not only the box. A combo box
+/// that stepped its own display and published nothing looks exactly right until
+/// the sound does not change.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A wheel over a combo box steps a row and publishes it", "[gui][combo]")
+{
+    using LE::SW::GlobalParameters::FFTSize;
+
+    SWTest::HostSideJuce const juceIsUp;
+    SWTest::Instance instance;
+    instance.openEditor();
+
+    auto &box(fftSizeBox(instance.editor()));
+    auto &parameters(instance.programMain().parameters());
+
+    auto const opened(box.getValue());
+    REQUIRE(opened == parameters.get<FFTSize>());
+
+    // Toward the user: down the list, which for a power of two is the larger.
+    scroll(box, -0.3f);
+    auto const stepped(box.getValue());
+    REQUIRE(stepped != opened);
+    CHECK(stepped == opened * 2);
+    CHECK(parameters.get<FFTSize>() == stepped);
+
+    // And back, which says the two directions are one gesture rather than two
+    // arbitrary ones.
+    scroll(box, +0.3f);
+    CHECK(box.getValue() == opened);
+    CHECK(parameters.get<FFTSize>() == opened);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note A wheel has no idea where a list begins, so wrapping would turn "keep
+/// scrolling" into "start over at the other end" -- which is a value the user
+/// never asked for, and for the FFT size an expensive one.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A wheel stops at the ends of a combo box rather than wrapping", "[gui][combo]")
+{
+    SWTest::HostSideJuce const juceIsUp;
+    SWTest::Instance instance;
+    instance.openEditor();
+
+    auto &box(fftSizeBox(instance.editor()));
+
+    auto const rows(box.numberOfItems());
+    REQUIRE(rows > 1);
+
+    /// \note Twice the list's length of notches, so it would have wrapped more
+    /// than once if it wrapped at all.
+    for (unsigned int notch(0); notch < 2 * rows; ++notch)
+        scroll(box, -0.3f);
+    auto const last(box.getValue());
+
+    scroll(box, -0.3f);
+    CHECK(box.getValue() == last);
+
+    for (unsigned int notch(0); notch < 2 * rows; ++notch)
+        scroll(box, +0.3f);
+    auto const first(box.getValue());
+    REQUIRE(first != last);
+
+    scroll(box, +0.3f);
+    CHECK(box.getValue() == first);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Not while the list is down. The menu scrolls itself, the box under it
+/// is not what the pointer is over, and a selection moving underneath an open
+/// list is how a user ends up with a value nobody picked.
+///
+/// \note The menu is never actually shown here -- a modal window needs a message
+/// loop -- so what this drives is the flag `showMenu()` sets, which is the thing
+/// the guard reads. \see GUI::PopupMenu::menuActive().
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A wheel does nothing while the combo box's menu is open", "[gui][combo]")
+{
+    SWTest::HostSideJuce const juceIsUp;
+    SWTest::Instance instance;
+    instance.openEditor();
+
+    auto &box(fftSizeBox(instance.editor()));
+    auto const opened(box.getValue());
+
+    static_cast<juce::Component &>(box).mouseDown(juce::MouseEvent(
+        juce::Desktop::getInstance().getMainMouseSource(), {}, juce::ModifierKeys(), 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, &box, &box, juce::Time(), {}, juce::Time(), 1, false));
+    REQUIRE(box.menuActive());
+
+    scroll(box, -0.3f);
+    CHECK(box.getValue() == opened);
 }
