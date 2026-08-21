@@ -189,7 +189,7 @@ version; both went with the parameter on 07.08.2026.
 			<p n="Center (LFO me!)" v="2000" on="1" T="500" ph="0.25" sync="0" wfrm="0" />
 		</Module>
 	</Modules>
-	<dawExtraState />
+	<dawExtraState settingsPage="1" />
 </SpectrumWorxPreset>
 ```
 
@@ -285,14 +285,34 @@ The element is written even when the hook writes nothing into it, so an empty
 calls the reader only when the element is present, so loading a `.swp` into a
 live session is not a silent reset of session state.
 
-**Its payload is deliberately empty for now.** The mechanism is the deliverable;
-the payload accrues. The candidate is the preset browser's location and
-selection, which is main-thread and is not a parameter.
+**Its payload is one attribute as of 21.08.2026**, and it accrues a bullet at a
+time. The mechanism was written empty from 02.08.2026 so that the day it carried
+something would not also be the day it started being written; the first payload
+is the settings panel's selected tab (issue #129):
+
+```xml
+<dawExtraState settingsPage="1" />
+```
+
+`SpectrumWorxCLAP::sessionState()` is the pair of hooks and
+`SpectrumWorxCLAP::settingsPage_` is what they read and write. It is on the
+plugin rather than on the editor because nothing in the editor lives long enough
+to hold it — the panel is destroyed every time the preset browser is opened, and
+the editor every time the window shuts, which is the report in #129. **The
+attribute name is on disk: renaming it is a silent break**, exactly as §2 says
+about a parameter's streaming name. A missing attribute leaves the member where
+it was, so a state written by a build that predates it resets nothing.
+
+The remaining candidate is the preset browser's location and selection, which is
+main-thread, is not a parameter, and today is a process-wide static
+(`PresetBrowser::lastPlace()`) rather than session state.
 
 The settings panel's Interface page is *not* a candidate, and it is the case that
-says where the line is. Its four — zoom, mouse-over reaction, LFO update
-behaviour, hide-cursor-on-knob-drag — used to persist nowhere at all (issues #61
-and #55). They are answers about how this user likes the editor to behave, not
+says where the line is — and note that it is the *page* rather than the *tab*:
+which tab was showing is a place this session was left, which is the block's, and
+what is on that page is how this user likes the editor to behave, which is not.
+Its four — zoom, mouse-over reaction, LFO update behaviour,
+hide-cursor-on-knob-drag — used to persist nowhere at all (issues #61 and #55). They are answers about how this user likes the editor to behave, not
 about this session, so they are the same in every instance and in every project,
 and they belong in the user's preferences file rather than in a host's state
 blob: `<user folder>/SpectrumWorxUserDefaults.xml`, through

@@ -625,10 +625,14 @@ class SpectrumWorxEditor final : private SkinLifetime,
     /// does. `tools/show-ui` only; see showPresetBrowser().
     void showFactoryBank(juce::String const &bank);
 
-    /// \brief Opens the settings panel on \p pageIndexToActivate, as the
-    /// settings button does. Public for the same reason showPresetBrowser() is:
-    /// the button is private and its handler recovers the editor from it.
+    /// \brief Opens the settings panel on \p pageIndexToActivate, as clicking
+    /// the logo does. Public for the same reason showPresetBrowser() is: the
+    /// button is private and its handler recovers the editor from it.
     void showSettings(unsigned int pageIndexToActivate);
+
+    /// \brief Opens it on whichever tab this session was last left on, which is
+    /// what the settings button does. \see EditorHost::settingsPage().
+    void showSettings();
 
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -1254,6 +1258,12 @@ class SpectrumWorxEditor final : private SkinLifetime,
         }
 
         juce::TabBarButton *createTabButton(juce::String const &tabName, int tabIndex) override;
+
+        /// \note Every route to a tab goes through here -- a press on the bar,
+        /// and setCurrentTabIndex() whether or not it was asked to send the
+        /// change message -- so it is the one place the session's answer has to
+        /// be written. \see EditorHost::settingsPage().
+        void currentTabChanged(int newCurrentTabIndex, juce::String const &newTabName) override;
 
       private: // JUCE ButtonListener overrides.
         void buttonClicked(juce::Button *) override;

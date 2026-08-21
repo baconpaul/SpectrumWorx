@@ -1282,7 +1282,7 @@ void SpectrumWorxEditor::buttonClicked(juce::Button *const pButton)
     {
         if (settingsButton_.getToggleState())
         {
-            showSettings(0);
+            showSettings();
         }
         else
         {
@@ -1994,6 +1994,28 @@ void SpectrumWorxEditor::showSettings(unsigned int const pageIndexToActivate)
     }
     settings_->setCurrentTabIndex(pageIndexToActivate, false);
     settingsButton_.setToggleState(true, juce::dontSendNotification);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Checked against the tabs this build has rather than trusted. The number
+/// comes out of a host's state blob, which is a file written by some earlier
+/// version -- the preset browser's remembered bank has the same problem and the
+/// same answer (\see PresetBrowser::restoreLastPlace()). JUCE clamps an
+/// out-of-range tab index to -1 and opens a panel with no page in it, which is
+/// the hole tests/gui/overlayPanelTests.cpp measures.
+///
+/// \note The argument is read before the call, which is what makes the
+/// delegation correct rather than merely short: building a Settings adds its
+/// first tab and so selects page 0, and that write goes through
+/// `currentTabChanged` like any other.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxEditor::showSettings()
+{
+    auto const page(editorHost_.settingsPage());
+    showSettings((page < numberOfSettingsPages) ? page : unsigned{enginePageIndex});
 }
 
 void SpectrumWorxEditor::updateSettings()
@@ -3761,6 +3783,19 @@ juce::TabBarButton *SpectrumWorxEditor::Settings::createTabButton(juce::String c
                                                                   int const /*tabIndex*/)
 {
     return new SettingsTab(tabName, getTabbedButtonBar());
+}
+
+/// \note Two of the indices arriving here are not a user's choice, and the range
+/// check is what keeps either out of the session state: addTab() selects the
+/// first tab as it adds it, and clearTabs() deselects with -1 on the way out.
+/// JUCE reaches this whether or not setCurrentTabIndex() was asked to send the
+/// change message -- the bar calls it unconditionally -- so opening the About
+/// page by the logo is remembered too.
+void SpectrumWorxEditor::Settings::currentTabChanged(int const newCurrentTabIndex,
+                                                     juce::String const & /*newTabName*/)
+{
+    if ((newCurrentTabIndex >= 0) && (newCurrentTabIndex < int{numberOfSettingsPages}))
+        editor().editorHost().setSettingsPage(static_cast<unsigned int>(newCurrentTabIndex));
 }
 
 SpectrumWorxEditor &SpectrumWorxEditor::Settings::editor()

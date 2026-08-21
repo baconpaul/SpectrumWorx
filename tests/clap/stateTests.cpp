@@ -484,8 +484,9 @@ TEST_CASE("Session state is the preset format plus a dawExtraState block", "[cla
     CHECK(text.find("<p n=") != std::string::npos);
 
     /// \note And it is *more* than a preset, which is the whole reason the two
-    /// can share a serialisation. Empty today; present regardless, so that the
-    /// day it is not empty is not also the day this starts being written.
+    /// can share a serialisation. It was written empty from 02.08.2026 until it
+    /// had a payload on 21.08.2026, so that the day it carried something was not
+    /// also the day it started being written.
     CHECK(text.find("<dawExtraState") != std::string::npos);
 
     /// The terminator goes into the stream: loadFrom() parses a C string and a
@@ -500,6 +501,57 @@ TEST_CASE("Session state is the preset format plus a dawExtraState block", "[cla
                                            plugin.implementation().program()));
     CHECK(asPreset.find("<SpectrumWorxPreset") != std::string::npos);
     CHECK(asPreset.find("<dawExtraState") == std::string::npos);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The block's first payload, and the case that says the mechanism does
+/// what it was built for. Issue #129 asks for the settings panel's tab to be
+/// remembered; the panel does not survive the preset browser being opened and
+/// the editor does not survive the window shutting, so the answer lives on the
+/// plugin and rides in the session.
+///
+/// \note Three claims, and the third is the one that makes the block worth
+/// having at all: the value comes back, a *preset* does not carry it, and
+/// loading a preset over a live session therefore leaves the tab where the user
+/// left it rather than resetting it.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("The settings tab rides in the dawExtraState block", "[clap][state]")
+{
+    Entry const entry;
+
+    constexpr unsigned int interfacePage{1};
+
+    OutStream saved;
+    {
+        Plugin const plugin;
+        driveIntoAState(plugin);
+        plugin.editorHost().setSettingsPage(interfacePage);
+        REQUIRE(plugin.state().save(&*plugin, &saved));
+    }
+
+    INFO("state:\n" << saved.text());
+    CHECK(saved.text().find("settingsPage=\"1\"") != std::string::npos);
+
+    Plugin const restored;
+    // The premise: it is not already there.
+    REQUIRE(restored.editorHost().settingsPage() != interfacePage);
+
+    InStream stream(saved.data());
+    REQUIRE(restored.state().load(&*restored, &stream));
+    CHECK(restored.editorHost().settingsPage() == interfacePage);
+
+    /// \note And a `.swp` over the top of it does not move it. The file has no
+    /// `<dawExtraState>` element, so `loadPreset` never calls the reader -- which
+    /// is the property that lets one serialisation be both documents.
+    auto const asPreset(LE::SW::savePreset({}, LE::SW::defaultSideChainSource, {},
+                                           restored.implementation().program()));
+    auto buffer(asBuffer(asPreset));
+    InStream presetStream(buffer);
+    REQUIRE(restored.state().load(&*restored, &presetStream));
+    CHECK(restored.editorHost().settingsPage() == interfacePage);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

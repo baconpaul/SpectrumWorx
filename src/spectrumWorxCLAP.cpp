@@ -2341,28 +2341,40 @@ catch (...)
 ///
 /// \brief Where session state that is not a parameter goes.
 ///
-///   Empty, and deliberately so. The mechanism is what the state work owed; the payload
-/// is a list that will grow one bullet at a time, and guessing at it now would
-/// be inventing a schema for settings nobody has asked to persist yet.
+///   One attribute as of 21.08.2026, and it is what the block was built for: the
+/// settings panel's selected tab, which is a place the user was rather than a
+/// sound the plugin makes. Issue #129. The payload accrues a bullet at a time;
+/// the remaining candidate, `[main-thread]` and not a parameter, is the preset
+/// browser's location and selection.
 ///
-///   The candidate, `[main-thread]` and not a parameter: the preset browser's
-/// location and selection -- it does not remember where it was, for the session
-/// case.
+/// \note The settings panel's Interface page was a candidate and is not one.
+/// Zoom, mouse-over reaction, LFO update behaviour and hide-cursor-on-knob-drag
+/// persisted nowhere at all (issues #61 and #55); they are answers about how this
+/// user likes the editor to behave rather than about this session, so they went
+/// to the user preferences file instead -- `sst::plugininfra::defaults::Provider`,
+/// \see gui/preferences.hpp. The two homes are not exclusive, and surge uses
+/// both. Which tab is showing is the *other* side of that line: two projects may
+/// have been left on two different tabs, so it is the session's.
+///                                       (16.08.2026, amended 21.08.2026.) (SW port)
 ///
-/// \note The settings panel's Interface page was the other candidate and is no
-/// longer one. Zoom, mouse-over reaction, LFO update behaviour and
-/// hide-cursor-on-knob-drag persisted nowhere at all (issues #61 and #55); they
-/// are answers about how this user likes the editor to behave rather than about
-/// this session, so they went to the user preferences file instead --
-/// `sst::plugininfra::defaults::Provider`, \see gui/preferences.hpp. The two
-/// homes are not exclusive, and surge uses both; these belong in that one.
-///                                       (16.08.2026.) (SW port)
+/// \note A missing attribute leaves the member where it was, which is what makes
+/// this readable by a build that predates the attribute *and* what keeps a state
+/// written by an older one from resetting anything. `QueryUnsignedAttribute`
+/// only writes through on success.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-DawExtraState SpectrumWorxCLAP::sessionState() const
+/// The one attribute the block carries, and it is on disk: do not rename it.
+static constexpr char settingsPageAttributeName[]{"settingsPage"};
+
+DawExtraState SpectrumWorxCLAP::sessionState()
 {
-    return {[](TiXmlElement &) {}, [](TiXmlElement const &) {}};
+    return {[this](TiXmlElement &element) {
+                element.SetAttribute(settingsPageAttributeName, static_cast<int>(settingsPage_));
+            },
+            [this](TiXmlElement const &element) {
+                element.QueryUnsignedAttribute(settingsPageAttributeName, &settingsPage_);
+            }};
 }
 
 ////////////////////////////////////////////////////////////////////////////////

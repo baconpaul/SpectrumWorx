@@ -315,6 +315,30 @@ class EditorHost
     /// the host, so the plugin must not offer the user a way to change it.
     virtual bool completelyDisableIOChanges() const = 0;
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Which tab the settings panel was last showing. `[main-thread]`
+    ///
+    /// \note Here rather than on the editor because nothing on the editor lives
+    /// long enough to hold it: the panel is destroyed every time the preset
+    /// browser is opened -- which is the report in issue #129 -- and the editor
+    /// every time the window shuts. It is the *session's* answer rather than
+    /// this user's, so it goes into the DAW extra state and not into the
+    /// preferences file: two projects may reasonably have been left on two
+    /// different tabs. \see SpectrumWorxCLAP::sessionState() and
+    /// streaming_format.md §4.4, whose first payload this is.
+    ///
+    /// \note A page index and not a `SettingsPage`: the enumeration is the
+    /// editor's, this layer is below it, and the number crosses a file where an
+    /// enumerator would only promise more than a restored session can. What
+    /// comes back out is checked against the tabs this build has -- \see
+    /// SpectrumWorxEditor::showSettings().
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    virtual unsigned int settingsPage() const = 0;
+    virtual void setSettingsPage(unsigned int) = 0;
+
     /// \note `shouldLoadLastSessionOnStartup()` was a pair here, reaching a flag
     /// nothing ever read: the checkbox on the interface page stored it and no
     /// session was ever reloaded from it. Restoring what was open is the host's

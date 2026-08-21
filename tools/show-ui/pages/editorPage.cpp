@@ -189,7 +189,15 @@ class HarnessHost final : public GUI::EditorHost
   public:
     bool completelyDisableIOChanges() const override { return false; }
 
+    /// \note A render is a function of the build, so the page asks for its tab
+    /// outright -- `SW_SHOW_UI_SETTINGS_PAGE` below -- rather than reading one
+    /// out of a session this harness has none of.
+    unsigned int settingsPage() const override { return settingsPage_; }
+    void setSettingsPage(unsigned int const page) override { settingsPage_ = page; }
+
   private:
+    unsigned int settingsPage_{0};
+
     HarnessEngine engine_;
     SilentNotifications notifications_;
     mutable Threading::ToEngineQueue toEngine_;
