@@ -34,6 +34,8 @@
 
 #include "le/utility/platformSpecifics.hpp"
 
+#include <cstdint>
+
 #include <juce_core/juce_core.h>
 
 /// `fs`, for the side channel's sample file. \see io/jucePath.hpp.
@@ -62,6 +64,58 @@ class SpectrumWorxEditor;
 /// \class EditorHost
 ///
 ////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \struct PanelState
+///
+/// \brief Where the user was in the panel column: which of the two panels was
+/// up, which tab the settings one was on, and where the browser was pointing.
+///
+/// \note Four answers rather than one because they are not exclusive -- a user
+/// who leaves the settings panel up was somewhere in the browser before that,
+/// and expects to be there again when they press PRESETS. \see issue #129.
+///
+/// \note The two enumerations cross a file, so they are streamed **by name**
+/// rather than by ordinal, exactly as the preferences file's are: inserting a
+/// value cannot then silently change what an existing session means, and what is
+/// in the file can be grepped for in the source.
+///
+/// \note Neither of the browser's two answers is trusted on the way back in. A
+/// folder is a path from a previous run that the user may have moved, and a bank
+/// is a name a later build need not still ship; PresetBrowser::restoreLastPlace()
+/// checks both and falls back to the top of the factory tree.
+///                                           (21.08.2026.)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+struct PanelState
+{
+    enum class Panel : std::uint8_t
+    {
+        presets,
+        settings
+    };
+
+    enum class PresetLocation : std::uint8_t
+    {
+        factory,
+        user
+    };
+
+    /// \note The browser, which is what a plugin with no session opens on: it is
+    /// what a user came for. \see SpectrumWorxEditor::openRememberedPanel().
+    Panel panel{Panel::presets};
+
+    /// \note An index and not a `SettingsPage`: that enumeration is the editor's
+    /// and this layer is below it. What comes back out of a file is checked
+    /// against the tabs this build has. \see SpectrumWorxEditor::showSettings().
+    unsigned int settingsPage{0};
+
+    PresetLocation presetLocation{PresetLocation::factory};
+    juce::String presetBank; ///< when presetLocation is factory
+    fs::path presetFolder;   ///< when presetLocation is user
+}; // struct PanelState
 
 class EditorHost
 {
@@ -317,27 +371,25 @@ class EditorHost
 
     ////////////////////////////////////////////////////////////////////////////
     ///
-    /// \brief Which tab the settings panel was last showing. `[main-thread]`
+    /// \brief Where the user was in the panel column. `[main-thread]`
     ///
     /// \note Here rather than on the editor because nothing on the editor lives
-    /// long enough to hold it: the panel is destroyed every time the preset
-    /// browser is opened -- which is the report in issue #129 -- and the editor
-    /// every time the window shuts. It is the *session's* answer rather than
-    /// this user's, so it goes into the DAW extra state and not into the
-    /// preferences file: two projects may reasonably have been left on two
-    /// different tabs. \see SpectrumWorxCLAP::sessionState() and
-    /// streaming_format.md §4.4, whose first payload this is.
+    /// long enough to hold it: a panel is destroyed every time the other one is
+    /// opened -- which is the report in issue #129 -- and the editor every time
+    /// the window shuts. It is the *session's* answer rather than this user's,
+    /// so it goes into the DAW extra state and not into the preferences file:
+    /// two projects may reasonably have been left in two different places.
+    /// \see SpectrumWorxCLAP::sessionState() and streaming_format.md §4.4.
     ///
-    /// \note A page index and not a `SettingsPage`: the enumeration is the
-    /// editor's, this layer is below it, and the number crosses a file where an
-    /// enumerator would only promise more than a restored session can. What
-    /// comes back out is checked against the tabs this build has -- \see
-    /// SpectrumWorxEditor::showSettings().
+    /// \note A reference rather than a getter and a setter per field. It is one
+    /// thread's own scratch state, every member of it is written by the widget
+    /// that owns that part of the panel, and the alternative is eight accessors
+    /// that say nothing the struct does not.
     ///
     ////////////////////////////////////////////////////////////////////////////
 
-    virtual unsigned int settingsPage() const = 0;
-    virtual void setSettingsPage(unsigned int) = 0;
+    virtual PanelState &panelState() = 0;
+    PanelState const &panelState() const { return const_cast<EditorHost &>(*this).panelState(); }
 
     /// \note `shouldLoadLastSessionOnStartup()` was a pair here, reaching a flag
     /// nothing ever read: the checkbox on the interface page stored it and no

@@ -13,6 +13,7 @@
 #ifndef presetBrowser_hpp__228370D3_4C4C_46B8_8544_9273C3AAEB61A
 #define presetBrowser_hpp__228370D3_4C4C_46B8_8544_9273C3AAEB61A
 //------------------------------------------------------------------------------
+#include "gui/editor/editorHost.hpp" // PanelState
 #include "gui/gui.hpp"
 
 #include "le/spectrumworx/presets.hpp"
@@ -190,32 +191,37 @@ class PresetBrowser final : public PanelBackground,
 
     ////////////////////////////////////////////////////////////////////////////
     ///
-    /// \struct Place
+    /// \name Where the browser was when it last closed
     ///
-    /// \brief Where the browser was when it last closed.
-    ///
-    /// \note Process-wide and main thread only, because the browser is built
-    /// and destroyed every time the overlay opens and closes -- so where it was
-    /// has to outlive it. It used to be half remembered: the destructor wrote
-    /// `currentDirectory_` into `GUI::presetsFolder()` and nothing recorded
-    /// `location_`, which is a member initialiser, so the browser reopened at
-    /// the root whatever the user had been looking at. Writing the user's
-    /// wanderings into `presetsFolder()` also moved the anchor `goToParent()`
-    /// stops at and the folder `createUserPresetsFolder()` makes; that global
-    /// means the preset root now and nothing writes to it.
+    ///   Somewhere outside the browser, because it is built and destroyed every
+    /// time the panels are swapped. It used to be half remembered: the
+    /// destructor wrote `currentDirectory_` into `GUI::presetsFolder()` and
+    /// nothing recorded `location_`, which is a member initialiser, so the
+    /// browser reopened at the root whatever the user had been looking at.
+    /// Writing the user's wanderings into `presetsFolder()` also moved the
+    /// anchor `goToParent()` stops at and the folder
+    /// `createUserPresetsFolder()` makes; that global means the preset root now
+    /// and nothing writes to it.
     ///                                       (08.08.2026.) (SW port)
     ///
+    /// \note It was a `static Place` here until 21.08.2026 -- process-wide, so
+    /// two instances shared one answer and none of it survived the host being
+    /// shut. It is the session's now, which is what issue #129 asked for and
+    /// what the reason above always wanted: the browser not outliving the window
+    /// is an argument for putting this *somewhere else*, and the plugin is a
+    /// better somewhere else than a global. The cost is that a brand new
+    /// instance opens at the factory root rather than where the last one was.
+    ///                                       (21.08.2026.)
+    ///
     ////////////////////////////////////////////////////////////////////////////
+    ///@{
 
-    struct Place
-    {
-        Location location{Location::Factory};
-        juce::String factoryBank; ///< when location is Factory
-        fs::path folder;          ///< when location is User
-    };
+    /// Where this instance was, which is the one this browser opens at.
+    PanelState &place();
+    PanelState const &place() const;
 
-    static Place &lastPlace();
     void restoreLastPlace();
+    ///@}
 
     void refresh();
     void refreshFactory();

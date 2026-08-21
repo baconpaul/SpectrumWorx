@@ -162,11 +162,13 @@ PresetBrowser::PresetBrowser()
 
 #pragma warning(pop)
 
-PresetBrowser::Place &PresetBrowser::lastPlace()
+PanelState &PresetBrowser::place()
 {
-    LE_ASSERT(isThisTheGUIThread());
-    static Place place;
-    return place;
+    return SpectrumWorxEditor::fromPresetBrowser(*this).editorHost().panelState();
+}
+PanelState const &PresetBrowser::place() const
+{
+    return const_cast<PresetBrowser &>(*this).place();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -181,16 +183,16 @@ PresetBrowser::Place &PresetBrowser::lastPlace()
 
 void PresetBrowser::restoreLastPlace()
 {
-    auto const &place(lastPlace());
+    auto const &state(place());
 
-    switch (place.location)
+    switch (state.presetLocation)
     {
-    case Location::Factory:
-        return setFactoryBank(place.factoryBank);
+    case PanelState::PresetLocation::factory:
+        return setFactoryBank(state.presetBank);
 
-    case Location::User:
-        if (std::error_code error; std::filesystem::is_directory(place.folder, error))
-            return setNewFolder(place.folder);
+    case PanelState::PresetLocation::user:
+        if (std::error_code error; std::filesystem::is_directory(state.presetFolder, error))
+            return setNewFolder(state.presetFolder);
         break;
     }
 
@@ -203,7 +205,13 @@ PresetBrowser::~PresetBrowser()
     //this->fadeOutComponent( 600, 0, 0, 0.2f );
     //juce::Point<int> const centre( this->getBounds().getCentre() );
     //juce::Desktop::getInstance().getAnimator().animateComponent( this, juce::Rectangle<int>( centre, centre ), 0, 600, true, 0, 0 );
-    lastPlace() = Place{location_, factoryBank_, currentDirectory_};
+    /// \note Into the session's state, which outlives both this browser and the
+    /// window it was in. \see the note on place().
+    auto &state(place());
+    state.presetLocation = (location_ == Location::User) ? PanelState::PresetLocation::user
+                                                         : PanelState::PresetLocation::factory;
+    state.presetBank = factoryBank_;
+    state.presetFolder = currentDirectory_;
 }
 
 /// \note A factory bank is compiled into the binary, so there is nothing to save

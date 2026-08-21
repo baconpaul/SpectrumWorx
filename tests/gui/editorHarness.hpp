@@ -240,8 +240,8 @@ class Instance final : public GUI::EditorHost
     /// \note Held by the instance and not by the editor, which is what the
     /// plugin does with it and what makes a case that closes and reopens the
     /// window measure the right thing. \see SpectrumWorxCLAP::sessionState().
-    unsigned int settingsPage() const override { return settingsPage_; }
-    void setSettingsPage(unsigned int const page) override { settingsPage_ = page; }
+    ///
+    GUI::PanelState &panelState() override { return panelState_; }
 
   private:
     Engine engine_;
@@ -250,7 +250,7 @@ class Instance final : public GUI::EditorHost
     Threading::ValueMailbox values_;
     std::unique_ptr<GUI::SpectrumWorxEditor> pEditor_;
     SideChainSource sideChainSource_{defaultSideChainSource};
-    unsigned int settingsPage_{0};
+    GUI::PanelState panelState_;
 }; // class Instance
 
 /// \brief JUCE, owned the way the shim owns it: one reference held across

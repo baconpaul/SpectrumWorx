@@ -513,6 +513,52 @@ TEST_CASE("The settings tab survives the editor window closing", "[gui][overlay]
     CHECK(differenceOver(interfacePage, rendered(reopened), overlayRectangle()) == 0);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The other half of issue #129: not only *which tab* but *which panel*.
+/// An always-visible column has to hold something, and what it holds when it is
+/// filled from nothing should be where the user was rather than a fixed answer.
+///
+/// \note Which is not what pressing the lit button does, and the case below this
+/// one says so: in `alwaysVisible` the two buttons are a two-way selector, so
+/// pressing the lit SETTINGS lands on the browser. A resting state that read the
+/// remembered panel would land back on settings and make the button a no-op.
+/// \see openRememberedPanel() against openRestingPanel().
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("An always-visible column opens on the panel it was left on", "[gui][overlay]")
+{
+    SWTest::HostSideJuce const juce;
+    SWTest::Instance instance;
+
+    auto const columnAfterLeavingItOn([&](bool const settings) {
+        instance.openEditor(Editor::PanelPlacement::alwaysVisible);
+        if (settings)
+            instance.editor().showSettings(Editor::interfacePageIndex);
+        else
+            instance.editor().showPresetBrowser(true);
+        auto const left(rendered(instance.editor()));
+        instance.closeEditor();
+
+        // A window opened again, which is what a host does with a restored plugin.
+        instance.openEditor(Editor::PanelPlacement::alwaysVisible);
+        return std::pair{left, rendered(instance.editor())};
+    });
+
+    auto const [leftOnPresets, reopenedOnPresets](columnAfterLeavingItOn(false));
+    auto const [leftOnSettings, reopenedOnSettings](columnAfterLeavingItOn(true));
+
+    // The premise: the two panels are distinguishable at all.
+    REQUIRE(differenceOver(leftOnPresets, leftOnSettings, panelColumnRectangle()) > 0);
+
+    CHECK(differenceOver(leftOnPresets, reopenedOnPresets, panelColumnRectangle()) == 0);
+    CHECK(differenceOver(leftOnSettings, reopenedOnSettings, panelColumnRectangle()) == 0);
+
+    // Which is not the same as always opening on one fixed panel.
+    CHECK(differenceOver(reopenedOnPresets, reopenedOnSettings, panelColumnRectangle()) > 0);
+}
+
 TEST_CASE("Clicking the logo opens the About page, not an empty panel", "[gui][overlay]")
 {
     ////////////////////////////////////////////////////////////////////////////
@@ -954,12 +1000,22 @@ TEST_CASE("A bank that is not there leaves the browser drawable", "[gui][overlay
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-/// \note Two banks and no assumption about where the browser starts. Where it
-/// was last left is process-wide -- it has to be, since the browser does not
-/// outlive the window -- so a case that opened one and called the first picture
-/// "the root" would be reading whatever the previous case left behind. Asking it
-/// to follow *two* different banks in turn says it is remembering rather than
-/// defaulting, from any starting point.
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Two banks and no assumption about where the browser starts: a case that
+/// opened one and called the first picture "the root" would pass against a
+/// browser that always opened at the root. Asking it to follow *two* different
+/// banks in turn says it is remembering rather than defaulting, from any
+/// starting point.
+///
+/// \note One instance, its window shut and opened again, which is the lifetime
+/// the report is about -- the browser does not outlive the window. Where it was
+/// left used to be a process-wide static and this case used two instances to say
+/// so; it is the session's as of 21.08.2026, so a second instance is a second
+/// answer and would say nothing. \see PanelState and issue #129.
+///
+////////////////////////////////////////////////////////////////////////////////
+
 TEST_CASE("The preset browser reopens where it was left", "[gui][overlay][presets]")
 {
     SWTest::HostSideJuce const juce;
@@ -967,20 +1023,17 @@ TEST_CASE("The preset browser reopens where it was left", "[gui][overlay][preset
     auto const banks(LE::SW::FactoryPresets::banks());
     REQUIRE(banks.size() >= 2);
 
-    auto const pictureAfterLeavingItAt([](std::string const &bank) {
-        juce::Image left;
-        {
-            SWTest::Instance instance;
-            auto &editor(overlayEditor(instance));
-            editor.showFactoryBank(bank);
-            left = rendered(editor);
-            instance.closeEditor();
-        }
+    SWTest::Instance instance;
 
-        SWTest::Instance instance;
+    auto const pictureAfterLeavingItAt([&](std::string const &bank) {
         auto &editor(overlayEditor(instance));
-        editor.showPresetBrowser(true);
-        return std::pair{left, rendered(editor)};
+        editor.showFactoryBank(bank);
+        auto const left(rendered(editor));
+        instance.closeEditor();
+
+        auto &reopened(overlayEditor(instance));
+        reopened.showPresetBrowser(true);
+        return std::pair{left, rendered(reopened)};
     });
 
     auto const [leftAtFirst, reopenedAtFirst](pictureAfterLeavingItAt(banks.front()));
