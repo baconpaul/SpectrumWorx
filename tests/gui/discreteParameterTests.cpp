@@ -12,6 +12,9 @@
 /// derives from GUI::PopupMenuWithSelection -- so the rows are readable without
 /// showing it, which is the whole of what these cases ask about.
 ///
+/// \note One case below is the exception and pays for it: what a wheel does
+/// while the list is down can only be asked with the list down.
+///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later
 ///
@@ -477,15 +480,25 @@ TEST_CASE("A wheel stops at the ends of a combo box rather than wrapping", "[gui
 /// is not what the pointer is over, and a selection moving underneath an open
 /// list is how a user ends up with a value nobody picked.
 ///
-/// \note The menu is never actually shown here -- a modal window needs a message
-/// loop -- so what this drives is the flag `showMenu()` sets, which is the thing
-/// the guard reads. \see GUI::PopupMenu::menuActive().
+/// \note The menu never runs *modally* here -- that needs a message loop -- so
+/// what this drives is the flag `showMenu()` sets, which is the thing the guard
+/// reads. \see GUI::PopupMenu::menuActive().
+///
+///   Its window is made all the same, though, which is the part that reads as
+/// "nothing is shown" and is not: `showMenuAsync()` puts the menu on the desktop
+/// before it returns. So this case needs a window server with a window manager
+/// behind it like any other, and skips where there is none. \see
+/// SWTest::aWindowCanBeMade(), which spells out what Xvfb does instead.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
 TEST_CASE("A wheel does nothing while the combo box's menu is open", "[gui][combo]")
 {
     SWTest::HostSideJuce const juceIsUp;
+
+    if (!SWTest::aWindowCanBeMade())
+        SKIP(SWTest::noWindow);
+
     SWTest::Instance instance;
     instance.openEditor();
 
@@ -504,15 +517,8 @@ TEST_CASE("A wheel does nothing while the combo box's menu is open", "[gui][comb
     ///
     /// \note Before the editor goes, and this is the one case in the file that
     /// needs saying. The settings panel's box is not a module strip's: its menu
-    /// has no parent component, so it is a real desktop window -- a
-    /// `LinuxComponentPeer` under Xvfb -- and leaving it up outlives the editor
-    /// rather than the other way about.
-    ///
-    ///   macOS tolerated that and Linux did not: `X_ChangeProperty` failed with
-    /// `BadAtom` on the way out and JUCE's leak detector then reported the menu,
-    /// its peer and the whole settings panel. All three Linux jobs of PR #169,
-    /// against a green macOS and a green Windows.
-    ///                                       (21.08.2026.)
+    /// has no parent component, so it is a real desktop window, and leaving it
+    /// up outlives the editor rather than the other way about.
     ///
     ////////////////////////////////////////////////////////////////////////////
     juce::PopupMenu::dismissAllActiveMenus();
