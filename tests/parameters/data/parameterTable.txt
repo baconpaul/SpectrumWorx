@@ -221,7 +221,7 @@ effect/Octaver/03 | float | 0 | 1 | 0 ;; Start Frequency | [ Hz]
 effect/Octaver/04 | float | 0 | 1 | 1 ;; Stop Frequency | [ Hz]
 effect/Octaver/05 | enum | 0 | 4 | 0 ;; Octave 1 | [] | -2;-1;0;+1;+2
 effect/Octaver/06 | float | -48 | 24 | 0 ;; Gain 1 | [ dB]
-effect/Octaver/07 | enum | 0 | 4 | 0 ;; Octave 2 | [] | -2;-1;0;+1;+2
+effect/Octaver/07 | enum | 0 | 4 | 1 ;; Octave 2 | [] | -2;-1;0;+1;+2
 effect/Octaver/08 | float | -48 | 24 | 0 ;; Gain 2 | [ dB]
 effect/Octaver/09 | int | 0 | 16000 | 16000 ;; Lowpass | [ Hz]
 effect/PVD_start/00 | bool | 0 | 1 | 0 ;; Bypass | []

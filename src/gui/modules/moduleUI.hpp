@@ -625,6 +625,13 @@ struct WidgetInitialiser
     template <class Parameter> static void setup(ModuleControlImpl<DiscreteParameter> &comboBox)
     {
         fillComboBoxForParameter<Parameter>(comboBox);
+
+        /// \note And onto the parameter's default, which the two fillers cannot
+        /// do for themselves: one leaves the box on value zero and the other on
+        /// its first power of two, both of which were the answer while zero was
+        /// the only default an enumerated parameter could have. \see issue #163.
+        ///                                   (21.08.2026.)
+        comboBox.DiscreteParameter::setValue(Parameter::default_());
     }
 
     template <class Parameter> static void setup(ModuleControlImpl<ModuleKnob> &knob)
