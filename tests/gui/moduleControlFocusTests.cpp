@@ -809,7 +809,9 @@ TEST_CASE("A wheel over a module combo box selects it and steps it", "[gui][modu
     comboBox.setSelectedIndex(0);
     auto const first(comboBox.getValue());
 
-    scrollOnce(comboBox, -0.3f);
+    /// \note Away from the user, which is down the list. \see
+    /// ComboBox::mouseWheelMove() and issue #124.
+    scrollOnce(comboBox, +0.3f);
 
     // It selected, which is what puts the control's LFO on screen...
     CHECK(editor.activeControl() == &control);
@@ -818,7 +820,7 @@ TEST_CASE("A wheel over a module combo box selects it and steps it", "[gui][modu
     CHECK_FALSE(comboBox.menuActive());
 
     // And back where it started, which is the gesture a user actually makes.
-    scrollOnce(comboBox, +0.3f);
+    scrollOnce(comboBox, -0.3f);
     CHECK(comboBox.getValue() == first);
 }
 

@@ -391,10 +391,12 @@ TEST_CASE("A parameter with no abbreviations reads the same either way", "[gui][
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \note Issue #124. Away from the user is *up* the list, which is what
-/// juce::ComboBox and sst-jucegui's DiscreteParamEditor both do, and the
-/// opposite of what the same gesture does to a knob. One is a list and the other
-/// is a number.
+/// \note Issue #124. Away from the user is *down* the list -- the later value --
+/// which is what the same gesture does to a knob, and deliberately not what
+/// juce::ComboBox and sst-jucegui's DiscreteParamEditor do. A module strip's box
+/// stands in a row of parameter editors with knobs either side of it, and a
+/// control that went the other way from the control beside it would be answering
+/// a question about lists that the user is not asking.
 ///
 /// \note The value has to reach the parameter and not only the box. A combo box
 /// that stepped its own display and published nothing looks exactly right until
@@ -416,8 +418,8 @@ TEST_CASE("A wheel over a combo box steps a row and publishes it", "[gui][combo]
     auto const opened(box.getValue());
     REQUIRE(opened == parameters.get<FFTSize>());
 
-    // Toward the user: down the list, which for a power of two is the larger.
-    scroll(box, -0.3f);
+    // Away from the user: down the list, which for a power of two is the larger.
+    scroll(box, +0.3f);
     auto const stepped(box.getValue());
     REQUIRE(stepped != opened);
     CHECK(stepped == opened * 2);
@@ -425,7 +427,7 @@ TEST_CASE("A wheel over a combo box steps a row and publishes it", "[gui][combo]
 
     // And back, which says the two directions are one gesture rather than two
     // arbitrary ones.
-    scroll(box, +0.3f);
+    scroll(box, -0.3f);
     CHECK(box.getValue() == opened);
     CHECK(parameters.get<FFTSize>() == opened);
 }
@@ -450,21 +452,23 @@ TEST_CASE("A wheel stops at the ends of a combo box rather than wrapping", "[gui
     REQUIRE(rows > 1);
 
     /// \note Twice the list's length of notches, so it would have wrapped more
-    /// than once if it wrapped at all.
-    for (unsigned int notch(0); notch < 2 * rows; ++notch)
-        scroll(box, -0.3f);
-    auto const last(box.getValue());
-
-    scroll(box, -0.3f);
-    CHECK(box.getValue() == last);
-
+    /// than once if it wrapped at all. Which end is which does not matter here
+    /// and the case does not say: what it asks is that a wheel held against
+    /// either one stays there.
     for (unsigned int notch(0); notch < 2 * rows; ++notch)
         scroll(box, +0.3f);
-    auto const first(box.getValue());
-    REQUIRE(first != last);
+    auto const oneEnd(box.getValue());
 
     scroll(box, +0.3f);
-    CHECK(box.getValue() == first);
+    CHECK(box.getValue() == oneEnd);
+
+    for (unsigned int notch(0); notch < 2 * rows; ++notch)
+        scroll(box, -0.3f);
+    auto const theOther(box.getValue());
+    REQUIRE(theOther != oneEnd);
+
+    scroll(box, -0.3f);
+    CHECK(box.getValue() == theOther);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -883,12 +883,12 @@ void ComboBox::mouseWheelMove(juce::MouseEvent const &event, juce::MouseWheelDet
     while (wheelTravel_ > 1.0f)
     {
         wheelTravel_ -= 1.0f;
-        --rows; // away from the user is up the list
+        ++rows; // away from the user is down the list
     }
     while (wheelTravel_ < -1.0f)
     {
         wheelTravel_ += 1.0f;
-        ++rows;
+        --rows;
     }
 
     if (rows == 0)

@@ -839,14 +839,19 @@ class ComboBox : public WidgetBase<>, public PopupMenuWithSelection
 
     ////////////////////////////////////////////////////////////////////////////
     ///
-    /// \brief Steps the selection, as juce::ComboBox and sst-jucegui both do it:
-    /// **a notch away from the user is the row above**.
+    /// \brief Steps the selection: **a notch away from the user is the next row
+    /// down the list**, which is the *later* value.
     ///
-    /// \note Which is the opposite of what the wheel does to a knob, where away
-    /// from the user raises the value. That is not an oversight in either place
-    /// -- one is a list and the other is a number -- and it is the arrangement
-    /// every other Surge Synth Team plugin ships, `DiscreteParamEditor` against
-    /// `ContinuousParamEditor`.
+    /// \note Deliberately not what juce::ComboBox and sst-jucegui's
+    /// `DiscreteParamEditor` do, both of which step to the row *above*. Their
+    /// convention is a list's -- scrolling away from you moves you toward the
+    /// top of it -- and it is the wrong one here, because these boxes do not
+    /// stand where a list stands. A module strip's is a parameter editor in a
+    /// row of parameter editors, with knobs either side of it, and away from the
+    /// user raises a knob. A control that went the other way from the control
+    /// beside it would be answering a question about lists that the user is not
+    /// asking.
+    ///                                       (21.08.2026.) \see issue #124.
     ///
     ////////////////////////////////////////////////////////////////////////////
 
