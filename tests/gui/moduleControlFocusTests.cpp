@@ -275,6 +275,31 @@ juce::Component &sharedGain(GUI::SharedModuleControls &shared)
     return shared.controlForParameter(LE::Parameters::IndexOf<Base::Parameters, Base::Gain>::value)
         .widget();
 }
+
+/// \brief One wheel notch over \p widget, positive being away from the user.
+///
+/// \note 0.3 rather than 1: GUI::ComboBox counts five notches to a row, and a
+/// notch is about what a wheel detent sends. \see
+/// tests/gui/discreteParameterTests.cpp, which is where what the wheel *does* to
+/// a list is pinned; what this file adds is the half that needs a window.
+void scrollOnce(juce::Component &widget, float const deltaY)
+{
+    juce::MouseWheelDetails wheel{};
+    wheel.deltaX = 0;
+    wheel.deltaY = deltaY;
+    wheel.isReversed = false;
+    wheel.isSmooth = false;
+    wheel.isInertial = false;
+
+    /// \note Its own event rather than eventOver()'s, which carries the left
+    /// button: a wheel with a button held is a drag as far as JUCE is concerned
+    /// and GUI::ComboBox declines it, exactly as juce::Slider does.
+    auto const centre(widget.getLocalBounds().getCentre().toFloat());
+    juce::MouseEvent const event(juce::Desktop::getInstance().getMainMouseSource(), centre,
+                                 juce::ModifierKeys(), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &widget,
+                                 &widget, juce::Time(), centre, juce::Time(), 1, false);
+    widget.mouseWheelMove(event, wheel);
+}
 } // anonymous namespace
 
 TEST_CASE("Dragging a knob the LFO owns moves nothing and deselects nothing", "[gui][modules][lfo]")
@@ -723,4 +748,97 @@ TEST_CASE("One press on a module combo box selects it and opens its menu", "[gui
     /// \note Before the editor goes. Its destructor dismisses menus itself, but
     /// a menu left up here would outlive the case rather than the editor.
     juce::PopupMenu::dismissAllActiveMenus();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Issue #124's other half. A module strip's combo box takes the module
+/// selection before it will move, exactly as a press on it does -- otherwise a
+/// wheel would edit one module's parameter while a different one stayed
+/// selected, which is the state `moduleParameterChanged()`'s assertions exist to
+/// catch.
+///
+/// \note Which is why the case is here rather than beside the other wheel cases:
+/// focus needs a window, and this file is where the window is.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A wheel over a module combo box selects it and steps it", "[gui][modules][combo]")
+{
+    SWTest::HostSideJuce const juceIsUp;
+
+    if (!aWindowCanBeMade())
+        SKIP(noWindow);
+
+    SWTest::Instance instance;
+    DesktopEditor const window(instance);
+    if (!window.tookTheKeyboard())
+        SKIP(keyboardRefused);
+
+    auto &editor(window.editor());
+    auto &moduleUI(stripFor(editor, "Swappah"));
+
+    auto *const pControl(firstControlOfType<GUI::DiscreteParameter>(moduleUI));
+    REQUIRE(pControl != nullptr);
+    auto &control(*pControl);
+    auto &comboBox(dynamic_cast<GUI::ComboBox &>(control.widget()));
+
+    REQUIRE(editor.activeControl() != &control);
+
+    /// \note Put at the top of the list first, and the reason is the point of
+    /// `MenuOrder`: a row is not a value. Swappah's Mode is declared Both,
+    /// Magnitudes, Phases and *listed* Magnitudes, Phases, Both, so its default
+    /// of zero is the **last** row -- and a step down the list from there is
+    /// correctly refused. Starting at a known row is what makes this a case
+    /// about the wheel rather than about which parameter it landed on.
+    comboBox.setSelectedIndex(0);
+    auto const first(comboBox.getValue());
+
+    scrollOnce(comboBox, -0.3f);
+
+    // It selected, which is what puts the control's LFO on screen...
+    CHECK(editor.activeControl() == &control);
+    // ...and the row moved, without a menu having been opened at all.
+    CHECK(comboBox.getValue() != first);
+    CHECK_FALSE(comboBox.menuActive());
+
+    // And back where it started, which is the gesture a user actually makes.
+    scrollOnce(comboBox, +0.3f);
+    CHECK(comboBox.getValue() == first);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The LFO owns the value, so a row the wheel moved to would be overwritten
+/// by the next sweep. The same guard the menu is behind, and the same one
+/// ModuleKnob turns its own wheel off with. \see syncMouseWheelAndLFOState().
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A wheel over a combo box the LFO owns moves nothing", "[gui][modules][lfo][combo]")
+{
+    SWTest::HostSideJuce const juceIsUp;
+
+    if (!aWindowCanBeMade())
+        SKIP(noWindow);
+
+    SWTest::Instance instance;
+    DesktopEditor const window(instance);
+    if (!window.tookTheKeyboard())
+        SKIP(keyboardRefused);
+
+    auto &editor(window.editor());
+    auto &moduleUI(stripFor(editor, "Swappah"));
+
+    auto *const pControl(firstControlOfType<GUI::DiscreteParameter>(moduleUI));
+    REQUIRE(pControl != nullptr);
+    auto &control(*pControl);
+    auto &comboBox(dynamic_cast<GUI::ComboBox &>(control.widget()));
+
+    control.lfo().parameters().set<Parameters::LFOImpl::Enabled>(true);
+    REQUIRE(control.isLFOEnabled());
+
+    auto const opened(comboBox.getValue());
+    scrollOnce(comboBox, -0.3f);
+    CHECK(comboBox.getValue() == opened);
 }

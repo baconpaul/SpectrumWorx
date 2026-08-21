@@ -837,6 +837,111 @@ void ComboBox::showMenu(std::function<void(bool)> onValueChanged)
     });
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// ComboBox::mouseWheelMove()
+// --------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Five notches to a row, which is juce::ComboBox's own calibration
+/// (`mouseWheelAccumulator += wheel.deltaY * 5.0f`). A mouse wheel sends about
+/// 0.2 per detent and a trackpad a great many smaller deltas, so this is one
+/// row per detent and a readable gesture on a trackpad.
+///
+/// \note Not while the menu is down. The menu scrolls itself, the box under it
+/// is not what the pointer is over, and changing the selection from beneath an
+/// open list is how a user ends up with a value nobody picked.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void ComboBox::mouseWheelMove(juce::MouseEvent const &event, juce::MouseWheelDetails const &wheel)
+{
+    if (!isEnabled() || menuActive() || !hasValidSelection() || (numberOfItems() < 2) ||
+        event.mods.isAnyMouseButtonDown())
+    {
+        juce::Component::mouseWheelMove(event, wheel);
+        return;
+    }
+
+    constexpr float notchesPerRow{5};
+
+    auto const travel(wheel.deltaY * (wheel.isReversed ? -1.0f : +1.0f) * notchesPerRow);
+
+    /// \note A reversal starts again rather than paying off what the other
+    /// direction left behind. Without this, one notch down and one notch up
+    /// leaves the box a row from where it started: the first call spends 1.0 of
+    /// 1.5 and keeps 0.5, and the second then has 1.0 exactly, which is not more
+    /// than a row. Scrolling back to where you were is the most ordinary thing a
+    /// user does with a wheel.
+    if ((travel * wheelTravel_) < 0)
+        wheelTravel_ = 0;
+
+    wheelTravel_ += travel;
+
+    int rows{0};
+    while (wheelTravel_ > 1.0f)
+    {
+        wheelTravel_ -= 1.0f;
+        --rows; // away from the user is up the list
+    }
+    while (wheelTravel_ < -1.0f)
+    {
+        wheelTravel_ += 1.0f;
+        ++rows;
+    }
+
+    if (rows == 0)
+        return;
+
+    auto const row(rowReachedBy(rows));
+    if (row == getSelectedIndex())
+        return;
+
+    setSelectedIndex(row);
+    selectionScrolled();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Steps a row at a time rather than adding \p rows to the index, because
+/// a row a user cannot land on by clicking is not one the wheel may land on
+/// either -- a disabled value, a section header, a separator. None of the boxes
+/// this plugin fills has any of the three today; the arithmetic that ignored
+/// them would be wrong the day one does, and would be wrong silently.
+///
+/// \note And it stops at the ends rather than wrapping. A wheel has no sense of
+/// where a list begins, so wrapping turns "keep scrolling" into "start over
+/// somewhere else", which is not what the gesture means.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+unsigned int ComboBox::rowReachedBy(int rows) const
+{
+    auto const last(static_cast<int>(numberOfItems()) - 1);
+    auto row(static_cast<int>(getSelectedIndex()));
+    auto reached(row);
+
+    auto const step(rows < 0 ? -1 : +1);
+    for (auto remaining(std::abs(rows)); remaining > 0; --remaining)
+    {
+        row += step;
+        while ((row >= 0) && (row <= last) && !isSelectableRow(static_cast<unsigned int>(row)))
+            row += step;
+        if ((row < 0) || (row > last))
+            break;
+        reached = row;
+    }
+
+    return static_cast<unsigned int>(reached);
+}
+
+bool ComboBox::isSelectableRow(unsigned int const row) const
+{
+    auto const &item(items()[row]);
+    return item.enabled && !item.isSectionHeader && !item.isSeparator;
+}
+
 LE_NOINLINE void ComboBox::setSelectedID(unsigned int const newSelectionID)
 {
     PopupMenuWithSelection::setSelectedID(newSelectionID);
@@ -1747,6 +1852,12 @@ void TitledComboBox::mouseDown(juce::MouseEvent const &)
                 //...mrmlj...move...editor/settings specific...
                 SpectrumWorxEditor::Settings::comboBoxValueChanged(*self);
         });
+}
+
+void TitledComboBox::selectionScrolled()
+{
+    //...mrmlj...move...editor/settings specific...
+    SpectrumWorxEditor::Settings::comboBoxValueChanged(*this);
 }
 
 namespace Detail
