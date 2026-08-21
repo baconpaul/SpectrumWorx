@@ -33,7 +33,13 @@
 #include "le/utility/parentFromMember.hpp"
 
 #include "le/utility/assert.hpp"
+#include "le/utility/lexicalCast.hpp"
+
 #include <algorithm>
+#include <cstdio>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include <ranges>
 
 namespace LE::Parameters
@@ -608,6 +614,166 @@ LFOImpl::SnappedPeriod LFOImpl::snapPeriodScale(value_type const periodScale,
 {
     return (syncTypes == Free) ? SnappedPeriod(clampFreePeriod(periodScale), Free)
                                : snapSyncedPeriod(periodScale, syncTypes);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// LFOImpl::printPeriodScale()
+// ---------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+/// \brief The letter a grid puts after its note value, and what the printed
+/// ratio is the stored period multiplied by.
+///
+/// \note A triplet is two thirds of the note it is written as, so a period of a
+/// sixth of a bar is written `1/4T`: multiply by 3/2 to get the note, by 2/3 to
+/// come back. Dotted is the other way about.
+struct Grid
+{
+    char const *suffix;
+    float toNote;
+};
+
+Grid gridFor(LFO::SyncType const syncType)
+{
+    switch (syncType)
+    {
+    case LFO::Triplet:
+        return {"T", 3 / 2.0f};
+    case LFO::Dotted:
+        return {"D", 2 / 3.0f};
+    default:
+        return {"", 1.0f};
+    }
+}
+
+/// Milliseconds against the bar a free LFO is measured in, which is a constant.
+float periodScaleToMilliseconds(float const periodScale)
+{
+    return periodScale * LFOImpl::Timer::referenceBarDuration * 1000;
+}
+} // anonymous namespace
+
+std::size_t LFOImpl::printSyncedPeriodScale(value_type const periodScale,
+                                            std::uint8_t const syncTypes,
+                                            std::span<char> const buffer)
+{
+    LE_ASSERT(syncTypes != Free);
+
+    auto const [snapped, grid](snapPeriodScale(periodScale, syncTypes));
+    auto const [suffix, toNote](gridFor(grid));
+
+    auto const note(snapped * toNote);
+
+    /// \note A note shorter than a bar is `1/n`, a longer one `n/1`. Which is
+    /// what a musician writes, and it keeps both halves whole numbers -- there
+    /// is no grid on which a period is three fifths of a bar.
+    auto const numerator(Math::convert<unsigned int>((note < 1) ? 1.0f : note));
+    auto const denominator(Math::convert<unsigned int>((note < 1) ? (1 / note) : 1.0f));
+
+    auto const written(std::snprintf(buffer.data(), buffer.size(), "%u/%u%s bars", numerator,
+                                     denominator, suffix));
+    LE_ASSERT(written > 0);
+    return static_cast<std::size_t>(written);
+}
+
+std::size_t LFOImpl::printPeriodScale(value_type const periodScale, std::uint8_t const syncTypes,
+                                      std::span<char> const buffer)
+{
+    if (syncTypes != Free)
+        return printSyncedPeriodScale(periodScale, syncTypes, buffer);
+
+    constexpr char suffix[]{" ms"};
+    LE_ASSERT(buffer.size() > sizeof(suffix));
+
+    /// \note The number is written into the buffer *less the suffix*, so that
+    /// appending it cannot reach the end however wide the number turns out to
+    /// be. Same shape as the panel's own millisecond line.
+    /// \note One decimal place and it keeps the zero, which is what every other
+    /// float in this plugin prints as: a reading that drops its point on a round
+    /// number jumps a character wide under the user's hand. \see printLinear()
+    /// and issue #94.
+    auto const written(Utility::lexical_cast(periodScaleToMilliseconds(periodScale), 1,
+                                             buffer.first(buffer.size() - sizeof(suffix)),
+                                             Utility::TrailingZeros::keep));
+    std::strcpy(&buffer[written], suffix);
+    return written + sizeof(suffix) - 1;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// LFOImpl::parsePeriodScale()
+// ---------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Answers `nothing` rather than a number for text that is not a period,
+/// for the reason `Parameters::parse` does: `strtof` reads zero out of "off",
+/// "N/A" and the empty string alike, and zero is not something this parameter
+/// can hold. What it *does* answer is inside the range, because a host may type
+/// anything.
+///
+/// \note The grid letter is read rather than assumed. A user who types `1/4T`
+/// into an LFO snapped to quarters is asking for a triplet, and what comes back
+/// is the nearest thing the mask allows -- which is what snapping is for and
+/// what the panel does with a drag.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+std::optional<LFOImpl::value_type> LFOImpl::parsePeriodScale(char const *const text,
+                                                             std::uint8_t const syncTypes)
+{
+    if (!text)
+        return {};
+
+    char *end{nullptr};
+    auto const first(std::strtof(text, &end));
+    if ((end == text) || !std::isfinite(first))
+        return {};
+
+    if (syncTypes == Free)
+        return clampFreePeriod(first / Timer::referenceBarDuration / 1000);
+
+    while (*end == ' ')
+        ++end;
+    if (*end != '/')
+        return {};
+
+    char const *const denominatorText(end + 1);
+    auto const second(std::strtof(denominatorText, &end));
+    if ((end == denominatorText) || (second == 0) || !std::isfinite(second))
+        return {};
+
+    while (*end == ' ')
+        ++end;
+
+    auto const note(first / second);
+    float fromNote{1};
+    switch (*end)
+    {
+    case 'T':
+    case 't':
+        fromNote = 2 / 3.0f;
+        break;
+    case 'D':
+    case 'd':
+        fromNote = 3 / 2.0f;
+        break;
+    default:
+        break;
+    }
+
+    auto const periodScale(note * fromNote);
+    if (!std::isfinite(periodScale) || (periodScale <= 0))
+        return {};
+
+    return snapSyncedPeriod(
+               Math::clamp(periodScale, currentPeriodScaleMinimum(), currentPeriodScaleMaximum()),
+               syncTypes)
+        .first;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

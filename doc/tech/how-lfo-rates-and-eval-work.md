@@ -351,6 +351,40 @@ meaning of the host's 0..1 moved when the meter did, and so did
 changed", so there was no way to tell a host about it either. Constant bounds
 make the question go away rather than answer it.
 
+### What a host reads, as against what it writes
+
+The number is a multiple of a bar; the *reading* is not, and until 21.08.2026 the
+host was handed the number. `value_to_text` now answers what the panel has drawn
+since 2011 (issue #158):
+
+| parameter | reads as | example |
+|---|---|---|
+| `LFO.T`, synced | the note value the period is snapped to, labelled with its grid | `1/4 bars`, `1/8T bars`, `2/1 bars` |
+| `LFO.T`, free | milliseconds against the **reference** bar, so a tempo change does not move it | `2000.0 ms` |
+| `LFO.ph` | a percentage of a period, ±50 | `-12.5 %` |
+
+`LFOImpl::print{,Synced}PeriodScale()` and `LFOImpl::parsePeriodScale()` are the
+pair, and they live beside the parameter rather than in the panel that draws them
+— the panel is JUCE and `plugin2Host.cpp` may not link it, and two spellings of
+one format is how a DAW's automation lane and the plugin's own strip come to
+disagree. `periodRatioString()` in the editor calls the same function.
+
+`1/8T bars` is text no general-purpose parser reads — `strtof` stops at the slash
+— so `text_to_value` has an arm of its own for it, and what it answers is snapped
+to the grids the mask allows. A user who types a note value the meter cannot hold
+gets the nearest one it can, which is what a drag on the panel does.
+
+**The skew is undone on the way in.** `PeriodScale` crosses the normalised edge
+*linearised* (`LFOParameterGetter`, so that a bar sits in the middle of a host's
+fader), and the generic printer's normalised arm did not know that — a *supplied*
+value printed through it named a different period from the one the same number
+would have set. `unlinearisePeriodScale()` in the printer's own arm is that fixed;
+`tests/clap/parameterTextTests.cpp` holds the round trip.
+
+The phase's percentage is a `DisplayValueTransformer`, which is where a display
+unit belongs. `ValuesDenominator<100>` on the declaration says the same thing to
+nobody: nothing in the printer reads that trait.
+
 `SyncTypes` and `Waveform` are **not** exported —
 `ParameterCounts::lfoExportedParameters` is 5, and the exported set is the first
 five in declaration order. They reach the engine as

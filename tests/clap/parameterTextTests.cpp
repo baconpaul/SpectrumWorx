@@ -480,3 +480,101 @@ TEST_CASE("An LFO's bounds read as the two ends of what they modulate", "[clap][
     }
     CHECK(checked > 0);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Issue #158. A period is a note value and a phase is a percentage --
+/// which is what the LFO panel has drawn since 2011 and what a host was not
+/// being told: `LFO.T` read as its raw multiple of a bar, roughly 0.0208 to 24,
+/// and `LFO.ph` as the plus-or-minus half it is stored as.
+///
+/// \note A default LFO is synced to quarters, so what the whole range reads as
+/// here is note values. The free arm -- milliseconds -- is not reachable from a
+/// host at all: `SyncTypes` is one of the two LFO sub-parameters that are not
+/// exported, so nothing a host can write changes it. LFOImpl::printPeriodScale()
+/// is where both arms are, and tests/parameters/lfoTests.cpp drives them.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("An LFO's period reads as a note value and its phase as a percentage", "[clap][text]")
+{
+    Entry const entry;
+    ActivePlugin plugin(48000, 512);
+    auto const &params(parameters(*plugin));
+
+    write(plugin, parameterID(moduleChainType, 0), 0);
+
+    std::uint32_t periods{0}, phases{0};
+    for (auto const &info : slotParameters(*plugin, params, 0))
+    {
+        std::string const name(info.name);
+
+        if (name.ends_with(" - LFO Period"))
+        {
+            ++periods;
+            INFO("'" << name << "'");
+
+            /// \note Every value across the fader, because the reading is a
+            /// snap onto a grid and the interesting failures are at the ends.
+            for (double position(0); position <= 1.0; position += 0.05)
+            {
+                INFO("at " << position);
+                auto const shown(displayOf(*plugin, params, info.id, position));
+
+                // A note value: "<n>/<d> bars", never a bare multiplier.
+                CHECK(shown.ends_with(" bars"));
+                CHECK(shown.find('/') != std::string::npos);
+            }
+        }
+
+        if (name.ends_with(" - LFO Phase"))
+        {
+            ++phases;
+            INFO("'" << name << "'");
+
+            // The two ends and the middle, in percent rather than in halves.
+            CHECK(displayOf(*plugin, params, info.id, 0) == "-50.0 %");
+            CHECK(displayOf(*plugin, params, info.id, 0.5) == "0.0 %");
+            CHECK(displayOf(*plugin, params, info.id, 1) == "50.0 %");
+        }
+    }
+
+    CHECK(periods > 0);
+    CHECK(phases > 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The note value a user types is the note value they get, which is more
+/// than the round trip above asks: that one only says print and parse agree with
+/// each other, and would be just as happy with the two of them agreeing on the
+/// wrong number. \see LFOImpl::parsePeriodScale().
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A note value typed into an LFO's period is the period it gets", "[clap][text]")
+{
+    Entry const entry;
+    ActivePlugin plugin(48000, 512);
+    auto const &params(parameters(*plugin));
+
+    write(plugin, parameterID(moduleChainType, 0), 0);
+
+    std::uint32_t checked{0};
+    for (auto const &info : slotParameters(*plugin, params, 0))
+    {
+        if (!std::string(info.name).ends_with(" - LFO Period"))
+            continue;
+
+        for (char const *const typed : {"1/1 bars", "1/2 bars", "1/4 bars", "2/1 bars"})
+        {
+            INFO("'" << info.name << "' typed '" << typed << "'");
+            double parsed{0};
+            REQUIRE(params.text_to_value(&*plugin, info.id, typed, &parsed));
+            CHECK(displayOf(*plugin, params, info.id, parsed) == typed);
+        }
+        ++checked;
+        break; // One is enough: they are 225 copies of one parameter.
+    }
+    CHECK(checked == 1);
+}

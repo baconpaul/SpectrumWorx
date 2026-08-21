@@ -241,6 +241,25 @@ template <class ActualModule, class AutomatedParameter> struct ParameterParser
         default:
             break;
 
+            ////////////////////////////////////////////////////////////////////////
+            ///
+            /// \note The period is text no general-purpose parser reads: `1/8T bars`
+            /// is not a number with a unit after it, and `strtof` stops at the
+            /// slash. So it is read the way it was written, by whoever knows the
+            /// sync mask. \see LFOImpl::parsePeriodScale() and issue #158.
+            ///
+            ////////////////////////////////////////////////////////////////////////
+
+        case IndexOf<LFO::Parameters, LFO::PeriodScale>::value:
+        {
+            auto const periodScale(LFO::parsePeriodScale(
+                parser.text, pModule->lfo(parameterID.moduleParameterIndex).syncTypes()));
+            if (!periodScale)
+                return {};
+            return LFO::internal2AutomatedValue(parameterID.lfoParameterIndex, *periodScale,
+                                                AutomatedParameter::normalised);
+        }
+
         ////////////////////////////////////////////////////////////////////////
         /// \note The two bounds are shown in the units of the parameter they
         /// modulate rather than as the normalised numbers they are -- see

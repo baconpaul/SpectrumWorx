@@ -2756,66 +2756,27 @@ bool skipPeriodRatio(SpectrumWorxEditor::LFODisplay::Period const &period)
     return period.lastSyncType() == LFO::Free;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The formatter a host's `value_to_text` uses, so that the panel and a
+/// DAW's automation lane cannot come to say different things about one period.
+/// This drew the ratio itself -- the same switch over the three grids, written
+/// out twice -- until the host was taught to print one. \see
+/// LFOImpl::printSyncedPeriodScale() and issue #158.
+///
+/// \note By the grid the last snap chose rather than by the whole mask, which is
+/// what this always did: a file may carry more than one (`sync="5"`), and what a
+/// reading is labelled with is the grid the value is actually on.
+///
+////////////////////////////////////////////////////////////////////////////////
+
 juce::String periodRatioString(SpectrumWorxEditor::LFODisplay const &parent,
                                double const &periodScale)
 {
-    std::array<char, 16> buffer;
-
-    double numerator;
-    double denominator;
-    char const *suffix;
-    switch (parent.period().lastSyncType())
-    {
-    case LFO::Quarter:
-        if (periodScale < 1)
-        {
-            numerator = 1;
-            denominator = 1 / periodScale;
-        }
-        else
-        {
-            denominator = 1;
-            numerator = periodScale;
-        }
-        suffix = "";
-        break;
-
-    case LFO::Triplet:
-        if (periodScale < 1)
-        {
-            numerator = 1;
-            denominator = 1 / (periodScale * 3 / 2);
-        }
-        else
-        {
-            denominator = 1;
-            numerator = (periodScale * 3 / 2);
-        }
-        suffix = "T";
-        break;
-
-    case LFO::Dotted:
-        if (periodScale < 1)
-        {
-            numerator = 1;
-            denominator = 1 / (periodScale * 2 / 3);
-        }
-        else
-        {
-            denominator = 1;
-            numerator = (periodScale * 2 / 3);
-        }
-        suffix = "D";
-        break;
-
-        LE_DEFAULT_CASE_UNREACHABLE();
-    }
-
-    unsigned int const charactersWritten(std::snprintf(
-        &buffer[0], buffer.size(), "%u/%u%s bars", Math::convert<unsigned int>(numerator),
-        Math::convert<unsigned int>(denominator), suffix));
-    LE_ASSERT(charactersWritten < buffer.size());
-    return juce::String(&buffer[0], charactersWritten);
+    std::array<char, 32> buffer;
+    auto const written(LFO::printSyncedPeriodScale(static_cast<float>(periodScale),
+                                                   parent.period().lastSyncType(), buffer));
+    return juce::String(&buffer[0], written);
 }
 
 juce::String periodMillisecondsString(SpectrumWorxEditor::LFODisplay const &parent,

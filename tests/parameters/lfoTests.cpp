@@ -1253,3 +1253,101 @@ TEST_CASE("Several LFOs on one clock stay independent", "[lfo]")
     CHECK(std::ranges::count(helds, helds.front()) == static_cast<std::ptrdiff_t>(helds.size()));
     CHECK(std::ranges::count(sawtooths, sawtooths.front()) < 4);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Issue #158. A period's *reading* is a note value when the LFO is synced
+/// and a length of time when it is free; the number it is stored as is neither.
+/// The panel has drawn it this way since 2011 and the host was being handed the
+/// raw multiple of a bar.
+///
+/// \note The rows are read against 4/4 at 120 BPM, which is what ScopedHostTiming
+/// puts in force: the quarter grid a bar of four four offers is a quarter, a half
+/// and a whole, the triplet grid is those times two thirds, and the dotted grid
+/// is those times three halves. \see how-lfo-rates-and-eval-work.md §4.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A period reads as a note value when synced and as a time when free", "[lfo]")
+{
+    ScopedHostTiming const timing;
+
+    std::array<char, 64> buffer;
+    auto const shown([&](float const periodScale, std::uint8_t const syncTypes) {
+        auto const written(LFOImpl::printPeriodScale(periodScale, syncTypes, buffer));
+        return std::string(buffer.data(), written);
+    });
+
+    CHECK(shown(1.0f, LFO::Quarter) == "1/1 bars");
+    CHECK(shown(0.5f, LFO::Quarter) == "1/2 bars");
+    CHECK(shown(0.25f, LFO::Quarter) == "1/4 bars");
+
+    // A period longer than a bar counts bars rather than fractions of one.
+    CHECK(shown(2.0f, LFO::Quarter) == "2/1 bars");
+
+    // A triplet is two thirds of the note it is written as, and a dot is three
+    // halves of it -- so both are labelled with the note, not with the fraction.
+    CHECK(shown(1 / 6.0f, LFO::Triplet) == "1/4T bars");
+    CHECK(shown(3 / 8.0f, LFO::Dotted) == "1/4D bars");
+
+    /// \note And the free arm is milliseconds against the *reference* bar, which
+    /// is two seconds whatever the host's tempo is -- the same constant the file
+    /// format converts a free period through. A tempo change may not move what a
+    /// free LFO reads any more than it moves what it runs at.
+    CHECK(shown(1.0f, LFO::Free) == "2000.0 ms");
+    CHECK(shown(0.5f, LFO::Free) == "1000.0 ms");
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note What the plugin prints, it has to read. `strtof` stops at the slash, so
+/// nothing generic could ever have parsed `1/8T bars`; this is the pair that
+/// makes a typed period possible at all.
+///
+/// \note Text that is not a period is declined rather than guessed, for the
+/// reason `Parameters::parse` gives: `strtof` answers zero for "off", "N/A" and
+/// the empty string alike, and zero is not a period this parameter can hold.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A period reads back the note value it displays", "[lfo]")
+{
+    ScopedHostTiming const timing;
+
+    std::array<char, 64> buffer;
+    auto const shown([&](float const periodScale, std::uint8_t const syncTypes) {
+        auto const written(LFOImpl::printPeriodScale(periodScale, syncTypes, buffer));
+        return std::string(buffer.data(), written);
+    });
+
+    struct Row
+    {
+        float periodScale;
+        std::uint8_t syncTypes;
+    };
+    Row const rows[]{{1.0f, LFO::Quarter}, {0.5f, LFO::Quarter},     {0.25f, LFO::Quarter},
+                     {2.0f, LFO::Quarter}, {1 / 6.0f, LFO::Triplet}, {3 / 8.0f, LFO::Dotted},
+                     {1.0f, LFO::Free},    {0.125f, LFO::Free}};
+
+    for (auto const &row : rows)
+    {
+        auto const text(shown(row.periodScale, row.syncTypes));
+        CAPTURE(text);
+
+        auto const parsed(LFOImpl::parsePeriodScale(text.c_str(), row.syncTypes));
+        REQUIRE(parsed.has_value());
+        CHECK(*parsed == Catch::Approx(row.periodScale).epsilon(0.001));
+        CHECK(shown(*parsed, row.syncTypes) == text);
+    }
+
+    // Text no period corresponds to is nothing, not zero.
+    CHECK_FALSE(LFOImpl::parsePeriodScale("", LFO::Quarter).has_value());
+    CHECK_FALSE(LFOImpl::parsePeriodScale("N/A", LFO::Quarter).has_value());
+    CHECK_FALSE(LFOImpl::parsePeriodScale("off", LFO::Free).has_value());
+    CHECK_FALSE(LFOImpl::parsePeriodScale(nullptr, LFO::Quarter).has_value());
+
+    /// \note A denominator of zero is text a user can type and `1/0` is not a
+    /// period; answering infinity for it would put a value the parameter cannot
+    /// hold into the engine.
+    CHECK_FALSE(LFOImpl::parsePeriodScale("1/0 bars", LFO::Quarter).has_value());
+}
