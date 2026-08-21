@@ -341,6 +341,10 @@ class SpectrumWorxCLAP final
     bool stateSave(clap_ostream const *) noexcept override;
     bool stateLoad(clap_istream const *) noexcept override;
 
+    /// \brief Takes the side chain's sample back to its start when the host's
+    /// transport starts. `[audio-thread]` \see the definition and issue #143.
+    void restartSampleOnTransportStart(clap_event_transport const *) noexcept;
+
     /// \brief The session's non-parameter state, as a pair of hooks over the
     /// `<dawExtraState>` block. Empty for now, and the note on the definition
     /// says what goes in it first.
@@ -640,6 +644,21 @@ class SpectrumWorxCLAP final
     ////////////////////////////////////////////////////////////////////////////
 
     Sample *pSample_{nullptr};
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Whether the host's transport was rolling on the last block, so
+    /// that the block it *starts* on can be told from every block after it.
+    /// `[audio-thread]`
+    ///
+    /// \note Only `process()` reads or writes it, and `activate()` clears it so
+    /// that a plugin brought up while the transport is already rolling counts
+    /// that as a start. \see restartSampleOnTransportStart() and issue #143.
+    ///                                       (21.08.2026.)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    bool transportWasPlaying_{false};
     fs::path sampleFile_;
     unsigned int decodedSampleRate_{0};
 
