@@ -1408,13 +1408,6 @@ void Knob::mouseDown(juce::MouseEvent const &event)
         return passMousePressToParent(*this, event);
     }
 
-    /// \note Read here rather than in mouseDrag, so that a drag keeps the
-    /// sensitivity it started with. `handleAbsoluteDrag` works out the value as
-    /// `valueOnMouseDown + travelSoFar / sensitivity`, so changing the divisor
-    /// half way through recomputes the whole gesture at the new rate and the
-    /// knob jumps. Pressing the key first is the gesture; pressing it mid-drag
-    /// now does nothing, which is the quieter of the two answers.
-    ///
     /// The anchor every later event measures itself against. \see fineAdjusted().
     dragStartY_ = event.position.y;
     lastDragY_ = event.position.y;
@@ -1445,12 +1438,52 @@ void Knob::mouseDrag(juce::MouseEvent const &event)
     juce::Slider::mouseDrag(fineAdjusted(event));
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The cursor goes back where it was pressed, and juce::Slider's own
+/// attempt at that is overwritten rather than prevented. `restoreMouseIfHidden`
+/// (juce_Slider.cpp:1187, reached from Slider::mouseUp) works out where the
+/// mouse would have travelled to for the value the knob ended on -- and then
+/// constrains that point to the knob's own screen bounds. A knob is some eighty
+/// pixels tall and a whole range is six hundred, so every drag long enough to be
+/// worth making overshoots and the cursor is left pinned to the top or bottom
+/// edge of the widget. It measures that travel at the coarse sensitivity too,
+/// which a drag that used shift did not happen at.
+///
+///   Where the press was is both simpler and what the gesture means: the mouse
+/// was taken away for the duration and is being handed back.
+///                                           (20.08.2026.)
+///
+////////////////////////////////////////////////////////////////////////////////
+
 void Knob::mouseUp(juce::MouseEvent const &event)
 {
     if (event.mods.isPopupMenu())
         return;
+
     juce::Slider::mouseUp(event);
+
+    if (hidesCursorWhileDragging())
+        juce::Desktop::getInstance().getMainMouseSource().setScreenPosition(
+            event.getMouseDownScreenPosition().toFloat());
 }
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Deliberately empty. juce::Slider::modifierKeysChanged calls
+/// `restoreMouseIfHidden()` for every modifier change that is not its own
+/// velocity swap (juce_Slider.cpp:1176) -- the guard above it exempts the
+/// `Rotary` style, which is a different value from the RotaryVerticalDrag these
+/// are. That puts the cursor back in the middle of the knob and ends the
+/// unbounded movement, which is precisely what pressing shift part way through a
+/// drag was doing: the gesture the key is there to refine was the gesture it
+/// broke. Nothing is lost by dropping it, because juce::Component's own only
+/// forwards to the parent and Slider does not call it either.
+///                                           (20.08.2026.)
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void Knob::modifierKeysChanged(juce::ModifierKeys const &) {}
 
 void LE_NOINLINE Knob::setValue(param_type const newValue)
 {

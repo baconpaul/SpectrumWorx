@@ -1094,7 +1094,7 @@ class Knob : public WidgetBase<juce::Slider>
     ///
     /// One is the 2012 feel, and a 16" laptop screen is not tall enough to drag
     /// a knob through its range at it.
-    static constexpr float dragSensitivity{2.5f};
+    static constexpr float dragSensitivity{2};
 
     /// \brief What holding shift divides the travel by.
     ///
@@ -1102,11 +1102,11 @@ class Knob : public WidgetBase<juce::Slider>
     /// the constructor switches off. \see Knob::fineAdjusted().
     ///
     /// \note Four rather than the ten sst-jucegui uses, because this is dividing
-    /// an already brisk 480 px. Ten would put a fine sweep back past the 1200
+    /// an already brisk 600 px. Ten would put a fine sweep well past the 1200
     /// this is getting away from.
     static constexpr float fineDragRatio{4};
 
-    /// \brief The travel a whole range takes, as JUCE counts it: 480 px, and
+    /// \brief The travel a whole range takes, as JUCE counts it: 600 px, and
     /// four times that with shift held.
     static constexpr int coarseDragPixels()
     {
@@ -1255,6 +1255,12 @@ class Knob : public WidgetBase<juce::Slider>
     void mouseDown(juce::MouseEvent const &) override;
     void mouseDrag(juce::MouseEvent const &) override;
     void mouseUp(juce::MouseEvent const &) override;
+
+    ////////////////////////////////////////////////////////////////////////////
+    /// \note Swallowed rather than forwarded, so that shift may be pressed in
+    /// the middle of a drag. \see fineAdjusted().
+    ////////////////////////////////////////////////////////////////////////////
+    void modifierKeysChanged(juce::ModifierKeys const &) override;
 
     void startedDragging() noexcept override;
     /// \note Was declared and defined only under !NDEBUG, but
