@@ -431,3 +431,37 @@ TEST_CASE("N, T and D are one choice rather than three toggles", "[gui][lfo]")
 /// drive. What guards it is that both go through the one
 /// `updateParameterAndNotifyHost<>`, which the two cases above exercise; a
 /// waveform case would need a real menu and would be measuring JUCE.
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note What issue #174 was, and the one thing about the mark worth a case.
+///
+///   `fillLFOWaveformsMenu()` held its eleven icons in a function-local static,
+/// and those are pointers into the artwork cache -- which `SkinLifetime` empties
+/// the moment the last editor closes. A second editor never re-ran the
+/// initialiser, so all eleven stayed invalid, `Artwork::draw()` returned without
+/// drawing, and the well was blank for the rest of the process. Picking another
+/// waveform did not help because every one of them was blank.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A second editor's LFO well has a mark in it", "[gui][lfo][skin]")
+{
+    SWTest::HostSideJuce const juce;
+    SWTest::Instance instance;
+
+    // an editor that raised an LFO panel and went away, which is what empties
+    // the cache the marks live in
+    {
+        PanelUnderTest const first(instance);
+    }
+    instance.closeEditor();
+
+    PanelUnderTest const panel(instance);
+    auto *const pDisplay(instance.editor().lfoDisplay());
+    REQUIRE(pDisplay != nullptr);
+
+    auto const *const pMark(pDisplay->waveformMenu().getSelectedItemIcon());
+    REQUIRE(pMark != nullptr);
+    CHECK(pMark->isValid());
+}

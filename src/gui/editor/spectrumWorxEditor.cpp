@@ -2191,7 +2191,7 @@ LE_NOINLINE double lfoValueToRangeSliderValue(juce::Slider const &slider,
 
 void fillLFOWaveformsMenu(PopupMenu &menu)
 {
-    static Artwork const *LE_RESTRICT const icons[] = {
+    Artwork const *LE_RESTRICT const icons[] = {
         &resourceArtwork<LFOSine>(),         &resourceArtwork<LFOTriangle>(),
         &resourceArtwork<LFOSawtooth>(),     &resourceArtwork<LFOReverseSaw>(),
         &resourceArtwork<LFOSquare>(),       &resourceArtwork<LFOExponent>(),
