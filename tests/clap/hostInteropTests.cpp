@@ -606,3 +606,101 @@ TEST_CASE("Learning the host's tempo does not move the LFO periods", "[clap][hos
     CHECK(afterLearningTheTempo == beforeAnyBlock);
     CHECK(afterMoreBlocks == beforeAnyBlock);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// What counts as the chain having changed
+////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+/// \brief The slot selector for module \p slot, as the host is shown it.
+clap_param_info slotSelector(clap_plugin const &plugin, clap_plugin_params const &params,
+                             std::uint8_t const slot)
+{
+    for (auto const &info : allParameterInfo(plugin, params))
+    {
+        LE::SW::ParameterID parameterID;
+        parameterID.binaryValue = info.id;
+        if ((parameterID.type() == LE::SW::ParameterID::ModuleChainParameter) &&
+            (parameterID.value._.moduleChain.moduleIndex == slot))
+            return info;
+    }
+    FAIL("no slot selector for that module");
+    return {};
+}
+} // anonymous namespace
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The regression this file exists to hold on to. `handleEvent()` decides
+/// whether a block changed the *shape* of the parameter list, and it used to
+/// answer that question by asking what type the parameter was rather than
+/// whether anything had happened -- so a host writing a slot back to the value
+/// it already held was answered as a chain change, and paid for with a full
+/// `CLAP_PARAM_RESCAN_INFO`.
+///
+///   In Ardour that closed a loop, because a rescan carrying `INFO` is what makes
+/// it write the parameter set back. \see issue #172 and the note on the return
+/// value in `handleEvent()`.
+///
+/// \note `rescanFlags` and not `mainThreadCallbacks`, which cannot tell these
+/// cases apart: `markCurrentProgramAsModified()` asks for a callback on the same
+/// path, so *any* parameter event arms one. What is being pinned is narrower --
+/// that the callback, when it runs, has no rescan to deliver.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A slot written back the value it already holds is not a chain change",
+          "[clap][host][parameters]")
+{
+    Entry const entry;
+    TestHost host{TestHost::everything()};
+    ActivePlugin plugin(48000, 512, host);
+
+    auto const &params(parameters(*plugin));
+    auto const selector(slotSelector(*plugin, params, 0));
+
+    std::vector<float> leftIn(512, 0.0f), rightIn(512, 0.0f);
+    std::vector<float> leftOut(512), rightOut(512);
+
+    /// Delivers \p value for the slot in one block, and runs the callback the
+    /// plugin asks for -- which is where a rescan, if there is one, is handed
+    /// over. Answers what the host was told to rescan.
+    auto const writeSlot([&](double const value) {
+        host.rescanFlags = 0;
+        OneParameterEvent const edit(selector.id, value);
+        plugin.process(leftIn, rightIn, leftOut, rightOut, nullptr, &*edit);
+        plugin.pumpMainThread();
+        return host.rescanFlags.load();
+    });
+
+    // The slot starts empty; min_value is `noModule` and the next value up is the
+    // first effect, so this genuinely fills it.
+    auto const firstEffect(selector.min_value + 1);
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Filling the slot is a change, and has to stay one.
+    ////////////////////////////////////////////////////////////////////////////
+
+    auto const onTheChange(writeSlot(firstEffect));
+    CHECK((onTheChange & CLAP_PARAM_RESCAN_INFO) != 0);
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Writing it again is not.
+    ////////////////////////////////////////////////////////////////////////////
+
+    CHECK(writeSlot(firstEffect) == 0);
+
+    // And not merely the second time: a host in the loop this comes from repeats
+    // the write on every block, so once quiet it has to stay quiet.
+    for (unsigned block(0); block < 8; ++block)
+        CHECK(writeSlot(firstEffect) == 0);
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Moving it really does still speak up, which is what says the guard reports
+    // changes rather than merely says less.
+    ////////////////////////////////////////////////////////////////////////////
+
+    auto const onEmptyingIt(writeSlot(selector.min_value));
+    CHECK((onEmptyingIt & CLAP_PARAM_RESCAN_INFO) != 0);
+}

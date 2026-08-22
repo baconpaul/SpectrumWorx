@@ -1053,6 +1053,26 @@ bool SpectrumWorxCLAP::handleEvent(clap_event_header const *const header)
     if (!liveRanges(parameterID, ranges, program()))
         return false;
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note **What the slot held before the write, so that the answer below can
+    /// mean that it changed.** \see the note on the return value.
+    ///
+    ///   Read from the chain rather than inferred from \p value, because the two
+    /// are not the same question. `AutomatedModuleChain::setParameter` declines a
+    /// slot change it cannot carry out -- a module it cannot build, or one that
+    /// fails to initialise -- and leaves the slot holding what it already had.
+    /// Comparing the value asked for against the value asked for last time would
+    /// call that a change; comparing the slot against itself does not.
+    ///                                       (22.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    bool const isSlotSelector(parameterID.type() == ParameterID::ModuleChainParameter);
+    auto const slot(parameterID.value._.moduleChain.moduleIndex);
+    auto const effectBefore(isSlotSelector ? moduleChain().getParameterForIndex(slot).getValue()
+                                           : noModule);
+
     auto const value(CLAPEdge::fromHost(parameterID, ranges, event->value));
     auto const applied(setParameter(parameterID, value));
 
@@ -1084,10 +1104,41 @@ bool SpectrumWorxCLAP::handleEvent(clap_event_header const *const header)
         pushed(toUI_.push(Threading::baseParameterChanged(parameterID.binaryValue, value)),
                "The echo queue is full; the main thread's Program is now behind the engine.");
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
     /// \note Only a module-chain parameter changes what the *other* parameters
     /// are: it decides which effect a slot holds, and so how many parameters
     /// that slot has and what they are called. Everything else is just a value.
-    return parameterID.type() == ParameterID::ModuleChainParameter;
+    ///
+    /// \note **And only when the slot actually moved.** This asked what type the
+    /// parameter was rather than whether anything had happened, so a host writing
+    /// a slot back to the value it already held was answered as a chain change --
+    /// which is not free: `chainChanged()` pushes a `ChainChanged` echo, asks for
+    /// a `CLAP_PARAM_RESCAN_INFO | _TEXT | _VALUES` and marks the program dirty.
+    ///
+    ///   In Ardour that closed a loop. A rescan carrying `INFO` reaches VST3 as
+    /// `restartComponent( kParamValuesChanged | kParamTitlesChanged )`, and
+    /// Ardour answers it by writing the whole parameter set back into the plugin
+    /// -- from inside `restartComponent` itself, every block, one event per
+    /// parameter. One of them is a slot, unchanged, and it asked for the next
+    /// rescan. Measured at some thirty turns a second for as long as the plugin
+    /// was loaded, each costing the wrapper a full `get_value` sweep and the host
+    /// a control-surface rebuild, all on the main thread.
+    ///
+    ///   A host is entitled to write those values back: that is what the flags
+    /// invite, and re-stating a value after being told the titles changed is not
+    /// a defect. Claiming a change that had not happened is, which is why the
+    /// guard belongs here and not behind a test for which host is running.
+    /// Nothing else needed one -- every other parameter type already answered
+    /// false. \see issue #172.
+    ///                                       (22.08.2026.) (SW port)
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    auto const effectAfter(isSlotSelector ? moduleChain().getParameterForIndex(slot).getValue()
+                                          : noModule);
+
+    return isSlotSelector && (effectBefore != effectAfter);
 }
 
 void SpectrumWorxCLAP::requestRescan(clap_param_rescan_flags const flags)
