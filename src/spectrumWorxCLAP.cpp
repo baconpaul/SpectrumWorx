@@ -304,6 +304,10 @@ bool SpectrumWorxCLAP::init() noexcept
     /// need not offer. See core/threading/threadCheck.hpp.
     Threading::markMainThread();
 
+    /// \note The prefix: what reaches the plugin is Ardour's own name with
+    /// clap-wrapper's " (CLAP-as-VST3)" appended. \see isArdour().
+    isArdour_ = _host.host()->name && (std::strncmp(_host.host()->name, "Ardour", 6) == 0);
+
     // The host may ask for the parameter list before activate(), and does.
     rebuildParameterIDs();
     return true;
@@ -523,6 +527,9 @@ void SpectrumWorxCLAP::deactivate() noexcept
 
     drainCommands();
     drainEngineEvents();
+
+    // The restart arrived after all. \see the fallback in process().
+    blocksAwaitingRestart_ = 0;
 
     /// \note Before the setup is applied rather than after: this is the restart
     /// that was asked for, so anything asking again from here on is asking about
@@ -1234,6 +1241,48 @@ clap_process_status SpectrumWorxCLAP::process(clap_process const *const process)
     /// before the block started.
     drainCommands();
 
+    /// \note **The restart that never came.** Ardour answers
+    /// `restartComponent( kIoChanged | kLatencyChanged )` by re-reading the
+    /// latency with the plugin still *active* and never deactivates, and calls
+    /// `stop_processing` only at either end of a session -- so this thread is the
+    /// only one that can ever apply a pending setup.
+    ///
+    /// \note **It allocates**, hence both guards: Ardour only, and only with the
+    /// transport parked, where the click lands on monitoring rather than in a
+    /// take. Sizing the working set for `maximumFFTSize` at activate() would make
+    /// it repositioning instead, and neither guard would be needed. The latency
+    /// is announced from `onMainThread()` -- outside activate(), but
+    /// `kLatencyChanged` is the part of a restart Ardour honours.
+    /// \see issue #172 and tracker.ardour.org/view.php?id=10470.
+    ///                                       (22.08.2026.) (SW port)
+
+    /// \brief Parked blocks to wait first, so a host that would restart still can.
+    static constexpr std::uint32_t blocksBeforeGivingUpOnTheRestart{4};
+
+    bool const transportRolling(process->transport &&
+                                ((process->transport->flags & CLAP_TRANSPORT_IS_PLAYING) != 0));
+
+    if (isArdour() && !transportRolling && spectralSetupPending() &&
+        restartRequested_.load(std::memory_order_acquire))
+    {
+        if (++blocksAwaitingRestart_ >= blocksBeforeGivingUpOnTheRestart)
+        {
+            auto const applied(applyPendingSpectralSetup());
+
+            blocksAwaitingRestart_ = 0;
+            restartRequested_.store(false, std::memory_order_release);
+            appliedWithoutARestart_.store(applied ? WithoutARestart::Applied
+                                                  : WithoutARestart::Failed,
+                                          std::memory_order_release);
+
+            _host.requestCallback(); // `[thread-safe]`; the announcement is not.
+        }
+    }
+    else
+    {
+        blocksAwaitingRestart_ = 0;
+    }
+
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \note **The block is rendered in pieces, and a parameter event takes
@@ -1629,6 +1678,31 @@ void SpectrumWorxCLAP::runEngine(clap_process const *const process, std::uint32_
 void SpectrumWorxCLAP::onMainThread() noexcept
 {
     drainEngineEvents();
+
+    /// \note The other half of the fallback in process(). The resync is for the
+    /// failure case, in the order deactivate() does it; the announcement is what
+    /// tells Ardour.
+    switch (appliedWithoutARestart_.exchange(WithoutARestart::Nothing, std::memory_order_acq_rel))
+    {
+    case WithoutARestart::Nothing:
+        break;
+
+    case WithoutARestart::Failed:
+        resyncSpectralParametersToEngine();
+        [[fallthrough]];
+
+    case WithoutARestart::Applied:
+    {
+        auto const previousLatency(
+            std::exchange(latencyInSamples_, uncheckedEngineSetup().latencyInSamples()));
+        if ((latencyInSamples_ != previousLatency) && _host.canUseLatency())
+            _host.latencyChanged();
+
+        if (pEditor_)
+            pEditor_->updateForEngineSetupChanges();
+        break;
+    }
+    }
 
     auto const flags(pendingRescan_.exchange(0));
     if (flags && _host.canUseParams())
