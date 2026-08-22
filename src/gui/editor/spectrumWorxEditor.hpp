@@ -1162,6 +1162,10 @@ class SpectrumWorxEditor final : private SkinLifetime,
             return pModuleControl_ && pModuleControl_->pointsInto(region);
         }
 
+        /// \brief The waveform popup, so that a headless case can ask which mark
+        /// the well is showing without painting one. \see issue #174.
+        PopupMenuWithSelection const &waveformMenu() const { return type_; }
+
       private:
         CapsuleButton switch_;
         TextButton quarter_;
