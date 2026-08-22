@@ -354,6 +354,10 @@ class SpectrumWorxCLAP final
     bool implementsLatency() const noexcept override { return true; }
     std::uint32_t latencyGet() const noexcept override { return latencyInSamples_; }
 
+    /// \brief Whether the host is Ardour, which does not answer a restart.
+    /// \see the fallback in process() and issue #172.
+    bool isArdour() const noexcept { return isArdour_; }
+
     // clap_plugin_gui, entirely by way of the shim
     bool implementsGui() const noexcept override { return clapJuceShim_ != nullptr; }
     ADD_SHIM_IMPLEMENTATION(clapJuceShim_)
@@ -726,6 +730,24 @@ class SpectrumWorxCLAP final
     ////////////////////////////////////////////////////////////////////////////
 
     std::atomic<bool> restartRequested_{false};
+
+    /// \see isArdour(). Written in init(), read from process().
+    bool isArdour_{false};
+
+    /// \brief Blocks rendered with a restart outstanding and the transport
+    /// parked. `[audio-thread]`, reset by deactivate().
+    std::uint32_t blocksAwaitingRestart_{0};
+
+    /// \brief What the audio thread did about a restart that never came, for
+    /// onMainThread() to finish.
+    enum class WithoutARestart : int
+    {
+        Nothing,
+        Applied,
+        Failed
+    };
+
+    std::atomic<WithoutARestart> appliedWithoutARestart_{WithoutARestart::Nothing};
 
     /// \brief A `ToUI::ChainChanged` waiting to be acted on. \see drainEngineEvents().
     bool chainChangedPending_{false};
