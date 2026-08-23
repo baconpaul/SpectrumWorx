@@ -1353,15 +1353,16 @@ bool SpectrumWorxCLAP::pushed(bool const wasPushed, char const *const what) cons
     return false;
 }
 
-/// \note A full retire ring is a leak, and freeing on this thread is the one
-/// thing the ring exists to prevent. 1024 deep against one entry per structural
-/// change, so it is a checked-build assertion rather than a policy.
+/// \note Its own ring, and that is the point: 1024 deep against one entry per
+/// structural change is ample, but it shared the echo ring until a fuzzer
+/// filled that with ~700 parameter echoes per permutation and a retirement had
+/// nowhere to go. A dropped echo is a stale reading; a dropped Retire is a leak.
 ///
 /// \note The push is the statement and the assert only reports on it --
 /// `LE_ASSERT_MSG` is `static_cast<void>(0)` under NDEBUG.
 void SpectrumWorxCLAP::retire(Threading::ToUI::Retired const what, void *const pObject)
 {
-    if (toUI_.push(Threading::retire(what, pObject)))
+    if (retire_.push(Threading::retire(what, pObject)))
         return;
 
     LE_ASSERT_MSG(false, "The retire queue is full; something will be leaked.");
@@ -1499,26 +1500,34 @@ void SpectrumWorxCLAP::drainEngineEvents()
         // rather than an object: the interface may still hold a strip pointing
         // at it, and dropping that strip is what finally frees it
         case Threading::ToUI::Kind::Retire:
-            switch (event.retire.what)
-            {
-            case Threading::ToUI::Retired::None:
-                break;
-            case Threading::ToUI::Retired::Module:
-                intrusive_ptr_release(&Engine::node(*static_cast<Module *>(event.retire.pObject)));
-                break;
-            case Threading::ToUI::Retired::Chain:
-                delete static_cast<AutomatedModuleChain *>(event.retire.pObject);
-                break;
-            case Threading::ToUI::Retired::Sample:
-                delete static_cast<Sample *>(event.retire.pObject);
-                break;
-            }
+            LE_ASSERT_MSG(false, "A retirement travels on its own ring.");
             break;
         }
     }
 
     if (std::exchange(chainChangedPending_, false) && pEditor_)
         pEditor_->resyncModuleRack();
+
+    // after the announcements, which is the order the engine made them in: a
+    // module is unlinked and said to be gone before the reference it left is
+    // dropped, and the strip holding the other reference goes with the resync
+    while (retire_.pop(event))
+    {
+        switch (event.retire.what)
+        {
+        case Threading::ToUI::Retired::None:
+            break;
+        case Threading::ToUI::Retired::Module:
+            intrusive_ptr_release(&Engine::node(*static_cast<Module *>(event.retire.pObject)));
+            break;
+        case Threading::ToUI::Retired::Chain:
+            delete static_cast<AutomatedModuleChain *>(event.retire.pObject);
+            break;
+        case Threading::ToUI::Retired::Sample:
+            delete static_cast<Sample *>(event.retire.pObject);
+            break;
+        }
+    }
 
     // after the rack, and only with a window: this is a redraw, and nothing
     // behind the interface depends on it
