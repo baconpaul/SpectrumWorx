@@ -91,7 +91,9 @@ endif ()
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "Never shared unless asked")
+# Not CACHE: without FORCE that loses to a -DBUILD_SHARED_LIBS=ON on the
+# configure line, and a shared pffft has no exported symbols (#186).
+set(BUILD_SHARED_LIBS OFF)
 
 # CI always passes one; a bare `cmake -B build` otherwise gets no optimisation
 # flags at all on single-config generators.
