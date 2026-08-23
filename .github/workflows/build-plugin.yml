@@ -314,7 +314,12 @@ jobs:
           sudo apt-get update
           if ! sudo apt-get install -y "gcc-$v" "g++-$v"; then
             sudo apt-get install -y software-properties-common
-            sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+            # Launchpad answers the signing-key request with a 500 and
+            # GPGKeyTemporarilyNotFoundError often enough to redden a PR by itself.
+            for i in 1 2 3; do
+              if sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test; then break; fi
+              sleep $(( i * 15 ))
+            done
             sudo apt-get update
             sudo apt-get install -y "gcc-$v" "g++-$v"
           fi
