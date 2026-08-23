@@ -41,6 +41,8 @@
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
+#include "core/modules/automatedModule.hpp"
+
 #include "le/parameters/lfoImpl.hpp"
 
 #include "le/math/math.hpp"
@@ -1374,4 +1376,36 @@ TEST_CASE("A period reads back the note value it displays", "[lfo]")
     /// period; answering infinity for it would put a value the parameter cannot
     /// hold into the engine.
     CHECK_FALSE(LFOImpl::parsePeriodScale("1/0 bars", LFO::Quarter).has_value());
+}
+
+TEST_CASE("An LFO's period follows a change of sync type onto the new grid", "[lfo]")
+{
+    ScopedHostTiming const timing;
+
+    // each sync type divides the bar differently, so a period set under one is
+    // not a period the next one has. It used to stay where it stood -- the
+    // \todo on addSyncType since 2011 -- so a preset stored a period off its own
+    // grid and the loader snapped it somewhere else \see issue #192
+    using LE::Parameters::IndexOf;
+    constexpr auto syncTypesIndex(IndexOf<LFOImpl::Parameters, LFOImpl::SyncTypes>::value);
+    constexpr auto periodScaleIndex(IndexOf<LFOImpl::Parameters, LFOImpl::PeriodScale>::value);
+
+    LFOImpl lfo;
+    lfo.parameters().set<LFOImpl::SyncTypes>(LFO::Quarter);
+    lfo.parameters().set<LFOImpl::PeriodScale>(LFOImpl::snapPeriodScale(0.3f, LFO::Quarter).first);
+    auto const onQuarter(lfo.periodScale());
+
+    // what a host writing Sync does, and what the editor's own setter does
+    lfo.parameters().set<LFOImpl::SyncTypes>(LFO::Triplet);
+    auto const moved(LE::SW::Automation::Detail::autoAdjustedLFOParameter(lfo, syncTypesIndex));
+
+    INFO("period " << onQuarter << " under Quarter, " << lfo.periodScale() << " under Triplet");
+    CHECK(lfo.periodScale() != onQuarter);
+    CHECK(lfo.periodScale() ==
+          Catch::Approx(LFOImpl::snapPeriodScale(lfo.periodScale(), LFO::Triplet).first));
+
+    // and it is the *period* the host is told about, not the sync it wrote
+    REQUIRE(moved);
+    CHECK(moved->first == periodScaleIndex);
+    CHECK(moved->second == Catch::Approx(lfo.periodScale()));
 }

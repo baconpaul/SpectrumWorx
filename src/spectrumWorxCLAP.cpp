@@ -829,6 +829,14 @@ bool SpectrumWorxCLAP::handleEvent(clap_event_header const *const header)
     auto const effectAfter(isSlotSelector ? moduleChain().getParameterForIndex(slot).getValue()
                                           : noModule);
 
+    // a sync type decides which divisions of the bar a period may take, so
+    // writing one moves the period onto the new grid; the host wrote neither
+    // and has to be told to read again \see issue #192
+    if ((parameterID.type() == ParameterID::LFOParameter) &&
+        (parameterID.value._.lfo.lfoParameterIndex ==
+         LE::Parameters::IndexOf<LFO::Parameters, LFO::SyncTypes>::value))
+        requestRescan(CLAP_PARAM_RESCAN_VALUES);
+
     return isSlotSelector && (effectBefore != effectAfter);
 }
 
