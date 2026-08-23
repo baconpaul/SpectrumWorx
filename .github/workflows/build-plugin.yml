@@ -19,7 +19,8 @@
 #                      at configure time (verified: that configuration writes no
 #                      _deps/ at all). One leg is a compiler rather than a
 #                      configuration, and so costs a matrix entry rather than a
-#                      job: Linux Debug again under GCC 15.
+#                      job: Linux Debug again under GCC 15, which is also the
+#                      one leg built with a hardened standard library.
 #   build_plugin       the four bundles, and on anything but a pull request the
 #                      installer as well.
 #   build_plugin_msvc  a pull request only, and a compile check only. It builds
@@ -218,11 +219,22 @@ jobs:
           #
           #   Debug only. What a second compiler has to say it says at compile
           # time, and rendering the goldens a second time would say nothing new.
+          #
+          #   And the hardened leg: `_GLIBCXX_ASSERTIONS` turns the standard
+          # library's own preconditions on -- a container subscript is bounds
+          # checked, so is an empty container's front(), and so is an invalid
+          # iterator range. Stated here rather than inherited: this leg already
+          # had it from the toolchain's default, which is how it caught the peak
+          # detector taking `&array[n]` for the end of a full one, and a default
+          # is not something to leave a check standing on. Nothing else in the
+          # matrix hardens, so this is the only leg that asks.
           - name: linux-x64-gcc15
             os: ubuntu-latest
             validator_asset: "*ubuntu*.zip"
             config: Debug
-            cmake_args: -GNinja -DCMAKE_C_COMPILER=gcc-15 -DCMAKE_CXX_COMPILER=g++-15
+            cmake_args: >-
+              -GNinja -DCMAKE_C_COMPILER=gcc-15 -DCMAKE_CXX_COMPILER=g++-15
+              -DCMAKE_CXX_FLAGS=-D_GLIBCXX_ASSERTIONS
             gcc_version: '15'
 
           # Release, where the GCC 15 leg above is Debug -- and the difference is
