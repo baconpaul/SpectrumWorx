@@ -178,7 +178,7 @@ jobs:
             os: windows-latest
             config: Release
             cmake_args: -GNinja -DCMAKE_C_COMPILER="$SW_CLANG_CL" -DCMAKE_CXX_COMPILER="$SW_CLANG_CL"
-            use_gcc15: false
+            gcc_version: ''
 
           # Host architecture only. The bundles are universal; the tests are not
           # shipped and building them twice buys nothing.
@@ -186,23 +186,23 @@ jobs:
             os: macos-latest
             config: Debug
             cmake_args: -GNinja
-            use_gcc15: false
+            gcc_version: ''
           - name: macos
             os: macos-latest
             config: Release
             cmake_args: -GNinja
-            use_gcc15: false
+            gcc_version: ''
 
           - name: linux-x64
             os: ubuntu-latest
             config: Debug
             cmake_args: -GNinja
-            use_gcc15: false
+            gcc_version: ''
           - name: linux-x64
             os: ubuntu-latest
             config: Release
             cmake_args: -GNinja
-            use_gcc15: false
+            gcc_version: ''
 
           # The Linux -Werror default was turned on because GCC 15.2 built the
           # tree clean -- 849 warnings over the Apple Clang baseline, five
@@ -216,7 +216,32 @@ jobs:
             os: ubuntu-latest
             config: Debug
             cmake_args: -GNinja -DCMAKE_C_COMPILER=gcc-15 -DCMAKE_CXX_COMPILER=g++-15
-            use_gcc15: true
+            gcc_version: '15'
+
+          # Release, where the GCC 15 leg above is Debug -- and the difference is
+          # the point rather than variety. The mid-end analyses only run once the
+          # optimiser has inlined something: the -Wuninitialized this leg was added
+          # for fires at -O2 and -O3 and is silent at -O0, so a Debug leg would have
+          # had nothing to say about it. Between the two, both halves of what a
+          # compiler notices are covered.
+          - name: linux-x64-gcc16
+            os: ubuntu-latest
+            config: Release
+            cmake_args: -GNinja -DCMAKE_C_COMPILER=gcc-16 -DCMAKE_CXX_COMPILER=g++-16
+            gcc_version: '16'
+            build_only: true
+
+          # The other end of the range: 13 is what the current LTS ships as its
+          # default, so it is the oldest compiler anybody building from source on
+          # a current distribution is likely to reach for. It comes from noble's
+          # own archive rather than the PPA. Release, and a compile check only --
+          # what an extra compiler has to say, it says before ctest starts.
+          - name: linux-x64-gcc13
+            os: ubuntu-latest
+            config: Release
+            cmake_args: -GNinja -DCMAKE_C_COMPILER=gcc-13 -DCMAKE_CXX_COMPILER=g++-13
+            gcc_version: '13'
+            build_only: true
 
     steps:
       - name: Checkout code
@@ -292,20 +317,26 @@ jobs:
 
       # Whether the image already has it depends on which Ubuntu ubuntu-latest
       # points at this month, so ask the archive first and fall back to the
-      # toolchain PPA, which carries GCC 15 for the releases whose archive does
-      # not. The version is printed because "gcc15" in a job name is a claim and
-      # this is the line in the log that settles it.
-      - name: Install GCC 15
-        if: matrix.use_gcc15
+      # toolchain PPA, which carries both 15 and 16 for the releases whose archive
+      # does not. The version is printed because "gcc16" in a job name is a claim
+      # and this is the line in the log that settles it.
+      - name: Install GCC ${{ matrix.gcc_version }}
+        if: matrix.gcc_version
         run: |
+          v='${{ matrix.gcc_version }}'
           sudo apt-get update
-          if ! sudo apt-get install -y gcc-15 g++-15; then
+          if ! sudo apt-get install -y "gcc-$v" "g++-$v"; then
             sudo apt-get install -y software-properties-common
-            sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+            # Launchpad answers the signing-key request with a 500 and
+            # GPGKeyTemporarilyNotFoundError often enough to redden a PR by itself.
+            for i in 1 2 3; do
+              if sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test; then break; fi
+              sleep $(( i * 15 ))
+            done
             sudo apt-get update
-            sudo apt-get install -y gcc-15 g++-15
+            sudo apt-get install -y "gcc-$v" "g++-$v"
           fi
-          g++-15 --version
+          "g++-$v" --version
 
       # SW_BUILD_TOOLS stays ON, and it is not optional: 66 of the 299 tests are
       # sw-show-ui rendering a page or a module UI offscreen, which is the only
@@ -344,11 +375,11 @@ jobs:
       # server to do that even for a component that is never shown. macOS and
       # Windows have one; a Linux runner does not, so it gets a virtual one.
       - name: Test
-        if: runner.os != 'Linux'
+        if: runner.os != 'Linux' && !matrix.build_only
         run: ctest --test-dir ./build -C ${{ matrix.config }} --output-on-failure
 
       - name: Test under Xvfb
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && !matrix.build_only
         run: xvfb-run -a ctest --test-dir ./build -C ${{ matrix.config }} --output-on-failure
 
   build_plugin:

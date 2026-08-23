@@ -76,6 +76,20 @@ if (MSVC)
     set(swWarningBaseline "")
 else ()
     set(swWarningBaseline -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas)
+    # -Wdangling-reference arrived in GCC 13 and fired on any reference bound to a
+    # call made through a temporary, whatever the reference turned out to point
+    # at. ParentFromMember()(member) is exactly that shape and returns a reference
+    # it reinterpret_casts out of &member -- its argument, never the functor -- so
+    # the temporary's death is nothing to do with it (lfoImpl.cpp:550). GCC 14
+    # narrowed the heuristic and 12 has no such warning, so 13 is the only version
+    # that needs this, and the bound is closed at both ends to keep the improved
+    # warning live everywhere else. Guarded because an unknown -Wno-error= name is
+    # a hard error, and the plain linux legs still build under GCC 12.
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
+        AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 13
+        AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14)
+        list(APPEND swWarningBaseline -Wno-dangling-reference)
+    endif ()
 endif ()
 
 # On by default where the development happens, so that a warning is noticed the
@@ -105,6 +119,15 @@ if (SW_WERROR AND NOT MSVC)
         # compiled and whether the asserts are live -- are information, and
         # -Werror would make each of them fatal. GCC already reports them as notes.
         list(APPEND swWarningBaseline "-Wno-error=#pragma-messages") # quoted: # comments
+    endif ()
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        # GCC 16 at -O3 reports -Wstringop-overflow= from inside libstdc++'s
+        # uninitialized_copy, inlined through vector<float>::operator=, against a
+        # vector whose size is a constexpr 512 -- "a region of size 0" that the
+        # constant disproves. Ten sibling copies of that same line do not warn,
+        # which is what an inlining artefact looks like and what a real overflow
+        # does not. Demoted rather than disabled: a true one has to stay visible.
+        list(APPEND swWarningBaseline -Wno-error=stringop-overflow)
     endif ()
 endif ()
 
