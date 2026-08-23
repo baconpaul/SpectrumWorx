@@ -106,6 +106,15 @@ if (SW_WERROR AND NOT MSVC)
         # -Werror would make each of them fatal. GCC already reports them as notes.
         list(APPEND swWarningBaseline "-Wno-error=#pragma-messages") # quoted: # comments
     endif ()
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        # GCC 16 at -O3 reports -Wstringop-overflow= from inside libstdc++'s
+        # uninitialized_copy, inlined through vector<float>::operator=, against a
+        # vector whose size is a constexpr 512 -- "a region of size 0" that the
+        # constant disproves. Ten sibling copies of that same line do not warn,
+        # which is what an inlining artefact looks like and what a real overflow
+        # does not. Demoted rather than disabled: a true one has to stay visible.
+        list(APPEND swWarningBaseline -Wno-error=stringop-overflow)
+    endif ()
 endif ()
 
 # The sources of `target` that are ours, by path.
