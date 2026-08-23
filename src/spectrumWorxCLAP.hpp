@@ -582,6 +582,7 @@ class SpectrumWorxCLAP final
 
     mutable Threading::ToEngineQueue toEngine_;
     Threading::ToUIQueue toUI_;
+    Threading::RetireQueue retire_;
     Threading::ValueMailbox values_;
 
     ////////////////////////////////////////////////////////////////////////////

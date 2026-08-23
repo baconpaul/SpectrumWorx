@@ -155,13 +155,12 @@ struct ToUI
         /// \note Carries nothing: what changed is engine state the main thread
         /// can read for itself, and the message is only the news that it did.
         /// **Coalesced by the sender**, unlike everything else here -- a host
-        /// ramping the tempo moves it on every block, and this ring also carries
-        /// the retirements, where a drop is a leak rather than a stale reading.
-        /// \see SpectrumWorxCLAP::timingChanged().
+        /// ramping the tempo moves it on every block, and a ring that fills has
+        /// dropped somebody's echo. \see SpectrumWorxCLAP::timingChanged().
         TimingChanged,
         /// Something the audio thread unlinked and the main thread must delete.
-        /// Dropping one of these is a leak, which is why this is a ring and not a
-        /// mailbox.
+        /// Dropping one of these is a leak, which is why it is a ring and not a
+        /// mailbox -- and its own ring, so that echo traffic cannot fill it.
         Retire
     };
 
@@ -206,6 +205,15 @@ struct ToUI
 
 using ToEngineQueue = SPSCQueue<ToEngine, 1024>;
 using ToUIQueue = SPSCQueue<ToUI, 1024>;
+
+/// \brief The retirements, which share the ToUI message type and nothing else.
+///
+/// \note Their own ring because the two have opposite failure modes on a full
+/// one: a dropped echo is a stale reading, a dropped Retire is a leak. Sharing
+/// meant the frequent droppable kind could starve the rare undroppable one --
+/// a host writing every parameter between two main-thread turns is ~700 echoes
+/// against a handful of retirements, measured at 60:1 under a fuzzer.
+using RetireQueue = SPSCQueue<ToUI, 1024>;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Makers.

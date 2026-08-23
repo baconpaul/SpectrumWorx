@@ -133,7 +133,7 @@ engine the main thread owns.
 | `core/threading/messages.hpp` | cases |
 |---|---|
 | `ToEngine` | `SetBaseParameter`, `SetSlot`, `MoveModule`, `SwapChain`, `SwapSample` |
-| `ToUI` | `BaseParameterChanged`, `ChainChanged`, `TimingChanged`, `Retire` |
+| `ToUI` | `BaseParameterChanged`, `ChainChanged`, `TimingChanged` — and `Retire`, on a ring of its own |
 
 Both are tagged unions, trivially copyable, owning nothing. Each case says which
 side is responsible for a pointer after it lands, and that is the entire
@@ -150,6 +150,16 @@ second per enabled LFO — up to 120,000/s for a full rack — against a UI that
 draws at 30 Hz. A FIFO would spend all its bandwidth on values nobody sees; a
 mailbox cannot overflow and coalesces by construction. Same message list, two
 transports.
+
+**And the retirements have a ring of their own.** They rode the same one as the
+echoes until a fuzzer showed what that costs: a host writing every parameter
+between two main-thread turns is ~700 echoes against a handful of retirements —
+60:1, measured — so the ring filled with the kind whose loss is a stale reading
+and had nothing left for the kind whose loss is a leak. They are the same message
+type and nothing else: opposite failure modes on a full ring is the whole reason
+to separate them. The main thread drains the echoes first and the retirements
+after, which is the order the engine made them in — a module is announced gone
+before the reference it left is dropped.
 
 **The ring refuses when full.** `SPSCQueue<Message, Capacity>`
 (`core/threading/spscQueue.hpp`) keeps free-running counters, masked only on the
@@ -168,8 +178,8 @@ seconds. It is news rather than data — the main thread reads the new timing of
 the engine for itself — so a second copy of it says nothing a first did not. That
 matters because the *rate* is unlike anything else on this ring: a host ramping
 the tempo reports a new bar duration on every block, some hundreds a second,
-and the ring it would fill is the one that also carries `Retire`, where a drop is
-a leak rather than a stale reading. So `SpectrumWorxCLAP::timingChanged()` keeps
+and a ring it fills has dropped somebody's echo, which leaves the main thread's
+Program behind the engine for that parameter. So `SpectrumWorxCLAP::timingChanged()` keeps
 one atomic flag, raises it with the message and lets the drain clear it, and at
 most one is ever outstanding. Nothing else here may do that: every other case
 carries a value or an ownership transfer, and the second of two is not the first.
