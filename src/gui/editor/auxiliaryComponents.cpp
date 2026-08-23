@@ -173,6 +173,14 @@ SpectrumWorxEditor const &SharedModuleControls::editor() const
 
 #pragma warning(push)
 #pragma warning(disable : 4355) // 'this' used in base member initializer list.
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wuninitialized"
+#endif
+
+/// \note GCC 16 inlines selectedModule() through parent()'s arithmetic, loses
+/// the object and calls pSelectedModule_ uninitialised. emplace() runs only from
+/// moduleActivated(), which asserts and dereferences it first.
 
 /// \note `parent().editor()` and not `editor()`: this control's own editor() is
 /// `ModuleControlBase`'s, which goes through `pModuleUI_` -- the member this
@@ -202,6 +210,9 @@ SharedModuleControls::FrequencyRange::FrequencyRange()
     //...mrmlj...setSkewFactor( ... );
 }
 
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 #pragma warning(pop)
 
 void SharedModuleControls::FrequencyRange::setValue(float const value)
