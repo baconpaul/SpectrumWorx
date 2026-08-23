@@ -177,7 +177,9 @@ void PeakDetector::findPeaksAndStrengthSort(float const *const amplitudes,
                                             std::uint16_t const numberOfBins)
 {
     findPeaks(amplitudes, numberOfBins);
-    std::sort(&peaks_[0], &peaks_[numberOfPeaks_]);
+    // data() + n rather than &peaks_[n]: the end of a full array is one past the
+    // last, which a hardened operator[] refuses to index \see issue #190
+    std::sort(peaks_.data(), peaks_.data() + numberOfPeaks_);
 }
 
 void PeakDetector::findPeaksAndEstimateFrequency(float const *const amplitudes,
@@ -293,7 +295,8 @@ void PeakDetector::findPeaksImpl(float const *LE_RESTRICT const amplitudes,
                 (pPeak->strength > strengthThreshold_) // is peak strong enough?
             )
             {
-                std::fill(&isPeak_[pPeak->startPos + 1], &isPeak_[pPeak->stopPos], true);
+                std::fill(isPeak_.data() + pPeak->startPos + 1, isPeak_.data() + pPeak->stopPos,
+                          true);
 
                 if (fs)
                     calculateTrueFrequency(*pPeak, numberOfBins, fs, ampsdB);
