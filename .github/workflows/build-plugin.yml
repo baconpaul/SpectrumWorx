@@ -423,15 +423,25 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
+      # \note Located rather than spelled: Windows puts the bundle in a CLAP/
+      # subdirectory of sw_assets and the other two do not.
+      - name: Find the built CLAP
+        if: ${{ !matrix.build_only }}
+        run: |
+          clap=$(find ./build/sw_assets -maxdepth 2 -name 'SpectrumWorx.clap' | head -1)
+          test -n "$clap" || { echo "no SpectrumWorx.clap under build/sw_assets"; ls -R ./build/sw_assets; exit 1; }
+          echo "SW_CLAP=$clap" >> "$GITHUB_ENV"
+          echo "validating $clap"
+
       - name: Validate the CLAP
         if: runner.os != 'Linux' && !matrix.build_only
         run: |
-          "$SW_VALIDATOR" validate ./build/sw_assets/SpectrumWorx.clap
+          "$SW_VALIDATOR" validate "$SW_CLAP"
 
       - name: Validate the CLAP under Xvfb
         if: runner.os == 'Linux' && !matrix.build_only
         run: |
-          xvfb-run -a "$SW_VALIDATOR" validate ./build/sw_assets/SpectrumWorx.clap
+          xvfb-run -a "$SW_VALIDATOR" validate "$SW_CLAP"
 
   build_plugin:
     name: Build - ${{ matrix.name }}
