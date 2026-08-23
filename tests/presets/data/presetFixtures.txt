@@ -21,6 +21,6 @@ ESS/Once Upon A Time.swp | 2 | Freqverb,Reverser | 15 | 1 | d25ee9de34df73e5
 Echoes/Great Escape.swp | 3 | Freqverb,Frecho,Gain | 22 | 1 | 1aee8bdd0079aaf8
 Echoes/Jumbo Jet.swp | 4 | Freqverb,Freqverb,Freqverb,Freqverb | 36 | 4 | 330c4603a5f5e141
 Gamma Shift/Bird Song.swp | 5 | Exaggerator,Swappah,Freqverb,Bandpass,Frecho | 38 | 1 | 17fd3582168bbe4c
-Gamma Shift/Bojangles.swp | 4 | PVD start,Imploder (pvd),PVD stop,Bandstop | 25 | 0 | 2c408206f2670e8c
-Overt Dynamics/Stalactite Rock Steady.swp | 5 | Freqverb,Slicer,Swappah,Exaggerator,Freqverb | 41 | 2 | d4fa75d96e10ae07
+Gamma Shift/Bojangles.swp | 4 | PVD start,Imploder (pvd),PVD stop,Bandstop | 25 | 0 | bfcd5ab2220271b3
+Overt Dynamics/Stalactite Rock Steady.swp | 5 | Freqverb,Slicer,Swappah,Exaggerator,Freqverb | 41 | 2 | a2dfb6fa4f37f71a
 Voices/Robokid.swp | 3 | Freqverb,Armonizer,Robotizer | 20 | 1 | 6cf5d61e1d12704e

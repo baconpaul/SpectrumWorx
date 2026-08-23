@@ -563,10 +563,12 @@ class ParametersLoader : private PresetHandler
         auto const pParameterNode(getParameterNode(parameterName));
         if (pParameterNode)
         {
-            if (loadLFO(*pParameterNode, lfo))
-                return std::nullopt;
-            else
-                return getParameterValue<T>(parameterValueText(*pParameterNode), parameterName);
+            // both grammars: 2.x put the *live* value here, so beside on="1" it
+            // is a snapshot of the sweep -- but nothing writes 2.x any more, so
+            // the choice is that snapshot against a default nobody chose, once
+            // \see issue #128
+            loadLFO(*pParameterNode, lfo);
+            return getParameterValue<T>(parameterValueText(*pParameterNode), parameterName);
         }
         else
         {

@@ -380,7 +380,7 @@ TEST_CASE("Saving while an LFO is running stores the setting, not the sweep",
     CHECK(savedParameterValue(saved, "Gain") == Catch::Approx(setValue));
 }
 
-TEST_CASE("A parameter under an enabled LFO takes its value from the LFO", "[preset-roundtrip]")
+TEST_CASE("A parameter under an enabled LFO still restores its own value", "[preset-roundtrip]")
 {
     /// Gain is base parameter 1, the first with an LFO of its own.
     constexpr std::uint8_t gain{1};
@@ -408,7 +408,10 @@ TEST_CASE("A parameter under an enabled LFO takes its value from the LFO", "[pre
         REQUIRE_FALSE(saved.empty());
     }
 
-    /// The value is in the file -- it is what is not applied.
+    /// The value is in the file, and it is applied: an LFO decides the *live*
+    /// value while it runs, but the stored one is what the parameter returns to
+    /// when it stops, what `clap_plugin_params` reports and what the next save
+    /// writes. Dropping it lost a host's state round trip. \see issue #192
     ///
     /// \note Read out of the document rather than searched for as a substring.
     /// It was `saved.find( SWTest::number( drivenValue ) )`, which asked the file
@@ -431,7 +434,7 @@ TEST_CASE("A parameter under an enabled LFO takes its value from the LFO", "[pre
     }
 
     engine.program().moduleChain().forEach<ModuleParameters>([&](ModuleParameters const &module) {
-        CHECK(module.getBaseParameter(gain) == module.parameterInfo(gain).default_);
+        CHECK(module.getBaseParameter(gain) == Catch::Approx(drivenValue));
         CHECK(module.baseLFO(gain - 1).enabled());
         // ...while the LFO's own settings did come back.
         CHECK(module.baseLFO(gain - 1).parameters().get<LFO::LowerBound>().getValue() == 0.125f);
@@ -650,6 +653,7 @@ TEST_CASE("The committed 3.0 fixture loads without the writer's help", "[preset-
     std::vector<std::string> effects;
     std::vector<float> gains;
     float strength{0};
+    float center{0};
     bool lfoEnabled{false};
     engine.program().moduleChain().forEach<ModuleParameters>([&](ModuleParameters const &module) {
         effects.emplace_back(Effects::effectStreamingName(module.effectTypeIndex()));
@@ -658,6 +662,7 @@ TEST_CASE("The committed 3.0 fixture loads without the writer's help", "[preset-
         {
             lfoEnabled |= module.lfo(5 - ModuleParameters::numberOfNonLFOBaseParameters).enabled();
             strength = module.getEffectParameter(2 /*Strength*/);
+            center = module.getEffectParameter(0 /*Center*/);
         }
     });
 
@@ -680,8 +685,48 @@ TEST_CASE("The committed 3.0 fixture loads without the writer's help", "[preset-
     /// change of element did not quietly cost the reader its settings.
     CHECK(lfoEnabled);
 
+    /// \note And its value, which the loader used to drop on the floor because
+    /// the LFO was on: 3000 in the file against a 2000 default. \see issue #128
+    CHECK(center == Catch::Approx(3000.0f));
+
     /// \note And `<dawExtraState>` is in the fixture with an element inside it
     /// that means nothing here. A preset reader installs no hook, so it must
     /// walk straight past -- neither reading it nor treating it as a module.
     CHECK(effects.size() == 2);
+}
+
+TEST_CASE("A 2.x preset's value beside an enabled LFO is taken as well", "[preset-roundtrip]")
+{
+    // 2.x wrote the *live* value there, so this one is a snapshot of a sweep
+    // rather than a setting -- taken anyway: nothing writes 2.x any more, and
+    // the alternative is a compiled default nobody chose \see issue #128
+    std::filesystem::path const fixtureFile(std::filesystem::path(SW_PRESET_FIXTURE_DIR) /
+                                            "Gamma Shift" / "Bojangles.swp");
+    REQUIRE(std::filesystem::is_regular_file(fixtureFile));
+
+    auto const contents(readPresetFile(fixtureFile));
+    REQUIRE(contents);
+
+    Fixture fixture;
+    auto &engine(fixture.engine());
+    SWTest::clearPresetProblems();
+    {
+        ScopedProblemCounter const counting;
+        REQUIRE(LE::SW::loadPreset(contents.get(), true, nullptr, PresetConsumer{engine}));
+    }
+
+    // slot two holds Imploder (pvd), whose Decay is effect parameter zero: the
+    // file says 1 against a default of 50
+    std::uint8_t index{0};
+    float decay{0};
+    bool lfoEnabled{false};
+    engine.program().moduleChain().forEach<ModuleParameters>([&](ModuleParameters const &module) {
+        if (index++ != 1)
+            return;
+        decay = module.getEffectParameter(0 /*Decay*/);
+        lfoEnabled = module.effectLFO(0).enabled();
+    });
+
+    CHECK(lfoEnabled);
+    CHECK(decay == Catch::Approx(1.0f));
 }
