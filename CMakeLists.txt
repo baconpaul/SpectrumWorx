@@ -124,6 +124,11 @@ option(SW_BUILD_TOOLS "Build the developer tools (sw-show-ui)" ON)
 # configure one otherwise. See doc/tech/threading_model.md §8.
 option(SW_BUILD_PLUGIN_BUNDLES "Build the .clap/.vst3/.component bundles" ON)
 
+# The .clap needs no SDK; the other formats and the standalone CPM-fetch 54MB of
+# them at configure time. CI wants the bundle a validator can load and nothing
+# else. \see src/clap-first/CMakeLists.txt
+option(SW_BUILD_CLAP_ONLY "Of the bundles, build only the .clap" OFF)
+
 if (SW_BUILD_TESTS)
     enable_testing()
 endif()
@@ -142,10 +147,12 @@ add_subdirectory(src)
 
 if (SW_BUILD_PLUGIN_BUNDLES)
     add_subdirectory(src/clap-first)
+endif()
 
-    # The installer packages the bundles, so it only exists when they do.
-    # `cmake --build <dir> --target spectrumworx-installer` is what CI runs and
-    # what a release is cut with; it is not part of `all`.
+# The installer packages every format, so it exists only when every format does.
+# `cmake --build <dir> --target spectrumworx-installer` is what CI runs and
+# what a release is cut with; it is not part of `all`.
+if (SW_BUILD_PLUGIN_BUNDLES AND NOT SW_BUILD_CLAP_ONLY)
     include(basic_installer_clapfirst)
     add_clapfirst_installer(
             INSTALLER_TARGET spectrumworx-installer
