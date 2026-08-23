@@ -723,7 +723,12 @@ class SpectrumWorxCLAP final
     std::atomic<WithoutARestart> appliedWithoutARestart_{WithoutARestart::Nothing};
 
     /// \brief A `ToUI::ChainChanged` waiting to be acted on. \see drainEngineEvents().
-    bool chainChangedPending_{false};
+    /// \note An atomic and not a ring message: it carries nothing -- the main
+    /// thread recomputes the rack off the model -- so a second of two says what
+    /// the first did. The engine only ever sets it, the main thread only ever
+    /// clears it, and a flag cannot be dropped the way a full ring drops a
+    /// message. \see chainChanged()
+    std::atomic<bool> chainChangedPending_{false};
 
     ////////////////////////////////////////////////////////////////////////////
     ///

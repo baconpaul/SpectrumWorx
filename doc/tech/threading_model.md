@@ -133,7 +133,7 @@ engine the main thread owns.
 | `core/threading/messages.hpp` | cases |
 |---|---|
 | `ToEngine` | `SetBaseParameter`, `SetSlot`, `MoveModule`, `SwapChain`, `SwapSample` |
-| `ToUI` | `BaseParameterChanged`, `ChainChanged`, `TimingChanged` — and `Retire`, on a ring of its own |
+| `ToUI` | `BaseParameterChanged`, `TimingChanged` — `Retire` on a ring of its own, and a chain change on a flag |
 
 Both are tagged unions, trivially copyable, owning nothing. Each case says which
 side is responsible for a pointer after it lands, and that is the entire
@@ -150,6 +150,16 @@ second per enabled LFO — up to 120,000/s for a full rack — against a UI that
 draws at 30 Hz. A FIFO would spend all its bandwidth on values nobody sees; a
 mailbox cannot overflow and coalesces by construction. Same message list, two
 transports.
+
+**And a chain change is a flag, not a message.** It carries nothing — the main
+thread recomputes the rack off the model, so a second of two says what the first
+did — which is the same test `TimingChanged` passes below. The difference is what
+happens on a full ring: a dropped chain change left the rack drawing the chain
+that was there before, with no second announcement coming. A flag the engine only
+sets and the main thread only clears cannot be dropped, and the callback that
+reads it is asked for by `requestRescan()` rather than by the push, so the
+wake-up never depended on the ring either. `TimingChanged` is the same shape and
+still a message; it caps itself at one outstanding rather than none.
 
 **And the retirements have a ring of their own.** They rode the same one as the
 echoes until a fuzzer showed what that costs: a host writing every parameter
@@ -313,8 +323,8 @@ the user asked for and the engine's chain is what is playing.
 
 Three things ask for it. **Whatever changed the main thread's chain says so** —
 `addUserAddedModule()`, `moduleAdded()`/`moduleRemoved()` and `GUI::loadPreset()`
-each call `refreshModuleRackAsync()`. **The engine's echo says so**,
-`ToUI::ChainChanged`, coalesced, for the changes that originate on the audio
+each call `refreshModuleRackAsync()`. **The engine's echo says so**, through
+`chainChangedPending_`, for the changes that originate on the audio
 thread — a host writing a slot selector inside `process()`. And that echo is
 acted on **synchronously**, from `drainEngineEvents()` in `onMainThread()`, which
 is worth stating because it is a precondition for everything below: a strip can
@@ -423,7 +433,7 @@ The inventory the model is measured by.
 | `Engine::Setup` and the spectral storage | `spectralSetupPending_` (`std::atomic`) + `clap_host::request_restart()`, applied in `deactivate()` after the queue is drained | ✅ |
 | An outstanding restart request | `restartRequested_`, `std::atomic`, test-and-set through `exchange` — both threads reach it | ✅ |
 | The `Sample` | `ToEngine::SwapSample` + `ToUI::Retire`; the main thread keeps the file name and the decoded rate | ✅ |
-| The module rack | recomputed from `programMain_`'s chain, by whatever changed it and by `ToUI::ChainChanged` | ✅ |
+| The module rack | recomputed from `programMain_`'s chain, by whatever changed it and by `chainChangedPending_` | ✅ |
 | Editor selection and active control | `SpectrumWorxEditor::{pSelectedModule_,pActiveControl_}`, per editor — and **not** what decides whether a widget is let go of; see §5 | ✅ |
 | The LFO display and the shared module controls | children of the editor holding a raw `ModuleUI *`; dropped by `detachFrom()` on their own pointer | ✅ |
 | `PopupMenu::menuActive_` | a member, per menu and therefore per editor; menus are dismissed before a strip, a chain or a program is replaced | ✅ |

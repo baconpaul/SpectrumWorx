@@ -143,10 +143,6 @@ struct ToUI
         /// A base value the engine settled on, after snapping or after a host
         /// automation event. Latchable: the model takes it and the host is told.
         BaseParameterChanged,
-        /// The chain changed shape -- a slot filled or emptied, two modules
-        /// swapped, a whole chain installed. The interface makes its rack a
-        /// function of the chain again; see SpectrumWorxEditor::resyncModuleRack().
-        ChainChanged,
         /// The host's bar duration or meter moved, so a synced LFO's period is a
         /// different number of seconds and its snap grid a different grid. The
         /// interface redraws the LFO panel; see
@@ -276,13 +272,6 @@ inline ToUI baseParameterChanged(std::uint32_t const parameterID, float const va
     ToUI message{};
     message.kind = ToUI::Kind::BaseParameterChanged;
     message.baseParameterChanged = {parameterID, value};
-    return message;
-}
-
-inline ToUI chainChanged()
-{
-    ToUI message{};
-    message.kind = ToUI::Kind::ChainChanged;
     return message;
 }
 

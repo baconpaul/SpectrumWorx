@@ -1373,10 +1373,11 @@ void SpectrumWorxCLAP::retire(Threading::ToUI::Retired const what, void *const p
 /// emptied or moved is somebody changing the sound.
 void SpectrumWorxCLAP::chainChanged(ChainChange const what)
 {
-    // dropping this leaves the rack drawing the chain that was there before,
-    // with no second announcement coming: the drain is edge-triggered on it
-    pushed(toUI_.push(Threading::chainChanged()),
-           "The echo queue is full; the module rack will not be resynchronised.");
+    // a flag rather than a message: it carries nothing, and on a full ring the
+    // rack was left drawing the chain that was there before with no second
+    // announcement coming. requestRescan() below asks for the callback that
+    // reads it, so the wake-up never depended on the push either
+    chainChangedPending_.store(true, std::memory_order_release);
     requestRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT | CLAP_PARAM_RESCAN_VALUES);
 
     // a whole chain arriving is not an edit: with audio running the chain a
@@ -1483,12 +1484,6 @@ void SpectrumWorxCLAP::drainEngineEvents()
             break;
         }
 
-        case Threading::ToUI::Kind::ChainChanged:
-            // coalesced: a preset that swaps the chain and then fills a slot is
-            // one resync, and a resync recomputes rather than diffs
-            chainChangedPending_ = true;
-            break;
-
         // cleared here rather than after the redraw, so a tempo that moves
         // again during the drain is announced rather than swallowed
         case Threading::ToUI::Kind::TimingChanged:
@@ -1505,7 +1500,9 @@ void SpectrumWorxCLAP::drainEngineEvents()
         }
     }
 
-    if (std::exchange(chainChangedPending_, false) && pEditor_)
+    // cleared before the resync, so a chain that changes again while the rack
+    // redraws is announced rather than swallowed
+    if (chainChangedPending_.exchange(false, std::memory_order_acquire) && pEditor_)
         pEditor_->resyncModuleRack();
 
     // after the announcements, which is the order the engine made them in: a
