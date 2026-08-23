@@ -8,14 +8,31 @@
 
 set(SW_CLAPFIRST_TARGET spectrumworx_clapfirst)
 
-set(SW_FORMATS CLAP VST3)
-if (APPLE)
-    list(APPEND SW_FORMATS AUV2)
+# The wrapper CPM-fetches a format's SDK at *configure* time, so a format left
+# out here is 54MB and a download not spent. \see SW_BUILD_CLAP_ONLY
+set(SW_FORMATS CLAP)
+if (NOT SW_BUILD_CLAP_ONLY)
+    list(APPEND SW_FORMATS VST3)
+    if (APPLE)
+        list(APPEND SW_FORMATS AUV2)
+    endif()
 endif()
 
 message(STATUS "SpectrumWorx plugin formats: ${SW_FORMATS}")
 
 add_compile_definitions(CLAP_WRAPPER_LOGLEVEL=0)
+
+# rtaudio and rtmidi are the standalone's, and fetched the same way.
+set(swStandaloneArguments
+        # target-postfix, output name, clap id
+        STANDALONE_CONFIGURATIONS
+        standalone "${PRODUCT_NAME}" "${SW_CLAP_ID}"
+
+        STANDALONE_MACOS_ICON "${CMAKE_SOURCE_DIR}/assets/installer/SpectrumWorxIcon.icns"
+        STANDALONE_WINDOWS_ICON "${CMAKE_SOURCE_DIR}/assets/installer/SpectrumWorxIcon.ico")
+if (SW_BUILD_CLAP_ONLY)
+    set(swStandaloneArguments)
+endif()
 
 make_clapfirst_plugins(
         TARGET_NAME ${SW_CLAPFIRST_TARGET}
@@ -36,12 +53,7 @@ make_clapfirst_plugins(
 
         ASSET_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/sw_assets
 
-        # target-postfix, output name, clap id
-        STANDALONE_CONFIGURATIONS
-        standalone "${PRODUCT_NAME}" "${SW_CLAP_ID}"
-
-        STANDALONE_MACOS_ICON "${CMAKE_SOURCE_DIR}/assets/installer/SpectrumWorxIcon.icns"
-        STANDALONE_WINDOWS_ICON "${CMAKE_SOURCE_DIR}/assets/installer/SpectrumWorxIcon.ico"
+        ${swStandaloneArguments}
 )
 
 # Read back by the installer; clap-wrapper does not set it.

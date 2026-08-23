@@ -11,12 +11,13 @@
 #                      matrix says why. Neither configuration alone runs the
 #                      whole suite: the goldens SKIP under !NDEBUG, so Release
 #                      is the only one that renders DSP, and Debug is the only
-#                      one that runs the ~1200 asserts. Built with
-#                      SW_BUILD_PLUGIN_BUNDLES=OFF, which leaves out the
-#                      per-format wrapping and with it the VST3 and AudioUnit
-#                      SDK fetches -- the test binaries link sw-dsp and sw-impl
-#                      and want none of it (verified: that configuration writes
-#                      no _deps/ at all). One leg is a compiler rather than a
+#                      one that runs the ~1200 asserts. Then clap-validator over
+#                      the built .clap, which is the only thing here that asks
+#                      whether a *host* can load it. Built with
+#                      SW_BUILD_CLAP_ONLY=ON: the .clap needs no SDK, while the
+#                      other formats and the standalone CPM-fetch 54MB of them
+#                      at configure time (verified: that configuration writes no
+#                      _deps/ at all). One leg is a compiler rather than a
 #                      configuration, and so costs a matrix entry rather than a
 #                      job: Linux Debug again under GCC 15.
 #   build_plugin       the four bundles, and on anything but a pull request the
@@ -176,6 +177,7 @@ jobs:
           # clang-cl" step below sets it, and says why PATH is the wrong answer.
           - name: windows-x64
             os: windows-latest
+            validator_asset: "*windows.zip"
             config: Release
             cmake_args: -GNinja -DCMAKE_C_COMPILER="$SW_CLANG_CL" -DCMAKE_CXX_COMPILER="$SW_CLANG_CL"
             gcc_version: ''
@@ -184,22 +186,26 @@ jobs:
           # shipped and building them twice buys nothing.
           - name: macos
             os: macos-latest
+            validator_asset: "*macos-universal.zip"
             config: Debug
             cmake_args: -GNinja
             gcc_version: ''
           - name: macos
             os: macos-latest
+            validator_asset: "*macos-universal.zip"
             config: Release
             cmake_args: -GNinja
             gcc_version: ''
 
           - name: linux-x64
             os: ubuntu-latest
+            validator_asset: "*ubuntu*.zip"
             config: Debug
             cmake_args: -GNinja
             gcc_version: ''
           - name: linux-x64
             os: ubuntu-latest
+            validator_asset: "*ubuntu*.zip"
             config: Release
             cmake_args: -GNinja
             gcc_version: ''
@@ -214,6 +220,7 @@ jobs:
           # time, and rendering the goldens a second time would say nothing new.
           - name: linux-x64-gcc15
             os: ubuntu-latest
+            validator_asset: "*ubuntu*.zip"
             config: Debug
             cmake_args: -GNinja -DCMAKE_C_COMPILER=gcc-15 -DCMAKE_CXX_COMPILER=g++-15
             gcc_version: '15'
@@ -346,7 +353,7 @@ jobs:
         run: |
           cmake -S . -B ./build ${{ matrix.cmake_args }} \
             -DCMAKE_BUILD_TYPE=${{ matrix.config }} \
-            -DSW_BUILD_PLUGIN_BUNDLES=OFF \
+            -DSW_BUILD_CLAP_ONLY=ON \
             -DSW_WERROR=ON \
             -DGITHUB_ACTIONS_BUILD=TRUE
 
@@ -369,7 +376,8 @@ jobs:
       - name: Build the test binaries
         run: |
           cmake --build ./build --config ${{ matrix.config }} \
-            --target sw-dsp-tests sw-plugin-tests sw-show-ui --parallel 4
+            --target sw-dsp-tests sw-plugin-tests sw-show-ui \
+                     spectrumworx_clapfirst_clap --parallel 4
 
       # sw-plugin-tests instantiates the real editor, and JUCE wants a display
       # server to do that even for a component that is never shown. macOS and
@@ -381,6 +389,49 @@ jobs:
       - name: Test under Xvfb
         if: runner.os == 'Linux' && !matrix.build_only
         run: xvfb-run -a ctest --test-dir ./build -C ${{ matrix.config }} --output-on-failure
+
+      # What ctest cannot ask: whether a host can load the thing. The suite
+      # drives the engine and the editor directly, so the CLAP entry point --
+      # the parameter list, the state round trips, the threading contract -- is
+      # only ever exercised here.
+      #
+      # It costs a link rather than a bundle set. `SW_BUILD_CLAP_ONLY` leaves
+      # the other formats out, and with them the 54MB of SDKs clap-wrapper
+      # CPM-fetches at *configure* time; everything the .clap links is already
+      # built for sw-plugin-tests, so the bundle itself is ten ninja edges.
+      #
+      # \note Three platforms, three layouts, and the release is not consistent
+      # about any of it: macOS is a .zip holding a .tar.gz holding
+      # `binaries/clap-validator`, Linux is the same without the `binaries/`,
+      # and Windows is a bare `clap-validator.exe` with no tarball at all. The
+      # inner tarball also still says 0.3.2 inside a 0.4.1 release. So: unpack
+      # whatever arrived and go looking for the binary, rather than spell a path
+      # that is right on one runner in three.
+      - name: Fetch clap-validator
+        if: ${{ !matrix.build_only }}
+        run: |
+          mkdir -p validator && cd validator
+          gh release download --repo free-audio/clap-validator \
+            --pattern '${{ matrix.validator_asset }}'
+          unzip -q -o ./*.zip
+          if ls ./*.tar.gz >/dev/null 2>&1; then tar xzf ./*.tar.gz; fi
+          validator=$(find . -type f \( -name clap-validator -o -name clap-validator.exe \) | head -1)
+          test -n "$validator" || { echo "no clap-validator in the release asset"; ls -R; exit 1; }
+          chmod +x "$validator"
+          echo "SW_VALIDATOR=$PWD/$validator" >> "$GITHUB_ENV"
+          "$validator" --version
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Validate the CLAP
+        if: runner.os != 'Linux' && !matrix.build_only
+        run: |
+          "$SW_VALIDATOR" validate ./build/sw_assets/SpectrumWorx.clap
+
+      - name: Validate the CLAP under Xvfb
+        if: runner.os == 'Linux' && !matrix.build_only
+        run: |
+          xvfb-run -a "$SW_VALIDATOR" validate ./build/sw_assets/SpectrumWorx.clap
 
   build_plugin:
     name: Build - ${{ matrix.name }}
