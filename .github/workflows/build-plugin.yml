@@ -229,6 +229,19 @@ jobs:
             config: Release
             cmake_args: -GNinja -DCMAKE_C_COMPILER=gcc-16 -DCMAKE_CXX_COMPILER=g++-16
             gcc_version: '16'
+            build_only: true
+
+          # The other end of the range: 13 is what the current LTS ships as its
+          # default, so it is the oldest compiler anybody building from source on
+          # a current distribution is likely to reach for. It comes from noble's
+          # own archive rather than the PPA. Release, and a compile check only --
+          # what an extra compiler has to say, it says before ctest starts.
+          - name: linux-x64-gcc13
+            os: ubuntu-latest
+            config: Release
+            cmake_args: -GNinja -DCMAKE_C_COMPILER=gcc-13 -DCMAKE_CXX_COMPILER=g++-13
+            gcc_version: '13'
+            build_only: true
 
     steps:
       - name: Checkout code
@@ -362,11 +375,11 @@ jobs:
       # server to do that even for a component that is never shown. macOS and
       # Windows have one; a Linux runner does not, so it gets a virtual one.
       - name: Test
-        if: runner.os != 'Linux'
+        if: runner.os != 'Linux' && !matrix.build_only
         run: ctest --test-dir ./build -C ${{ matrix.config }} --output-on-failure
 
       - name: Test under Xvfb
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && !matrix.build_only
         run: xvfb-run -a ctest --test-dir ./build -C ${{ matrix.config }} --output-on-failure
 
   build_plugin:
