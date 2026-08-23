@@ -76,6 +76,20 @@ if (MSVC)
     set(swWarningBaseline "")
 else ()
     set(swWarningBaseline -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas)
+    # -Wdangling-reference arrived in GCC 13 and fired on any reference bound to a
+    # call made through a temporary, whatever the reference turned out to point
+    # at. ParentFromMember()(member) is exactly that shape and returns a reference
+    # it reinterpret_casts out of &member -- its argument, never the functor -- so
+    # the temporary's death is nothing to do with it (lfoImpl.cpp:550). GCC 14
+    # narrowed the heuristic and 12 has no such warning, so 13 is the only version
+    # that needs this, and the bound is closed at both ends to keep the improved
+    # warning live everywhere else. Guarded because an unknown -Wno-error= name is
+    # a hard error, and the plain linux legs still build under GCC 12.
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
+        AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 13
+        AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14)
+        list(APPEND swWarningBaseline -Wno-dangling-reference)
+    endif ()
 endif ()
 
 # On by default where the development happens, so that a warning is noticed the
