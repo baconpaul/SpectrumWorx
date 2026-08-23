@@ -201,8 +201,11 @@ TEST_CASE("A module the engine displaces is released rather than leaked", "[clap
 
 namespace
 {
-/// One more than either ring holds.
-constexpr unsigned overflowing{LE::SW::Threading::ToEngineQueue::capacity + 1};
+/// One more than the ring in question holds. Two constants because the two are
+/// no longer the same depth: the echo ring is the one a host automating hard
+/// fills, so it is the deeper of them.
+constexpr unsigned overflowingCommands{LE::SW::Threading::ToEngineQueue::capacity + 1};
+constexpr unsigned overflowingEchoes{LE::SW::Threading::ToUIQueue::capacity + 1};
 
 LE::SW::ParameterID globalParameterID(unsigned const index)
 {
@@ -223,7 +226,7 @@ TEST_CASE("A full command ring is counted rather than ignored", "[clap][protocol
     /// \note No `process()` anywhere in here, which is what makes the ring fill:
     /// draining it is what a block does. An editor with a stuck audio thread in
     /// front of it is the real shape of this.
-    for (unsigned edit(0); edit < overflowing; ++edit)
+    for (unsigned edit(0); edit < overflowingCommands; ++edit)
         host.editParameter(globalParameterID(0), 0.5f);
 
     CHECK(implementation.droppedMessages() > 0);
@@ -246,9 +249,9 @@ TEST_CASE("A full echo ring leaves the main thread's Program behind, and says so
     /// \note One echo per block, and nothing pumping the main thread -- which is
     /// a host that is slow to run the callback it was asked for, with automation
     /// moving. Every one of these is applied to the engine.
-    for (unsigned block(0); block < overflowing; ++block)
+    for (unsigned block(0); block < overflowingEchoes; ++block)
     {
-        OneParameterEvent const event(id, 0.25 + (0.5 * block) / overflowing);
+        OneParameterEvent const event(id, 0.25 + (0.5 * block) / overflowingEchoes);
         plugin.process(leftIn, rightIn, leftOut, rightOut, nullptr, &*event);
     }
 
@@ -300,7 +303,7 @@ TEST_CASE("A sample the engine never received is not recorded as loaded",
     REQUIRE(host.currentSampleFile().empty());
 
     // Fill the ring so that the sample's own push cannot land.
-    for (unsigned edit(0); edit < overflowing; ++edit)
+    for (unsigned edit(0); edit < overflowingCommands; ++edit)
         host.editParameter(globalParameterID(0), 0.5f);
     REQUIRE(implementation.droppedMessages() > 0);
 

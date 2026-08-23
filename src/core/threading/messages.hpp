@@ -204,7 +204,9 @@ struct ToUI
 ////////////////////////////////////////////////////////////////////////////////
 
 using ToEngineQueue = SPSCQueue<ToEngine, 1024>;
-using ToUIQueue = SPSCQueue<ToUI, 1024>;
+// 16k * 24 bytes, and deep rather than right: a host automating hard outruns any
+// depth, so this defers the drops rather than preventing them
+using ToUIQueue = SPSCQueue<ToUI, 16 * 1024>;
 
 /// \brief The retirements, which share the ToUI message type and nothing else.
 ///
