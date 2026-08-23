@@ -306,6 +306,33 @@ void ModuleKnob::valueChanged() noexcept
     moduleParameterChanged();
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note juce::Slider calls these from mouseDown and mouseUp, which is exactly
+/// where the host's gesture belongs: the drag is one edit however many values it
+/// passes through. `EditorKnob` brackets the global knobs the same way.
+///
+/// \note Guarded on the LFO, as every other gesture on this widget is -- the
+/// wheel, the double click and mouseDrag() all stand aside when the LFO owns the
+/// value. A begin/end pair around an edit the widget refuses to make would be a
+/// parameter the host could learn but the mouse cannot move.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void ModuleKnob::startedDragging() noexcept
+{
+    Knob::startedDragging();
+    if (!isLFOEnabled())
+        beginGesture();
+}
+
+void ModuleKnob::stoppedDragging() noexcept
+{
+    if (control().gestureIsOpen())
+        endGesture();
+    Knob::stoppedDragging();
+}
+
 void ModuleKnob::lfoStateChanged()
 {
     /// \note JUCE 8 split the out-parameter off into isDoubleClickReturnEnabled();
@@ -888,7 +915,8 @@ void ModuleUI::buttonClicked(juce::Button *LE_RESTRICT const pButton)
     if (pButton == &bypass_)
     {
         float const value(Math::convert<float>(bypass_.getValue()));
-        editor().updateModuleParameterAndNotifyHost(*this, bypassIndex, value);
+        // a click, so a whole gesture of its own -- there is no drag to hold one
+        editor().updateModuleParameterAndNotifyHost(*this, bypassIndex, value, true);
     }
     else
     {

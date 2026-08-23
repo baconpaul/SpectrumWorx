@@ -1469,8 +1469,6 @@ void SpectrumWorxEditor::moduleControlActivated(ModuleControlBase &control, doub
     setActiveModuleName(control.moduleUI().getName());
     setActiveControlName(control.widget().getName());
     updateActiveControlValue();
-
-    host().automatedParameterBeginEdit(moduleControlID(control));
 }
 
 void SpectrumWorxEditor::moduleControlDectivated(ModuleControlBase const &control)
@@ -1484,8 +1482,39 @@ void SpectrumWorxEditor::moduleControlDectivated(ModuleControlBase const &contro
     setActiveControlValue(juce::String());
 
     retireLFODisplay();
+}
 
-    host().automatedParameterEndEdit(moduleControlID(control));
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief The gesture a module control's drag is held in, opened on the press
+/// and closed on the release.
+///
+/// \note Which is all a gesture is for. Selecting a control used to open one --
+/// `moduleControlActivated()` did, and `focusGained` reaches that -- so merely
+/// clicking a knob and then reaching for another told the host two parameters
+/// were being edited, in the order `end( the first )`, `begin( the second )`. A
+/// host with MIDI learn armed takes the first parameter it hears about, so it
+/// learned the knob the user had walked away from. \see issue #188.
+///
+/// \note An edit that is not a drag -- a wheel notch, a menu row, a typed value
+/// -- brackets itself instead, through `asDiscreteGesture`. \see
+/// ModuleControlBase::publishValue().
+///
+/// \note The ID rather than the control, so that a begin and its end cannot name
+/// different parameters. The frequency range is one widget standing for two, and
+/// `FrequencyRange::valueChanged()` can move it from one thumb to the other while
+/// the mouse is still down. \see ModuleControlBase::beginGesture().
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxEditor::moduleControlGestureBegin(ParameterID const parameterID) const
+{
+    host().automatedParameterBeginEdit(parameterID);
+}
+
+void SpectrumWorxEditor::moduleControlGestureEnd(ParameterID const parameterID) const
+{
+    host().automatedParameterEndEdit(parameterID);
 }
 
 void SpectrumWorxEditor::retireLFODisplay()
@@ -1522,10 +1551,11 @@ void SpectrumWorxEditor::retireLFODisplay()
 /// control had it -- and that calls `moduleControlDectivated()`, which asserts
 /// that the LFO display for that control is still there.
 ///
-/// \note Deliberately **not** `moduleControlDectivated()`: that ends the host's
-/// automation gesture, and `moduleControlID()` walks the chain for the control's
-/// module -- which by the time a strip is dropped has left it. The gesture is
-/// ended on the path that removes the module, where the module is still there.
+/// \note Deliberately **not** `moduleControlDectivated()`: it asserts that the
+/// LFO display is still there, and clearing `pActiveControl_` first is what makes
+/// the focus loss a no-op. Deactivation used to end the host's automation
+/// gesture too, which a dropped strip could not name a parameter for; a gesture
+/// now lasts only as long as the mouse is down. \see issue #188.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2070,7 +2100,8 @@ void SpectrumWorxEditor::queueGlobalParameter(std::uint8_t const index, float co
 
 void SpectrumWorxEditor::updateModuleParameterAndNotifyHost(ModuleUI &moduleUI,
                                                             std::uint8_t const moduleParameterIndex,
-                                                            float const parameterValue) const
+                                                            float const parameterValue,
+                                                            bool const asDiscreteGesture) const
 {
     auto &module(moduleUI.module());
     std::uint8_t const moduleIndex(moduleChain().getIndexForModule(module));
@@ -2085,7 +2116,8 @@ void SpectrumWorxEditor::updateModuleParameterAndNotifyHost(ModuleUI &moduleUI,
     // automatedParameterChanged queues into the ring the host collects on its
     // next process() or flush(), and the requestParameterFlush() inside it is
     // what gets the command drained with the transport parked
-    host().automatedParameterChanged(module, moduleIndex, moduleParameterIndex, parameterValue);
+    host().automatedParameterChanged(module, moduleIndex, moduleParameterIndex, parameterValue,
+                                     asDiscreteGesture);
 }
 
 SpectrumWorxEditor::ModuleMenuButton::ModuleMenuButton(SpectrumWorxEditor &parent)

@@ -111,6 +111,13 @@ class SharedModuleControls : public WidgetBase<>
         void mouseDown(juce::MouseEvent const &) noexcept override;
         void mouseDrag(juce::MouseEvent const &) noexcept override;
 
+        /// \brief The press and the release, which is what a host gesture
+        /// brackets. \see issue #188.
+        ///@{
+        void startedDragging() noexcept override;
+        void stoppedDragging() noexcept override;
+        ///@}
+
         void mouseEnter(juce::MouseEvent const &) noexcept override;
         void mouseExit(juce::MouseEvent const &) noexcept override;
 
