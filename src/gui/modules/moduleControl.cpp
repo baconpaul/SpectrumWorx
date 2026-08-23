@@ -194,6 +194,11 @@ void ModuleControlBase::moduleParameterChanged()
 /// control deactivates -- and `isActive()` is false by the time the user presses
 /// return on a value they are quite deliberately setting.
 ///
+/// \note **The gesture, where a drag has not already opened one.** A wheel notch,
+/// a menu row and a typed value are each one whole edit, so each is bracketed
+/// here; a drag opens its gesture on the press and closes it on the release, and
+/// the values in between belong to that one. \see beginGesture(), issue #188.
+///
 ////////////////////////////////////////////////////////////////////////////////
 
 void ModuleControlBase::publishValue()
@@ -203,8 +208,35 @@ void ModuleControlBase::publishValue()
     ///                                       (12.03.2013.) (Domagoj Saric)
     SpectrumWorxEditor &editor(this->editor());
     std::uint8_t const parameterIndex(moduleParameterIndex() + 1); // Bypass
-    editor.updateModuleParameterAndNotifyHost(moduleUI(), parameterIndex, getValue());
+    editor.updateModuleParameterAndNotifyHost(moduleUI(), parameterIndex, getValue(),
+                                              needsOwnGesture());
     editor.updateActiveControlValue();
+}
+
+/// \note Asserted rather than counted: JUCE pairs a slider's mouseDown with its
+/// mouseUp, and a gesture that could nest would be a widget opening one it never
+/// closes.
+void ModuleControlBase::beginGesture()
+{
+    LE_ASSERT(!gestureOpen_);
+    gestureOpen_ = true;
+    gestureID_ = parameterMenuID();
+    editor().moduleControlGestureBegin(gestureID_);
+}
+
+void ModuleControlBase::endGesture()
+{
+    LE_ASSERT(gestureOpen_);
+    gestureOpen_ = false;
+    editor().moduleControlGestureEnd(gestureID_);
+}
+
+/// \note The comparison and not the flag alone: a drag of the frequency range
+/// can cross to the other thumb, and the parameter it moves to is one nothing
+/// has opened a gesture for.
+bool ModuleControlBase::needsOwnGesture() const
+{
+    return !gestureOpen_ || (gestureID_.binaryValue != parameterMenuID().binaryValue);
 }
 
 void ModuleControlBase::configureControl(bool const mouseClickCanGrabFocus)

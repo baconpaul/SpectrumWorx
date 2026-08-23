@@ -296,6 +296,13 @@ class SpectrumWorxEditor final : private SkinLifetime,
                                 double interval);
     void moduleControlDectivated(ModuleControlBase const &);
 
+    /// \brief The gesture a module control's drag is held in. \see the
+    /// definitions, and issue #188.
+    ///@{
+    void moduleControlGestureBegin(ParameterID) const;
+    void moduleControlGestureEnd(ParameterID) const;
+    ///@}
+
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \brief Which module strip is selected, and which of its controls the mouse
@@ -335,7 +342,7 @@ class SpectrumWorxEditor final : private SkinLifetime,
     }
 
     void updateModuleParameterAndNotifyHost(ModuleUI &, std::uint8_t moduleParameterIndex,
-                                            float parameterValue) const;
+                                            float parameterValue, bool asDiscreteGesture) const;
 
     void destroyChainGUIs();
 

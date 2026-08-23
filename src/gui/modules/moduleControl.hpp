@@ -100,6 +100,8 @@ template <class ImplWidget> class ModuleControl : public ParameterMenu
         return impl().ModuleControlBase::isLFOEnabled();
     } //...mrmlj...try to access the effect-specific lfo directly...
     void moduleParameterChanged() { impl().ModuleControlBase::moduleParameterChanged(); }
+    void beginGesture() { impl().ModuleControlBase::beginGesture(); }
+    void endGesture() { impl().ModuleControlBase::endGesture(); }
 
     ModuleControlBase &control()
     { /*LE_ASSERT( &ModuleControlBase::controlForWidget( impl() ) == &impl() );*/ return impl(); }
@@ -208,6 +210,25 @@ class ModuleControlBase
 
     ////////////////////////////////////////////////////////////////////////////
     ///
+    /// \brief The host's automation gesture for this parameter, held open across
+    /// a drag. \see issue #188 and SpectrumWorxEditor::moduleControlGestureBegin().
+    ///
+    /// \note Only a drag needs these. Every other edit is one value with nothing
+    /// either side of it, and `publishValue()` gives it a gesture of its own.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    ///@{
+    void beginGesture();
+    void endGesture();
+    bool gestureIsOpen() const { return gestureOpen_; }
+
+    /// \brief Whether this edit has to bracket itself -- true unless a drag has
+    /// already opened a gesture for this very parameter.
+    bool needsOwnGesture() const;
+    ///@}
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
     /// \name What the right button's menu asks of a module control
     ///
     ///   The three answers that are not one-liners over the getters above.
@@ -292,6 +313,16 @@ class ModuleControlBase
   private:
     std::uint8_t parameterIndex_;
     ModuleUI *LE_RESTRICT pModuleUI_;
+
+    /// \note The widget's, not the editor's: two controls can be mid-gesture at
+    /// once only if two mice are, but this says which *parameter* is held open
+    /// and that is this control's own. The ID is kept rather than recomputed
+    /// because the frequency range can change which of its two parameters it
+    /// stands for while the mouse is still down.
+    ///@{
+    bool gestureOpen_{false};
+    ParameterID gestureID_;
+    ///@}
 
     /// \note Which control is active is the *editor's* -- see
     /// SpectrumWorxEditor::pActiveControl_ -- so that two instances of the plugin

@@ -792,3 +792,194 @@ TEST_CASE("A wheel over a combo box the LFO owns moves nothing", "[gui][modules]
     scrollOnce(comboBox, -0.3f);
     CHECK(comboBox.getValue() == opened);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// Selection is not a gesture
+/// --------------------------
+///
+///   `moduleControlActivated()` opens a host automation gesture and
+/// `moduleControlDectivated()` closes one, and both are reached from
+/// `ModuleControlImpl::focusGained`/`focusLost` -- so *selecting* a control,
+/// which is a local matter of which LFO the strip shows, tells the host a
+/// parameter is being edited. Nothing has to be dragged.
+///
+///   The cost is issue #188: a host with MIDI learn armed takes the first
+/// parameter it hears about, and moving the selection from one control to
+/// another emits the outgoing control's gesture end *before* the incoming one's
+/// begin. So the parameter learned is the one the user selected and walked away
+/// from, not the one they then dragged.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("Selecting a control does not tell the host it is being edited",
+          "[gui][modules][automation]")
+{
+    SWTest::HostSideJuce const juceIsUp;
+
+    if (!SWTest::aWindowCanBeMade())
+        SKIP(SWTest::noWindow);
+
+    SWTest::Instance instance;
+    DesktopEditor const window(instance);
+    if (!window.tookTheKeyboard())
+        SKIP(keyboardRefused);
+
+    auto &editor(window.editor());
+    editor.addUserAddedModule(0);
+    editor.addUserAddedModule(0);
+    editor.resyncModuleRack();
+
+    auto *const pFirstStrip(editor.regionInSlot(0));
+    auto *const pSecondStrip(editor.regionInSlot(1));
+    REQUIRE(pFirstStrip != nullptr);
+    REQUIRE(pSecondStrip != nullptr);
+
+    auto *const pSelected(firstKnob(*pFirstStrip));
+    auto *const pDragged(firstKnob(*pSecondStrip));
+    REQUIRE(pSelected != nullptr);
+    REQUIRE(pDragged != nullptr);
+
+    auto const selectedID(editor.moduleControlID(*pSelected).binaryValue);
+    auto const draggedID(editor.moduleControlID(*pDragged).binaryValue);
+    REQUIRE(selectedID != draggedID);
+
+    // "Select a knob and dont edit it" -- the press's focus half, which is what
+    // makes a control the selected one. \see the note in the first case.
+    pSelected->widget().grabKeyboardFocus();
+    REQUIRE(editor.activeControl() == pSelected);
+
+    // Where the host's Learn is armed: everything before this the host has
+    // already heard and acted on, so only what follows can be learned.
+    instance.hostEdits().clear();
+
+    // "Drag another knob" -- the reaching for it, which is all the gestures are
+    // about: they come from the focus move and not from the drag, and no
+    // synthesised drag can move a value anyway. \see the note on eventOver().
+    pDragged->widget().grabKeyboardFocus();
+    REQUIRE(editor.activeControl() == pDragged);
+
+    // "Do we get an event for the first knob" -- the question the issue asks, and
+    // no is the only answer a host can use. A knob that was merely selected is
+    // not being edited.
+    for (auto const &edit : instance.hostEdits())
+        CHECK(edit.id != selectedID);
+
+    // ...and the sharper half: nothing at all was said. The mechanism was a
+    // gesture pair rather than a value change to self, and both ends of it have
+    // gone with the selection that raised them.
+    CHECK(instance.hostEdits().empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+///   ...and the other half of #188, which is that the gestures are still there.
+/// One per edit, where the edit is: the press and the release around a drag, and
+/// a bracket of its own around each of the edits that are not one.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A knob's press and release bracket one host gesture", "[gui][modules][automation]")
+{
+    SWTest::HostSideJuce const juceIsUp;
+
+    if (!SWTest::aWindowCanBeMade())
+        SKIP(SWTest::noWindow);
+
+    SWTest::Instance instance;
+    DesktopEditor const window(instance);
+    if (!window.tookTheKeyboard())
+        SKIP(keyboardRefused);
+
+    auto &editor(window.editor());
+    auto &moduleUI(stripFor(editor, "Freeze"));
+
+    auto *const pControl(firstKnob(moduleUI));
+    REQUIRE(pControl != nullptr);
+    auto &knob(pControl->widget());
+    auto const knobID(editor.moduleControlID(*pControl).binaryValue);
+
+    knob.grabKeyboardFocus();
+    REQUIRE(editor.activeControl() == pControl);
+    instance.hostEdits().clear();
+
+    // \note The press and the release alone. A synthesised drag cannot move a
+    // value -- ModuleKnob::valueChanged() asserts isMouseOverOrDragging(), which
+    // no hand-built event sets -- and the gesture is not the drag's anyway: JUCE
+    // raises startedDragging() from mouseDown and stoppedDragging() from mouseUp.
+    clickOnce(knob);
+
+    REQUIRE(instance.hostEdits().size() == 2);
+    CHECK(instance.hostEdits()[0].kind == SWTest::HostEdit::Kind::GestureBegin);
+    CHECK(instance.hostEdits()[1].kind == SWTest::HostEdit::Kind::GestureEnd);
+    CHECK(instance.hostEdits()[0].id == knobID);
+    CHECK(instance.hostEdits()[1].id == knobID);
+}
+
+/// \note A combo box rather than a knob, because a wheel over a knob would need
+/// the value to move and no synthesised event can do that. The path is the same
+/// one either way -- publishValue() with no drag holding a gesture open.
+TEST_CASE("A wheel notch is a whole gesture of its own", "[gui][modules][automation][combo]")
+{
+    SWTest::HostSideJuce const juceIsUp;
+
+    if (!SWTest::aWindowCanBeMade())
+        SKIP(SWTest::noWindow);
+
+    SWTest::Instance instance;
+    DesktopEditor const window(instance);
+    if (!window.tookTheKeyboard())
+        SKIP(keyboardRefused);
+
+    auto &editor(window.editor());
+    auto &moduleUI(stripFor(editor, "Swappah"));
+
+    auto *const pControl(firstControlOfType<GUI::DiscreteParameter>(moduleUI));
+    REQUIRE(pControl != nullptr);
+    auto &comboBox(dynamic_cast<GUI::ComboBox &>(pControl->widget()));
+
+    comboBox.grabKeyboardFocus();
+    REQUIRE(editor.activeControl() == pControl);
+
+    auto const before(comboBox.getValue());
+    auto const comboID(editor.moduleControlID(*pControl).binaryValue);
+    instance.hostEdits().clear();
+
+    scrollOnce(comboBox, -0.3f);
+    REQUIRE(comboBox.getValue() != before); // the notch has to have moved a row
+
+    REQUIRE(instance.hostEdits().size() == 3);
+    CHECK(instance.hostEdits()[0].kind == SWTest::HostEdit::Kind::GestureBegin);
+    CHECK(instance.hostEdits()[1].kind == SWTest::HostEdit::Kind::Value);
+    CHECK(instance.hostEdits()[2].kind == SWTest::HostEdit::Kind::GestureEnd);
+    for (auto const &edit : instance.hostEdits())
+        CHECK(edit.id == comboID);
+}
+
+/// \note No window and no mouse: a value typed into the right button menu is the
+/// one edit that reaches a control while the control is *not* selected -- the
+/// type-in field has the keyboard. \see ModuleControlBase::publishValue().
+TEST_CASE("A value typed into the menu is a whole gesture of its own",
+          "[gui][modules][automation][menu]")
+{
+    SWTest::HostSideJuce const juceIsUp;
+
+    SWTest::Instance instance;
+    instance.openEditor();
+    auto &editor(instance.editor());
+    auto &moduleUI(stripFor(editor, "Freeze"));
+
+    auto *const pControl(firstKnob(moduleUI));
+    REQUIRE(pControl != nullptr);
+    auto const knobID(editor.moduleControlID(*pControl).binaryValue);
+
+    instance.hostEdits().clear();
+    REQUIRE(pControl->setValueFromText(pControl->getValueText()));
+
+    REQUIRE(instance.hostEdits().size() == 3);
+    CHECK(instance.hostEdits()[0].kind == SWTest::HostEdit::Kind::GestureBegin);
+    CHECK(instance.hostEdits()[1].kind == SWTest::HostEdit::Kind::Value);
+    CHECK(instance.hostEdits()[2].kind == SWTest::HostEdit::Kind::GestureEnd);
+    for (auto const &edit : instance.hostEdits())
+        CHECK(edit.id == knobID);
+}

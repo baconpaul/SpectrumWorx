@@ -322,6 +322,31 @@ void SharedModuleControls::FrequencyRange::mouseDrag(juce::MouseEvent const &eve
     juce::Slider::mouseDrag(refinedDrag(fine_, event));
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Guarded on the LFO exactly as mouseDrag() above is, and on a thumb
+/// being selected for the same reason: with neither there is no parameter for a
+/// gesture to be about.
+///
+/// \note The end asks the control rather than repeating the test. Whether the
+/// LFO owns this parameter is a question that can change while the mouse is
+/// down -- the right button menu's switch is one way -- and what has to balance
+/// is the gesture that was actually opened.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SharedModuleControls::FrequencyRange::startedDragging() noexcept
+{
+    if ((selectedThumb_ != Constants::noThumb) && !lfo().enabled())
+        beginGesture();
+}
+
+void SharedModuleControls::FrequencyRange::stoppedDragging() noexcept
+{
+    if (gestureIsOpen())
+        endGesture();
+}
+
 void SharedModuleControls::FrequencyRange::mouseMove(juce::MouseEvent const &event) noexcept
 {
     updateSliderSelection(event);

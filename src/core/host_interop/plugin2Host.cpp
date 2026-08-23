@@ -75,7 +75,8 @@ void Plugin2HostInteropControler::moduleChangedByUser(std::uint8_t const chainPa
 void Plugin2HostInteropControler::automatedParameterChanged(Module const &module,
                                                             std::uint8_t const moduleIndex,
                                                             std::uint8_t const moduleParameterIndex,
-                                                            float const parameterValue) const
+                                                            float const parameterValue,
+                                                            bool const asDiscreteGesture) const
 {
     //LE_ASSERT( moduleParameterID.moduleParameterIndex < Constants::maxNumberOfParametersPerModule ); //...mrmlj...TuneWorx...
     /// \todo Consider a smarter place to put this check (currently needed only
@@ -90,7 +91,11 @@ void Plugin2HostInteropControler::automatedParameterChanged(Module const &module
     Plugin2HostInteropControler::ParameterValueForAutomation const automationValue = {
         Automation::internal2AutomatedValue(moduleParameterIndex, parameterValue, false, module),
         Automation::internal2AutomatedValue(moduleParameterIndex, parameterValue, true, module)};
+    if (asDiscreteGesture)
+        automatedParameterBeginEdit(parameterID);
     automatedParameterChanged(parameterID, automationValue);
+    if (asDiscreteGesture)
+        automatedParameterEndEdit(parameterID);
 }
 
 void Plugin2HostInteropControler::automatedParameterChanged(ParameterID::LFO const lfoParameterID,

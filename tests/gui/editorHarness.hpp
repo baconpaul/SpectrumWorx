@@ -117,16 +117,46 @@ constexpr char noWindow[]{
     "No window manager: JUCE cannot put a component on the desktop here, and these cases need a "
     "real window to drive the keyboard with."};
 
+/// \brief One entry of what a host would have been told about a parameter.
+///
+/// \note Order across the three kinds is the point, so they share one log: a
+/// host arms MIDI learn and takes the *first* parameter it hears about, whichever
+/// kind it arrives as. \see issue #188.
+struct HostEdit
+{
+    enum class Kind
+    {
+        GestureBegin,
+        GestureEnd,
+        Value
+    };
+    Kind kind;
+    ParameterID::BinaryValue id;
+}; // struct HostEdit
+
 /// \note Every one of these is a notification travelling plugin -> host, and
-/// there is no host.
+/// there is no host -- so the parameter-facing three are recorded instead of
+/// sent, which is the only way a case can read what a host would have seen.
 class SilentNotifications final : public Plugin2HostInteropControler
 {
+  public:
+    mutable std::vector<HostEdit> edits;
+
   private:
-    void automatedParameterBeginEdit(ParameterID) const override {}
-    void automatedParameterEndEdit(ParameterID) const override {}
+    void automatedParameterBeginEdit(ParameterID const id) const override
+    {
+        edits.push_back({HostEdit::Kind::GestureBegin, id.binaryValue});
+    }
+    void automatedParameterEndEdit(ParameterID const id) const override
+    {
+        edits.push_back({HostEdit::Kind::GestureEnd, id.binaryValue});
+    }
     void gestureBegin(char const *) const override {}
     void gestureEnd() const override {}
-    void automatedParameterChanged(ParameterID, ParameterValueForAutomation) const override {}
+    void automatedParameterChanged(ParameterID const id, ParameterValueForAutomation) const override
+    {
+        edits.push_back({HostEdit::Kind::Value, id.binaryValue});
+    }
     void moduleChanged(std::uint8_t, Module const *) const override {}
     bool parameterListChanged() const override { return true; }
     void presetChangeBegin() const override {}
@@ -196,6 +226,9 @@ class Instance final : public GUI::EditorHost
 
     SpectrumWorxCore &core() override { return engine_; }
     Plugin2HostInteropControler &automation() override { return notifications_; }
+
+    /// \brief What the host was told about parameters, in order. \see HostEdit.
+    std::vector<HostEdit> &hostEdits() const { return notifications_.edits; }
 
     ////////////////////////////////////////////////////////////////////////////
     ///

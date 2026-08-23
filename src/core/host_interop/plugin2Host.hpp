@@ -90,8 +90,12 @@ class Plugin2HostInteropControler
     }
 
     void automatedParameterChanged(ParameterID::LFO, float value) const;
+    /// \param asDiscreteGesture wraps the change in a gesture of its own, for an
+    /// edit that is not part of a drag -- a wheel notch, a menu row, a typed
+    /// value. A drag brackets itself and passes false. \see issue #188.
     void automatedParameterChanged(Module const &, std::uint8_t moduleIndex,
-                                   std::uint8_t moduleParameterIndex, float parameterValue) const;
+                                   std::uint8_t moduleParameterIndex, float parameterValue,
+                                   bool asDiscreteGesture) const;
     void modulesChanged(AutomatedModuleChain const &, std::uint8_t firstModuleIndex,
                         std::uint8_t lastModuleIndex) const;
     void moduleChangedByUser(std::uint8_t chainParameterIndex, Module const *) const;
