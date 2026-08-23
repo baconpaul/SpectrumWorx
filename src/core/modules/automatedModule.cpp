@@ -141,14 +141,18 @@ Detail::autoAdjustedLFOParameter(LFO &lfo, std::uint8_t const lfoParameterIndex)
     using LE::Parameters::IndexOf;
     auto const lowerBoundIndex(IndexOf<LFO::Parameters, LFO::LowerBound>::value);
     auto const upperBoundIndex(IndexOf<LFO::Parameters, LFO::UpperBound>::value);
+    auto const syncTypesIndex(IndexOf<LFO::Parameters, LFO::SyncTypes>::value);
+    auto const periodScaleIndex(IndexOf<LFO::Parameters, LFO::PeriodScale>::value);
     LE_ASSUME(lfoParameterIndex < ParameterCounts::lfoExportedParameters);
     switch (lfoParameterIndex)
     {
+    /// \note The pair names the parameter that *moved*, which is the one the
+    /// caller tells the host about -- these two named the one that was written.
     case lowerBoundIndex:
         if (lfo.upperBound() < lfo.lowerBound())
         {
             lfo.setUpperBound(lfo.lowerBound());
-            return AutoAdjustedLFOParameter(lowerBoundIndex, lfo.upperBound());
+            return AutoAdjustedLFOParameter(upperBoundIndex, lfo.upperBound());
         }
         break;
 
@@ -156,9 +160,28 @@ Detail::autoAdjustedLFOParameter(LFO &lfo, std::uint8_t const lfoParameterIndex)
         if (lfo.lowerBound() > lfo.upperBound())
         {
             lfo.setLowerBound(lfo.upperBound());
-            return AutoAdjustedLFOParameter(upperBoundIndex, lfo.lowerBound());
+            return AutoAdjustedLFOParameter(lowerBoundIndex, lfo.lowerBound());
         }
         break;
+
+    /// \note A period is a division of the bar and each sync type divides it
+    /// differently, so the period that was set is not one the new type has. It
+    /// was left where it stood -- the `\todo` on LFO::addSyncType since 2011 --
+    /// which a preset then stored and the loader snapped somewhere else.
+    /// \see issue #192
+    case syncTypesIndex:
+    {
+        if (lfo.syncTypes() == LFO::Free)
+            break; // a free period is a duration, and every one of them is legal
+        auto const standing(lfo.periodScale());
+        auto const snapped(LFO::snapPeriodScale(standing, lfo.syncTypes()).first);
+        if (snapped != standing)
+        {
+            lfo.setPeriodScale(snapped);
+            return AutoAdjustedLFOParameter(periodScaleIndex, snapped);
+        }
+        break;
+    }
 
     default:
         break;
