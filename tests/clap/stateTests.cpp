@@ -1622,3 +1622,78 @@ TEST_CASE("A parameter the host writes is an edit", "[clap][state][presets]")
 
     CHECK(loaded.modified.load());
 }
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The standalone's startup order, which no plugin format uses: state,
+/// then a window, then a sample rate. A knob quantised to the bin width or the
+/// step time has neither until `activate()`, so `setupForParameter()` leaves it
+/// unranged and the strip writes the restored value into a widget still holding
+/// juce::Slider's own 0 .. 10 -- which clamps it, and re-ranging the knob a
+/// moment later cannot get back a number that has already been thrown away.
+///
+/// \note Both halves are the case: what the *knob* shows and what the Program
+/// holds. Only the display was ever wrong, which is why this survived -- a
+/// session saved from that window still writes 4500.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A quantised knob keeps its value when the window opens before the sample rate",
+          "[clap][state][gui]")
+{
+    Entry const entry;
+    juce::ScopedJuceInitialiser_GUI const juceIsUp;
+
+    /// Ah-ah's centre frequency: 0 .. 6000 Hz, quantised to the bin width, and
+    /// the first of the effect's own parameters.
+    auto const ahAh(LE::SW::Effects::effectIndex("Ah-ah"));
+    REQUIRE(ahAh >= 0);
+    constexpr std::uint8_t centre{5}; // past the five base parameters
+    constexpr float edited{4500};     // the default is 2000, and neither is 10
+
+    auto const id(moduleParameterID(0, centre));
+
+    OutStream saved;
+    {
+        Plugin const plugin;
+        REQUIRE(plugin.editorHost().editSlot(0, ahAh));
+        plugin.editorHost().editParameter(id, edited);
+        REQUIRE(plugin.state().save(&*plugin, &saved));
+    }
+
+    INFO("state:\n" << saved.text());
+
+    // the order: a session, then a window, and only then a rate
+    LE::SW::GUI::SpectrumWorxEditor *pEditor{nullptr};
+    SWTest::TestHost host{{.params = true, .state = true, .gui = true}};
+    SWTest::ActivePlugin plugin(sampleRate, blockSize, host, [&](clap_plugin const &inactive) {
+        InStream stream(saved.data());
+        REQUIRE(stateOf(inactive).load(&inactive, &stream));
+
+        auto const *const gui(
+            static_cast<clap_plugin_gui const *>(inactive.get_extension(&inactive, CLAP_EXT_GUI)));
+        REQUIRE(gui != nullptr);
+        REQUIRE(gui->create(&inactive, CLAP_WINDOW_API_COCOA, false));
+
+        pEditor = static_cast<LE::SW::SpectrumWorxCLAP &>(SWTest::editorHostOf(inactive)).gui();
+        REQUIRE(pEditor != nullptr);
+        auto *const pStrip(pEditor->regionInSlot(0));
+        REQUIRE(pStrip != nullptr);
+        INFO("with the window up and no sample rate");
+        CHECK(pStrip->effectSpecificParameterControl(0).getValue() == Catch::Approx(edited));
+    });
+
+    auto &editorHost(SWTest::editorHostOf(*plugin));
+    auto *const pStrip(pEditor->regionInSlot(0));
+    REQUIRE(pStrip != nullptr);
+    INFO("after activate");
+    CHECK(pStrip->effectSpecificParameterControl(0).getValue() == Catch::Approx(edited));
+    editorHost.programMain().moduleChain().forEach<LE::SW::Engine::ModuleParameters>(
+        [&](LE::SW::Engine::ModuleParameters const &module) {
+            CHECK(module.getEffectParameter(0) == Catch::Approx(edited));
+        });
+
+    auto const *const gui(
+        static_cast<clap_plugin_gui const *>(plugin->get_extension(&*plugin, CLAP_EXT_GUI)));
+    gui->destroy(&*plugin);
+}
