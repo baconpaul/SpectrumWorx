@@ -1308,7 +1308,6 @@ class SpectrumWorxEditor final : private SkinLifetime,
 
             TitledComboBox const &paletteComboBox() const { return palette_; }
             TitledComboBox const &mouseOverComboBox() const { return moduleUIMouseOverReaction_; }
-            TitledComboBox const &lfoUpdateComboBox() const { return lfoUpdateBehaviour_; }
 
           private: // JUCE component overrides.
             void paint(juce::Graphics &) override;
@@ -1324,7 +1323,6 @@ class SpectrumWorxEditor final : private SkinLifetime,
             TitledComboBox zoom_;
             TitledComboBox palette_;
             TitledComboBox moduleUIMouseOverReaction_;
-            TitledComboBox lfoUpdateBehaviour_;
             LEDTextButton hideCursorOnKnobDrag_;
         }; // class InterfacePage
 

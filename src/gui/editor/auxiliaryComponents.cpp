@@ -425,7 +425,6 @@ void SharedModuleControls::FrequencyRange::reportInactiveControl()
         selectedThumb_ = Constants::noThumb;
         reassignTo(invalidIndex);
         parameterIndexForInternalWriteAccess_ = invalidIndex;
-        repaint();
     }
 }
 

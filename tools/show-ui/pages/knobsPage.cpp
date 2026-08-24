@@ -9,9 +9,7 @@
 /// replaced was five film strips of 127 frames each -- so the artwork was its
 /// own contact sheet and anyone could see the whole travel at once. This is that
 /// contact sheet for the paint code: the editor knob, then the module knob in
-/// both polarities and both sizes, and the two states that are not a value at
-/// all (focused, and LFO-driven, where the knob's own value says nothing and the
-/// wedge goes away).
+/// both polarities and both sizes, selected and not.
 ///
 ///   The editor pages cannot show this. A knob there sits wherever its
 /// parameter's default put it -- which for the symmetric ones is dead centre,
@@ -50,8 +48,8 @@ class KnobsPage final : public juce::Component
 
     void paint(juce::Graphics &graphics) override
     {
-        // The module panel's own background, so the rims and the focus halo are
-        // read against what they will actually sit on.
+        // The module panel's own background, so the rims and the halo are read
+        // against what they will actually sit on.
         graphics.fillAll(juce::Colour(0xFF232323));
 
         label(graphics, "The editor's knobs, painted", margin, margin, 22.5f, juce::Colours::white);
@@ -70,8 +68,7 @@ class KnobsPage final : public juce::Component
                 if (row.editor)
                     GUI::paintEditorKnob(graphics, face, value);
                 else
-                    GUI::paintModuleKnob(graphics, face, value, row.bipolar, row.drawWedge,
-                                         row.selected);
+                    GUI::paintModuleKnob(graphics, face, value, row.bipolar, row.selected);
             }
             y += cell;
         }
@@ -88,24 +85,18 @@ class KnobsPage final : public juce::Component
         char const *caption;
         unsigned int diameter;
         bool editor;  ///< an EditorKnob rather than a ModuleKnob
-        bool bipolar; ///< module knobs only, as are the two below
-        bool drawWedge;
+        bool bipolar; ///< module knobs only, as is the one below
         bool selected;
     }; // struct Row
 
     static constexpr Row rows_[]{
-        {"EditorKnob, 83 px (in, out and mix)", GUI::EditorKnob::diameter, true, false, false,
-         false},
-        {"ModuleKnob unipolar, 77 px", GUI::ModuleKnob::diameter, false, false, true, false},
-        {"ModuleKnob bipolar, 77 px", GUI::ModuleKnob::diameter, false, true, true, false},
-        {"ModuleKnob unipolar, 77 px, focused", GUI::ModuleKnob::diameter, false, false, true,
-         true},
-        {"LFO driven -- no wedge, whatever the value", GUI::ModuleKnob::diameter, false, false,
-         false, false},
+        {"EditorKnob, 83 px (in, out and mix)", GUI::EditorKnob::diameter, true, false, false},
+        {"ModuleKnob unipolar, 77 px", GUI::ModuleKnob::diameter, false, false, false},
+        {"ModuleKnob bipolar, 77 px", GUI::ModuleKnob::diameter, false, true, false},
+        {"ModuleKnob unipolar, 77 px, selected", GUI::ModuleKnob::diameter, false, false, true},
         {"ModuleKnob unipolar, 35 px (gain and wet)", GUI::ModuleKnob::smallDiameter, false, false,
-         true, false},
-        {"ModuleKnob bipolar, 35 px, focused", GUI::ModuleKnob::smallDiameter, false, true, true,
-         true},
+         false},
+        {"ModuleKnob bipolar, 35 px, selected", GUI::ModuleKnob::smallDiameter, false, true, true},
     };
     static constexpr int rows{int(std::size(rows_))};
 

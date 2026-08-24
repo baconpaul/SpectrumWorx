@@ -169,11 +169,6 @@ fs::path const &presetsFolder();
 /// \note Not done by presetsFolder(); see the note at the definition.
 bool createUserPresetsFolder();
 
-class ModuleControlBase;
-class ModuleUI;
-
-bool shouldUpdateLFOControl(ModuleControlBase const &);
-
 ////////////////////////////////////////////////////////////////////////////////
 /// \internal
 /// \class WidgetBase
@@ -711,6 +706,10 @@ class ComboBox : public WidgetBase<>, public PopupMenuWithSelection
     ////////////////////////////////////////////////////////////////////////////
 
     virtual void selectionScrolled() {}
+
+    /// \brief Whether the box draws as the selected one -- the keyboard, unless
+    /// whoever owns it has another answer. \see DiscreteParameter.
+    virtual bool showsAsSelected() const { return hasDirectFocus(); }
 
   protected: // juce::Component overrides
     void paint(juce::Graphics &) override;

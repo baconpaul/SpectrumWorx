@@ -28,8 +28,7 @@ namespace LE::SW::GUI
 ////////////////////////////////////////////////////////////////////////////////
 
 void paintModuleKnob(juce::Graphics &graphics, juce::Rectangle<float> const bounds,
-                     float const normalisedValue, bool const bipolar, bool const drawWedge,
-                     bool const selected)
+                     float const normalisedValue, bool const bipolar, bool const selected)
 {
     using namespace ModuleKnobStyle;
 
@@ -41,24 +40,19 @@ void paintModuleKnob(juce::Graphics &graphics, juce::Rectangle<float> const boun
 
     KnobPainter::paintDome(graphics, bounds, innerGradientRadius);
 
-    /// \note How far the wedge has opened, which the cap's radius follows -- and
-    /// so zero when there is no wedge to follow. A cap sized off a value the
-    /// knob is not showing is the one thing the LFO state could still leak.
-    auto const openness(!drawWedge ? 0.0f : bipolar ? std::abs(2 * value - 1) : value);
+    /// \note How far the wedge has opened, which the cap's radius follows.
+    auto const openness(bipolar ? std::abs(2 * value - 1) : value);
 
-    if (drawWedge)
-    {
-        // The far edge is the value; the near one is the stop it opens from.
-        auto const to(KnobPainter::angleFor(value));
-        auto const from(bipolar ? 0.0f : -KnobPainter::halfSweepDegrees);
-        juce::Path pie;
-        pie.addPieSegment(
-            bounds.withSizeKeepingCentre(2 * radius * wedgeRadius, 2 * radius * wedgeRadius),
-            juce::degreesToRadians(std::min(from, to)), juce::degreesToRadians(std::max(from, to)),
-            0.0f);
-        graphics.setColour(ColourMap::getColour(ColourMap::Accent));
-        graphics.fillPath(pie);
-    }
+    // The far edge is the value; the near one is the stop it opens from.
+    auto const to(KnobPainter::angleFor(value));
+    auto const from(bipolar ? 0.0f : -KnobPainter::halfSweepDegrees);
+    juce::Path pie;
+    pie.addPieSegment(
+        bounds.withSizeKeepingCentre(2 * radius * wedgeRadius, 2 * radius * wedgeRadius),
+        juce::degreesToRadians(std::min(from, to)), juce::degreesToRadians(std::max(from, to)),
+        0.0f);
+    graphics.setColour(ColourMap::getColour(ColourMap::Accent));
+    graphics.fillPath(pie);
 
     auto const cap(capRadiusClosed + (capRadiusOpen - capRadiusClosed) * openness);
     KnobPainter::paintCap(graphics, bounds, cap, cap /*a hard edge*/,

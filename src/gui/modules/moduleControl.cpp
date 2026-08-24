@@ -98,17 +98,20 @@ bool ModuleControlBase::reportActiveControl(double const minimum, double const m
         ///                                   (25.04.2013.) (Domagoj Saric)
         editor().moduleControlActivated(*this, minimum, maximum, interval);
         editor().pActiveControl_ = this;
+        // the halo is drawn on the selection, so the selection has to repaint
+        widget().repaint();
         return true;
     }
     return false;
 }
 
-bool ModuleControlBase::reportInactiveControl() const
+bool ModuleControlBase::reportInactiveControl()
 {
     if (isActive() && !Detail::hasDirectFocus(widget()))
     {
         editor().moduleControlDectivated(*this);
         editor().pActiveControl_ = nullptr;
+        widget().repaint();
         return true;
     }
     else

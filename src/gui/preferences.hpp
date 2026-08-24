@@ -70,14 +70,6 @@ class Preferences
         WhenParentOrNothingSelected
     };
 
-    enum LFOUpdateBehaviour
-    {
-        NoUpdate,
-        WhenControlSelected,
-        WhenControlActive,
-        Always
-    };
-
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \brief The zooms the Interface page offers, ascending, as percentages.
@@ -115,7 +107,6 @@ class Preferences
     {
         return moduleUIMouseOverReaction_;
     }
-    LFOUpdateBehaviour lfoUpdateBehaviour() const { return lfoUpdateBehaviour_; }
     ColourMap::Palette palette() const { return palette_; }
     bool hideCursorOnKnobDrag() const { return hideCursorOnKnobDrag_; }
     /// Always one of zoomPercentages.
@@ -123,7 +114,6 @@ class Preferences
 
     /// Each of these writes the file. `[main-thread]`
     void setModuleUIMouseOverReaction(ModuleUIMouseOverReaction);
-    void setLFOUpdateBehaviour(LFOUpdateBehaviour);
     /// \note Stores it. Painting in it is ColourMap::setPalette()'s half, and
     /// the two are done together -- \see SpectrumWorxEditor::setPalette(),
     /// which is the only place a user changes this.
@@ -145,7 +135,6 @@ class Preferences
     std::unique_ptr<Storage> storage_;
 
     ModuleUIMouseOverReaction moduleUIMouseOverReaction_{Never};
-    LFOUpdateBehaviour lfoUpdateBehaviour_{Always};
     ColourMap::Palette palette_{ColourMap::ClassicBlue};
     bool hideCursorOnKnobDrag_{true};
     unsigned int zoomPercent_{defaultZoomPercent};

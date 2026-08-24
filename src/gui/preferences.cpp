@@ -43,7 +43,6 @@ std::string defaultsFileName() { return std::string(productName) + "UserDefaults
 enum PreferenceKey
 {
     moduleUIMouseOverReactionKey,
-    lfoUpdateBehaviourKey,
     hideCursorOnKnobDragKey,
     zoomPercentKey,
     paletteKey,
@@ -59,8 +58,6 @@ std::string preferenceKeyName(PreferenceKey const key)
     {
     case moduleUIMouseOverReactionKey:
         return "moduleUIMouseOverReaction";
-    case lfoUpdateBehaviourKey:
-        return "lfoUpdateBehaviour";
     case hideCursorOnKnobDragKey:
         return "hideCursorOnKnobDrag";
     case zoomPercentKey:
@@ -93,12 +90,8 @@ void reportPreferencesError(std::string const &message, std::string const &title
 constexpr std::array<char const *, 3> mouseOverReactionNames{"Never", "WhenParentModuleSelected",
                                                              "WhenParentOrNothingSelected"};
 
-constexpr std::array<char const *, 4> lfoUpdateBehaviourNames{"NoUpdate", "WhenControlSelected",
-                                                              "WhenControlActive", "Always"};
-
-/// The tables are indexed by the enumerator, so they have to cover it.
+/// The table is indexed by the enumerator, so it has to cover it.
 static_assert(mouseOverReactionNames.size() == Preferences::WhenParentOrNothingSelected + 1);
-static_assert(lfoUpdateBehaviourNames.size() == Preferences::Always + 1);
 
 template <typename Enumeration, std::size_t count>
 std::string nameOf(Enumeration const value, std::array<char const *, count> const &names)
@@ -173,11 +166,6 @@ Preferences::Preferences(fs::path const &folder) : storage_(std::make_unique<Sto
                                      nameOf(moduleUIMouseOverReaction_, mouseOverReactionNames)),
         mouseOverReactionNames, moduleUIMouseOverReaction_);
 
-    lfoUpdateBehaviour_ =
-        valueNamed(provider.getUserDefaultValue(
-                       lfoUpdateBehaviourKey, nameOf(lfoUpdateBehaviour_, lfoUpdateBehaviourNames)),
-                   lfoUpdateBehaviourNames, lfoUpdateBehaviour_);
-
     palette_ = paletteNamed(provider.getUserDefaultValue(paletteKey, ColourMap::nameOf(palette_)),
                             palette_);
 
@@ -207,13 +195,6 @@ void Preferences::setModuleUIMouseOverReaction(ModuleUIMouseOverReaction const v
     moduleUIMouseOverReaction_ = value;
     storage_->provider.updateUserDefaultValue(moduleUIMouseOverReactionKey,
                                               nameOf(value, mouseOverReactionNames));
-}
-
-void Preferences::setLFOUpdateBehaviour(LFOUpdateBehaviour const value)
-{
-    lfoUpdateBehaviour_ = value;
-    storage_->provider.updateUserDefaultValue(lfoUpdateBehaviourKey,
-                                              nameOf(value, lfoUpdateBehaviourNames));
 }
 
 void Preferences::setPalette(ColourMap::Palette const value)

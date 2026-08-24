@@ -109,11 +109,10 @@ void paintTriggerButton(juce::Graphics &, juce::Rectangle<float> bounds, bool on
 ///
 /// \param normalisedValue where the value sits in its range, 0 to 1; for a
 /// \p bipolar knob 0.5 is the centre the wedge opens from.
-/// \param drawWedge false while an LFO drives the parameter, when the knob's own
-/// value says nothing.
-/// \param selected whether it has the keyboard focus.
+/// \param selected whether this is the control the interface is showing -- which
+/// is not the keyboard focus. \see ModuleControlBase::isActive().
 void paintModuleKnob(juce::Graphics &, juce::Rectangle<float> bounds, float normalisedValue,
-                     bool bipolar, bool drawWedge, bool selected);
+                     bool bipolar, bool selected);
 
 } // namespace LE::SW::GUI
 

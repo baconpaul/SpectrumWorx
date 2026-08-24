@@ -1073,6 +1073,104 @@ TEST_CASE("A selected control keeps its LFO strip when the keyboard goes elsewhe
     CHECK(lfoStripIsUp(editor));
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The halo is the same claim as the LFO strip, drawn on the control
+/// instead of over the rack: both say "this is the one you are editing". It was
+/// keyed on the keyboard focus, which stopped being the selection -- so clicking
+/// away left a strip on screen naming a knob that had gone plain, and the two
+/// halves of one statement disagreed.
+///
+/// \note Rendered rather than reasoned about, and pixel for pixel: what the
+/// widget *decides* is a boolean this file could read off the control, and what
+/// it *draws* is the thing that was wrong. \see knobPaintingTests.cpp, which
+/// compares two renders of a painter for the same reason.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+/// One widget, painted into an image of its own at its own size.
+juce::Image renderOf(juce::Component &widget)
+{
+    juce::Image image(juce::Image::ARGB, widget.getWidth(), widget.getHeight(), true,
+                      juce::SoftwareImageType{});
+    juce::Graphics graphics(image);
+    widget.paintEntireComponent(graphics, false);
+    return image;
+}
+
+/// \note Both sides are renders of the same widget, so there is no size to check.
+bool differ(juce::Image const &a, juce::Image const &b)
+{
+    for (int y(0); y < a.getHeight(); ++y)
+        for (int x(0); x < a.getWidth(); ++x)
+            if (a.getPixelAt(x, y) != b.getPixelAt(x, y))
+                return true;
+    return false;
+}
+} // anonymous namespace
+
+TEST_CASE("The halo stays on the control whose LFO strip is showing",
+          "[gui][modules][lfo][selection]")
+{
+    SWTest::HostSideJuce const juceIsUp;
+
+    if (!SWTest::aWindowCanBeMade())
+        SKIP(SWTest::noWindow);
+
+    SWTest::Instance instance;
+    DesktopEditor const window(instance);
+    if (!window.tookTheKeyboard())
+        SKIP(keyboardRefused);
+
+    // Every shape a module control comes in, because each draws its own halo:
+    // three of them ask the control and the fourth is a combo box, which has the
+    // question put to it. \see ComboBox::showsAsSelected().
+    char const *effect{"Freeze"};
+    GUI::ModuleControlBase *(*controlIn)(GUI::ModuleUI &){nullptr};
+
+    SECTION("a knob") { controlIn = firstControlOfType<GUI::ModuleKnob>; }
+    SECTION("an LED button")
+    {
+        effect = "TuneWorx";
+        controlIn = firstControlOfType<GUI::ModuleLEDTextButton>;
+    }
+    SECTION("a trigger") { controlIn = firstControlOfType<GUI::TriggerButton>; }
+    SECTION("a combo box")
+    {
+        effect = "Swappah";
+        controlIn = firstControlOfType<GUI::DiscreteParameter>;
+    }
+
+    auto &editor(window.editor());
+    auto const [pFirstStrip, pSecondStrip](twoStrips(editor, effect));
+
+    auto *const pControl(controlIn(*pFirstStrip));
+    auto *const pOther(controlIn(*pSecondStrip));
+    REQUIRE(pControl != nullptr);
+    REQUIRE(pOther != nullptr);
+
+    pControl->widget().grabKeyboardFocus();
+    REQUIRE(editor.activeControl() == pControl);
+    REQUIRE(lfoStripIsUp(editor));
+    auto const selected(renderOf(pControl->widget()));
+
+    // The reported case: the keyboard goes to a preset row or a host's panel, the
+    // strip stays up -- and so must the halo.
+    editor.grabKeyboardFocus();
+    REQUIRE(!pControl->widget().hasKeyboardFocus(false));
+    REQUIRE(editor.activeControl() == pControl);
+    REQUIRE(lfoStripIsUp(editor));
+    CHECK(!differ(selected, renderOf(pControl->widget())));
+
+    // ...and it goes when the selection does, which is what says there is a halo
+    // in the first render at all.
+    pOther->widget().grabKeyboardFocus();
+    REQUIRE(editor.activeControl() == pOther);
+    CHECK(differ(selected, renderOf(pControl->widget())));
+}
+
 TEST_CASE("The shared controls survive the keyboard going elsewhere", "[gui][modules][selection]")
 {
     SWTest::HostSideJuce const juceIsUp;

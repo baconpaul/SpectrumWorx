@@ -158,14 +158,6 @@ class ModuleKnob : public Knob, public ModuleControl<ModuleKnob>
   protected: // ModuleControl interface.
     void lfoStateChanged();
 
-    /// \brief The halo is drawn on the focus, so a change of focus is a repaint.
-    ///
-    /// \note This was the default do-nothing, and the halo therefore appeared
-    /// whenever something else happened to repaint the knob -- for a right press,
-    /// not until the menu closed again, which is the second half of issue #92.
-    /// The other two focusable module widgets have always had this.
-    void focusChanged() { repaint(); }
-
     void updateForEngineSetupChanges(Engine::Setup const &);
 
     void moduleControlActivated();
@@ -227,8 +219,6 @@ class ModuleLEDTextButton : public LEDTextButton, public ModuleControl<ModuleLED
     bool parameterAcceptsText() const override { return false; }
 
   protected: // ModuleControl interface.
-    void focusChanged() { repaint(); }
-
     // Implementation note:
     //   We allow a smooth LFO range control for boolean parameters.
     //                                        (21.07.2011.) (Domagoj Saric)
@@ -281,7 +271,6 @@ class TriggerButton : public WidgetBase<juce::Button>, public ModuleControl<Trig
 
   protected: // ModuleControl interface.
     void lfoStateChanged() { setValue(false); }
-    void focusChanged() { repaint(); }
 
     // Implementation note:
     //   We allow a smooth LFO range control for boolean parameters.
@@ -367,9 +356,12 @@ class DiscreteParameter : public ComboBox, public ModuleControl<DiscreteParamete
 
     void addParameterValueEntries(juce::PopupMenu &) override;
 
-  protected: // ModuleControl interface.
-    void focusChanged();
+  private: // ComboBox
+    /// \note The selection rather than the keyboard, as on every other module
+    /// control. \see ModuleControlBase::isActive() and issue #139.
+    bool showsAsSelected() const override { return control().isActive(); }
 
+  protected: // ModuleControl interface.
     juce::String const &getTextFromValue(value_type const valueIndex) const
     {
         return getItemText(valueIndex);
