@@ -253,9 +253,13 @@ void ModuleKnob::setupForParameter(Polarity const polarity, unsigned int const k
         break;
     case FrequencyInHertz:
         LE_ASSERT(quantizationStep == 1);
+        // unquantised until there is a setup to quantise against, but ranged:
+        // juce::Slider's own 0 .. 10 would clamp the value on the way in
+        setRange(info.minimum, info.maximum);
         break;
     case TimeInMilliseconds:
         LE_ASSERT(quantizationStep == 0 || quantizationStep == 1);
+        setRange(info.minimum, info.maximum);
         break;
         LE_DEFAULT_CASE_UNREACHABLE();
     }
