@@ -1466,8 +1466,8 @@ juce::String SpectrumWorxEditor::moduleParameterMenuName(Module const &module,
            parameterName;
 }
 
-void SpectrumWorxEditor::moduleControlActivated(ModuleControlBase &control, double const minimum,
-                                                double const maximum, double const interval)
+void SpectrumWorxEditor::showLFOFor(ModuleControlBase &control, double const minimum,
+                                    double const maximum, double const interval)
 {
     /// \note
     ///   In addition to the reason given for the SharedModuleControls instance
@@ -1488,6 +1488,17 @@ void SpectrumWorxEditor::moduleControlActivated(ModuleControlBase &control, doub
     updateActiveControlValue();
 }
 
+void SpectrumWorxEditor::moduleControlActivated(ModuleControlBase &control, double const minimum,
+                                                double const maximum, double const interval)
+{
+    // a selection replaces whatever a hover was flashing, and the strip is about
+    // to be laid out for the new control either way
+    pPreviewControl_ = nullptr;
+    activeControlRange_ = {minimum, maximum, interval};
+
+    showLFOFor(control, minimum, maximum, interval);
+}
+
 void SpectrumWorxEditor::moduleControlDectivated(ModuleControlBase const &control)
 {
     LE_ASSERT(lfoDisplay_);
@@ -1498,6 +1509,92 @@ void SpectrumWorxEditor::moduleControlDectivated(ModuleControlBase const &contro
     setActiveControlName(selectedModule() ? selectedModule()->description() : juce::String());
     setActiveControlValue(juce::String());
 
+    retireLFODisplay();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// What the pointer is on
+// ----------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+///   Four entry points and no coordinate arithmetic, which works because JUCE
+/// delivers the exit before the enter: moving from a strip onto one of its knobs
+/// clears the strip's hover and then the knob puts it straight back, and both
+/// happen before anything is painted.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxEditor::moduleHovered(ModuleUI &region)
+{
+    if (pHoveredModule_ == &region)
+        return;
+
+    if (auto *const pOutgoing = pHoveredModule_)
+    {
+        pHoveredModule_ = nullptr;
+        pOutgoing->repaint();
+    }
+    pHoveredModule_ = &region;
+    region.repaint();
+}
+
+void SpectrumWorxEditor::moduleUnhovered(ModuleUI &region)
+{
+    if (pHoveredModule_ != &region)
+        return;
+
+    pHoveredModule_ = nullptr;
+    region.repaint();
+}
+
+void SpectrumWorxEditor::moduleControlHovered(ModuleControlBase &control, double const minimum,
+                                              double const maximum, double const interval)
+{
+    pHoveredControl_ = &control;
+
+    if (auto *const pStrip = control.stripDrawnOn())
+        moduleHovered(*pStrip);
+    else if (pHoveredModule_)
+        moduleUnhovered(*pHoveredModule_); // the shared controls stand above the rack
+
+    /// \note Not for the selected control, which the strip is already showing --
+    /// and "previewing the selection" would then have to be undone on the way
+    /// out, which is exactly the state endLFOPreview() exists not to have.
+    if (preferences().previewLFOOnHover() && (&control != pActiveControl_))
+    {
+        pPreviewControl_ = &control;
+        showLFOFor(control, minimum, maximum, interval);
+    }
+}
+
+void SpectrumWorxEditor::moduleControlUnhovered(ModuleControlBase &control)
+{
+    if (pHoveredControl_ != &control)
+        return;
+
+    pHoveredControl_ = nullptr;
+
+    if (auto *const pStrip = control.stripDrawnOn())
+        moduleUnhovered(*pStrip);
+
+    endLFOPreview();
+}
+
+void SpectrumWorxEditor::endLFOPreview()
+{
+    if (!pPreviewControl_)
+        return;
+    pPreviewControl_ = nullptr;
+
+    if (pActiveControl_)
+        return showLFOFor(*pActiveControl_, activeControlRange_.minimum,
+                          activeControlRange_.maximum, activeControlRange_.interval);
+
+    setActiveModuleName(selectedModule() ? selectedModule()->getName() : juce::String());
+    setActiveControlName(selectedModule() ? selectedModule()->description() : juce::String());
+    setActiveControlValue(juce::String());
     retireLFODisplay();
 }
 
@@ -1595,6 +1692,16 @@ void SpectrumWorxEditor::detachFrom(ModuleUI &region)
     // and a cleared pActiveControl_ makes that re-entry a no-op
     if (activeControlIsRegions)
         pActiveControl_ = nullptr;
+
+    // and the three the pointer keeps, which point into the strip the same way
+    // and are read by every repaint. Cleared rather than handed over: the
+    // pointer is wherever it is, and whatever it lands on next will say so
+    if (pHoveredControl_ && pHoveredControl_->pointsInto(region))
+        pHoveredControl_ = nullptr;
+    if (pPreviewControl_ && pPreviewControl_->pointsInto(region))
+        pPreviewControl_ = nullptr;
+    if (pHoveredModule_ == &region)
+        pHoveredModule_ = nullptr;
 
     // both destroyed *now*, where retireLFODisplay() and moduleDeactivated()
     // only disable them and post a message to do it later. That deferral suits a
@@ -1835,6 +1942,23 @@ void SpectrumWorxEditor::updateLFO(ModuleUI &moduleUI, std::uint8_t const parame
          LE::Parameters::IndexOf<LFOImpl::Parameters, LFOImpl::Enabled>::value) &&
         (value == 0))
         showUnmodulatedValue(moduleUI, parameterIndex);
+
+    //   And the strip whole, where a *bound* moved: the knobs on it draw the
+    // bounds when the animation is off, and this index addresses a parameter the
+    // way an LFO does -- which only ModuleUI::setParameter() knows how to turn
+    // into a widget. Guarded on the two, because a host is as free to automate a
+    // phase every block as it is to move a bound once. \see issue #210.
+    using LFOImpl = LE::Parameters::LFOImpl;
+    if ((lfoParameterIndex ==
+         LE::Parameters::IndexOf<LFOImpl::Parameters, LFOImpl::LowerBound>::value) ||
+        (lfoParameterIndex ==
+         LE::Parameters::IndexOf<LFOImpl::Parameters, LFOImpl::UpperBound>::value))
+    {
+        moduleUI.repaint();
+        // the gain and wet pair stand above the rack rather than on the strip
+        if (sharedModuleControlsActive())
+            sharedModuleControls().repaint();
+    }
 
     if (lfoDisplay_ && lfoDisplay_->isEnabled())
         lfoDisplay_->updateForChangedParameters(moduleUI, parameterIndex, lfoParameterIndex, value);
@@ -2126,9 +2250,24 @@ void SpectrumWorxEditor::setPalette(ColourMap::Palette const palette)
     // rather than two that have to agree
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note **The unmodulated value, where the user has asked not to see the
+/// sweep.** Skipping the write instead would be cheaper and would leave every
+/// knob frozen wherever its LFO happened to have it when the preference was
+/// turned off -- a value nobody chose, and the same complaint issue #204 was
+/// about. Writing what the parameter itself holds converges on the next tick,
+/// costs nothing after it (juce::Slider ignores a value it already has), and
+/// needs no answer to "which editors have to be told". \see
+/// Preferences::showLFOAnimation() and issue #210.
+///
+////////////////////////////////////////////////////////////////////////////////
+
 void SpectrumWorxEditor::pumpModulatedValues()
 {
     LE_ASSERT(isThisTheGUIThread());
+
+    bool const animate(preferences().showLFOAnimation());
 
     editorHost().modulatedValues().forEachChanged([&](std::size_t const index, float const value) {
         ParameterID const parameterID{Plugins::ParameterIndex{static_cast<std::uint16_t>(index)}};
@@ -2139,15 +2278,22 @@ void SpectrumWorxEditor::pumpModulatedValues()
         if (!pRegion)
             return;
 
-        // the slot's effect may have changed since the value was written, and
+        //   The slot's effect may have changed since the value was written, and
         // then this is an index the *previous* effect had: the mailbox is a
         // fixed array over the maximal layout and keeps its dirty bit until
-        // swept, so a preset leaves values for slots whose effects it replaced
-        if (parameterID.value._.module.moduleParameterIndex >=
-            pRegion->module().numberOfParameters())
+        // swept, so a preset leaves values for slots whose effects it replaced.
+        //
+        //   Zero is Bypass, which no LFO drives and which the mailbox therefore
+        // never carries -- and the `- 1` below would read past the start of the
+        // unmodulated values if it did: those are indexed as the LFOs are.
+        auto const parameterIndex(parameterID.value._.module.moduleParameterIndex);
+        if ((parameterIndex == 0) || (parameterIndex >= pRegion->module().numberOfParameters()))
             return;
 
-        pRegion->setParameter(parameterID.value._.module.moduleParameterIndex, value,
+        pRegion->setParameter(parameterIndex,
+                              animate ? value
+                                      : pRegion->module().unmodulatedParameter(
+                                            static_cast<std::uint8_t>(parameterIndex - 1)),
                               ModuleUI::LFOValue);
     });
 }
@@ -2486,7 +2632,7 @@ juce::String phaseString(SpectrumWorxEditor::LFODisplay const &parent, double co
 juce::String rangeValueString(SpectrumWorxEditor::LFODisplay const &parent,
                               double const &periodScale)
 {
-    LE_ASSERT(parent.control().isActive());
+    LE_ASSERT(parent.control().isDisplayed());
     return parent.control().getTextFromValue(static_cast<float>(periodScale));
 }
 
@@ -2548,9 +2694,8 @@ void SpectrumWorxEditor::LFODisplay::paint(juce::Graphics &graphics)
     //...mrmlj...ugh...2.6.x quick-fix workarounds...reinvestigate and clean this up...
     if (!this->isEnabled())
         return;
-    LE_ASSERT(editor().activeControl() != nullptr);
-    LE_ASSERT(editor().activeControl() == &control());
-    LE_ASSERT(control().isActive());
+    LE_ASSERT(editor().displayedControl() != nullptr);
+    LE_ASSERT(editor().displayedControl() == &control());
     LE_ASSERT(getParentComponent() == &editor().mainArea());
 
     {
@@ -2712,6 +2857,12 @@ void SpectrumWorxEditor::LFODisplay::sliderValueChanged(juce::Slider *const pSli
 
         updateParameterAndNotifyHost<LFO::LowerBound>(newLowerBound);
         updateParameterAndNotifyHost<LFO::UpperBound>(newUpperBound);
+
+        //   The knob draws the bounds too, where the animation is off, and
+        // nothing else would repaint it: with the sweep not moving the widget,
+        // there is no value change to carry a repaint along with it.
+        // \see ModuleKnob::lfoRangeToDraw() and issue #210.
+        control().widget().repaint();
     }
     else if (pSlider == &period_)
     {
@@ -3486,11 +3637,6 @@ void SpectrumWorxEditor::Settings::comboBoxValueChanged(ComboBox const &comboBox
     {
         editor.setPalette(static_cast<ColourMap::Palette>(value));
     }
-    else if (&comboBox == &settings.interfacePage_.mouseOverComboBox())
-    {
-        preferences().setModuleUIMouseOverReaction(
-            static_cast<Preferences::ModuleUIMouseOverReaction>(value));
-    }
     else
     {
         LE_UNREACHABLE_CODE();
@@ -3625,9 +3771,10 @@ void SpectrumWorxEditor::Settings::EnginePage::paint(juce::Graphics &g)
 SpectrumWorxEditor::Settings::InterfacePage::InterfacePage()
     : PanelBackground(SettingsPage), zoom_(*this, xMargin, yMargin + 0 * yStep + yOffset, "Zoom"),
       palette_(*this, xMargin, yMargin + 1 * yStep + yOffset, "Color Scheme"),
-      moduleUIMouseOverReaction_(*this, xMargin, yMargin + 2 * yStep + yOffset,
-                                 "Mouse Over Reaction"),
-      hideCursorOnKnobDrag_(*this, xMargin - 4, yMargin + 3 * yStep + yOffset,
+      showLFOAnimation_(*this, xMargin - 4, yMargin + 2 * yStep + yOffset, "Show LFO animation"),
+      previewLFOOnHover_(*this, xMargin - 4, yMargin + 2 * yStep + yOffset + ledStep,
+                         "Preview LFO on hover"),
+      hideCursorOnKnobDrag_(*this, xMargin - 4, yMargin + 2 * yStep + yOffset + 2 * ledStep,
                             "Hide cursor on knob drag")
 {
     Settings &parent(
@@ -3662,10 +3809,12 @@ SpectrumWorxEditor::Settings::InterfacePage::InterfacePage()
     palette_.addItem(ColourMap::DarkGray, "Dark Gray");
     palette_.setSelectedIndex(preferences().palette());
 
-    moduleUIMouseOverReaction_.addItem(Preferences::Never, "Never");
-    moduleUIMouseOverReaction_.addItem(Preferences::WhenParentModuleSelected, "Module selected");
-    moduleUIMouseOverReaction_.addItem(Preferences::WhenParentOrNothingSelected, "Always");
-    moduleUIMouseOverReaction_.setSelectedIndex(preferences().moduleUIMouseOverReaction());
+    showLFOAnimation_.setToggleState(preferences().showLFOAnimation(), juce::dontSendNotification);
+    showLFOAnimation_.addListener(&parent);
+
+    previewLFOOnHover_.setToggleState(preferences().previewLFOOnHover(),
+                                      juce::dontSendNotification);
+    previewLFOOnHover_.addListener(&parent);
 
     hideCursorOnKnobDrag_.setToggleState(preferences().hideCursorOnKnobDrag(),
                                          juce::dontSendNotification);
@@ -3731,12 +3880,28 @@ SpectrumWorxEditor &SpectrumWorxEditor::Settings::editor()
                                              &SpectrumWorxEditor::settings_, false>()(*this);
 }
 
+/// \note The rack is repainted for the first of the three, and polling is why:
+/// what a knob under an LFO draws changes with that switch, and a knob is
+/// otherwise only repainted when the mailbox has a new value for it -- which,
+/// with the transport parked, is never.
 void SpectrumWorxEditor::Settings::buttonClicked(juce::Button *const pButton)
 {
-    LE_ASSERT(pButton == &interfacePage_.hideCursorOnKnobDrag_);
-    (void)pButton;
+    auto &page(interfacePage_);
 
-    preferences().setHideCursorOnKnobDrag(interfacePage_.hideCursorOnKnobDrag_.getToggleState());
+    if (pButton == &page.showLFOAnimation_)
+    {
+        preferences().setShowLFOAnimation(page.showLFOAnimation_.getToggleState());
+        editor().mainArea().repaint();
+    }
+    else if (pButton == &page.previewLFOOnHover_)
+    {
+        preferences().setPreviewLFOOnHover(page.previewLFOOnHover_.getToggleState());
+    }
+    else
+    {
+        LE_ASSERT(pButton == &page.hideCursorOnKnobDrag_);
+        preferences().setHideCursorOnKnobDrag(page.hideCursorOnKnobDrag_.getToggleState());
+    }
 }
 
 } // namespace LE::SW::GUI

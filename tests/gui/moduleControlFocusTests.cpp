@@ -714,101 +714,6 @@ TEST_CASE("One press on a module combo box selects it and opens its menu", "[gui
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \note Issue #124's other half. A module strip's combo box takes the module
-/// selection before it will move, exactly as a press on it does -- otherwise a
-/// wheel would edit one module's parameter while a different one stayed
-/// selected, which is the state `moduleParameterChanged()`'s assertions exist to
-/// catch.
-///
-/// \note Which is why the case is here rather than beside the other wheel cases:
-/// focus needs a window, and this file is where the window is.
-///
-////////////////////////////////////////////////////////////////////////////////
-
-TEST_CASE("A wheel over a module combo box selects it and steps it", "[gui][modules][combo]")
-{
-    SWTest::HostSideJuce const juceIsUp;
-
-    if (!SWTest::aWindowCanBeMade())
-        SKIP(SWTest::noWindow);
-
-    SWTest::Instance instance;
-    DesktopEditor const window(instance);
-    if (!window.tookTheKeyboard())
-        SKIP(keyboardRefused);
-
-    auto &editor(window.editor());
-    auto &moduleUI(stripFor(editor, "Swappah"));
-
-    auto *const pControl(firstControlOfType<GUI::DiscreteParameter>(moduleUI));
-    REQUIRE(pControl != nullptr);
-    auto &control(*pControl);
-    auto &comboBox(dynamic_cast<GUI::ComboBox &>(control.widget()));
-
-    REQUIRE(editor.activeControl() != &control);
-
-    /// \note Put at the top of the list first, and the reason is the point of
-    /// `MenuOrder`: a row is not a value. Swappah's Mode is declared Both,
-    /// Magnitudes, Phases and *listed* Magnitudes, Phases, Both, so its default
-    /// of zero is the **last** row -- and a step down the list from there is
-    /// correctly refused. Starting at a known row is what makes this a case
-    /// about the wheel rather than about which parameter it landed on.
-    comboBox.setSelectedIndex(0);
-    auto const first(comboBox.getValue());
-
-    /// \note Away from the user, which is down the list. \see
-    /// ComboBox::mouseWheelMove() and issue #124.
-    scrollOnce(comboBox, +0.3f);
-
-    // It selected, which is what puts the control's LFO on screen...
-    CHECK(editor.activeControl() == &control);
-    // ...and the row moved, without a menu having been opened at all.
-    CHECK(comboBox.getValue() != first);
-    CHECK_FALSE(comboBox.menuActive());
-
-    // And back where it started, which is the gesture a user actually makes.
-    scrollOnce(comboBox, -0.3f);
-    CHECK(comboBox.getValue() == first);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \note The LFO owns the value, so a row the wheel moved to would be overwritten
-/// by the next sweep. The same guard the menu is behind, and the same one
-/// ModuleKnob turns its own wheel off with. \see syncMouseWheelAndLFOState().
-///
-////////////////////////////////////////////////////////////////////////////////
-
-TEST_CASE("A wheel over a combo box the LFO owns moves nothing", "[gui][modules][lfo][combo]")
-{
-    SWTest::HostSideJuce const juceIsUp;
-
-    if (!SWTest::aWindowCanBeMade())
-        SKIP(SWTest::noWindow);
-
-    SWTest::Instance instance;
-    DesktopEditor const window(instance);
-    if (!window.tookTheKeyboard())
-        SKIP(keyboardRefused);
-
-    auto &editor(window.editor());
-    auto &moduleUI(stripFor(editor, "Swappah"));
-
-    auto *const pControl(firstControlOfType<GUI::DiscreteParameter>(moduleUI));
-    REQUIRE(pControl != nullptr);
-    auto &control(*pControl);
-    auto &comboBox(dynamic_cast<GUI::ComboBox &>(control.widget()));
-
-    control.lfo().parameters().set<Parameters::LFOImpl::Enabled>(true);
-    REQUIRE(control.isLFOEnabled());
-
-    auto const opened(comboBox.getValue());
-    scrollOnce(comboBox, -0.3f);
-    CHECK(comboBox.getValue() == opened);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-///
 /// Selection is not a gesture
 /// --------------------------
 ///
@@ -1310,9 +1215,9 @@ TEST_CASE("Dropping the selected module clears both selections", "[gui][modules]
 /// after the keyboard has gone to the preset pane, and without a second guard the
 /// next sweep of the mouse across it would silently drop the LFO strip.
 ///
-///   The preference is the right question: with the default reaction the mouse
-/// never *selects* a control, so it has no business deselecting one.
-/// \see Preferences::ModuleUIMouseOverReaction and issue #139.
+///   The pointer is the right question: it never *selects* a control, so it has
+/// no business deselecting one. It was a preference that said so and is now the
+/// only behaviour there is. \see issue #139 and issue #210.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1329,14 +1234,12 @@ TEST_CASE("The mouse passing over a clicked control does not deselect it",
     if (!window.tookTheKeyboard())
         SKIP(keyboardRefused);
 
-    // \note A folder of this case's own, and the reaction set in it rather than
-    // read. The suite points every case at one shared folder, and something in it
-    // writes there -- so what this would otherwise see is whatever ran last.
+    // \note A folder of this case's own. The suite points every case at one
+    // shared folder, and something in it writes there -- so what this would
+    // otherwise see is whatever ran last.
     fs::path const folder(fs::path(SW_TEST_OUTPUT_DIR) / "preferences" / "mouseOverKeepsClicked");
     fs::remove_all(folder);
     GUI::setPreferencesFolder(folder);
-    GUI::preferences().setModuleUIMouseOverReaction(GUI::Preferences::Never);
-    REQUIRE(GUI::preferences().moduleUIMouseOverReaction() == GUI::Preferences::Never);
 
     auto &editor(window.editor());
     auto &moduleUI(stripFor(editor, "Freeze"));

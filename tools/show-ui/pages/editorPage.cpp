@@ -229,6 +229,7 @@ class EditorPage final : public juce::Component
         {
             fillFirstSlot();
             showModuleDrop();
+            showHighlights();
         }
 
         if (openPresetBrowser)
@@ -424,6 +425,66 @@ class EditorPage final : public juce::Component
         std::fprintf(stderr, "sw-show-ui: %s at %s\n", swap ? "swap" : "insert", pIndex + 1);
         editor_->showModuleDrop(
             {swap ? Drop::swap : Drop::insert, static_cast<std::uint8_t>(std::atoi(pIndex + 1))});
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief SW_SHOW_UI_HIGHLIGHT -- everything issue #210 asks an eye about, in
+    /// one picture: a selected strip and control beside a hovered strip and
+    /// control, and on the selected knob the band an LFO's travel draws when the
+    /// user has asked not to watch the sweep.
+    ///
+    ///   The selection has to read as louder than the hover at a glance, the
+    /// hover has to read as something rather than nothing, and the band has to be
+    /// tellable from the wedge it sits under. None of the three is a question a
+    /// case can answer.
+    ///
+    /// \note None of it is otherwise reachable from a render. The pointer does
+    /// not exist here, and the selection goes through the keyboard -- which an
+    /// offscreen editor cannot take, `grabKeyboardFocus()` jasserting on a
+    /// component that is on no screen rather than declining. So they are asked
+    /// for directly: select() is the click's own step less the keyboard, and
+    /// mouseEnter() is what JUCE would deliver.
+    ///
+    /// \note A render switch rather than an interactive one: it turns the LFO
+    /// animation preference off, and only `--render` points the preferences at a
+    /// folder of its own. \see usePreferencesOfNobodyInParticular().
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    void showHighlights()
+    {
+        if (!std::getenv("SW_SHOW_UI_HIGHLIGHT"))
+            return;
+
+        // a second strip, so that "selected" and "hovered" are side by side
+        editor_->addUserAddedModule(0);
+        editor_->resyncModuleRack();
+
+        auto *const pSelected(editor_->regionInSlot(0));
+        auto *const pHovered(editor_->regionInSlot(1));
+        LE_ASSERT_MSG(pSelected && pHovered, "The harness could not fill two slots.");
+        if (!pSelected || !pHovered)
+            return;
+
+        pSelected->activate();
+
+        auto &selected(pSelected->effectSpecificParameterControl(0));
+        selected.select();
+
+        //   An LFO over part of the knob's travel, with the animation off, which
+        // is the only state that draws the band. \see ModuleKnob::lfoRangeToDraw()
+        GUI::preferences().setShowLFOAnimation(false);
+        editor_->setLFOEnabled(selected, true);
+        selected.lfo().setLowerBound(0.25f);
+        selected.lfo().setUpperBound(0.80f);
+
+        auto &widget(pHovered->effectSpecificParameterControl(0).widget());
+        auto const centre(widget.getLocalBounds().getCentre().toFloat());
+        widget.mouseEnter(juce::MouseEvent(juce::Desktop::getInstance().getMainMouseSource(),
+                                           centre, juce::ModifierKeys(), 1.0f, 0.0f, 0.0f, 0.0f,
+                                           0.0f, &widget, &widget, juce::Time(), centre,
+                                           juce::Time(), 1, false));
     }
 
     HarnessHost host_;

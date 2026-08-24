@@ -127,6 +127,16 @@ void scroll(juce::Component &component, float const deltaY)
     component.mouseWheelMove(event, wheel);
 }
 
+/// \brief The pointer arriving over \p component, which is what earns a module
+/// control its wheel. \see issue #210.
+void pointerEnters(juce::Component &component)
+{
+    auto const centre(component.getLocalBounds().getCentre().toFloat());
+    component.mouseEnter(juce::MouseEvent(
+        juce::Desktop::getInstance().getMainMouseSource(), centre, juce::ModifierKeys(), 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, &component, &component, juce::Time(), centre, juce::Time(), 1, false));
+}
+
 /// Every descendant of \p root that is a \p Widget, in child order.
 template <typename Widget> std::vector<Widget *> descendantsOfType(juce::Component &root)
 {
@@ -522,4 +532,93 @@ TEST_CASE("A wheel does nothing while the combo box's menu is open", "[gui][comb
     ///
     ////////////////////////////////////////////////////////////////////////////
     juce::PopupMenu::dismissAllActiveMenus();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Issue #124's other half, and what issue #210 turned it into. A wheel
+/// over a module strip's combo box used to take the module selection before it
+/// would move -- otherwise it would have edited one module's parameter while a
+/// different one stayed selected, which is the state `moduleParameterChanged()`'s
+/// assertions exist to catch. It needed a window to do that at all, focus being
+/// the window manager's to refuse.
+///
+///   The pointer being on a control is now reason enough to edit it, so the
+/// wheel does the thing it was always trying to do: it steps the box under the
+/// pointer and leaves the ring where the user last clicked.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A wheel over a module combo box steps it without selecting it", "[gui][modules][combo]")
+{
+    SWTest::HostSideJuce const juceIsUp;
+    SWTest::Instance instance;
+    instance.openEditor();
+
+    auto &editor(instance.editor());
+    auto &strip(stripFor(editor, "Swappah"));
+
+    auto *const pComboBox(firstComboBox(strip));
+    REQUIRE(pComboBox != nullptr);
+    auto &comboBox(*pComboBox);
+    auto &control(GUI::ModuleControlBase::controlForWidget(comboBox));
+
+    REQUIRE(editor.activeControl() != &control);
+
+    /// \note Put at the top of the list first, and the reason is the point of
+    /// `MenuOrder`: a row is not a value. Swappah's Mode is declared Both,
+    /// Magnitudes, Phases and *listed* Magnitudes, Phases, Both, so its default
+    /// of zero is the **last** row -- and a step down the list from there is
+    /// correctly refused. Starting at a known row is what makes this a case
+    /// about the wheel rather than about which parameter it landed on.
+    comboBox.setSelectedIndex(0);
+    auto const first(comboBox.getValue());
+
+    pointerEnters(comboBox);
+    REQUIRE(control.isHovered());
+
+    // Away from the user, which is down the list.
+    scroll(comboBox, +0.3f);
+
+    // The row moved, without a menu having been opened at all...
+    CHECK(comboBox.getValue() != first);
+    CHECK_FALSE(comboBox.menuActive());
+    // ...and the selection did not follow the pointer. \see issue #210.
+    CHECK(editor.activeControl() != &control);
+
+    // And back where it started, which is the gesture a user actually makes.
+    scroll(comboBox, -0.3f);
+    CHECK(comboBox.getValue() == first);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The LFO owns the value, so a row the wheel moved to would be overwritten
+/// by the next sweep. The same guard the menu is behind, and the same one
+/// ModuleKnob turns its own wheel off with. \see syncMouseWheelAndLFOState().
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A wheel over a combo box the LFO owns moves nothing", "[gui][modules][lfo][combo]")
+{
+    SWTest::HostSideJuce const juceIsUp;
+    SWTest::Instance instance;
+    instance.openEditor();
+
+    auto &editor(instance.editor());
+    auto &strip(stripFor(editor, "Swappah"));
+
+    auto *const pComboBox(firstComboBox(strip));
+    REQUIRE(pComboBox != nullptr);
+    auto &comboBox(*pComboBox);
+    auto &control(GUI::ModuleControlBase::controlForWidget(comboBox));
+
+    editor.setLFOEnabled(control, true);
+    REQUIRE(control.isLFOEnabled());
+
+    pointerEnters(comboBox);
+
+    auto const opened(comboBox.getValue());
+    scroll(comboBox, -0.3f);
+    CHECK(comboBox.getValue() == opened);
 }

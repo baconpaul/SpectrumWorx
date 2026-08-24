@@ -40,6 +40,7 @@
 #include "gui/modules/moduleControl.hpp"
 #include "gui/modules/moduleUI.hpp"
 #include "gui/painters/backgroundPainter.hpp"
+#include "gui/preferences.hpp"
 
 #include "le/parameters/lfoImpl.hpp"
 #include "le/parameters/parametersUtilities.hpp"
@@ -66,6 +67,22 @@ constexpr std::uint8_t
     syncTypesIndex(LE::Parameters::IndexOf<LFOImpl::Parameters, LFOImpl::SyncTypes>::value);
 constexpr std::uint8_t
     waveformIndex(LE::Parameters::IndexOf<LFOImpl::Parameters, LFOImpl::Waveform>::value);
+
+/// \brief Whether two renders of the same widget differ anywhere.
+///
+/// \note Pixels rather than a colour: what a case here asks is that a drawing
+/// followed something, and naming a colour would pin the palette instead. Same
+/// rule as knobPaintingTests.cpp.
+bool differsFrom(juce::Image const &a, juce::Image const &b)
+{
+    if ((a.getWidth() != b.getWidth()) || (a.getHeight() != b.getHeight()))
+        return true;
+    for (int y(0); y < a.getHeight(); ++y)
+        for (int x(0); x < a.getWidth(); ++x)
+            if (a.getPixelAt(x, y) != b.getPixelAt(x, y))
+                return true;
+    return false;
+}
 
 /// \brief The first module control in \p component's subtree, which is a knob on
 /// the module strip and therefore something an LFO can be attached to.
@@ -615,4 +632,71 @@ TEST_CASE("A second editor's LFO well has a mark in it", "[gui][lfo][skin]")
     auto const *const pMark(pDisplay->waveformMenu().getSelectedItemIcon());
     REQUIRE(pMark != nullptr);
     CHECK(pMark->isValid());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The band a knob wears instead of following the sweep did not follow the
+/// bounds at all: with the animation off the widget's *value* never changes, and
+/// a repaint had only ever ridden along with one, so the knob kept whatever band
+/// it had been built with. \see issue #210.
+///
+/// \note Rendered rather than inspected: what the knob draws is what the bug was
+/// about, and `lfoRangeToDraw()` is its own business.
+///
+/// \note That the *value* cannot hide the band is not asked here and cannot
+/// usefully be: the two arcs shared an outer edge when it could, so even a band
+/// entirely under the wedge left a ring of antialiasing behind and every render
+/// differed from every other. It is a statement about radii instead. \see
+/// knobPaintingTests.cpp.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A knob follows the LFO bounds while the animation is off", "[gui][lfo][knob]")
+{
+    SWTest::HostSideJuce const juceIsUp;
+
+    SWTest::Instance instance;
+    PanelUnderTest const panel(instance);
+    auto &editor(instance.editor());
+
+    LE::SW::GUI::preferences().setShowLFOAnimation(false);
+    editor.setLFOEnabled(panel.control(), true);
+    REQUIRE(panel.control().isLFOEnabled());
+
+    auto &widget(panel.control().widget());
+    auto const drawn([&] {
+        juce::Image image(juce::Image::ARGB, widget.getWidth(), widget.getHeight(), true,
+                          juce::SoftwareImageType{});
+        juce::Graphics graphics(image);
+        widget.paintEntireComponent(graphics, false);
+        return image;
+    });
+
+    auto *const pPanel(editor.lfoDisplay());
+    REQUIRE(pPanel != nullptr);
+    auto &range(pPanel->range());
+
+    /// \note sendNotificationSync, which is what makes this reachable without a
+    /// message loop: juce::Slider calls its listeners from inside the call.
+    range.setMinValue(0.1, juce::sendNotificationSync);
+    range.setMaxValue(0.4, juce::sendNotificationSync);
+    auto const narrow(drawn());
+
+    range.setMaxValue(0.9, juce::sendNotificationSync);
+    auto const wide(drawn());
+    CHECK(differsFrom(narrow, wide));
+
+    //   ...and the band belongs to the animation switch rather than to the LFO:
+    // with the sweep showing, the wedge says everything the band would.
+    LE::SW::GUI::preferences().setShowLFOAnimation(true);
+    CHECK(differsFrom(wide, drawn()));
+
+    //   The same bounds draw the same knob again, which is what says the check
+    // above was about the bounds rather than about something else having moved.
+    LE::SW::GUI::preferences().setShowLFOAnimation(false);
+    range.setMaxValue(0.4, juce::sendNotificationSync);
+    CHECK_FALSE(differsFrom(narrow, drawn()));
+
+    LE::SW::GUI::preferences().setShowLFOAnimation(true);
 }

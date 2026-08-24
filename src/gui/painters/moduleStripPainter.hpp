@@ -14,6 +14,7 @@
 #define moduleStripPainter_hpp__B6D5210F_9C34_4E8A_A017_58D2E6B4739C
 //------------------------------------------------------------------------------
 #include "gui/painters/framePainter.hpp"
+#include "gui/painters/highlight.hpp"
 #include "gui/painters/ruleStyle.hpp"
 
 #include <juce_graphics/juce_graphics.h>
@@ -49,8 +50,10 @@ FrameStyle constexpr moduleStripFrame{
 
 /// \brief Draws the frame a module's controls sit in, into \p bounds.
 ///
-/// \param selected whether this is the strip whose controls the editor is
-/// showing, which is the halo and nothing else.
+/// \param highlight whether this is the strip whose controls the editor is
+/// showing, or merely the one the pointer is over. Either way it is the halo and
+/// nothing else, at full strength for the first and hoverStrength for the
+/// second. \see issue #210.
 ///
 /// \note `graphics.setOpacity( 0.5f )` stood at the call site and dimmed an
 /// unselected strip's frame. It has done nothing since the artwork became a
@@ -60,7 +63,7 @@ FrameStyle constexpr moduleStripFrame{
 /// change of appearance rather than a port. It also would not have been an
 /// improvement: the knobs, the name and the rule are children and full strength
 /// whatever the frame does, and the halo already says which strip is live.
-void paintModuleStrip(juce::Graphics &, juce::Rectangle<float> bounds, bool selected);
+void paintModuleStrip(juce::Graphics &, juce::Rectangle<float> bounds, Highlight);
 
 } // namespace LE::SW::GUI
 

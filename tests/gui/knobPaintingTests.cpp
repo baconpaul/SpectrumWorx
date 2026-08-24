@@ -62,10 +62,12 @@ template <typename Painter> juce::Image render(Painter &&paint)
     return image;
 }
 
-juce::Image moduleKnob(float const value, bool const bipolar)
+juce::Image moduleKnob(float const value, bool const bipolar,
+                       GUI::Highlight const highlight = GUI::Highlight::None,
+                       std::optional<juce::Range<float>> const lfoRange = std::nullopt)
 {
     return render([&](juce::Graphics &graphics, juce::Rectangle<float> const bounds) {
-        GUI::paintModuleKnob(graphics, bounds, value, bipolar, false /*not selected*/);
+        GUI::paintModuleKnob(graphics, bounds, value, bipolar, highlight, lfoRange);
     });
 }
 
@@ -103,6 +105,55 @@ TEST_CASE("Both knobs draw the value they are given", "[gui][knob]")
     // ...and the polarity is a parameter rather than a decoration: at the centre
     // of the range a unipolar wedge is half open and a bipolar one is shut.
     CHECK(differ(moduleKnob(0.5f, false), moduleKnob(0.5f, true)));
+}
+
+TEST_CASE("A module knob draws its three highlights differently", "[gui][knob]")
+{
+    juce::ScopedJuceInitialiser_GUI const juceInitialiser;
+
+    /// \note Three renders and three inequalities rather than a colour: what
+    /// would go wrong here is a hover drawn at the selection's strength, or at
+    /// none at all, and either reads as "the pointer does nothing". \see issue
+    /// #210.
+    auto const plain(moduleKnob(0.5f, false, GUI::Highlight::None));
+    auto const hovered(moduleKnob(0.5f, false, GUI::Highlight::Hovered));
+    auto const selected(moduleKnob(0.5f, false, GUI::Highlight::Selected));
+
+    CHECK(differ(plain, hovered));
+    CHECK(differ(plain, selected));
+    CHECK(differ(hovered, selected));
+}
+
+TEST_CASE("An LFO range is drawn, and only where there is one", "[gui][knob][lfo]")
+{
+    juce::ScopedJuceInitialiser_GUI const juceInitialiser;
+
+    ///   The band the knob wears instead of following the sweep, and the binding
+    /// to the bounds it stands for. \see Preferences::showLFOAnimation().
+    auto const none(moduleKnob(0.5f, false));
+    CHECK(differ(none, moduleKnob(0.5f, false, GUI::Highlight::None, {{0.1f, 0.9f}})));
+
+    // ...and it is the *bounds* that are drawn, not merely the fact of them.
+    CHECK(differ(moduleKnob(0.5f, false, GUI::Highlight::None, {{0.1f, 0.9f}}),
+                 moduleKnob(0.5f, false, GUI::Highlight::None, {{0.6f, 0.9f}})));
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note **And the value is not drawn beside it.** The band replaces the
+    /// wedge rather than joining it: an LFO's bounds are absolute over the
+    /// parameter's range rather than an excursion around where it was left, so
+    /// the value under a running LFO is not where the parameter is. Drawn as well
+    /// it was both a wrong answer and, being opaque, the thing covering the right
+    /// one.
+    ///
+    ///   Two values and one band, which is exact where a pixel count is not: with
+    /// the wedge still drawn under the band the two rendered differently, and
+    /// with it drawn over them they differed along the arc they shared -- so
+    /// "something changed" passed either way while nothing useful was visible.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    CHECK_FALSE(differ(moduleKnob(0.0f, false, GUI::Highlight::None, {{0.1f, 0.9f}}),
+                       moduleKnob(1.0f, false, GUI::Highlight::None, {{0.1f, 0.9f}})));
 }
 
 TEST_CASE("Both knobs sweep through the same arc", "[gui][knob]")

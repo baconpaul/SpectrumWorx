@@ -85,12 +85,10 @@ class StripUnderTest
 
         /// \note The strip has to be *selected* and not merely have a control
         /// activated: SharedModuleControls -- which the frequency range lives on
-        /// -- is built by moduleActivated(), and a mouse entering the region is
-        /// the public way in. The preference that gates it is Never by default.
-        /// \see ModuleUI::selectionTracksMouseMovements().
-        LE::SW::GUI::preferences().setModuleUIMouseOverReaction(
-            LE::SW::GUI::Preferences::WhenParentOrNothingSelected);
-        static_cast<juce::Component &>(*pModuleUI).mouseEnter(pressAt(*pModuleUI, 1, 0));
+        /// -- is built by moduleActivated(). The pointer does not select one and
+        /// a headless case has no keyboard to give it, so it is asked directly.
+        /// \see ModuleUI::activate() and issue #210.
+        pModuleUI->activate();
         REQUIRE(editor.selectedModule() == pModuleUI);
 
         pControl_ = &pModuleUI->effectSpecificParameterControl(0);
@@ -305,9 +303,7 @@ TEST_CASE("The frequency range's menu is about the thumb pressed", "[gui][module
     auto *const pModuleUI(editor.regionInSlot(0));
     REQUIRE(pModuleUI != nullptr);
 
-    LE::SW::GUI::preferences().setModuleUIMouseOverReaction(
-        LE::SW::GUI::Preferences::WhenParentOrNothingSelected);
-    static_cast<juce::Component &>(*pModuleUI).mouseEnter(pressAt(*pModuleUI, 1, 0));
+    pModuleUI->activate();
     REQUIRE(editor.selectedModule() == pModuleUI);
     REQUIRE(editor.activeControl() == nullptr);
 
@@ -350,9 +346,9 @@ TEST_CASE("The frequency range's menu is about the thumb pressed", "[gui][module
 /// entries key on, and what "Reset to default value" would have written -- was
 /// about the module's Bypass.
 ///
-/// \note The preference is put back to its default here, which is the harder
-/// half: with `Never` the press may not take the selection, and what the menu is
-/// about must not depend on whether it did.
+/// \note And the pointer never takes the selection, which is the harder half:
+/// the press may leave the knob selected, and what the menu is about must not
+/// depend on whether it did. \see issue #210.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -370,23 +366,20 @@ TEST_CASE("The frequency range's menu is about the thumb pressed while a knob is
     auto *const pModuleUI(editor.regionInSlot(0));
     REQUIRE(pModuleUI != nullptr);
 
-    LE::SW::GUI::preferences().setModuleUIMouseOverReaction(
-        LE::SW::GUI::Preferences::WhenParentOrNothingSelected);
-    static_cast<juce::Component &>(*pModuleUI).mouseEnter(pressAt(*pModuleUI, 1, 0));
+    pModuleUI->activate();
     REQUIRE(editor.selectedModule() == pModuleUI);
 
-    /// \note A knob taking the selection the way the pointer gives it, rather
-    /// than `moduleControlActivated()` -- which builds the strip without making
+    /// \note A knob really taking the selection, rather than
+    /// `moduleControlActivated()` -- which builds the strip without making
     /// anything the *active* control, and it is that pointer the frequency range
-    /// asks about.
+    /// asks about. select() is the click's own step without the keyboard, which
+    /// a headless case cannot give. \see issue #210.
     auto &knob(pModuleUI->effectSpecificParameterControl(0));
-    static_cast<juce::Component &>(knob.widget()).mouseEnter(pressAt(knob.widget(), 1, 0));
+    knob.select();
     REQUIRE(editor.activeControl() == &knob);
 
     auto &range(editor.sharedModuleControls().frequencyRange());
     auto &widget(static_cast<juce::Component &>(range));
-
-    LE::SW::GUI::preferences().setModuleUIMouseOverReaction(LE::SW::GUI::Preferences::Never);
 
     // the sweep that leaves the slider standing for nothing
     widget.mouseEnter(pressAt(range, 1, 0));
@@ -421,7 +414,6 @@ TEST_CASE("The frequency range's menu is about the thumb pressed while a knob is
     CHECK(range.parameterMenuID().binaryValue ==
           idFor(LE::Parameters::IndexOf<Parameters, StopFrequency>::value));
 
-    // ...and the knob kept the halo throughout, the preference saying the pointer
-    // may not take it
+    // ...and the knob kept the ring throughout: the pointer may not take it
     CHECK(editor.activeControl() == &knob);
 }

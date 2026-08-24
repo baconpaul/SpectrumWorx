@@ -138,8 +138,8 @@ template <typename Widget> std::vector<Widget *> descendantsOfType(juce::Compone
 /// box arrived as a fourth and this said so.
 GUI::TitledComboBox &comboBoxOffering(Editor &editor, std::size_t const choices)
 {
-    /// Zoom, colour scheme and mouse-over reaction.
-    std::size_t constexpr onTheInterfacePage{3};
+    /// Zoom and colour scheme, the page's three switches being LEDs.
+    std::size_t constexpr onTheInterfacePage{2};
 
     auto const comboBoxes(descendantsOfType<GUI::TitledComboBox>(editor));
     REQUIRE(comboBoxes.size() == onTheInterfacePage);
@@ -156,18 +156,38 @@ GUI::TitledComboBox &zoomComboBox(Editor &editor)
 {
     return comboBoxOffering(editor, Preferences::zoomPercentages.size());
 }
-GUI::TitledComboBox &mouseOverComboBox(Editor &editor) { return comboBoxOffering(editor, 3); }
 
-/// The one LED on the Interface page, found through the combo boxes so that the
-/// module strips' own LEDs cannot be picked up instead.
-GUI::LEDTextButton &hideCursorButton(Editor &editor)
+/// \brief One of the Interface page's LEDs, by the caption it carries.
+///
+/// \note Found through the zoom box's parent so that the module strips' own LEDs
+/// cannot be picked up instead, and by name because there are three of them.
+GUI::LEDTextButton &ledCaptioned(Editor &editor, juce::String const &caption)
 {
-    auto *const pPage(mouseOverComboBox(editor).getParentComponent());
+    auto *const pPage(zoomComboBox(editor).getParentComponent());
     REQUIRE(pPage != nullptr);
 
     auto const buttons(descendantsOfType<GUI::LEDTextButton>(*pPage));
-    REQUIRE(buttons.size() == 1);
+    REQUIRE(buttons.size() == 3);
+
+    for (auto *const pButton : buttons)
+        if (pButton->getName() == caption)
+            return *pButton;
+
+    FAIL("no LED on the Interface page is captioned " << caption);
     return *buttons.front();
+}
+
+GUI::LEDTextButton &hideCursorButton(Editor &editor)
+{
+    return ledCaptioned(editor, "Hide cursor on knob drag");
+}
+GUI::LEDTextButton &lfoAnimationButton(Editor &editor)
+{
+    return ledCaptioned(editor, "Show LFO animation");
+}
+GUI::LEDTextButton &lfoPreviewButton(Editor &editor)
+{
+    return ledCaptioned(editor, "Preview LFO on hover");
 }
 
 /// An editor with the Interface page up.
@@ -188,7 +208,8 @@ TEST_CASE("With no preferences file every value is at its default", "[gui][prefe
 {
     Preferences const preferences(caseFolder("absent"));
 
-    CHECK(preferences.moduleUIMouseOverReaction() == Preferences::Never);
+    CHECK(preferences.showLFOAnimation());
+    CHECK(preferences.previewLFOOnHover());
     CHECK(preferences.hideCursorOnKnobDrag());
     CHECK(preferences.zoomPercent() == Preferences::defaultZoomPercent);
 
@@ -204,7 +225,8 @@ TEST_CASE("Every preference survives a new instance over the same folder", "[gui
 
     {
         Preferences written(folder);
-        written.setModuleUIMouseOverReaction(Preferences::WhenParentModuleSelected);
+        written.setShowLFOAnimation(false);
+        written.setPreviewLFOOnHover(false);
         written.setPalette(GUI::ColourMap::ClassicRed);
         written.setHideCursorOnKnobDrag(false);
         written.setZoomPercent(75);
@@ -213,7 +235,8 @@ TEST_CASE("Every preference survives a new instance over the same folder", "[gui
     }
 
     Preferences const read(folder);
-    CHECK(read.moduleUIMouseOverReaction() == Preferences::WhenParentModuleSelected);
+    CHECK(!read.showLFOAnimation());
+    CHECK(!read.previewLFOOnHover());
     CHECK(read.palette() == GUI::ColourMap::ClassicRed);
     CHECK(!read.hideCursorOnKnobDrag());
     CHECK(read.zoomPercent() == 75);
@@ -233,15 +256,16 @@ TEST_CASE("The file names its keys and its enumerated values", "[gui][preference
     auto const folder(caseFolder("names"));
 
     Preferences preferences(folder);
-    preferences.setModuleUIMouseOverReaction(Preferences::WhenParentOrNothingSelected);
+    preferences.setPalette(GUI::ColourMap::ClassicGreen);
+    preferences.setShowLFOAnimation(false);
     preferences.setHideCursorOnKnobDrag(false);
     preferences.setZoomPercent(125);
 
     auto const file(contentsOf(preferences.file()));
     CAPTURE(file);
 
-    CHECK(file.find("key=\"moduleUIMouseOverReaction\" value=\"WhenParentOrNothingSelected\"") !=
-          std::string::npos);
+    CHECK(file.find("key=\"palette\" value=\"ClassicGreen\"") != std::string::npos);
+    CHECK(file.find("key=\"showLFOAnimation\" value=\"0\"") != std::string::npos);
     CHECK(file.find("key=\"hideCursorOnKnobDrag\" value=\"0\"") != std::string::npos);
     CHECK(file.find("key=\"zoomPercent\" value=\"125\"") != std::string::npos);
 }
@@ -254,14 +278,14 @@ TEST_CASE("A value this build does not recognise reads as the default", "[gui][p
     write(folder / "SpectrumWorxUserDefaults.xml",
           "<?xml version = \"1.0\" encoding = \"UTF-8\" ?>\n"
           "<defaults version=\"1\">\n"
-          "  <default key=\"moduleUIMouseOverReaction\" value=\"Sideways\" type=\"1\"/>\n"
-          "  <default key=\"palette\" value=\"ClassicRed\" type=\"1\"/>\n"
+          "  <default key=\"palette\" value=\"Sideways\" type=\"1\"/>\n"
           "  <default key=\"zoomPercent\" value=\"300\" type=\"2\"/>\n"
+          "  <default key=\"showLFOAnimation\" value=\"0\" type=\"2\"/>\n"
           "</defaults>\n");
 
     Preferences const preferences(folder);
 
-    CHECK(preferences.moduleUIMouseOverReaction() == Preferences::Never);
+    CHECK(preferences.palette() == GUI::ColourMap::ClassicBlue);
 
     /// \note 300 is a zoom, and a reasonable one -- issue #55 asks for it -- but
     /// it is not one this build offers, and the combo box could show nothing for
@@ -271,7 +295,7 @@ TEST_CASE("A value this build does not recognise reads as the default", "[gui][p
     CHECK(preferences.zoomPercent() == Preferences::defaultZoomPercent);
 
     // ...and neither unreadable key cost it the one beside it.
-    CHECK(preferences.palette() == GUI::ColourMap::ClassicRed);
+    CHECK(!preferences.showLFOAnimation());
 }
 
 TEST_CASE("Every offered zoom scales the skin by its own percentage", "[gui][preferences]")
@@ -310,36 +334,42 @@ TEST_CASE("Every offered zoom scales the skin by its own percentage", "[gui][pre
 TEST_CASE("The Interface page opens showing what is in the preferences", "[gui][preferences]")
 {
     useCaseFolder("pageReads");
-    GUI::preferences().setModuleUIMouseOverReaction(Preferences::WhenParentModuleSelected);
+    GUI::preferences().setZoomPercent(75);
+    GUI::preferences().setShowLFOAnimation(false);
     GUI::preferences().setHideCursorOnKnobDrag(false);
 
     SWTest::HostSideJuce const juce;
     SWTest::Instance instance;
     auto &editor(editorOnTheInterfacePage(instance));
 
-    CHECK(mouseOverComboBox(editor).getSelectedID() == Preferences::WhenParentModuleSelected);
+    CHECK(zoomComboBox(editor).getSelectedID() == 75);
+    CHECK(!lfoAnimationButton(editor).getToggleState());
+    CHECK(lfoPreviewButton(editor).getToggleState());
     CHECK(!hideCursorButton(editor).getToggleState());
 }
 
-TEST_CASE("Choosing a mouse-over reaction on the page writes it to the file", "[gui][preferences]")
+TEST_CASE("Toggling the LFO switches on the page writes them to the file", "[gui][preferences]")
 {
-    useCaseFolder("pageWritesTheComboBox");
-    GUI::preferences().setModuleUIMouseOverReaction(Preferences::Never);
+    useCaseFolder("pageWritesTheLFOLEDs");
+    GUI::preferences().setShowLFOAnimation(true);
+    GUI::preferences().setPreviewLFOOnHover(true);
 
     SWTest::HostSideJuce const juce;
     SWTest::Instance instance;
     auto &editor(editorOnTheInterfacePage(instance));
 
-    auto &comboBox(mouseOverComboBox(editor));
-    comboBox.setSelectedID(Preferences::WhenParentOrNothingSelected);
-    Editor::Settings::comboBoxValueChanged(comboBox);
+    /// \note sendNotificationSync, which is what makes this reachable headlessly:
+    /// juce::Button calls its listeners from inside the call rather than posting.
+    lfoAnimationButton(editor).setToggleState(false, juce::sendNotificationSync);
+    lfoPreviewButton(editor).setToggleState(false, juce::sendNotificationSync);
 
-    CHECK(GUI::preferences().moduleUIMouseOverReaction() ==
-          Preferences::WhenParentOrNothingSelected);
+    CHECK(!GUI::preferences().showLFOAnimation());
+    CHECK(!GUI::preferences().previewLFOOnHover());
 
     // And on disk, which is the half issue #61 was about.
     Preferences const onDisk(GUI::preferences().file().parent_path());
-    CHECK(onDisk.moduleUIMouseOverReaction() == Preferences::WhenParentOrNothingSelected);
+    CHECK(!onDisk.showLFOAnimation());
+    CHECK(!onDisk.previewLFOOnHover());
 }
 
 TEST_CASE("Toggling hide-cursor-on-knob-drag on the page writes it to the file",

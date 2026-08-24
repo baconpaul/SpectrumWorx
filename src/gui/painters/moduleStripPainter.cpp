@@ -23,10 +23,13 @@ namespace LE::SW::GUI
 ////////////////////////////////////////////////////////////////////////////////
 
 void paintModuleStrip(juce::Graphics &graphics, juce::Rectangle<float> const bounds,
-                      bool const selected)
+                      Highlight const highlight)
 {
+    float const halo(highlight == Highlight::Selected  ? 1.0f
+                     : highlight == Highlight::Hovered ? hoverStrength
+                                                       : 0.0f);
     FramePainter::paint(graphics, bounds, moduleStripFrame, ColourMap::getColour(ColourMap::Accent),
-                        ColourMap::getColour(ColourMap::ModuleBackground), selected);
+                        ColourMap::getColour(ColourMap::ModuleBackground), halo);
 }
 
 } // namespace LE::SW::GUI

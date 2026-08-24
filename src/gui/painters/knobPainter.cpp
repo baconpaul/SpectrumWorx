@@ -92,9 +92,9 @@ void KnobPainter::paintCap(juce::Graphics &graphics, juce::Rectangle<float> cons
 }
 
 void KnobPainter::paintFocusRing(juce::Graphics &graphics, juce::Point<float> const centre,
-                                 float const radius)
+                                 float const radius, float const strength)
 {
-    auto const edge(ColourMap::getColour(ColourMap::FocusHalo));
+    auto const edge(ColourMap::getColour(ColourMap::FocusHalo).withMultipliedAlpha(strength));
     auto const reach(radius + focusGlow);
     auto halo(radialAbout(centre, reach, edge.withAlpha(0.0f), edge.withAlpha(0.0f)));
     halo.addColour(radius / reach, edge);

@@ -95,12 +95,20 @@ void ModuleLEDTextButton::paintButton(juce::Graphics &g, bool const isMouseOverB
     /// \note A combo box's selected background, borrowed: this button stands
     /// where one does and says it is the selected control the same way. It was
     /// `paintImage( ModuleComboOn )` while that was a file.
-    if (control().isActive())
-        FramePainter::paint(g,
-                            juce::Rectangle<float>(0, -1, static_cast<float>(moduleComboWidth),
-                                                   static_cast<float>(moduleComboHeight)),
-                            moduleComboFrame, ColourMap::getColour(ColourMap::FocusHalo),
-                            ColourMap::getColour(ColourMap::ComboBackground), true /*halo*/);
+    ///
+    /// \note And the same background at half strength for the control merely
+    /// under the pointer. \see issue #210.
+    if (float const strength(control().isActive()    ? 1.0f
+                             : control().isHovered() ? hoverStrength
+                                                     : 0.0f);
+        strength > 0)
+        FramePainter::paint(
+            g,
+            juce::Rectangle<float>(0, -1, static_cast<float>(moduleComboWidth),
+                                   static_cast<float>(moduleComboHeight)),
+            moduleComboFrame,
+            ColourMap::getColour(ColourMap::FocusHalo).withMultipliedAlpha(strength),
+            ColourMap::getColour(ColourMap::ComboBackground), strength);
     g.setOrigin(3, 1);
     LEDTextButton::paintButton(g, isMouseOverButton, isButtonDown);
 }
@@ -222,9 +230,10 @@ void TriggerButton::paintButton(juce::Graphics &graphics, bool const isMouseOver
     if (fade)
         graphics.endTransparencyLayer();
 
-    if (control().isActive())
+    if (control().isActive() || control().isHovered())
         KnobPainter::paintFocusRing(graphics, face.getCentre().toFloat(),
-                                    static_cast<float>(face.getWidth()) / 2);
+                                    static_cast<float>(face.getWidth()) / 2,
+                                    control().isActive() ? 1.0f : hoverStrength);
 }
 
 ModuleKnob::ModuleKnob(juce::Component &parent, unsigned int const x, unsigned int const y)
@@ -280,6 +289,38 @@ void ModuleKnob::mouseDrag(juce::MouseEvent const &event) noexcept
     Knob::mouseDrag(event);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Where an LFO bound sits on this knob's travel.
+///
+///   An LFO's bounds are normalised over the parameter's own range -- the same
+/// mapping the strip's two-value slider is laid out with -- and the wedge is
+/// drawn in proportion of *length*, which is not the same thing on a skewed
+/// range. So the bound becomes a value first and a position second.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+float ModuleKnob::positionOfLFOBound(float const bound)
+{
+    auto const minimum(getMinimum());
+    auto const maximum(getMaximum());
+    return static_cast<float>(
+        juce::Slider::valueToProportionOfLength(minimum + bound * (maximum - minimum)));
+}
+
+/// \note Nothing at all unless the user has asked for the sweep to be still: with
+/// the animation on, the wedge is already saying everything the band would.
+/// \see Preferences::showLFOAnimation() and issue #210.
+std::optional<juce::Range<float>> ModuleKnob::lfoRangeToDraw()
+{
+    if (preferences().showLFOAnimation() || !isLFOEnabled())
+        return std::nullopt;
+
+    auto const &lfo(control().lfo());
+    return juce::Range<float>(positionOfLFOBound(lfo.lowerBound()),
+                              positionOfLFOBound(lfo.upperBound()));
+}
+
 void ModuleKnob::paint(juce::Graphics &graphics)
 {
     // valueToProportionOfLength() rather than getNormalisedValue(), so a skewed
@@ -290,7 +331,7 @@ void ModuleKnob::paint(juce::Graphics &graphics)
         graphics,
         juce::Rectangle<float>(static_cast<float>(marginForGlow), static_cast<float>(marginForGlow),
                                static_cast<float>(diameter_), static_cast<float>(diameter_)),
-        value, polarity_ == Bipolar, control().isActive());
+        value, polarity_ == Bipolar, highlightFor(control()), lfoRangeToDraw());
 
     graphics.setColour(ColourMap::getColour(ColourMap::Text));
     {
@@ -420,8 +461,17 @@ bool ModuleKnob::isOnKnobFace(juce::Point<int> const position) const
 }
 
 void ModuleKnob::moduleControlActivated() { syncMouseWheelAndLFOState(); }
-void ModuleKnob::moduleControlDeactivated() { setScrollWheelEnabled(false); }
-void ModuleKnob::syncMouseWheelAndLFOState() { setScrollWheelEnabled(!isLFOEnabled()); }
+void ModuleKnob::moduleControlDeactivated() { syncMouseWheelAndLFOState(); }
+void ModuleKnob::moduleControlHoverChanged() { syncMouseWheelAndLFOState(); }
+
+/// \note Hovered as well as selected, which is the wheel half of issue #210: a
+/// knob the pointer is on takes notches without taking the selection. Off for
+/// everything else, which is what keeps a wheel from moving the values of the
+/// knobs a user is scrolling the rack past -- issue #124.
+void ModuleKnob::syncMouseWheelAndLFOState()
+{
+    setScrollWheelEnabled(!isLFOEnabled() && (control().isActive() || control().isHovered()));
+}
 
 #ifdef __GNUC__ //...mrmlj... GCC 4.6, Clang 2.8-3.2
 unsigned int const ModuleKnob::spaceForText /* = 27*/;
@@ -480,29 +530,22 @@ void DiscreteParameter::mouseDown(juce::MouseEvent const &event)
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \note Takes the selection first, exactly as mouseDown() above does and for
-/// the same reason: `moduleParameterChanged()` asserts that the control being
-/// changed is the selected one, which is what puts its LFO on screen. A wheel
-/// that edited a control while a different module stayed selected would be the
-/// state those assertions exist to catch.
+/// \note **The wheel does not select, and used to.** It took the keyboard first,
+/// because `moduleParameterChanged()` asserted that the control being changed was
+/// the selected one -- so a notch over a box moved the LFO strip and the shared
+/// controls to it, and it needed a window to do so at all, focus being the
+/// window manager's to refuse.
 ///
-/// \note Which means a wheel needs a window, since focus does. That is a real
-/// cost and it is paid where the click already pays it. \see
-/// tests/gui/moduleControlFocusTests.cpp.
+///   A control under the pointer may now be edited without being selected, which
+/// is what the wheel wanted all along. \see issue #210, and
+/// ModuleKnob::syncMouseWheelAndLFOState() for the knob's half of the same
+/// change.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
 void DiscreteParameter::mouseWheelMove(juce::MouseEvent const &event,
                                        juce::MouseWheelDetails const &wheel)
 {
-    if (!hasDirectFocus())
-    {
-        juce::Component::SafePointer<juce::Component> const self(this);
-        grabKeyboardFocus();
-        if (!self || !hasDirectFocus())
-            return;
-    }
-
     if (isLFOEnabled())
         return;
 
@@ -672,7 +715,10 @@ void ModuleUI::moveToSlot(std::uint8_t const slotIndex)
 
 void ModuleUI::paint(juce::Graphics &graphics)
 {
-    paintModuleStrip(graphics, getLocalBounds().toFloat(), selected());
+    paintModuleStrip(graphics, getLocalBounds().toFloat(),
+                     selected()  ? Highlight::Selected
+                     : hovered() ? Highlight::Hovered
+                                 : Highlight::None);
     graphics.setColour(ColourMap::getColour(ColourMap::Accent));
     graphics.drawHorizontalLine(nameRule, static_cast<float>(ModuleUI::border),
                                 Math::convert<float>(getWidth() - ModuleUI::border));
@@ -739,29 +785,34 @@ void ModuleUI::mouseUp(juce::MouseEvent const &event) noexcept
         editor().moduleDragEnd(*this, event);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note **The pointer marks the strip, it does not select it.** These were
+/// `activate()` and `deactivate()` behind a preference that decided whether a
+/// sweep across the rack should move the selection -- which took the LFO strip
+/// and the shared controls with it, and is what issue #139 spent its length
+/// defending against. \see issue #210.
+///
+/// \note Nothing here needs to ask where the pointer went. Moving onto one of
+/// this strip's own controls sends this an exit and that control an enter, in
+/// that order and before anything is painted, and the control puts the strip's
+/// hover straight back. \see SpectrumWorxEditor::moduleControlHovered().
+///
+////////////////////////////////////////////////////////////////////////////////
+
 void ModuleUI::mouseEnter(juce::MouseEvent const &event)
 {
     updateCursorFor(event.getPosition());
-
-    if (selectionTracksMouseMovements())
-        activate();
+    editor().moduleHovered(*this);
 }
 
 void ModuleUI::mouseMove(juce::MouseEvent const &event) { updateCursorFor(event.getPosition()); }
 
-void ModuleUI::mouseExit(juce::MouseEvent const &event) noexcept
-{
-    /// \note In some strange cases (e.g. while a ComboBox drop down menu is
-    /// open and the mouse is moved over a module) JUCE will call mouseExit()
-    /// without first calling mouseEnter().
-    ///                                       (24.05.2012.) (Domagoj Saric)
-    if (!editor().selectedModule())
-        return;
-
-    if (selectionTracksMouseMovements() &&
-        !juce::Rectangle<int>(0, 0, width, height).contains(event.x, event.y))
-        deactivate();
-}
+/// \note In some strange cases (e.g. while a ComboBox drop down menu is open and
+/// the mouse is moved over a module) JUCE will call mouseExit() without first
+/// calling mouseEnter() -- which moduleUnhovered() answers by doing nothing.
+///                                           (24.05.2012.) (Domagoj Saric)
+void ModuleUI::mouseExit(juce::MouseEvent const &) noexcept { editor().moduleUnhovered(*this); }
 
 void ModuleUI::focusGained(FocusChangeType)
 {
@@ -787,7 +838,6 @@ void ModuleUI::focusOfChildComponentChanged(FocusChangeType const changeType)
 
 void ModuleUI::activate()
 {
-    LE_ASSERT(hasFocus() || selectionTracksMouseMovements());
     if (this->selected())
         return;
 
@@ -811,23 +861,6 @@ void ModuleUI::activate()
     repaint();
 }
 
-void ModuleUI::deactivate()
-{
-    LE_ASSERT(selected());
-    LE_ASSERT(!hasFocus());
-
-    editor().moduleDeactivated();
-    editor().pSelectedModule_ = nullptr;
-    repaint();
-}
-
-bool ModuleUI::selectionTracksMouseMovements() const
-{
-    return (preferences().moduleUIMouseOverReaction() ==
-            Preferences::WhenParentOrNothingSelected) &&
-           ModuleControlBase::noModuleOrModuleControlFocused(editor());
-}
-
 namespace
 {
 auto const bypassIndex = LE::Parameters::IndexOf<Effects::BaseParameters::Parameters,
@@ -837,7 +870,7 @@ void setParameterControl(ModuleControlBase &control, float const parameterValue,
                          ModuleUI::ParameterChangeSource const source)
 {
     control.setValue(parameterValue);
-    if ((source == ModuleUI::AutomationOrPreset) && control.isActive())
+    if ((source == ModuleUI::AutomationOrPreset) && control.isDisplayed())
     {
         SpectrumWorxEditor::fromChild(control.widget()).updateActiveControlValue();
     }
@@ -981,6 +1014,7 @@ SpectrumWorxEditor &ModuleUI::editor() { return editor_; }
 SpectrumWorxEditor const &ModuleUI::editor() const { return editor_; }
 
 bool ModuleUI::selected() const { return this == editor().selectedModule(); }
+bool ModuleUI::hovered() const { return this == editor().hoveredModule(); }
 
 SharedModuleControls &ModuleUI::sharedControls()
 {
