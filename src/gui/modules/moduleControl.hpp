@@ -115,8 +115,6 @@ template <class ImplWidget> class ModuleControl : public ParameterMenu
   protected: // Default implementations for the module control interface callbacks
     static void lfoStateChanged() {};
 
-    static void focusChanged() {}
-
     static void moduleControlActivated() {}
     static void moduleControlDeactivated() {}
 
@@ -203,6 +201,8 @@ class ModuleControlBase
     //...mrmlj...excludes non-lfoable parameters (Bypass)...
     std::uint8_t moduleParameterIndex() const { return parameterIndex_; }
 
+    /// \brief Whether this is the selected control -- the one the LFO strip is
+    /// showing, and the one wearing the halo. Not the keyboard. \see issue #139.
     bool isActive() const;
 
     bool isLFOEnabled() const;
@@ -298,7 +298,7 @@ class ModuleControlBase
 
   protected:
     bool reportActiveControl(double minimum, double maximum, double interval);
-    bool reportInactiveControl() const;
+    bool reportInactiveControl();
 
     void configureControl(bool mouseClickCanGrabFocus);
 
@@ -410,17 +410,20 @@ class ModuleControlImpl final : public ModuleControlBase, public ImplWidget
     {
         LE_ASSERT(this->getWantsKeyboardFocus());
         reportActiveControl();
-        ImplWidget::focusChanged();
     }
     ////////////////////////////////////////////////////////////////////////////
     ///
-    /// \note **The halo, and nothing else.** Losing the keyboard is not losing
-    /// the selection: this used to retire the LFO strip, on the assumption that
-    /// the focus was on its way to another module control. It goes to a preset
-    /// row, a settings box, a host's automation panel or another application at
-    /// least as often, and each of those wiped the strip the user had just set
-    /// up. The selection is handed over by whoever takes it instead.
+    /// \note **Deliberately nothing.** Losing the keyboard is not losing the
+    /// selection: this used to retire the LFO strip, on the assumption that the
+    /// focus was on its way to another module control. It goes to a preset row, a
+    /// settings box, a host's automation panel or another application at least as
+    /// often, and each of those wiped the strip the user had just set up. The
+    /// selection is handed over by whoever takes it instead.
     /// \see reportActiveControl() and issue #139.
+    ///
+    /// \note Which is why the halo is not drawn on the focus either -- it says
+    /// which control the LFO strip is showing, and a control keeps that when the
+    /// keyboard leaves. \see ModuleControlBase::isActive().
     ///
     /// \note Which retires three guards with it. There is no longer a tear-down
     /// to keep away from an open menu -- the knob's own right button menu takes
@@ -432,10 +435,7 @@ class ModuleControlImpl final : public ModuleControlBase, public ImplWidget
     /// more.
     ///
     ////////////////////////////////////////////////////////////////////////////
-    virtual void focusLost(juce::Component::FocusChangeType) noexcept override
-    {
-        ImplWidget::focusChanged();
-    }
+    virtual void focusLost(juce::Component::FocusChangeType) noexcept override {}
 
     virtual void mouseEnter(juce::MouseEvent const &) override { reportActiveControl(); }
     virtual void mouseExit(juce::MouseEvent const &) noexcept override { mouseLeft(); }

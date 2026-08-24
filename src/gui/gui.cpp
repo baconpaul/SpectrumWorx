@@ -669,7 +669,7 @@ void ComboBox::paint(juce::Graphics &graphics)
         graphics,
         juce::Rectangle<float>(0, 0, static_cast<float>(getWidth()),
                                static_cast<float>(boxHeight_)),
-        frame_, ColourMap::getColour(hasDirectFocus() ? ColourMap::FocusHalo : ColourMap::Accent),
+        frame_, ColourMap::getColour(showsAsSelected() ? ColourMap::FocusHalo : ColourMap::Accent),
         ColourMap::getColour(ColourMap::ComboBackground), true /*halo*/);
 
     graphics.setColour(ColourMap::getColour(ColourMap::Text));
@@ -1749,18 +1749,5 @@ void addEnumeratedParameterValueStringsToComboBox(LE::Utility::Span<char const *
     comboBox.setValue(0);
 }
 } // namespace Detail
-
-// The LFO update policy. Here rather than on Theme because these ask about a
-// ModuleControlBase and a ModuleUI, neither of which a LookAndFeel should know
-// exist.
-
-bool shouldUpdateLFOControl(ModuleControlBase const &control)
-{
-    Preferences::LFOUpdateBehaviour const lfoUpdateBehaviour(preferences().lfoUpdateBehaviour());
-    return (lfoUpdateBehaviour == Preferences::Always) ||
-           (lfoUpdateBehaviour == Preferences::WhenControlActive && control.isActive()) ||
-           (lfoUpdateBehaviour == Preferences::WhenControlSelected &&
-            Detail::hasDirectFocus(control.widget()));
-}
 
 } // namespace LE::SW::GUI

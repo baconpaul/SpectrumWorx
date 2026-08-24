@@ -3191,10 +3191,6 @@ void SpectrumWorxEditor::Settings::comboBoxValueChanged(ComboBox const &comboBox
         preferences().setModuleUIMouseOverReaction(
             static_cast<Preferences::ModuleUIMouseOverReaction>(value));
     }
-    else if (&comboBox == &settings.interfacePage_.lfoUpdateComboBox())
-    {
-        preferences().setLFOUpdateBehaviour(static_cast<Preferences::LFOUpdateBehaviour>(value));
-    }
     else
     {
         LE_UNREACHABLE_CODE();
@@ -3331,8 +3327,7 @@ SpectrumWorxEditor::Settings::InterfacePage::InterfacePage()
       palette_(*this, xMargin, yMargin + 1 * yStep + yOffset, "Color Scheme"),
       moduleUIMouseOverReaction_(*this, xMargin, yMargin + 2 * yStep + yOffset,
                                  "Mouse Over Reaction"),
-      lfoUpdateBehaviour_(*this, xMargin, yMargin + 3 * yStep + yOffset, "LFO Update Behaviour"),
-      hideCursorOnKnobDrag_(*this, xMargin - 4, yMargin + 4 * yStep + yOffset,
+      hideCursorOnKnobDrag_(*this, xMargin - 4, yMargin + 3 * yStep + yOffset,
                             "Hide cursor on knob drag")
 {
     Settings &parent(
@@ -3371,12 +3366,6 @@ SpectrumWorxEditor::Settings::InterfacePage::InterfacePage()
     moduleUIMouseOverReaction_.addItem(Preferences::WhenParentModuleSelected, "Module selected");
     moduleUIMouseOverReaction_.addItem(Preferences::WhenParentOrNothingSelected, "Always");
     moduleUIMouseOverReaction_.setSelectedIndex(preferences().moduleUIMouseOverReaction());
-
-    lfoUpdateBehaviour_.addItem(Preferences::NoUpdate, "Never");
-    lfoUpdateBehaviour_.addItem(Preferences::WhenControlSelected, "Control selected");
-    lfoUpdateBehaviour_.addItem(Preferences::WhenControlActive, "Control active");
-    lfoUpdateBehaviour_.addItem(Preferences::Always, "Always");
-    lfoUpdateBehaviour_.setSelectedIndex(preferences().lfoUpdateBehaviour());
 
     hideCursorOnKnobDrag_.setToggleState(preferences().hideCursorOnKnobDrag(),
                                          juce::dontSendNotification);

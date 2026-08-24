@@ -92,10 +92,10 @@ void ModuleLEDTextButton::mouseDown(juce::MouseEvent const &event)
 void ModuleLEDTextButton::paintButton(juce::Graphics &g, bool const isMouseOverButton,
                                       bool const isButtonDown)
 {
-    /// \note A combo box's focused background, borrowed: this button stands
-    /// where one does and says it has the focus the same way. It was
+    /// \note A combo box's selected background, borrowed: this button stands
+    /// where one does and says it is the selected control the same way. It was
     /// `paintImage( ModuleComboOn )` while that was a file.
-    if (hasDirectFocus())
+    if (control().isActive())
         FramePainter::paint(g,
                             juce::Rectangle<float>(0, -1, static_cast<float>(moduleComboWidth),
                                                    static_cast<float>(moduleComboHeight)),
@@ -222,7 +222,7 @@ void TriggerButton::paintButton(juce::Graphics &graphics, bool const isMouseOver
     if (fade)
         graphics.endTransparencyLayer();
 
-    if (this->hasDirectFocus())
+    if (control().isActive())
         KnobPainter::paintFocusRing(graphics, face.getCentre().toFloat(),
                                     static_cast<float>(face.getWidth()) / 2);
 }
@@ -286,8 +286,7 @@ void ModuleKnob::paint(juce::Graphics &graphics)
         graphics,
         juce::Rectangle<float>(static_cast<float>(marginForGlow), static_cast<float>(marginForGlow),
                                static_cast<float>(diameter_), static_cast<float>(diameter_)),
-        value, polarity_ == Bipolar, !control().isLFOEnabled() || shouldUpdateLFOControl(control()),
-        this->hasDirectFocus());
+        value, polarity_ == Bipolar, control().isActive());
 
     graphics.setColour(ColourMap::getColour(ColourMap::Text));
     {
@@ -543,8 +542,6 @@ void DiscreteParameter::addParameterValueEntries(juce::PopupMenu &menu)
 }
 
 void DiscreteParameter::selectionScrolled() { moduleParameterChanged(); }
-
-void DiscreteParameter::focusChanged() { repaint(); }
 
 #pragma warning(push)
 #pragma warning(disable : 4355) // 'this' used in base member initializer list.
@@ -837,10 +834,7 @@ auto const bypassIndex = LE::Parameters::IndexOf<Effects::BaseParameters::Parame
 void setParameterControl(ModuleControlBase &control, float const parameterValue,
                          ModuleUI::ParameterChangeSource const source)
 {
-    if ((source != ModuleUI::LFOValue) || shouldUpdateLFOControl(control))
-    {
-        control.setValue(parameterValue);
-    }
+    control.setValue(parameterValue);
     if ((source == ModuleUI::AutomationOrPreset) && control.isActive())
     {
         SpectrumWorxEditor::fromChild(control.widget()).updateActiveControlValue();

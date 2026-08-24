@@ -138,8 +138,8 @@ template <typename Widget> std::vector<Widget *> descendantsOfType(juce::Compone
 /// box arrived as a fourth and this said so.
 GUI::TitledComboBox &comboBoxOffering(Editor &editor, std::size_t const choices)
 {
-    /// Zoom, colour scheme, mouse-over reaction and LFO update behaviour.
-    std::size_t constexpr onTheInterfacePage{4};
+    /// Zoom, colour scheme and mouse-over reaction.
+    std::size_t constexpr onTheInterfacePage{3};
 
     auto const comboBoxes(descendantsOfType<GUI::TitledComboBox>(editor));
     REQUIRE(comboBoxes.size() == onTheInterfacePage);
@@ -157,7 +157,6 @@ GUI::TitledComboBox &zoomComboBox(Editor &editor)
     return comboBoxOffering(editor, Preferences::zoomPercentages.size());
 }
 GUI::TitledComboBox &mouseOverComboBox(Editor &editor) { return comboBoxOffering(editor, 3); }
-GUI::TitledComboBox &lfoUpdateComboBox(Editor &editor) { return comboBoxOffering(editor, 4); }
 
 /// The one LED on the Interface page, found through the combo boxes so that the
 /// module strips' own LEDs cannot be picked up instead.
@@ -190,7 +189,6 @@ TEST_CASE("With no preferences file every value is at its default", "[gui][prefe
     Preferences const preferences(caseFolder("absent"));
 
     CHECK(preferences.moduleUIMouseOverReaction() == Preferences::Never);
-    CHECK(preferences.lfoUpdateBehaviour() == Preferences::Always);
     CHECK(preferences.hideCursorOnKnobDrag());
     CHECK(preferences.zoomPercent() == Preferences::defaultZoomPercent);
 
@@ -207,7 +205,7 @@ TEST_CASE("Every preference survives a new instance over the same folder", "[gui
     {
         Preferences written(folder);
         written.setModuleUIMouseOverReaction(Preferences::WhenParentModuleSelected);
-        written.setLFOUpdateBehaviour(Preferences::WhenControlActive);
+        written.setPalette(GUI::ColourMap::ClassicRed);
         written.setHideCursorOnKnobDrag(false);
         written.setZoomPercent(75);
 
@@ -216,7 +214,7 @@ TEST_CASE("Every preference survives a new instance over the same folder", "[gui
 
     Preferences const read(folder);
     CHECK(read.moduleUIMouseOverReaction() == Preferences::WhenParentModuleSelected);
-    CHECK(read.lfoUpdateBehaviour() == Preferences::WhenControlActive);
+    CHECK(read.palette() == GUI::ColourMap::ClassicRed);
     CHECK(!read.hideCursorOnKnobDrag());
     CHECK(read.zoomPercent() == 75);
 }
@@ -236,7 +234,6 @@ TEST_CASE("The file names its keys and its enumerated values", "[gui][preference
 
     Preferences preferences(folder);
     preferences.setModuleUIMouseOverReaction(Preferences::WhenParentOrNothingSelected);
-    preferences.setLFOUpdateBehaviour(Preferences::WhenControlSelected);
     preferences.setHideCursorOnKnobDrag(false);
     preferences.setZoomPercent(125);
 
@@ -244,8 +241,6 @@ TEST_CASE("The file names its keys and its enumerated values", "[gui][preference
     CAPTURE(file);
 
     CHECK(file.find("key=\"moduleUIMouseOverReaction\" value=\"WhenParentOrNothingSelected\"") !=
-          std::string::npos);
-    CHECK(file.find("key=\"lfoUpdateBehaviour\" value=\"WhenControlSelected\"") !=
           std::string::npos);
     CHECK(file.find("key=\"hideCursorOnKnobDrag\" value=\"0\"") != std::string::npos);
     CHECK(file.find("key=\"zoomPercent\" value=\"125\"") != std::string::npos);
@@ -260,7 +255,7 @@ TEST_CASE("A value this build does not recognise reads as the default", "[gui][p
           "<?xml version = \"1.0\" encoding = \"UTF-8\" ?>\n"
           "<defaults version=\"1\">\n"
           "  <default key=\"moduleUIMouseOverReaction\" value=\"Sideways\" type=\"1\"/>\n"
-          "  <default key=\"lfoUpdateBehaviour\" value=\"WhenControlActive\" type=\"1\"/>\n"
+          "  <default key=\"palette\" value=\"ClassicRed\" type=\"1\"/>\n"
           "  <default key=\"zoomPercent\" value=\"300\" type=\"2\"/>\n"
           "</defaults>\n");
 
@@ -276,7 +271,7 @@ TEST_CASE("A value this build does not recognise reads as the default", "[gui][p
     CHECK(preferences.zoomPercent() == Preferences::defaultZoomPercent);
 
     // ...and neither unreadable key cost it the one beside it.
-    CHECK(preferences.lfoUpdateBehaviour() == Preferences::WhenControlActive);
+    CHECK(preferences.palette() == GUI::ColourMap::ClassicRed);
 }
 
 TEST_CASE("Every offered zoom scales the skin by its own percentage", "[gui][preferences]")
@@ -316,7 +311,6 @@ TEST_CASE("The Interface page opens showing what is in the preferences", "[gui][
 {
     useCaseFolder("pageReads");
     GUI::preferences().setModuleUIMouseOverReaction(Preferences::WhenParentModuleSelected);
-    GUI::preferences().setLFOUpdateBehaviour(Preferences::NoUpdate);
     GUI::preferences().setHideCursorOnKnobDrag(false);
 
     SWTest::HostSideJuce const juce;
@@ -324,7 +318,6 @@ TEST_CASE("The Interface page opens showing what is in the preferences", "[gui][
     auto &editor(editorOnTheInterfacePage(instance));
 
     CHECK(mouseOverComboBox(editor).getSelectedID() == Preferences::WhenParentModuleSelected);
-    CHECK(lfoUpdateComboBox(editor).getSelectedID() == Preferences::NoUpdate);
     CHECK(!hideCursorButton(editor).getToggleState());
 }
 

@@ -8,7 +8,7 @@
 ///
 ///   How they *look* is checked by looking: `sw-show-ui knobs` is a contact
 /// sheet of both knobs across their whole travel, in both polarities, both
-/// sizes, focused and LFO-driven, and reading it takes a second. That is the
+/// sizes, selected and not, and reading it takes a second. That is the
 /// right instrument for a drawing, and it is the one to reach for when
 /// ModuleKnobStyle or EditorKnobStyle is touched.
 ///
@@ -25,9 +25,9 @@
 ///
 /// \note A fuller set lived here while the port was being verified: which
 /// 10-degree sectors the wedge grew into, that it opened from the left stop when
-/// unipolar and from twelve o'clock when bipolar, that the focus ring changed
-/// nothing inside the face, and the pointer's bearing recovered from the render
-/// by high-passing an angular profile. All of it passed, and all of it was
+/// unipolar and from twelve o'clock when bipolar, that the halo changed nothing
+/// inside the face, and the pointer's bearing recovered from the render by
+/// high-passing an angular profile. All of it passed, and all of it was
 /// scaffolding for one change -- measuring by machine what the contact sheet
 /// says at a glance. It is in the history if a knob ever needs re-fitting.
 ///
@@ -62,10 +62,10 @@ template <typename Painter> juce::Image render(Painter &&paint)
     return image;
 }
 
-juce::Image moduleKnob(float const value, bool const bipolar, bool const drawWedge = true)
+juce::Image moduleKnob(float const value, bool const bipolar)
 {
     return render([&](juce::Graphics &graphics, juce::Rectangle<float> const bounds) {
-        GUI::paintModuleKnob(graphics, bounds, value, bipolar, drawWedge, false /*focus*/);
+        GUI::paintModuleKnob(graphics, bounds, value, bipolar, false /*not selected*/);
     });
 }
 
@@ -103,26 +103,6 @@ TEST_CASE("Both knobs draw the value they are given", "[gui][knob]")
     // ...and the polarity is a parameter rather than a decoration: at the centre
     // of the range a unipolar wedge is half open and a bipolar one is shut.
     CHECK(differ(moduleKnob(0.5f, false), moduleKnob(0.5f, true)));
-}
-
-TEST_CASE("An LFO driven module knob shows no value at all", "[gui][knob]")
-{
-    juce::ScopedJuceInitialiser_GUI const juceInitialiser;
-
-    //   The knob's own value says nothing while an LFO drives the parameter, so
-    // no part of the drawing may depend on it. Not just the wedge: the cap
-    // follows how far the wedge has opened, and sizing it off a value the knob
-    // is not showing is the way this leaks -- which it did, until it was looked
-    // at on the contact sheet.
-    auto const driven(moduleKnob(0.0f, false, false /*no wedge*/));
-    for (float value(0.25f); value <= 1.0f; value += 0.25f)
-    {
-        INFO("value " << value);
-        CHECK_FALSE(differ(driven, moduleKnob(value, false, false)));
-    }
-
-    // And it is a real difference from the same knob showing that value.
-    CHECK(differ(driven, moduleKnob(1.0f, false, true)));
 }
 
 TEST_CASE("Both knobs sweep through the same arc", "[gui][knob]")
