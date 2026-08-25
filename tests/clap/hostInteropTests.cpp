@@ -39,6 +39,7 @@
 #include "core/parameterID.hpp"
 #include "core/threading/threadCheck.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstring>
@@ -65,6 +66,22 @@ clap_param_info firstGlobalParameter(clap_plugin const &plugin, clap_plugin_para
         if (std::strcmp(info.module, "Global") == 0)
             return info;
     FAIL("no global parameter");
+    return {};
+}
+
+/// \brief The slot selector for module \p slot, as the host is shown it.
+clap_param_info slotSelector(clap_plugin const &plugin, clap_plugin_params const &params,
+                             std::uint8_t const slot)
+{
+    for (auto const &info : allParameterInfo(plugin, params))
+    {
+        LE::SW::ParameterID parameterID;
+        parameterID.binaryValue = info.id;
+        if ((parameterID.type() == LE::SW::ParameterID::ModuleChainParameter) &&
+            (parameterID.value._.moduleChain.moduleIndex == slot))
+            return info;
+    }
+    FAIL("no slot selector for that module");
     return {};
 }
 
@@ -181,14 +198,18 @@ TEST_CASE("The same host is not marked dirty from inside the audio callback", "[
     // this different from the deferral a thread-check-less host gets. The plugin
     // asks, is told this is not the main thread, and defers on the strength of
     // the answer rather than on the absence of one.
+    //
+    // A slot change carries it, since issue #225: an ordinary parameter write is
+    // implicitly dirty and no longer announces itself, so it would leave nothing
+    // to defer. Filling a slot changes the shape of the parameter list.
     Entry const entry;
     TestHost host{TestHost::everything()};
     ActivePlugin plugin(48000, 512, host);
 
     auto const &params(parameters(*plugin));
-    auto const global(firstGlobalParameter(*plugin, params));
+    auto const selector(slotSelector(*plugin, params, 0));
 
-    OneParameterEvent const edit(global.id, aDifferentValue(*plugin, params, global));
+    OneParameterEvent const edit(selector.id, selector.min_value + 1);
 
     std::vector<float> leftIn(512, 0.0f), rightIn(512, 0.0f);
     std::vector<float> leftOut(512), rightOut(512);
@@ -206,6 +227,50 @@ TEST_CASE("The same host is not marked dirty from inside the audio callback", "[
 ////////////////////////////////////////////////////////////////////////////////
 // What the editor sends out
 ////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A parameter the host writes reaches the main thread unprompted", "[clap][host]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    ///   The engine applies a host's write on the audio thread and echoes it over
+    /// `toUI_`; `drainEngineEvents()` is what turns that into `programMain_` and
+    /// a moving control, and it runs on the callback. So the push has to *ask*
+    /// for one -- nothing else on this path will.
+    ///
+    ///   It used to arrive by accident. `markSessionAsUnsaved()` deferred through
+    /// `request_callback`, so every parameter event armed a callback whether or
+    /// not anything needed draining, and issue #225 stopped calling it. The suite
+    /// stayed green: automation moved nothing until a save or a gesture happened
+    /// past, and then the whole backlog arrived at once.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    Entry const entry;
+    TestHost host{TestHost::everything()};
+    ActivePlugin plugin(48000, 512, host);
+
+    auto const &params(parameters(*plugin));
+    auto const global(firstGlobalParameter(*plugin, params));
+    auto const wanted(aDifferentValue(*plugin, params, global));
+
+    unsigned const callbacksBefore(host.mainThreadCallbacks);
+
+    OneParameterEvent const write(global.id, wanted);
+
+    std::vector<float> leftIn(512, 0.0f), rightIn(512, 0.0f);
+    std::vector<float> leftOut(512), rightOut(512);
+    plugin.process(leftIn, rightIn, leftOut, rightOut, nullptr, &*write);
+
+    // the ask, which is the half that went missing
+    CHECK(host.mainThreadCallbacks > callbacksBefore);
+
+    // and what the ask is for: the main thread's copy, which paramsValue answers
+    // from and which a control redraws off
+    plugin.pumpMainThread();
+
+    double readBack{0};
+    REQUIRE(params.get_value(&*plugin, global.id, &readBack));
+    CHECK(readBack == Catch::Approx(wanted));
+}
 
 TEST_CASE("A knob drag reaches the host as a balanced gesture around its value", "[clap][host]")
 {
@@ -646,25 +711,6 @@ TEST_CASE("Learning the host's tempo does not move the LFO periods", "[clap][hos
 // What counts as the chain having changed
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace
-{
-/// \brief The slot selector for module \p slot, as the host is shown it.
-clap_param_info slotSelector(clap_plugin const &plugin, clap_plugin_params const &params,
-                             std::uint8_t const slot)
-{
-    for (auto const &info : allParameterInfo(plugin, params))
-    {
-        LE::SW::ParameterID parameterID;
-        parameterID.binaryValue = info.id;
-        if ((parameterID.type() == LE::SW::ParameterID::ModuleChainParameter) &&
-            (parameterID.value._.moduleChain.moduleIndex == slot))
-            return info;
-    }
-    FAIL("no slot selector for that module");
-    return {};
-}
-} // anonymous namespace
-
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \note The regression this file exists to hold on to. `handleEvent()` decides
@@ -678,10 +724,12 @@ clap_param_info slotSelector(clap_plugin const &plugin, clap_plugin_params const
 /// it write the parameter set back. \see issue #172 and the note on the return
 /// value in `handleEvent()`.
 ///
-/// \note `rescanFlags` and not `mainThreadCallbacks`, which cannot tell these
-/// cases apart: `markCurrentProgramAsModified()` asks for a callback on the same
-/// path, so *any* parameter event arms one. What is being pinned is narrower --
-/// that the callback, when it runs, has no rescan to deliver.
+/// \note `rescanFlags` and not `mainThreadCallbacks`. It used to be that
+/// `markCurrentProgramAsModified()` armed a callback on the same path, so *any*
+/// parameter event set one going and the two cases could not be told apart that
+/// way; since issue #225 only a chain change does. The narrower claim is the one
+/// worth pinning either way -- that the callback, when it runs, has no rescan to
+/// deliver.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 

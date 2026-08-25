@@ -804,7 +804,10 @@ bool SpectrumWorxCLAP::handleEvent(clap_event_header const *const header)
 
     // the host moving a parameter is an edit; drainCommands() applying what the
     // interface queued is not, the interface having already reported it
-    markCurrentProgramAsModified();
+    //
+    // the flag alone, as an editor edit gets: the host wrote this one, and
+    // ext/state.h makes a parameter change dirty without being told \see #225
+    markCurrentProgramAsEdited();
 
     // the main thread's copy of the same state, and not gated on there being an
     // editor: paramsValue and stateSave read programMain_ with the window shut
@@ -815,8 +818,11 @@ bool SpectrumWorxCLAP::handleEvent(clap_event_header const *const header)
     // a dropped echo leaves programMain_ behind the engine for that parameter
     // permanently, this being the only thing that carries a host's write across
     if (applied == Plugins::ErrorCode<Protocol>::Success)
+    {
         pushed(toUI_.push(Threading::baseParameterChanged(parameterID.binaryValue, value)),
                "The echo queue is full; the main thread's Program is now behind the engine.");
+        requestEchoDrain();
+    }
 
     // only a module-chain parameter changes what the *other* parameters are: it
     // decides which effect a slot holds, and so how many that slot has and what
@@ -838,6 +844,14 @@ bool SpectrumWorxCLAP::handleEvent(clap_event_header const *const header)
         requestRescan(CLAP_PARAM_RESCAN_VALUES);
 
     return isSlotSelector && (effectBefore != effectAfter);
+}
+
+/// \note `[thread-safe]`, which `clap_host::request_callback` is, and reached
+/// from the audio thread.
+void SpectrumWorxCLAP::requestEchoDrain()
+{
+    if (!pendingEchoDrain_.exchange(true, std::memory_order_acq_rel))
+        _host.requestCallback();
 }
 
 void SpectrumWorxCLAP::requestRescan(clap_param_rescan_flags const flags)
@@ -1209,6 +1223,9 @@ void SpectrumWorxCLAP::runEngine(clap_process const *const process, std::uint32_
 
 void SpectrumWorxCLAP::onMainThread() noexcept
 {
+    // cleared before the drain, so an echo pushed while it runs asks again
+    // rather than being swallowed
+    pendingEchoDrain_.store(false, std::memory_order_release);
     drainEngineEvents();
 
     // the other half of the fallback in process(): resync for the failure case,
