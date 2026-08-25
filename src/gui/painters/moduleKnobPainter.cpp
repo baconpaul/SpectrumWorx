@@ -28,7 +28,8 @@ namespace LE::SW::GUI
 ////////////////////////////////////////////////////////////////////////////////
 
 void paintModuleKnob(juce::Graphics &graphics, juce::Rectangle<float> const bounds,
-                     float const normalisedValue, bool const bipolar, bool const selected)
+                     float const normalisedValue, bool const bipolar, Highlight const highlight,
+                     std::optional<juce::Range<float>> const lfoRange)
 {
     using namespace ModuleKnobStyle;
 
@@ -43,25 +44,44 @@ void paintModuleKnob(juce::Graphics &graphics, juce::Rectangle<float> const boun
     /// \note How far the wedge has opened, which the cap's radius follows.
     auto const openness(bipolar ? std::abs(2 * value - 1) : value);
 
-    // The far edge is the value; the near one is the stop it opens from.
-    auto const to(KnobPainter::angleFor(value));
-    auto const from(bipolar ? 0.0f : -KnobPainter::halfSweepDegrees);
-    juce::Path pie;
-    pie.addPieSegment(
-        bounds.withSizeKeepingCentre(2 * radius * wedgeRadius, 2 * radius * wedgeRadius),
-        juce::degreesToRadians(std::min(from, to)), juce::degreesToRadians(std::max(from, to)),
-        0.0f);
-    graphics.setColour(ColourMap::getColour(ColourMap::Accent));
-    graphics.fillPath(pie);
+    auto const fillArc([&](float const one, float const other, ColourMap::Name const colour) {
+        juce::Path pie;
+        pie.addPieSegment(
+            bounds.withSizeKeepingCentre(2 * radius * wedgeRadius, 2 * radius * wedgeRadius),
+            juce::degreesToRadians(std::min(one, other)),
+            juce::degreesToRadians(std::max(one, other)), 0.0f);
+        graphics.setColour(ColourMap::getColour(colour));
+        graphics.fillPath(pie);
+    });
 
-    auto const cap(capRadiusClosed + (capRadiusOpen - capRadiusClosed) * openness);
+    if (lfoRange)
+        // between the two bounds, where the value would be from a stop to itself
+        fillArc(KnobPainter::angleFor(juce::jlimit(0.0f, 1.0f, lfoRange->getStart())),
+                KnobPainter::angleFor(juce::jlimit(0.0f, 1.0f, lfoRange->getEnd())),
+                ColourMap::ModuleKnobLFORange);
+    else
+        // the far edge is the value; the near one is the stop it opens from
+        fillArc(KnobPainter::angleFor(value), bipolar ? 0.0f : -KnobPainter::halfSweepDegrees,
+                ColourMap::Accent);
+
+    /// \note And the cap stays shut under a range. It grows with the *value* so
+    /// that the accent keeps a roughly even thickness as it lengthens, and a
+    /// range has no length to follow -- one that grew with the span would draw a
+    /// wide travel thinner than a narrow one, which is backwards.
+    auto const cap(lfoRange ? capRadiusClosed
+                            : capRadiusClosed + (capRadiusOpen - capRadiusClosed) * openness);
     KnobPainter::paintCap(graphics, bounds, cap, cap /*a hard edge*/,
                           ColourMap::getColour(ColourMap::ModuleKnobCap));
 
-    if (selected)
-        KnobPainter::paintFocusRing(graphics, centre, radius);
-    else
-        KnobPainter::paintDomeRim(graphics, bounds, rimThickness);
+    switch (highlight)
+    {
+    case Highlight::Selected:
+        return KnobPainter::paintFocusRing(graphics, centre, radius);
+    case Highlight::Hovered:
+        return KnobPainter::paintFocusRing(graphics, centre, radius, hoverStrength);
+    case Highlight::None:
+        return KnobPainter::paintDomeRim(graphics, bounds, rimThickness);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

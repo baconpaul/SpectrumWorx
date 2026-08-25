@@ -40,6 +40,7 @@
 #include "painters/editorKnobPainter.hpp"
 #include "painters/framePainter.hpp"
 #include "painters/glyphPainter.hpp"
+#include "painters/highlight.hpp"
 #include "painters/knobPainter.hpp"
 #include "painters/panelPainter.hpp"
 
@@ -710,6 +711,10 @@ class ComboBox : public WidgetBase<>, public PopupMenuWithSelection
     /// \brief Whether the box draws as the selected one -- the keyboard, unless
     /// whoever owns it has another answer. \see DiscreteParameter.
     virtual bool showsAsSelected() const { return hasDirectFocus(); }
+
+    /// \brief And whether it draws as merely the one under the pointer, which
+    /// is a rim halfway to the selected one's. \see issue #210.
+    virtual bool showsAsHovered() const { return false; }
 
   protected: // juce::Component overrides
     void paint(juce::Graphics &) override;

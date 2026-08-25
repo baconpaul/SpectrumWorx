@@ -85,9 +85,21 @@ class SharedModuleControls : public WidgetBase<>
       protected: // ModuleControlBase overrides
         void lfoStateChanged() override {}
 
-        /// \note This one is its own ModuleControlBase rather than a
+        /// \note These are its own ModuleControlBase rather than a
         /// ModuleControlImpl<>, so it answers for itself. \see issue #139.
+        ///@{
         void deselect() override { reportInactiveControl(); }
+
+        /// \note And the selection here is a *thumb*, so this is the one control
+        /// select() cannot make up an answer for: it forwards to the same
+        /// reportActiveControl() a press does, which does nothing until a thumb
+        /// has been chosen.
+        void select() override { reportActiveControl(); }
+        ///@}
+
+        /// \note And this one is the base's outright: a two-thumbed slider has no
+        /// wheel and no ring of its own to re-key. \see issue #210.
+        void unhover() override { mouseLeft(); }
 
         void setValue(float value) override;
         float getValue() const override;

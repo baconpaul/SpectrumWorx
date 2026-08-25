@@ -19,7 +19,6 @@
 #include <sst/plugininfra/userdefaults.h>
 
 #include <algorithm>
-#include <array>
 #include <cstdio>
 #include <optional>
 #include <string>
@@ -42,7 +41,8 @@ std::string defaultsFileName() { return std::string(productName) + "UserDefaults
 
 enum PreferenceKey
 {
-    moduleUIMouseOverReactionKey,
+    showLFOAnimationKey,
+    previewLFOOnHoverKey,
     hideCursorOnKnobDragKey,
     zoomPercentKey,
     paletteKey,
@@ -56,8 +56,10 @@ std::string preferenceKeyName(PreferenceKey const key)
 {
     switch (key)
     {
-    case moduleUIMouseOverReactionKey:
-        return "moduleUIMouseOverReaction";
+    case showLFOAnimationKey:
+        return "showLFOAnimation";
+    case previewLFOOnHoverKey:
+        return "previewLFOOnHover";
     case hideCursorOnKnobDragKey:
         return "hideCursorOnKnobDrag";
     case zoomPercentKey:
@@ -84,35 +86,11 @@ void reportPreferencesError(std::string const &message, std::string const &title
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// The enumerations, by name
+// The palette, by name
 ////////////////////////////////////////////////////////////////////////////////
 
-constexpr std::array<char const *, 3> mouseOverReactionNames{"Never", "WhenParentModuleSelected",
-                                                             "WhenParentOrNothingSelected"};
-
-/// The table is indexed by the enumerator, so it has to cover it.
-static_assert(mouseOverReactionNames.size() == Preferences::WhenParentOrNothingSelected + 1);
-
-template <typename Enumeration, std::size_t count>
-std::string nameOf(Enumeration const value, std::array<char const *, count> const &names)
-{
-    auto const index(static_cast<std::size_t>(value));
-    LE_ASSERT(index < count);
-    return names[index];
-}
-
-template <typename Enumeration, std::size_t count>
-Enumeration valueNamed(std::string const &name, std::array<char const *, count> const &names,
-                       Enumeration const valueIfUnrecognised)
-{
-    for (std::size_t index(0); index < count; ++index)
-        if (name == names[index])
-            return static_cast<Enumeration>(index);
-    return valueIfUnrecognised;
-}
-
-/// \note The same, over ColourMap::nameOf() rather than over a table here: the
-/// palettes are the map's own enumeration and their spellings belong with it.
+/// \note Over ColourMap::nameOf() rather than a table here: the palettes are the
+/// map's own enumeration and their spellings belong with it.
 ColourMap::Palette paletteNamed(std::string const &name,
                                 ColourMap::Palette const valueIfUnrecognised)
 {
@@ -161,10 +139,9 @@ Preferences::Preferences(fs::path const &folder) : storage_(std::make_unique<Sto
 {
     auto &provider(storage_->provider);
 
-    moduleUIMouseOverReaction_ = valueNamed(
-        provider.getUserDefaultValue(moduleUIMouseOverReactionKey,
-                                     nameOf(moduleUIMouseOverReaction_, mouseOverReactionNames)),
-        mouseOverReactionNames, moduleUIMouseOverReaction_);
+    showLFOAnimation_ = provider.getUserDefaultValue(showLFOAnimationKey, showLFOAnimation_) != 0;
+    previewLFOOnHover_ =
+        provider.getUserDefaultValue(previewLFOOnHoverKey, previewLFOOnHover_) != 0;
 
     palette_ = paletteNamed(provider.getUserDefaultValue(paletteKey, ColourMap::nameOf(palette_)),
                             palette_);
@@ -190,11 +167,16 @@ bool Preferences::isOfferedZoom(unsigned int const percent)
 
 Preferences::~Preferences() = default;
 
-void Preferences::setModuleUIMouseOverReaction(ModuleUIMouseOverReaction const value)
+void Preferences::setShowLFOAnimation(bool const value)
 {
-    moduleUIMouseOverReaction_ = value;
-    storage_->provider.updateUserDefaultValue(moduleUIMouseOverReactionKey,
-                                              nameOf(value, mouseOverReactionNames));
+    showLFOAnimation_ = value;
+    storage_->provider.updateUserDefaultValue(showLFOAnimationKey, value ? 1 : 0);
+}
+
+void Preferences::setPreviewLFOOnHover(bool const value)
+{
+    previewLFOOnHover_ = value;
+    storage_->provider.updateUserDefaultValue(previewLFOOnHoverKey, value ? 1 : 0);
 }
 
 void Preferences::setPalette(ColourMap::Palette const value)

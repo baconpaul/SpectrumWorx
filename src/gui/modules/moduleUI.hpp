@@ -162,6 +162,7 @@ class ModuleKnob : public Knob, public ModuleControl<ModuleKnob>
 
     void moduleControlActivated();
     void moduleControlDeactivated();
+    void moduleControlHoverChanged();
 
     double valueRangeMinimum() const { return getMinimum(); }
     double valueRangeMaximum() const { return getMaximum(); }
@@ -174,6 +175,13 @@ class ModuleKnob : public Knob, public ModuleControl<ModuleKnob>
 
   private:
     void syncMouseWheelAndLFOState();
+
+    /// \brief The band an LFO's travel covers, in the knob's own proportions, or
+    /// nothing where there is none to draw. \see the definitions and issue #210.
+    ///@{
+    std::optional<juce::Range<float>> lfoRangeToDraw();
+    float positionOfLFOBound(float bound);
+    ///@}
 
   private:
     Quantization quantization_;
@@ -360,6 +368,7 @@ class DiscreteParameter : public ComboBox, public ModuleControl<DiscreteParamete
     /// \note The selection rather than the keyboard, as on every other module
     /// control. \see ModuleControlBase::isActive() and issue #139.
     bool showsAsSelected() const override { return control().isActive(); }
+    bool showsAsHovered() const override { return control().isHovered(); }
 
   protected: // ModuleControl interface.
     juce::String const &getTextFromValue(value_type const valueIndex) const
@@ -461,6 +470,21 @@ class ModuleUI final : public WidgetBase<>, private juce::Button::Listener
     /// pointer into freed storage.
     bool selected() const;
 
+    /// \brief And whether the pointer is somewhere on it, which is a fainter
+    /// version of the same halo and nothing else. \see issue #210.
+    bool hovered() const;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Makes this the selected strip. `[main-thread]`
+    ///
+    /// \note Public because the pointer no longer does it: a strip is selected by
+    /// the keyboard reaching it or one of its controls, and a headless case has
+    /// no keyboard to give. \see issue #210 and tests/gui.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    void activate();
+
   public:
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -491,9 +515,6 @@ class ModuleUI final : public WidgetBase<>, private juce::Button::Listener
   private:
     friend class SpectrumWorxEditor;
     friend class SharedModuleControls; //...mrmlj...
-    void activate();
-    void deactivate();
-    bool selectionTracksMouseMovements() const;
 
   private:
     /// \brief A hand over a drag handle and the arrow everywhere else. \see

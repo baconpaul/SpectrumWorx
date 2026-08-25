@@ -74,11 +74,12 @@ class FramePainter
   public:
     /// \brief Draws a frame filling \p bounds.
     ///
-    /// \param halo whether to lay the glow down first. A module strip asks for
-    /// it only when it is the live one; a combo box always has it and says
-    /// which one has the focus with \p rim instead.
+    /// \param haloStrength what to multiply the glow's opacity by, zero for no
+    /// glow at all. A module strip asks for the full one only when it is the
+    /// selected one and a fraction of it under the pointer; a combo box always
+    /// has it and says which one is selected with \p rim instead.
     static void paint(juce::Graphics &, juce::Rectangle<float> bounds, FrameStyle const &,
-                      juce::Colour rim, juce::Colour fill, bool halo);
+                      juce::Colour rim, juce::Colour fill, float haloStrength);
 
     /// \brief Where the rim's outer edge lands, for a caller that has to put
     /// something else against it.

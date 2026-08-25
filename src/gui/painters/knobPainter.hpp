@@ -134,14 +134,19 @@ class KnobPainter
     ///
     ////////////////////////////////////////////////////////////////////////////
     ///@{
-    /// \brief The ring that says a round control has the keyboard focus: white
-    /// on \p radius and gone \c focusGlow either side of it.
+    /// \brief The ring that says a round control is the selected one: white on
+    /// \p radius and gone \c focusGlow either side of it.
+    ///
+    /// \param strength what to multiply its opacity by, which is how a control
+    /// merely under the pointer wears the same ring more faintly. \see
+    /// hoverStrength and issue #210.
     ///
     /// \note Skin file 58 until 18.08.2026 -- a 53 x 53 disc carrying a radial
     /// gradient whose ten stops were all the same white and differed only in
     /// opacity. A plain stroke reads as a hard outline against the dome's black
     /// edge, which is not what this looked like.
-    static void paintFocusRing(juce::Graphics &, juce::Point<float> centre, float radius);
+    static void paintFocusRing(juce::Graphics &, juce::Point<float> centre, float radius,
+                               float strength = 1.0f);
 
     /// In pixels either side of the rim, and the reason a knob is laid out with
     /// a margin around it. \see ModuleKnob::marginForGlow.

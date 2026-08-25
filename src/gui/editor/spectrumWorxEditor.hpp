@@ -332,6 +332,45 @@ class SpectrumWorxEditor final : private SkinLifetime,
     ModuleUI *selectedModule() const { return pSelectedModule_; }
     ModuleControlBase *activeControl() const { return pActiveControl_; }
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief And what the *pointer* is on, which is a separate question with a
+    /// separate answer. \see issue #210.
+    ///
+    ///   A strip and one of its controls can both be hovered -- the pointer is
+    /// over both -- where selection is one strip and one control. Neither
+    /// hovering nor leaving moves a selection.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    ///@{
+    ModuleUI *hoveredModule() const { return pHoveredModule_; }
+    ModuleControlBase *hoveredControl() const { return pHoveredControl_; }
+
+    void moduleHovered(ModuleUI &);
+    void moduleUnhovered(ModuleUI &);
+    void moduleControlHovered(ModuleControlBase &, double minimum, double maximum, double interval);
+    void moduleControlUnhovered(ModuleControlBase &);
+    ///@}
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Which control the LFO strip is showing: the hovered one while it
+    /// is previewing, the selected one otherwise.
+    ///
+    /// \note Not the same question as activeControl(), and everything that draws
+    /// or reads the strip asks this one instead. \see
+    /// Preferences::previewLFOOnHover() and issue #210.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    ModuleControlBase *displayedControl() const
+    {
+        return pPreviewControl_ ? pPreviewControl_ : pActiveControl_;
+    }
+
+    /// \brief Puts the strip back on the selected control, where a hover had lent
+    /// it to another. Does nothing when nothing is being previewed.
+    void endLFOPreview();
+
     ParameterID moduleControlID(ModuleControlBase const &) const;
 
     /// \brief The same, for a parameter no widget on a strip stands for: the
@@ -1438,7 +1477,6 @@ class SpectrumWorxEditor final : private SkinLifetime,
             InterfacePage();
 
             TitledComboBox const &paletteComboBox() const { return palette_; }
-            TitledComboBox const &mouseOverComboBox() const { return moduleUIMouseOverReaction_; }
 
           private: // JUCE component overrides.
             void paint(juce::Graphics &) override;
@@ -1449,11 +1487,13 @@ class SpectrumWorxEditor final : private SkinLifetime,
           private:
             friend class Settings;
             /// \note Zoom first and the colour scheme under it, those being the
-            /// two a user reaches for. Each control draws its own title, so the
-            /// order is a layout decision rather than an artwork one.
+            /// two a user reaches for, then the three switches. Each control
+            /// draws its own title, so the order is a layout decision rather than
+            /// an artwork one.
             TitledComboBox zoom_;
             TitledComboBox palette_;
-            TitledComboBox moduleUIMouseOverReaction_;
+            LEDTextButton showLFOAnimation_;
+            LEDTextButton previewLFOOnHover_;
             LEDTextButton hideCursorOnKnobDrag_;
         }; // class InterfacePage
 
@@ -1470,6 +1510,9 @@ class SpectrumWorxEditor final : private SkinLifetime,
         static std::uint16_t const yMargin = 30;
         static std::uint16_t const yOffset = 7;
         static std::uint16_t const yStep = 60;
+        /// \note Between two LEDs, which carry no title of their own and so do
+        /// not need the room a combo box's does.
+        static std::uint16_t const ledStep = 30;
     }; // class Settings
 
     /// Tab indices into Settings, in addTab() order.
@@ -1483,10 +1526,39 @@ class SpectrumWorxEditor final : private SkinLifetime,
 
   private:
     friend class ModuleControlBase;
-    /// \note Written by ModuleUI::activate()/deactivate() and by
+    /// \note Written by ModuleUI::activate() and by
     /// ModuleControlBase::report{Active,Inactive}Control(), and nowhere else.
     ModuleUI *pSelectedModule_{nullptr};
     ModuleControlBase *pActiveControl_{nullptr};
+
+    /// \note And these by the four hover entry points above. \see issue #210.
+    ModuleUI *pHoveredModule_{nullptr};
+    ModuleControlBase *pHoveredControl_{nullptr};
+
+    /// \brief The hovered control while the LFO strip is lent to it, and nothing
+    /// the rest of the time. Never the selected control.
+    ModuleControlBase *pPreviewControl_{nullptr};
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief What the selected control's LFO strip was laid out over, kept so
+    /// that a preview can put it back.
+    ///
+    /// \note Kept rather than re-asked. The three numbers come off the *widget*
+    /// -- `ModuleControlImpl::reportActiveControl()` reads them from the template
+    /// -- and the editor holds a ModuleControlBase, which cannot.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    struct ControlRange
+    {
+        double minimum{0};
+        double maximum{0};
+        double interval{0};
+    } activeControlRange_;
+
+    /// \brief moduleControlActivated() without the bookkeeping: puts \p control's
+    /// LFO and readings on the strip, building it if there is none.
+    void showLFOFor(ModuleControlBase &control, double minimum, double maximum, double interval);
 
   private:
     /// \note First member, and a reference: everything below is built in the

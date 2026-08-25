@@ -348,16 +348,17 @@ The settings panel's Interface page is *not* a candidate, and it is the case tha
 says where the line is — and note that it is the *page* rather than the *tab*:
 which tab was showing is a place this session was left, which is the block's, and
 what is on that page is how this user likes the editor to behave, which is not.
-Its four — zoom, mouse-over reaction, LFO update behaviour,
-hide-cursor-on-knob-drag — used to persist nowhere at all (issues #61 and #55). They are answers about how this user likes the editor to behave, not
+Its five — zoom, colour scheme, show-LFO-animation, preview-LFO-on-hover,
+hide-cursor-on-knob-drag — used to persist nowhere at all (issues #61 and #55).
+They are answers about how this user likes the editor to behave, not
 about this session, so they are the same in every instance and in every project,
 and they belong in the user's preferences file rather than in a host's state
 blob: `<user folder>/SpectrumWorxUserDefaults.xml`, through
 `sst::plugininfra::defaults::Provider`. \see `src/gui/preferences.hpp`. Its
-format is that library's; what this tree fixes about it is that both
-enumerations are streamed **by name**, so inserting a value cannot silently
-change what an existing file means. `tests/gui/preferencesTests.cpp` pins the
-names.
+format is that library's; what this tree fixes about it is that the one
+enumeration in it — the palette — is streamed **by name**, so inserting a value
+cannot silently change what an existing file means.
+`tests/gui/preferencesTests.cpp` pins the names.
 
 The zoom is a percentage and **100 means no transform at all**. It used to mean
 1.5: the skin was a 563 x 376 bitmap laid out for a 2010 screen and

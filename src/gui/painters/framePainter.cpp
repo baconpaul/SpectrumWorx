@@ -44,13 +44,13 @@ juce::Rectangle<float> FramePainter::rimWithin(juce::Rectangle<float> const boun
 
 void FramePainter::paint(juce::Graphics &graphics, juce::Rectangle<float> const bounds,
                          FrameStyle const &style, juce::Colour const rim, juce::Colour const fill,
-                         bool const halo)
+                         float const haloStrength)
 {
     auto const frame(rimWithin(bounds, style));
     auto const inside(frame.reduced(style.rimThickness));
     auto const insideRadius(style.cornerRadius - style.rimThickness);
 
-    if (halo && (style.glowRings > 0))
+    if ((haloStrength > 0) && (style.glowRings > 0))
     {
         //   Outermost first, each ring covered in turn by the brighter one
         // inside it, so what shows is the difference between them.
@@ -60,7 +60,8 @@ void FramePainter::paint(juce::Graphics &graphics, juce::Rectangle<float> const 
             auto const outwards(
                 style.glowRings > 1 ? static_cast<float>(ring - 1) / (style.glowRings - 1) : 0.0f);
             graphics.setColour(white.withAlpha(
-                style.glowInnerAlpha + (style.glowOuterAlpha - style.glowInnerAlpha) * outwards));
+                haloStrength *
+                (style.glowInnerAlpha + (style.glowOuterAlpha - style.glowInnerAlpha) * outwards)));
             auto const reach(static_cast<float>(ring));
             graphics.fillRoundedRectangle(frame.expanded(reach), style.cornerRadius + reach);
         }

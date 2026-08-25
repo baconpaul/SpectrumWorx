@@ -15,9 +15,12 @@
 #ifndef moduleKnobPainter_hpp__47E0B93C_5A18_4D72_BC69_0E3F81A5D264
 #define moduleKnobPainter_hpp__47E0B93C_5A18_4D72_BC69_0E3F81A5D264
 //------------------------------------------------------------------------------
+#include "gui/painters/highlight.hpp"
 #include "gui/painters/knobPainter.hpp"
 
 #include <juce_graphics/juce_graphics.h>
+
+#include <optional>
 
 namespace LE::SW::GUI
 {
@@ -47,13 +50,17 @@ namespace LE::SW::GUI
 /// it -- which is what the artwork did, and what keeps the blue a band of
 /// roughly even thickness rather than a lengthening spike.
 ///
+///   Where an LFO's travel is drawn the *wedge* is what it replaces -- same
+/// radius, same arc, translucent, and between the two bounds rather than out
+/// from a stop. \see paintModuleKnob() for why the value goes.
+///
 /// \note Radii are fractions of the knob's own radius, so they hold at both the
 /// 51 px module knob and the 23 px shared one. The rim and the focus halo are in
 /// pixels instead: they are hairlines at both sizes rather than something that
 /// scales with them.
 namespace ModuleKnobStyle
 {
-/// \note Geometry only. The colours are ColourMap's -- three ModuleKnob* entries,
+/// \note Geometry only. The colours are ColourMap's -- four ModuleKnob* entries,
 /// plus Accent for the wedge and FocusHalo for the ring.
 float constexpr innerGradientRadius{0.26f}; ///< the dome holds its centre colour in to here
 float constexpr wedgeRadius{0.717f};
@@ -109,10 +116,22 @@ void paintTriggerButton(juce::Graphics &, juce::Rectangle<float> bounds, bool on
 ///
 /// \param normalisedValue where the value sits in its range, 0 to 1; for a
 /// \p bipolar knob 0.5 is the centre the wedge opens from.
-/// \param selected whether this is the control the interface is showing -- which
-/// is not the keyboard focus. \see ModuleControlBase::isActive().
+/// \param highlight whether this is the control the interface is showing, or the
+/// one the pointer is over -- neither of which is the keyboard focus. \see
+/// ModuleControlBase::isActive() and ModuleControlBase::isHovered().
+/// \param lfoRange the two ends of an LFO's travel, on the same 0 to 1 scale,
+/// where there is one to draw. Nothing is the usual answer: the range is shown
+/// only for a parameter under an LFO whose sweep the user has asked not to see.
+///
+/// \note **The range is drawn *instead of* the value, and \p normalisedValue is
+/// then only the cap's business.** An LFO's bounds are absolute over the
+/// parameter's own range rather than an excursion either side of where it was
+/// left, so while one is running the value under it is not where the parameter
+/// is and nothing reads it -- a wedge saying otherwise is a wrong answer that
+/// also covers the right one. \see Preferences::showLFOAnimation(), issue #210.
 void paintModuleKnob(juce::Graphics &, juce::Rectangle<float> bounds, float normalisedValue,
-                     bool bipolar, bool selected);
+                     bool bipolar, Highlight,
+                     std::optional<juce::Range<float>> lfoRange = std::nullopt);
 
 } // namespace LE::SW::GUI
 

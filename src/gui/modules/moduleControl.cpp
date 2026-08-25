@@ -14,7 +14,6 @@
 
 #include "gui/editor/spectrumWorxEditor.hpp"
 #include "gui/modules/moduleUI.hpp"
-#include "gui/preferences.hpp"
 
 #include "le/parameters/lfo.hpp"
 #include "le/parameters/parser.hpp"
@@ -45,6 +44,26 @@ namespace LE::SW::GUI
 /// SpectrumWorxEditor::pActiveControl_ now, one per editor.
 
 bool ModuleControlBase::isActive() const { return this == editor().activeControl(); }
+bool ModuleControlBase::isHovered() const { return this == editor().hoveredControl(); }
+bool ModuleControlBase::isDisplayed() const { return this == editor().displayedControl(); }
+
+Highlight highlightFor(ModuleControlBase const &control)
+{
+    return control.isActive()    ? Highlight::Selected
+           : control.isHovered() ? Highlight::Hovered
+                                 : Highlight::None;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note **The keyboard, and nothing else.** This used to read a preference --
+/// whether the pointer merely passing over a control should select it, and if so
+/// under what conditions -- and the answer nobody could make work was any of the
+/// ones that were not "no". A hovered control now has its own display, its own
+/// wheel and its own LFO preview, none of which move the selection. \see issue
+/// #210, and Preferences, which no longer has the question.
+///
+////////////////////////////////////////////////////////////////////////////////
 
 bool ModuleControlBase::tryActivateControl() const
 {
@@ -54,21 +73,7 @@ bool ModuleControlBase::tryActivateControl() const
     if (juce::Component::getNumCurrentlyModalComponents() != 0)
         return false;
 
-    Preferences::ModuleUIMouseOverReaction const desiredReaction(
-        preferences().moduleUIMouseOverReaction());
-    juce::Component const *const pFocusedComponent(juce::Component::getCurrentlyFocusedComponent());
-
-    bool const nothingFocused(noModuleOrModuleControlFocused());
-    bool const parentFocused(pFocusedComponent == &moduleUI());
-    bool const parentOrNothingFocused(parentFocused |
-                                      nothingFocused); // Intentional bitwise or as an optimization.
-    bool const controlFocused(pFocusedComponent == &widget());
-    if ((controlFocused) ||
-        (desiredReaction == Preferences::WhenParentOrNothingSelected && parentOrNothingFocused) ||
-        (desiredReaction == Preferences::WhenParentModuleSelected && parentFocused))
-        return true;
-    else
-        return false;
+    return juce::Component::getCurrentlyFocusedComponent() == &widget();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -85,24 +90,36 @@ bool ModuleControlBase::tryActivateControl() const
 bool ModuleControlBase::reportActiveControl(double const minimum, double const maximum,
                                             double const interval)
 {
-    if (tryActivateControl())
-    {
-        if (auto *const pOutgoing = editor().activeControl())
-            pOutgoing->deselect();
+    return tryActivateControl() && activateControl(minimum, maximum, interval);
+}
 
-        /// \note The control is marked as activated only after the editor
-        /// has been informed (and the LFO GUI created) to avoid race condition
-        /// crashes when a user activates a control that is being automated (and
-        /// SpectrumWorxEditor::updateActiveControlValue() gets called as a
-        /// response to setParameter() before the LFO gets created).
-        ///                                   (25.04.2013.) (Domagoj Saric)
-        editor().moduleControlActivated(*this, minimum, maximum, interval);
-        editor().pActiveControl_ = this;
-        // the halo is drawn on the selection, so the selection has to repaint
-        widget().repaint();
-        return true;
-    }
-    return false;
+/// \note The hand-over itself, split out because select() needs it without the
+/// question in front. \see the declaration of select().
+bool ModuleControlBase::activateControl(double const minimum, double const maximum,
+                                        double const interval)
+{
+    if (isActive())
+        return false;
+
+    //   The preview goes first, so that the strip is back on the control that is
+    // about to be deselected: moduleControlDectivated() asserts that it is
+    // showing whichever control it is told about. \see issue #210.
+    editor().endLFOPreview();
+
+    if (auto *const pOutgoing = editor().activeControl())
+        pOutgoing->deselect();
+
+    /// \note The control is marked as activated only after the editor
+    /// has been informed (and the LFO GUI created) to avoid race condition
+    /// crashes when a user activates a control that is being automated (and
+    /// SpectrumWorxEditor::updateActiveControlValue() gets called as a
+    /// response to setParameter() before the LFO gets created).
+    ///                                       (25.04.2013.) (Domagoj Saric)
+    editor().moduleControlActivated(*this, minimum, maximum, interval);
+    editor().pActiveControl_ = this;
+    // the ring is drawn on the selection, so the selection has to repaint
+    widget().repaint();
+    return true;
 }
 
 bool ModuleControlBase::reportInactiveControl()
@@ -191,12 +208,13 @@ void ModuleControlBase::addLFOMenuEntry(juce::PopupMenu &menu)
                  });
 }
 
+/// \note Selected **or** hovered, and it used to be only the first. A control the
+/// pointer is on takes the wheel without taking the selection, so an edit from
+/// one is as legitimate as an edit from the other -- and the strip it is on need
+/// not be the selected strip either. \see issue #210.
 void ModuleControlBase::moduleParameterChanged()
 {
-    LE_ASSERT(!editor().selectedModule() || editor().selectedModule() == &moduleUI());
-    LE_ASSERT(noModuleOrModuleControlFocused() || Detail::hasDirectFocus(widget()) ||
-              moduleUI().hasDirectFocus());
-    LE_ASSERT(isActive());
+    LE_ASSERT_MSG(isActive() || isHovered(), "an edit from a control the user is not on");
     LE_ASSERT(!isLFOEnabled());
 
     publishValue();
@@ -263,48 +281,49 @@ bool ModuleControlBase::needsOwnGesture() const
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \note **Only where the mouse is what selects.** This was
-/// `reportInactiveControl()` outright, and it could not reach a control the user
-/// had *clicked*: the guard inside answers no while the control holds the
-/// keyboard, and holding the keyboard was the only way to be selected.
+/// \note **Neither of these touches the selection.** This pair was
+/// `reportActiveControl()` and `reportInactiveControl()`, guarded by a preference
+/// that decided whether the pointer selected a control at all -- and the
+/// selection had then to be defended from the pointer, which is what issue #139
+/// is a record of. A click selects; the pointer hovers; the two no longer
+/// compete.
 ///
-///   It is not any more -- a control stays selected after the focus has gone to
-/// the preset pane or to another application -- so an unguarded exit would drop
-/// the LFO strip on the next sweep of the mouse across the rack, which is the
-/// thing issue #139 is about. Under the default reaction the pointer never
-/// selects a control, so it has no business deselecting one.
-///
-/// \note `deselect()` rather than `reportInactiveControl()`: the widget's own
-/// `moduleControlDeactivated()` has to run, and it resolves in ModuleControlImpl.
+/// \note The outgoing control is told, for the reason the outgoing *selected* one
+/// is: JUCE delivers the exit before the next enter, so this is belt and braces
+/// rather than the usual route -- but it does call mouseExit() without a matching
+/// mouseEnter() in at least one case. \see ModuleUI::mouseExit().
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
+void ModuleControlBase::mouseEntered(double const minimum, double const maximum,
+                                     double const interval)
+{
+    if (isHovered())
+        return;
+
+    if (juce::Component::getNumCurrentlyModalComponents() != 0)
+        return;
+
+    if (auto *const pOutgoing = editor().hoveredControl())
+        pOutgoing->unhover();
+
+    editor().moduleControlHovered(*this, minimum, maximum, interval);
+    widget().repaint();
+}
+
 void ModuleControlBase::mouseLeft()
 {
-    if (preferences().moduleUIMouseOverReaction() == Preferences::Never)
+    if (!isHovered())
         return;
-    deselect();
+
+    editor().moduleControlUnhovered(*this);
+    widget().repaint();
 }
 
 void ModuleControlBase::configureControl(bool const mouseClickCanGrabFocus)
 {
     widget().setWantsKeyboardFocus(true);
     widget().setMouseClickGrabsKeyboardFocus(mouseClickCanGrabFocus);
-}
-
-bool ModuleControlBase::noModuleOrModuleControlFocused(SpectrumWorxEditor const &editor)
-{
-    // Implementation note:
-    //   We ignore focused widgets on auxiliary windows.
-    //                                        (07.07.2011.) (Domagoj Saric)
-    juce::Component const *const pFocusedComponent(juce::Component::getCurrentlyFocusedComponent());
-    return (pFocusedComponent == nullptr) || (pFocusedComponent == &editor) ||
-           (!editor.isParentOf(*pFocusedComponent));
-}
-
-bool ModuleControlBase::noModuleOrModuleControlFocused() const
-{
-    return noModuleOrModuleControlFocused(editor());
 }
 
 ModuleControlBase::Module &ModuleControlBase::module() { return moduleUI().module(); }
@@ -446,6 +465,13 @@ bool ModuleControlBase::isASharedModuleControl() const
     /// SharedModuleControls instance).
     ///                                       (12.02.2014.) (Domagoj Saric)
     return pModuleUI_ != widget().getParentComponent();
+}
+
+/// \note The same question the other way round, and the one the hover asks: the
+/// pointer over a shared control is not over any strip.
+ModuleUI *ModuleControlBase::stripDrawnOn()
+{
+    return isASharedModuleControl() ? nullptr : pModuleUI_;
 }
 
 } // namespace LE::SW::GUI

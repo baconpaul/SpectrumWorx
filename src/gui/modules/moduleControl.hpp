@@ -118,6 +118,11 @@ template <class ImplWidget> class ModuleControl : public ParameterMenu
     static void moduleControlActivated() {}
     static void moduleControlDeactivated() {}
 
+    /// \note The pointer arriving or leaving, for a widget that has something to
+    /// re-key on it. A knob has: the wheel works on a hovered control as well as
+    /// on the selected one. \see issue #210.
+    static void moduleControlHoverChanged() {}
+
     static void updateForEngineSetupChanges(Engine::Setup const &) {}
 
   private:
@@ -126,6 +131,11 @@ template <class ImplWidget> class ModuleControl : public ParameterMenu
 }; // class ModuleControl
 
 class ModuleUI;
+
+/// \brief Which of the three a control draws itself as. The selection wins,
+/// there being one ring to draw and two questions that ask for it.
+/// \see issue #210.
+Highlight highlightFor(ModuleControlBase const &);
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -154,11 +164,28 @@ class ModuleControlBase
 
     virtual void lfoStateChanged() = 0;
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Makes this the selected control, as a click on it does.
+    ///
+    /// \note What a click does is take the keyboard, and the keyboard is what
+    /// selects. This is the second half without the first, which is the only way
+    /// in for something that has no window: `grabKeyboardFocus()` on a component
+    /// that is on no screen jasserts rather than declining. tools/show-ui and the
+    /// headless cases in tests/gui are what it is for.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    virtual void select() = 0;
+
     /// \brief Tells this control it is no longer the selected one.
     ///
     /// \note Asked of the control that is *losing* the selection, by the one
     /// taking it. Losing the keyboard no longer does it. \see issue #139.
     virtual void deselect() = 0;
+
+    /// \brief The same for the pointer: told to the control the pointer is
+    /// leaving, by the one it has arrived at. \see issue #210.
+    virtual void unhover() = 0;
 
     virtual void updateForEngineSetupChanges(Engine::Setup const &) {}
 
@@ -201,11 +228,32 @@ class ModuleControlBase
     //...mrmlj...excludes non-lfoable parameters (Bypass)...
     std::uint8_t moduleParameterIndex() const { return parameterIndex_; }
 
-    /// \brief Whether this is the selected control -- the one the LFO strip is
-    /// showing, and the one wearing the halo. Not the keyboard. \see issue #139.
+    /// \brief Whether this is the selected control -- the one wearing the ring
+    /// and the one the shared controls follow. Not the keyboard. \see issue #139.
     bool isActive() const;
 
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Whether the pointer is on this control.
+    ///
+    ///   Which is not selecting it and never becomes selecting it: a hovered
+    /// control wears the ring at half strength, takes the wheel, and -- with
+    /// Preferences::previewLFOOnHover() on -- lends the LFO strip its own LFO
+    /// until the pointer leaves. \see issue #210.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    bool isHovered() const;
+
+    /// \brief Whether this is the control the LFO strip is currently showing,
+    /// which is the hovered one while it is previewing and the selected one
+    /// otherwise. \see SpectrumWorxEditor::displayedControl().
+    bool isDisplayed() const;
+
     bool isLFOEnabled() const;
+
+    /// \brief The strip this control is drawn on, or nothing -- the shared gain,
+    /// wet and frequency range stand above the rack rather than on a strip.
+    ModuleUI *stripDrawnOn();
 
     void moduleParameterChanged();
 
@@ -214,8 +262,18 @@ class ModuleControlBase
     /// this control under the mouse right now. \see the definition.
     void publishValue();
 
-    /// \brief What a control does when the pointer leaves it. \see the definition.
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \name What the pointer arriving and leaving does
+    ///
+    ///   Neither of them selects anything. \see issue #210, and
+    /// ModuleControlImpl, which is where the widget's own half is called from.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    ///@{
+    void mouseEntered(double minimum, double maximum, double interval);
     void mouseLeft();
+    ///@}
 
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -297,11 +355,11 @@ class ModuleControlBase
 
     static bool isActive(juce::Component const &);
 
-    bool noModuleOrModuleControlFocused() const; //...mrmlj...
-    static bool noModuleOrModuleControlFocused(SpectrumWorxEditor const &);
-
   protected:
     bool reportActiveControl(double minimum, double maximum, double interval);
+    /// \brief The same, with the question of whether it may be skipped: what
+    /// select() is over reportActiveControl(). \see the definition.
+    bool activateControl(double minimum, double maximum, double interval);
     bool reportInactiveControl();
 
     void configureControl(bool mouseClickCanGrabFocus);
@@ -401,11 +459,37 @@ class ModuleControlImpl final : public ModuleControlBase, public ImplWidget
             ImplWidget::moduleControlDeactivated();
     }
 
+    /// \note The keyboard's step left out and the widget's own kept. \see the
+    /// declaration of select().
+    void select() override
+    {
+        bool const activated(ModuleControlBase::activateControl(ImplWidget::valueRangeMinimum(),
+                                                                ImplWidget::valueRangeMaximum(),
+                                                                ImplWidget::valueRangeQuantum()));
+        if (activated)
+            ImplWidget::moduleControlActivated();
+    }
+
+    void reportHoveredControl()
+    {
+        ModuleControlBase::mouseEntered(ImplWidget::valueRangeMinimum(),
+                                        ImplWidget::valueRangeMaximum(),
+                                        ImplWidget::valueRangeQuantum());
+        ImplWidget::moduleControlHoverChanged();
+    }
+
     /// \note The same thing asked from outside. `moduleControlDeactivated()` is
     /// the widget's own and resolves in this template, so the editor cannot reach
     /// it through a ModuleControlBase -- and it has to, now that the control
     /// losing the selection is told by the one taking it. \see issue #139.
     void deselect() override { reportInactiveControl(); }
+
+    /// \note And the same again for the pointer. \see issue #210.
+    void unhover() override
+    {
+        ModuleControlBase::mouseLeft();
+        ImplWidget::moduleControlHoverChanged();
+    }
 
     using ModuleControlBase::isActive;
 
@@ -441,8 +525,11 @@ class ModuleControlImpl final : public ModuleControlBase, public ImplWidget
     ////////////////////////////////////////////////////////////////////////////
     virtual void focusLost(juce::Component::FocusChangeType) noexcept override {}
 
-    virtual void mouseEnter(juce::MouseEvent const &) override { reportActiveControl(); }
-    virtual void mouseExit(juce::MouseEvent const &) noexcept override { mouseLeft(); }
+    /// \note The pointer takes the *hover* and never the selection, which is what
+    /// the mouse-over reaction preference used to be able to change. \see issue
+    /// #210.
+    virtual void mouseEnter(juce::MouseEvent const &) override { reportHoveredControl(); }
+    virtual void mouseExit(juce::MouseEvent const &) noexcept override { unhover(); }
 }; // class ModuleControlImpl
 
 #pragma warning(pop)

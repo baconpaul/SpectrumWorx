@@ -143,10 +143,11 @@ class KnobUnderTest
         pControl_ = firstKnob(*pModuleUI);
         REQUIRE(pControl_ != nullptr);
 
-        /// \note The range the LFO strip's two-value bound slider is laid out
-        /// over; an LFO's bounds are normalised, so the knob's own units do not
-        /// come into it. \see lfoDisplayTests.cpp, which sets it up the same way.
-        editor.moduleControlActivated(*pControl_, 0.0, 1.0, 0.0);
+        /// \note Really selected, rather than only having the strip built for
+        /// it: the wheel is keyed on the selection as well as on the LFO, and
+        /// select() is the click's own step without the keyboard a headless case
+        /// cannot give. \see issue #210.
+        pControl_->select();
 
         // Whatever building the strip and the panel queued is not a case's.
         drain(instance.toEngine());

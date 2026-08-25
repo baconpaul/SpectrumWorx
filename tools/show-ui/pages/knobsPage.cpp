@@ -36,6 +36,48 @@ namespace
 
 namespace GUI = LE::SW::GUI;
 
+struct Row
+{
+    char const *caption;
+    unsigned int diameter;
+    bool editor;  ///< an EditorKnob rather than a ModuleKnob
+    bool bipolar; ///< module knobs only, as are the two below
+    GUI::Highlight highlight{GUI::Highlight::None};
+
+    /// \brief Whether this row is an LFO's travel rather than a value.
+    ///
+    /// \note And the row then sweeps the *band* rather than the value, because
+    /// the value is not drawn while there is one -- nine identical knobs would be
+    /// the correct picture and a useless one. \see paintModuleKnob().
+    bool lfoRange{false};
+}; // struct Row
+
+/// \brief A band a third of the travel wide, starting \p position of the way
+/// along, which is what a banded row shows at each of its nine steps.
+juce::Range<float> lfoBandAt(float const position)
+{
+    float constexpr width{0.35f};
+    auto const start(position * (1 - width));
+    return {start, start + width};
+}
+
+Row const rows[]{
+    {"EditorKnob, 83 px (in, out and mix)", GUI::EditorKnob::diameter, true, false},
+    {"ModuleKnob unipolar, 77 px", GUI::ModuleKnob::diameter, false, false},
+    {"ModuleKnob bipolar, 77 px", GUI::ModuleKnob::diameter, false, true},
+    {"ModuleKnob unipolar, 77 px, hovered", GUI::ModuleKnob::diameter, false, false,
+     GUI::Highlight::Hovered},
+    {"ModuleKnob unipolar, 77 px, selected", GUI::ModuleKnob::diameter, false, false,
+     GUI::Highlight::Selected},
+    {"ModuleKnob, 77 px, an LFO's travel swept across it -- no value is drawn",
+     GUI::ModuleKnob::diameter, false, false, GUI::Highlight::None, true},
+    {"ModuleKnob, 77 px, the same, selected", GUI::ModuleKnob::diameter, false, false,
+     GUI::Highlight::Selected, true},
+    {"ModuleKnob unipolar, 35 px (gain and wet)", GUI::ModuleKnob::smallDiameter, false, false},
+    {"ModuleKnob bipolar, 35 px, selected", GUI::ModuleKnob::smallDiameter, false, true,
+     GUI::Highlight::Selected},
+};
+
 class KnobsPage final : public juce::Component
 {
   public:
@@ -43,7 +85,7 @@ class KnobsPage final : public juce::Component
     {
         if (!GUI::Theme::haveSingleton())
             GUI::Theme::createSingleton();
-        setSize(margin * 2 + steps * cell, margin * 2 + rows * cell + headerHeight);
+        setSize(margin * 2 + steps * cell, margin * 2 + rowCount * cell + headerHeight);
     }
 
     void paint(juce::Graphics &graphics) override
@@ -55,7 +97,7 @@ class KnobsPage final : public juce::Component
         label(graphics, "The editor's knobs, painted", margin, margin, 22.5f, juce::Colours::white);
 
         int y(margin + headerHeight);
-        for (auto const &row : rows_)
+        for (auto const &row : rows)
         {
             label(graphics, row.caption, margin, y - 21, 16.5f, juce::Colours::grey);
             for (unsigned int step(0); step < steps; ++step)
@@ -68,7 +110,10 @@ class KnobsPage final : public juce::Component
                 if (row.editor)
                     GUI::paintEditorKnob(graphics, face, value);
                 else
-                    GUI::paintModuleKnob(graphics, face, value, row.bipolar, row.selected);
+                    GUI::paintModuleKnob(graphics, face, value, row.bipolar, row.highlight,
+                                         row.lfoRange
+                                             ? std::optional<juce::Range<float>>(lfoBandAt(value))
+                                             : std::nullopt);
             }
             y += cell;
         }
@@ -80,25 +125,7 @@ class KnobsPage final : public juce::Component
     static constexpr int margin{30};
     static constexpr int headerHeight{60};
 
-    struct Row
-    {
-        char const *caption;
-        unsigned int diameter;
-        bool editor;  ///< an EditorKnob rather than a ModuleKnob
-        bool bipolar; ///< module knobs only, as is the one below
-        bool selected;
-    }; // struct Row
-
-    static constexpr Row rows_[]{
-        {"EditorKnob, 83 px (in, out and mix)", GUI::EditorKnob::diameter, true, false, false},
-        {"ModuleKnob unipolar, 77 px", GUI::ModuleKnob::diameter, false, false, false},
-        {"ModuleKnob bipolar, 77 px", GUI::ModuleKnob::diameter, false, true, false},
-        {"ModuleKnob unipolar, 77 px, selected", GUI::ModuleKnob::diameter, false, false, true},
-        {"ModuleKnob unipolar, 35 px (gain and wet)", GUI::ModuleKnob::smallDiameter, false, false,
-         false},
-        {"ModuleKnob bipolar, 35 px, selected", GUI::ModuleKnob::smallDiameter, false, true, true},
-    };
-    static constexpr int rows{int(std::size(rows_))};
+    static constexpr int rowCount{int(std::size(rows))};
 
     static void label(juce::Graphics &graphics, juce::String const &text, int const x, int const y,
                       float const height, juce::Colour const colour)

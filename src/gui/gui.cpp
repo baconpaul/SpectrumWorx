@@ -663,14 +663,20 @@ ComboBox::ComboBox(juce::Component &parent, FrameStyle const &frame, int const w
 /// both ends.
 void ComboBox::paint(juce::Graphics &graphics)
 {
-    // the rim is the whole of "this box has the focus" -- white rather than the
-    // skin's blue -- and the halo is under both, so the box does not jump size
-    FramePainter::paint(
-        graphics,
-        juce::Rectangle<float>(0, 0, static_cast<float>(getWidth()),
-                               static_cast<float>(boxHeight_)),
-        frame_, ColourMap::getColour(showsAsSelected() ? ColourMap::FocusHalo : ColourMap::Accent),
-        ColourMap::getColour(ColourMap::ComboBackground), true /*halo*/);
+    // the rim is the whole of "this box is the selected one" -- white rather
+    // than the skin's blue, and halfway between the two for one merely under the
+    // pointer -- and the halo is under all three, so the box does not jump size
+    auto const accent(ColourMap::getColour(ColourMap::Accent));
+    auto const white(ColourMap::getColour(ColourMap::FocusHalo));
+    auto const rim(showsAsSelected()  ? white
+                   : showsAsHovered() ? accent.interpolatedWith(white, hoverStrength)
+                                      : accent);
+
+    FramePainter::paint(graphics,
+                        juce::Rectangle<float>(0, 0, static_cast<float>(getWidth()),
+                                               static_cast<float>(boxHeight_)),
+                        frame_, rim, ColourMap::getColour(ColourMap::ComboBackground),
+                        1.0f /*halo*/);
 
     graphics.setColour(ColourMap::getColour(ColourMap::Text));
     graphics.setFont(Theme::singleton().labelFont());

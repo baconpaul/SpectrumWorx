@@ -47,29 +47,22 @@ namespace LE::SW::GUI
 /// `<folder>/SpectrumWorxUserDefaults.xml`.
 ///
 /// \note Values are cached in members rather than read through the provider on
-/// every call: `moduleUIMouseOverReaction()` is asked on mouse movement over a
-/// module control, and the provider's answer is a map lookup and a string
-/// comparison. Each setter writes its own key through, so the file is one
-/// rewrite per user click rather than three.
+/// every call: `showLFOAnimation()` is asked once per knob per repaint, and the
+/// provider's answer is a map lookup and a string comparison. Each setter writes
+/// its own key through, so the file is one rewrite per user click rather than
+/// five.
 ///
-/// \note The enumerations are streamed by *name*, not by ordinal, so inserting a
-/// value in the middle cannot silently change what an existing file means and the
-/// file stays legible to whoever opens it. The names are the enum identifiers, so
-/// a value in the file can be grepped for in the source, and an unrecognised one
-/// reads as the default.
+/// \note The one enumeration in here -- the palette -- is streamed by *name*, not
+/// by ordinal, so inserting a value in the middle cannot silently change what an
+/// existing file means and the file stays legible to whoever opens it. The names
+/// are the enum identifiers, so a value in the file can be grepped for in the
+/// source, and an unrecognised one reads as the default.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
 class Preferences
 {
   public:
-    enum ModuleUIMouseOverReaction
-    {
-        Never,
-        WhenParentModuleSelected,
-        WhenParentOrNothingSelected
-    };
-
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \brief The zooms the Interface page offers, ascending, as percentages.
@@ -103,17 +96,39 @@ class Preferences
     Preferences(Preferences const &) = delete; // makes non-copyable
     Preferences &operator=(Preferences const &) = delete;
 
-    ModuleUIMouseOverReaction moduleUIMouseOverReaction() const
-    {
-        return moduleUIMouseOverReaction_;
-    }
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Whether a knob an LFO is driving follows the sweep.
+    ///
+    ///   On, the value moves as the LFO moves it, which is what the plugin has
+    /// always done. Off, the knob draws the LFO's *bounds* instead and draws no
+    /// value at all -- the same information, and honestly, without eight strips'
+    /// worth of movement in the corner of the eye. \see paintModuleKnob(),
+    /// ColourMap::ModuleKnobLFORange and issue #210.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    bool showLFOAnimation() const { return showLFOAnimation_; }
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Whether the LFO strip follows the pointer as well as the click.
+    ///
+    ///   A control is selected by clicking it, whatever this says. With it on,
+    /// merely hovering one shows its LFO for as long as the pointer is there and
+    /// puts it back afterwards; the selection -- and the ring that marks it --
+    /// does not move. \see SpectrumWorxEditor::displayedControl() and issue #210.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    bool previewLFOOnHover() const { return previewLFOOnHover_; }
+
     ColourMap::Palette palette() const { return palette_; }
     bool hideCursorOnKnobDrag() const { return hideCursorOnKnobDrag_; }
     /// Always one of zoomPercentages.
     unsigned int zoomPercent() const { return zoomPercent_; }
 
     /// Each of these writes the file. `[main-thread]`
-    void setModuleUIMouseOverReaction(ModuleUIMouseOverReaction);
+    void setShowLFOAnimation(bool);
+    void setPreviewLFOOnHover(bool);
     /// \note Stores it. Painting in it is ColourMap::setPalette()'s half, and
     /// the two are done together -- \see SpectrumWorxEditor::setPalette(),
     /// which is the only place a user changes this.
@@ -134,7 +149,8 @@ class Preferences
     class Storage;
     std::unique_ptr<Storage> storage_;
 
-    ModuleUIMouseOverReaction moduleUIMouseOverReaction_{Never};
+    bool showLFOAnimation_{true};
+    bool previewLFOOnHover_{true};
     ColourMap::Palette palette_{ColourMap::ClassicBlue};
     bool hideCursorOnKnobDrag_{true};
     unsigned int zoomPercent_{defaultZoomPercent};
