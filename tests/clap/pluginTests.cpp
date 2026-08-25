@@ -648,6 +648,63 @@ TEST_CASE("The host sees the engine's own parameters, not a stand-in", "[clap]")
     CHECK(sawAGlobal);
 }
 
+/// \note Against the formatting it replaced rather than against a written-out
+/// list: what a table can get wrong is the indexing, and only the old expression
+/// says what the right answer was. \see issue #223
+TEST_CASE("Every parameter's module path is the one its id asks for", "[clap]")
+{
+    Entry const entry;
+    ActivePlugin plugin(48000, 512);
+
+    auto const *const params(
+        static_cast<clap_plugin_params const *>(plugin->get_extension(&*plugin, CLAP_EXT_PARAMS)));
+    REQUIRE(params != nullptr);
+
+    auto const formatted([](LE::SW::ParameterID const parameterID) {
+        char text[CLAP_PATH_SIZE]{};
+        switch (parameterID.type())
+        {
+        case LE::SW::ParameterID::GlobalParameter:
+            std::strncpy(text, "Global", CLAP_PATH_SIZE - 1);
+            break;
+        case LE::SW::ParameterID::ModuleChainParameter:
+            std::snprintf(text, CLAP_PATH_SIZE, "Module %u",
+                          parameterID.value._.moduleChain.moduleIndex + 1u);
+            break;
+        case LE::SW::ParameterID::ModuleParameter:
+            std::snprintf(text, CLAP_PATH_SIZE, "Module %u",
+                          parameterID.value._.module.moduleIndex + 1u);
+            break;
+        case LE::SW::ParameterID::LFOParameter:
+            std::snprintf(text, CLAP_PATH_SIZE, "Module %u/LFO",
+                          parameterID.value._.lfo.moduleIndex + 1u);
+            break;
+        }
+        return std::string(text);
+    });
+
+    auto const count(params->count(&*plugin));
+    REQUIRE(count == LE::SW::ParameterCounts::maxNumberOfParameters);
+
+    std::set<std::string> paths;
+    for (std::uint32_t index(0); index < count; ++index)
+    {
+        clap_param_info info{};
+        REQUIRE(params->get_info(&*plugin, index, &info));
+
+        LE::SW::ParameterID parameterID;
+        parameterID.binaryValue = info.id;
+
+        CAPTURE(index, info.id, info.module);
+        CHECK(formatted(parameterID) == info.module);
+        paths.insert(info.module);
+    }
+
+    // "Global", one per slot and one per slot's LFOs -- so every slot was
+    // reached and neither shape answered for the other
+    CHECK(paths.size() == 1u + 2u * LE::SW::Constants::maxNumberOfModules);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \note The cost of declaring every slot's parameters up front: on an empty
@@ -1046,6 +1103,48 @@ TEST_CASE("An effect chosen before activate still processes audio", "[clap]")
         CHECK(allFinite(rightOut));
     }
     CHECK(peak(leftOut) > 0);
+}
+
+/// \note A count, not a flag: both routes ask for the same three, so OR-ing them
+/// cannot tell one announcement from two. REAPER answers each by reading every
+/// parameter, and resolves each of those ids by walking the list -- so a second
+/// rescan is another 485,112 get_info calls and another 50ms of frozen main
+/// thread. \see issue #223
+TEST_CASE("Filling a slot from the editor announces itself once", "[clap]")
+{
+    // moduleChangedByUser() asserts it is on the GUI thread, which in a test
+    // binary means there has to be a MessageManager for it to be the thread of
+    juce::ScopedJuceInitialiser_GUI const juceIsUp;
+
+    Entry const entry;
+    TestHost host{{.params = true}};
+    ActivePlugin plugin(48000, 512, host);
+
+    auto &editorHost(editorHostOf(*plugin));
+    auto const &params(parameters(*plugin));
+
+    host.rescanCalls = 0;
+
+    // what SpectrumWorxEditor::setModuleInSlot does: the slot to the engine, and
+    // the selector to the host as the parameter edit it is
+    REQUIRE(editorHost.editSlot(0, 0));
+    editorHost.automation().moduleChangedByUser(std::uint8_t(0), std::int8_t(0));
+
+    // the callback the announcement asked for, before the engine has run: this
+    // is the ordering that matters, and the one a host really produces. Draining
+    // the two requests together would let requestRescan() coalesce them and hide
+    // the second announcement this case exists to catch
+    plugin.pumpMainThread();
+
+    // now the engine applies the queued slot and raises chainChanged()
+    params.flush(&*plugin, &noInputEvents(), &discardedOutputEvents());
+
+    // and whatever that asked for, so a second announcement has its chance
+    for (unsigned callback(0); callback < 3; ++callback)
+        plugin.pumpMainThread();
+
+    CHECK(host.rescanCalls == 1);
+    CHECK((host.rescanFlags & CLAP_PARAM_RESCAN_INFO) != 0);
 }
 
 TEST_CASE("Filling a slot makes the host re-read the descriptions", "[clap]")

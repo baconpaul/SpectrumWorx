@@ -248,6 +248,7 @@ bool SpectrumWorxCLAP::init() noexcept
 
     // The host may ask for the parameter list before activate(), and does.
     rebuildParameterIDs();
+    buildModulePaths();
     return true;
 }
 
@@ -627,27 +628,42 @@ bool SpectrumWorxCLAP::paramsInfo(std::uint32_t const index,
     return true;
 }
 
-void SpectrumWorxCLAP::modulePathFor(ParameterID const parameterID,
-                                     char (&path)[CLAP_PATH_SIZE]) const noexcept
+void SpectrumWorxCLAP::buildModulePaths()
+{
+    char text[CLAP_PATH_SIZE];
+
+    modulePaths_[0] = "Global";
+    for (unsigned slot(0); slot < Constants::maxNumberOfModules; ++slot)
+    {
+        std::snprintf(text, sizeof(text), "Module %u", slot + 1u);
+        modulePaths_[1u + slot] = text;
+        std::snprintf(text, sizeof(text), "Module %u/LFO", slot + 1u);
+        modulePaths_[1u + Constants::maxNumberOfModules + slot] = text;
+    }
+}
+
+std::size_t SpectrumWorxCLAP::modulePathIndex(ParameterID const parameterID) noexcept
 {
     switch (parameterID.type())
     {
     case ParameterID::GlobalParameter:
-        std::strncpy(path, "Global", CLAP_PATH_SIZE - 1);
-        break;
+        return 0u;
+    // a slot selector belongs to the slot it selects for
     case ParameterID::ModuleChainParameter:
-        std::snprintf(path, CLAP_PATH_SIZE, "Module %u",
-                      parameterID.value._.moduleChain.moduleIndex + 1u);
-        break;
+        return 1u + parameterID.value._.moduleChain.moduleIndex;
     case ParameterID::ModuleParameter:
-        std::snprintf(path, CLAP_PATH_SIZE, "Module %u",
-                      parameterID.value._.module.moduleIndex + 1u);
-        break;
+        return 1u + parameterID.value._.module.moduleIndex;
     case ParameterID::LFOParameter:
-        std::snprintf(path, CLAP_PATH_SIZE, "Module %u/LFO",
-                      parameterID.value._.lfo.moduleIndex + 1u);
-        break;
+        return 1u + Constants::maxNumberOfModules + parameterID.value._.lfo.moduleIndex;
     }
+    return 0u;
+}
+
+void SpectrumWorxCLAP::modulePathFor(ParameterID const parameterID,
+                                     char (&path)[CLAP_PATH_SIZE]) const noexcept
+{
+    auto const &text(modulePaths_[modulePathIndex(parameterID)]);
+    std::memcpy(path, text.c_str(), text.size() + 1u);
 }
 
 /// \note The *live* range, not the fixed one paramsInfo advertises: normalising
@@ -1636,12 +1652,14 @@ void SpectrumWorxCLAP::HostProxy::automatedParameterChanged(
                                           UIEdit::Kind::Value}),
                    "The outgoing edit queue is full; the host was not told about an edit.");
 
-    // the same rescan handleEvent() asks for when the *host* fills a slot: a
-    // slot selector changes what the other parameters are called and what they
-    // mean, and it can be moved from either side
-    if (parameterID.type() == ParameterID::ModuleChainParameter)
-        const_cast<SpectrumWorxCLAP &>(plugin_).requestRescan(
-            CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT | CLAP_PARAM_RESCAN_VALUES);
+    // and no rescan for a slot selector, though this is where the parameter list
+    // changes: the engine raises chainChanged() when it applies the slot, which
+    // asks for the same one. Asking here as well only means asking twice -- the
+    // two land in different callbacks, so requestRescan() cannot coalesce them,
+    // and REAPER answers each by reading every parameter. \see issue #223
+    //
+    // this is what the host's own route already does: handleEvent() asks for
+    // nothing either and lets chainChanged() speak for it
 
     plugin_.markCurrentProgramAsEdited();
     plugin_.requestParameterFlush();
