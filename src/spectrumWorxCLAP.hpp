@@ -200,6 +200,12 @@ class SpectrumWorxCLAP final
     /// that the state is dirty". \see issue #219.
     void markCurrentProgramAsEdited() const;
 
+    /// \brief Asks the host for the callback that drains the echo ring.
+    ///
+    /// \note Coalesced: the drain takes the whole ring, so one outstanding
+    /// request covers however many events a block carried.
+    void requestEchoDrain();
+
   public:
     explicit SpectrumWorxCLAP(clap_host const *);
     ~SpectrumWorxCLAP() override;
@@ -563,6 +569,15 @@ class SpectrumWorxCLAP final
     /// parameter event in process(). Mutable because marking tells the host
     /// something and changes nothing about the plugin.
     mutable std::atomic<bool> pendingMarkDirty_{false};
+
+    /// \brief An echo is on the ring and the main thread has not been woken.
+    ///
+    /// \note Its own flag since issue #225. The wake-up used to arrive as a side
+    /// effect of `markSessionAsUnsaved()`'s deferral, so when a parameter write
+    /// stopped announcing itself the echo sat there: the interface did not move
+    /// and `paramsValue` answered from a `programMain_` blocks behind the engine.
+    /// Draining the ring is not the same errand as telling the host to save.
+    std::atomic<bool> pendingEchoDrain_{false};
 
     /// What the editor moved, waiting for a process() or flush() to carry it to
     /// the host.

@@ -17,6 +17,7 @@
 ///
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
+#include "core/parameterID.hpp"
 #include "core/threading/threadCheck.hpp"
 
 #include "swClapEntryImpl.hpp"
@@ -63,9 +64,14 @@ Observation observation;
 ///
 /// \note That combination is what makes `markCurrentProgramAsModified()` defer:
 /// it cannot ask which thread it is on, so it records the intent and calls
-/// `request_callback`, which is `[thread-safe]`. Any parameter event delivered to
+/// `request_callback`, which is `[thread-safe]`. A slot change delivered to
 /// process() therefore reaches this host callback from inside the audio callback,
 /// which is the observation point -- no test hook in the plugin, just the API.
+///
+/// \note A slot change and not any parameter, since issue #225: an ordinary
+/// parameter write is a dirty state implicitly and no longer announces itself, so
+/// it would arrive here silently. Filling a slot changes the shape of the
+/// parameter list, which the host does have to be told about.
 clap_host const &observingHost()
 {
     static clap_host_state const state{
@@ -264,12 +270,21 @@ TEST_CASE("The plugin calls its host back from inside the audio callback",
         static_cast<clap_plugin_params const *>(pPlugin->get_extension(pPlugin, CLAP_EXT_PARAMS)));
     REQUIRE(pParams != nullptr);
 
-    // Index 0 is a global parameter, so it exists whatever is in the slots -- a
-    // parameter no effect owns is dropped by handleEvent() before it reaches the
-    // host callback this is watching for.
+    // the selector for the first slot, which starts empty: min_value is
+    // `noModule` and one above it is the first effect, so this genuinely fills it
     clap_param_info info{};
-    REQUIRE(pParams->get_info(pPlugin, 0, &info));
-    OneEvent const event(info.id, info.default_value);
+    bool found(false);
+    for (std::uint32_t index(0); !found && (index < pParams->count(pPlugin)); ++index)
+    {
+        REQUIRE(pParams->get_info(pPlugin, index, &info));
+        LE::SW::ParameterID parameterID;
+        parameterID.binaryValue = info.id;
+        found = (parameterID.type() == LE::SW::ParameterID::ModuleChainParameter) &&
+                (parameterID.value._.moduleChain.moduleIndex == 0);
+    }
+    REQUIRE(found);
+
+    OneEvent const event(info.id, info.min_value + 1);
 
     std::vector<float> leftIn(blockSize, 0.0f), rightIn(blockSize, 0.0f);
     std::vector<float> leftOut(blockSize, 0.0f), rightOut(blockSize, 0.0f);
@@ -298,6 +313,7 @@ TEST_CASE("The plugin calls its host back from inside the audio callback",
     // on, so it deferred -- and the deferral is only correct if it really does
     // arrive later.
     CHECK(observation.markedDirty.load() == 0);
+
     pPlugin->on_main_thread(pPlugin);
     CHECK(observation.markedDirty.load() == 1);
 
