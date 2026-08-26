@@ -15,6 +15,7 @@ executed or a record of how the port got where it is; that is in [`old/`](old/).
 | [`latency.md`](latency.md) | Why the delay is one FFT window, why it cannot be less, the two FIFO primings that hold it constant, and the block-splitting bug that happened without the second one. |
 | [`how-lfo-rates-and-eval-work.md`](how-lfo-rates-and-eval-work.md) | What an LFO's period holds, which bar it is a fraction of, what tempo sync does and does not move, and how often the thing is evaluated against how often its clock moves. |
 | [`sidechain-approach.md`](sidechain-approach.md) | The three things that can feed the side channel, why the choice is a *source* and not a bus topology, and what an old preset's `Input_mode` turns into. |
+| [`undo-redo.md`](undo-redo.md) | What can be taken back, the three shapes a step comes in and why one of them is not enough, and the seam between the plugin's history and the editor that no test reaches. |
 
 ## What is left — the issue tracker
 
