@@ -359,7 +359,8 @@ void PanelBackground::setSizeFromPanel()
 ////////////////////////////////////////////////////////////////////////////////
 
 PaintedButton::PaintedButton(juce::Component &parent, juce::String const &text, int const width,
-                             int const height, bool const toggled)
+                             int const height, bool const toggled, Glow const glow)
+    : glow_(glow)
 {
     setButtonText(text);
 
@@ -389,8 +390,10 @@ void PaintedButton::paintButton(juce::Graphics &graphics, bool isMouseOverButton
     if (fade)
         graphics.beginTransparencyLayer(opacity);
 
+    bool const alsoLit((glow_ == Glow::whenHovered) ? isMouseOverButton : getToggleState());
+
     ButtonPainter::paint(graphics, getLocalBounds().toFloat(), ButtonPainter::Rectangular,
-                         isEnabled() && (isButtonDown || getToggleState()), getButtonText());
+                         isEnabled() && (isButtonDown || alsoLit), getButtonText());
 
     if (fade)
         graphics.endTransparencyLayer();

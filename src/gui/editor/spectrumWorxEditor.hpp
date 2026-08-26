@@ -1612,8 +1612,57 @@ class SpectrumWorxEditor final : private SkinLifetime,
 
     SampleArea sampleArea_;
 
-    PaintedButton preset_;
-    PaintedButton settingsButton_;
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \class UndoButton
+    ///
+    /// \brief One end of the split pill under the rack: undo on the left, redo
+    /// on the right.
+    ///
+    /// \note Two widgets rather than one with two hit zones, so that hovering,
+    /// pressing and being unavailable are each JUCE's own answer per half --
+    /// which is what makes an empty stack read as a dead end rather than as a
+    /// button that does nothing. \see issue #101.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    class UndoButton final : public WidgetBase<juce::Button>
+    {
+      public:
+        /// \note Half the width the Presets button had, so that the two of them
+        /// fill exactly the slot it left.
+        static int constexpr width{43};
+        static int constexpr height{36};
+
+        UndoButton(juce::Component &parent, bool undoRatherThanRedo);
+
+      private:
+        void paintButton(juce::Graphics &, bool isMouseOverButton, bool isButtonDown) override;
+
+        bool const undo_;
+    }; // class UndoButton
+
+    UndoButton undoButton_;
+    UndoButton redoButton_;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The one button that swaps the panel, captioned with where it goes
+    /// rather than with where you are.
+    ///
+    /// \note Was two, one per panel, each toggled on while its panel was up. The
+    /// panels share a rectangle and exactly one of them is always open, so the
+    /// pair could only ever be in two of its four states -- and a lit button
+    /// beside an unlit one says "pick one", which is not what a control with one
+    /// possible outcome means. \see updatePanelButton().
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    PaintedButton panelButton_;
+
+    /// \brief Puts the caption and the two halves in step with what is open and
+    /// what is on the stacks. \note Polled, for the reason the Save buttons are.
+    void updatePanelControls();
 
     ////////////////////////////////////////////////////////////////////////////
     ///

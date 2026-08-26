@@ -432,15 +432,26 @@ float constexpr disabled{0.30f};
 /// \brief A caption on a ButtonPainter pill: Presets and Settings, and the preset
 /// browser's Save, Save as and Delete.
 ///
-/// \note Held down *or* toggled on is what "selected" means here.
+/// \note Held down is always lit. What else lights it is the \p Glow the button
+/// was built with: a button that is one of a set says which one is chosen, and a
+/// button with only one outcome has nothing to say about itself until a pointer
+/// is on it. \see issue #212, and the panel button, which is the second kind.
 class PaintedButton : public WidgetBase<juce::Button>
 {
   public:
+    enum class Glow
+    {
+        whenSelected, ///< lit while toggled on
+        whenHovered   ///< lit while the pointer is over it
+    };
+
     PaintedButton(juce::Component &parent, juce::String const &text, int width, int height,
-                  bool toggled = true);
+                  bool toggled = true, Glow = Glow::whenSelected);
 
   private:
     void paintButton(juce::Graphics &, bool isMouseOverButton, bool isButtonDown) override;
+
+    Glow glow_;
 }; // class PaintedButton
 
 ////////////////////////////////////////////////////////////////////////////////
