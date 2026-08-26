@@ -1274,6 +1274,16 @@ class SpectrumWorxEditor final : private SkinLifetime,
         void buttonClicked(juce::Button *) override;
         void sliderValueChanged(juce::Slider *) noexcept override;
 
+        /// \brief Opens a gesture for whatever the dragged slider writes, and
+        /// closes it on release.
+        ///
+        /// \note Here rather than on the sliders, because this is already their
+        /// listener and JUCE calls these from the widget's own drag. The range
+        /// slider stands for two parameters and opens two, which is why the open
+        /// set is a mask rather than one index.
+        void sliderDragStarted(juce::Slider *) override;
+        void sliderDragEnded(juce::Slider *) override;
+
       private:
         void updateAllControls();
         void updateAutomatableControls();
@@ -1290,6 +1300,13 @@ class SpectrumWorxEditor final : private SkinLifetime,
         void setWaveform(unsigned int waveformID);
 
         void automatedParameterChanged(std::uint8_t lfoParameterIndex, float parameterValue) const;
+
+        /// \brief This strip's ID for \p lfoParameterIndex, or nothing when the
+        /// control it belongs to is one no LFO can drive.
+        std::optional<ParameterID> lfoParameterID(std::uint8_t lfoParameterIndex) const;
+
+        /// \brief Runs \p forEach over every LFO parameter \p pSlider writes.
+        template <typename F> void forEachParameterOf(juce::Slider const *pSlider, F forEach) const;
 
         /// \brief One LFO parameter, queued rather than written.
         ///
@@ -1356,6 +1373,10 @@ class SpectrumWorxEditor final : private SkinLifetime,
         PopupMenuWithSelection type_;
 
         ModuleControlBase *pModuleControl_;
+
+        /// \brief Which LFO parameters a drag is holding a gesture open for, as
+        /// a bit per index. \see sliderDragStarted().
+        std::uint8_t openGestures_{0};
 
         static unsigned int const width = 174;
 

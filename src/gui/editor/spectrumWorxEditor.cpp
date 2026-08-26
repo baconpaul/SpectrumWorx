@@ -2747,7 +2747,8 @@ void SpectrumWorxEditor::setLFOEnabled(ModuleControlBase &control, bool const en
 
     float const value(enable ? 1.0f : 0.0f);
     editorHost().editParameter(parameterID, value);
-    host().automatedParameterChanged(lfoParameterID, value);
+    // a switch, so a whole gesture of its own
+    host().automatedParameterChanged(lfoParameterID, value, true /*asDiscreteGesture*/);
 
     control.lfoStateChanged();
     // ...and the knob goes back to the value under the LFO rather than staying
@@ -2975,17 +2976,80 @@ void SpectrumWorxEditor::LFODisplay::updateLFOAndHostFromPeriodControl()
     updateParameterAndNotifyHost<LFO::PeriodScale>(period_.getValue());
 }
 
-void SpectrumWorxEditor::LFODisplay::automatedParameterChanged(std::uint8_t const lfoParameterIndex,
-                                                               float const parameterValue) const
+std::optional<ParameterID>
+SpectrumWorxEditor::LFODisplay::lfoParameterID(std::uint8_t const lfoParameterIndex) const
 {
     auto const moduleParameterIndex(control().moduleParameterIndex());
 
     if (moduleParameterIndex >= (SW::Constants::maxNumberOfParametersPerModule - 1))
+        return std::nullopt; //...mrmlj...a parameter no LFO can drive...
+
+    ParameterID parameterID;
+    parameterID.value.type = ParameterID::LFOParameter;
+    parameterID.value._.lfo = {lfoParameterIndex, moduleParameterIndex, moduleIndex()};
+    return parameterID;
+}
+
+/// \note The same three-way dispatch sliderValueChanged() makes, and it has to
+/// stay that way: what a drag opens a gesture for must be exactly what the drag
+/// then writes, or the pair names a parameter the mouse never moved.
+template <typename F>
+void SpectrumWorxEditor::LFODisplay::forEachParameterOf(juce::Slider const *const pSlider,
+                                                        F forEach) const
+{
+    using namespace LE::Parameters;
+
+    if (pSlider == &range_)
+    {
+        forEach(std::uint8_t{IndexOf<LFO::Parameters, LFO::LowerBound>::value});
+        forEach(std::uint8_t{IndexOf<LFO::Parameters, LFO::UpperBound>::value});
+    }
+    else if (pSlider == &period_)
+        forEach(std::uint8_t{IndexOf<LFO::Parameters, LFO::PeriodScale>::value});
+    else
+    {
+        LE_ASSERT(pSlider == &phase_);
+        forEach(std::uint8_t{IndexOf<LFO::Parameters, LFO::Phase>::value});
+    }
+}
+
+void SpectrumWorxEditor::LFODisplay::sliderDragStarted(juce::Slider *const pSlider)
+{
+    forEachParameterOf(pSlider, [this](std::uint8_t const lfoParameterIndex) {
+        auto const parameterID(lfoParameterID(lfoParameterIndex));
+        if (!parameterID)
+            return;
+        openGestures_ = static_cast<std::uint8_t>(openGestures_ | (1u << lfoParameterIndex));
+        editor().host().automatedParameterBeginEdit(*parameterID);
+    });
+}
+
+/// \note The mask decides, not the slider: the control under the strip can be
+/// swapped while a mouse is down, and what has to balance is the gesture that
+/// was actually opened.
+void SpectrumWorxEditor::LFODisplay::sliderDragEnded(juce::Slider *const pSlider)
+{
+    forEachParameterOf(pSlider, [this](std::uint8_t const lfoParameterIndex) {
+        if (!(openGestures_ & (1u << lfoParameterIndex)))
+            return;
+        openGestures_ = static_cast<std::uint8_t>(openGestures_ & ~(1u << lfoParameterIndex));
+        if (auto const parameterID = lfoParameterID(lfoParameterIndex))
+            editor().host().automatedParameterEndEdit(*parameterID);
+    });
+}
+
+void SpectrumWorxEditor::LFODisplay::automatedParameterChanged(std::uint8_t const lfoParameterIndex,
+                                                               float const parameterValue) const
+{
+    auto const parameterID(lfoParameterID(lfoParameterIndex));
+    if (!parameterID)
         return;
 
-    ParameterID::LFO const lfoParameterID = {lfoParameterIndex, moduleParameterIndex,
-                                             moduleIndex()};
-    editor().host().automatedParameterChanged(lfoParameterID, parameterValue);
+    // false while a drag holds one open for this parameter, so the drag is one
+    // gesture rather than one per step
+    bool const asDiscreteGesture(!(openGestures_ & (1u << lfoParameterIndex)));
+    editor().host().automatedParameterChanged(parameterID->value._.lfo, parameterValue,
+                                              asDiscreteGesture);
 }
 
 void SpectrumWorxEditor::LFODisplay::queueLFOParameter(std::uint8_t const lfoParameterIndex,

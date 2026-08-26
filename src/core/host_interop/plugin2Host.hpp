@@ -89,7 +89,10 @@ class Plugin2HostInteropControler
             asDiscreteGesture);
     }
 
-    void automatedParameterChanged(ParameterID::LFO, float value) const;
+    /// \brief Every LFO parameter's only route to the host.
+    /// \param asDiscreteGesture as below -- false while the strip's own drag
+    /// holds a gesture open for this parameter. \see LFODisplay::sliderDragStarted().
+    void automatedParameterChanged(ParameterID::LFO, float value, bool asDiscreteGesture) const;
     /// \param asDiscreteGesture wraps the change in a gesture of its own, for an
     /// edit that is not part of a drag -- a wheel notch, a menu row, a typed
     /// value. A drag brackets itself and passes false. \see issue #188.
