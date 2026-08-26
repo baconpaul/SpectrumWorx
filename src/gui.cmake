@@ -57,6 +57,7 @@ target_compile_definitions(sw-gui-resources PRIVATE LE_ENABLE_ASSERT_HANDLER)
 ################################################################################
 
 add_library(sw-gui-widgets STATIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/gui/animation.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/gui.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/gui/preferences.cpp
 )

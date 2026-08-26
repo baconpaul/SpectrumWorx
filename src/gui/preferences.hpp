@@ -27,6 +27,9 @@
 #ifndef preferences_hpp__6F0B2C41_9D77_4A5E_8C3B_1E4A0D96B27F
 #define preferences_hpp__6F0B2C41_9D77_4A5E_8C3B_1E4A0D96B27F
 //------------------------------------------------------------------------------
+/// `AnimationStyle`, which is one of the answers.
+#include "animation.hpp"
+
 /// `ColourMap::Palette`, which is one of the answers.
 #include "colourMap.hpp"
 
@@ -52,8 +55,8 @@ namespace LE::SW::GUI
 /// its own key through, so the file is one rewrite per user click rather than
 /// five.
 ///
-/// \note The one enumeration in here -- the palette -- is streamed by *name*, not
-/// by ordinal, so inserting a value in the middle cannot silently change what an
+/// \note The enumerations in here -- the palette and the animation style -- are
+/// streamed by *name*, not by ordinal, so inserting a value in the middle cannot silently change what an
 /// existing file means and the file stays legible to whoever opens it. The names
 /// are the enum identifiers, so a value in the file can be grepped for in the
 /// source, and an unrecognised one reads as the default.
@@ -122,6 +125,19 @@ class Preferences
     bool previewLFOOnHover() const { return previewLFOOnHover_; }
 
     ColourMap::Palette palette() const { return palette_; }
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief How the module rack moves when it changes, or NoAnimation.
+    ///
+    ///   A strip grows when it is added, shrinks when it is removed, and slides
+    /// when a slot ahead of it is filled or emptied. Under NoAnimation each of
+    /// those is where it ends up straight away. \see GUI::styleFor(), which is
+    /// what every caller asks rather than reading this directly -- it is also
+    /// NoAnimation whenever the motion could not be seen. Issue #47.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    AnimationStyle animationStyle() const { return animationStyle_; }
     bool hideCursorOnKnobDrag() const { return hideCursorOnKnobDrag_; }
     /// Always one of zoomPercentages.
     unsigned int zoomPercent() const { return zoomPercent_; }
@@ -133,6 +149,7 @@ class Preferences
     /// the two are done together -- \see SpectrumWorxEditor::setPalette(),
     /// which is the only place a user changes this.
     void setPalette(ColourMap::Palette);
+    void setAnimationStyle(AnimationStyle);
     void setHideCursorOnKnobDrag(bool);
     /// \note A percentage this build does not offer is ignored, for the same
     /// reason an unrecognised enumeration name is: the file is the user's to
@@ -152,6 +169,7 @@ class Preferences
     bool showLFOAnimation_{true};
     bool previewLFOOnHover_{true};
     ColourMap::Palette palette_{ColourMap::ClassicBlue};
+    AnimationStyle animationStyle_{FastAnimation};
     bool hideCursorOnKnobDrag_{true};
     unsigned int zoomPercent_{defaultZoomPercent};
 }; // class Preferences

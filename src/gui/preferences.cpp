@@ -46,6 +46,7 @@ enum PreferenceKey
     hideCursorOnKnobDragKey,
     zoomPercentKey,
     paletteKey,
+    animationStyleKey,
     numberOfPreferenceKeys
 };
 
@@ -66,6 +67,8 @@ std::string preferenceKeyName(PreferenceKey const key)
         return "zoomPercent";
     case paletteKey:
         return "palette";
+    case animationStyleKey:
+        return "animationStyle";
     case numberOfPreferenceKeys:
         break;
     }
@@ -99,6 +102,22 @@ ColourMap::Palette paletteNamed(std::string const &name,
         auto const palette(static_cast<ColourMap::Palette>(index));
         if (name == ColourMap::nameOf(palette))
             return palette;
+    }
+    return valueIfUnrecognised;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// The animation style, by name
+////////////////////////////////////////////////////////////////////////////////
+
+AnimationStyle animationStyleNamed(std::string const &name,
+                                   AnimationStyle const valueIfUnrecognised)
+{
+    for (unsigned int index(0); index < numberOfAnimationStyles; ++index)
+    {
+        auto const style(static_cast<AnimationStyle>(index));
+        if (name == nameOf(style))
+            return style;
     }
     return valueIfUnrecognised;
 }
@@ -146,6 +165,9 @@ Preferences::Preferences(fs::path const &folder) : storage_(std::make_unique<Sto
     palette_ = paletteNamed(provider.getUserDefaultValue(paletteKey, ColourMap::nameOf(palette_)),
                             palette_);
 
+    animationStyle_ = animationStyleNamed(
+        provider.getUserDefaultValue(animationStyleKey, nameOf(animationStyle_)), animationStyle_);
+
     hideCursorOnKnobDrag_ =
         provider.getUserDefaultValue(hideCursorOnKnobDragKey, hideCursorOnKnobDrag_) != 0;
 
@@ -183,6 +205,12 @@ void Preferences::setPalette(ColourMap::Palette const value)
 {
     palette_ = value;
     storage_->provider.updateUserDefaultValue(paletteKey, ColourMap::nameOf(value));
+}
+
+void Preferences::setAnimationStyle(AnimationStyle const value)
+{
+    animationStyle_ = value;
+    storage_->provider.updateUserDefaultValue(animationStyleKey, nameOf(value));
 }
 
 void Preferences::setHideCursorOnKnobDrag(bool const value)

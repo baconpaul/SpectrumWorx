@@ -1477,6 +1477,7 @@ class SpectrumWorxEditor final : private SkinLifetime,
             InterfacePage();
 
             TitledComboBox const &paletteComboBox() const { return palette_; }
+            TitledComboBox const &animationComboBox() const { return animation_; }
 
           private: // JUCE component overrides.
             void paint(juce::Graphics &) override;
@@ -1487,11 +1488,12 @@ class SpectrumWorxEditor final : private SkinLifetime,
           private:
             friend class Settings;
             /// \note Zoom first and the colour scheme under it, those being the
-            /// two a user reaches for, then the three switches. Each control
-            /// draws its own title, so the order is a layout decision rather than
-            /// an artwork one.
+            /// two a user reaches for, then how the rack moves, then the three
+            /// switches. Each control draws its own title, so the order is a
+            /// layout decision rather than an artwork one.
             TitledComboBox zoom_;
             TitledComboBox palette_;
+            TitledComboBox animation_;
             LEDTextButton showLFOAnimation_;
             LEDTextButton previewLFOOnHover_;
             LEDTextButton hideCursorOnKnobDrag_;

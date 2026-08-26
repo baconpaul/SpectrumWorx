@@ -138,8 +138,8 @@ template <typename Widget> std::vector<Widget *> descendantsOfType(juce::Compone
 /// box arrived as a fourth and this said so.
 GUI::TitledComboBox &comboBoxOffering(Editor &editor, std::size_t const choices)
 {
-    /// Zoom and colour scheme, the page's three switches being LEDs.
-    std::size_t constexpr onTheInterfacePage{2};
+    /// Zoom, colour scheme and animations, the page's three switches being LEDs.
+    std::size_t constexpr onTheInterfacePage{3};
 
     auto const comboBoxes(descendantsOfType<GUI::TitledComboBox>(editor));
     REQUIRE(comboBoxes.size() == onTheInterfacePage);
