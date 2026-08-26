@@ -2252,6 +2252,18 @@ char const *SpectrumWorxCLAP::decodeAndPublishSample(fs::path const &sampleFile)
 
 char const *SpectrumWorxCLAP::setNewSample(fs::path const &newSampleFile)
 {
+    // the file it already holds, decoded for the rate it is running at: nothing
+    // to read, nothing to hand the engine and no edit to report. A preset load
+    // asks for the sample whether or not the file changed, so two presets naming
+    // one file used to decode it twice
+    //
+    // the rate is half the question, and the half that is easy to lose: a host
+    // changing it makes activate() decode the same path again, through
+    // decodeAndPublishSample() rather than through here
+    if (!newSampleFile.empty() && (newSampleFile == sampleFile_) &&
+        (decodedSampleRate_ == static_cast<unsigned int>(sampleRate_)))
+        return nullptr;
+
     auto const *const pErrorMessage(decodeAndPublishSample(newSampleFile));
     if (pErrorMessage)
         return pErrorMessage;
