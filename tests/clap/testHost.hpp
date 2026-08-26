@@ -969,6 +969,71 @@ inline std::vector<clap_param_info> allParameterInfo(clap_plugin const &plugin,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Finding a parameter to move
+////////////////////////////////////////////////////////////////////////////////
+
+/// \brief The first parameter a host is shown that belongs to no slot.
+///
+/// \note A global rather than a module parameter, for two reasons: it exists
+/// whatever the slots hold -- an event for a parameter no effect owns is dropped
+/// by handleEvent() before it reaches anything -- and it keeps its own range at
+/// the host edge, so a value in the effect's own units and a value the host
+/// would write are the same number. The three main knobs are globals, so this is
+/// also what a real drag moves.
+inline clap_param_info firstGlobalParameter(clap_plugin const &plugin,
+                                            clap_plugin_params const &params)
+{
+    for (auto const &info : allParameterInfo(plugin, params))
+        if (std::strcmp(info.module, "Global") == 0)
+            return info;
+    FAIL("no global parameter");
+    return {};
+}
+
+/// \brief The slot selector for module \p slot, as the host is shown it.
+inline clap_param_info slotSelector(clap_plugin const &plugin, clap_plugin_params const &params,
+                                    std::uint8_t const slot)
+{
+    for (auto const &info : allParameterInfo(plugin, params))
+    {
+        LE::SW::ParameterID parameterID;
+        parameterID.binaryValue = info.id;
+        if ((parameterID.type() == LE::SW::ParameterID::ModuleChainParameter) &&
+            (parameterID.value._.moduleChain.moduleIndex == slot))
+            return info;
+    }
+    FAIL("no slot selector for that module");
+    return {};
+}
+
+/// \brief A parameter belonging to the effect in \p slot, and not its bypass.
+inline clap_param_info moduleParameterIn(clap_plugin const &plugin,
+                                         clap_plugin_params const &params, std::uint8_t const slot)
+{
+    for (auto const &info : allParameterInfo(plugin, params))
+    {
+        LE::SW::ParameterID parameterID;
+        parameterID.binaryValue = info.id;
+        if ((parameterID.type() == LE::SW::ParameterID::ModuleParameter) &&
+            (parameterID.value._.module.moduleIndex == slot) &&
+            (parameterID.value._.module.moduleParameterIndex != 0 /*bypass*/))
+            return info;
+    }
+    FAIL("no module parameter for that slot");
+    return {};
+}
+
+/// Somewhere in the parameter's range that is not where it already is.
+inline double aDifferentValue(clap_plugin const &plugin, clap_plugin_params const &params,
+                              clap_param_info const &info)
+{
+    double current{0};
+    REQUIRE(params.get_value(&plugin, info.id, &current));
+    auto const middle((info.min_value + info.max_value) / 2);
+    return (current == middle) ? info.max_value : middle;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Naming a parameter the way the host addresses it
 ////////////////////////////////////////////////////////////////////////////////
 

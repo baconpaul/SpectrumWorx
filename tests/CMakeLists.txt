@@ -71,6 +71,7 @@ add_executable(sw-plugin-tests
         clap/publishProtocolTests.cpp
         clap/stateTests.cpp
         clap/threadingTests.cpp
+        clap/undoTests.cpp
 
         # Drives a real clap_plugin through its C entry point.
         core/threadCheckTests.cpp
