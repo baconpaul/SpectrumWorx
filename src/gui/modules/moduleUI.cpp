@@ -692,7 +692,10 @@ ModuleUI::~ModuleUI()
         LE_ASSERT(!hasFocus());
     }
 
-    fadeOutComponent(*this, 0, 600, true);
+    // before the shrink, which is a snapshot: a strip dropped mid-grow would
+    // otherwise be photographed small and shrink from there
+    setTransform(juce::AffineTransform());
+    shrinkAway(*this);
 }
 
 void ModuleUI::setUpForEffect(char const *const effectName, char const *const effectDescription)
@@ -703,6 +706,8 @@ void ModuleUI::setUpForEffect(char const *const effectName, char const *const ef
     description_ = effectDescription;
 }
 
+/// \note `slot_` is assigned now and the pixels arrive over the next few frames.
+/// That gap is why every caller reads slot() rather than getX(). \see GUI::moveTo().
 void ModuleUI::moveToSlot(std::uint8_t const slotIndex)
 {
     /// \note The assignment is new, and its absence was invisible for as long as
@@ -713,7 +718,7 @@ void ModuleUI::moveToSlot(std::uint8_t const slotIndex)
     /// without asking the chain.
     slot_ = slotIndex;
     std::uint16_t const myHorizontalOffset(horizontalOffset + slotIndex * (width + distance));
-    setTopLeftPosition(myHorizontalOffset, verticalOffset);
+    moveTo(*this, myHorizontalOffset, verticalOffset);
 }
 
 void ModuleUI::paint(juce::Graphics &graphics)

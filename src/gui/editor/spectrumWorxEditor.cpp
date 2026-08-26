@@ -2047,6 +2047,7 @@ void SpectrumWorxEditor::createModuleRegion(LE::Utility::IntrusivePtr<Module> co
             return;
         }
         addToParentAndShow(mainArea_, *pRegion);
+        pRegion->growIntoSlot();
         return;
     }
 
@@ -2337,9 +2338,11 @@ SpectrumWorxEditor::ModuleMenuButton::ModuleMenuButton(SpectrumWorxEditor &paren
 void SpectrumWorxEditor::ModuleMenuButton::moveToSlot(std::uint8_t const slotIndex)
 {
     //...mrmlj..."magic number" adjustments...
-    setTopLeftPosition(6 + ModuleUI::horizontalOffset +
-                           ((ModuleUI::width + ModuleUI::distance) * slotIndex),
-                       (ModuleUI::verticalOffset - 6) + (ModuleUI::height / 2) - (getHeight() / 2));
+    moveTo(*this,
+           6 + ModuleUI::horizontalOffset + ((ModuleUI::width + ModuleUI::distance) * slotIndex),
+           (ModuleUI::verticalOffset - 6) + (ModuleUI::height / 2) - (getHeight() / 2));
+    // after the move, so that one coming back to a rack that filled up arrives
+    // where it belongs rather than sliding in from where it was hidden
     setIsVisible(slotIndex < SW::Constants::maxNumberOfModules);
 }
 
@@ -3637,6 +3640,10 @@ void SpectrumWorxEditor::Settings::comboBoxValueChanged(ComboBox const &comboBox
     {
         editor.setPalette(static_cast<ColourMap::Palette>(value));
     }
+    else if (&comboBox == &settings.interfacePage_.animationComboBox())
+    {
+        preferences().setAnimationStyle(static_cast<AnimationStyle>(value));
+    }
     else
     {
         LE_UNREACHABLE_CODE();
@@ -3771,11 +3778,12 @@ void SpectrumWorxEditor::Settings::EnginePage::paint(juce::Graphics &g)
 SpectrumWorxEditor::Settings::InterfacePage::InterfacePage()
     : PanelBackground(SettingsPage), zoom_(*this, xMargin, yMargin + 0 * yStep + yOffset, "Zoom"),
       palette_(*this, xMargin, yMargin + 1 * yStep + yOffset, "Color Scheme"),
-      showLFOAnimation_(*this, xMargin - 4, yMargin + 2 * yStep + yOffset,
+      animation_(*this, xMargin, yMargin + 2 * yStep + yOffset, "Module Animations"),
+      showLFOAnimation_(*this, xMargin - 4, yMargin + 3 * yStep + yOffset,
                         "Animate LFO modulations"),
-      previewLFOOnHover_(*this, xMargin - 4, yMargin + 2 * yStep + yOffset + ledStep,
+      previewLFOOnHover_(*this, xMargin - 4, yMargin + 3 * yStep + yOffset + ledStep,
                          "Hover shows LFO settings"),
-      hideCursorOnKnobDrag_(*this, xMargin - 4, yMargin + 2 * yStep + yOffset + 2 * ledStep,
+      hideCursorOnKnobDrag_(*this, xMargin - 4, yMargin + 3 * yStep + yOffset + 2 * ledStep,
                             "Hide cursor on knob edits")
 {
     Settings &parent(
@@ -3809,6 +3817,12 @@ SpectrumWorxEditor::Settings::InterfacePage::InterfacePage()
     palette_.addItem(ColourMap::DarkPurple, "Dark Purple");
     palette_.addItem(ColourMap::DarkGray, "Dark Gray");
     palette_.setSelectedIndex(preferences().palette());
+
+    // spelled here rather than taken from nameOf(), for the reason above
+    animation_.addItem(NoAnimation, "None");
+    animation_.addItem(FastAnimation, "Fast");
+    animation_.addItem(SlowAnimation, "Slow");
+    animation_.setSelectedIndex(preferences().animationStyle());
 
     showLFOAnimation_.setToggleState(preferences().showLFOAnimation(), juce::dontSendNotification);
     showLFOAnimation_.addListener(&parent);

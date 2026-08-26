@@ -13,6 +13,7 @@
 #ifndef moduleUI_hpp__8228E5F3_535E_4B08_9AD0_072C9fA7AD93
 #define moduleUI_hpp__8228E5F3_535E_4B08_9AD0_072C9fA7AD93
 //------------------------------------------------------------------------------
+#include "gui/animation.hpp"
 #include "gui/gui.hpp"
 #include "gui/painters/moduleKnobPainter.hpp"
 #include "gui/painters/moduleStripPainter.hpp"
@@ -509,6 +510,12 @@ class ModuleUI final : public WidgetBase<>, private juce::Button::Listener
 
     void moveToSlot(std::uint8_t slotIndex);
 
+    /// \brief Scales the strip up from nothing where it stands.
+    /// \note Not the constructor's: a strip is parented after it is built, and
+    /// an unparented component is one styleFor() reads as off screen. \see
+    /// SpectrumWorxEditor::createModuleRegion().
+    void growIntoSlot() { growIn_.start(*this); }
+
     ModuleControlBase &effectSpecificParameterControl(std::uint8_t parameterIndex);
     ModuleControlBase const &effectSpecificParameterControl(std::uint8_t parameterIndex) const;
 
@@ -600,6 +607,10 @@ class ModuleUI final : public WidgetBase<>, private juce::Button::Listener
     juce::String description_;
 
     std::uint8_t slot_{0};
+
+    /// \note Last of the members, so that it stops before anything it could be
+    /// scaling is destroyed.
+    GrowIn growIn_;
 
   public:
     /// \note All std::uint16_t, including the four that fit in a byte. These are
