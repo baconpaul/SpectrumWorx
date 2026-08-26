@@ -99,7 +99,8 @@ void Plugin2HostInteropControler::automatedParameterChanged(Module const &module
 }
 
 void Plugin2HostInteropControler::automatedParameterChanged(ParameterID::LFO const lfoParameterID,
-                                                            float const value) const
+                                                            float const value,
+                                                            bool const asDiscreteGesture) const
 {
     using namespace SW::Constants;
     using namespace ParameterCounts;
@@ -112,7 +113,11 @@ void Plugin2HostInteropControler::automatedParameterChanged(ParameterID::LFO con
     parameterID.value._.lfo = lfoParameterID;
     ParameterValueForAutomation const automationValue = {
         value, LFO::internal2AutomatedValue(lfoParameterID.lfoParameterIndex, value, true)};
+    if (asDiscreteGesture)
+        automatedParameterBeginEdit(parameterID);
     automatedParameterChanged(parameterID, automationValue);
+    if (asDiscreteGesture)
+        automatedParameterEndEdit(parameterID);
 }
 
 void Plugin2HostInteropControler::globalParameterChanged(

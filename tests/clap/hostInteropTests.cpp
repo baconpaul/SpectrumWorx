@@ -337,6 +337,53 @@ TEST_CASE("A knob drag reaches the host as a balanced gesture around its value",
     CHECK(recorded.events().empty());
 }
 
+TEST_CASE("An LFO parameter edit reaches the host as a balanced gesture", "[clap][host][lfo]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The same contract as the case above, for the one parameter family
+    /// that was not keeping it. Module parameters and globals bracket a whole
+    /// edit through `asDiscreteGesture` (plugin2Host.cpp), and the LFO overload
+    /// -- which is every LFO parameter's only route to the host -- emitted the
+    /// value on its own. A host that records automation had nothing to group it
+    /// by, and one that ignores ungestured values dropped the edit entirely.
+    ///
+    /// \note A filled slot, because an LFO parameter means nothing without one:
+    /// its value is converted through the live ranges of whatever effect owns
+    /// the parameter it drives.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    Entry const entry;
+    TestHost host{TestHost::everything()};
+    ActivePlugin plugin(48000, 512, host);
+
+    auto &editorHost(editorHostOf(*plugin));
+    REQUIRE(editorHost.editSlot(0, 0));
+    plugin.pumpMainThread();
+
+    LE::SW::ParameterID::LFO const lfo{/*lfoParameterIndex*/ 0, /*moduleParameterIndex*/ 0,
+                                       /*moduleIndex*/ 0};
+
+    LE::SW::ParameterID target;
+    target.value.type = LE::SW::ParameterID::LFOParameter;
+    target.value._.lfo = lfo;
+
+    editorHost.automation().automatedParameterChanged(lfo, 1.0f, true /*asDiscreteGesture*/);
+
+    RecordedOutputEvents recorded;
+    plugin.flush(nullptr, &*recorded);
+
+    auto const mine(recorded.forParameter(target.binaryValue));
+    REQUIRE(mine.size() == 3);
+    CHECK(mine[0].type == CLAP_EVENT_PARAM_GESTURE_BEGIN);
+    CHECK(mine[1].type == CLAP_EVENT_PARAM_VALUE);
+    CHECK(mine[2].type == CLAP_EVENT_PARAM_GESTURE_END);
+
+    // Balanced across the whole list, not just this parameter's slice.
+    CHECK(recorded.count(CLAP_EVENT_PARAM_GESTURE_BEGIN) ==
+          recorded.count(CLAP_EVENT_PARAM_GESTURE_END));
+}
+
 TEST_CASE("Edits made while audio runs come out of process(), not flush()", "[clap][host]")
 {
     // The same queue, collected from the other end. A host that is playing never
