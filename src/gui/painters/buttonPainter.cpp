@@ -126,6 +126,55 @@ void ButtonPainter::paint(juce::Graphics &graphics, juce::Rectangle<float> const
     graphics.drawText(text, pill.translated(0, -captionRise), juce::Justification::centred, false);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// ButtonPainter::paintHalfPill()
+// -----------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The pill is inset by glowReach on three sides and not on the fourth:
+/// the two halves have to *meet*, and a gap the width of a halo between them
+/// would read as two buttons standing next to each other rather than as one
+/// split in two.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+juce::Rectangle<float> ButtonPainter::paintHalfPill(juce::Graphics &graphics,
+                                                    juce::Rectangle<float> const bounds,
+                                                    bool const roundedOnLeft, bool const lit)
+{
+    auto pill(bounds.reduced(0, glowReach));
+    if (roundedOnLeft)
+    {
+        pill.setLeft(pill.getX() + glowReach);
+        pill.setRight(pill.getRight() - halfPillSeam);
+    }
+    else
+    {
+        pill.setLeft(pill.getX() + halfPillSeam);
+        pill.setRight(pill.getRight() - glowReach);
+    }
+
+    juce::Path shape;
+    shape.addRoundedRectangle(pill.getX(), pill.getY(), pill.getWidth(), pill.getHeight(),
+                              rectangularRadius, rectangularRadius,
+                              /*topLeft*/ roundedOnLeft, /*topRight*/ !roundedOnLeft,
+                              /*bottomLeft*/ roundedOnLeft, /*bottomRight*/ !roundedOnLeft);
+
+    graphics.setGradientFill(face(pill, ColourMap::getColour(ColourMap::ButtonFaceTop),
+                                  ColourMap::getColour(ColourMap::ButtonFaceBottom), 1.0f, 0));
+    graphics.fillPath(shape);
+
+    if (lit)
+    {
+        graphics.setColour(ColourMap::getColour(ColourMap::Accent));
+        graphics.strokePath(shape, juce::PathStrokeType(rimThickness));
+    }
+
+    return pill;
+}
+
 int ButtonPainter::widthFor(juce::String const &text, Shape const shape)
 {
     auto const caption(juce::GlyphArrangement::getStringWidthInt(font(), text));

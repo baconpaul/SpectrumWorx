@@ -98,6 +98,61 @@ void GlyphPainter::paintJog(juce::Graphics &graphics, juce::Rectangle<float> con
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+// GlyphPainter::paintUndoArrow()
+// -----------------------------
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The head decides the layout rather than the bar does: it is centred on
+/// the top bar and is wider than the bar is thick, so where that bar can sit is
+/// set by half the head's width, and the bend's radius is whatever is left
+/// between the two bars.
+///
+/// \note Redo is undo through a mirror rather than a second drawing. A pair that
+/// had drifted apart would read as a bug rather than as a choice, and the two
+/// are the same arrow.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void GlyphPainter::paintUndoArrow(juce::Graphics &graphics, juce::Rectangle<float> const bounds,
+                                  bool const pointsLeft, juce::Colour const colour)
+{
+    auto const ink(centred(bounds, undoWidth, undoHeight));
+
+    auto const topLine(ink.getY() + undoHeadWidth / 2);
+    auto const bottomLine(ink.getBottom() - undoStroke / 2);
+    auto const radius((bottomLine - topLine) / 2);
+
+    auto const headBase(ink.getX() + undoHeadLength);
+    auto const bendX(ink.getRight() - radius);
+
+    //   Up and round from the bottom of the bend, then back along the top. One
+    // subpath, so the bend meets the bar without a join to antialias twice.
+    juce::Path turn;
+    turn.addCentredArc(bendX, (topLine + bottomLine) / 2, radius, radius, 0.0f,
+                       juce::MathConstants<float>::pi, 0.0f, true /*starts the subpath*/);
+    turn.lineTo(headBase, topLine);
+
+    juce::Path head;
+    head.startNewSubPath(ink.getX(), topLine);
+    head.lineTo(headBase, topLine - undoHeadWidth / 2);
+    head.lineTo(headBase, topLine + undoHeadWidth / 2);
+    head.closeSubPath();
+
+    auto const mirrored(
+        pointsLeft ? juce::AffineTransform()
+                   : juce::AffineTransform::scale(-1.0f, 1.0f, ink.getCentreX(), ink.getCentreY()));
+
+    graphics.setColour(colour);
+    graphics.strokePath(
+        turn,
+        juce::PathStrokeType(undoStroke, juce::PathStrokeType::curved, juce::PathStrokeType::butt),
+        mirrored);
+    graphics.fillPath(head, mirrored);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
 // GlyphPainter::paintFolder()
 // ---------------------------
 //

@@ -64,6 +64,13 @@ namespace ButtonStyle
 float constexpr glowReach{5.f};
 
 float constexpr rectangularRadius{8.f};
+
+/// \brief The hairline of ground left between the two halves of a split pill.
+///
+/// \note Without it the two abut exactly and read as one long pill: a control
+/// with two ends has to *show* two ends, and a seam does that without a second
+/// colour or a drawn divider.
+float constexpr halfPillSeam{1.f};
 float constexpr rimThickness{RuleStyle::thickness}; ///< the blue line on a lit button's edge
 
 /// \brief The halo: \p glowRings rounded rectangles, each a pixel further out
@@ -155,6 +162,22 @@ class ButtonPainter
 
     /// \brief The width a button of this shape needs to hold \p text.
     ///
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief Half of a split pill -- rounded on its outer side, square where it
+    /// meets its partner, so that two of them read as one control with two ends.
+    ///
+    /// \note No halo, unlike a Rectangular button: the glow is drawn outside the
+    /// pill and the inner edge of a half has no outside to put one in. What says
+    /// a half is live is its rim. \see the undo control, which is the only thing
+    /// shaped like this.
+    ///
+    /// \return the rectangle the pill was drawn in, for whatever goes on it.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    static juce::Rectangle<float> paintHalfPill(juce::Graphics &, juce::Rectangle<float> bounds,
+                                                bool roundedOnLeft, bool lit);
+
     /// \note For a Rectangular button that includes the room the halo wants, so
     /// it is wider than the pill it draws. \see ButtonStyle::glowReach.
     static int widthFor(juce::String const &text, Shape);
