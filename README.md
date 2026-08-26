@@ -25,6 +25,66 @@ to generate the ported code, while preserving the DSP code and operating model.
 Right now, this is a bit of a work-in-prgoress as we figure out if we can move it from
 a two week sprint to an official 3.0 release from the team.
 
+
+## Building from Sounce
+
+As a prerequisite
+
+- You need `git`, CMake 3.28 or newer, and a C++20 toolchain — clang or gcc on
+macOS and Linux, Visual Studio 2022 on Windows.
+- On Linux you also need the usual JUCE development packages; X11, freetype and fontconfig
+are core ones. You can see the list we use in CI on ubuntu [here](https://github.com/surge-synthesizer/sst-githubactions/blob/5bb92ec9d3401eba6a85f8edea98395b3b866e84/prepare-for-juce/action.yml#L22)
+- Everything else is a submodule or is fetched by CMake at configure time. 
+
+With those resolved you can clone and build. 
+
+```bash
+git clone https://github.com/surge-synthesizer/SpectrumWorx.git
+cd SpectrumWorx
+git submodule update --init --recursive
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target spectrumworx_clapfirst_all --parallel
+```
+
+That leaves all four formats in `build/sw_assets`:
+
+```
+build/sw_assets/SpectrumWorx.clap
+build/sw_assets/SpectrumWorx.vst3
+build/sw_assets/SpectrumWorx.component    # macOS only
+build/sw_assets/SpectrumWorx[.ext]        # the standalone; .app on macOS, .exe on Windows, no ext on linux
+```
+
+Windows puts each of them in a per-format subdirectory of `sw_assets` —
+`CLAP/`, `VST3/`, `Standalone-…` — rather than side by side.
+
+
+On Mac and Linux you can also have cmake install the plugin locally at build time by having the 
+first cmake add the `SW_COPY_AFTER_BUILD` flag
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DSW_COPY_AFTER_BUILD=ON
+```
+
+which installs into `~/Library/Audio/Plug-Ins/{CLAP,VST3,Components}` on macOS and
+`~/.clap` and `~/.vst3` on Linux after every build. It does nothing on Windows.
+
+### The other targets, and the options worth knowing
+
+- **The default target** — `cmake --build build` with no `--target` — builds the
+  bundles *and* the test binaries and `sw-show-ui` alongside them.
+- `ctest--test-dir build` runs the test suite once built. This is our CI gate.
+- **`--target spectrumworx-installer`** builds the platform installer into
+  `build/installer`. That is what a release is cut with; on Windows it wants
+  Inno Setup on `PATH` at *configure* time.
+- **`-DSW_BUILD_CLAP_ONLY=ON`** builds the `.clap` and nothing else. Worth it if
+  you only want something a CLAP host can load: the other formats and the
+  standalone CPM-fetch 54MB of SDKs at configure time and this skips all of it.
+- **`-DSW_BUILD_TESTS=OFF -DSW_BUILD_TOOLS=OFF`** leaves the test binaries and
+  the tools out of the build entirely.
+- **`-DSW_WERROR=OFF`** at configure time will skip `-Werror` which is useful if using a new
+  compiler or compiler version.
+
 ## A Note About Coding Assistants in This Project.
 
 In Surge Synth Team for our headline properties (Surge XT, Shortcircuit XT, OB-Xf and the various
