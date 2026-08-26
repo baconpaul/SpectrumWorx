@@ -700,6 +700,40 @@ TEST_CASE("A 2011 preset is legal session state", "[clap][state]")
 // The sample
 ////////////////////////////////////////////////////////////////////////////////
 
+TEST_CASE("Setting the sample to the file already loaded changes nothing", "[clap][state]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Decoding is the expensive thing this plugin does on the main
+    /// thread -- `stateLoad`'s own note puts a long file at "hundreds of
+    /// megabytes" -- and every preset load asks for it whether or not the file
+    /// changed. Two presets naming one sample decoded it twice.
+    ///
+    /// \note Read through the modified flag rather than through a decode
+    /// counter, because that is the contract rather than the mechanism: setting
+    /// a value to the value it already has is not an edit, and a session told
+    /// otherwise offers to save a file nothing happened to.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    Entry const entry;
+
+    fs::path const sample("Carrier.mp3");
+
+    Plugin const plugin(nullHost(), true /*active*/);
+    REQUIRE(plugin.editorHost().setNewSample(sample) == nullptr);
+    REQUIRE(plugin.editorHost().currentSampleFile().filename() == "Carrier.mp3");
+
+    auto const decodedAt(plugin.implementation().decodedSampleRate());
+    plugin.editorHost().loadedPreset().modified.store(false, std::memory_order_relaxed);
+
+    REQUIRE(plugin.editorHost().setNewSample(sample) == nullptr);
+
+    CHECK_FALSE(plugin.editorHost().loadedPreset().modified.load(std::memory_order_relaxed));
+    // and the sample it already had is still the one it has
+    CHECK(plugin.editorHost().currentSampleFile().filename() == "Carrier.mp3");
+    CHECK(plugin.implementation().decodedSampleRate() == decodedAt);
+}
+
 TEST_CASE("The loaded sample survives a session", "[clap][state]")
 {
     Entry const entry;
