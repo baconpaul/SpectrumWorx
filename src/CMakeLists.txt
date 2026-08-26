@@ -27,6 +27,11 @@ add_library(sw-impl STATIC
         # statics over Program const* that clap_plugin_params is made of.
         core/host_interop/host2Plugin.cpp
         core/host_interop/plugin2Host.cpp
+
+        # What the user did, so it can be taken back. Beside the plugin rather
+        # than under core/, because src/core is the engine -- checkNoJuceInDSP
+        # reads it that way -- and this is main-thread plugin bookkeeping.
+        undoHistory.cpp
 )
 
 sw_force_include_odr_header(sw-impl)

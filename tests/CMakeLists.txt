@@ -74,6 +74,7 @@ add_executable(sw-plugin-tests
 
         # Drives a real clap_plugin through its C entry point.
         core/threadCheckTests.cpp
+        core/undoHistoryTests.cpp
         external_audio/sampleFeedTests.cpp
         external_audio/sampleTests.cpp
         goldens/engineHarness.cpp # the CLAP cases drive an instantiable core

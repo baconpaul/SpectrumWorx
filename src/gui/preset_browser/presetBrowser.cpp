@@ -844,6 +844,29 @@ void PresetBrowser::setNewFolder(fs::path const &file)
     background().repaint();
 }
 
+void PresetBrowser::showLoadedPreset()
+{
+    auto const &loaded(editor().editorHost().loadedPreset());
+
+    if (loaded.name.isEmpty())
+    {
+        refresh(); // nothing is loaded; whatever was selected no longer is
+        return;
+    }
+
+    if (loaded.location == PanelState::PresetLocation::factory)
+    {
+        setFactoryBank(loaded.bank); // which refreshes
+        return;
+    }
+
+    location_ = Location::User;
+    currentDirectory_ = loaded.file.parent_path();
+    deselectAllRows();
+    refresh();
+    background().repaint();
+}
+
 void PresetBrowser::setFactoryBank(juce::String const &bank)
 {
     location_ = Location::Factory;

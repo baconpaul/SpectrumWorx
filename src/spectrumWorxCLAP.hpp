@@ -25,6 +25,7 @@
 #include "core/threading/messages.hpp"
 #include "core/threading/valueMailbox.hpp"
 #include "external_audio/sample.hpp"
+#include "undoHistory.hpp"
 #include "gui/editor/editorHost.hpp"
 #include "le/spectrumworx/sideChainSource.hpp"
 
@@ -152,10 +153,11 @@ class SpectrumWorxCLAP final
         void automatedParameterEndEdit(ParameterSelector) const;
 
         /// \note The engine's other notion of a gesture: a named block of edits
-        /// ("Add module"), for a host that can label an undo step. CLAP has no
-        /// call for it, its gestures being per parameter.
-        static void gestureBegin(char const * /*description*/) {}
-        static void gestureEnd() {}
+        /// ("Add module"). CLAP has no call for it, its gestures being per
+        /// parameter, so nothing of this reaches the host -- it is what the
+        /// plugin's own undo history is cut into steps by. \see issue #101.
+        void gestureBegin(char const *description) const;
+        void gestureEnd() const;
 
         /// \note True, meaning "do not push me every parameter of a module that
         /// just changed". The list is fixed (see rebuildParameterIDs), and the
@@ -271,6 +273,13 @@ class SpectrumWorxCLAP final
 
     void editParameter(ParameterID, float value) const override;
     bool editSlot(std::uint8_t slot, std::int8_t effectIndex) override;
+
+    bool canUndo() const override { return undoHistory_.canUndo(); }
+    bool canRedo() const override { return undoHistory_.canRedo(); }
+    char const *undoName() const override { return undoHistory_.undoName(); }
+    char const *redoName() const override { return undoHistory_.redoName(); }
+    void undo() override;
+    void redo() override;
     void editModuleMove(std::uint8_t from, std::uint8_t to) override;
 
     /// \note The one thing on this interface that only a plugin can answer:
@@ -349,6 +358,21 @@ class SpectrumWorxCLAP final
     /// \brief The session's non-parameter state -- where the user was in the
     /// panel column -- as a pair of hooks over the `<dawExtraState>` block.
     DawExtraState sessionState();
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief The half of that block which says *which preset is playing*, and
+    /// nothing about where the user was looking.
+    ///
+    /// \note The two halves are separable because undo has to treat them
+    /// differently: taking back a preset load has to put the previous preset's
+    /// name, bank, file and comment back -- the browser's selection is drawn
+    /// from them -- and must not put the panel, the settings tab or the browser
+    /// folder back, the user not having asked to be moved. \see issue #101.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    DawExtraState loadedPresetState();
 
     // clap_plugin_latency. Cached at activate(): engineSetup() asserts that the
     // setup is current, and the host may ask at any time.
@@ -575,6 +599,82 @@ class SpectrumWorxCLAP final
     ////////////////////////////////////////////////////////////////////////////
 
     Program programMain_;
+
+    ////////////////////////////////////////////////////////////////////////////
+    //
+    // Undo. All of it `[main-thread]`, and none of it known to the engine.
+    //
+    ////////////////////////////////////////////////////////////////////////////
+
+    UndoHistory undoHistory_;
+
+    /// \brief Whether an edit reaching the model should be remembered.
+    ///
+    /// \note False while a step is being applied, and while a host restores a
+    /// session: neither is something the user did, and the first would record the
+    /// undo as a new action and make redo unreachable.
+    bool recordingUndoSteps_{true};
+
+    /// \brief The value a parameter held before the gesture now open on it.
+    ///
+    /// \note Small and flat rather than a map: a gesture is per parameter and
+    /// two are open at once only where one widget writes two parameters -- the
+    /// frequency range and the LFO's bounds. \see rememberForUndo().
+    struct PendingDelta
+    {
+        ParameterID id;
+        float previousValue;
+        bool held;
+    };
+    std::array<PendingDelta, 4> pendingDeltas_{};
+
+    /// \brief programMain_ as a preset, plus which preset it came from -- but
+    /// nothing about
+    /// where the user was in the interface rides along.
+    std::string captureStateForUndo();
+
+    /// \brief Records \p name against the state from before this action, and
+    /// makes the state after it the new baseline.
+    void recordUndoSnapshot(char const *name);
+
+    /// \brief Remembers \p previousValue if nothing has been remembered for
+    /// \p id yet. Called before the model is written, which is the only moment
+    /// the old value still exists.
+    void rememberForUndo(ParameterID, float previousValue);
+
+    /// \brief Turns what rememberForUndo() held for \p id into a step.
+    void recordPendingDelta(ParameterID);
+
+    /// \brief Drops everything held but unclaimed. \see presetChangeEnd().
+    void forgetPendingDeltas();
+
+    /// \brief Puts \p record back, and answers with what it replaced.
+    UndoHistory::Record applyUndoRecord(UndoHistory::Record const &);
+
+    ////////////////////////////////////////////////////////////////////////////
+    //
+    // Chain edits, which are undone as commands rather than as a whole state.
+    //
+    ////////////////////////////////////////////////////////////////////////////
+
+    /// \brief The inverse of every chain edit made since the last one was
+    /// recorded, in the order that puts them back.
+    ///
+    /// \note Accumulated as the edits happen rather than captured when the step
+    /// is named, and that is what lets the name arrive *late*: every
+    /// `gestureBegin()` in the editor is called after the edit it names, so by
+    /// the time one does this list is already complete. \see recordChainEdit().
+    std::vector<UndoHistory::ChainCommand> pendingChainInverse_;
+
+    /// \brief What \p slot holds now, with the values that would have to come
+    /// back with it.
+    UndoHistory::SlotState currentSlotState(std::uint8_t slot) const;
+
+    /// \brief Turns whatever is pending into a step called \p name.
+    void recordChainEdit(char const *name);
+
+    /// \brief Carries out \p edit and answers with the edit that would undo it.
+    UndoHistory::ChainEdit applyChainEdit(UndoHistory::ChainEdit const &);
 
     std::atomic<std::uint32_t> pendingRescan_{0};
 

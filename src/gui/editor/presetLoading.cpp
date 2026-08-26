@@ -414,6 +414,13 @@ bool loadPreset(EditorHost &host, SpectrumWorxEditor *const pEditor, char *const
     // Whatever a previous load left uncollected is not this load's.
     takePresetLoadReport();
 
+    //   Before *both* passes, and it has to be: the first one fills the main
+    // thread's Program, so anything asking "what was playing before this" -- the
+    // undo history does -- has until here to ask. The sample and which preset is
+    // loaded are still the outgoing ones at this point too, which they are not
+    // by the end of the pass below.
+    consumer.notifyHostAboutPresetChangeBegin();
+
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \brief The main thread's copy first, in a pass of its own.
@@ -444,7 +451,6 @@ bool loadPreset(EditorHost &host, SpectrumWorxEditor *const pEditor, char *const
     /// \note The format layer speaks `std::string` -- it is below JUCE now, and
     /// a preset's comment is UTF-8 bytes whatever the interface's string type is.
     std::string commentBytes;
-    consumer.notifyHostAboutPresetChangeBegin();
     bool const succeeded(SW::loadPreset(inMemoryPreset, ignoreExternalSample,
                                         comment ? &commentBytes : nullptr, consumer,
                                         pDawExtraState));

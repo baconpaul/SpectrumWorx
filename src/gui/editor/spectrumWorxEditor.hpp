@@ -305,6 +305,10 @@ class SpectrumWorxEditor final : private SkinLifetime,
     ////////////////////////////////////////////////////////////////////////////
     void parameterChangedElsewhere(ParameterID, float value);
 
+    /// \brief A preset arrived by a route this panel knows nothing about -- an
+    /// undo of a load -- so the browser's selection is naming the wrong one.
+    void presetChangedElsewhere();
+
     void moduleActivated();
     void moduleDeactivated();
     void moduleControlActivated(ModuleControlBase &, double minimum, double maximum,

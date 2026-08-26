@@ -248,6 +248,28 @@ class EditorHost
 
     ////////////////////////////////////////////////////////////////////////////
     ///
+    /// \brief Taking back what the user did. `[main-thread]`
+    ///
+    /// \note Defaulted rather than pure, and the defaults say "no history".
+    /// Whoever hosts the editor decides whether there is one -- the plugin keeps
+    /// it, so that it outlives a window being closed and reopened, and the
+    /// show-ui harness has none and needs none.
+    ///
+    /// \note The names are the caption on the control, so they are the words a
+    /// user reads: "Add module", not a debug string. Null when there is nothing
+    /// to take back. \see issue #101.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    virtual bool canUndo() const { return false; }
+    virtual bool canRedo() const { return false; }
+    virtual char const *undoName() const { return nullptr; }
+    virtual char const *redoName() const { return nullptr; }
+    virtual void undo() {}
+    virtual void redo() {}
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
     /// \brief Appends the host's own entries for \p parameter to \p menu -- its
     /// automation lanes, its MIDI learn, whatever it has -- when a knob's right
     /// button menu is being built. `[main-thread]`

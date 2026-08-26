@@ -700,6 +700,127 @@ TEST_CASE("A 2011 preset is legal session state", "[clap][state]")
 // The sample
 ////////////////////////////////////////////////////////////////////////////////
 
+TEST_CASE("A session that fails to load leaves undo working", "[clap][state][undo]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Recording is turned off while a host restores a session, that not
+    /// being something the user did. It was turned back on by an assignment at
+    /// the end of the function -- with an early return in between, so a state
+    /// this build could not read switched undo off for the life of the instance
+    /// and nothing done afterwards was ever undoable.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    Entry const entry;
+
+    Plugin const plugin(nullHost(), true /*active*/);
+    auto &editorHost(plugin.editorHost());
+
+    char notAState[]{"this is not a preset"};
+    InStream rubbish(notAState);
+    REQUIRE_FALSE(plugin.state().load(&*plugin, &rubbish));
+
+    LE::SW::ParameterID target;
+    target.value.type = LE::SW::ParameterID::GlobalParameter;
+    target.value._.global.index = 0;
+
+    editorHost.automation().automatedParameterBeginEdit(target);
+    editorHost.editParameter(target, 0.5f);
+    editorHost.automation().automatedParameterEndEdit(target);
+
+    CHECK(editorHost.canUndo());
+}
+
+TEST_CASE("Undoing a preset load puts the preset it replaced back", "[clap][state][undo]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Which preset is playing is not in the Program -- it is in the
+    /// session block beside where the user had got to -- so an undo that
+    /// restored only the sound left the browser's selection naming a preset the
+    /// plugin was no longer playing. The half of that block undo wants is
+    /// `loadedPresetState()`; the half it must leave alone is the panel.
+    ///
+    /// \note Driven through presetChangeBegin() rather than by loading a real
+    /// preset, which is what GUI::loadPreset() calls before either of its
+    /// passes. What is under test is that the step remembers what was playing
+    /// *at that moment* and puts it back.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    Entry const entry;
+
+    Plugin const plugin(nullHost(), true /*active*/);
+    auto &editorHost(plugin.editorHost());
+
+    auto &loaded(editorHost.loadedPreset());
+    loaded.loaded("The one before", LE::SW::GUI::PanelState::PresetLocation::factory);
+    loaded.bank = "Techno";
+
+    auto &panel(editorHost.panelState());
+    panel.panel = LE::SW::GUI::PanelState::Panel::settings;
+
+    // a preset load begins: the step remembers what was playing
+    editorHost.automation().presetChangeBegin();
+
+    // ...and the browser points the plugin at what it just loaded
+    loaded.loaded("The one after", LE::SW::GUI::PanelState::PresetLocation::user);
+    loaded.bank = "Verbs";
+    panel.panel = LE::SW::GUI::PanelState::Panel::presets;
+
+    REQUIRE(editorHost.canUndo());
+    editorHost.undo();
+
+    CHECK(loaded.name == "The one before");
+    CHECK(loaded.bank == "Techno");
+    CHECK(loaded.location == LE::SW::GUI::PanelState::PresetLocation::factory);
+
+    // and the user is left where they were standing, not where they were when
+    // the preset they are taking back arrived
+    CHECK(panel.panel == LE::SW::GUI::PanelState::Panel::presets);
+}
+
+TEST_CASE("A host restoring a session leaves nothing to undo", "[clap][state][undo]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The session arriving is where the user starts, not a step they
+    /// took, and what it replaced belonged to whatever the plugin was doing
+    /// before -- which is not a place an undo should be able to go back to.
+    ///
+    /// \note Also the case that says the recording flag is put *back*: a load
+    /// takes it down, and an edit made afterwards has to be undoable again.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    Entry const entry;
+
+    Plugin const plugin(nullHost(), true /*active*/);
+    auto &editorHost(plugin.editorHost());
+
+    LE::SW::ParameterID target;
+    target.value.type = LE::SW::ParameterID::GlobalParameter;
+    target.value._.global.index = 0;
+
+    editorHost.automation().automatedParameterBeginEdit(target);
+    editorHost.editParameter(target, 0.5f);
+    editorHost.automation().automatedParameterEndEdit(target);
+    REQUIRE(editorHost.canUndo());
+
+    OutStream saved;
+    REQUIRE(plugin.state().save(&*plugin, &saved));
+
+    InStream stream(saved.data());
+    REQUIRE(plugin.state().load(&*plugin, &stream));
+
+    CHECK_FALSE(editorHost.canUndo());
+    CHECK_FALSE(editorHost.canRedo());
+
+    // and the next thing the user does is undoable again
+    editorHost.automation().automatedParameterBeginEdit(target);
+    editorHost.editParameter(target, 0.25f);
+    editorHost.automation().automatedParameterEndEdit(target);
+    CHECK(editorHost.canUndo());
+}
+
 TEST_CASE("Setting the sample to the file already loaded changes nothing", "[clap][state]")
 {
     ////////////////////////////////////////////////////////////////////////////
