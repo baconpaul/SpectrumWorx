@@ -1558,6 +1558,12 @@ void SpectrumWorxCLAP::drainEngineEvents()
 void SpectrumWorxCLAP::editParameter(ParameterID const parameterID, float const value) const
 {
     auto &plugin(const_cast<SpectrumWorxCLAP &>(*this));
+
+    // before the write, which is the only moment the value being replaced still
+    // exists. Held rather than recorded: what closes the step is the gesture's
+    // end, and a drag writes many values inside one
+    plugin.rememberForUndo(parameterID, getParameter(parameterID, programMain_));
+
     setParameterIn<Protocol>(plugin.programMain_, parameterID, value);
     // applied above before the push is attempted, so a drop leaves the
     // interface and the saved session holding an edit the engine never heard
@@ -1572,16 +1578,24 @@ void SpectrumWorxCLAP::editParameter(ParameterID const parameterID, float const 
 /// \see ParametersOnlyModuleInitialiser.
 bool SpectrumWorxCLAP::editSlot(std::uint8_t const slot, std::int8_t const effectIndex)
 {
+    // before anything moves, and kept rather than recorded: a chain edit is one
+    // or several of these and the name for them all arrives afterwards
+    auto const wasThere(recordingUndoSteps_ ? std::optional{currentSlotState(slot)} : std::nullopt);
+
     // building it is synchronous and this thread's, so an effect the build does
     // not have is a failure the caller hears about here; only installing defers
     auto *const pModule(Threading::createModuleForSlot(*this, effectIndex, slot));
     if ((effectIndex != AutomatedModuleChain::noModule) && !pModule)
-        return false;
+        return false; // nothing changed, so there is nothing to put back
 
     // this thread's copy, so the destroying overload is the right one
     programMain_.moduleChain().setParameter(slot, effectIndex, ParametersOnlyModuleInitialiser{});
     pushed(Threading::publishSlot(*this, toEngine_, slot, effectIndex, pModule),
            "The command queue is full; a slot change reached the interface and not the engine.");
+
+    // front, because undoing several is doing them backwards
+    if (wasThere)
+        pendingChainInverse_.insert(pendingChainInverse_.begin(), *wasThere);
     return true;
 }
 
@@ -1590,6 +1604,10 @@ void SpectrumWorxCLAP::editModuleMove(std::uint8_t const from, std::uint8_t cons
     programMain_.moduleChain().moveModule(from, to);
     pushed(Threading::publishModuleMove(*this, toEngine_, from, to),
            "The command queue is full; a module move reached the interface and not the engine.");
+
+    if (recordingUndoSteps_)
+        pendingChainInverse_.insert(pendingChainInverse_.begin(),
+                                    UndoHistory::MoveModule{to, from});
 }
 
 void SpectrumWorxCLAP::flushUIEdits(clap_output_events const *const out)
@@ -1680,6 +1698,9 @@ void SpectrumWorxCLAP::HostProxy::automatedParameterEndEdit(ParameterSelector co
     plugin_.pushed(plugin_.uiEdits_.push({parameter.value, 0, UIEdit::Kind::GestureEnd}),
                    "The outgoing edit queue is full; a gesture will not be balanced.");
     plugin_.requestParameterFlush();
+
+    // the whole edit is over, so what editParameter() held is now a step
+    const_cast<SpectrumWorxCLAP &>(plugin_).recordPendingDelta(ParameterID{parameter});
 }
 
 /// \note `clap_host_params` is an *optional* extension, and clap-helpers'
@@ -1695,7 +1716,23 @@ void SpectrumWorxCLAP::requestParameterFlush() const
 
 /// \note Nothing to announce up front: CLAP has no "hold on" call, and the
 /// rescan at the other end is what a host acts on.
-void SpectrumWorxCLAP::HostProxy::presetChangeBegin() const {}
+/// \note Where a chain edit becomes an undo step. The name is the one the editor
+/// passed, so "Add module" reaches the user unchanged -- and it arrives *after*
+/// the edits it names, which is why what it closes is a list built as those
+/// edits happened. \see pendingChainInverse_.
+void SpectrumWorxCLAP::HostProxy::gestureBegin(char const *const description) const
+{
+    const_cast<SpectrumWorxCLAP &>(plugin_).recordChainEdit(description);
+}
+
+void SpectrumWorxCLAP::HostProxy::gestureEnd() const {}
+
+void SpectrumWorxCLAP::HostProxy::presetChangeBegin() const
+{
+    auto &plugin(const_cast<SpectrumWorxCLAP &>(plugin_));
+    plugin.recordUndoSnapshot("Load preset");
+    plugin.forgetPendingDeltas();
+}
 
 /// \note INFO as well as VALUES and TEXT: a preset replaces the module chain, so
 /// what the parameters are *called* and which module path they sit under both
@@ -1705,6 +1742,10 @@ void SpectrumWorxCLAP::HostProxy::presetChangeBegin() const {}
 void SpectrumWorxCLAP::HostProxy::presetChangeEnd() const
 {
     auto &plugin(const_cast<SpectrumWorxCLAP &>(plugin_));
+
+    // every parameter the load wrote went through editParameter() and none of
+    // them was a gesture, so nothing it set aside belongs to anybody
+    plugin.forgetPendingDeltas();
 
     // only when the chain is already in, which with audio running it is not:
     // publishChain() queues it then, and drainCommands() raises chainChanged()
@@ -1821,6 +1862,338 @@ void SpectrumWorxCLAP::markSessionAsUnsaved() const
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// Undo
+//
+////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \class UndoPause
+///
+/// \brief Undo recording, off for as long as this is in scope.
+///
+/// \note A guard rather than the save-and-restore pair it replaces, and the
+/// pair is why: `stateLoad` had an early return between its halves, so a state
+/// this build could not read turned undo off for the life of the instance and
+/// nothing the user did afterwards was ever undoable. Two of the three sites
+/// can also leave by an exception.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+class UndoPause
+{
+  public:
+    explicit UndoPause(bool &recording) : recording_(recording), was_(recording)
+    {
+        recording = false;
+    }
+    ~UndoPause() { recording_ = was_; }
+
+    UndoPause(UndoPause const &) = delete; // makes non-copyable
+    UndoPause &operator=(UndoPause const &) = delete;
+
+  private:
+    bool &recording_;
+    bool const was_;
+}; // class UndoPause
+} // anonymous namespace
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note Half a DawExtraState, and the half matters. Which preset is playing is
+/// part of what an undo has to put back -- the browser draws its selection from
+/// it, and a sound that came back under the wrong name is worse than either --
+/// while the panel column, the settings tab and the browser folder are places
+/// the user was, and taking back an edit should not move them.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+std::string SpectrumWorxCLAP::captureStateForUndo()
+{
+    auto const identity(loadedPresetState());
+    return savePreset(LE::IO::pathToUTF8(sampleFile_), sideChainSourceMain_, {}, programMain_,
+                      &identity);
+}
+
+/// \note Captured here and now rather than cached from the end of the last
+/// action. The one caller is `presetChangeBegin()`, which `GUI::loadPreset()`
+/// makes before either of its passes -- so nothing has moved yet and this is
+/// simply what is playing.
+void SpectrumWorxCLAP::recordUndoSnapshot(char const *const name)
+{
+    if (!recordingUndoSteps_)
+        return;
+
+    undoHistory_.record(name, UndoHistory::StateSnapshot{captureStateForUndo()},
+                        UndoHistory::Clock::now());
+}
+
+void SpectrumWorxCLAP::rememberForUndo(ParameterID const parameterID, float const previousValue)
+{
+    if (!recordingUndoSteps_)
+        return;
+
+    for (auto const &pending : pendingDeltas_)
+        if (pending.held && (pending.id.binaryValue == parameterID.binaryValue))
+            return; // a drag already remembered where this one started
+
+    for (auto &pending : pendingDeltas_)
+    {
+        if (pending.held)
+            continue;
+        pending = {parameterID, previousValue, true};
+        return;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Full, so the oldest goes rather than the newest being dropped, and
+    /// the difference is everything. A write that no gesture ever claims holds
+    /// its place for ever -- and a preset load makes one per global parameter,
+    /// so four of those wedged this permanently and nothing the user did
+    /// afterwards was ever recorded again. Dropping the newest made the wedge
+    /// silent; dropping the oldest makes it self-clearing.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    std::shift_left(pendingDeltas_.begin(), pendingDeltas_.end(), 1);
+    pendingDeltas_.back() = {parameterID, previousValue, true};
+}
+
+/// \note Nothing a gesture was waiting to claim survives a preset load: the load
+/// is one step and the writes inside it are not edits of their own.
+void SpectrumWorxCLAP::forgetPendingDeltas() { pendingDeltas_ = {}; }
+
+void SpectrumWorxCLAP::recordPendingDelta(ParameterID const parameterID)
+{
+    if (!recordingUndoSteps_)
+        return;
+
+    for (auto &pending : pendingDeltas_)
+    {
+        if (!pending.held || (pending.id.binaryValue != parameterID.binaryValue))
+            continue;
+
+        pending.held = false;
+
+        // what the slot's effect calls it, taken now: the step outlives whatever
+        // is in that slot, and a name read later would be a different parameter's
+        std::array<char, 64> name{};
+        getParameterName(parameterID, {name.data(), name.size() - 1}, &programMain_);
+
+        undoHistory_.record(name.data(),
+                            UndoHistory::ValueDelta{parameterID, pending.previousValue},
+                            UndoHistory::Clock::now());
+        return;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief What \p slot holds, and everything that would have to come back with
+/// it.
+///
+/// \note Over `parameterIDs_` rather than over a count of its own. The skeleton
+/// is fixed and that vector is the enumeration the host is shown, so asking it
+/// which parameters belong to a slot cannot drift from what a parameter *is*.
+/// The slot's own selector is not among them: putting the module back is
+/// editSlot()'s half, not a value's.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+UndoHistory::SlotState SpectrumWorxCLAP::currentSlotState(std::uint8_t const slot) const
+{
+    UndoHistory::SlotState state{
+        slot,
+        static_cast<std::int8_t>(programMain_.moduleChain().getParameterForIndex(slot).getValue()),
+        {}};
+
+    if (state.effectIndex == AutomatedModuleChain::noModule)
+        return state; // an empty slot comes back empty
+
+    for (auto const &exported : parameterIDs_)
+    {
+        ParameterID const parameterID{exported};
+
+        bool const mine((parameterID.type() == ParameterID::ModuleParameter)
+                            ? (parameterID.value._.module.moduleIndex == slot)
+                            : ((parameterID.type() == ParameterID::LFOParameter) &&
+                               (parameterID.value._.lfo.moduleIndex == slot)));
+        if (!mine)
+            continue;
+
+        state.parameters.emplace_back(parameterID, getParameter(parameterID, programMain_));
+    }
+
+    return state;
+}
+
+void SpectrumWorxCLAP::recordChainEdit(char const *const name)
+{
+    if (!recordingUndoSteps_ || pendingChainInverse_.empty())
+        return;
+
+    undoHistory_.record(name, UndoHistory::ChainEdit{std::exchange(pendingChainInverse_, {})},
+                        UndoHistory::Clock::now());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Carries out \p edit, and answers with the edit that would undo it.
+///
+/// \note Each command's inverse is taken *before* it runs, for the reason the
+/// recording path takes it before the edit: once a slot has been emptied there
+/// is nothing left to ask what it held.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+UndoHistory::ChainEdit SpectrumWorxCLAP::applyChainEdit(UndoHistory::ChainEdit const &edit)
+{
+    UndoHistory::ChainEdit inverse;
+
+    for (auto const &command : edit.commands)
+    {
+        if (auto const *const pSlot = std::get_if<UndoHistory::SlotState>(&command))
+        {
+            inverse.commands.insert(inverse.commands.begin(), currentSlotState(pSlot->slot));
+
+            editSlot(pSlot->slot, pSlot->effectIndex);
+
+            //   After the slot, and in ring order behind it: the engine applies
+            // the slot change and then these, so the module they name exists by
+            // the time they arrive.
+            for (auto const &[parameterID, value] : pSlot->parameters)
+            {
+                editParameter(parameterID, value);
+                if (pEditor_)
+                    pEditor_->parameterChangedElsewhere(parameterID, value);
+            }
+        }
+        else
+        {
+            auto const &move(std::get<UndoHistory::MoveModule>(command));
+            inverse.commands.insert(inverse.commands.begin(),
+                                    UndoHistory::MoveModule{move.to, move.from});
+            editModuleMove(move.from, move.to);
+        }
+    }
+
+    // the rack follows the chain, and the chain has just moved under it
+    chainChanged(ChainChange::userEdited);
+
+    return inverse;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Puts \p record back, and answers with what it replaced so that the
+/// step can be taken the other way.
+///
+/// \note A delta goes back through editParameter(), which is one write and no
+/// chain rebuild. A snapshot goes through the preset loader, which is the same
+/// road stateLoad() takes -- and it is a *load*, so the recording flag is down
+/// for both: the writes underneath are this function's, not the user's.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+UndoHistory::Record SpectrumWorxCLAP::applyUndoRecord(UndoHistory::Record const &record)
+{
+    LE_ASSERT(Threading::isMainThread() || !Threading::isAudioThread());
+
+    if (auto const *const pDelta = std::get_if<UndoHistory::ValueDelta>(&record))
+    {
+        auto const replaced(getParameter(pDelta->id, programMain_));
+
+        editParameter(pDelta->id, pDelta->value);
+
+        //   And the widget, which nothing else would move. A parameter reaches
+        // the interface by one of two roads and this is neither: the host's
+        // write comes back as an engine echo and takes this same call
+        // (drainEngineEvents), and an edit the user made moved the widget on the
+        // way past. An undo is a write with no widget behind it.
+        if (pEditor_)
+            pEditor_->parameterChangedElsewhere(pDelta->id, pDelta->value);
+
+        //   Announced as a value rescan rather than as an automation gesture,
+        // which is the same way resyncSpectralParametersToEngine() announces a
+        // value the user did not drag to. A gesture would have to carry the
+        // value in the units the host is shown, and only the editor knows the
+        // conversion for the family a parameter belongs to.
+        markCurrentProgramAsEdited();
+        requestRescan(CLAP_PARAM_RESCAN_VALUES | CLAP_PARAM_RESCAN_TEXT);
+
+        return UndoHistory::ValueDelta{pDelta->id, replaced};
+    }
+
+    if (auto const *const pChain = std::get_if<UndoHistory::ChainEdit>(&record))
+        return applyChainEdit(*pChain);
+
+    auto const &snapshot(std::get<UndoHistory::StateSnapshot>(record));
+    auto const replaced(captureStateForUndo());
+
+    // loadPreset() parses in place, so it gets a copy of its own
+    std::vector<char> buffer(snapshot.state.begin(), snapshot.state.end());
+    buffer.push_back('\0');
+
+    GUI::UnattendedLoad const unattended; // nobody to answer a dialog about a step
+
+    auto const identity(loadedPresetState());
+    GUI::loadPreset(*this, pEditor_, buffer.data(), false /*ignoreExternalSample*/, nullptr,
+                    nullptr, &identity);
+
+    // after the load, for the reason stateLoad() applies it after its own: the
+    // load ends in presetChangeEnd(), which would call the restored preset
+    // modified a moment later
+    loadedPreset_.modified.store(restoredPresetModified_, std::memory_order_relaxed);
+
+    // the browser is showing a selection for a preset that is no longer the one
+    // playing, and may be looking in another bank than the one that is
+    if (pEditor_)
+        pEditor_->presetChangedElsewhere();
+
+    requestRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT | CLAP_PARAM_RESCAN_VALUES);
+
+    return UndoHistory::StateSnapshot{replaced};
+}
+
+void SpectrumWorxCLAP::undo()
+{
+    LE_ASSERT(Threading::isMainThread() || !Threading::isAudioThread());
+
+    auto const *const pStep(undoHistory_.peekUndo());
+    if (!pStep)
+        return;
+
+    // the applying is not itself an action, or it would land on the stack and
+    // put redo out of reach
+    auto replaced([&] {
+        UndoPause const paused(recordingUndoSteps_);
+        return applyUndoRecord(pStep->record);
+    }());
+
+    undoHistory_.commitUndo(std::move(replaced));
+}
+
+void SpectrumWorxCLAP::redo()
+{
+    LE_ASSERT(Threading::isMainThread() || !Threading::isAudioThread());
+
+    auto const *const pStep(undoHistory_.peekRedo());
+    if (!pStep)
+        return;
+
+    auto replaced([&] {
+        UndoPause const paused(recordingUndoSteps_);
+        return applyUndoRecord(pStep->record);
+    }());
+
+    undoHistory_.commitRedo(std::move(replaced));
+}
+
 bool SpectrumWorxCLAP::stateSave(clap_ostream const *const stream) noexcept
 try
 {
@@ -1861,6 +2234,10 @@ try
     // nobody asked for this load, so nothing under it may stop to ask the user
     GUI::UnattendedLoad const unattended;
 
+    // nor is it something to take back: the session arriving is where the user
+    // starts, not a step they took
+    UndoPause const paused(recordingUndoSteps_);
+
     // pEditor_ is null unless a window happens to be open, and the same call
     // serves both because the consumer takes the editor as a pointer
     //
@@ -1875,6 +2252,8 @@ try
     // GUI::loadPreset ends in presetChangeEnd, which marks the *session*
     // modified, and that is not what this one means. \see issue #177
     loadedPreset_.modified.store(restoredPresetModified_, std::memory_order_relaxed);
+
+    undoHistory_.clear();
 
     // deferred rather than announced straight through: GUI::loadPreset() above
     // ends in chainChanged(), which asks for the same rescan, and a host acts on
@@ -1946,6 +2325,45 @@ void readNamed(TiXmlElement const &element, char const *const attribute, Value &
         pText && (std::strcmp(pText, name) == 0))
         value = named;
 }
+void writeLoadedPreset(TiXmlElement &element, GUI::LoadedPreset const &loaded)
+{
+    element.SetAttribute(loadedPresetAttribute, loaded.name.toStdString());
+    element.SetAttribute(loadedLocationAttribute,
+                         (loaded.location == GUI::PanelState::PresetLocation::user)
+                             ? userLocation
+                             : factoryLocation);
+    element.SetAttribute(loadedBankAttribute, loaded.bank.toStdString());
+    element.SetAttribute(loadedFileAttribute, IO::pathToUTF8(loaded.file));
+    element.SetAttribute(loadedModifiedAttribute,
+                         loaded.modified.load(std::memory_order_relaxed) ? 1 : 0);
+    element.SetAttribute(loadedCommentAttribute, loaded.comment.toStdString());
+}
+
+void readLoadedPreset(TiXmlElement const &element, GUI::LoadedPreset &loaded,
+                      bool &restoredModified)
+{
+    if (auto const *const pName = element.Attribute(loadedPresetAttribute))
+        loaded.name = juce::String::fromUTF8(pName);
+    readNamed(element, loadedLocationAttribute, loaded.location, userLocation,
+              GUI::PanelState::PresetLocation::user);
+    readNamed(element, loadedLocationAttribute, loaded.location, factoryLocation,
+              GUI::PanelState::PresetLocation::factory);
+    if (auto const *const pBank = element.Attribute(loadedBankAttribute))
+        loaded.bank = juce::String::fromUTF8(pBank);
+    if (auto const *const pFile = element.Attribute(loadedFileAttribute))
+        loaded.file = IO::utf8ToPath(pFile);
+    if (auto const *const pComment = element.Attribute(loadedCommentAttribute))
+        loaded.comment = juce::String::fromUTF8(pComment);
+
+    /// \note Into a plain member rather than straight into the atomic: this runs
+    /// while the block is being parsed, and the load it is part of ends in
+    /// `presetChangeEnd` -> `markCurrentProgramAsModified`, which would set the
+    /// flag back to true a moment later. Whoever asked for the load applies it
+    /// once the load is over. \see issue #177.
+    int modified{restoredModified ? 1 : 0};
+    element.QueryIntAttribute(loadedModifiedAttribute, &modified);
+    restoredModified = (modified != 0);
+}
 } // anonymous namespace
 
 DawExtraState SpectrumWorxCLAP::sessionState()
@@ -1968,17 +2386,7 @@ DawExtraState SpectrumWorxCLAP::sessionState()
                 // session written on one has to open on another
                 element.SetAttribute(presetFolderAttribute, IO::pathToUTF8(state.presetFolder));
 
-                auto const &loaded(loadedPreset_);
-                element.SetAttribute(loadedPresetAttribute, loaded.name.toStdString());
-                element.SetAttribute(loadedLocationAttribute,
-                                     (loaded.location == GUI::PanelState::PresetLocation::user)
-                                         ? userLocation
-                                         : factoryLocation);
-                element.SetAttribute(loadedBankAttribute, loaded.bank.toStdString());
-                element.SetAttribute(loadedFileAttribute, IO::pathToUTF8(loaded.file));
-                element.SetAttribute(loadedModifiedAttribute,
-                                     loaded.modified.load(std::memory_order_relaxed) ? 1 : 0);
-                element.SetAttribute(loadedCommentAttribute, loaded.comment.toStdString());
+                writeLoadedPreset(element, loadedPreset_);
             },
             [this](TiXmlElement const &element) {
                 auto &state(panelState_);
@@ -2003,28 +2411,17 @@ DawExtraState SpectrumWorxCLAP::sessionState()
                 if (auto const *const pFolder = element.Attribute(presetFolderAttribute))
                     state.presetFolder = IO::utf8ToPath(pFolder);
 
-                auto &loaded(loadedPreset_);
-                if (auto const *const pName = element.Attribute(loadedPresetAttribute))
-                    loaded.name = juce::String::fromUTF8(pName);
-                readNamed(element, loadedLocationAttribute, loaded.location, userLocation,
-                          GUI::PanelState::PresetLocation::user);
-                readNamed(element, loadedLocationAttribute, loaded.location, factoryLocation,
-                          GUI::PanelState::PresetLocation::factory);
-                if (auto const *const pBank = element.Attribute(loadedBankAttribute))
-                    loaded.bank = juce::String::fromUTF8(pBank);
-                if (auto const *const pFile = element.Attribute(loadedFileAttribute))
-                    loaded.file = IO::utf8ToPath(pFile);
-                if (auto const *const pComment = element.Attribute(loadedCommentAttribute))
-                    loaded.comment = juce::String::fromUTF8(pComment);
+                readLoadedPreset(element, loadedPreset_, restoredPresetModified_);
+            }};
+}
 
-                /// \note Into a plain member rather than straight into the atomic:
-                /// this runs while the block is being parsed, and the load it is
-                /// part of ends in `presetChangeEnd` -> `markCurrentProgramAsModified`,
-                /// which would set the flag back to true a moment later. `stateLoad`
-                /// applies it once the load is over. \see issue #177.
-                int modified{restoredPresetModified_ ? 1 : 0};
-                element.QueryIntAttribute(loadedModifiedAttribute, &modified);
-                restoredPresetModified_ = (modified != 0);
+/// \note Only the second half of the block above. \see the note on the
+/// declaration for why undo wants one half and not the other.
+DawExtraState SpectrumWorxCLAP::loadedPresetState()
+{
+    return {[this](TiXmlElement &element) { writeLoadedPreset(element, loadedPreset_); },
+            [this](TiXmlElement const &element) {
+                readLoadedPreset(element, loadedPreset_, restoredPresetModified_);
             }};
 }
 

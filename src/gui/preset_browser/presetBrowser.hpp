@@ -131,6 +131,13 @@ class PresetBrowser final : public PanelBackground,
     /// render it. See SpectrumWorxEditor::showFactoryBank().
     void setFactoryBank(juce::String const &bank);
 
+    /// \brief Points the browser at whatever is loaded *now*, and selects it.
+    ///
+    /// \note For a load nobody in this panel asked for -- an undo of one, which
+    /// can land on a preset in another bank entirely. Navigates before it
+    /// refreshes, refresh() ending in highlightLoadedPreset().
+    void showLoadedPreset();
+
   private:
     void setNewFolder(fs::path const &);
 

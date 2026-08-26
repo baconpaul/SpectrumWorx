@@ -421,6 +421,269 @@ TEST_CASE("Edits made while audio runs come out of process(), not flush()", "[cl
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Undo
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A parameter gesture can be undone and redone", "[clap][host][undo]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Driven the way the editor drives it: the value reaches the model
+    /// through editParameter() and the gesture that brackets it reaches the host
+    /// separately, and it is the *end* of that gesture that closes the step.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    Entry const entry;
+    TestHost host{TestHost::everything()};
+    ActivePlugin plugin(48000, 512, host);
+
+    auto &editorHost(editorHostOf(*plugin));
+    auto const &params(parameters(*plugin));
+    auto const global(firstGlobalParameter(*plugin, params));
+    auto const wanted(aDifferentValue(*plugin, params, global));
+
+    LE::SW::ParameterID target;
+    target.binaryValue = global.id;
+
+    double before{0};
+    REQUIRE(params.get_value(&*plugin, global.id, &before));
+    REQUIRE(before != wanted);
+
+    CHECK_FALSE(editorHost.canUndo());
+
+    editorHost.automation().automatedParameterBeginEdit(target);
+    editorHost.editParameter(target, static_cast<float>(wanted));
+    editorHost.automation().automatedParameterEndEdit(target);
+
+    double after{0};
+    REQUIRE(params.get_value(&*plugin, global.id, &after));
+    REQUIRE(after == Catch::Approx(wanted));
+
+    REQUIRE(editorHost.canUndo());
+    CHECK_FALSE(editorHost.canRedo());
+
+    editorHost.undo();
+
+    double undone{0};
+    REQUIRE(params.get_value(&*plugin, global.id, &undone));
+    CHECK(undone == Catch::Approx(before));
+
+    CHECK_FALSE(editorHost.canUndo());
+    REQUIRE(editorHost.canRedo());
+
+    editorHost.redo();
+
+    double redone{0};
+    REQUIRE(params.get_value(&*plugin, global.id, &redone));
+    CHECK(redone == Catch::Approx(wanted));
+    CHECK(editorHost.canUndo());
+}
+
+TEST_CASE("Filling a slot can be undone", "[clap][host][undo]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The snapshot half, and the case that says the cached baseline is
+    /// taken at the right moment: editSlot() changes the chain *before*
+    /// gestureBegin() names the step, so a snapshot captured when the name
+    /// arrives would already hold the module being added.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    Entry const entry;
+    TestHost host{TestHost::everything()};
+    ActivePlugin plugin(48000, 512, host);
+
+    auto &editorHost(editorHostOf(*plugin));
+    auto const &params(parameters(*plugin));
+    auto const selector(slotSelector(*plugin, params, 0));
+
+    double empty{0};
+    REQUIRE(params.get_value(&*plugin, selector.id, &empty));
+
+    REQUIRE(editorHost.editSlot(0, 0));
+    editorHost.automation().gestureBegin("Add module");
+    editorHost.automation().gestureEnd();
+    plugin.pumpMainThread();
+
+    double filled{0};
+    REQUIRE(params.get_value(&*plugin, selector.id, &filled));
+    REQUIRE(filled != empty);
+
+    REQUIRE(editorHost.canUndo());
+    CHECK(std::string(editorHost.undoName()) == "Add module");
+
+    editorHost.undo();
+    plugin.pumpMainThread();
+
+    double undone{0};
+    REQUIRE(params.get_value(&*plugin, selector.id, &undone));
+    CHECK(undone == Catch::Approx(empty));
+}
+
+TEST_CASE("A preset load leaves knob edits undoable", "[clap][host][undo]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note A preset writes every global parameter through editParameter() and
+    /// brackets none of them -- it is one step, the load itself, not six. The
+    /// value each write set aside in case a gesture wanted it was therefore
+    /// never claimed, and the four places for those filled up and stayed full:
+    /// after one load, no knob edit was ever recorded again. Which is what a
+    /// user sees as "undo skips what I just did and takes back the load".
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    Entry const entry;
+    TestHost host{TestHost::everything()};
+    ActivePlugin plugin(48000, 512, host);
+
+    auto &editorHost(editorHostOf(*plugin));
+    auto const &params(parameters(*plugin));
+
+    // a module, because a module knob is what a user drags -- and, unlike a
+    // global, it is not one of the parameters the load below writes
+    REQUIRE(editorHost.editSlot(0, 0));
+    editorHost.automation().gestureBegin("Add module");
+    editorHost.automation().gestureEnd();
+    plugin.pumpMainThread();
+
+    auto const owned([&] {
+        for (auto const &info : allParameterInfo(*plugin, params))
+        {
+            LE::SW::ParameterID id;
+            id.binaryValue = info.id;
+            if ((id.type() == LE::SW::ParameterID::ModuleParameter) &&
+                (id.value._.module.moduleIndex == 0) &&
+                (id.value._.module.moduleParameterIndex != 0 /*bypass*/))
+                return info;
+        }
+        FAIL("no module parameter for the filled slot");
+        return clap_param_info{};
+    }());
+
+    LE::SW::ParameterID target;
+    target.binaryValue = owned.id;
+
+    // a preset load, as the loader makes one: bracketed as a whole, and every
+    // global written inside it without a gesture of its own
+    editorHost.automation().presetChangeBegin();
+    for (auto const &info : allParameterInfo(*plugin, params))
+    {
+        LE::SW::ParameterID id;
+        id.binaryValue = info.id;
+        if (id.type() != LE::SW::ParameterID::GlobalParameter)
+            continue;
+
+        // each one written back as it stands: what matters is that the write
+        // happens and carries no gesture, not what it sets. A value of its own
+        // would have to be a legal one for the parameter, and the FFT size only
+        // takes powers of two
+        double current{0};
+        REQUIRE(params.get_value(&*plugin, info.id, &current));
+        editorHost.editParameter(id, static_cast<float>(current));
+    }
+    editorHost.automation().presetChangeEnd();
+
+    REQUIRE(editorHost.canUndo());
+    auto const afterTheLoad(std::string(editorHost.undoName()));
+
+    // and now the user turns a knob on the strip
+    editorHost.automation().automatedParameterBeginEdit(target);
+    editorHost.editParameter(target, 0.5f);
+    editorHost.automation().automatedParameterEndEdit(target);
+
+    REQUIRE(editorHost.canUndo());
+    INFO("undo would take back: " << editorHost.undoName());
+    CHECK(std::string(editorHost.undoName()) != afterTheLoad);
+}
+
+TEST_CASE("Undoing a module removal brings its values back with it", "[clap][host][undo]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note The half of a chain edit that cannot be expressed as "put the slot
+    /// back": the chain builds a *new* module for a refilled slot, with nothing
+    /// in it, so the step has to carry the values the destroyed one held.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    Entry const entry;
+    TestHost host{TestHost::everything()};
+    ActivePlugin plugin(48000, 512, host);
+
+    auto &editorHost(editorHostOf(*plugin));
+    auto const &params(parameters(*plugin));
+
+    REQUIRE(editorHost.editSlot(0, 0));
+    editorHost.automation().gestureBegin("Add module");
+    editorHost.automation().gestureEnd();
+    plugin.pumpMainThread();
+
+    // a parameter of that module, and somewhere in its range it is not already
+    auto const owned([&] {
+        for (auto const &info : allParameterInfo(*plugin, params))
+        {
+            LE::SW::ParameterID id;
+            id.binaryValue = info.id;
+            if ((id.type() == LE::SW::ParameterID::ModuleParameter) &&
+                (id.value._.module.moduleIndex == 0) &&
+                (id.value._.module.moduleParameterIndex != 0 /*bypass*/))
+                return info;
+        }
+        FAIL("no module parameter for the filled slot");
+        return clap_param_info{};
+    }());
+
+    LE::SW::ParameterID target;
+    target.binaryValue = owned.id;
+
+    /// \note Written in the effect's own units and read back in the host's,
+    /// which are not the same number: a module parameter is normalised at the
+    /// host edge over whatever natural range the effect owns. So the case moves
+    /// it to *somewhere else* and remembers what the host then reads, rather
+    /// than naming a value in one unit and asserting it in the other.
+    double before{0};
+    REQUIRE(params.get_value(&*plugin, owned.id, &before));
+
+    auto const moveTo([&](float const internal) {
+        editorHost.automation().automatedParameterBeginEdit(target);
+        editorHost.editParameter(target, internal);
+        editorHost.automation().automatedParameterEndEdit(target);
+        plugin.pumpMainThread();
+
+        double read{0};
+        REQUIRE(params.get_value(&*plugin, owned.id, &read));
+        return read;
+    });
+
+    auto set(moveTo(1.0f));
+    if (set == Catch::Approx(before))
+        set = moveTo(0.0f);
+    REQUIRE(set != Catch::Approx(before));
+
+    // now take the module away, the way removeModule() does
+    REQUIRE(editorHost.editSlot(0, -1 /*no module*/));
+    editorHost.automation().gestureBegin("Remove module");
+    editorHost.automation().gestureEnd();
+    plugin.pumpMainThread();
+
+    REQUIRE(std::string(editorHost.undoName()) == "Remove module");
+
+    editorHost.undo();
+    plugin.pumpMainThread();
+
+    // the module is back...
+    auto const selector(slotSelector(*plugin, params, 0));
+    double refilled{0};
+    REQUIRE(params.get_value(&*plugin, selector.id, &refilled));
+    CHECK(refilled != -1);
+
+    // ...and so is what it was holding, which a bare "put the slot back" would
+    // have left at the effect's default
+    double restored{0};
+    REQUIRE(params.get_value(&*plugin, owned.id, &restored));
+    CHECK(restored == Catch::Approx(set));
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // The contract clap-helpers checks when it can
 ////////////////////////////////////////////////////////////////////////////////
 

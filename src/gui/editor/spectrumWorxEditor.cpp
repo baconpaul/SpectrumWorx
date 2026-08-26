@@ -2177,6 +2177,14 @@ void SpectrumWorxEditor::parameterChangedElsewhere(ParameterID const parameterID
     }
 }
 
+void SpectrumWorxEditor::presetChangedElsewhere()
+{
+    LE_ASSERT(isThisTheGUIThread());
+
+    if (presetBrowser_)
+        presetBrowser_->showLoadedPreset();
+}
+
 void SpectrumWorxEditor::timerCallback()
 {
     applyPaletteIfChanged();
