@@ -117,7 +117,9 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost, PanelPlacement co
       /// \todo A sampler display and a spectrum display were planned here.
 
       // buttons...
-      preset_(mainArea_, "PRESETS", 86, 36), settingsButton_(mainArea_, "SETTINGS", 86, 36),
+      undoButton_(mainArea_, true /*undo*/), redoButton_(mainArea_, false /*redo*/),
+      panelButton_(mainArea_, "SETTINGS", 86, 36, false /*momentary*/,
+                   PaintedButton::Glow::whenHovered),
       ignoreExternalSample_(mainArea_, GlyphButton::Glyph::Lock, true /*toggles*/)
 {
     using LE::Parameters::IndexOf;
@@ -152,8 +154,10 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost, PanelPlacement co
 
     sampleArea_.setBounds(113, 461, 173, 30);
 
-    preset_.setTopLeftPosition(111, 507);
-    settingsButton_.setTopLeftPosition(201, 507);
+    // the two halves abut, which is what makes them read as one control
+    undoButton_.setTopLeftPosition(111, 507);
+    redoButton_.setTopLeftPosition(111 + UndoButton::width, 507);
+    panelButton_.setTopLeftPosition(201, 507);
 
     /// \note Placed from the label it belongs to rather than from a constant of
     /// its own -- the pair is centred over the sidechain source box, so where
@@ -162,8 +166,15 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost, PanelPlacement co
         BackgroundPainter::sideChainLockBounds().getCentre().roundToInt());
     ignoreExternalSample_.setName("Ignore external audio");
 
-    preset_.addListener(this);
-    settingsButton_.addListener(this);
+    // a stable handle: the caption is what the button *does* next and changes
+    // with the panel, so it is no use naming the thing
+    panelButton_.setName("Panel");
+
+    undoButton_.addListener(this);
+    redoButton_.addListener(this);
+    panelButton_.addListener(this);
+
+    updatePanelControls();
 
     resyncModuleRack();
 
@@ -387,7 +398,7 @@ void SpectrumWorxEditor::panelPlacement(PanelPlacement const placement)
     // leaving alwaysVisible drops the resting panel, nothing the user asked for
     // being in it; one they did ask for stays up and moves
     if ((placement != PanelPlacement::alwaysVisible) && settings_.has_value() &&
-        !settingsButton_.getToggleState())
+        (editorHost_.panelState().panel != PanelState::Panel::settings))
         settings_ = std::nullopt;
 
     if ((placement == PanelPlacement::alwaysVisible) && !currentPanel())
@@ -449,9 +460,8 @@ void SpectrumWorxEditor::openRememberedPanel()
 void SpectrumWorxEditor::hidePanels()
 {
     settings_ = std::nullopt;
-    settingsButton_.setToggleState(false, juce::dontSendNotification);
     presetBrowser_ = std::nullopt;
-    preset_.setToggleState(false, juce::dontSendNotification);
+    updatePanelControls();
 
     if (panelPlacement_ == PanelPlacement::alwaysVisible)
         openRestingPanel();
@@ -476,11 +486,11 @@ void SpectrumWorxEditor::showPresetBrowser(bool const show)
     if (!presetBrowser_.has_value())
     {
         settings_ = std::nullopt;
-        settingsButton_.setToggleState(false, juce::dontSendNotification);
         presetBrowser_.emplace();
         showPanel(*presetBrowser_);
     }
-    preset_.setToggleState(true, juce::dontSendNotification);
+
+    updatePanelControls();
 
     // \see showSettings(), which records the other half of the same answer
     editorHost_.panelState().panel = PanelState::Panel::presets;
@@ -1091,23 +1101,25 @@ void SpectrumWorxEditor::paint(juce::Graphics &graphics)
 
 void SpectrumWorxEditor::buttonClicked(juce::Button *const pButton)
 {
-    if (pButton == &settingsButton_)
+    if (pButton == &undoButton_)
     {
-        if (settingsButton_.getToggleState())
-        {
-            showSettings();
-        }
-        else
-        {
-            LE_ASSERT(settings_);
-            hidePanels();
-        }
+        editorHost_.undo();
+    }
+    else if (pButton == &redoButton_)
+    {
+        editorHost_.redo();
     }
     else
     {
-        LE_ASSERT(pButton == &preset_);
-        togglePresetBrowser(*pButton);
+        LE_ASSERT(pButton == &panelButton_);
+        // the caption says where it goes, so the click goes there
+        if (settings_.has_value())
+            showPresetBrowser(true);
+        else
+            showSettings();
     }
+
+    updatePanelControls();
 }
 
 void LE_NOINLINE SpectrumWorxEditor::updateString(String const stringID,
@@ -1828,12 +1840,11 @@ void SpectrumWorxEditor::showSettings(unsigned int const pageIndexToActivate)
     if (!settings_.has_value())
     {
         presetBrowser_ = std::nullopt;
-        preset_.setToggleState(false, juce::dontSendNotification);
         settings_.emplace();
         showPanel(*settings_);
     }
     settings_->setCurrentTabIndex(pageIndexToActivate, false);
-    settingsButton_.setToggleState(true, juce::dontSendNotification);
+    updatePanelControls();
 
     // which panel the user is in is as much a place as which tab of it they
     // are on, and both are the session's. \see issue #129
@@ -2193,6 +2204,8 @@ void SpectrumWorxEditor::timerCallback()
 
     updateSaveButtonsIfShowing();
 
+    updatePanelControls();
+
     pumpModulatedValues();
 }
 
@@ -2335,6 +2348,71 @@ void SpectrumWorxEditor::updateModuleParameterAndNotifyHost(ModuleUI &moduleUI,
     // what gets the command drained with the transport parked
     host().automatedParameterChanged(module, moduleIndex, moduleParameterIndex, parameterValue,
                                      asDiscreteGesture);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// UndoButton
+//
+////////////////////////////////////////////////////////////////////////////////
+
+SpectrumWorxEditor::UndoButton::UndoButton(juce::Component &parent, bool const undoRatherThanRedo)
+    : undo_(undoRatherThanRedo)
+{
+    setButtonText(undo_ ? "Undo" : "Redo"); // what a screen reader reads
+    setWantsKeyboardFocus(false);
+    setMouseClickGrabsKeyboardFocus(false);
+    setSize(width, height);
+    addToParentAndShow(parent, *this);
+}
+
+/// \note The mark is drawn in the caption colour and faded with the pill rather
+/// than greyed on its own: a half with nothing on its stack is *unavailable*,
+/// which is the same thing every other disabled control in the skin says by
+/// going dim. \see PointerFeedback::disabled.
+void SpectrumWorxEditor::UndoButton::paintButton(juce::Graphics &graphics, bool isMouseOverButton,
+                                                 bool const isButtonDown)
+{
+    if (!isEnabled())
+        isMouseOverButton = false;
+
+    auto opacity(isMouseOverButton ? PointerFeedback::over : PointerFeedback::normal);
+    if (!isEnabled())
+        opacity *= PointerFeedback::disabled;
+
+    bool const fade(opacity < 1.0f);
+    if (fade)
+        graphics.beginTransparencyLayer(opacity);
+
+    auto const pill(ButtonPainter::paintHalfPill(
+        graphics, getLocalBounds().toFloat(),
+        /*roundedOnLeft*/ undo_, isEnabled() && (isButtonDown || isMouseOverButton)));
+
+    GlyphPainter::paintUndoArrow(graphics, pill, undo_,
+                                 ColourMap::getColour(ColourMap::ButtonCaption));
+
+    if (fade)
+        graphics.endTransparencyLayer();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief The caption names the panel the button goes *to*, and the two halves
+/// of the undo control are lit only where there is something to take back.
+///
+/// \note Polled from timerCallback() as well as called after a click, for the
+/// reason updateSaveButtonsIfShowing() is: the stacks move for reasons the
+/// editor is never told about -- an edit made through a route that does not end
+/// in a button, or a host restoring a session, which empties them.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxEditor::updatePanelControls()
+{
+    panelButton_.setButtonText(settings_.has_value() ? "PRESETS" : "SETTINGS");
+
+    undoButton_.setEnabled(editorHost_.canUndo());
+    redoButton_.setEnabled(editorHost_.canRedo());
 }
 
 SpectrumWorxEditor::ModuleMenuButton::ModuleMenuButton(SpectrumWorxEditor &parent)

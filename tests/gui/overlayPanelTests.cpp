@@ -74,34 +74,39 @@ template <typename Widget> std::vector<Widget *> descendantsOfType(juce::Compone
     return found;
 }
 
-/// The one button in \p root reading \p text.
-juce::Button &buttonNamed(juce::Component &root, juce::String const &text)
-{
-    std::vector<juce::Button *> matching;
-    for (auto *const pButton : descendantsOfType<juce::Button>(root))
-        if (pButton->getButtonText() == text)
-            matching.push_back(pButton);
-    REQUIRE(matching.size() == 1);
-    return *matching.front();
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 ///
 /// \brief What pressing \p button does, minus the mouse.
 ///
 /// \note `triggerClick()` wants a message loop and a test binary has none, and a
-/// synthesised `mouseDown` never reaches a component in one either. Both of the
-/// buttons this is used on toggle, so setting the state *is* the press -- JUCE
-/// sends the click message from inside `setToggleState()` -- and that is what
-/// puts the editor's own `buttonClicked` under test rather than the function it
-/// happens to call.
+/// synthesised `mouseDown` never reaches a component in one either. JUCE sends
+/// the click message from inside `setToggleState()`, so *changing* the state is
+/// the press -- and that is what puts the editor's own `buttonClicked` under
+/// test rather than the function it happens to call.
+///
+/// \note Flipped rather than set true. The panel button is momentary since the
+/// two became one, so it has no state to be in and only the change fires.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
 void press(juce::Button &button)
 {
-    REQUIRE_FALSE(button.getToggleState());
-    button.setToggleState(true, juce::sendNotificationSync);
+    button.setToggleState(!button.getToggleState(), juce::sendNotificationSync);
+}
+
+/// \brief The one button that swaps the panel.
+///
+/// \note By component name rather than by caption: the caption is the panel it
+/// would take you to and changes as you move between them, so it says where you
+/// are rather than which control this is.
+juce::Button &panelButton(juce::Component &root)
+{
+    std::vector<juce::Button *> matching;
+    for (auto *const pButton : descendantsOfType<juce::Button>(root))
+        if (pButton->getName() == "Panel")
+            matching.push_back(pButton);
+    REQUIRE(matching.size() == 1);
+    return *matching.front();
 }
 
 /// The rectangle a panel is given when it is laid over the module strips.
@@ -388,7 +393,7 @@ TEST_CASE("The settings panel reopens on the tab it was left on", "[gui][overlay
     SWTest::Instance instance;
     auto &editor(overlayEditor(instance));
 
-    auto &settingsButton(buttonNamed(editor, "SETTINGS"));
+    auto &panel(panelButton(editor));
 
     auto const pictureAfterLeavingItOn([&](unsigned int const page) {
         editor.showSettings(page);
@@ -401,7 +406,7 @@ TEST_CASE("The settings panel reopens on the tab it was left on", "[gui][overlay
         /// PRESETS press contributes here is making the panel go away, which is
         /// what this call does.
         editor.showPresetBrowser(true); // "you tab away back to Presets"...
-        press(settingsButton);          // ...and come back the way a user does.
+        press(panel);                   // ...and come back the way a user does.
 
         return std::pair{left, rendered(editor)};
     });
@@ -507,7 +512,7 @@ TEST_CASE("The settings tab survives the editor window closing", "[gui][overlay]
     REQUIRE(differenceOver(enginePage, interfacePage, overlayRectangle()) > 0);
 
     auto &reopened(overlayEditor(instance));
-    press(buttonNamed(reopened, "SETTINGS"));
+    press(panelButton(reopened));
 
     CHECK(differenceOver(interfacePage, rendered(reopened), overlayRectangle()) == 0);
 }
