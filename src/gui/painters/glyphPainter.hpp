@@ -72,6 +72,28 @@ int constexpr lockWidgetHeight{24};
 ///@}
 
 ////////////////////////////////////////////////////////////////////////////////
+/// \name Undo and redo
+///
+///   A hook: up and round from the foot of the bend, back along the top, and a
+/// head on the end of it.
+///
+///     <====\
+///          |
+///
+/// \note The head is centred *on* the bar rather than hanging off one side of
+/// it, and is a good deal wider than the bar is thick. Both are what make it
+/// read as an arrow at sixteen pixels rather than as a line that thickens.
+///
+////////////////////////////////////////////////////////////////////////////////
+///@{
+float constexpr undoWidth{18.0f};
+float constexpr undoHeight{16.0f};
+float constexpr undoStroke{3.0f};
+float constexpr undoHeadLength{6.5f};
+float constexpr undoHeadWidth{11.0f};
+///@}
+
+////////////////////////////////////////////////////////////////////////////////
 /// \name Up one folder
 ///
 ///   A stem with an arrowhead on top of it and a foot turning right at the
@@ -184,6 +206,11 @@ class GlyphPainter
 
     /// \brief A padlock, centred in \p bounds.
     static void paintLock(juce::Graphics &, juce::Rectangle<float> bounds, juce::Colour);
+
+    /// \brief The undo mark: an arc over the top with an arrowhead on the end it
+    /// came back to, pointing left for undo and right for redo.
+    static void paintUndoArrow(juce::Graphics &, juce::Rectangle<float> bounds, bool pointsLeft,
+                               juce::Colour);
 
   public:
     GlyphPainter() = delete; // a drawing, not an object
