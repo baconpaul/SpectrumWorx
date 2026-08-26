@@ -77,8 +77,9 @@ int constexpr lockWidgetHeight{24};
 ///   A hook: up and round from the foot of the bend, back along the top, and a
 /// head on the end of it.
 ///
-///     <====\
+///     <====.
 ///          |
+///          '
 ///
 /// \note The head is centred *on* the bar rather than hanging off one side of
 /// it, and is a good deal wider than the bar is thick. Both are what make it
