@@ -1578,9 +1578,17 @@ void SpectrumWorxCLAP::editParameter(ParameterID const parameterID, float const 
 /// \see ParametersOnlyModuleInitialiser.
 bool SpectrumWorxCLAP::editSlot(std::uint8_t const slot, std::int8_t const effectIndex)
 {
-    // before anything moves, and kept rather than recorded: a chain edit is one
-    // or several of these and the name for them all arrives afterwards
-    auto const wasThere(recordingUndoSteps_ ? std::optional{currentSlotState(slot)} : std::nullopt);
+    //   Before anything moves, and kept rather than recorded: a chain edit is one
+    // or several of these and the name for them all arrives afterwards.
+    //
+    // \note A flag and a value rather than a std::optional of one. GCC 12 and 13
+    // report the optional's payload as maybe-uninitialized at -O3 -- through the
+    // vector inside it, at a line in <vector> -- which is a false positive and
+    // not one this build can turn off, warnings being errors.
+    bool const remember(recordingUndoSteps_);
+    UndoHistory::SlotState wasThere;
+    if (remember)
+        wasThere = currentSlotState(slot);
 
     // building it is synchronous and this thread's, so an effect the build does
     // not have is a failure the caller hears about here; only installing defers
@@ -1594,8 +1602,8 @@ bool SpectrumWorxCLAP::editSlot(std::uint8_t const slot, std::int8_t const effec
            "The command queue is full; a slot change reached the interface and not the engine.");
 
     // front, because undoing several is doing them backwards
-    if (wasThere)
-        pendingChainInverse_.insert(pendingChainInverse_.begin(), *wasThere);
+    if (remember)
+        pendingChainInverse_.insert(pendingChainInverse_.begin(), std::move(wasThere));
     return true;
 }
 
