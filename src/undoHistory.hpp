@@ -90,8 +90,8 @@ class UndoHistory
 
     struct SlotState
     {
-        std::uint8_t slot;
-        std::int8_t effectIndex; ///< the chain's noModule empties it
+        std::uint8_t slot{0};
+        std::int8_t effectIndex{0}; ///< the chain's noModule empties it
         std::vector<std::pair<ParameterID, float>> parameters;
     };
 
