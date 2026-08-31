@@ -1362,8 +1362,11 @@ TEST_CASE("A period reads back the note value it displays", "[lfo]")
 
         auto const parsed(LFOImpl::parsePeriodScale(text.c_str(), row.syncTypes));
         REQUIRE(parsed.has_value());
-        CHECK(*parsed == Catch::Approx(row.periodScale).epsilon(0.001));
-        CHECK(shown(*parsed, row.syncTypes) == text);
+        CHECK(parsed->first == Catch::Approx(row.periodScale).epsilon(0.001));
+        CHECK(shown(parsed->first, row.syncTypes) == text);
+
+        // and the grid the text carried, which is the one it was printed on
+        CHECK(parsed->second == row.syncTypes);
     }
 
     // Text no period corresponds to is nothing, not zero.
@@ -1376,6 +1379,92 @@ TEST_CASE("A period reads back the note value it displays", "[lfo]")
     /// period; answering infinity for it would put a value the parameter cannot
     /// hold into the engine.
     CHECK_FALSE(LFOImpl::parsePeriodScale("1/0 bars", LFO::Quarter).has_value());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note What a *user* types, as against what the plugin printed. The reading is
+/// deliberately loose in three ways -- the denominator is optional, the unit is
+/// optional, and the grid letter may be any of the spellings a musician uses --
+/// and strict in the one that matters: text carrying no digit is not a period.
+/// \see issue #221.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A period reads the shorthand a musician types", "[lfo]")
+{
+    ScopedHostTiming const timing;
+
+    std::array<char, 64> buffer;
+    auto const shown([&](LFOImpl::SnappedPeriod const &period) {
+        auto const written(LFOImpl::printPeriodScale(period.first, period.second, buffer));
+        return std::string(buffer.data(), written);
+    });
+
+    ///   Typed on the left, and what the panel then reads on the right -- so the
+    /// case is the round trip a user sees rather than a float nobody types.
+    struct Row
+    {
+        char const *typed;
+        char const *shows;
+    };
+    Row const rows[]{
+        // the four asked for in the issue: a count of bars, a dotted bar, and two
+        // decimals that are lengths rather than note values
+        {"4b", "4/1 bars"},
+        {"1Db", "1/1D bars"},
+        {"0.25", "1/4 bars"},
+        {"0.333", "1/2T bars"},
+
+        // the denominator optional, with and without the unit and its spacing
+        {"4", "4/1 bars"},
+        {"2 bars", "2/1 bars"},
+        {"2", "2/1 bars"},
+
+        // the grid letter in every spelling, cased either way, spaced or not
+        {"1/4D", "1/4D bars"},
+        {"1/4 d", "1/4D bars"},
+        {"1/4.", "1/4D bars"},
+        {"1/4 dotted", "1/4D bars"},
+        {"1/8T", "1/8T bars"},
+        {"1/8 t", "1/8T bars"},
+        {"1/8 triplet", "1/8T bars"},
+        {"1 / 4 T bars", "1/4T bars"},
+
+        // and what the plugin itself writes, which has to survive being typed
+        {"1/4 bars", "1/4 bars"},
+        {"1/4T bars", "1/4T bars"},
+        {"1/4D bars", "1/4D bars"},
+    };
+
+    for (auto const &row : rows)
+    {
+        CAPTURE(row.typed);
+        auto const parsed(LFOImpl::parsePeriodScale(row.typed, LFO::Quarter));
+        REQUIRE(parsed.has_value());
+        CHECK(shown(*parsed) == row.shows);
+    }
+
+    ///   And the grid comes back with the value, because the text can name one
+    /// the LFO is not on: typing a dotted quarter at a quarter-snapped LFO is a
+    /// request for the dotted grid, not for the nearest quarter. This is the
+    /// half of the issue the panel acts on. \see the LFO display's typein.
+    CHECK(LFOImpl::parsePeriodScale("1/4D", LFO::Quarter)->second == LFO::Dotted);
+    CHECK(LFOImpl::parsePeriodScale("1/4T", LFO::Quarter)->second == LFO::Triplet);
+    CHECK(LFOImpl::parsePeriodScale("1/4", LFO::Triplet)->second == LFO::Quarter);
+
+    ///   A length that names no grid lands on whichever one is nearest, which is
+    /// how `0.333` reaches a triplet at all: 1/3 of a bar is exactly a triplet
+    /// half and 0.083 away from the nearest quarter.
+    CHECK(LFOImpl::parsePeriodScale("0.333", LFO::Quarter)->second == LFO::Triplet);
+    CHECK(LFOImpl::parsePeriodScale("0.25", LFO::Triplet)->second == LFO::Quarter);
+
+    // Loosening the reading does not loosen the refusal: still no digit, still
+    // not a period.
+    CHECK_FALSE(LFOImpl::parsePeriodScale("bars", LFO::Quarter).has_value());
+    CHECK_FALSE(LFOImpl::parsePeriodScale("T", LFO::Quarter).has_value());
+    CHECK_FALSE(LFOImpl::parsePeriodScale("N/A bars", LFO::Quarter).has_value());
+    CHECK_FALSE(LFOImpl::parsePeriodScale("-1/4", LFO::Quarter).has_value());
 }
 
 TEST_CASE("An LFO's period follows a change of sync type onto the new grid", "[lfo]")

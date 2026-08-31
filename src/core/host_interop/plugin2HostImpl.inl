@@ -252,11 +252,19 @@ template <class ActualModule, class AutomatedParameter> struct ParameterParser
 
         case IndexOf<LFO::Parameters, LFO::PeriodScale>::value:
         {
-            auto const periodScale(LFO::parsePeriodScale(
-                parser.text, pModule->lfo(parameterID.moduleParameterIndex).syncTypes()));
-            if (!periodScale)
+            auto const syncTypes(pModule->lfo(parameterID.moduleParameterIndex).syncTypes());
+            auto const parsed(LFO::parsePeriodScale(parser.text, syncTypes));
+            if (!parsed)
                 return {};
-            return LFO::internal2AutomatedValue(parameterID.lfoParameterIndex, *periodScale,
+
+            /// \note The grid the text named is dropped here where the panel acts
+            /// on it: this edge answers one number and has no second parameter to
+            /// write, so `1/4D` typed into a host's lane is the nearest quarter
+            /// rather than a mask change nothing asked for. \see issue #221.
+            auto const periodScale((syncTypes == LFO::Free)
+                                       ? parsed->first
+                                       : LFO::snapPeriodScale(parsed->first, syncTypes).first);
+            return LFO::internal2AutomatedValue(parameterID.lfoParameterIndex, periodScale,
                                                 AutomatedParameter::normalised);
         }
 

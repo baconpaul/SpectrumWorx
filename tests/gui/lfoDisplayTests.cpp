@@ -588,6 +588,62 @@ TEST_CASE("Switching an LFO off puts the knob back where the parameter is", "[gu
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The half of issue #221 the panel owns. The parser answers the grid the
+/// text named as well as the period; typing a dotted quarter at a quarter-snapped
+/// LFO is a request for the dotted grid, and the panel is the only caller with a
+/// second parameter to write it into.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A note typed into the period moves the LFO onto the grid it names", "[gui][lfo][menu]")
+{
+    SWTest::HostSideJuce const juce;
+    SWTest::Instance instance;
+    PanelUnderTest const panel(instance);
+
+    auto *const pDisplay(instance.editor().lfoDisplay());
+    REQUIRE(pDisplay != nullptr);
+    auto &period(pDisplay->period());
+
+    REQUIRE(panel.lfo().syncTypes() == LFO::Quarter);
+    REQUIRE(panel.lit(" N "));
+
+    REQUIRE(period.setParameterFromText("1/4D"));
+
+    ///   The mask crossed to the engine, and not merely the panel's own copy:
+    /// every LFO sub-parameter takes updateParameterAndNotifyHost<>, which is the
+    /// one route the audio thread hears. \see issue #159.
+    {
+        auto const queued(lastLFOEdit(drain(instance.toEngine()),
+                                      panel.control().moduleParameterIndex(), syncTypesIndex));
+        REQUIRE(queued.has_value());
+        CHECK(queued->setBaseParameter.value == static_cast<float>(LFO::Dotted));
+    }
+
+    CHECK(panel.lfo().syncTypes() == LFO::Dotted);
+    CHECK_FALSE(panel.lit(" N "));
+    CHECK(panel.lit(" D "));
+    CHECK(period.parameterValueText() == "1/4D bars");
+
+    // and back, by a note that names the plain grid
+    REQUIRE(period.setParameterFromText("1/8"));
+    CHECK(panel.lfo().syncTypes() == LFO::Quarter);
+    CHECK(panel.lit(" N "));
+    CHECK(period.parameterValueText() == "1/8 bars");
+
+    ///   A note already on the lit grid writes no mask at all: the panel asks for
+    /// one only when the text names a different one, and a `SyncTypes` write it
+    /// did not need would still cost the host a parameter change.
+    drain(instance.toEngine());
+    REQUIRE(period.setParameterFromText("1/4"));
+    CHECK_FALSE(lastLFOEdit(drain(instance.toEngine()), panel.control().moduleParameterIndex(),
+                            syncTypesIndex)
+                    .has_value());
+    CHECK(panel.lfo().syncTypes() == LFO::Quarter);
+}
+
 TEST_CASE("The whole waveform well answers a press, not just the arrow", "[gui][lfo]")
 {
     SWTest::HostSideJuce const juce;

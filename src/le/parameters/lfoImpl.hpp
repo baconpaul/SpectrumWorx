@@ -381,7 +381,10 @@ class LFOImpl : public LFO
 
     /// \brief printPeriodScale() run backwards, or nothing for text that is not
     /// a period this LFO could hold.
-    static std::optional<value_type> parsePeriodScale(char const *text, std::uint8_t syncTypes);
+    ///
+    /// \note Answers the grid the text named along with the period, because it
+    /// can name one the LFO is not on. \see issue #221.
+    static std::optional<SnappedPeriod> parsePeriodScale(char const *text, std::uint8_t syncTypes);
 
     //...mrmlj...cleanup with a new 'logarithmic' parameter/control...
     static void snapPeriodScaleFromAutomation(PeriodScale &);

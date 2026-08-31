@@ -36,12 +36,14 @@
 #include "le/utility/lexicalCast.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <optional>
 #include <ranges>
+#include <string>
 
 namespace LE::Parameters
 {
@@ -768,64 +770,157 @@ std::size_t LFOImpl::printPeriodScale(value_type const periodScale, std::uint8_t
 /// can hold. What it *does* answer is inside the range, because a host may type
 /// anything.
 ///
-/// \note The grid letter is read rather than assumed. A user who types `1/4T`
-/// into an LFO snapped to quarters is asking for a triplet, and what comes back
-/// is the nearest thing the mask allows -- which is what snapping is for and
-/// what the panel does with a drag.
+/// \note It answers a grid as well as a value, because the text can name one and
+/// a user who types `1/4D` into an LFO snapped to quarters is not asking for the
+/// nearest quarter. What is done with that is the caller's: the panel writes
+/// `SyncTypes` and then the period, and a host's `text_to_value` -- which has one
+/// number to give back and no second parameter to write -- resnaps into the mask
+/// it already has. \see issue #221.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-std::optional<LFOImpl::value_type> LFOImpl::parsePeriodScale(char const *const text,
-                                                             std::uint8_t const syncTypes)
+namespace
+{
+/// \brief The text split where the note stops: digits, a decimal point, a
+/// solidus and spaces on one side, everything else upper-cased on the other.
+///
+/// \note A `.` joins the number only when a digit follows it, which is what lets
+/// `0.25` and `1/4.` mean different things -- a decimal point and the old
+/// engraver's dot -- without either of them needing a second grammar.
+struct SplitNote
+{
+    std::string number;
+    std::string suffix;
+    bool hasDigit{false};
+};
+
+SplitNote splitNote(char const *const text)
+{
+    SplitNote split;
+    bool inNumber{true};
+    for (auto const *p(text); *p; ++p)
+    {
+        bool const digit(*p >= '0' && *p <= '9');
+        bool const decimalPoint((*p == '.') && (p[1] >= '0') && (p[1] <= '9'));
+        if (inNumber && (digit || decimalPoint || (*p == '/') || (*p == ' ')))
+        {
+            split.number += *p;
+            split.hasDigit |= digit;
+        }
+        else if (*p != ' ')
+        {
+            inNumber = false;
+            split.suffix += static_cast<char>(std::toupper(static_cast<unsigned char>(*p)));
+        }
+    }
+    return split;
+}
+
+/// \brief Which grid the text named, or `Free` for text that named none.
+///
+/// \note `Free` here is "the user did not say", not the sync mode. Only the
+/// letter names a grid: `1/4` and `0.25` and `4 bars` are lengths, and the grid
+/// they land on is whichever one is nearest -- which for all three is the plain
+/// one, since a length written on a grid is exactly on it.
+LFO::SyncType gridNamedBy(std::string suffix)
+{
+    if (suffix.find("TRIPLET") != std::string::npos)
+        return LFO::Triplet;
+    if ((suffix.find("DOTTED") != std::string::npos) || (suffix.find('.') != std::string::npos))
+        return LFO::Dotted;
+
+    // the unit off the end, so that what is left is the grid letter alone: the
+    // panel writes `1/8T bars` and a user types `1/8Tb`, `1/8T` or `1/8 t`
+    if (auto const bars(suffix.find("BARS")); bars != std::string::npos)
+        suffix.erase(bars, 4);
+    else if (!suffix.empty() && (suffix.back() == 'B'))
+        suffix.pop_back();
+
+    if (suffix == "T")
+        return LFO::Triplet;
+    if (suffix == "D")
+        return LFO::Dotted;
+    return LFO::Free;
+}
+
+/// \brief What a grid's note value is multiplied by to reach a period.
+///
+/// \note A triplet is two thirds of the note it is written as and a dotted note
+/// three halves of it, which is the inverse of gridFor()'s `toNote`.
+float periodFromNote(LFO::SyncType const grid)
+{
+    switch (grid)
+    {
+    case LFO::Triplet:
+        return 2 / 3.0f;
+    case LFO::Dotted:
+        return 3 / 2.0f;
+    default:
+        return 1.0f;
+    }
+}
+} // anonymous namespace
+
+std::optional<LFOImpl::SnappedPeriod> LFOImpl::parsePeriodScale(char const *const text,
+                                                                std::uint8_t const syncTypes)
 {
     if (!text)
         return {};
 
-    char *end{nullptr};
-    auto const first(std::strtof(text, &end));
-    if ((end == text) || !std::isfinite(first))
-        return {};
-
     if (syncTypes == Free)
-        return clampFreePeriod(first / Timer::referenceBarDuration / 1000);
-
-    while (*end == ' ')
-        ++end;
-    if (*end != '/')
-        return {};
-
-    char const *const denominatorText(end + 1);
-    auto const second(std::strtof(denominatorText, &end));
-    if ((end == denominatorText) || (second == 0) || !std::isfinite(second))
-        return {};
-
-    while (*end == ' ')
-        ++end;
-
-    auto const note(first / second);
-    float fromNote{1};
-    switch (*end)
     {
-    case 'T':
-    case 't':
-        fromNote = 2 / 3.0f;
-        break;
-    case 'D':
-    case 'd':
-        fromNote = 3 / 2.0f;
-        break;
-    default:
-        break;
+        char *end{nullptr};
+        auto const milliseconds(std::strtof(text, &end));
+        if ((end == text) || !std::isfinite(milliseconds))
+            return {};
+        return SnappedPeriod(clampFreePeriod(milliseconds / Timer::referenceBarDuration / 1000),
+                             Free);
     }
 
-    auto const periodScale(note * fromNote);
+    auto const split(splitNote(text));
+    if (!split.hasDigit)
+        return {};
+
+    ///   The denominator is optional, which is the whole of what this issue was
+    /// about: `4 bars` and `4/1 bars` are the same period written two ways, and
+    /// only the second one used to be a period at all.
+    float numerator{0}, denominator{1};
+    {
+        auto const solidus(split.number.find('/'));
+        char *end{nullptr};
+        auto const *const numberText(split.number.c_str());
+        numerator = std::strtof(numberText, &end);
+        if (end == numberText)
+            return {};
+
+        if (solidus != std::string::npos)
+        {
+            auto const *const denominatorText(numberText + solidus + 1);
+            denominator = std::strtof(denominatorText, &end);
+            if (end == denominatorText)
+                return {};
+        }
+    }
+
+    if (!std::isfinite(numerator) || !std::isfinite(denominator) || (denominator == 0))
+        return {};
+
+    auto const grid(gridNamedBy(split.suffix));
+    auto const periodScale((numerator / denominator) *
+                           periodFromNote((grid == Free) ? Quarter : grid));
     if (!std::isfinite(periodScale) || (periodScale <= 0))
         return {};
 
+    ///   Snapped on the grid the text named, and across all three when it named
+    /// none: `0.333` is a length rather than a note, and the nearest thing to it
+    /// is a triplet half however the LFO is currently set. That is the second
+    /// half of the issue -- the typein can move the grid, where it used to be
+    /// held to whichever one the mask already allowed.
+    auto const gridsToSnapOn(static_cast<std::uint8_t>((grid == Free) ? All : grid));
+
     return snapSyncedPeriod(
-               Math::clamp(periodScale, currentPeriodScaleMinimum(), currentPeriodScaleMaximum()),
-               syncTypes)
-        .first;
+        Math::clamp(periodScale, currentPeriodScaleMinimum(), currentPeriodScaleMaximum()),
+        gridsToSnapOn);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

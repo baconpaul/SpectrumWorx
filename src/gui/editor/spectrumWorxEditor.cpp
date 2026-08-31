@@ -3456,10 +3456,20 @@ bool SpectrumWorxEditor::LFODisplay::ParameterSlider::setParameterFromText(juce:
     {
     case IndexOf<LFO::Parameters, LFO::PeriodScale>::value:
     {
-        auto const periodScale(LFO::parsePeriodScale(text.toRawUTF8(), parent().lfo().syncTypes()));
-        if (!periodScale)
+        auto const syncTypes(parent().lfo().syncTypes());
+        auto const parsed(LFO::parsePeriodScale(text.toRawUTF8(), syncTypes));
+        if (!parsed)
             return false;
-        setValue(*periodScale, juce::sendNotificationSync);
+
+        ///   And the grid the text named, when it named one the LFO is not on:
+        /// `1/4D` typed at a quarter-snapped LFO is a request for the dotted
+        /// grid, not for the nearest quarter. The mask goes first, the ring
+        /// being ordered and the engine resnapping what it is given against
+        /// whatever mask it holds. \see issue #221.
+        if ((syncTypes != LFO::Free) && (parsed->second != syncTypes))
+            parent().setSyncTypes(parsed->second);
+
+        setValue(parsed->first, juce::sendNotificationSync);
         return true;
     }
 
