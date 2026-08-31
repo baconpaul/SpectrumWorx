@@ -370,9 +370,28 @@ one format is how a DAW's automation lane and the plugin's own strip come to
 disagree. `periodRatioString()` in the editor calls the same function.
 
 `1/8T bars` is text no general-purpose parser reads — `strtof` stops at the slash
-— so `text_to_value` has an arm of its own for it, and what it answers is snapped
-to the grids the mask allows. A user who types a note value the meter cannot hold
-gets the nearest one it can, which is what a drag on the panel does.
+— so `text_to_value` has an arm of its own for it. A user who types a note value
+the meter cannot hold gets the nearest one it can, which is what a drag on the
+panel does.
+
+**What is read is looser than what is written, and answers a grid as well as a
+number** (issue #221). The denominator is optional and so is the unit, so `4b`,
+`4` and `4/1 bars` are one period; a decimal is a length rather than a note, so
+`0.25` is a quarter of a bar and `0.333` is a third of one; and the grid letter
+takes any spelling a musician uses — `1/4D`, `1/4 d`, `1/4.`, `1/4 dotted`. The
+one thing still refused is text carrying no digit, for the reason
+`Parameters::parse` refuses it: `strtof` reads zero out of `off`, `N/A` and the
+empty string alike, and zero is not a period this parameter can hold.
+
+**Only the letter names a grid.** Text that carries one is snapped on that grid
+whatever the mask says; text that carries none is a length, and snaps to whichever
+of the three grids is nearest — which for a note written on one is that one, and
+which is how `0.333` reaches `1/2T`. `parsePeriodScale()` therefore answers a
+`SnappedPeriod`, and what the caller does with the grid is the caller's: **the
+panel writes `SyncTypes` and then the period**, so typing `1/4D` at a
+quarter-snapped LFO moves it onto the dotted grid, while `text_to_value` — which
+has one number to give back and no second parameter to write — resnaps into the
+mask it already has.
 
 **The skew is undone on the way in.** `PeriodScale` crosses the normalised edge
 *linearised* (`LFOParameterGetter`, so that a bar sits in the middle of a host's
