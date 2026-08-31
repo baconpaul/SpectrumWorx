@@ -387,6 +387,21 @@ rather than on the editor because nothing in the editor lives long enough to hol
 it — a panel is destroyed every time the other one is opened, and the editor
 every time the window shuts, which is the report in #129.
 
+**`presetBank` and `presetFolder` are both live, whichever side `presetLocation`
+names** (issue #231). The browser is in one tree at a time and remembers the
+other, so toggling User and back costs the user nothing; `PresetBrowser::
+rememberPlace()` therefore writes only the field for the side it is on, and
+`setNewFolder()` keeps the factory bank rather than clearing it. Reading them the
+other way — as one position plus a stale field — is what made the toggle throw
+the factory bank away and then serialise the empty string over it.
+
+**And they are written as the browser moves, not as it is destroyed.** Every
+navigation goes through `rememberPlace()`, so a `stateSave` taken with the window
+open — which is what most hosts do — sees where the user actually is. It used to
+see wherever the browser had been *constructed*, `~PresetBrowser` having been the
+only writer. Closing the window is still covered by the same rule and needs no
+write of its own: the last navigation had already recorded itself.
+
 Three rules the block follows, and each of them is a bug that would otherwise be
 silent:
 

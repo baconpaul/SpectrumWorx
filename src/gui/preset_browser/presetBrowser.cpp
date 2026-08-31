@@ -185,18 +185,46 @@ void PresetBrowser::restoreLastPlace()
     setFactoryBank({});
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Where the browser is, into the session's state -- which outlives both
+/// this browser and the window it is in.
+///
+/// \note **Only the side it is on.** The two sides are remembered separately, so
+/// walking the user's folders may not touch the bank the factory side is in and
+/// the other way about; that is the whole of what a toggle restores from.
+/// \see issue #231.
+///
+/// \note And on every move rather than on the way out. A host that saves its
+/// session with the window still open -- which is most of them -- used to
+/// serialise wherever the browser had been *constructed*, the destructor being
+/// the only writer. Closing the editor still goes through here, `~PresetBrowser`
+/// running from `~SpectrumWorxEditor` down whatever path the host destroys the
+/// GUI on, so nothing is lost by the write no longer being there.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void PresetBrowser::rememberPlace()
+{
+    auto &state(place());
+
+    if (location_ == Location::User)
+    {
+        state.presetLocation = PanelState::PresetLocation::user;
+        state.presetFolder = currentDirectory_;
+        return;
+    }
+
+    state.presetLocation = PanelState::PresetLocation::factory;
+    state.presetBank = factoryBank_;
+}
+
 PresetBrowser::~PresetBrowser()
 {
     //...mrmlj...fade out does not work for 'on desktop components'
     //this->fadeOutComponent( 600, 0, 0, 0.2f );
     //juce::Point<int> const centre( this->getBounds().getCentre() );
     //juce::Desktop::getInstance().getAnimator().animateComponent( this, juce::Rectangle<int>( centre, centre ), 0, 600, true, 0, 0 );
-    // into the session's state, which outlives both this browser and the window
-    auto &state(place());
-    state.presetLocation = (location_ == Location::User) ? PanelState::PresetLocation::user
-                                                         : PanelState::PresetLocation::factory;
-    state.presetBank = factoryBank_;
-    state.presetFolder = currentDirectory_;
 }
 
 /// \note A factory bank is compiled into the binary, so there is nothing to save
@@ -774,10 +802,14 @@ void PresetBrowser::buttonClicked(juce::Button *const pButton)
     {
         // the toggle state is already the new one, juce::Button flipping it
         // before it tells its listeners, so this reads the answer
+        //
+        // and back to where that side was left rather than to the top of its
+        // tree: the two positions are remembered separately, so a look at the
+        // other one and back costs the user nothing. \see issue #231
         if (userPresets_.getToggleState())
-            setNewFolder(GUI::presetsFolder());
+            goToUserPresets();
         else
-            setFactoryBank({});
+            setFactoryBank(place().presetBank);
     }
     else if (pButton == &jogPrevious_)
     {
@@ -880,11 +912,16 @@ void PresetBrowser::askForOverwrite(std::function<void(bool)> onAnswer)
     GUI::warningOkCancelBox(_T( "File already exists!" ), _T( "Overwrite?" ), std::move(onAnswer));
 }
 
+/// \note The factory bank is kept rather than cleared. It is read nowhere but
+/// behind an `inFactory()` test, and holding it is what lets the toggle put the
+/// user back in the bank they left rather than at the top of the tree.
+/// \see issue #231.
+
 void PresetBrowser::setNewFolder(fs::path const &file)
 {
     location_ = Location::User;
-    factoryBank_.clear();
     currentDirectory_ = file;
+    rememberPlace();
     deselectAllRows();
     refresh();
     background().repaint();
@@ -906,17 +943,14 @@ void PresetBrowser::showLoadedPreset()
         return;
     }
 
-    location_ = Location::User;
-    currentDirectory_ = loaded.file.parent_path();
-    deselectAllRows();
-    refresh();
-    background().repaint();
+    setNewFolder(loaded.file.parent_path());
 }
 
 void PresetBrowser::setFactoryBank(juce::String const &bank)
 {
     location_ = Location::Factory;
     factoryBank_ = bank;
+    rememberPlace();
     deselectAllRows();
     refresh();
     background().repaint();

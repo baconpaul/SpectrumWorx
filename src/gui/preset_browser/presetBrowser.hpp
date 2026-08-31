@@ -131,6 +131,10 @@ class PresetBrowser final : public PanelBackground,
     /// render it. See SpectrumWorxEditor::showFactoryBank().
     void setFactoryBank(juce::String const &bank);
 
+    /// \brief The same for the user's own tree, and public for the same reason:
+    /// a headless run has no folder row to double-click.
+    void setNewFolder(fs::path const &);
+
     /// \brief Points the browser at whatever is loaded *now*, and selects it.
     ///
     /// \note For a load nobody in this panel asked for -- an undo of one, which
@@ -139,8 +143,6 @@ class PresetBrowser final : public PanelBackground,
     void showLoadedPreset();
 
   private:
-    void setNewFolder(fs::path const &);
-
     /// \brief Up one level, wherever "up" is from here. Does nothing at the top
     /// of either tree, which is also where the up button is disabled.
     void goToParent();
@@ -206,6 +208,9 @@ class PresetBrowser final : public PanelBackground,
     PanelState const &place() const;
 
     void restoreLastPlace();
+
+    /// The reverse: where the browser is now, into the side it is on.
+    void rememberPlace();
     ///@}
 
     void refresh();
