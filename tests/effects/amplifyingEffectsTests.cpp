@@ -18,17 +18,25 @@
 /// the fixture file, and a bound that wide is not much of a test.
 ///
 ///   These are the test instead. Not "the output is these numbers" but "the
-/// effect does what it is called": a magnet lands on its target, a spring
-/// oscillates and in the direction it was told to, an octaver puts energy an
-/// octave away, To PV and From PV are inverses, an imploder sustains, an
-/// exploder grows, a slew limiter slows a change down. None of that moves when a
-/// bin does, so all of it holds on any platform and in either build type -- the
-/// goldens render in Release only, and these do not.
+/// effect does what it is called": a magnet lands on its target where the
+/// resynthesis can carry it, a spring oscillates and in the direction it was
+/// told to, an octaver puts energy an octave away, To PV and From PV are
+/// inverses, an imploder sustains, an exploder grows, a slew limiter slows a
+/// change down. None of that moves when a bin does, so all of it holds on any
+/// platform and in either build type -- the goldens render in Release only, and
+/// these do not.
 ///
 /// \note The properties are deliberately one-sided where the effect is:
 /// "Up never goes below the input pitch" is a real guarantee, "Up reaches
 /// exactly +N cents" is a claim about a pitch detector's accuracy and would be a
 /// tolerance argument dressed up as a property.
+///
+/// \note And where an effect does not do what it is called, the case says so
+/// rather than picking a setting that reads well. A two-octave pitch magnet puts
+/// out three tones and the target is not reliably the loudest; that is recorded
+/// here, with the arithmetic that produces it, against the day the phase-locked
+/// rewrite in issue #19 replaces it. A test that cannot see the defect cannot
+/// tell you the fix worked either.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later
@@ -64,19 +72,15 @@ constexpr std::uint8_t channels{2};
 /// in a checked build.
 constexpr SWTest::RenderSetup standardSetup{1024, 4, channels, sampleRate, 256};
 
-/// \note 2048 for the one property that is a claim about a *frequency* rather
-/// than about a level or a direction: Pitch Magnet landing on its target. A
-/// phase-vocoder shift resolves at the engine's bin spacing, and at 1024 bins
-/// (43 Hz apart) a partial shifted two octaves up smears across three of them --
-/// measured, not guessed: the peak landed 377 cents flat of an 880 Hz target,
-/// with the target itself the second loudest thing in the spectrum. At 2048 the
-/// same render lands within **0.2 cents** of 880, 330 and 110 alike.
+/// \note 2048 for the properties that are claims about a *frequency* rather than
+/// about a level or a direction. Overlap 4 because it is the shipping default
+/// -- `Constants::defaultOverlapFactor` -- and what a shift does at the setting
+/// people run it at is the thing worth pinning.
 ///
-///   4096 is worse again for the 880 case (82 cents sharp) and not better for
-/// the others, so this is not "more bins are better" -- it is one setting where
-/// the measurement is unambiguous, chosen by measuring. That the answer is
-/// FFT-size dependent at all belongs in issue #19, not in a wider
-/// tolerance here.
+///   No setting here is chosen to make the pitch magnet read well. It cannot be:
+/// a two-octave shift aliases at every FFT size this engine offers, and which of
+/// the target and its two images comes out loudest is not stable across them.
+/// \see the two magnet cases below, which record that rather than dodge it.
 constexpr SWTest::RenderSetup pitchSetup{2048, 4, channels, sampleRate, 256};
 
 constexpr std::uint32_t oneSecond{sampleRate};
@@ -176,32 +180,52 @@ double magnitudeAt(std::span<float const> mono, double const frequency)
     return std::sqrt(real * real + imaginary * imaginary) / count;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///
 /// \brief The loudest frequency between \p lowest and \p highest, in Hz.
 ///
-/// Searched in cents rather than in bins, coarse then fine, because everything
-/// being asserted about it is musical -- "an octave above", "within N cents of
-/// the target" -- and because a linear scan fine enough to resolve cents at
-/// 100 Hz is wasted at 2 kHz.
+///   Swept linearly at the analysed window's own resolution, then refined in
+/// cents around the winner.
+///
+/// \note The sweep step has to come from the window rather than from the ear.
+/// A Hann window of \p mono samples resolves `sampleRate / size` and its main
+/// lobe is twice that wide, so a step of one resolution unit cannot straddle a
+/// peak. A grid in *cents* can, and did: at 25 cents the samples near 880 Hz
+/// fall 12 Hz apart while a half-second window's lobe is 8 Hz wide, so the pitch
+/// magnet's loudest partial -- an alias at 966 Hz, above the 880 the effect was
+/// asked for -- landed between two samples and read as 0.0004 against the
+/// target's 0.067. The case then reported "+0.2 cents" and passed. \see #19.
+///
+////////////////////////////////////////////////////////////////////////////////
 double dominantFrequency(std::span<float const> mono, double const lowest = 60,
                          double const highest = 4000)
 {
-    auto const scan([&](double const from, double const to, double const centsPerStep) {
-        double best{from}, bestMagnitude{-1};
-        auto const step(std::pow(2.0, centsPerStep / 1200));
-        for (double frequency(from); frequency <= to; frequency *= step)
+    if (mono.size() < 2)
+        return lowest;
+
+    double best{lowest}, bestMagnitude{-1};
+    auto const consider([&](double const frequency) {
+        auto const magnitude(magnitudeAt(mono, frequency));
+        if (magnitude > bestMagnitude)
         {
-            auto const magnitude(magnitudeAt(mono, frequency));
-            if (magnitude > bestMagnitude)
-            {
-                bestMagnitude = magnitude;
-                best = frequency;
-            }
+            bestMagnitude = magnitude;
+            best = frequency;
         }
-        return best;
     });
 
-    auto const coarse(scan(lowest, highest, 25));
-    return scan(std::max(lowest, coarse / 1.05), std::min(highest, coarse * 1.05), 2);
+    auto const resolution(sampleRate / static_cast<double>(mono.size()));
+    for (double frequency(lowest); frequency <= highest; frequency += resolution)
+        consider(frequency);
+
+    // then in cents, one resolution unit either side, for a reading finer than
+    // the sweep that found it
+    auto const coarse(best);
+    bestMagnitude = -1;
+    auto const step(std::pow(2.0, 2.0 / 1200));
+    for (double frequency(std::max(lowest, coarse - resolution));
+         frequency <= std::min(highest, coarse + resolution); frequency *= step)
+        consider(frequency);
+    return best;
 }
 
 double cents(double const from, double const to) { return 1200 * std::log2(to / from); }
@@ -487,39 +511,122 @@ TEST_CASE("A pitch magnet at zero strength does not move the pitch", "[effects][
     CHECK(std::abs(cents(input, settled)) < 15);
 }
 
+namespace
+{
+/// A settled half-second of the magnet pulling \p input to \p target, one
+/// channel. Two seconds rendered: half of it is the ramp, the rest is the look.
+std::vector<float> magnetised(double const input, double const target)
+{
+    auto const rendered(renderOne(
+        "Pitch Magnet", tone(input, 2 * oneSecond),
+        [target](Module &module) {
+            module.setEffectParameter(magnetTarget, static_cast<float>(target));
+            // 60 semitones a second: two octaves inside half a second, so a two
+            // second render is settling time and then a long look.
+            module.setEffectParameter(magnetSpeed, 60);
+        },
+        pitchSetup));
+    return window(rendered, oneSecond, oneSecond / 2);
+}
+
+/// One hop rate, the spacing of a phase vocoder's alias images. \see the
+/// two-octave case below for why this is the number that decides them.
+double hopRate(SWTest::RenderSetup const &setup)
+{
+    return static_cast<double>(setup.sampleRate) / (setup.fftSize / setup.overlapFactor);
+}
+} // anonymous namespace
+
 TEST_CASE("A pitch magnet arrives at its target and stays there", "[effects][property][pitch]")
 {
     // The property the effect is named for, and the one a golden cannot state:
     // whatever the pitch detector picks and however the bins land, the output
-    // pitch ends up at the target frequency. Two octaves up, one down and a
-    // fifth up, because the clamp that limits the movement is two-sided and the
-    // distance is what decides how long it takes.
+    // pitch ends up at the target frequency. A fifth up and two octaves down,
+    // because the clamp that limits the movement is two-sided.
+    //
+    // Not two octaves *up*: that one does not arrive, and the case below is what
+    // says so. A shift of scale s spreads each input bin over s output bins,
+    // the resynthesis carries +-overlapFactor/2 bins, and 330 and 110 are the
+    // two targets whose scale -- 1.5 and 0.5 -- fits inside the default 4.
     constexpr double input{220};
 
-    auto const magnet([&](double const target) {
-        auto const rendered(renderOne(
-            "Pitch Magnet", tone(input, 2 * oneSecond),
-            [target](Module &module) {
-                module.setEffectParameter(magnetTarget, static_cast<float>(target));
-                // 60 semitones a second: two octaves inside half a second, so a
-                // two second render is settling time and then a long look.
-                module.setEffectParameter(magnetSpeed, 60);
-            },
-            pitchSetup));
-        return dominantFrequency(window(rendered, oneSecond, oneSecond / 2), 60, 4000);
-    });
-
-    for (double const target : {880.0, 330.0, 110.0})
+    for (double const target : {330.0, 110.0})
     {
-        auto const arrived(magnet(target));
+        auto const arrived(dominantFrequency(magnetised(input, target)));
         UNSCOPED_INFO("target " << target << " Hz, arrived at " << arrived << " Hz, "
                                 << cents(target, arrived) << " cents off");
-        /// \note Twenty cents, which is a hundredth of the smallest distance
-        /// being travelled. It could be one cent -- all three measure at 0.2 --
+        /// \note Twenty cents, which is a hundredth of the smaller distance
+        /// being travelled. It could be two -- they measure at 0.5 and 1.8 --
         /// but the bound worth writing down is the one that says "this is the
         /// note it was asked for" rather than one that pins today's arithmetic.
         CHECK(std::abs(cents(target, arrived)) < 20);
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief A two-octave magnet puts out three tones, not one.
+///
+///   Recorded rather than asserted away, because it is what the effect does
+/// today and the fix is a phase-locked rewrite that has not happened. \see #19.
+///
+///   The mechanism decides the frequencies exactly, which is why this case
+/// derives them instead of pasting them. `pitchShiftAndScale()` back-maps every
+/// output bin to `round(k / scale)`, so an input bin is replicated across
+/// `scale` output bins, all carrying the same commanded frequency. Resynthesis
+/// can only realise a deviation of +-`overlapFactor`/2 bins from a bin's centre,
+/// so the replicas past that fold, and reappear one hop rate --
+/// `sampleRate / hop` -- above and below the target. Alias-free would need
+/// `overlapFactor >= scale`; the default overlap is 4 and two octaves is scale
+/// 4, exactly marginal.
+///
+/// \note What is *not* asserted is which of the three is loudest. They are
+/// within a factor of two of each other here, and the ordering moves with the
+/// FFT size and, on the evidence of the other eight amplifying effects, with the
+/// FFT backend. \see Tolerances::amplified() and the note at the top of this
+/// file. The stable facts are that all three are present and that the images are
+/// not a rounding error, and those are the two this case states.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A two-octave pitch magnet lands on its target and on two aliases",
+          "[effects][property][pitch]")
+{
+    constexpr double input{220}, target{880};
+
+    auto const settled(magnetised(input, target));
+    auto const fold(hopRate(pitchSetup));
+
+    auto const atTarget(magnitudeAt(settled, target));
+    auto const below(magnitudeAt(settled, target - fold));
+    auto const above(magnitudeAt(settled, target + fold));
+
+    UNSCOPED_INFO("fold " << fold << " Hz | " << (target - fold) << " Hz " << below << ", "
+                          << target << " Hz " << atTarget << ", " << (target + fold) << " Hz "
+                          << above);
+
+    /// \note A hundredth of the input's amplitude. The three measure around 0.05
+    /// to 0.07 and the spectrum away from them is under 0.001, so this separates
+    /// "there is a partial here" from "there is nothing here" with two orders of
+    /// margin either way, and does not pin a level.
+    constexpr double present{0.005};
+    CHECK(atTarget > present);
+    CHECK(below > present);
+    CHECK(above > present);
+
+    // The images are the defect: a quarter of the target is the bound that says
+    // "audible artefact" rather than "numerical residue". Both measure above 0.7.
+    CHECK(std::max(below, above) > (atTarget / 4));
+
+    // And whichever of the three wins, it is one of the three -- the claim the
+    // effect can actually support at this setting.
+    auto const loudest(dominantFrequency(settled));
+    auto const offBy(
+        std::min({std::abs(cents(target, loudest)), std::abs(cents(target - fold, loudest)),
+                  std::abs(cents(target + fold, loudest))}));
+    UNSCOPED_INFO("loudest " << loudest << " Hz, " << offBy
+                             << " cents from the nearest of the three");
+    CHECK(offBy < 20);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
