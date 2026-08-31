@@ -1605,10 +1605,37 @@ void SpectrumWorxEditor::endLFOPreview()
         return showLFOFor(*pActiveControl_, activeControlRange_.minimum,
                           activeControlRange_.maximum, activeControlRange_.interval);
 
+    restateHeader();
+    retireLFODisplay();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief What the header says, derived from what the editor is pointing at
+/// rather than remembered from what put it there.
+///
+///   A selected control names itself, a selected strip names itself and
+/// describes what it does, and nothing selected says nothing. Written as a
+/// derivation because both callers reach it having just lost the thing the
+/// header was about -- a preview that ended, a strip that is being freed -- and
+/// neither is in a position to say what should replace it.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+void SpectrumWorxEditor::restateHeader()
+{
+    LE_ASSERT(isThisTheGUIThread());
+
+    if (pActiveControl_)
+    {
+        setActiveModuleName(pActiveControl_->moduleUI().getName());
+        setActiveControlName(pActiveControl_->widget().getName());
+        return updateActiveControlValue();
+    }
+
     setActiveModuleName(selectedModule() ? selectedModule()->getName() : juce::String());
     setActiveControlName(selectedModule() ? selectedModule()->description() : juce::String());
     setActiveControlValue(juce::String());
-    retireLFODisplay();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1700,6 +1727,12 @@ void SpectrumWorxEditor::detachFrom(ModuleUI &region)
     bool const sharedControlsAreRegions(sharedModuleControls_ &&
                                         sharedModuleControls_->pointsInto(region));
 
+    // and whether the header is naming it, which is either of the two ways it can
+    // be: the strip is the selected one, or a hover is previewing one of its
+    // controls. \see issue #237
+    bool const headerNamesRegion(pSelectedModule_ == &region ||
+                                 (pPreviewControl_ && pPreviewControl_->pointsInto(region)));
+
     // the pointer first, before anything is destroyed: JUCE delivers a focus
     // loss synchronously, which comes back here through reportInactiveControl(),
     // and a cleared pActiveControl_ makes that re-entry a no-op
@@ -1776,6 +1809,21 @@ void SpectrumWorxEditor::detachFrom(ModuleUI &region)
 
     if (pSelectedModule_ == &region)
         pSelectedModule_ = nullptr;
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note And the header restated, because nothing downstream will.
+    ///
+    ///   `~ModuleUI` blanks it, but only down its `if ( selected() )` branch --
+    /// and the line above has just made that false for the strip it is about to
+    /// run for. With strips left over the staleness is invisible, the next click
+    /// on another one overwriting it; at zero there is nothing left to click and
+    /// the removed effect's name and description stay on screen. \see issue #237.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    if (headerNamesRegion)
+        restateHeader();
 }
 
 void SpectrumWorxEditor::mainKnobDragStarted(std::uint8_t const index) const

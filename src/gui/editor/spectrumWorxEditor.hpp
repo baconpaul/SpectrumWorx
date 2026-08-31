@@ -336,6 +336,16 @@ class SpectrumWorxEditor final : private SkinLifetime,
     ModuleUI *selectedModule() const { return pSelectedModule_; }
     ModuleControlBase *activeControl() const { return pActiveControl_; }
 
+    /// \name What the header above the rack is saying
+    ///
+    /// \note Public so a headless run can read it: it is editor state rather
+    /// than any strip's, so nothing else in the tree answers for it.
+    ///@{
+    juce::String const &headerName() const { return strings_[activeModuleName]; }
+    juce::String const &headerDescription() const { return strings_[activeControlName]; }
+    juce::String const &headerValue() const { return strings_[activeControlValue]; }
+    ///@}
+
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \brief And what the *pointer* is on, which is a separate question with a
@@ -743,6 +753,8 @@ class SpectrumWorxEditor final : private SkinLifetime,
     void setActiveModuleName(juce::String const &newName);
     void setActiveControlName(juce::String const &newName);
     void setActiveControlValue(juce::String const &newValue);
+
+    void restateHeader();
 
     void updateSampleName(juce::String const &);
     void setSampleLoadingStatus();

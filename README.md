@@ -26,7 +26,7 @@ Right now, this is a bit of a work-in-prgoress as we figure out if we can move i
 a two week sprint to an official 3.0 release from the team.
 
 
-## Building from Sounce
+## Building from Source
 
 As a prerequisite
 
