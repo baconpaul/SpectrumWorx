@@ -34,13 +34,16 @@
 #include "core/modules/moduleDSPAndGUI.hpp"
 
 #include "gui/gui.hpp"
+#include "gui/preset_browser/presetBrowser.hpp"
 #include "le/spectrumworx/factoryPresets.hpp"
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <filesystem>
 #include <string>
+#include <system_error>
 #include <vector>
 //------------------------------------------------------------------------------
 namespace
@@ -243,6 +246,110 @@ TEST_CASE("The User toggle swaps trees and says which one is showing", "[gui][pr
     click(*row[User]);
     CHECK_FALSE(row[User]->getToggleState());
     CHECK(rowCount(editor) == factoryRows);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Where each side of the toggle was left
+//
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The two sides are remembered separately, so a look at the other one and
+/// back costs nothing. Before issue #231 the toggle went to the top of whichever
+/// tree it landed in and the factory bank was cleared on the way, so there was
+/// nothing left to come back to even in memory.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("The User toggle comes back to the bank it left", "[gui][presets]")
+{
+    SWTest::HostSideJuce const juce;
+    SWTest::Instance instance;
+    auto &editor(browserEditor(instance));
+
+    auto const row(navigationRow(editor));
+    auto const banks(FactoryPresets::banks());
+    REQUIRE(!banks.empty());
+
+    juce::String const bank(banks.front().c_str());
+    editor.showFactoryBank(bank);
+    auto const insideTheBank(rowCount(editor));
+    REQUIRE(insideTheBank != topLevelBankCount());
+    REQUIRE(row[Up]->isEnabled()); // i.e. below the top of the tree
+
+    click(*row[User]);
+    REQUIRE(row[User]->getToggleState());
+
+    click(*row[User]);
+    CHECK_FALSE(row[User]->getToggleState());
+
+    // back in the bank, not at the top of the tree above it
+    CHECK(rowCount(editor) == insideTheBank);
+    CHECK(row[Up]->isEnabled());
+    CHECK(instance.panelState().presetBank == bank);
+}
+
+TEST_CASE("The User toggle comes back to the folder it left", "[gui][presets]")
+{
+    SWTest::HostSideJuce const juce;
+    SWTest::Instance instance;
+    auto &editor(browserEditor(instance));
+
+    auto const row(navigationRow(editor));
+
+    ///   A folder under the user root, made for this case: a fresh installation
+    /// has none, and the position that has to survive is one *inside* the tree.
+    auto const folder(GUI::presetsFolder() / "SpectrumWorxToggleCase");
+    std::error_code error;
+    std::filesystem::create_directories(folder, error);
+    REQUIRE(std::filesystem::is_directory(folder, error));
+
+    auto *const pBrowser(editor.presetBrowser());
+    REQUIRE(pBrowser != nullptr);
+    pBrowser->setNewFolder(folder);
+    REQUIRE(instance.panelState().presetFolder == folder);
+
+    click(*row[User]);
+    REQUIRE_FALSE(row[User]->getToggleState()); // ...over to the factory side
+
+    click(*row[User]);
+    CHECK(row[User]->getToggleState());
+    CHECK(instance.panelState().presetFolder == folder);
+
+    std::filesystem::remove(folder, error);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \note The half of issue #231 that was a question rather than a fault: a host
+/// that never streams on a window close still has to see where the user went.
+/// It does -- but through the browser writing every move into the session's
+/// state, not through a write on the way out. The destructor used to be the only
+/// writer, which left a host that saves with the window *open* -- most of them --
+/// serialising wherever the browser had been constructed.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("Where the browser is reaches the session's state as it moves", "[gui][presets][state]")
+{
+    SWTest::HostSideJuce const juce;
+    SWTest::Instance instance;
+    auto &editor(browserEditor(instance));
+
+    auto const banks(FactoryPresets::banks());
+    REQUIRE(!banks.empty());
+    juce::String const bank(banks.front().c_str());
+
+    editor.showFactoryBank(bank);
+
+    // with the window still open, which is what a host's stateSave sees
+    CHECK(instance.panelState().presetLocation == GUI::PanelState::PresetLocation::factory);
+    CHECK(instance.panelState().presetBank == bank);
+
+    // and the window closing does not take it back
+    instance.closeEditor();
+    CHECK(instance.panelState().presetLocation == GUI::PanelState::PresetLocation::factory);
+    CHECK(instance.panelState().presetBank == bank);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
