@@ -26,17 +26,20 @@
 /// platform and in either build type -- the goldens render in Release only, and
 /// these do not.
 ///
-/// \note The properties are deliberately one-sided where the effect is:
-/// "Up never goes below the input pitch" is a real guarantee, "Up reaches
+/// \note The properties are deliberately one-sided where the effect is: "Up
+/// never goes below the input pitch" is the guarantee worth making, "Up reaches
 /// exactly +N cents" is a claim about a pitch detector's accuracy and would be a
-/// tolerance argument dressed up as a property.
+/// tolerance argument dressed up as a property. One-sided is not the same as
+/// unconditional -- that first one holds of pitch as a 30 ms window measures it,
+/// and not of every cycle of the waveform.
 ///
 /// \note And where an effect does not do what it is called, the case says so
 /// rather than picking a setting that reads well. A two-octave pitch magnet puts
-/// out three tones and the target is not reliably the loudest; that is recorded
-/// here, with the arithmetic that produces it, against the day the phase-locked
-/// rewrite in issue #19 replaces it. A test that cannot see the defect cannot
-/// tell you the fix worked either.
+/// out three tones and the target is not reliably the loudest; a pitch scale the
+/// shifter carries cleanly when it is held still comes apart when it is swept.
+/// Both are recorded here, with the arithmetic that produces them, against the
+/// day the phase-locked rewrite in issue #246 replaces them. A test that cannot
+/// see the defect cannot tell you the fix worked either.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later
@@ -374,10 +377,11 @@ enum SpringDirection : int
 /// that is bit-identical once the shift is taken out. Anchoring to the signal is
 /// what stops a latency change reading as a pitch change.
 ///
-/// \note It does not make the grid *dense*, and that is a separate problem this
-/// note should not be read as fixing: at 16 windows over a 250 ms modulation the
-/// grid is 4 samples per cycle and the extremes it reports are well short of the
-/// real ones. \see issue #87.
+/// \note The grid also has to be dense enough for the modulation it is laid
+/// over. Four windows per cycle reads the extremes 140 cents short of the truth
+/// and moves 48 of them on grid placement alone; sixteen holds 4. What a caller
+/// owes this function is a \p count that gives it a dozen or more windows per
+/// cycle of whatever it is measuring.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -414,72 +418,207 @@ TEST_CASE("A pitch spring oscillates, and only where it is told to", "[effects][
     constexpr double input{220};
     constexpr double depthInCents{600};
 
+    /// \note 500 ms against 32 windows, so the grid gets ~16 windows per cycle
+    /// of the modulation. At the 250 ms and 16 windows this case used to run,
+    /// four windows a cycle read the extremes up to 140 cents short and moved 48
+    /// of them on where the grid happened to fall. \see issue #246.
     auto const spring([&](SpringDirection const direction, std::string_view const name) {
         return pitchOverTime(renderOne(name, tone(input, 2 * oneSecond),
                                        [direction](Module &module) {
                                            module.setEffectParameter(springType, direction);
                                            module.setEffectParameter(springDepth, depthInCents);
-                                           module.setEffectParameter(springPeriod, 250);
+                                           module.setEffectParameter(springPeriod, 500);
                                        }),
-                             16);
+                             32);
     });
 
-    /// \note Both spellings of the effect. The PVD one is the same oscillator
-    /// driving a phase-vocoder shifter instead of the plain one, so the *pitch*
-    /// property is identical and is exactly what should be asserted of both --
-    /// the goldens can only say that their samples differ.
-    for (auto const name : {"Pitch Spring", "Pitch Spring (pvd)"})
+    auto const extremes([](std::vector<double> const &pitches) {
+        auto const [lowest, highest](std::ranges::minmax_element(pitches));
+        return std::pair{*lowest, *highest};
+    });
+
+    auto const [upLow, upHigh](extremes(spring(up, "Pitch Spring")));
+    auto const [downLow, downHigh](extremes(spring(down, "Pitch Spring")));
+    UNSCOPED_INFO("up " << upLow << ".." << upHigh << " Hz, down " << downLow << ".." << downHigh
+                        << " Hz");
+
+    // It oscillates: the range it covers is a real fraction of the depth it was
+    // given, rather than one value repeated.
+    CHECK(cents(upLow, upHigh) > (depthInCents / 4));
+    CHECK(cents(downLow, downHigh) > (depthInCents / 4));
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note One-sided, and a claim about pitch as a 30 ms window measures it
+    /// rather than about every cycle of the waveform. Up is "the input pitch and
+    /// above", which is what the modulator asks for and what a listener hears --
+    /// but the render does dip below it, briefly, each time the scale sweeps.
+    /// The last case in this section is where that is recorded.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    CHECK(cents(input, upLow) > -100);
+    CHECK(cents(input, downHigh) < 100);
+
+    // And neither exceeds the depth it was asked for. The slack is the
+    // measurement's own error, which this grid holds under 5 cents.
+    CHECK(cents(input, upHigh) < (depthInCents + 50));
+    CHECK(cents(downLow, input) < (depthInCents + 50));
+}
+
+TEST_CASE("A PV pitch spring oscillates, and holds nothing else", "[effects][property][pitch]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    ///   The same oscillator driving `PVPitchShifter` instead of the plain one,
+    /// and the pitch property the case above asserts does not survive the
+    /// change. On the same grid the plain spelling reads every bound within 2
+    /// cents; this one puts its "up" extreme anywhere between 445 and 993 cents
+    /// depending only on where the windows fall, and its "up" floor 58 cents
+    /// under the input.
+    ///
+    /// \note Which is what #246 predicts of it rather than a surprise: the PV
+    /// variants hold no phase state at all -- `PVPitchShifter::process()` is
+    /// `pitchShiftAndScale()` and nothing else -- so a partial replicated across
+    /// output bins has no accumulated phase to be coherent with, and a moving
+    /// scale re-replicates it every frame.
+    ///
+    /// \note So only the claim that survives is made. Recording that the others
+    /// do not is the point of the case: a fix for #246 has to bring this
+    /// spelling up to the one above, and nothing else here would notice.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    constexpr double input{220};
+    constexpr double depthInCents{600};
+
+    auto const spring([&](SpringDirection const direction) {
+        return pitchOverTime(renderOne("Pitch Spring (pvd)", tone(input, 2 * oneSecond),
+                                       [direction](Module &module) {
+                                           module.setEffectParameter(springType, direction);
+                                           module.setEffectParameter(springDepth, depthInCents);
+                                           module.setEffectParameter(springPeriod, 500);
+                                       }),
+                             32);
+    });
+
+    for (auto const direction : {up, down})
     {
-        UNSCOPED_INFO(name);
-
-        auto const upwards(spring(up, name));
-        auto const downwards(spring(down, name));
-
-        auto const extremes([](std::vector<double> const &pitches) {
-            auto const [lowest, highest](std::ranges::minmax_element(pitches));
-            return std::pair{*lowest, *highest};
-        });
-
-        auto const [upLow, upHigh](extremes(upwards));
-        auto const [downLow, downHigh](extremes(downwards));
-        UNSCOPED_INFO("up " << upLow << ".." << upHigh << " Hz, down " << downLow << ".."
-                            << downHigh << " Hz");
-
-        // It oscillates: the range it covers is a real fraction of the depth it
-        // was given, rather than one value repeated.
-        CHECK(cents(upLow, upHigh) > (depthInCents / 4));
-        CHECK(cents(downLow, downHigh) > (depthInCents / 4));
-
-        /// \note One-sided, with a semitone of slack for the detector rather
-        /// than for the effect. Up is "the input pitch and above"; the claim
-        /// worth making is that it never goes the other way.
-        CHECK(cents(input, upLow) > -100);
-        CHECK(cents(input, downHigh) < 100);
-
-        ////////////////////////////////////////////////////////////////////////
-        ///
-        /// And neither exceeds the depth it was asked for -- by more than the
-        /// measurement's own error, which is what the slack is and why it is 200
-        /// rather than the 100 above.
-        ///
-        /// \note The number is measured, not chosen. Sixteen windows over the
-        /// half-second analysed is a grid of about four samples per cycle of a
-        /// 250 ms modulation, so which part of the sweep each window catches --
-        /// and therefore what the extremes read -- depends on where the grid
-        /// falls. Moving the render by one hop (#83) moved this reading from 690
-        /// to 727 cents on a render that is bit-identical once the shift is taken
-        /// out, which is how the fragility was found.
-        ///
-        /// \note Sampling denser does not help and is not the fix: at 64 windows
-        /// each is ~690 samples, about three cycles of a 220 Hz tone, and the
-        /// detector's answers become noise -- it then reports the "up" spring
-        /// going 200 cents *below* the input. The grid cannot be refined without
-        /// a longer render or a better detector. \see issue #87.
-        ///
-        ////////////////////////////////////////////////////////////////////////
-        CHECK(cents(input, upHigh) < (depthInCents + 200));
-        CHECK(cents(downLow, input) < (depthInCents + 200));
+        UNSCOPED_INFO((direction == up ? "up" : "down"));
+        auto const pitches(spring(direction));
+        auto const [lowest, highest](std::ranges::minmax_element(pitches));
+        UNSCOPED_INFO(*lowest << ".." << *highest << " Hz");
+        CHECK(cents(*lowest, *highest) > (depthInCents / 4));
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// A moving pitch scale, which is #246 seen from the time domain
+////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+/// Pitch Shifter's effect parameters, in declaration order.
+enum ShifterParameter : std::uint8_t
+{
+    shifterSemitones = 0,
+    shifterCents = 1
+};
+
+/// \brief How many of a render's cycles have a period that departs from its
+/// neighbours' by more than \p tolerance cents.
+///
+/// \note Successive positive-going zero crossings, linearly interpolated. No
+/// window and no transform, so nothing here is a claim about a detector: a
+/// sweep moves the trend and leaves this at zero, and only a cycle out of step
+/// with the ones around it counts. The dry chain and a shift the effect can
+/// carry both score zero.
+unsigned disturbedCycles(std::span<float const> render, std::uint32_t const first,
+                         std::uint32_t const count, double const tolerance = 40,
+                         SWTest::RenderSetup const &setup = standardSetup)
+{
+    auto const mono(window(render, setup.fftSize + first, count));
+    std::vector<double> periods;
+    double previous{-1};
+    for (std::size_t n(1); n < mono.size(); ++n)
+        if ((mono[n - 1] <= 0) && (mono[n] > 0))
+        {
+            auto const crossing(static_cast<double>(n - 1) +
+                                (mono[n - 1] == mono[n]
+                                     ? 0.0
+                                     : -mono[n - 1] / static_cast<double>(mono[n] - mono[n - 1])));
+            if (previous >= 0)
+                periods.push_back(crossing - previous);
+            previous = crossing;
+        }
+
+    constexpr std::size_t reach{5};
+    unsigned disturbed{0};
+    for (std::size_t index(reach); (index + reach) < periods.size(); ++index)
+    {
+        std::vector<double> neighbours;
+        for (std::size_t other(index - reach); other <= (index + reach); ++other)
+            if (other != index)
+                neighbours.push_back(periods[other]);
+        std::ranges::sort(neighbours);
+        if (std::abs(cents(neighbours[neighbours.size() / 2], periods[index])) > tolerance)
+            ++disturbed;
+    }
+    return disturbed;
+}
+} // anonymous namespace
+
+TEST_CASE("A pitch scale the effect can hold still, it cannot sweep", "[effects][property][pitch]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    ///   The before-picture for the moving half of #246, and the reason the case
+    /// above measures pitch on 30 ms windows rather than cycle by cycle.
+    ///
+    ///   A tritone is scale 1.414. Held there, the shifter is clean -- the
+    /// images one hop rate either side sit at a few percent of the partial and
+    /// no cycle is out of step with its neighbours. Swept across the same range
+    /// by a spring, the same shifter puts cycles a semitone and more off the
+    /// sweep it is on, at full level. #246's `overlapFactor >= scale` reaches
+    /// the first and says nothing about the second.
+    ///
+    /// \note So a fix has to be measured here as well as on a static spectrum.
+    /// Identity phase locking that clears the images of a two-octave shift can
+    /// leave this untouched, and every other case in this file would stay green.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    constexpr double input{220};
+    constexpr std::uint32_t analysed{oneSecond / 2};
+
+    // the sweep's own top, held: six semitones, the same 1.414 the spring reaches
+    auto const held(renderOne("Pitch Shifter", tone(input, 2 * oneSecond), [](Module &module) {
+        module.setEffectParameter(shifterSemitones, 6);
+        module.setEffectParameter(shifterCents, 0);
+    }));
+    auto const heldDisturbance(disturbedCycles(held, oneSecond, analysed));
+    UNSCOPED_INFO("held at +6 st: " << heldDisturbance << " disturbed cycles");
+    CHECK(heldDisturbance == 0);
+
+    // and the empty chain, so the counter is known to have a floor
+    CHECK(disturbedCycles(dryRender(tone(input, 2 * oneSecond)), oneSecond, analysed) == 0);
+
+    // and the same range swept, in both spellings
+    auto const swept([&](std::string_view const name) {
+        return disturbedCycles(renderOne(name, tone(input, 2 * oneSecond),
+                                         [](Module &module) {
+                                             module.setEffectParameter(springType, up);
+                                             module.setEffectParameter(springDepth, 600);
+                                             module.setEffectParameter(springPeriod, 250);
+                                         }),
+                               oneSecond, analysed);
+    });
+
+    auto const plain(swept("Pitch Spring"));
+    auto const pv(swept("Pitch Spring (pvd)"));
+    UNSCOPED_INFO("swept 0..+600 ct: " << plain << " disturbed cycles plain, " << pv << " PV");
+    CHECK(plain > 10);
+
+    // the PV spelling, which carries no phase state at all, is the worse of the
+    // two -- so a fix that only reaches the phase half would show up here
+    CHECK(pv > plain);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -568,7 +707,7 @@ TEST_CASE("A pitch magnet arrives at its target and stays there", "[effects][pro
 /// \brief A two-octave magnet puts out three tones, not one.
 ///
 ///   Recorded rather than asserted away, because it is what the effect does
-/// today and the fix is a phase-locked rewrite that has not happened. \see #19.
+/// today and the fix is a phase-locked rewrite that has not happened. \see #246.
 ///
 ///   The mechanism decides the frequencies exactly, which is why this case
 /// derives them instead of pasting them. `pitchShiftAndScale()` back-maps every
