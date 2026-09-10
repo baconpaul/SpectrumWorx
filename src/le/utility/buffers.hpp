@@ -297,15 +297,10 @@ template <typename T> class SharedStorageBuffer : public Span<T>
 
         using iterator = T *LE_RESTRICT;
 
-        bool const doAlign(!std::is_pointer_v<T>);
-
-        /// \note static_casting through void * (instead of reinterpret_casting
-        /// throguh std::size_t) fails with compiler errors on GCC 4.9 on ranges
-        /// of pointers (it complains about __restrict being inapliccable to
-        /// void).
-        ///                                   (24.12.2014.) (Domagoj Saric)
-        iterator const newBeginning(reinterpret_cast<T *>(reinterpret_cast<std::size_t>(
-            doAlign ? Math::align(storage.begin()) : storage.begin())));
+        /// \note Aligned whatever `T` is: keying this off the element type made
+        /// the layout compiler dependent, `is_pointer_v` not being portable for
+        /// a restrict qualified pointer.
+        iterator const newBeginning(static_cast<T *>(Math::align(storage.begin())));
         auto const alignmentFixup(
             static_cast<std::uint8_t>(reinterpret_cast<std::size_t>(newBeginning) -
                                       reinterpret_cast<std::size_t>(storage.begin())));
@@ -315,10 +310,8 @@ template <typename T> class SharedStorageBuffer : public Span<T>
         iterator const newEnd(
             reinterpret_cast<T *>(reinterpret_cast<std::size_t>(storage.begin())));
         LE_ASSERT_MSG(newBeginning <= newEnd, "Failed to generate a valid range.");
-        LE_ASSERT_MSG(
-            !doAlign ||
-                (reinterpret_cast<std::size_t>(newBeginning) % Constants::vectorAlignment == 0),
-            "Failed to generate a properly aligned range.");
+        LE_ASSERT_MSG(reinterpret_cast<std::size_t>(newBeginning) % Constants::vectorAlignment == 0,
+                      "Failed to generate a properly aligned range.");
         static_cast<Range &>(*this) = Range(newBeginning, newEnd);
         LE_ASSERT_MSG(size() == newSize / sizeof(T), "Generated range has an invalid size.");
 

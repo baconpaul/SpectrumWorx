@@ -5,9 +5,13 @@
 ///
 ///   This used to teach the standard library's type traits about restrict
 /// qualified pointers, and to carry TR1 fallbacks for pre-2011 libstdc++.
-/// Both are gone: libc++, libstdc++ and the MS STL all answer is_pointer,
-/// is_trivially_default_constructible and is_trivially_destructible correctly
-/// for `T * __restrict` today, and C++20 makes specialising them ill-formed.
+/// Both are gone, and C++20 makes specialising them ill-formed anyway.
+///
+///   The traits are still not to be trusted on a restrict qualified pointer:
+/// `std::is_pointer_v<float * __restrict>` is 1 on libc++ and 0 on libstdc++
+/// (gcc 12.4, 13.3), `__restrict` being no part of standard C++. Nothing in
+/// the tree asks one that question any more -- see SharedStorageBuffer::resize(),
+/// where it laid the buffers out one way per compiler.
 ///
 /// Copyright (c) 2011 - 2016. Little Endian Ltd.
 /// SPDX-License-Identifier: GPL-3.0-or-later

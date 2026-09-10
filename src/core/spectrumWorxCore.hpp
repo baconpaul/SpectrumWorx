@@ -438,7 +438,7 @@ class SpectrumWorxCore : public Host2PluginInteropControler,
     class InputBuffers
     {
       public:
-        using Channels = Utility::SharedStorageBuffer<Engine::real_t *LE_RESTRICT>;
+        using Channels = Utility::SharedStorageBuffer<Engine::real_t *>;
 
         InputBuffers() : blockSize_(0), forceSideChannel_(false) {}
 
