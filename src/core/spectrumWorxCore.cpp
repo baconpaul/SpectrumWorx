@@ -189,27 +189,9 @@ bool SpectrumWorxCore::InputBuffers::resize(std::uint32_t const blockSize,
     std::size_t const blockBytes(std::size_t{blockSize} * sizeof(Engine::real_t));
     auto const channelDataStorage(align(blockBytes));
 
-    ////////////////////////////////////////////////////////////////////////////
-    ///
-    /// \note **A bound on the layout below, not a model of it.** Whether
-    /// SharedStorageBuffer::resize() aligns the two pointer arrays it carves is
-    /// decided by `std::is_pointer_v<T>`, and `T` here is `float * LE_RESTRICT`:
-    /// Clang answers true for a restrict-qualified pointer and GCC answers
-    /// false, so the same source aligns on one compiler and not on the other.
-    ///
-    ///   This used to reserve `align( channels * base )` -- exactly what Clang
-    /// consumes, with nothing spare -- so under GCC the second carve's alignment
-    /// and the fixup it pushed into the data region ran 16 bytes past the end.
-    /// A checked build asserted; a release one corrupted the heap and glibc
-    /// aborted somewhere else entirely. Mono is where it bit, because two
-    /// one-pointer arrays are what makes the carves land off alignment.
-    ///
-    ///   So each carve is reserved rounded up, and one alignment more covers the
-    /// data region starting wherever the arrays left off. The cost is at most
-    /// three alignments -- 48 bytes on every target here -- per instance.
-    ///
-    ////////////////////////////////////////////////////////////////////////////
-
+    /// \note A bound on the layout below, not a model of it: each carve is
+    /// reserved rounded up and one alignment more covers the data region, so no
+    /// alignment fixup can run past the end. Costs at most three alignments.
     auto const arrayStorage(align(numberOfMainChannels * baseChannelStorage) +
                             align(numberOfSideChannels * baseChannelStorage));
     auto const requiredStorage(arrayStorage + vectorAlignment +
