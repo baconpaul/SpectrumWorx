@@ -206,6 +206,9 @@ std::vector<float> renderChain(RenderSetup const &setup, std::span<Slot const> c
     engine.setBlockSize(setup.blockSize);
     engine.set<GlobalParameters::FFTSize>(setup.fftSize);
     engine.set<GlobalParameters::OverlapFactor>(setup.overlapFactor);
+    engine.set<GlobalParameters::MixPercentage>(setup.mix);
+    engine.set<GlobalParameters::InputGain>(setup.inputGain);
+    engine.set<GlobalParameters::OutputGain>(setup.outputGain);
 
     bool const initialised(engine.initialise());
     LE_ASSERT_MSG(initialised, "Test engine failed to initialise.");
