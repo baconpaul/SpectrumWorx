@@ -132,8 +132,8 @@ engine the main thread owns.
 
 | `core/threading/messages.hpp` | cases |
 |---|---|
-| `ToEngine` | `SetBaseParameter`, `SetSlot`, `MoveModule`, `SwapChain`, `SwapSample` |
-| `ToUI` | `BaseParameterChanged` — `Retire` on a ring of its own, and chain and timing changes on flags |
+| `ToEngine` | `SetBaseParameter`, `SetSlot`, `MoveModule`, `SwapChain`, `SwapSample`, `RepublishParameters` |
+| `ToUI` | `BaseParameterChanged`, `BaseParameterRepublished` — `Retire` on a ring of its own, and chain and timing changes on flags |
 
 Both are tagged unions, trivially copyable, owning nothing. Each case says which
 side is responsible for a pointer after it lands, and that is the entire
@@ -178,14 +178,49 @@ way into the array, and `push` declines rather than clobbering the unread tail.
 That is the one place it differs from `sst::cpputils::SimpleRingBuffer`, and it
 is the whole reason for having our own.
 
+**And a lost echo is put back.** An echo is the only thing that carries a host's
+write into `programMain_`, and no depth survives a host that automates hard with
+the callback starved — clap-validator's `param-fuzz-basic` lost thousands in one
+test (issue #198). So a refused echo raises `echoesLost_`, a flag for the reason
+the chain and timing news are: the echoes are gone, the news that they went is
+not. `drainEngineEvents()` drains the ring completely and then queues
+`ToEngine::RepublishParameters`, and the engine answers at the end of its next
+`drainCommands()` — after the batch, so an edit queued behind the request is in
+what it reads — with every parameter an effect owns, as
+`ToUI::BaseParameterRepublished`. Draining first is what makes room for them.
+
+Two ways the request can itself be lost, and neither is allowed to lose it. The
+command ring can be full, so the flag is put back up until a push succeeds. And a
+deactivated plugin drains no commands, so with the engine stopped the main thread
+— which owns it then — republishes on the spot rather than leaving `stateSave` to
+read the stale copy until the next `activate()`.
+
+**A republish is state, not a replay of writes.** The echoes replay what the
+engine was told, in order, so every side effect of a setter lands the same way on
+both copies. A republish is what the engine ended up holding, pushed through the
+same setters, and that is faithful except where a setter depends on what it
+writes over:
+
+- a module parameter's write is ignored while its LFO runs, so a republished one
+  is applied `WhileModulated::stored` — otherwise a base changed while the LFO was
+  briefly off could never come back;
+- a period snaps to the sync type its LFO has when the period is written, and the
+  parameter list puts the period first, so each LFO's sync type is republished
+  ahead of its period.
+
+A slot the republish moves is announced by the drain itself — a rack resync and a
+`RESCAN_INFO` — because the engine's own announcement ran when `programMain_` did
+not have it yet. The cost is every parameter pushed inside one block after a
+storm: no allocation and no lock, and chunking across blocks is there if it ever
+shows up in a measurement.
+
 **The mailbox sweeps with `exchange`.** `core/threading/valueMailbox.hpp` is a
 value per dense parameter index plus a bitset of what moved, so a write landing
 mid-sweep is carried into the next sweep rather than lost.
 
 **The timing change is where that rule was learned.** A host ramping the tempo
 reports a new bar duration on every block, some hundreds a second, and a ring it
-fills has dropped somebody's echo, which leaves the main thread's Program behind
-the engine for that parameter. It rode the ring behind a sender-side flag that
+fills has dropped somebody's echo, which costs a full republish to put back. It rode the ring behind a sender-side flag that
 capped it at one outstanding *message* rather than at none — so it still spent a
 slot, and a push that failed cleared its own flag and gave up, which at a fixed
 tempo meant the panel never caught up. As a flag it costs nothing and cannot be
@@ -429,7 +464,7 @@ The inventory the model is measured by.
 | What | Shared how | State |
 |---|---|---|
 | Parameter edits, interface → engine | `ToEngineQueue`, drained at the top of `process()`, in `paramsFlush()` and in `deactivate()`; freed unapplied at destruction | ✅ |
-| Base-value changes, engine → interface | `ToUIQueue`, drained in `onMainThread()` and in `deactivate()` | ✅ |
+| Base-value changes, engine → interface | `ToUIQueue`, drained in `onMainThread()` and in `deactivate()`; a refused echo raises `echoesLost_` and the engine republishes every parameter | ✅ |
 | Modulated values, for painting | `ValueMailbox`, written per block, swept at 30 Hz | ✅ |
 | Plugin → host notifications | `UIEdits` ring | ✅ |
 | Which thread is which | `Threading::{isMainThread,isAudioThread}` | ✅ |
@@ -516,6 +551,7 @@ result.
 | `tests/core/threadCheckTests.cpp` | thread identity, driven through the C entry point rather than read off the source |
 | `tests/core/engineOwnershipTests.cpp` | who may mutate the engine and when; that every block is written; that a spectral change waits and then lands; that a published chain comes back holding what it displaced |
 | `tests/core/protocolTests.cpp` | refusal when full, survival past the end of the storage, and two cases that run real threads — 100k messages through an eight-slot ring arriving once and in order, and a mailbox swept while a writer runs flat out |
+| `tests/clap/publishProtocolTests.cpp` | both halves of publish-and-retire in every build configuration; what each full ring costs; and the echo resync, asserted by comparing both copies parameter by parameter and as saved state — after a fuzzed storm, with an LFO running, with a synced period, with a slot moved under an open editor, with the command ring full, and deactivated before any callback |
 | `tests/gui/twoInstanceTests.cpp` | closing one editor leaves the other's `MessageManager` alive; selection is independent; ejecting a module and then its ghost |
 | `tests/clap/hostInteropTests.cpp` | `reset()` between blocks; flush conditional on `isActive()`; both arms of every `canUseThreadCheck()` branch |
 | `tests/clap/pluginTests.cpp` | *"A full rack with LFOs running and an editor open processes cleanly"* and *"Two instances process while their editors come and go"* — the latter with **two real audio threads** and a message thread opening and closing both windows underneath them |

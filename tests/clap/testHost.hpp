@@ -622,7 +622,13 @@ class TimedParameterEvents
         double value;
     };
 
-    TimedParameterEvents(std::initializer_list<At> const events) : list_{this, size, get}
+    TimedParameterEvents(std::initializer_list<At> const events)
+        : TimedParameterEvents(std::vector<At>(events))
+    {
+    }
+
+    // for a block built in a loop
+    explicit TimedParameterEvents(std::vector<At> const &events) : list_{this, size, get}
     {
         std::uint32_t previous(0);
         for (auto const &[time, id, value] : events)

@@ -236,6 +236,7 @@ void SpectrumWorxCLAP::discardQueuedCommands()
         case Threading::ToEngine::Kind::None:
         case Threading::ToEngine::Kind::SetBaseParameter:
         case Threading::ToEngine::Kind::MoveModule:
+        case Threading::ToEngine::Kind::RepublishParameters:
             break;
         }
     }
@@ -1045,15 +1046,8 @@ bool SpectrumWorxCLAP::handleEvent(clap_event_header const *const header)
     //
     // only when the engine took it -- setParameter declines a slot selector
     // that would leave a hole in the rack
-    //
-    // a dropped echo leaves programMain_ behind the engine for that parameter
-    // permanently, this being the only thing that carries a host's write across
     if (applied == Plugins::ErrorCode<Protocol>::Success)
-    {
-        pushed(toUI_.push(Threading::baseParameterChanged(parameterID.binaryValue, value)),
-               "The echo queue is full; the main thread's Program is now behind the engine.");
-        requestEchoDrain();
-    }
+        echo(Threading::baseParameterChanged(parameterID.binaryValue, value));
 
     // only a module-chain parameter changes what the *other* parameters are: it
     // decides which effect a slot holds, and so how many that slot has and what
@@ -1504,12 +1498,19 @@ void SpectrumWorxCLAP::onMainThread() noexcept
 /// calling `process()` at all.
 void SpectrumWorxCLAP::drainCommands()
 {
+    bool republish(false);
+
     Threading::ToEngine command;
     while (toEngine_.pop(command))
     {
         switch (command.kind)
         {
         case Threading::ToEngine::Kind::None:
+            break;
+
+        // after the loop, so an edit queued behind the request is in what is read
+        case Threading::ToEngine::Kind::RepublishParameters:
+            republish = true;
             break;
 
         case Threading::ToEngine::Kind::SetBaseParameter:
@@ -1568,6 +1569,9 @@ void SpectrumWorxCLAP::drainCommands()
         }
     }
 
+    if (republish)
+        republishParameters();
+
     // once per batch rather than per command: a preset that moves the FFT size
     // and the overlap factor together is one restart, not two
     //
@@ -1582,9 +1586,8 @@ void SpectrumWorxCLAP::drainCommands()
 ///
 /// \brief The one answer to "what happens when a ring is full".
 ///
-/// \note It counts; it does not repair. A dropped echo, edit or gesture is
-/// *gone*: the other side has already moved by the time the push fails, and the
-/// ring was where the information to put it back would have been.
+/// \note It counts; it does not repair. A dropped edit or gesture is *gone*: the
+/// other side has already moved by the time the push fails. echo() repairs its own.
 ///
 /// \note A counter and not an assertion, so it reads the same in a checked build
 /// and a shipped one, and a case that fills a ring on purpose can measure rather
@@ -1615,6 +1618,52 @@ void SpectrumWorxCLAP::retire(Threading::ToUI::Retired const what, void *const p
         return;
 
     LE_ASSERT_MSG(false, "The retire queue is full; something will be leaked.");
+}
+
+void SpectrumWorxCLAP::echo(Threading::ToUI const message)
+{
+    if (!pushed(toUI_.push(message),
+                "The echo queue is full; the main thread's Program is now behind the engine."))
+        echoesLost_.store(true, std::memory_order_release);
+    requestEchoDrain();
+}
+
+/// \note Every parameter in one block: a spike after a storm, with no allocation or lock.
+///
+/// \note In `parameterIDs_` order, so a slot selector lands before what depends on it.
+void SpectrumWorxCLAP::republishParameters()
+{
+    LE_ASSERT(currentThreadMayMutateEngineState());
+
+    using LE::Parameters::IndexOf;
+    auto const periodScale(IndexOf<LFO::Parameters, LFO::PeriodScale>::value);
+    auto const syncTypes(IndexOf<LFO::Parameters, LFO::SyncTypes>::value);
+
+    Plugins::ParameterInformation<Protocol> ranges;
+    auto const republish([&](ParameterID const parameterID) {
+        // the filter a host's write passes in handleEvent()
+        if (liveRanges(parameterID, ranges, program()))
+            echo(Threading::baseParameterRepublished(parameterID.binaryValue,
+                                                     getParameter(parameterID, program())));
+    });
+
+    for (auto const &exported : parameterIDs_)
+    {
+        ParameterID parameterID{exported};
+        bool const isLFO(parameterID.type() == ParameterID::LFOParameter);
+
+        // a period snaps to the sync type it is written under, so it follows its own
+        if (isLFO && (parameterID.value._.lfo.lfoParameterIndex == periodScale))
+            continue;
+
+        republish(parameterID);
+
+        if (isLFO && (parameterID.value._.lfo.lfoParameterIndex == syncTypes))
+        {
+            parameterID.value._.lfo.lfoParameterIndex = periodScale;
+            republish(parameterID);
+        }
+    }
 }
 
 /// \note And says the session needs saving. Whether it is an *edit* is what the
@@ -1701,9 +1750,9 @@ void SpectrumWorxCLAP::publishModulatedValues()
     });
 }
 
-void SpectrumWorxCLAP::drainEngineEvents()
+bool SpectrumWorxCLAP::drainEchoes()
 {
-    LE_ASSERT(Threading::isMainThread() || !Threading::isAudioThread());
+    bool slotMoved(false);
 
     Threading::ToUI event;
     while (toUI_.pop(event))
@@ -1717,11 +1766,24 @@ void SpectrumWorxCLAP::drainEngineEvents()
         // paramsValue and stateSave answer from programMain_ with the window
         // shut, and a strip that then redraws reads a copy that already agrees
         case Threading::ToUI::Kind::BaseParameterChanged:
+        case Threading::ToUI::Kind::BaseParameterRepublished:
         {
             ParameterID const parameterID{
                 Plugins::ParameterID{event.baseParameterChanged.parameterID}};
+            bool const isSlotSelector(parameterID.type() == ParameterID::ModuleChainParameter);
+            auto const &chain(programMain_.moduleChain());
+            auto const slot(parameterID.value._.moduleChain.moduleIndex);
+            auto const effectBefore(isSlotSelector ? chain.getParameterForIndex(slot).getValue()
+                                                   : noModule);
+
+            // a write replays what the engine was told, state is what it has
             setParameterIn<Protocol>(programMain_, parameterID, event.baseParameterChanged.value,
-                                     lfoTimer().timing());
+                                     lfoTimer().timing(),
+                                     (event.kind == Threading::ToUI::Kind::BaseParameterRepublished)
+                                         ? WhileModulated::stored
+                                         : WhileModulated::ignored);
+            slotMoved |=
+                isSlotSelector && (chain.getParameterForIndex(slot).getValue() != effectBefore);
             if (pEditor_)
                 pEditor_->parameterChangedElsewhere(parameterID, event.baseParameterChanged.value);
             break;
@@ -1735,15 +1797,43 @@ void SpectrumWorxCLAP::drainEngineEvents()
             break;
         }
     }
+    return slotMoved;
+}
+
+void SpectrumWorxCLAP::drainEngineEvents()
+{
+    LE_ASSERT(Threading::isMainThread() || !Threading::isAudioThread());
+
+    bool slotMoved(drainEchoes());
+
+    // after the ring is empty, so the republished values have room in it
+    if (echoesLost_.exchange(false, std::memory_order_acquire))
+    {
+        // a stopped engine is this thread's; a queued request would wait for activate()
+        if (!engineIsRunning())
+        {
+            republishParameters();
+            slotMoved |= drainEchoes();
+        }
+        // the flag outlives a full command ring, or the resync is lost as the echoes were
+        else if (!pushed(toEngine_.push(Threading::republishParameters()),
+                         "The command queue is full; the echo resync will be asked for again."))
+            echoesLost_.store(true, std::memory_order_release);
+    }
+
+    // the engine's own announcement may have read this copy before the slot moved
+    if (slotMoved)
+        requestRescan(CLAP_PARAM_RESCAN_INFO | CLAP_PARAM_RESCAN_TEXT | CLAP_PARAM_RESCAN_VALUES);
 
     // cleared before the resync, so a chain that changes again while the rack
     // redraws is announced rather than swallowed
-    if (chainChangedPending_.exchange(false, std::memory_order_acquire) && pEditor_)
+    if ((chainChangedPending_.exchange(false, std::memory_order_acquire) || slotMoved) && pEditor_)
         pEditor_->resyncModuleRack();
 
     // after the announcements, which is the order the engine made them in: a
     // module is unlinked and said to be gone before the reference it left is
     // dropped, and the strip holding the other reference goes with the resync
+    Threading::ToUI event;
     while (retire_.pop(event))
     {
         switch (event.retire.what)

@@ -18,6 +18,13 @@
 namespace LE::SW
 {
 
+/// \brief What a write does to a parameter whose LFO is running.
+enum struct WhileModulated : bool
+{
+    ignored, ///< automation: the LFO has the parameter
+    stored   ///< another Program's state being copied \see issue #198
+};
+
 template <class InterfaceImpl> class AutomatedModuleImpl
 {
   public: // Parameters
@@ -30,7 +37,7 @@ template <class InterfaceImpl> class AutomatedModuleImpl
                                                            bool normalised) const;
 
     void setAutomatedParameter(std::uint8_t parameterIndex, Plugins::AutomatedParameterValue,
-                               bool normalised);
+                               bool normalised, WhileModulated = WhileModulated::ignored);
 
     char const *getParameterValueString(std::uint8_t parameterIndex,
                                         LE::Parameters::AutomatedParameterPrinter const &) const;

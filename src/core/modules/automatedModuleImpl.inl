@@ -79,14 +79,16 @@ AutomatedModuleImpl<Impl>::getAutomatedParameter(std::uint8_t const parameterInd
 template <class Impl>
 void AutomatedModuleImpl<Impl>::setAutomatedParameter(std::uint8_t const parameterIndex,
                                                       Plugins::AutomatedParameterValue const value,
-                                                      bool const normalised)
+                                                      bool const normalised,
+                                                      WhileModulated const whileModulated)
 {
     //...mrmlj...LE_ASSUME( parameterIndex < SW::Constants::maxNumberOfParametersPerModule );
 
     if (parameterIndex >= impl().numberOfParameters())
         return; // index out of range
 
-    if (parameterIndex != 0 && impl().lfo(parameterIndex - 1).enabled()) //...mrmlj...skip bypass
+    if ((whileModulated == WhileModulated::ignored) && parameterIndex != 0 &&
+        impl().lfo(parameterIndex - 1).enabled()) //...mrmlj...skip bypass
         return; // skip automation if the parameter's LFO is enabled
 
     if (parameterIndex < impl().numberOfBaseParameters)
