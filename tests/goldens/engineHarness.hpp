@@ -221,6 +221,15 @@ struct RenderSetup
     ////////////////////////////////////////////////////////////////////////////
     std::uint32_t callSize{0};
 
+    /// \brief The global dry/wet, 1 -- `MixPercentage`'s own default -- being the
+    /// all-wet path every render before this was made under.
+    float mix{1.0f};
+
+    /// \brief The two global gains, linear and not dB: 1 is unity, and the
+    /// display transform is the host's business rather than the engine's.
+    float inputGain{1.0f};
+    float outputGain{1.0f};
+
     std::uint32_t framesPerCall() const { return callSize ? callSize : blockSize; }
 };
 
