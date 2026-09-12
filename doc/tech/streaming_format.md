@@ -149,13 +149,15 @@ through `LFO::Timer`'s process-global bar duration; the binary split hid that an
 fixed nothing. The conversion reads a constant reference bar since 06.08.2026 —
 [`how-lfo-rates-and-eval-work.md`](how-lfo-rates-and-eval-work.md) §4.
 
-**A leaked *meter* still would**, and that one is by design rather than by
-accident: a synced period snaps to the divisions the meter has, so loading the
-same preset in three four genuinely produces a different period.
-`snapSyncedPeriodScale()` reads `Timer::measureNumerator()`, which is still a
-process-global static. Nothing in either binary drives a meter other than 4/4
-outside the scope guard in `lfoTests.cpp`, so this is a hazard rather than a
-symptom — see issue #14.
+**A leaked *meter* cannot, since 12.09.2026.** That one was by design rather
+than by accident — a synced period snaps to the divisions the meter has, so
+loading the same preset in three four genuinely produces a different period —
+but the meter it read was `Timer::measureNumerator()`, a process-global static,
+so a case that drove another one changed what every later load in the binary
+converted. The meter a load snaps against is the loading instance's now:
+`ParametersLoader` takes an `LFO::Timing` and the consumer hands it one. See
+issue #11 and [`how-lfo-rates-and-eval-work.md`](how-lfo-rates-and-eval-work.md)
+§4.
 
 ---
 

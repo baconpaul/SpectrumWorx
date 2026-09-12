@@ -75,7 +75,11 @@ template <class Protocol> class ProgramParameterSetter
     using AutomatedParameter = typename Plugins::AutomatedParameterFor<Protocol>::type;
     using result_type = void;
 
-    explicit ProgramParameterSetter(Plugins::AutomatedParameterValue const value) : value_(value) {}
+    ProgramParameterSetter(Plugins::AutomatedParameterValue const value,
+                           LE::Parameters::LFO::Timing const &lfoTiming)
+        : value_(value), lfoTiming_(lfoTiming)
+    {
+    }
 
     result_type operator()(ParameterID::Global const parameterID,
                            Program *LE_RESTRICT const pProgram) const
@@ -126,20 +130,26 @@ template <class Protocol> class ProgramParameterSetter
         if (pModule &&
             (parameterID.moduleParameterIndex < pModule->numberOfLFOControledParameters()))
             Automation::setAutomatedLFOParameter<AutomatedParameter>(
-                parameterID.moduleParameterIndex, parameterID.lfoParameterIndex, value_, *pModule);
+                parameterID.moduleParameterIndex, parameterID.lfoParameterIndex, value_, *pModule,
+                lfoTiming_);
     }
 
   private:
     Plugins::AutomatedParameterValue const value_;
+
+    /// \note The engine's bar: there is one clock per instance and this Program
+    /// is the same instance's. \see issue #11.
+    LE::Parameters::LFO::Timing const lfoTiming_;
 }; // class ProgramParameterSetter
 
 /// \brief Applies \p value to \p parameterID in \p program. `[main-thread]`
 template <class Protocol>
 void setParameterIn(Program &program, ParameterID const parameterID,
-                    Plugins::AutomatedParameterValue const value)
+                    Plugins::AutomatedParameterValue const value,
+                    LE::Parameters::LFO::Timing const &lfoTiming)
 {
-    invokeFunctorOnIdentifiedParameter(parameterID, ProgramParameterSetter<Protocol>{value},
-                                       &program);
+    invokeFunctorOnIdentifiedParameter(
+        parameterID, ProgramParameterSetter<Protocol>{value, lfoTiming}, &program);
 }
 
 } // namespace LE::SW

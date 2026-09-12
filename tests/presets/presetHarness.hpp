@@ -120,6 +120,8 @@ struct PresetConsumer
 
     LE::SW::Program &program() const { return engine.program(); }
 
+    LE::Parameters::LFO::Timing lfoTiming() const { return engine.lfoTimer().timing(); }
+
     static void notifyHostAboutPresetChangeBegin() {}
     static void notifyHostAboutPresetChangeEnd() {}
 }; // struct PresetConsumer

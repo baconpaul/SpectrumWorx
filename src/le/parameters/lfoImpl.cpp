@@ -97,25 +97,26 @@ bool LFO::setUpperBound(LFOImpl::value_type const newUpperBound)
     return false;
 }
 
-std::uint16_t LFO::setPeriodInMilliseconds(std::uint16_t const periodInMilisecons)
+std::uint16_t LFO::setPeriodInMilliseconds(std::uint16_t const periodInMilisecons,
+                                           Timing const &timing)
 {
-    return Math::convert<std::uint16_t>(setPeriodInSeconds(periodInMilisecons / 1000.0f) * 1000.0f);
+    return Math::convert<std::uint16_t>(setPeriodInSeconds(periodInMilisecons / 1000.0f, timing) *
+                                        1000.0f);
 }
 
-float LFO::setPeriodInSeconds(float const periodInSeconds)
+float LFO::setPeriodInSeconds(float const periodInSeconds, Timing const &timing)
 {
     auto &impl(static_cast<LFOImpl &>(*this));
 
     /// \note The bar the period is a fraction *of*, which is the reference one
     /// for a free LFO and the host's for a synced one. \see LFOImpl::getValue
     bool const freeRunning(impl.syncTypes() == LFO::Free);
-    auto const bar(freeRunning ? LFOImpl::Timer::referenceBarDuration
-                               : LFOImpl::Timer::basePeriod());
+    auto const bar(freeRunning ? referenceBarDuration : timing.barDuration);
 
     auto const periodScale(periodInSeconds / bar);
-    auto const clampedPeriodScale(freeRunning
-                                      ? impl.clampFreePeriod(periodScale)
-                                      : impl.snapSyncedPeriod(periodScale, impl.syncTypes()).first);
+    auto const clampedPeriodScale(
+        freeRunning ? impl.clampFreePeriod(periodScale)
+                    : impl.snapSyncedPeriod(periodScale, impl.syncTypes(), timing).first);
     impl.setPeriodScale(clampedPeriodScale);
     return clampedPeriodScale * bar;
 }
@@ -208,7 +209,7 @@ void LFOImpl::setPeriodScale(value_type const newPeriodScale)
 LFOImpl::value_type LFOImpl::currentPeriodScaleMinimum()
 {
     return (2.0f / 3.0f /*for triplets    */) / LFOImpl::minimumPeriodAsMaximumBeatDenominator /
-           LFOImpl::Timer::referenceMeasureNumerator;
+           LFOImpl::referenceMeasureNumerator;
 }
 LFOImpl::value_type LFOImpl::currentPeriodScaleMaximum()
 {
@@ -483,19 +484,19 @@ LFOImpl::PeriodScale::value_type LFOImpl::adjustValueForPreset(PeriodScale const
     LE_ASSERT(periodScale == this->periodScale());
     if (syncTypes() == LFO::Free)
     {
-        return periodScale * LFOImpl::Timer::referenceBarDuration * 1000;
+        return periodScale * LFOImpl::referenceBarDuration * 1000;
     }
     return periodScale;
 }
 
 template <>
 LFOImpl::PeriodScale::value_type LFOImpl::adjustValueFromPreset<LFOImpl::PeriodScale>(
-    LFOImpl::PeriodScale::value_type const periodScale) const
+    LFOImpl::PeriodScale::value_type const periodScale, Timing const &timing) const
 {
     if (syncTypes() == LFO::Free)
-        return clampFreePeriod(periodScale / LFOImpl::Timer::referenceBarDuration / 1000);
+        return clampFreePeriod(periodScale / LFOImpl::referenceBarDuration / 1000);
     else
-        return snapSyncedPeriod(periodScale, syncTypes()).first;
+        return snapSyncedPeriod(periodScale, syncTypes(), timing).first;
 }
 
 namespace
@@ -550,14 +551,14 @@ std::optional<std::uint8_t> LFOImpl::parseSyncChoice(char const *const text)
     return {};
 }
 
-void LFOImpl::snapPeriodScaleFromAutomation(PeriodScale &periodScale)
+void LFOImpl::snapPeriodScaleFromAutomation(PeriodScale &periodScale, Timing const &timing)
 {
     auto const &parameters(Utility::ParametersFromMember<Parameters, 1>()(periodScale));
     auto const &lfo(
         Utility::ParentFromMember<LFOImpl, Parameters, &LFOImpl::parameters_>()(parameters));
 
     if (lfo.syncTypes() != LFO::Free)
-        periodScale = snapSyncedPeriod(periodScale, lfo.syncTypes()).first;
+        periodScale = snapSyncedPeriod(periodScale, lfo.syncTypes(), timing).first;
     else
     {
         LE_ASSERT(clampFreePeriod(periodScale) == periodScale);
@@ -582,13 +583,13 @@ LFOImpl::value_type LFOImpl::clampFreePeriod(value_type const absolutePeriod)
 
 namespace
 {
-lfo_value_t snapSyncedPeriodScale(lfo_value_t const periodScale)
+lfo_value_t snapSyncedPeriodScale(lfo_value_t const periodScale, LFOImpl::Timing const &timing)
 {
     using namespace Math;
 
-    float const measureNumerator(LFOImpl::Timer::measureNumeratorFloat());
+    float const measureNumerator(timing.measureNumeratorFloat());
     std::uint8_t const numberOfBeats(round(periodScale * measureNumerator));
-    if (numberOfBeats > LFOImpl::Timer::measureNumerator())
+    if (numberOfBeats > timing.measureNumerator)
     {
         float const numberOfBeatsClampedToPowerOfTwo(
             convert<float>(PowerOfTwo::round(numberOfBeats)));
@@ -600,10 +601,10 @@ lfo_value_t snapSyncedPeriodScale(lfo_value_t const periodScale)
     }
     else if (numberOfBeats > 0)
     {
-        LE_ASSERT((numberOfBeats >= 1) && (numberOfBeats <= LFOImpl::Timer::measureNumerator()));
+        LE_ASSERT((numberOfBeats >= 1) && (numberOfBeats <= timing.measureNumerator));
 
         unsigned const beats(numberOfBeats);
-        unsigned const beatsPerBar(LFOImpl::Timer::measureNumerator());
+        unsigned const beatsPerBar(timing.measureNumerator);
 
         auto const wholeDivisorFinder(
             [beatsPerBar](unsigned const value) { return beatsPerBar % value == 0; });
@@ -640,20 +641,21 @@ lfo_value_t snapSyncedPeriodScale(lfo_value_t const periodScale)
     }
 }
 
-lfo_value_t snapSyncedPeriodScale(lfo_value_t const periodScale, float const tempoScale)
+lfo_value_t snapSyncedPeriodScale(lfo_value_t const periodScale, LFOImpl::Timing const &timing,
+                                  float const tempoScale)
 {
-    return snapSyncedPeriodScale(periodScale * tempoScale) / tempoScale;
+    return snapSyncedPeriodScale(periodScale * tempoScale, timing) / tempoScale;
 }
 } // anonymous namespace
 
 LFOImpl::SnappedPeriod LFOImpl::snapSyncedPeriod(value_type const periodScale,
-                                                 std::uint8_t const syncTypes)
+                                                 std::uint8_t const syncTypes, Timing const &timing)
 {
     LE_ASSERT(syncTypes != Free);
 
-    float const quarterPeriod(snapSyncedPeriodScale(periodScale, 1 / 1.0f));
-    float const tripletPeriod(snapSyncedPeriodScale(periodScale, 3 / 2.0f));
-    float const dottedPeriod(snapSyncedPeriodScale(periodScale, 2 / 3.0f));
+    float const quarterPeriod(snapSyncedPeriodScale(periodScale, timing, 1 / 1.0f));
+    float const tripletPeriod(snapSyncedPeriodScale(periodScale, timing, 3 / 2.0f));
+    float const dottedPeriod(snapSyncedPeriodScale(periodScale, timing, 2 / 3.0f));
 
     SnappedPeriod const nearestPeriods[] = {
         SnappedPeriod((syncTypes & Quarter) ? quarterPeriod : std::numeric_limits<float>::max(),
@@ -670,10 +672,10 @@ LFOImpl::SnappedPeriod LFOImpl::snapSyncedPeriod(value_type const periodScale,
 }
 
 LFOImpl::SnappedPeriod LFOImpl::snapPeriodScale(value_type const periodScale,
-                                                std::uint8_t const syncTypes)
+                                                std::uint8_t const syncTypes, Timing const &timing)
 {
     return (syncTypes == Free) ? SnappedPeriod(clampFreePeriod(periodScale), Free)
-                               : snapSyncedPeriod(periodScale, syncTypes);
+                               : snapSyncedPeriod(periodScale, syncTypes, timing);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -713,17 +715,17 @@ Grid gridFor(LFO::SyncType const syncType)
 /// Milliseconds against the bar a free LFO is measured in, which is a constant.
 float periodScaleToMilliseconds(float const periodScale)
 {
-    return periodScale * LFOImpl::Timer::referenceBarDuration * 1000;
+    return periodScale * LFOImpl::referenceBarDuration * 1000;
 }
 } // anonymous namespace
 
 std::size_t LFOImpl::printSyncedPeriodScale(value_type const periodScale,
-                                            std::uint8_t const syncTypes,
+                                            std::uint8_t const syncTypes, Timing const &timing,
                                             std::span<char> const buffer)
 {
     LE_ASSERT(syncTypes != Free);
 
-    auto const [snapped, grid](snapPeriodScale(periodScale, syncTypes));
+    auto const [snapped, grid](snapPeriodScale(periodScale, syncTypes, timing));
     auto const [suffix, toNote](gridFor(grid));
 
     auto const note(snapped * toNote);
@@ -741,10 +743,10 @@ std::size_t LFOImpl::printSyncedPeriodScale(value_type const periodScale,
 }
 
 std::size_t LFOImpl::printPeriodScale(value_type const periodScale, std::uint8_t const syncTypes,
-                                      std::span<char> const buffer)
+                                      Timing const &timing, std::span<char> const buffer)
 {
     if (syncTypes != Free)
-        return printSyncedPeriodScale(periodScale, syncTypes, buffer);
+        return printSyncedPeriodScale(periodScale, syncTypes, timing, buffer);
 
     constexpr char suffix[]{" ms"};
     LE_ASSERT(buffer.size() > sizeof(suffix));
@@ -868,7 +870,8 @@ float periodFromNote(LFO::SyncType const grid)
 } // anonymous namespace
 
 std::optional<LFOImpl::SnappedPeriod> LFOImpl::parsePeriodScale(char const *const text,
-                                                                std::uint8_t const syncTypes)
+                                                                std::uint8_t const syncTypes,
+                                                                Timing const &timing)
 {
     if (!text)
         return {};
@@ -879,8 +882,7 @@ std::optional<LFOImpl::SnappedPeriod> LFOImpl::parsePeriodScale(char const *cons
         auto const milliseconds(std::strtof(text, &end));
         if ((end == text) || !std::isfinite(milliseconds))
             return {};
-        return SnappedPeriod(clampFreePeriod(milliseconds / Timer::referenceBarDuration / 1000),
-                             Free);
+        return SnappedPeriod(clampFreePeriod(milliseconds / referenceBarDuration / 1000), Free);
     }
 
     auto const split(splitNote(text));
@@ -926,7 +928,7 @@ std::optional<LFOImpl::SnappedPeriod> LFOImpl::parsePeriodScale(char const *cons
 
     return snapSyncedPeriod(
         Math::clamp(periodScale, currentPeriodScaleMinimum(), currentPeriodScaleMaximum()),
-        gridsToSnapOn);
+        gridsToSnapOn, timing);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -954,7 +956,8 @@ void LFOImpl::updateForNewTimingInformation(
         return;
 
     if (timingInformationChage.measureNumeratorChanged())
-        setPeriodScale(snapSyncedPeriod(periodScale(), syncTypes()).first);
+        setPeriodScale(
+            snapSyncedPeriod(periodScale(), syncTypes(), timingInformationChage.timing_).first);
 }
 
 namespace
@@ -1041,19 +1044,6 @@ LFOImpl::linearisePeriodScale(Plugins::AutomatedParameterValue const nonlinearNo
     return std::pow(nonlinearNormalisedPeriodScale, normalisedPeriodScaleSkewFactor());
 }
 
-// Implementation note:
-//   'Free' LFO periods are saved to presets with absolute millisecond values so
-// that their value would be restored correctly independent of the current BPM.
-// The conversion between an absolute period value and a period scale (used for
-// synced LFOs) requires the current bar duration, to avoid requiring the active
-// LFOImpl::Timer instance to be passed to preset loading/saving code a global
-// variable is used. This should not create problems if the assumption that no
-// host uses more than one tempo value at any given time is correct.
-//                                            (07.01.2011.) (Domagoj Saric)
-// Assume 120 BPM 4/4
-std::atomic<LFOImpl::value_type> LFOImpl::Timer::barDuration_(LFOImpl::Timer::referenceBarDuration);
-std::atomic<std::uint8_t> LFOImpl::Timer::measureNumerator_(4);
-
 namespace
 {
 /// \note Relaxed throughout; see the note on the declarations.
@@ -1100,12 +1090,14 @@ LFOImpl::Timer::Timer() { reset(); }
 LFOImpl::Timer::TimingInformationChange
 LFOImpl::Timer::establishedChange(value_type const barDuration, std::uint8_t const measureNumerator)
 {
+    Timing const incoming{barDuration, measureNumerator};
     if (!timingInformationEstablished_)
     {
         timingInformationEstablished_ = true;
-        return {1, false}; // a ratio of one rescales nothing
+        return {1, false, incoming}; // a ratio of one rescales nothing
     }
-    return {relaxed(barDuration_) / barDuration, relaxed(measureNumerator_) != measureNumerator};
+    return {relaxed(barDuration_) / barDuration, relaxed(measureNumerator_) != measureNumerator,
+            incoming};
 }
 
 LFOImpl::Timer::TimingInformationChange LFOImpl::Timer::updatePositionAndTimingInformation(
@@ -1188,7 +1180,7 @@ void LFOImpl::Timer::reset()
     relaxed(measureNumerator_, referenceMeasureNumerator);
 }
 
-LFOImpl::value_type LFOImpl::Timer::measureNumeratorFloat()
+LFOImpl::value_type LFOImpl::Timer::measureNumeratorFloat() const
 {
     return Math::convert<LFOImpl::value_type>(measureNumerator());
 }

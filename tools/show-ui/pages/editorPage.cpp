@@ -113,7 +113,8 @@ class HarnessHost final : public GUI::EditorHost
     void editParameter(ParameterID const parameterID, float const value) const override
     {
         setParameterIn<LE::Plugins::Protocol::CLAP>(const_cast<HarnessEngine &>(engine_).program(),
-                                                    parameterID, value);
+                                                    parameterID, value,
+                                                    engine_.lfoTimer().timing());
         toEngine_.push(Threading::setBaseParameter(parameterID.binaryValue, value));
     }
 

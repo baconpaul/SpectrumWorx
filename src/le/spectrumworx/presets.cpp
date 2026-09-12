@@ -532,9 +532,10 @@ template <> std::string PresetHandler::makeString<float>(float const binarySourc
 /// which `loadPreset`'s catch-all turned into "unable to load". It reports the
 /// same thing without the throw: `pParameters_` is null and every getter misses,
 /// which the missing-parameter path already handles.
-ParametersLoader::ParametersLoader(Preset const &preset)
+ParametersLoader::ParametersLoader(Preset const &preset, Parameters::LFO::Timing const &lfoTiming)
     : PresetHandler(const_cast<Preset &>(preset)),
-      grammar_(preset.formatVersion() >= 3 ? Grammar::V3 : Grammar::Legacy), syncedLFOFound_(false)
+      grammar_(preset.formatVersion() >= 3 ? Grammar::V3 : Grammar::Legacy), syncedLFOFound_(false),
+      lfoTiming_(lfoTiming)
 {
     pParameters_ = preset.root().FirstChildElement(globalParametersNodeName_);
     LE_ASSERT_MSG(pParameters_, "Preset node not found");
@@ -730,8 +731,9 @@ namespace
 class LFODataLoader
 {
   public:
-    LFODataLoader(TiXmlElement const &parameterNode, Parameters::LFOImpl const &lfo)
-        : parameterNode_(parameterNode), lfo_(lfo)
+    LFODataLoader(TiXmlElement const &parameterNode, Parameters::LFOImpl const &lfo,
+                  Parameters::LFO::Timing const &lfoTiming)
+        : parameterNode_(parameterNode), lfo_(lfo), lfoTiming_(lfoTiming)
     {
     }
 
@@ -773,7 +775,8 @@ class LFODataLoader
         {
             auto const value(lfo_.adjustValueFromPreset<LFOParameter>(
                 static_cast<typename LFOParameter::value_type>(
-                    Utility::lexical_cast<typename LFOParameter::binary_type>(pElementValue))));
+                    Utility::lexical_cast<typename LFOParameter::binary_type>(pElementValue)),
+                lfoTiming_));
             if (element.isValidValue(value))
             {
                 element = value;
@@ -795,6 +798,7 @@ class LFODataLoader
   private:
     TiXmlElement const &parameterNode_;
     Parameters::LFOImpl const &lfo_;
+    Parameters::LFO::Timing const &lfoTiming_;
 }; // class LFODataLoader
 } // anonymous namespace
 
@@ -810,7 +814,8 @@ bool ParametersLoader::loadLFO(TiXmlElement const &parameterNode, LFO &lfo) cons
     // LFO::adjustvalueFromPreset<PeriodScale>() function assumes the SyncTypes
     // parameter to already be loaded/set.
     //                                        (18.02.2011.) (Domagoj Saric)
-    LE::Parameters::forEachReversed(lfo.parameters(), LFODataLoader(parameterNode, lfo));
+    LE::Parameters::forEachReversed(lfo.parameters(),
+                                    LFODataLoader(parameterNode, lfo, lfoTiming_));
     syncedLFOFound_ |= lfo.enabled() && (lfo.syncTypes() != LFO::Free);
     return lfo.enabled();
 }

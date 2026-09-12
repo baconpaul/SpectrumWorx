@@ -62,7 +62,7 @@ Plugins::AutomatedParameterValue getAutomatedLFOParameter(std::uint8_t parameter
 template <class AutomatedParameter>
 std::optional<AutoAdjustedLFOParameter>
 setAutomatedLFOParameter(std::uint8_t parameterIndex, std::uint8_t lfoParameterIndex,
-                         Plugins::AutomatedParameterValue, ModuleParameters &);
+                         Plugins::AutomatedParameterValue, ModuleParameters &, LFO::Timing const &);
 
 template <class AutomatedParameter>
 Plugins::AutomatedParameterValue getDefaultAutomatedLFOParameter(std::uint8_t lfoParameterIndex);
@@ -109,8 +109,8 @@ char const *getParameterUnit(std::uint8_t parameterIndex, ModuleParameters const
 
 namespace Detail
 {
-std::optional<AutoAdjustedLFOParameter> autoAdjustedLFOParameter(LFO &lfo,
-                                                                 std::uint8_t lfoParameterIndex);
+std::optional<AutoAdjustedLFOParameter>
+autoAdjustedLFOParameter(LFO &lfo, std::uint8_t lfoParameterIndex, LFO::Timing const &);
 
 using value_type = Plugins::AutomatedParameterValue;
 
@@ -126,7 +126,10 @@ template <class AutomatedParameter> class LFOParameterSetter : public AutomatedP
     using result_type = typename AutomatedParameter::Setter::result_type;
     using LFO = LE::Parameters::LFOImpl;
 
-    LFOParameterSetter(value_type const value) : AutomatedParameter::Setter{value} {}
+    LFOParameterSetter(value_type const value, LFO::Timing const &timing)
+        : AutomatedParameter::Setter{value}, timing_{timing}
+    {
+    }
     using AutomatedParameter::Setter::operator();
 
     void operator()(LFO::PeriodScale &parameter) const
@@ -137,8 +140,13 @@ template <class AutomatedParameter> class LFOParameterSetter : public AutomatedP
         parameter =
             AutomatedParameter::template convertAutomationToParameterValue<LFO::PeriodScale>(
                 sourceValue);
-        LFO::snapPeriodScaleFromAutomation(parameter);
+        LFO::snapPeriodScaleFromAutomation(parameter, timing_);
     }
+
+  private:
+    /// \note The grid a synced period lands on, from the instance whose parameter
+    /// this is. \see issue #11.
+    LFO::Timing const timing_;
 }; // class LFOParameterSetter
 
 ////////////////////////////////////////////////////////////////////////
@@ -198,7 +206,8 @@ getDefaultAutomatedLFOParameter(std::uint8_t const lfoParameterIndex)
 template <class AutomatedParameter>
 std::optional<AutoAdjustedLFOParameter>
 setAutomatedLFOParameter(std::uint8_t const parameterIndex, std::uint8_t const lfoParameterIndex,
-                         Plugins::AutomatedParameterValue const value, ModuleParameters &module)
+                         Plugins::AutomatedParameterValue const value, ModuleParameters &module,
+                         LFO::Timing const &timing)
 {
     LE_ASSUME(parameterIndex < (Constants::maxNumberOfParametersPerModule - 1 /*Bypass*/));
 
@@ -206,7 +215,8 @@ setAutomatedLFOParameter(std::uint8_t const parameterIndex, std::uint8_t const l
     bool const wasEnabled(lfo.enabled());
 
     LE::Parameters::invokeFunctorOnIndexedParameter(
-        lfo.parameters(), lfoParameterIndex, Detail::LFOParameterSetter<AutomatedParameter>{value});
+        lfo.parameters(), lfoParameterIndex,
+        Detail::LFOParameterSetter<AutomatedParameter>{value, timing});
 
     // a sweep that stops leaves the parameter wherever it happened to be, and
     // that is a value nobody chose \see issue #204
@@ -219,7 +229,7 @@ setAutomatedLFOParameter(std::uint8_t const parameterIndex, std::uint8_t const l
     // if (to minimize host calls) a fixup is made this is reported to the
     // calling function.
     //                                        (04.07.2011.) (Domagoj Saric)
-    return Detail::autoAdjustedLFOParameter(lfo, lfoParameterIndex);
+    return Detail::autoAdjustedLFOParameter(lfo, lfoParameterIndex, timing);
 }
 
 } // namespace Automation

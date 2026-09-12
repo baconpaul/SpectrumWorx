@@ -197,7 +197,7 @@ template <class Impl, class Protocol> class Host2PluginInteropImpl<Impl, Protoco
             auto const implicitlyUpdatedParameter(
                 Automation::template setAutomatedLFOParameter<AutomatedParameter>(
                     parameterID.moduleParameterIndex, parameterID.lfoParameterIndex, value_,
-                    *pModule));
+                    *pModule, pEffect->lfoTimer().timing()));
             if (pEffect->host().wantsManualDependentParameterNotifications() &&
                 implicitlyUpdatedParameter)
             {

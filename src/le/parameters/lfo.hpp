@@ -105,6 +105,45 @@ class LFO
 #endif // _MSC_VER
 
   public:
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \brief One bar at the tempo and meter the engine assumes when a host
+    /// reports none: 120 BPM in four four, so two seconds.
+    ///
+    /// \note **The unit a free-running LFO's period is measured in.** A synced
+    /// LFO's period is a fraction of the *host's* bar, which is the whole of what
+    /// syncing means and is why that one follows the tempo. A free one is a
+    /// duration in seconds, and expressing it against a bar that never changes
+    /// length is how it stays one without the parameter having to be rewritten
+    /// every time the tempo moves.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    static constexpr float referenceBarDuration{60.0f / 120 * 4};
+    static constexpr std::uint8_t referenceMeasureNumerator{4};
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \class Timing
+    /// \brief The host's bar as one *plugin instance* sees it: how long it is and
+    /// how many beats it has.
+    ///
+    /// \note A snapshot taken by value, and that is the point of it: the two
+    /// numbers live in the instance's `Timer` as separate atomics written by the
+    /// audio thread, so a reader that wants both wants them from one instant.
+    ///
+    /// \note A default-constructed one is the reference bar above, which is the
+    /// answer for anything with no host to ask. \see issue #11.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    struct Timing
+    {
+        float barDuration{referenceBarDuration};
+        std::uint8_t measureNumerator{referenceMeasureNumerator};
+
+        float measureNumeratorFloat() const { return static_cast<float>(measureNumerator); }
+    }; // struct Timing
+
     void setEnabled(bool value); ///< \brief enable/disable the LFO
     void setPhase(
         float
@@ -119,12 +158,17 @@ class LFO
     /// \return true if the lower bound had to be adjusted in order to make sure that the upper-bound >= lower-bound condition always holds
     bool setUpperBound(float upperBound);
 
-    std::uint16_t setPeriodInMilliseconds(
-        std::uint16_t
-            periodInMilliseconds); ///< set the LFO period in milliseconds \return the actually applied value (autoadjusted/'clamped' to the values allowed by the currently configured sync types)
-    float setPeriodInSeconds(
-        float
-            periodInSeconds); ///< set the LFO period in seconds \return the actually applied value (autoadjusted/'clamped' to the values allowed by the currently configured sync types)<BR> \overload
+    /// \brief set the LFO period in milliseconds
+    /// \return the actually applied value (autoadjusted/'clamped' to the values allowed by the currently configured sync types)
+    /// \note The period is a fraction of a bar and the bar is the host's, so
+    /// turning one into a length of time takes the instance's Timing rather than
+    /// anything this object knows.
+    std::uint16_t setPeriodInMilliseconds(std::uint16_t periodInMilliseconds, Timing const &);
+
+    /// \brief set the LFO period in seconds
+    /// \return the actually applied value (autoadjusted/'clamped' to the values allowed by the currently configured sync types)
+    /// \overload
+    float setPeriodInSeconds(float periodInSeconds, Timing const &);
 
     bool enabled() const;           ///< is LFO enabled?
     float period() const;           ///< retrieve the current period

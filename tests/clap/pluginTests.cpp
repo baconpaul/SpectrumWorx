@@ -153,6 +153,19 @@ float engineLFOPeriodScale(clap_plugin const &plugin, std::uint8_t const moduleI
     return pModule->lfo(lfoIndex).periodScale();
 }
 
+/// \brief The bar this instance's engine is running against: how long it is and
+/// how many beats it has.
+///
+/// \note Per instance since issue #11, which is why it is asked of a plugin
+/// rather than of `LFOImpl::Timer` -- two instances in two tracks are at two
+/// tempi and there is no process-wide answer to give.
+LE::Parameters::LFOImpl::Timing engineLFOTiming(clap_plugin const &plugin)
+{
+    auto *const pHelper(static_cast<LE::SW::PluginHelper *>(plugin.plugin_data));
+    REQUIRE(pHelper != nullptr);
+    return static_cast<LE::SW::SpectrumWorxCLAP *>(pHelper)->lfoTimer().timing();
+}
+
 /// \brief A module parameter's static description, for a value inside its range.
 LE::Parameters::RuntimeInformation const &moduleParameterInfo(clap_plugin const &plugin,
                                                               std::uint8_t const moduleIndex,
@@ -1603,10 +1616,10 @@ TEST_CASE("With no transport the LFO clock is 120 BPM in four four", "[clap][lfo
     std::vector<float> leftOut(blockSize), rightOut(blockSize);
     plugin.process(leftIn, rightIn, leftOut, rightOut, nullptr /*no transport at all*/);
 
-    using Timer = LE::Parameters::LFOImpl::Timer;
+    auto const timing(engineLFOTiming(*plugin));
     // One bar of four beats at 120 BPM is two seconds.
-    CHECK_THAT(Timer::basePeriod(), Catch::Matchers::WithinAbs(2.0, 1e-6));
-    CHECK(Timer::measureNumerator() == 4);
+    CHECK_THAT(timing.barDuration, Catch::Matchers::WithinAbs(2.0, 1e-6));
+    CHECK(timing.measureNumerator == 4);
 }
 
 TEST_CASE("An enabled LFO keeps running while the transport is stopped", "[clap][lfo]")
@@ -1839,18 +1852,97 @@ TEST_CASE("The LFO clock follows the host into three four, six eight and five fo
         CHECK(nextBarLine == barLine);
 
         // ...and the clock the rest of the engine reads says the same thing.
-        using Timer = LE::Parameters::LFOImpl::Timer;
-        CHECK(Timer::measureNumerator() == beatsPerBar);
-        CHECK_THAT(Timer::basePeriod(), Catch::Matchers::WithinAbs(beatsPerBar * 60 / tempo, 1e-6));
-
-        /// \note And back to the assumed 120 BPM 4/4 before the next meter, which
-        /// is what a block with no transport at all *is*. `Timer`'s tempo and
-        /// meter are process-wide statics -- issue #11 -- so a case that left five
-        /// four behind would change what every later case in the binary measures.
-        plugin.process(leftIn, rightIn, leftOut, rightOut, nullptr);
+        auto const timing(engineLFOTiming(*plugin));
+        CHECK(timing.measureNumerator == beatsPerBar);
+        CHECK_THAT(timing.barDuration, Catch::Matchers::WithinAbs(beatsPerBar * 60 / tempo, 1e-6));
     }
+}
 
-    CHECK(LE::Parameters::LFOImpl::Timer::measureNumerator() == 4);
+TEST_CASE("Two instances at two meters each snap onto their own grid", "[clap][lfo]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Issue #11. The tempo and the meter were process-wide statics, so the
+    /// last instance to process a block decided what *every* instance in the
+    /// process snapped, printed and parsed a period against -- two tracks at two
+    /// tempi seeing one tempo, and a synced LFO in one of them landing on the
+    /// other's grid.
+    ///
+    /// \note Half a bar is the request to make, because the two meters answer it
+    /// differently and both answers are legal: four four has a half-bar period
+    /// and five four does not, five being prime, so its nearest is a single beat.
+    /// A write that reached the wrong grid gives the wrong one of those two
+    /// numbers rather than something out of range.
+    ///
+    /// \note Both instances are written to *after* both have processed, so that
+    /// one shared answer could only ever be one of the two meters -- whichever
+    /// order the blocks ran in, one of the two checks below is the one that goes
+    /// red.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+    constexpr float sampleRate{48000};
+    constexpr std::uint32_t blockSize{512};
+    constexpr double tempo{120};
+    constexpr float halfABar{0.5f};
+    constexpr float aFifthOfABar{0.2f};
+
+    Entry const entry;
+    ActivePlugin inFourFour(sampleRate, blockSize);
+    ActivePlugin inFiveFour(sampleRate, blockSize);
+
+    std::vector<float> leftIn(blockSize, 0.0f), rightIn(blockSize, 0.0f);
+    std::vector<float> leftOut(blockSize), rightOut(blockSize);
+
+    auto const setUp([&](ActivePlugin &plugin, std::uint16_t const beatsPerBar) {
+        OneParameterEvent const fillSlotOne(parameterID(moduleChainType, 0), 0);
+        plugin.flush(&*fillSlotOne);
+
+        OneParameterEvent const enable(lfoParameterID(0, 0, lfoEnabled), 1);
+        plugin.flush(&*enable);
+
+        auto const playing(
+            transportAt(tempo, 0, CLAP_TRANSPORT_IS_PLAYING, beatsPerBar, 4 /*beat unit*/));
+        plugin.process(leftIn, rightIn, leftOut, rightOut, &playing);
+    });
+
+    setUp(inFourFour, 4);
+    setUp(inFiveFour, 5);
+
+    // Each instance's clock holds the meter its own host reported.
+    CHECK(engineLFOTiming(*inFourFour).measureNumerator == 4);
+    CHECK(engineLFOTiming(*inFiveFour).measureNumerator == 5);
+
+    auto const askForHalfABar([&](ActivePlugin &plugin) {
+        editorHostOf(*plugin).editParameter(
+            LE::SW::ParameterID{LE::Plugins::ParameterID{lfoParameterID(0, 0, lfoPeriodScale)}},
+            halfABar);
+        plugin.flush();
+        return engineLFOPeriodScale(*plugin, 0, 0);
+    });
+
+    auto const inFourFourPeriod(askForHalfABar(inFourFour));
+    auto const inFiveFourPeriod(askForHalfABar(inFiveFour));
+    CAPTURE(inFourFourPeriod, inFiveFourPeriod);
+
+    // Four four has a half bar...
+    CHECK_THAT(inFourFourPeriod, Catch::Matchers::WithinAbs(halfABar, 1e-4));
+    // ...and five four has a beat and a bar and nothing between them.
+    CHECK_THAT(inFiveFourPeriod, Catch::Matchers::WithinAbs(aFifthOfABar, 1e-4));
+
+    ///   And what each host *reads* is on its own grid too, which is the same
+    /// static one step further out: `value_to_text` runs on the main thread and
+    /// printed a note value against whichever meter had last processed a block.
+    auto const reads([](ActivePlugin &plugin) {
+        auto const &params(parameters(*plugin));
+        auto const id(lfoParameterID(0, 0, lfoPeriodScale));
+        double value{-1};
+        REQUIRE(params.get_value(&*plugin, id, &value));
+        std::array<char, 64> text{};
+        REQUIRE(params.value_to_text(&*plugin, id, value, text.data(), text.size()));
+        return std::string(text.data());
+    });
+    CHECK(reads(inFourFour) == "1/2 bars");
+    CHECK(reads(inFiveFour) == "1/5 bars");
 }
 
 TEST_CASE("A host that opens in five four does not move the period it was given", "[clap][lfo]")
@@ -1903,7 +1995,7 @@ TEST_CASE("A host that opens in five four does not move the period it was given"
     auto const inFiveFour(transportAt(tempo, 0, CLAP_TRANSPORT_IS_PLAYING, 5, 4));
     plugin.process(leftIn, rightIn, leftOut, rightOut, &inFiveFour);
 
-    REQUIRE(LE::Parameters::LFOImpl::Timer::measureNumerator() == 5);
+    REQUIRE(engineLFOTiming(*plugin).measureNumerator == 5);
     CHECK_THAT(engineLFOPeriodScale(*plugin, 0, 0),
                Catch::Matchers::WithinAbs(quarterOfABar, 1e-6));
 
@@ -1921,7 +2013,7 @@ TEST_CASE("A host that opens in five four does not move the period it was given"
     auto const inSixEight(transportAt(tempo, 5, CLAP_TRANSPORT_IS_PLAYING, 6, 8));
     plugin.process(leftIn, rightIn, leftOut, rightOut, &inSixEight);
 
-    REQUIRE(LE::Parameters::LFOImpl::Timer::measureNumerator() == 6);
+    REQUIRE(engineLFOTiming(*plugin).measureNumerator == 6);
     CAPTURE(engineLFOPeriodScale(*plugin, 0, 0));
     CHECK_THAT(engineLFOPeriodScale(*plugin, 0, 0), Catch::Matchers::WithinAbs(1.0 / 3, 1e-4));
 
@@ -1948,10 +2040,6 @@ TEST_CASE("A host that opens in five four does not move the period it was given"
     REQUIRE(params.get_value(&*plugin, lfoParameterID(0, 0, lfoPeriodScale), &hostVisibleAfter));
     CAPTURE(hostVisibleBefore, hostVisibleAfter);
     CHECK(hostVisibleAfter == hostVisibleBefore);
-
-    // Back to the assumed 120 BPM 4/4 for whatever runs next; see the case above.
-    plugin.process(leftIn, rightIn, leftOut, rightOut, nullptr);
-    CHECK(LE::Parameters::LFOImpl::Timer::measureNumerator() == 4);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

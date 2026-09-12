@@ -617,12 +617,6 @@ class SpectrumWorxCLAP final
     ///     `SW::loadPreset` with `onlySetParameters()` -- see
     ///     `presetLoading.cpp`'s `Loader::mainThreadCopy`.
     ///
-    /// \note One thing the two copies still disagree about: a module built here
-    /// is built at a different *moment* than the engine's, and
-    /// `LFOImpl::SyncTypes::default_()` reads process-global tempo state, so a
-    /// slot filled either side of the transport becoming known defaults its LFOs
-    /// differently. \see issue #11.
-    ///
     /// \note Its modules carry parameters and no spectral storage -- see
     /// `ParametersOnlyModuleInitialiser`. Nothing asks this one for a spectrum.
     ///
