@@ -9,7 +9,8 @@ reaches a file.
 
 Written 06.08.2026, when the rate answer changed; §3 rewritten 20.08.2026 with
 issues #78 and #151, which were both that second question being answered by
-accident. Everything here is in the tree and has cases naming it —
+accident; §7 written 12.09.2026 with issue #11, which is where a bar stopped
+belonging to the process. Everything here is in the tree and has cases naming it —
 `tests/parameters/lfoTests.cpp` and `tests/clap/pluginTests.cpp` `[clap][lfo]`.
 
 ---
@@ -41,8 +42,9 @@ drain clears, and lands in `SpectrumWorxEditor::updateForNewTimingInfo()`. See
 [`threading_model.md`](threading_model.md) §3, which is where the reason the news
 travels on a flag rather than on the ring is.
 
-`Timer::referenceBarDuration` and `Timer::referenceMeasureNumerator`
-(`le/parameters/lfoImpl.hpp`) are that constant bar. It is the same 120 BPM 4/4
+`LFO::referenceBarDuration` and `LFO::referenceMeasureNumerator`
+(`le/parameters/lfo.hpp`) are that constant bar, and a default-constructed
+`LFO::Timing` is the pair of them — §7. It is the same 120 BPM 4/4
 the engine already assumes when a host reports no transport, so a plugin in a
 host with no tempo and a free LFO in a host with one are running off the same
 clock, and always were.
@@ -293,14 +295,14 @@ the same session saved at two tempi wrote two different files. That is what made
 process — a good half of the rows — and it is why the suite was split into two
 binaries. **Splitting the binaries fixed nothing; the constant is the fix.**
 
-The *meter* is a different matter and is not fixed, because it is not broken: a
-synced period snaps to the divisions the meter has, so the same preset genuinely
-loads to a different period in three four. `snapSyncedPeriodScale()` reads
-`Timer::measureNumerator()` and that is still a process-global static, which
-makes it a hazard for a test binary in the way the tempo used to be. Every case
-that drives another meter therefore puts 4/4 back on the way out — the
-`ScopedHostTiming` guard in `lfoTests.cpp`, and a block with no transport at all
-in the two CLAP cases.
+The *meter* is a different matter and is not a fault: a synced period snaps to
+the divisions the meter has, so the same preset genuinely loads to a different
+period in three four. What it used to be was a hazard in the way the tempo was —
+`snapSyncedPeriodScale()` read `Timer::measureNumerator()`, a process-global
+static, so a case that drove another meter changed what every later load in the
+binary converted, and every one of them had to put 4/4 back on the way out.
+Since 12.09.2026 the meter is the **loading instance's**: `ParametersLoader`
+takes an `LFO::Timing` and the preset consumer hands it one. §7 and issue #11.
 
 The meters those cases drive are 3/4, 6/8 and 5/4, which is issue #14. What each
 of them can hold falls out of "a whole number of beats that divides the bar":
@@ -448,13 +450,46 @@ The flag is gone with its only reader. A host that reports no tempo gets 120 BPM
 in four four, which is an answer rather than an absence, and the panel stopped
 asking the question in August 2026.
 
-## 7. What is still true and unfixed
+## 7. A bar belongs to an instance
 
-`Timer`'s bar duration and measure numerator are **process-wide statics** —
-`std::atomic`, so not a data race, but two tracks at two tempi still see one
-tempo. Issue #11 has it. The parameter layer no longer reads them for
-anything but the snap grid, which is what made the corpus digests order-dependent
-and is the half that mattered most.
+`Timer`'s bar duration and measure numerator are **members**, one pair per timer
+and one timer per engine. They were process-wide statics until 12.09.2026 —
+`std::atomic`, so not a data race, but two tracks at two tempi saw one tempo, and
+a synced LFO in one of them snapped to the other's grid. Issue #11.
+
+What kept them shared was not the clock. The clock was always per engine; what
+was static was everything that *reads* a meter — `snapPeriodScale()`,
+`printPeriodScale()`, `parsePeriodScale()`, `snapPeriodScaleFromAutomation()`,
+the preset conversion — all of them called from the parameter layer and the
+editor, neither of which had an instance to ask. So the fix is a type rather than
+a field: **`LFO::Timing` is the host's bar as a value** — a duration and a
+numerator, defaulting to the reference 120 BPM 4/4 — and every one of those
+functions takes one. `Timer::timing()` snapshots the pair in one read of each
+atomic, which is also what keeps the message thread from catching a tempo and a
+meter from two different blocks.
+
+Who hands one over, by route:
+
+| route | where the bar comes from |
+|---|---|
+| the engine's own resnap | `TimingInformationChange::timing_`, carried with the change |
+| a host parameter write | `pEffect->lfoTimer().timing()`, in `host2PluginImpl.inl` |
+| the main thread's copy of that write | `setParameterIn(..., lfoTimer().timing())` |
+| `value_to_text` / `text_to_value` | `ParameterValueStringGetter::lfoTiming` and `ParameterParser::lfoTiming` |
+| a preset or a session | `ParametersLoader`'s, from the consumer's `lfoTiming()` |
+| the LFO panel | `LFODisplay::lfoTiming()`, which is the editor's core's |
+
+The case that pins it is `Two instances at two meters each snap onto their own
+grid` (`tests/clap/pluginTests.cpp`), with `Two timers at two tempi keep two
+answers` (`tests/parameters/lfoTests.cpp`) underneath it. Making the two fields
+`static` again turns both red, the four-four instance snapping and printing onto
+five four's grid.
+
+A case that wants five four now says so and carries it nowhere; the suite has no
+guard restoring four four on the way out, because there is nothing left to
+restore.
+
+## 8. What is still true and unfixed
 
 **A meter change resnaps one of the two Programs.**
 `Processor::updateModuleLFOs()` walks the modules the audio thread owns;
@@ -466,7 +501,7 @@ back is what finally reconciles them. Measured by `A host that opens in five fou
 does not move the period it was given` (`tests/clap/pluginTests.cpp`), which pins
 it as behaviour rather than endorsing it.
 
-## 8. Reading order
+## 9. Reading order
 
 1. `le/parameters/lfo.hpp` — the enums, and the SDK-facing interface
 2. `le/parameters/lfoImpl.hpp` — the seven parameters, the traits and `Timer`

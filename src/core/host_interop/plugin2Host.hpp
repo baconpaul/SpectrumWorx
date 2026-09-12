@@ -15,6 +15,7 @@
 
 #include "core/parameterID.hpp"
 
+#include "le/parameters/lfo.hpp" // ParameterValueStringGetter holds an LFO::Timing
 #include "le/parameters/printer.hpp"
 #include "le/parameters/parametersUtilities.hpp" // IndexOf, Clang
 #include "le/plugins/plugin.hpp"
@@ -226,6 +227,11 @@ struct Plugin2HostPassiveInteropController::ParameterValueStringGetter
     result_type operator()(ParameterID::LFO, Program const *) const;
 
     mutable Parameters::AutomatedParameterPrinter printer;
+
+    /// \note Beside the printer rather than inside it: a period reads as a note
+    /// value on the instance's own grid, and `AutomatedParameterPrinter` is
+    /// generic parameter machinery that knows nothing of LFOs. \see issue #11.
+    Parameters::LFO::Timing lfoTiming;
 }; // struct ParameterValueStringGetter
 #pragma warning(pop)
 

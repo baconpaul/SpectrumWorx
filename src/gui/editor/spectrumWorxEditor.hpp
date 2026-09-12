@@ -1367,6 +1367,11 @@ class SpectrumWorxEditor final : private SkinLifetime,
                                         /*Plugins::AutomatedParameterValue*/ float);
 
         LFO const &lfo() const { return const_cast<LFODisplay &>(*this).lfo(); }
+
+        /// \brief The host's bar as this instance's engine has it: the grid a
+        /// period is snapped, printed and parsed against. \see issue #11.
+        LFO::Timing lfoTiming() const;
+
         ModuleControlBase const &control() const
         {
             return const_cast<LFODisplay &>(*this).control();

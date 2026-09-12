@@ -563,7 +563,7 @@ char const *Plugin2HostPassiveInteropController::ParameterValueStringGetter::ope
                 LE_DEFAULT_CASE_UNREACHABLE();
             }
         }
-        LFO::printPeriodScale(periodScale, lfo.syncTypes(), printer.printer.buffer);
+        LFO::printPeriodScale(periodScale, lfo.syncTypes(), lfoTiming, printer.printer.buffer);
         return printer.printer.buffer.begin();
     }
 

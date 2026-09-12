@@ -156,10 +156,11 @@ class Plugin2HostPassiveInteropImpl : public Plugin2HostPassiveInteropController
         //...mrmlj...(printing required both in the DSP and UI)...
 
         // http://www.juce.com/forum/topic/juce-module-automatically-handle-plugin-parameters
-        ParameterValueStringGetter const getter = {
-            {pValue ? std::optional<Plugins::AutomatedParameterValue>(*pValue) : std::nullopt,
-             valueSourceFor(parameterID),
-             {text, impl().engineSetup()}}};
+        ParameterValueStringGetter const getter{
+            {{pValue ? std::optional<Plugins::AutomatedParameterValue>(*pValue) : std::nullopt,
+              valueSourceFor(parameterID),
+              {text, impl().engineSetup()}},
+             impl().lfoTimer().timing()}};
         char const *const pValueString(invokeFunctorOnIdentifiedParameter(
             parameterID, std::forward<ParameterValueStringGetter const>(getter), &program));
         copyToBuffer(pValueString, text);

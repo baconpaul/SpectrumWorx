@@ -134,7 +134,8 @@ float effectAutomated2InternalValue(std::uint8_t const effectParameterIndex,
 }
 
 std::optional<AutoAdjustedLFOParameter>
-Detail::autoAdjustedLFOParameter(LFO &lfo, std::uint8_t const lfoParameterIndex)
+Detail::autoAdjustedLFOParameter(LFO &lfo, std::uint8_t const lfoParameterIndex,
+                                 LFO::Timing const &timing)
 {
     //LFO::value_type const * __restrict pSourceBound;
     //LFO::value_type       * __restrict pTargetBound;
@@ -174,7 +175,7 @@ Detail::autoAdjustedLFOParameter(LFO &lfo, std::uint8_t const lfoParameterIndex)
         if (lfo.syncTypes() == LFO::Free)
             break; // a free period is a duration, and every one of them is legal
         auto const standing(lfo.periodScale());
-        auto const snapped(LFO::snapPeriodScale(standing, lfo.syncTypes()).first);
+        auto const snapped(LFO::snapPeriodScale(standing, lfo.syncTypes(), timing).first);
         if (snapped != standing)
         {
             lfo.setPeriodScale(snapped);

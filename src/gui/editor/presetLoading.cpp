@@ -307,6 +307,10 @@ struct Consumer
 
     Program &program() const { return mainThreadCopy ? host.programMain() : host.core().program(); }
 
+    /// \note The engine's, for both passes: there is one clock per instance and
+    /// the main thread's Program has no bar of its own. \see issue #11.
+    LE::Parameters::LFO::Timing lfoTiming() const { return host.core().lfoTimer().timing(); }
+
     /// \note Silent on the main-thread pass: the host is told once, about the
     /// load as a whole, by the pass that reaches the engine.
     void notifyHostAboutPresetChangeBegin() const

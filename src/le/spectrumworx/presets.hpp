@@ -26,6 +26,8 @@
 #include "le/spectrumworx/authorName.hpp"
 
 #include "le/math/conversion.hpp"
+/// `LFO::Timing`, the bar a loading instance snaps a synced period onto.
+#include "le/parameters/lfo.hpp"
 #include "le/parameters/parametersUtilities.hpp"
 /// `isAnEvent`, which is what "an event always streams off" is spelt with.
 #include "le/parameters/trigger/tag.hpp"
@@ -507,7 +509,9 @@ class AutomatedModuleChain;
 class ParametersLoader : private PresetHandler
 {
   public:
-    ParametersLoader(Preset const &);
+    /// \param lfoTiming the loading instance's bar, which is the grid a synced
+    ///        period in the file is snapped onto. \see issue #11.
+    ParametersLoader(Preset const &, Parameters::LFO::Timing const &lfoTiming);
 
     typedef AutomatedModuleChain ModuleChain;
 
@@ -703,6 +707,8 @@ class ParametersLoader : private PresetHandler
     Grammar grammar_;
 
     mutable bool syncedLFOFound_;
+
+    Parameters::LFO::Timing const lfoTiming_;
 
     mutable std::vector<TiXmlElement const *> readParameters_;
 
@@ -918,7 +924,7 @@ bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignoreExterna
                 pDawExtraState->from(*pNode);
         }
 
-        ParametersLoader parametersLoader(preset);
+        ParametersLoader parametersLoader(preset, consumer.lfoTiming());
 
         auto loader(consumer.presetLoader(ignoreExternalSample));
 

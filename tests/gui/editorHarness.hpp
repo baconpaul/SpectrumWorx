@@ -259,7 +259,8 @@ class Instance final : public GUI::EditorHost
     /// `Threading::publish*()` would apply them here anyway.
     void editParameter(ParameterID const parameterID, float const value) const override
     {
-        setParameterIn<LE::Plugins::Protocol::CLAP>(mutableProgram(), parameterID, value);
+        setParameterIn<LE::Plugins::Protocol::CLAP>(mutableProgram(), parameterID, value,
+                                                    engine_.lfoTimer().timing());
         toEngine_.push(Threading::setBaseParameter(parameterID.binaryValue, value));
     }
 

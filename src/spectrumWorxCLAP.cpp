@@ -1720,7 +1720,8 @@ void SpectrumWorxCLAP::drainEngineEvents()
         {
             ParameterID const parameterID{
                 Plugins::ParameterID{event.baseParameterChanged.parameterID}};
-            setParameterIn<Protocol>(programMain_, parameterID, event.baseParameterChanged.value);
+            setParameterIn<Protocol>(programMain_, parameterID, event.baseParameterChanged.value,
+                                     lfoTimer().timing());
             if (pEditor_)
                 pEditor_->parameterChangedElsewhere(parameterID, event.baseParameterChanged.value);
             break;
@@ -1780,7 +1781,7 @@ void SpectrumWorxCLAP::editParameter(ParameterID const parameterID, float const 
     // end, and a drag writes many values inside one
     plugin.rememberForUndo(parameterID, getParameter(parameterID, programMain_));
 
-    setParameterIn<Protocol>(plugin.programMain_, parameterID, value);
+    setParameterIn<Protocol>(plugin.programMain_, parameterID, value, lfoTimer().timing());
     // applied above before the push is attempted, so a drop leaves the
     // interface and the saved session holding an edit the engine never heard
     pushed(

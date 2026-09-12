@@ -170,6 +170,12 @@ class LFOImpl : public LFO
 
             value_type const barDurationChangeRatio_;
             bool const measureNumeratorChanged_;
+
+            /// \brief What the timing now *is*, as against what changed about it:
+            /// resnapping a synced period needs the new grid, and carrying it
+            /// here is what keeps every route that reports a change from having
+            /// to carry a second argument beside it.
+            Timing const timing_;
         }; // struct TimingInformationChange
 #ifdef _MSC_VER
 #pragma warning(pop)
@@ -177,22 +183,6 @@ class LFOImpl : public LFO
 
       public:
         Timer();
-
-        ////////////////////////////////////////////////////////////////////////
-        ///
-        /// \brief One bar at the tempo and meter the engine assumes when a host
-        /// reports none: 120 BPM in four four, so two seconds.
-        ///
-        /// \note **The unit a free-running LFO's period is measured in.** A
-        /// synced LFO's period is a fraction of the *host's* bar, which is the
-        /// whole of what syncing means and is why that one follows the tempo. A
-        /// free one is a duration in seconds, and expressing it against a bar
-        /// that never changes length is how it stays one without the parameter
-        /// having to be rewritten every time the tempo moves.
-        ///
-        ////////////////////////////////////////////////////////////////////////
-        static constexpr value_type referenceBarDuration{60.0f / 120 * 4};
-        static constexpr std::uint8_t referenceMeasureNumerator{4};
 
         value_type const &currentTimeInBars() const { return currentTimeInBars_; }
 
@@ -233,34 +223,33 @@ class LFOImpl : public LFO
 
         ////////////////////////////////////////////////////////////////////////
         ///
-        /// \brief The host's tempo, as every LFO in the process sees it.
+        /// \brief The host's tempo and meter, as this instance's LFOs see them.
         ///
-        /// \note Still process-wide, and still wrong for two instances in two
-        /// tracks at two tempi -- but no longer a data race. Each instance's
-        /// audio thread writes these once a block and the message thread reads
-        /// them to lay out the LFO panel, which as plain scalars is undefined
-        /// behaviour rather than merely a stale answer. Relaxed atomics, because
-        /// nothing else is published through them: what a reader needs is a
-        /// tempo, not a happens-before edge.
+        /// \note Per timer, and a timer is per engine: two tracks at two tempi no
+        /// longer share one answer. They were process-wide statics until issue
+        /// #11, which is why everything that snaps a period now takes a `Timing`
+        /// -- the parameter layer and the editor had no instance to ask.
         ///
-        ///   Making them per-instance is the real fix and is not this redesign's:
-        /// they are read by `snapPeriodScale()`, `clampFreePeriod()` and the two
-        /// period-scale bounds, all *static* and all called from the parameter
-        /// layer and the editor, so a per-instance timer means threading one
-        /// through the LFO parameter interface. Recorded in issue #11.
+        /// \note Relaxed atomics, because the audio thread writes them once a
+        /// block and the message thread reads them to lay out the LFO panel;
+        /// plain scalars there are undefined behaviour rather than merely a stale
+        /// answer. Nothing else is published through them, so what a reader needs
+        /// is a tempo and not a happens-before edge. Whoever wants both at once
+        /// takes `timing()`, which reads each exactly once.
         ///
         /// \note There is deliberately no "has a host told us a tempo" flag: one
         /// that has not is 120 BPM 4/4, which every LFO already runs against, and
-        /// a sticky process-global answer is not something a parameter default
-        /// may depend on.
+        /// a sticky answer is not something a parameter default may depend on.
         ///
         ////////////////////////////////////////////////////////////////////////
-        static value_type basePeriod() { return barDuration_.load(std::memory_order_relaxed); }
-        static std::uint8_t measureNumerator()
+        value_type basePeriod() const { return barDuration_.load(std::memory_order_relaxed); }
+        std::uint8_t measureNumerator() const
         {
             return measureNumerator_.load(std::memory_order_relaxed);
         }
-        static value_type measureNumeratorFloat();
+        value_type measureNumeratorFloat() const;
+
+        Timing timing() const { return {basePeriod(), measureNumerator()}; }
 
       private:
         /// \brief What to report for incoming timing, given what was already
@@ -277,12 +266,7 @@ class LFOImpl : public LFO
         /// \brief Whether this timer has ever been told the timing, as opposed to
         /// still holding the assumed 120 BPM 4/4.
         ///
-        /// \note Per instance, and the reason no static can answer it: reset()
-        /// puts barDuration_ back to the assumption, so a process-wide "we have
-        /// been told" would claim knowledge of a value that is a placeholder
-        /// again. The question is also per engine rather than per process.
-        ///
-        ///   What it is for: the first block after construction or reset()
+        /// \note What it is for: the first block after construction or reset()
         /// *establishes* the timing rather than changing it, and the difference
         /// matters because a Free LFO's period is rescaled by every bar-duration
         /// change (see updateForNewTimingInformation). Comparing a host's real
@@ -293,8 +277,8 @@ class LFOImpl : public LFO
         ////////////////////////////////////////////////////////////////////////
         bool timingInformationEstablished_{false};
 
-        static std::atomic<value_type> barDuration_;
-        static std::atomic<std::uint8_t> measureNumerator_;
+        std::atomic<value_type> barDuration_{referenceBarDuration};
+        std::atomic<std::uint8_t> measureNumerator_{referenceMeasureNumerator};
     }; // class Timer
 
   public:
@@ -341,7 +325,11 @@ class LFOImpl : public LFO
     static value_type currentPeriodScaleMinimum();
     static value_type currentPeriodScaleMaximum();
 
-    static SnappedPeriod snapPeriodScale(value_type periodScale, std::uint8_t syncTypes);
+    /// \note The `Timing` is the grid, and it is an argument rather than a
+    /// process-global because two instances in two tracks are at two tempi.
+    /// \see issue #11.
+    static SnappedPeriod snapPeriodScale(value_type periodScale, std::uint8_t syncTypes,
+                                         Timing const &);
 
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -363,22 +351,23 @@ class LFOImpl : public LFO
     ////////////////////////////////////////////////////////////////////////////
 
     static std::size_t printPeriodScale(value_type periodScale, std::uint8_t syncTypes,
-                                        std::span<char> buffer);
+                                        Timing const &, std::span<char> buffer);
 
     /// \brief The note value alone, without the milliseconds arm: what the panel
     /// draws on its own line. \see printPeriodScale(), whose synced arm this is.
     static std::size_t printSyncedPeriodScale(value_type periodScale, std::uint8_t syncTypes,
-                                              std::span<char> buffer);
+                                              Timing const &, std::span<char> buffer);
 
     /// \brief printPeriodScale() run backwards, or nothing for text that is not
     /// a period this LFO could hold.
     ///
     /// \note Answers the grid the text named along with the period, because it
     /// can name one the LFO is not on. \see issue #221.
-    static std::optional<SnappedPeriod> parsePeriodScale(char const *text, std::uint8_t syncTypes);
+    static std::optional<SnappedPeriod> parsePeriodScale(char const *text, std::uint8_t syncTypes,
+                                                         Timing const &);
 
     //...mrmlj...cleanup with a new 'logarithmic' parameter/control...
-    static void snapPeriodScaleFromAutomation(PeriodScale &);
+    static void snapPeriodScaleFromAutomation(PeriodScale &, Timing const &);
 
     /// \name The four sync choices a host is offered
     ///
@@ -411,8 +400,11 @@ class LFOImpl : public LFO
         return value;
     }
 
+    /// \note The `Timing` reaches only the `PeriodScale` specialisation, which
+    /// snaps a synced period onto the loading instance's grid.
     template <typename T>
-    typename T::value_type adjustValueFromPreset(typename T::value_type const value) const
+    typename T::value_type adjustValueFromPreset(typename T::value_type const value,
+                                                 Timing const &) const
     {
         return value;
     }
@@ -438,7 +430,8 @@ class LFOImpl : public LFO
   private:
     friend class LFO;
     static value_type clampFreePeriod(value_type absolutePeriod);
-    static SnappedPeriod snapSyncedPeriod(value_type periodScale, std::uint8_t syncTypes);
+    static SnappedPeriod snapSyncedPeriod(value_type periodScale, std::uint8_t syncTypes,
+                                          Timing const &);
 
     value_type getWaveformAmplitudeForPosition(value_type position, bool newPeriodBegun) const;
 
@@ -456,7 +449,8 @@ LFOImpl::PeriodScale::value_type LFOImpl::adjustValueForPreset(PeriodScale const
 
 template <>
 LFOImpl::PeriodScale::value_type
-    LFOImpl::adjustValueFromPreset<LFOImpl::PeriodScale>(LFOImpl::PeriodScale::value_type) const;
+LFOImpl::adjustValueFromPreset<LFOImpl::PeriodScale>(LFOImpl::PeriodScale::value_type,
+                                                     LFOImpl::Timing const &) const;
 
 ////////////////////////////////////////////////////////////////////////////////
 //

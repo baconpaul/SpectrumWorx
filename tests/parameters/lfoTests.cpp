@@ -35,9 +35,9 @@
 /// property would only restate the formula. Regenerate with SW_LFO_TABLE_UPDATE=1
 /// and read the diff -- a row that moves is an LFO shape that changed.
 ///
-/// \note `Timer`'s tempo and meter are `static` -- process wide, which
-/// issue #11 records -- so every case here states the timing it wants
-/// rather than inheriting whatever ran before it.
+/// \note A `Timer` carries its own tempo and meter, and everything that snaps,
+/// prints or parses a period takes them as an argument, so a case states the
+/// bar it wants and leaves nothing behind for the next one. \see issue #11.
 ///
 /// Copyright (c) 2026 the SpectrumWorx contributors.
 /// SPDX-License-Identifier: GPL-3.0-or-later
@@ -87,61 +87,6 @@ static_assert(std::size(waveformNames) == LFO::NumberOfWaveforms);
 /// One bar of four beats at 120 BPM is two seconds, which is what a host that
 /// reports nothing is assumed to be doing.
 constexpr float twoSeconds{2.0f};
-
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \class ScopedHostTiming
-///
-/// \brief States the host's tempo and meter, and puts them back.
-///
-/// \note **Every case in this file needs one**, including the ones that do not
-/// care what the tempo is, and that is not tidiness. `Timer`'s tempo and meter
-/// are `static` -- process wide, which issue #11 records -- and
-/// `adjustValueForPreset()` converts a Free LFO's period to milliseconds
-/// through the bar duration. So a case that leaves 140 BPM behind changes what
-/// every later preset load in the binary converts to, and the digests go red in
-/// `presetCorpusTests.cpp`, which never mentions an LFO. That is exactly what
-/// the first version of this file did.
-///
-/// \note What it no longer has to contain is the sync-type default. That used
-/// to read a third static -- a sticky "has a host ever reported a tempo" flag --
-/// so merely *establishing* a tempo here changed what a brand new LFO anywhere
-/// in the process defaulted to. The flag is gone and the default is the constant
-/// `Quarter`; see "A brand new LFO's sync type does not depend on the transport"
-/// below, which is what stops it coming back.
-///
-/// \note The way back is the *no-transport* overload of
-/// `updatePositionAndTimingInformation`, which restores the assumed 120 BPM 4/4
-/// that `reset()` alone would leave a `barDurationChanged()` short of.
-///
-/// \note `reset()` on the way in, because whether the timing is *established* is
-/// per timer and the first update after a reset establishes rather than changes
-/// -- the whole of the 03.08.2026 fix. Skipping it reports a bar-duration change
-/// nobody asked for.
-///
-////////////////////////////////////////////////////////////////////////////////
-
-class ScopedHostTiming
-{
-  public:
-    explicit ScopedHostTiming(float const barDuration = twoSeconds,
-                              std::uint8_t const measureNumerator = 4)
-    {
-        LFOImpl::Timer timer;
-        timer.reset();
-        timer.updatePositionAndTimingInformation(0, barDuration, measureNumerator);
-    }
-
-    ~ScopedHostTiming()
-    {
-        LFOImpl::Timer timer;
-        timer.reset();
-        timer.updatePositionAndTimingInformation(0u /*samples*/, 48000.0f);
-    }
-
-    ScopedHostTiming(ScopedHostTiming const &) = delete; // makes non-copyable
-    ScopedHostTiming &operator=(ScopedHostTiming const &) = delete;
-}; // class ScopedHostTiming
 
 /// \brief Sets \p lfo's waveform and enables it, leaving everything else at its
 /// default.
@@ -358,8 +303,26 @@ constexpr float barOf(std::uint8_t const beatsPerBar)
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \brief Every distinct period a quarter-note-synced LFO can hold in the meter
-/// currently in force, sweeping requests from one beat up to one bar.
+/// \brief A host's bar, to snap and print against.
+///
+/// \note This was a `ScopedHostTiming` guard until issue #11, and the guard was
+/// the whole shape of the bug: the tempo and the meter were process-wide
+/// statics, so a case that drove five four had to put four four back on the way
+/// out or every later case in the binary measured something else. They are per
+/// timer now and a meter is an argument, so a case states the one it wants and
+/// carries it nowhere.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+LFOImpl::Timing meterOf(std::uint8_t const beatsPerBar)
+{
+    return {barOf(beatsPerBar), beatsPerBar};
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief Every distinct period a quarter-note-synced LFO can hold in \p timing's
+/// meter, sweeping requests from one beat up to one bar.
 ///
 /// \note A sweep rather than a handful of requests with their answers written
 /// next to them: what is being asked is which periods are *reachable*, and an
@@ -368,9 +331,9 @@ constexpr float barOf(std::uint8_t const beatsPerBar)
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-std::vector<float> snapGridOfTheCurrentMeter()
+std::vector<float> snapGridOf(LFOImpl::Timing const &timing)
 {
-    auto const beatsPerBar(LFOImpl::Timer::measureNumeratorFloat());
+    auto const beatsPerBar(timing.measureNumeratorFloat());
     constexpr unsigned int steps{200};
 
     std::vector<float> grid;
@@ -379,7 +342,7 @@ std::vector<float> snapGridOfTheCurrentMeter()
         auto const oneBeat(1 / beatsPerBar);
         auto const wanted(oneBeat +
                           (1 - oneBeat) * static_cast<float>(step) / static_cast<float>(steps));
-        auto const snapped(LFOImpl::snapPeriodScale(wanted, LFO::Quarter).first);
+        auto const snapped(LFOImpl::snapPeriodScale(wanted, LFO::Quarter, timing).first);
         if (std::ranges::none_of(grid, [snapped](float const already) {
                 return std::abs(already - snapped) < 1e-4f;
             }))
@@ -399,8 +362,6 @@ std::vector<float> snapGridOfTheCurrentMeter()
 
 TEST_CASE("Every LFO waveform matches the committed table", "[lfo]")
 {
-    ScopedHostTiming const timing;
-
     auto const table(currentTable());
     REQUIRE(table.size() == LFO::NumberOfWaveforms);
 
@@ -465,8 +426,6 @@ TEST_CASE("Every LFO waveform matches the committed table", "[lfo]")
 
 TEST_CASE("The waveforms are eleven different shapes", "[lfo]")
 {
-    ScopedHostTiming const timing;
-
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \note What the table cannot say. It would be perfectly happy with eleven
@@ -495,8 +454,6 @@ TEST_CASE("The waveforms are eleven different shapes", "[lfo]")
 
 TEST_CASE("Every LFO waveform stays inside the unit interval", "[lfo]")
 {
-    ScopedHostTiming const timing;
-
     /// \note `getValue()` asserts this in a checked build -- `isValueInRange()`
     /// on the raw waveform and `isValueInBounds()` on the mapped result -- so in
     /// that build this case is the thing that *runs* those assertions over
@@ -518,8 +475,6 @@ TEST_CASE("Every LFO waveform stays inside the unit interval", "[lfo]")
 
 TEST_CASE("Every LFO waveform stays inside the unit interval at any phase", "[lfo]")
 {
-    ScopedHostTiming const timing;
-
     // the case above sweeps at the default phase, and zero is the one value of
     // it that cannot put the position inside a period below zero
     //
@@ -548,8 +503,6 @@ TEST_CASE("Every LFO waveform stays inside the unit interval at any phase", "[lf
 
 TEST_CASE("A held random waveform holds and a sliding one slides", "[lfo]")
 {
-    ScopedHostTiming const timing;
-
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \note The three random waveforms are three different things and only
@@ -614,8 +567,6 @@ TEST_CASE("A held random waveform holds and a sliding one slides", "[lfo]")
 
 TEST_CASE("A period begins once per period, however the clock is sampled", "[lfo]")
 {
-    ScopedHostTiming const timing;
-
     /// \note Dirac is the probe rather than a waveform under test: it answers
     /// `maximumValue` exactly when `newPeriodBegun` is set and `minimumValue`
     /// otherwise, so counting its peaks counts period beginnings and nothing
@@ -645,8 +596,6 @@ TEST_CASE("A period begins once per period, however the clock is sampled", "[lfo
 
 TEST_CASE("Sample & Glide glides once per period whatever the buffer size", "[lfo]")
 {
-    ScopedHostTiming const timing;
-
     /// The reference: one evaluation per clock tick, which is what the plugin
     /// does when the host's buffer happens to equal the hop.
     auto const oncePerTick(driven(LFO::RandomSlide, drivenTicks, barsPerTick, 1, 1));
@@ -704,8 +653,6 @@ TEST_CASE("Sample & Glide glides once per period whatever the buffer size", "[lf
 
 TEST_CASE("The LFO's bounds map its range onto the parameter's", "[lfo]")
 {
-    ScopedHostTiming const timing;
-
     // The whole point of the two bounds, and nothing had ever set either: an
     // enabled LFO sweeps [lowerBound, upperBound] rather than [0, 1].
     LFOImpl lfo;
@@ -725,8 +672,6 @@ TEST_CASE("The LFO's bounds map its range onto the parameter's", "[lfo]")
 
 TEST_CASE("A bound crossing the other drags it along and says so", "[lfo]")
 {
-    ScopedHostTiming const timing;
-
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \note `LowerBound > UpperBound`, which the todo lists as untested and
@@ -790,9 +735,8 @@ TEST_CASE("A brand new LFO's sync type does not depend on the transport", "[lfo]
     /// them -- so a transport-dependent default has `stateSave` storing a `sync`
     /// the audio thread is not running.
     ///
-    ///   Deliberately **not** written with a `ScopedHostTiming`: the whole point
-    /// is that establishing a transport must not change the answer, so this case
-    /// states both timings itself and compares across them.
+    ///   The whole point is that establishing a transport must not change the
+    /// answer, so this case drives a timer both ways and asks across them.
     ///
     ////////////////////////////////////////////////////////////////////////////
 
@@ -801,54 +745,41 @@ TEST_CASE("A brand new LFO's sync type does not depend on the transport", "[lfo]
         return lfo.syncTypes();
     });
 
+    LFOImpl::Timer timer;
+    timer.reset();
+
     // No transport: the assumed 120 BPM 4/4.
-    {
-        LFOImpl::Timer timer;
-        timer.reset();
-        timer.updatePositionAndTimingInformation(0u /*samples*/, 48000.0f);
-    }
+    timer.updatePositionAndTimingInformation(0u /*samples*/, 48000.0f);
     auto const withoutTransport(freshlyDefaultedSyncType());
 
     // A host reports one, which is what used to flip the answer for ever after.
-    {
-        LFOImpl::Timer timer;
-        timer.reset();
-        timer.updatePositionAndTimingInformation(0, twoSeconds, 4);
-    }
+    timer.updatePositionAndTimingInformation(0, twoSeconds, 4);
     auto const withTransport(freshlyDefaultedSyncType());
 
     CAPTURE(withoutTransport, withTransport);
     CHECK(withoutTransport == withTransport);
     CHECK(withTransport == LFO::Quarter);
-
-    // ...and back, so the rest of the binary sees what it expects.
-    {
-        LFOImpl::Timer timer;
-        timer.reset();
-        timer.updatePositionAndTimingInformation(0u /*samples*/, 48000.0f);
-    }
-    CHECK(freshlyDefaultedSyncType() == LFO::Quarter);
 }
 
 TEST_CASE("A free LFO's period is clamped rather than snapped", "[lfo]")
 {
-    ScopedHostTiming const timing;
+    constexpr LFOImpl::Timing timing{}; // the reference bar, 120 BPM in four four
 
     // Free takes any period inside the range, unchanged.
-    auto const [midRange, type](LFOImpl::snapPeriodScale(0.375f, LFO::Free));
+    auto const [midRange, type](LFOImpl::snapPeriodScale(0.375f, LFO::Free, timing));
     CHECK(type == LFO::Free);
     CHECK(midRange == Catch::Approx(0.375f));
 
     // ...and only the ends of the range move it.
-    CHECK(LFOImpl::snapPeriodScale(1000.0f, LFO::Free).first ==
+    CHECK(LFOImpl::snapPeriodScale(1000.0f, LFO::Free, timing).first ==
           Catch::Approx(LFOImpl::currentPeriodScaleMaximum()));
-    CHECK(LFOImpl::snapPeriodScale(0.0f, LFO::Free).first ==
+    CHECK(LFOImpl::snapPeriodScale(0.0f, LFO::Free, timing).first ==
           Catch::Approx(LFOImpl::currentPeriodScaleMinimum()));
 }
 
 TEST_CASE("A synced LFO's period lands on a division of the bar", "[lfo]")
 {
-    ScopedHostTiming const timing;
+    constexpr LFOImpl::Timing timing{}; // the reference bar, 120 BPM in four four
 
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -860,8 +791,9 @@ TEST_CASE("A synced LFO's period lands on a division of the bar", "[lfo]")
     ///
     ////////////////////////////////////////////////////////////////////////////
 
-    auto const quarter(
-        [](float const wanted) { return LFOImpl::snapPeriodScale(wanted, LFO::Quarter).first; });
+    auto const quarter([&](float const wanted) {
+        return LFOImpl::snapPeriodScale(wanted, LFO::Quarter, timing).first;
+    });
 
     // Asking for a bar, a half and a quarter gets exactly those.
     CHECK(quarter(1.0f) == Catch::Approx(1.0f));
@@ -878,21 +810,21 @@ TEST_CASE("A synced LFO's period lands on a division of the bar", "[lfo]")
     }
 
     // And the type it snapped to is reported, which is what the editor labels.
-    CHECK(LFOImpl::snapPeriodScale(0.3f, LFO::Quarter).second == LFO::Quarter);
+    CHECK(LFOImpl::snapPeriodScale(0.3f, LFO::Quarter, timing).second == LFO::Quarter);
 }
 
 TEST_CASE("Triplet and dotted sync land somewhere quarter sync cannot", "[lfo]")
 {
-    ScopedHostTiming const timing;
+    constexpr LFOImpl::Timing timing{}; // the reference bar, 120 BPM in four four
 
     /// \note The control for the case above: three sync types that all snapped
     /// to the same grid would be one sync type with three names, and nothing had
     /// ever asked for more than the default.
 
     constexpr float wanted{0.3f};
-    auto const asQuarter(LFOImpl::snapPeriodScale(wanted, LFO::Quarter));
-    auto const asTriplet(LFOImpl::snapPeriodScale(wanted, LFO::Triplet));
-    auto const asDotted(LFOImpl::snapPeriodScale(wanted, LFO::Dotted));
+    auto const asQuarter(LFOImpl::snapPeriodScale(wanted, LFO::Quarter, timing));
+    auto const asTriplet(LFOImpl::snapPeriodScale(wanted, LFO::Triplet, timing));
+    auto const asDotted(LFOImpl::snapPeriodScale(wanted, LFO::Dotted, timing));
 
     CAPTURE(asQuarter.first, asTriplet.first, asDotted.first);
     CHECK(asTriplet.second == LFO::Triplet);
@@ -903,7 +835,7 @@ TEST_CASE("Triplet and dotted sync land somewhere quarter sync cannot", "[lfo]")
     /// \note `All` is the three of them offered together, so whatever it picks
     /// has to be one of the three -- and the nearest of them, which is what
     /// makes it useful rather than merely permissive.
-    auto const asAll(LFOImpl::snapPeriodScale(wanted, LFO::All));
+    auto const asAll(LFOImpl::snapPeriodScale(wanted, LFO::All, timing));
     auto const distance([](float const value) { return std::abs(value - wanted); });
     CHECK(std::min({distance(asQuarter.first), distance(asTriplet.first),
                     distance(asDotted.first)}) == Catch::Approx(distance(asAll.first)));
@@ -911,7 +843,7 @@ TEST_CASE("Triplet and dotted sync land somewhere quarter sync cannot", "[lfo]")
 
 TEST_CASE("The snapped period follows the host's meter", "[lfo]")
 {
-    ScopedHostTiming const timing;
+    constexpr LFOImpl::Timing timing{}; // the reference bar, 120 BPM in four four
 
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -924,35 +856,26 @@ TEST_CASE("The snapped period follows the host's meter", "[lfo]")
     /// is no such thing as the quarter-of-a-bar that 4/4 snaps to.
     ///
     ////////////////////////////////////////////////////////////////////////////
-    {
-        REQUIRE(LFOImpl::Timer::measureNumerator() == 4);
-        CHECK(LFOImpl::snapPeriodScale(0.25f, LFO::Quarter).first == Catch::Approx(0.25f));
-    }
-    {
-        /// Three beats to the bar, at the same tempo -- so the bar is 1.5 s.
-        ScopedHostTiming const inThreeFour(1.5f, 3);
-        REQUIRE(LFOImpl::Timer::measureNumerator() == 3);
+    CHECK(LFOImpl::snapPeriodScale(0.25f, LFO::Quarter, timing).first == Catch::Approx(0.25f));
 
-        // One beat is a third of a bar now, and asking for a quarter gets it.
-        auto const oneBeat(LFOImpl::snapPeriodScale(0.25f, LFO::Quarter).first);
-        CAPTURE(oneBeat);
-        CHECK(oneBeat == Catch::Approx(1.0f / 3).margin(1e-4));
+    /// Three beats to the bar, at the same tempo -- so the bar is 1.5 s.
+    auto const inThreeFour(meterOf(3));
 
-        // ...and a whole bar is still a whole bar.
-        CHECK(LFOImpl::snapPeriodScale(1.0f, LFO::Quarter).first == Catch::Approx(1.0f));
-    }
+    // One beat is a third of a bar now, and asking for a quarter gets it.
+    auto const oneBeat(LFOImpl::snapPeriodScale(0.25f, LFO::Quarter, inThreeFour).first);
+    CAPTURE(oneBeat);
+    CHECK(oneBeat == Catch::Approx(1.0f / 3).margin(1e-4));
 
-    /// \note And 4/4 is back, because the 3/4 guard went out of scope with the
-    /// block above it. These are process-wide statics; a case that left 3/4
-    /// behind would change what every later case in the binary measures. See
-    /// ScopedHostTiming.
-    CHECK(LFOImpl::Timer::measureNumerator() == 4);
+    // ...and a whole bar is still a whole bar.
+    CHECK(LFOImpl::snapPeriodScale(1.0f, LFO::Quarter, inThreeFour).first == Catch::Approx(1.0f));
+
+    // ...and four four still answers as it did, the two meters being two values
+    // rather than one shared setting. \see issue #11.
+    CHECK(LFOImpl::snapPeriodScale(0.25f, LFO::Quarter, timing).first == Catch::Approx(0.25f));
 }
 
 TEST_CASE("Three four, six eight and five four each snap to a grid of their own", "[lfo]")
 {
-    ScopedHostTiming const timing;
-
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \note Issue #14 asks for a meter other than 4/4 somewhere in the suite;
@@ -970,11 +893,8 @@ TEST_CASE("Three four, six eight and five four each snap to a grid of their own"
     ///
     ////////////////////////////////////////////////////////////////////////////
 
-    auto const gridIn([](std::uint8_t const beatsPerBar) {
-        ScopedHostTiming const meter(barOf(beatsPerBar), beatsPerBar);
-        REQUIRE(LFOImpl::Timer::measureNumerator() == beatsPerBar);
-        return snapGridOfTheCurrentMeter();
-    });
+    auto const gridIn(
+        [](std::uint8_t const beatsPerBar) { return snapGridOf(meterOf(beatsPerBar)); });
 
     auto const isTheGrid([](std::vector<float> const &grid, std::vector<float> const &expected) {
         INFO("reachable: " << row(grid) << "  --  expected: " << row(expected));
@@ -1000,21 +920,17 @@ TEST_CASE("Three four, six eight and five four each snap to a grid of their own"
     /// half a bar gets half a bar in four four and six eight, a third of one in
     /// three four, and a fifth in five four.
     auto const halfABarIn([](std::uint8_t const beatsPerBar) {
-        ScopedHostTiming const meter(barOf(beatsPerBar), beatsPerBar);
-        return LFOImpl::snapPeriodScale(0.5f, LFO::Quarter).first;
+        return LFOImpl::snapPeriodScale(0.5f, LFO::Quarter, meterOf(beatsPerBar)).first;
     });
     CHECK(halfABarIn(4) == Catch::Approx(0.5f));
     CHECK(halfABarIn(6) == Catch::Approx(0.5f));
     CHECK(halfABarIn(3) == Catch::Approx(third).margin(1e-4));
     CHECK(halfABarIn(5) == Catch::Approx(fifth).margin(1e-4));
-
-    // Every guard above went out of scope with the statement that made it.
-    CHECK(LFOImpl::Timer::measureNumerator() == 4);
 }
 
 TEST_CASE("Four sixths of a bar in six eight is a half bar away, not a whole one", "[lfo]")
 {
-    ScopedHostTiming const inSixEight(barOf(6), 6);
+    auto const inSixEight(meterOf(6));
 
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -1041,17 +957,13 @@ TEST_CASE("Four sixths of a bar in six eight is a half bar away, not a whole one
     ///
     ////////////////////////////////////////////////////////////////////////////
 
-    REQUIRE(LFOImpl::Timer::measureNumerator() == 6);
-
     // A sixth from the half bar, two sixths from the whole one.
-    CHECK(LFOImpl::snapPeriodScale(4 / 6.0f, LFO::Quarter).first ==
+    CHECK(LFOImpl::snapPeriodScale(4 / 6.0f, LFO::Quarter, inSixEight).first ==
           Catch::Approx(0.5f).margin(1e-4));
 }
 
 TEST_CASE("Every synced period snaps to a nearest beat count its meter divides", "[lfo]")
 {
-    ScopedHostTiming const timing;
-
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \note The general form of the case above, over every meter a host is
@@ -1082,9 +994,7 @@ TEST_CASE("Every synced period snaps to a nearest beat count its meter divides",
     for (unsigned beatsPerBar(2); beatsPerBar <= 16; ++beatsPerBar)
     {
         auto const numerator(static_cast<std::uint8_t>(beatsPerBar));
-        ScopedHostTiming const meter(barOf(numerator), numerator);
-        REQUIRE(LFOImpl::Timer::measureNumerator() == numerator);
-
+        auto const meter(meterOf(numerator));
         auto const divisors(divisorsOf(beatsPerBar));
 
         for (unsigned beats(1); beats <= beatsPerBar; ++beats)
@@ -1094,7 +1004,7 @@ TEST_CASE("Every synced period snaps to a nearest beat count its meter divides",
             });
 
             auto const wanted(static_cast<float>(beats) / static_cast<float>(beatsPerBar));
-            auto const snapped(LFOImpl::snapPeriodScale(wanted, LFO::Quarter).first);
+            auto const snapped(LFOImpl::snapPeriodScale(wanted, LFO::Quarter, meter).first);
             auto const snappedBeats(
                 static_cast<unsigned>(std::lround(snapped * static_cast<float>(beatsPerBar))));
 
@@ -1111,7 +1021,7 @@ TEST_CASE("Every synced period snaps to a nearest beat count its meter divides",
 
 TEST_CASE("A request exactly between two beat counts takes the shorter period", "[lfo]")
 {
-    ScopedHostTiming const timing;
+    constexpr LFOImpl::Timing timing{}; // the reference bar, 120 BPM in four four
 
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -1129,20 +1039,61 @@ TEST_CASE("A request exactly between two beat counts takes the shorter period", 
     ///
     ////////////////////////////////////////////////////////////////////////////
 
-    REQUIRE(LFOImpl::Timer::measureNumerator() == 4);
-    CHECK(LFOImpl::snapPeriodScale(0.75f, LFO::Quarter).first == Catch::Approx(0.5f));
+    CHECK(LFOImpl::snapPeriodScale(0.75f, LFO::Quarter, timing).first == Catch::Approx(0.5f));
 
+    CHECK(LFOImpl::snapPeriodScale(2 / 3.0f, LFO::Quarter, meterOf(3)).first ==
+          Catch::Approx(1 / 3.0f).margin(1e-4));
+}
+
+TEST_CASE("Two timers at two tempi keep two answers", "[lfo]")
+{
+    ////////////////////////////////////////////////////////////////////////////
+    ///
+    /// \note Issue #11, at its smallest. The bar duration and the measure
+    /// numerator were `static` members of `Timer`, so every instance in the
+    /// process read whichever one had last been told a transport -- a data race
+    /// once, then merely one tempo for two tracks.
+    ///
+    /// \note Driven alternately rather than one after the other: a
+    /// last-writer-wins static agrees with the second timer for as long as
+    /// nothing else writes, so a case that established both and then asked would
+    /// have had to ask in the right order to see anything at all.
+    ///
+    ////////////////////////////////////////////////////////////////////////////
+
+    LFOImpl::Timer inFiveFour;
+    LFOImpl::Timer inThreeFour;
+    inFiveFour.reset();
+    inThreeFour.reset();
+
+    for (unsigned block(0); block < 4; ++block)
     {
-        ScopedHostTiming const inThreeFour(barOf(3), 3);
-        CHECK(LFOImpl::snapPeriodScale(2 / 3.0f, LFO::Quarter).first ==
-              Catch::Approx(1 / 3.0f).margin(1e-4));
+        inFiveFour.updatePositionAndTimingInformation(static_cast<float>(block), barOf(5), 5);
+        inThreeFour.updatePositionAndTimingInformation(static_cast<float>(block), barOf(3), 3);
     }
+
+    CHECK(inFiveFour.measureNumerator() == 5);
+    CHECK(inThreeFour.measureNumerator() == 3);
+    CHECK(inFiveFour.basePeriod() == Catch::Approx(barOf(5)));
+    CHECK(inThreeFour.basePeriod() == Catch::Approx(barOf(3)));
+
+    ///   And a timer nobody has told anything still answers the assumption,
+    /// which is what a plugin in a host with no transport runs against.
+    LFOImpl::Timer const untold;
+    CHECK(untold.measureNumerator() == LFOImpl::referenceMeasureNumerator);
+    CHECK(untold.basePeriod() == Catch::Approx(LFOImpl::referenceBarDuration));
+
+    ///   The grid each of them hands to a snap is its own, which is the half of
+    /// this that reaches a stored parameter: five is prime, so half a bar is a
+    /// single beat there and a third of one in three four.
+    CHECK(LFOImpl::snapPeriodScale(0.5f, LFO::Quarter, inFiveFour.timing()).first ==
+          Catch::Approx(1 / 5.0f).margin(1e-4));
+    CHECK(LFOImpl::snapPeriodScale(0.5f, LFO::Quarter, inThreeFour.timing()).first ==
+          Catch::Approx(1 / 3.0f).margin(1e-4));
 }
 
 TEST_CASE("A host that opens in five four is stating its meter rather than changing it", "[lfo]")
 {
-    ScopedHostTiming const timing;
-
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \note The other half of issue #14, and the one it was filed about.
@@ -1224,8 +1175,6 @@ TEST_CASE("A host that opens in five four is stating its meter rather than chang
 
 TEST_CASE("A meter change resnaps a synced LFO and leaves a free one alone", "[lfo]")
 {
-    ScopedHostTiming const timing;
-
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \note `updateForNewTimingInformation()`, which is the other half of what
@@ -1277,8 +1226,6 @@ TEST_CASE("A meter change resnaps a synced LFO and leaves a free one alone", "[l
 
 TEST_CASE("A tempo change moves neither a free LFO's rate nor its parameter", "[lfo]")
 {
-    ScopedHostTiming const timing;
-
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \note The pair that has to hold together, and the reason the 2011
@@ -1337,8 +1284,6 @@ TEST_CASE("A tempo change moves neither a free LFO's rate nor its parameter", "[
 
 TEST_CASE("The first block after a reset establishes the timing rather than changing it", "[lfo]")
 {
-    ScopedHostTiming const timing;
-
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \note The 03.08.2026 fix, stated directly for the first time. A timer
@@ -1373,8 +1318,6 @@ TEST_CASE("The first block after a reset establishes the timing rather than chan
 
 TEST_CASE("Several LFOs on one clock stay independent", "[lfo]")
 {
-    ScopedHostTiming const timing;
-
     /// \note The todo's "several at once". They share a `Timer` -- one per
     /// engine, read by every module's every LFO -- and each carries its own
     /// waveform state, so a shared `state_` or a shared position would show up
@@ -1418,8 +1361,8 @@ TEST_CASE("Several LFOs on one clock stay independent", "[lfo]")
 /// The panel has drawn it this way since 2011 and the host was being handed the
 /// raw multiple of a bar.
 ///
-/// \note The rows are read against 4/4 at 120 BPM, which is what ScopedHostTiming
-/// puts in force: the quarter grid a bar of four four offers is a quarter, a half
+/// \note The rows are read against 4/4 at 120 BPM, which is what a default
+/// `Timing` is: the quarter grid a bar of four four offers is a quarter, a half
 /// and a whole, the triplet grid is those times two thirds, and the dotted grid
 /// is those times three halves. \see how-lfo-rates-and-eval-work.md §4.
 ///
@@ -1427,11 +1370,11 @@ TEST_CASE("Several LFOs on one clock stay independent", "[lfo]")
 
 TEST_CASE("A period reads as a note value when synced and as a time when free", "[lfo]")
 {
-    ScopedHostTiming const timing;
+    constexpr LFOImpl::Timing timing{}; // the reference bar, 120 BPM in four four
 
     std::array<char, 64> buffer;
     auto const shown([&](float const periodScale, std::uint8_t const syncTypes) {
-        auto const written(LFOImpl::printPeriodScale(periodScale, syncTypes, buffer));
+        auto const written(LFOImpl::printPeriodScale(periodScale, syncTypes, timing, buffer));
         return std::string(buffer.data(), written);
     });
 
@@ -1469,11 +1412,11 @@ TEST_CASE("A period reads as a note value when synced and as a time when free", 
 
 TEST_CASE("A period reads back the note value it displays", "[lfo]")
 {
-    ScopedHostTiming const timing;
+    constexpr LFOImpl::Timing timing{}; // the reference bar, 120 BPM in four four
 
     std::array<char, 64> buffer;
     auto const shown([&](float const periodScale, std::uint8_t const syncTypes) {
-        auto const written(LFOImpl::printPeriodScale(periodScale, syncTypes, buffer));
+        auto const written(LFOImpl::printPeriodScale(periodScale, syncTypes, timing, buffer));
         return std::string(buffer.data(), written);
     });
 
@@ -1491,7 +1434,7 @@ TEST_CASE("A period reads back the note value it displays", "[lfo]")
         auto const text(shown(row.periodScale, row.syncTypes));
         CAPTURE(text);
 
-        auto const parsed(LFOImpl::parsePeriodScale(text.c_str(), row.syncTypes));
+        auto const parsed(LFOImpl::parsePeriodScale(text.c_str(), row.syncTypes, timing));
         REQUIRE(parsed.has_value());
         CHECK(parsed->first == Catch::Approx(row.periodScale).epsilon(0.001));
         CHECK(shown(parsed->first, row.syncTypes) == text);
@@ -1501,15 +1444,15 @@ TEST_CASE("A period reads back the note value it displays", "[lfo]")
     }
 
     // Text no period corresponds to is nothing, not zero.
-    CHECK_FALSE(LFOImpl::parsePeriodScale("", LFO::Quarter).has_value());
-    CHECK_FALSE(LFOImpl::parsePeriodScale("N/A", LFO::Quarter).has_value());
-    CHECK_FALSE(LFOImpl::parsePeriodScale("off", LFO::Free).has_value());
-    CHECK_FALSE(LFOImpl::parsePeriodScale(nullptr, LFO::Quarter).has_value());
+    CHECK_FALSE(LFOImpl::parsePeriodScale("", LFO::Quarter, timing).has_value());
+    CHECK_FALSE(LFOImpl::parsePeriodScale("N/A", LFO::Quarter, timing).has_value());
+    CHECK_FALSE(LFOImpl::parsePeriodScale("off", LFO::Free, timing).has_value());
+    CHECK_FALSE(LFOImpl::parsePeriodScale(nullptr, LFO::Quarter, timing).has_value());
 
     /// \note A denominator of zero is text a user can type and `1/0` is not a
     /// period; answering infinity for it would put a value the parameter cannot
     /// hold into the engine.
-    CHECK_FALSE(LFOImpl::parsePeriodScale("1/0 bars", LFO::Quarter).has_value());
+    CHECK_FALSE(LFOImpl::parsePeriodScale("1/0 bars", LFO::Quarter, timing).has_value());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1524,11 +1467,11 @@ TEST_CASE("A period reads back the note value it displays", "[lfo]")
 
 TEST_CASE("A period reads the shorthand a musician types", "[lfo]")
 {
-    ScopedHostTiming const timing;
+    constexpr LFOImpl::Timing timing{}; // the reference bar, 120 BPM in four four
 
     std::array<char, 64> buffer;
     auto const shown([&](LFOImpl::SnappedPeriod const &period) {
-        auto const written(LFOImpl::printPeriodScale(period.first, period.second, buffer));
+        auto const written(LFOImpl::printPeriodScale(period.first, period.second, timing, buffer));
         return std::string(buffer.data(), written);
     });
 
@@ -1571,7 +1514,7 @@ TEST_CASE("A period reads the shorthand a musician types", "[lfo]")
     for (auto const &row : rows)
     {
         CAPTURE(row.typed);
-        auto const parsed(LFOImpl::parsePeriodScale(row.typed, LFO::Quarter));
+        auto const parsed(LFOImpl::parsePeriodScale(row.typed, LFO::Quarter, timing));
         REQUIRE(parsed.has_value());
         CHECK(shown(*parsed) == row.shows);
     }
@@ -1580,27 +1523,27 @@ TEST_CASE("A period reads the shorthand a musician types", "[lfo]")
     /// the LFO is not on: typing a dotted quarter at a quarter-snapped LFO is a
     /// request for the dotted grid, not for the nearest quarter. This is the
     /// half of the issue the panel acts on. \see the LFO display's typein.
-    CHECK(LFOImpl::parsePeriodScale("1/4D", LFO::Quarter)->second == LFO::Dotted);
-    CHECK(LFOImpl::parsePeriodScale("1/4T", LFO::Quarter)->second == LFO::Triplet);
-    CHECK(LFOImpl::parsePeriodScale("1/4", LFO::Triplet)->second == LFO::Quarter);
+    CHECK(LFOImpl::parsePeriodScale("1/4D", LFO::Quarter, timing)->second == LFO::Dotted);
+    CHECK(LFOImpl::parsePeriodScale("1/4T", LFO::Quarter, timing)->second == LFO::Triplet);
+    CHECK(LFOImpl::parsePeriodScale("1/4", LFO::Triplet, timing)->second == LFO::Quarter);
 
     ///   A length that names no grid lands on whichever one is nearest, which is
     /// how `0.333` reaches a triplet at all: 1/3 of a bar is exactly a triplet
     /// half and 0.083 away from the nearest quarter.
-    CHECK(LFOImpl::parsePeriodScale("0.333", LFO::Quarter)->second == LFO::Triplet);
-    CHECK(LFOImpl::parsePeriodScale("0.25", LFO::Triplet)->second == LFO::Quarter);
+    CHECK(LFOImpl::parsePeriodScale("0.333", LFO::Quarter, timing)->second == LFO::Triplet);
+    CHECK(LFOImpl::parsePeriodScale("0.25", LFO::Triplet, timing)->second == LFO::Quarter);
 
     // Loosening the reading does not loosen the refusal: still no digit, still
     // not a period.
-    CHECK_FALSE(LFOImpl::parsePeriodScale("bars", LFO::Quarter).has_value());
-    CHECK_FALSE(LFOImpl::parsePeriodScale("T", LFO::Quarter).has_value());
-    CHECK_FALSE(LFOImpl::parsePeriodScale("N/A bars", LFO::Quarter).has_value());
-    CHECK_FALSE(LFOImpl::parsePeriodScale("-1/4", LFO::Quarter).has_value());
+    CHECK_FALSE(LFOImpl::parsePeriodScale("bars", LFO::Quarter, timing).has_value());
+    CHECK_FALSE(LFOImpl::parsePeriodScale("T", LFO::Quarter, timing).has_value());
+    CHECK_FALSE(LFOImpl::parsePeriodScale("N/A bars", LFO::Quarter, timing).has_value());
+    CHECK_FALSE(LFOImpl::parsePeriodScale("-1/4", LFO::Quarter, timing).has_value());
 }
 
 TEST_CASE("An LFO's period follows a change of sync type onto the new grid", "[lfo]")
 {
-    ScopedHostTiming const timing;
+    constexpr LFOImpl::Timing timing{}; // the reference bar, 120 BPM in four four
 
     // each sync type divides the bar differently, so a period set under one is
     // not a period the next one has. It used to stay where it stood -- the
@@ -1612,17 +1555,19 @@ TEST_CASE("An LFO's period follows a change of sync type onto the new grid", "[l
 
     LFOImpl lfo;
     lfo.parameters().set<LFOImpl::SyncTypes>(LFO::Quarter);
-    lfo.parameters().set<LFOImpl::PeriodScale>(LFOImpl::snapPeriodScale(0.3f, LFO::Quarter).first);
+    lfo.parameters().set<LFOImpl::PeriodScale>(
+        LFOImpl::snapPeriodScale(0.3f, LFO::Quarter, timing).first);
     auto const onQuarter(lfo.periodScale());
 
     // what a host writing Sync does, and what the editor's own setter does
     lfo.parameters().set<LFOImpl::SyncTypes>(LFO::Triplet);
-    auto const moved(LE::SW::Automation::Detail::autoAdjustedLFOParameter(lfo, syncTypesIndex));
+    auto const moved(
+        LE::SW::Automation::Detail::autoAdjustedLFOParameter(lfo, syncTypesIndex, timing));
 
     INFO("period " << onQuarter << " under Quarter, " << lfo.periodScale() << " under Triplet");
     CHECK(lfo.periodScale() != onQuarter);
     CHECK(lfo.periodScale() ==
-          Catch::Approx(LFOImpl::snapPeriodScale(lfo.periodScale(), LFO::Triplet).first));
+          Catch::Approx(LFOImpl::snapPeriodScale(lfo.periodScale(), LFO::Triplet, timing).first));
 
     // and it is the *period* the host is told about, not the sync it wrote
     REQUIRE(moved);

@@ -253,7 +253,7 @@ template <class ActualModule, class AutomatedParameter> struct ParameterParser
         case IndexOf<LFO::Parameters, LFO::PeriodScale>::value:
         {
             auto const syncTypes(pModule->lfo(parameterID.moduleParameterIndex).syncTypes());
-            auto const parsed(LFO::parsePeriodScale(parser.text, syncTypes));
+            auto const parsed(LFO::parsePeriodScale(parser.text, syncTypes, lfoTiming));
             if (!parsed)
                 return {};
 
@@ -261,9 +261,10 @@ template <class ActualModule, class AutomatedParameter> struct ParameterParser
             /// on it: this edge answers one number and has no second parameter to
             /// write, so `1/4D` typed into a host's lane is the nearest quarter
             /// rather than a mask change nothing asked for. \see issue #221.
-            auto const periodScale((syncTypes == LFO::Free)
-                                       ? parsed->first
-                                       : LFO::snapPeriodScale(parsed->first, syncTypes).first);
+            auto const periodScale(
+                (syncTypes == LFO::Free)
+                    ? parsed->first
+                    : LFO::snapPeriodScale(parsed->first, syncTypes, lfoTiming).first);
             return LFO::internal2AutomatedValue(parameterID.lfoParameterIndex, periodScale,
                                                 AutomatedParameter::normalised);
         }
@@ -317,6 +318,10 @@ template <class ActualModule, class AutomatedParameter> struct ParameterParser
     }
 
     LE::Parameters::ParameterValueParser const parser;
+
+    /// \see ParameterValueStringGetter::lfoTiming, which is the same fact on the
+    /// printing side.
+    LE::Parameters::LFO::Timing const lfoTiming;
 }; // struct ParameterParser
 
 #pragma warning(pop)
@@ -470,8 +475,8 @@ Plugin2HostPassiveInteropImpl<Impl, Protocol>::getParameterFromDisplay(
     ParameterID const parameterID, char const *const display, Program const &program) const
 {
     using Parser = ParameterParser<typename Impl::Module, AutomatedParameter>;
-    return invokeFunctorOnIdentifiedParameter(parameterID, Parser{{display, impl().engineSetup()}},
-                                              &program);
+    return invokeFunctorOnIdentifiedParameter(
+        parameterID, Parser{{display, impl().engineSetup()}, impl().lfoTimer().timing()}, &program);
 }
 
 template <class Impl, class Protocol>

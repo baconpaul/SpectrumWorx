@@ -2895,7 +2895,8 @@ juce::String periodRatioString(SpectrumWorxEditor::LFODisplay const &parent,
 {
     std::array<char, 32> buffer;
     auto const written(LFO::printSyncedPeriodScale(static_cast<float>(periodScale),
-                                                   parent.period().lastSyncType(), buffer));
+                                                   parent.period().lastSyncType(),
+                                                   parent.lfoTiming(), buffer));
     return juce::String(&buffer[0], written);
 }
 
@@ -3219,18 +3220,24 @@ void SpectrumWorxEditor::LFODisplay::updateAutomatableControls()
     type_.setSelectedID(lfo.waveForm());
 }
 
+SpectrumWorxEditor::LFODisplay::LFO::Timing SpectrumWorxEditor::LFODisplay::lfoTiming() const
+{
+    return editor().effect().lfoTimer().timing();
+}
+
 void SpectrumWorxEditor::LFODisplay::updatePeriodControl()
 {
     auto &lfo(this->lfo());
 
     float const rangeMinimum(LFO::PeriodScale::minimum());
     float const rangeMaximum(LFO::PeriodScale::maximum());
-    double const rangeBeginning(LFO::snapPeriodScale(rangeMinimum, lfo.syncTypes()).first);
-    double const rangeEnd(LFO::snapPeriodScale(rangeMaximum, lfo.syncTypes()).first);
+    auto const timing(lfoTiming());
+    double const rangeBeginning(LFO::snapPeriodScale(rangeMinimum, lfo.syncTypes(), timing).first);
+    double const rangeEnd(LFO::snapPeriodScale(rangeMaximum, lfo.syncTypes(), timing).first);
     // one millisecond of the *reference* bar, so the slider's step does not
     // change under the user when the host changes tempo
     double const step(
-        (lfo.syncTypes() != LFO::Free) ? 0 : 1 / 1000.0 / LFO::Timer::referenceBarDuration // 1 ms
+        (lfo.syncTypes() != LFO::Free) ? 0 : 1 / 1000.0 / LFO::referenceBarDuration // 1 ms
     );
 
     period_.setRange(rangeBeginning, rangeEnd, step);
@@ -3462,7 +3469,7 @@ juce::String periodString(SpectrumWorxEditor::LFODisplay const &parent)
 {
     std::array<char, 64> buffer;
     auto const written(LFO::printPeriodScale(static_cast<float>(parent.period().getValue()),
-                                             parent.lfo().syncTypes(), buffer));
+                                             parent.lfo().syncTypes(), parent.lfoTiming(), buffer));
     return juce::String(&buffer[0], written);
 }
 
@@ -3595,7 +3602,7 @@ bool SpectrumWorxEditor::LFODisplay::ParameterSlider::setParameterFromText(juce:
     case IndexOf<LFO::Parameters, LFO::PeriodScale>::value:
     {
         auto const syncTypes(parent().lfo().syncTypes());
-        auto const parsed(LFO::parsePeriodScale(text.toRawUTF8(), syncTypes));
+        auto const parsed(LFO::parsePeriodScale(text.toRawUTF8(), syncTypes, parent().lfoTiming()));
         if (!parsed)
             return false;
 
@@ -3679,8 +3686,8 @@ SpectrumWorxEditor::LFODisplay::Period::Period(LFODisplay &parent)
 double SpectrumWorxEditor::LFODisplay::Period::snapValue(double const attemptedValue,
                                                          DragMode /*dragMode*/)
 {
-    LFO::SnappedPeriod const result(
-        LFO::snapPeriodScale(static_cast<float>(attemptedValue), parent().lfo().syncTypes()));
+    LFO::SnappedPeriod const result(LFO::snapPeriodScale(
+        static_cast<float>(attemptedValue), parent().lfo().syncTypes(), parent().lfoTiming()));
     lastSyncType_ = result.second;
     return result.first;
 }
@@ -3690,9 +3697,8 @@ double SpectrumWorxEditor::LFODisplay::Period::milliseconds() const
     // whichever bar the period is a fraction of: the reference one for a free
     // LFO, the host's for a synced one. The panel has to convert the way
     // LFOImpl::getValue does, or it prints a rate the LFO is not running at
-    float const bar((lastSyncType() == LFO::Free)
-                        ? LFO::Timer::referenceBarDuration
-                        : parent().editor().effect().lfoTimer().basePeriod());
+    float const bar((lastSyncType() == LFO::Free) ? LFO::referenceBarDuration
+                                                  : parent().lfoTiming().barDuration);
     return this->getValue() * bar * 1000;
 }
 

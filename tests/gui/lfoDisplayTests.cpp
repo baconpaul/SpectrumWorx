@@ -233,8 +233,8 @@ class PanelUnderTest
         parameterID.value.type = LE::SW::ParameterID::LFOParameter;
         parameterID.value._.lfo = {lfoParameterIndex, pControl_->moduleParameterIndex(),
                                    /*moduleIndex*/ 0};
-        LE::SW::setParameterIn<LE::Plugins::Protocol::CLAP>(instance_.mutableProgram(), parameterID,
-                                                            value);
+        LE::SW::setParameterIn<LE::Plugins::Protocol::CLAP>(
+            instance_.mutableProgram(), parameterID, value, instance_.engine().lfoTimer().timing());
         instance_.editor().parameterChangedElsewhere(parameterID, value);
     }
 
