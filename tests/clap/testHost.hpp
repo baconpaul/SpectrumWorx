@@ -169,10 +169,13 @@ class TestHost
         /// calls a partially implemented one host misbehaviour and then refuses
         /// the extension outright (host-proxy.hxx:449-459).
         bool gui{false};
+        /// \note The one the plugin reports a new FFT size through: without it
+        /// `canUseLatency()` is false and a restart changes the delay silently.
+        bool latency{false};
     }; // struct Offers
 
     /// A host with everything, which is what a DAW is.
-    static Offers everything() { return {true, true, true, true, true}; }
+    static Offers everything() { return {true, true, true, true, true, true}; }
 
     explicit TestHost(Offers const offers)
         : offers_(offers), mainThread_(std::this_thread::get_id()),
@@ -203,6 +206,7 @@ class TestHost
                },
                [](clap_host const *) { return true; }, [](clap_host const *) { return true; },
                [](clap_host const *, bool) {}},
+          latency_{[](clap_host const *const pHost) { ++self(pHost).latencyChanges; }},
           host_{CLAP_VERSION, this, "sw-tests", "SpectrumWorx", "", "0", &getExtension,
                 // request_restart, request_process, request_callback -- in that
                 // order; the last is the one a deferred rescan asks for.
@@ -243,6 +247,9 @@ class TestHost
     std::atomic<unsigned> restartRequests{0};
     std::atomic<unsigned> processRequests{0};
     std::atomic<unsigned> dirtyMarks{0};
+    /// How often the plugin said its delay had moved, which only a restart or
+    /// the without-a-restart fallback does. \see SpectrumWorxCLAP::activate().
+    std::atomic<unsigned> latencyChanges{0};
     /// How often the plugin asked which thread it was on, which is the evidence
     /// that it asks at all rather than always taking the deferral.
     std::atomic<unsigned> threadChecks{0};
@@ -400,6 +407,8 @@ class TestHost
             return &host.log_;
         if (host.offers_.gui && (std::strcmp(id, CLAP_EXT_GUI) == 0))
             return &host.gui_;
+        if (host.offers_.latency && (std::strcmp(id, CLAP_EXT_LATENCY) == 0))
+            return &host.latency_;
         return nullptr;
     }
 
@@ -439,6 +448,7 @@ class TestHost
     clap_host_thread_check threadCheck_;
     clap_host_log log_;
     clap_host_gui gui_;
+    clap_host_latency latency_;
     clap_host host_;
 }; // class TestHost
 
