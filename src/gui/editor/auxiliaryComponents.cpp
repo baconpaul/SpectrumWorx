@@ -55,15 +55,16 @@ static std::uint8_t const stopFrequencyThumbIndex = 2;
 static int const noThumb = -1;
 } // namespace Constants
 
-SharedModuleControls::SharedModuleControls()
+SharedModuleControls::SharedModuleControls(SpectrumWorxEditor &editor)
     : /// \note In order to enable a simple parameter-to-control (index) mapping,
       /// the control widgets must be added to the parent SharedModuleControls
       /// component in the correct order.
       ///                                       (11.02.2014.) (Domagoj Saric)
-      gain_(*this, *editor().selectedModule(), 8, 6,
+      gain_(*this, *editor.selectedModule(), 8, 6,
             IndexOf<Parameters, Gain>::value -
                 1), //...mrmlj...ModuleControlBase::moduleParameterIndex() excludes bypass...
-      wet_(*this, *editor().selectedModule(), 113, 6, IndexOf<Parameters, Wet>::value - 1)
+      wet_(*this, *editor.selectedModule(), 113, 6, IndexOf<Parameters, Wet>::value - 1),
+      frequencyRange_(*editor.selectedModule())
 {
     gain_.setupForParameter(ModuleKnob::Bipolar, ModuleKnob::smallDiameter, ModuleKnob::Fixed,
                             Gain::discreteValueDistance);
@@ -73,9 +74,9 @@ SharedModuleControls::SharedModuleControls()
     addToParentAndShow(*this, frequencyRange_);
 
     setBounds(116, 120, 174, 119);
-    addToParentAndShow(editor().mainArea(), *this);
+    addToParentAndShow(editor.mainArea(), *this);
 
-    updateForEngineSetupChanges(editor().engineSetup());
+    updateForEngineSetupChanges(editor.engineSetup());
 }
 
 void SharedModuleControls::updateForEngineSetupChanges(Engine::Setup const &setup)
@@ -152,21 +153,8 @@ SpectrumWorxEditor const &SharedModuleControls::editor() const
     return const_cast<SharedModuleControls &>(*this).editor();
 }
 
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wuninitialized"
-#endif
-
-/// \note GCC 16 inlines selectedModule() through parent()'s arithmetic, loses
-/// the object and calls pSelectedModule_ uninitialised. emplace() runs only from
-/// moduleActivated(), which asserts and dereferences it first.
-
-/// \note `parent().editor()` and not `editor()`: this control's own editor() is
-/// `ModuleControlBase`'s, which goes through `pModuleUI_` -- the member this
-/// initialiser list is setting. `parent()` is pointer arithmetic from a member
-/// back to its owner and needs nothing constructed.
-SharedModuleControls::FrequencyRange::FrequencyRange()
-    : ModuleControlBase(Constants::invalidIndex, *parent().editor().selectedModule()),
+SharedModuleControls::FrequencyRange::FrequencyRange(ModuleUI &selectedModule)
+    : ModuleControlBase(Constants::invalidIndex, selectedModule),
       parameterIndexForInternalWriteAccess_(Constants::invalidIndex),
       selectedThumb_(Constants::noThumb)
 {
@@ -188,10 +176,6 @@ SharedModuleControls::FrequencyRange::FrequencyRange()
     setStopValue(StopFrequency ::maximum());
     //...mrmlj...setSkewFactor( ... );
 }
-
-#ifdef __GNUC__
-#pragma GCC diagnostic pop
-#endif
 
 void SharedModuleControls::FrequencyRange::setValue(float const value)
 {

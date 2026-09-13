@@ -40,7 +40,7 @@ class SharedModuleControls : public WidgetBase<>
                                  public ParameterMenu
     {
       public:
-        FrequencyRange();
+        explicit FrequencyRange(ModuleUI &selectedModule);
 
         /// \note Which thumb this control currently stands for -- set by hover
         /// as well as by dragging, which is why it is not
@@ -233,7 +233,8 @@ class SharedModuleControls : public WidgetBase<>
     }; // class FrequencyRange
 
   public:
-    SharedModuleControls();
+    // emplaced into the editor's optional, which editor() cannot find until it is engaged
+    explicit SharedModuleControls(SpectrumWorxEditor &editor);
 
     void updateForEngineSetupChanges(Engine::Setup const &);
 
