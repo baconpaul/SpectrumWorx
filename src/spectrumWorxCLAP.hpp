@@ -452,10 +452,19 @@ class SpectrumWorxCLAP final
     /// \brief Applies everything the audio thread has reported, on the main
     /// thread. `[main-thread]`
     void drainEngineEvents();
+    /// \return whether an echo changed what a slot holds
+    bool drainEchoes();
 
     /// \brief Hands \p pObject back for the main thread to destroy.
     /// `[audio-thread]` \see the definition.
     void retire(Threading::ToUI::Retired, void *pObject);
+
+    /// \brief A base value for `programMain_`, raising `echoesLost_` on a full
+    /// ring. `[audio-thread]`, or main with the engine stopped.
+    void echo(Threading::ToUI);
+
+    /// \brief Every owned parameter's value, as state. Thread as echo(). \see #198
+    void republishParameters();
 
   public:
     /// \brief The one reference \p module carries, handed back for the main
@@ -717,6 +726,10 @@ class SpectrumWorxCLAP final
     /// Draining the ring is not the same errand as telling the host to save.
     std::atomic<bool> pendingEchoDrain_{false};
 
+    /// \brief An echo was refused, so `programMain_` is behind by parameters nobody
+    /// can name. A flag cannot overflow. \see drainEngineEvents(), issue #198
+    std::atomic<bool> echoesLost_{false};
+
     /// What the editor moved, waiting for a process() or flush() to carry it to
     /// the host.
     ///
@@ -751,8 +764,8 @@ class SpectrumWorxCLAP final
     ///   Every one is a divergence between the two `Program` copies, or between
     /// one of them and the host, that nothing can put right afterwards -- the
     /// ring is where the information was. A slot change and a chain change are
-    /// undone by their publisher; an echo, an edit and a gesture cannot be,
-    /// because by the time the push fails the other side has already moved.
+    /// undone by their publisher, and an echo by a republish; an edit and a gesture
+    /// cannot be, because by the time the push fails the other side has moved.
     ///
     ///   1024 deep against a ring drained every block, so a non-zero value means
     /// something is wrong upstream rather than that the user was quick.

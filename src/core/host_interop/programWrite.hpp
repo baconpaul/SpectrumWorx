@@ -76,8 +76,9 @@ template <class Protocol> class ProgramParameterSetter
     using result_type = void;
 
     ProgramParameterSetter(Plugins::AutomatedParameterValue const value,
-                           LE::Parameters::LFO::Timing const &lfoTiming)
-        : value_(value), lfoTiming_(lfoTiming)
+                           LE::Parameters::LFO::Timing const &lfoTiming,
+                           WhileModulated const whileModulated)
+        : value_(value), lfoTiming_(lfoTiming), whileModulated_(whileModulated)
     {
     }
 
@@ -116,7 +117,7 @@ template <class Protocol> class ProgramParameterSetter
         auto const pModule(pProgram->moduleChain().moduleAs<Module>(parameterID.moduleIndex));
         if (pModule)
             pModule->setAutomatedParameter(parameterID.moduleParameterIndex, value_,
-                                           AutomatedParameter::normalised);
+                                           AutomatedParameter::normalised, whileModulated_);
     }
 
     /// \note The bounds fixup a `setAutomatedLFOParameter` can make to its
@@ -140,16 +141,19 @@ template <class Protocol> class ProgramParameterSetter
     /// \note The engine's bar: there is one clock per instance and this Program
     /// is the same instance's. \see issue #11.
     LE::Parameters::LFO::Timing const lfoTiming_;
+
+    WhileModulated const whileModulated_;
 }; // class ProgramParameterSetter
 
 /// \brief Applies \p value to \p parameterID in \p program. `[main-thread]`
 template <class Protocol>
 void setParameterIn(Program &program, ParameterID const parameterID,
                     Plugins::AutomatedParameterValue const value,
-                    LE::Parameters::LFO::Timing const &lfoTiming)
+                    LE::Parameters::LFO::Timing const &lfoTiming,
+                    WhileModulated const whileModulated = WhileModulated::ignored)
 {
     invokeFunctorOnIdentifiedParameter(
-        parameterID, ProgramParameterSetter<Protocol>{value, lfoTiming}, &program);
+        parameterID, ProgramParameterSetter<Protocol>{value, lfoTiming, whileModulated}, &program);
 }
 
 } // namespace LE::SW

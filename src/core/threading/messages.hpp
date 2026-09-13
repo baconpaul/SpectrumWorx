@@ -62,7 +62,10 @@ struct ToEngine
         /// one user act ("play this file", "take the host's port") and because a
         /// block that saw one without the other would be a block fed from the
         /// wrong place. \see SideChainSource.
-        SwapSample
+        SwapSample,
+        /// Every parameter's base value, echoed back. Asked for when an echo was
+        /// lost on a full ToUI ring; nothing travels.
+        RepublishParameters
     };
 
     Kind kind{Kind::None};
@@ -143,6 +146,9 @@ struct ToUI
         /// A base value the engine settled on, after snapping or after a host
         /// automation event. Latchable: the model takes it and the host is told.
         BaseParameterChanged,
+        /// The same payload, answering ToEngine::RepublishParameters: the
+        /// engine's state rather than a write, so it lands under a running LFO.
+        BaseParameterRepublished,
         /// Something the audio thread unlinked and the main thread must delete.
         /// Dropping one of these is a leak, which is why it is a ring and not a
         /// mailbox -- and its own ring, so that echo traffic cannot fill it.
@@ -256,10 +262,25 @@ inline ToEngine swapSample(void *const pSample, bool const replacesSample,
     return message;
 }
 
+inline ToEngine republishParameters()
+{
+    ToEngine message{};
+    message.kind = ToEngine::Kind::RepublishParameters;
+    return message;
+}
+
 inline ToUI baseParameterChanged(std::uint32_t const parameterID, float const value)
 {
     ToUI message{};
     message.kind = ToUI::Kind::BaseParameterChanged;
+    message.baseParameterChanged = {parameterID, value};
+    return message;
+}
+
+inline ToUI baseParameterRepublished(std::uint32_t const parameterID, float const value)
+{
+    ToUI message{};
+    message.kind = ToUI::Kind::BaseParameterRepublished;
     message.baseParameterChanged = {parameterID, value};
     return message;
 }
