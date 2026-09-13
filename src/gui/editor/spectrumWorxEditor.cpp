@@ -1389,7 +1389,7 @@ void SpectrumWorxEditor::moduleActivated()
     /// possibly be already created.
     ///                                       (17.01.2012.) (Domagoj Saric)
     if (!sharedModuleControls_)
-        sharedModuleControls_.emplace();
+        sharedModuleControls_.emplace(*this);
     else
         sharedModuleControls_->setEnabled(true);
     sharedModuleControls_->updateForActiveModule();
