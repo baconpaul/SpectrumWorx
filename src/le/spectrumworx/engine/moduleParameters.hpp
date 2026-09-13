@@ -168,6 +168,7 @@ class ModuleParameters : public ModuleNode
     ///                                       (14.03.2014.) (Domagoj Saric)
     using LFO = LE::Parameters::LFOImpl;
     using LFOs = LE::Utility::Span<LFO>;
+    using LFOPlaceholder = std::aligned_storage<sizeof(LFO), __alignof(LFO)>::type;
 
     void updateLFOs(LFO::Timer::TimingInformationChange);
 
@@ -196,7 +197,6 @@ class ModuleParameters : public ModuleNode
                                                         ParameterInfo const &);
 
   protected:
-    using LFOPlaceholder = std::aligned_storage<sizeof(LFO), __alignof(LFO)>::type;
     LFOs lfos() const;
 
   public: //...mrmlj...

@@ -435,6 +435,25 @@ typename EffectParameterOffsets<Effect>::ParameterOffsets const
     EffectParameterOffsets<Effect>::parameterOffsets =
         &array_aux<typename Effect::Parameters, offset_t,
                    std::make_index_sequence<Effect::Parameters::static_size>>::data[0];
+
+/// \note Only allocate the storage for all (base + effect) LFOs in the
+/// implementation class and let the base class construct all the LFOs. The
+/// other approach is to have the base class allocate and construct the
+/// base parameter LFOs and the implementation class the LFOs for the effect
+/// specific parameters. The first approach is better as all the LFOs are in
+/// a single, contiguous location (and can thus be accessed through a single
+/// pointer) and the LFO array construction code is generated only in a
+/// single location (smaller code and faster compiles).
+///                                       (23.04.2015.) (Domagoj Saric)
+template <std::size_t size> struct LFOStorage
+{
+    std::array<ModuleParameters::LFOPlaceholder, size> lfos_;
+
+    /// \note One per LFO-able parameter, sized and indexed exactly as lfos_ is:
+    /// the value each of those parameters has when its LFO is off. See
+    /// ModuleParameters::unmodulatedBaseParameter().
+    std::array<float, size> unmodulatedValues_;
+}; // struct LFOStorage
 } // namespace Detail
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -450,7 +469,12 @@ typename EffectParameterOffsets<Effect>::ParameterOffsets const
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-template <class EffectParam, class Base> class ModuleEffectImpl : public Base
+// storage is a base so it exists before ModuleParameters constructs the LFOs in it
+template <class EffectParam, class Base>
+class ModuleEffectImpl
+    : private Engine::Detail::LFOStorage<ModuleParameters::numberOfLFOBaseParameters +
+                                         EffectParam::Parameters::static_size>,
+      public Base
 {
   public:
     using Effect = EffectParam;
@@ -461,15 +485,11 @@ template <class EffectParam, class Base> class ModuleEffectImpl : public Base
         Engine::Detail::MakeEmptyChannelStateHolder>::template ChannelStates<Effect>;
 
   public:
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wuninitialized"
-#endif // __clang__
     template <typename EffectTypeIndex, typename... T>
     ModuleEffectImpl(EffectTypeIndex, T &&...args)
         : Base(std::forward<T>(args)...,
-               Engine::Detail::MakeEffectMetaData<Effect, EffectTypeIndex>::data, &lfos_[0],
-               &unmodulatedValues_[0],
+               Engine::Detail::MakeEffectMetaData<Effect, EffectTypeIndex>::data,
+               this->lfos_.data(), this->unmodulatedValues_.data(),
                Engine::Detail::EffectParameterOffsets<Effect>::parameterOffsets,
                static_cast<std::uint16_t>(
                    reinterpret_cast<char const *>(&effect().parameters()) -
@@ -484,9 +504,6 @@ template <class EffectParam, class Base> class ModuleEffectImpl : public Base
         /// defaults, which is what an unmodulated value starts as.
         this->captureUnmodulatedValues();
     }
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif // __clang__
 
   public:
     Effect &effect() { return effect_; }
@@ -549,26 +566,6 @@ template <class EffectParam, class Base> class ModuleEffectImpl : public Base
   private:
     Effect effect_;
     ChannelStatesHolder channelStatesHolder_;
-
-    /// \note Only allocate the storage for all (base + effect) LFOs in the
-    /// implementation class and let the base class construct all the LFOs. The
-    /// other approach is to have the base class allocate and construct the
-    /// base parameter LFOs and the implementation class the LFOs for the effect
-    /// specific parameters. The first approach is better as all the LFOs are in
-    /// a single, contiguous location (and can thus be accessed through a single
-    /// pointer) and the LFO array construction code is generated only in a
-    /// single location (smaller code and faster compiles).
-    ///                                       (23.04.2015.) (Domagoj Saric)
-    using LFOStorage =
-        std::array<ModuleParameters::LFOPlaceholder,
-                   ModuleParameters::numberOfLFOBaseParameters + Effect::Parameters::static_size>;
-    LFOStorage lfos_;
-
-    /// \note One per LFO-able parameter, sized and indexed exactly as lfos_ is:
-    /// the value each of those parameters has when its LFO is off. See
-    /// ModuleParameters::unmodulatedBaseParameter().
-    std::array<float, ModuleParameters::numberOfLFOBaseParameters + Effect::Parameters::static_size>
-        unmodulatedValues_;
 
 #ifndef NDEBUG
     bool setupCalled_;
