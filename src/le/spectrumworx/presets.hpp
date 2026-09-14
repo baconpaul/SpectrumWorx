@@ -877,6 +877,10 @@ namespace GlobalParameters
 struct Parameters;
 }
 
+/// \brief Moves a pre-3.0 file's Out and Mix to the pair that sounds as it did
+/// when Out scaled only the wet. \see issue #256.
+void relevelLegacyOutputGain(GlobalParameters::Parameters &);
+
 /// \note `juce::String::CharPointerType::CharType`, which on this build is
 /// `char` and on a `JUCE_STRING_UTF_TYPE != 8` one would not be. It is a
 /// `char` outright now, because a preset is UTF-8 bytes on disk whatever the
@@ -946,6 +950,8 @@ bool loadPreset(char *LE_RESTRICT const inMemoryPreset, bool const ignoreExterna
 
         GlobalParameters::Parameters newParameters;
         LE::Parameters::forEach(newParameters, parametersLoader);
+        if (preset.formatVersion() < 3)
+            relevelLegacyOutputGain(newParameters);
         //...mrmlj...clang's early template instantiation...AutomatedModuleChain newChain;
         typename std::remove_reference<decltype(loader.targetChain())>::type newChain;
         parametersLoader.loadModuleChain(newChain);

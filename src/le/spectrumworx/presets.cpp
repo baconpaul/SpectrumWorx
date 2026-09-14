@@ -726,6 +726,22 @@ std::optional<unsigned int> ParametersLoader::getLegacyInputMode()
     return Utility::lexical_cast<unsigned int>(pInputMode);
 }
 
+void relevelLegacyOutputGain(GlobalParameters::Parameters &parameters)
+{
+    auto &out(parameters.get<GlobalParameters::OutputGain>());
+    auto &mix(parameters.get<GlobalParameters::MixPercentage>());
+    double const oldOut(out.getValue()), oldMix(mix.getValue());
+
+    // the two laws agree here, and unity presets must not move a bit
+    if (oldOut == 1 || oldMix == 1)
+        return;
+
+    // hold the wet at oldOut * oldMix and the dry at 1 - oldMix
+    double const newOut(oldOut * oldMix + (1 - oldMix));
+    out.setValue(static_cast<float>(newOut));
+    mix.setValue(static_cast<float>(oldOut * oldMix / newOut));
+}
+
 namespace
 {
 class LFODataLoader

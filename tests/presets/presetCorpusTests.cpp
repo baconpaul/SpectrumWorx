@@ -82,9 +82,11 @@
 #include "le/spectrumworx/presets.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -92,6 +94,7 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -580,6 +583,153 @@ TEST_CASE("A 2.x preset carries its own defaults", "[preset-corpus][issue-15]")
 
         CHECK(loaded.text.find("\n  Low pass = 16000 |") != std::string::npos);
         CHECK(loaded.missing == 1);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief A 2.x file's Out and Mix, read as the sound they made when Out scaled
+/// only the wet. \see issue #256.
+///
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A 2.x preset's Out and Mix keep the level they had", "[preset-corpus][issue-256]")
+{
+    auto const octaverPreset([](std::string_view const out, std::string_view const mix) {
+        std::string preset(
+            "<SpectrumWorxPreset Version=\"2.6\" LastModified=\"15.12.2011 15:35\" Comment=\"\">\n"
+            "\t<Global In=\"1.0000\" Out=\"");
+        preset += out;
+        preset += "\" Mix=\"";
+        preset += mix;
+        preset += "\" FFT_size=\"2048\" Overlap_factor=\"4\" Window_type=\"0\" Input_mode=\"0\"/>\n"
+                  "\t<Modules>\n"
+                  "\t\t<Octaver Bypass=\"0\">\n"
+                  "\t\t\t<Gain sync=\"1\">0.0000</Gain>\n"
+                  "\t\t\t<Wet sync=\"1\">100.0000</Wet>\n"
+                  "\t\t\t<Start_frequency sync=\"1\">0.0000</Start_frequency>\n"
+                  "\t\t\t<Stop_frequency sync=\"1\">1.0000</Stop_frequency>\n"
+                  "\t\t\t<Octave_1 sync=\"1\">3</Octave_1>\n"
+                  "\t\t\t<Gain_1 sync=\"1\">0.0000</Gain_1>\n"
+                  "\t\t\t<Octave_2 sync=\"1\">2</Octave_2>\n"
+                  "\t\t\t<Gain_2 sync=\"1\">0.0000</Gain_2>\n"
+                  "\t\t\t<Low_pass sync=\"1\">16000.0000</Low_pass>\n"
+                  "\t\t</Octaver>\n"
+                  "\t</Modules>\n"
+                  "</SpectrumWorxPreset>\n";
+        std::vector<char> buffer(preset.begin(), preset.end());
+        buffer.push_back('\0'); // the parse is destructive and wants a terminator
+        return buffer;
+    });
+
+    SECTION("the values move")
+    {
+        bool succeeded{false};
+        auto const loaded(loadBuffer(octaverPreset("2.0000", "0.5000"), succeeded));
+        REQUIRE(succeeded);
+        INFO(loaded.text);
+        CHECK(loaded.text.find("global Out = 1.5\n") != std::string::npos);
+        CHECK(loaded.text.find("global Mix = 0.666667\n") != std::string::npos);
+    }
+
+    SECTION("unity in either is already the same sound, so nothing moves")
+    {
+        auto const [out, mix] =
+            GENERATE(std::pair{"2.0000", "1.0000"}, std::pair{"1.0000", "0.5000"});
+        bool succeeded{false};
+        auto const loaded(loadBuffer(octaverPreset(out, mix), succeeded));
+        REQUIRE(succeeded);
+        INFO(loaded.text);
+        CHECK(loaded.text.find("global Out = " + SWTest::number(std::stof(out)) + "\n") !=
+              std::string::npos);
+        CHECK(loaded.text.find("global Mix = " + SWTest::number(std::stof(mix)) + "\n") !=
+              std::string::npos);
+    }
+
+    SECTION("a 3.0 file was written under the new law and is read as written")
+    {
+        SWTest::Engine engine;
+        engine.setNumberOfChannels(2, 2);
+        engine.setSampleRate(48000);
+        engine.setBlockSize(512);
+        REQUIRE(engine.initialise());
+        REQUIRE(engine.set<GlobalParameters::OutputGain>(2.0f));
+        REQUIRE(engine.set<GlobalParameters::MixPercentage>(0.5f));
+
+        auto const written(savePreset({}, engine.sideChainSource(), {}, {}, engine.program()));
+        REQUIRE(written.find("Format=\"3\"") != std::string::npos);
+        std::vector<char> buffer(written.begin(), written.end());
+        buffer.push_back('\0');
+
+        bool succeeded{false};
+        auto const loaded(loadBuffer(std::move(buffer), succeeded));
+        REQUIRE(succeeded);
+        INFO(loaded.text);
+        CHECK(loaded.text.find("global Out = 2\n") != std::string::npos);
+        CHECK(loaded.text.find("global Mix = 0.5\n") != std::string::npos);
+    }
+
+    SECTION("and it sounds as it did")
+    {
+        constexpr std::uint32_t blockSize{512};
+        constexpr unsigned int blocks{32};
+        constexpr double out{2}, mix{0.5};
+
+        auto const render([&](std::optional<std::pair<float, float>> const outAndMix) {
+            SWTest::Engine engine;
+            engine.setNumberOfChannels(2, 2);
+            engine.setSampleRate(48000);
+            engine.setBlockSize(blockSize);
+            REQUIRE(engine.initialise());
+            {
+                ScopedProblemCounter const counting;
+                auto preset(octaverPreset("2.0000", "0.5000"));
+                REQUIRE(LE::SW::loadPreset(preset.data(), true, nullptr, PresetConsumer{engine}));
+            }
+            if (outAndMix)
+            {
+                REQUIRE(engine.set<GlobalParameters::OutputGain>(outAndMix->first));
+                REQUIRE(engine.set<GlobalParameters::MixPercentage>(outAndMix->second));
+            }
+            engine.setRandomSeed(0xA5A5C3C3u);
+            engine.resume();
+
+            std::vector<float> input(blockSize * blocks), rendered;
+            SWTest::generate(SWTest::Signal::Sweep, input, 48000.0f);
+            std::vector<float> left(blockSize), right(blockSize), outLeft(blockSize),
+                outRight(blockSize);
+            float const *inputs[]{left.data(), right.data()};
+            float *outputs[]{outLeft.data(), outRight.data()};
+            for (unsigned int block(0); block < blocks; ++block)
+            {
+                std::copy_n(input.begin() + block * blockSize, blockSize, left.begin());
+                right = left;
+                engine.process(inputs, inputs, outputs, 1.0f, blockSize);
+                rendered.insert(rendered.end(), outLeft.begin(), outLeft.end());
+            }
+            engine.suspend();
+            return rendered;
+        });
+
+        auto const loaded(render(std::nullopt));
+        auto const wet(render(std::pair{1.0f, 1.0f}));
+        auto const dry(render(std::pair{1.0f, 0.0f}));
+
+        double worst{0}, worstUnmigrated{0}, peak{0};
+        for (std::size_t frame(0); frame < loaded.size(); ++frame)
+        {
+            auto const heard(out * mix * wet[frame] + (1 - mix) * dry[frame]);
+            auto const unmigrated(out * (mix * wet[frame] + (1 - mix) * dry[frame]));
+            worst = std::max(worst, std::abs(loaded[frame] - heard));
+            worstUnmigrated = std::max(worstUnmigrated, std::abs(loaded[frame] - unmigrated));
+            peak = std::max(peak, std::abs(double{loaded[frame]}));
+        }
+
+        INFO("worst " << worst << ", unmigrated " << worstUnmigrated << ", peak " << peak);
+        REQUIRE(peak > 0.1);
+        CHECK(worst < 1e-5);
+        // or the comparison above could not tell a migrated load from a bare one
+        CHECK(worstUnmigrated > 0.01);
     }
 }
 

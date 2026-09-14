@@ -558,6 +558,17 @@ simply skipped when there is nowhere to draw.
   own defaults", holds both halves — the second by hand, because no factory
   preset uses the Octaver at all and the claim had no fixture anywhere.
 
+- **Changing what a value means.** Convert it at load, keyed on `Format`, so a
+  file written under the old meaning still sounds as it did. The one case so far
+  is issue #256: 2.x applied Out to the wet only, 3.0 applies it outside the mix,
+  and `relevelLegacyOutputGain()` moves a pre-3 file's pair to
+  `Out' = Out·Mix + 1 − Mix`, `Mix' = Out·Mix / Out'`, which keeps the wet at
+  `Out·Mix` and the dry at `1 − Mix`. Where either is unity the two laws already
+  agree and nothing moves. Rendered against the old engine on 13.09.2026, 279 of
+  the 288 factory presets came back bit-exact and the other nine within 6e-8. The one
+  frozen fixture with both away from unity, `Gamma Shift/Bird Song`, moved its
+  `presetFixtures.txt` row and nothing else in it. A `Format="3"` file is read
+  as written, including one a nightly saved before the change.
 - **Renaming a knob.** Change `EFFECT_PARAMETER_NAME`, add
   `EFFECT_PARAMETER_STREAMING_NAME` in the effect's **header** with the *old*
   string. Nothing fails: the label lives right of ` ;; ` in
