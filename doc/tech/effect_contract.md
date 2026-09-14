@@ -761,7 +761,8 @@ input FIFO fills to windowSize
   └─ copy + analysis window + FFT       ── channelBuffers.setCurrentDataToChannelData()
   └─ for each module: module.process()  ── your effect runs here
   └─ IFFT + synthesis window + overlap-add
-  └─ scale by outputGain / wolaGain
+  └─ scale by outputGain * mix / wolaGain
+  └─ add the dry hop at outputGain * (1 - mix)
   advance by stepSize
 ```
 

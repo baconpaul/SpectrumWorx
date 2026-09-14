@@ -61,11 +61,9 @@ class Processor::ProcessParameters
     std::uint8_t currentChannel() const { return currentChannel_; }
     std::uint32_t numberOfSamples() const { return numberOfSamples_; }
 
-    float const &mixPercentage() const { return mixPercentage_; }
-    float const &outputScaling() const
-    {
-        return outputScaling_;
-    } ///< Combined postAmp and mixPercentage
+    // out sits outside the mix, so it scales both terms
+    float const &wetScaling() const { return wetScaling_; }
+    float const &dryScaling() const { return dryScaling_; }
 
     bool doMix() const { return doMix_; }
 
@@ -110,8 +108,8 @@ class Processor::ProcessParameters
 
     std::uint32_t const numberOfSamples_;
 
-    float const mixPercentage_;
-    float const outputScaling_;
+    float const wetScaling_;
+    float const dryScaling_;
 
     bool const doMix_;
 }; // class Processor::ProcessParameters
@@ -397,10 +395,9 @@ void Processor::processSingleChannel(ProcessParameters const &processParameters)
                 channelBuffers.putNewTimeDomainDataToOutput(fft_, synthesisWindow()));
 
             // Scale the results to:
-            // - apply the user selected post/output gain
+            // - apply the mix and the user selected post/output gain
             // - compensate for the WOLA gain.
-            multiply(pOutput, processParameters.outputScaling() / engineSetup().wolaGain(),
-                     stepSize);
+            multiply(pOutput, processParameters.wetScaling() / engineSetup().wolaGain(), stepSize);
 
             if (processParameters.doMix())
             {
@@ -409,8 +406,7 @@ void Processor::processSingleChannel(ProcessParameters const &processParameters)
                 // the input data in-place (as it was already consumed and
                 // will be discarded) and add it to output data.
                 //                            (11.02.2010.) (Domagoj Saric)
-                float const inputScaling(1 - processParameters.mixPercentage());
-                multiply(channelBuffers.inputBuffer(), inputScaling, stepSize);
+                multiply(channelBuffers.inputBuffer(), processParameters.dryScaling(), stepSize);
                 add(channelBuffers.inputBuffer(), pOutput, stepSize);
             }
 
@@ -868,7 +864,8 @@ LE_FORCEINLINE Processor::ProcessParameters::ProcessParameters(
 
       currentChannel_(0), numberOfSamples_(numberOfSamples),
 
-      mixPercentage_(mixAmount), outputScaling_(outputGain * mixAmount), doMix_(mixPercentage_ < 1)
+      wetScaling_(outputGain * mixAmount), dryScaling_(outputGain * (1 - mixAmount)),
+      doMix_(mixAmount < 1)
 {
 }
 
