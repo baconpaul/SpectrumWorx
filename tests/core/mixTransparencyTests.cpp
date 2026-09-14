@@ -23,7 +23,6 @@
 #include "le/spectrumworx/effects/configuration/constants.hpp"
 #include "le/spectrumworx/effects/configuration/effectNames.hpp"
 
-#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
@@ -31,6 +30,7 @@
 #include <cmath>
 #include <cstdint>
 #include <span>
+#include <utility>
 #include <vector>
 //------------------------------------------------------------------------------
 namespace
@@ -170,38 +170,75 @@ TEST_CASE("A misaligned dry path would be visible", "[mix][latency]")
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-/// \brief What the two global gains do at Mix 0, which is not the same thing.
-///
-///   `outputScaling_` is `outputGain * mix`, so at 0 the Out control is dead;
-/// the dry is added at `1 - mix` with no gain of its own, so In reaches the
-/// output in full. Factory presets that ship In away from unity are therefore
-/// louder at Mix 0 than the track they are on, and Out cannot bring them back.
-///
-/// \note Pinned rather than fixed: either half is a change to what a preset
-/// sounds like at Mix 0.
+/// \brief The two global gains, which sit either side of the whole mix:
+/// `out * (mix * process(in * x) + (1 - mix) * in * x)`. \see issue #256.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-TEST_CASE("At Mix 0 the In gain reaches the output and the Out gain does not", "[mix]")
+TEST_CASE("At Mix 0 both gains reach the output", "[mix][issue-256]")
 {
     auto const gain(GENERATE(0.5f, 2.0f));
     auto const input(sweep());
     SWTest::Slot const bypassed[]{{-1, {}}};
 
+    auto scaledInput(input);
+    for (auto &sample : scaledInput)
+        sample *= gain;
+
     auto withInput(setupFor(2048, 4));
     withInput.inputGain = gain;
-    auto const scaled(mixResidue(channelOf(SWTest::renderChain(withInput, bypassed, input), 0),
-                                 input, withInput.fftSize));
-
     auto withOutput(setupFor(2048, 4));
     withOutput.outputGain = gain;
-    auto const unscaled(mixResidue(channelOf(SWTest::renderChain(withOutput, bypassed, input), 0),
-                                   input, withOutput.fftSize));
 
-    REQUIRE(scaled.compared > 0);
-    REQUIRE(unscaled.compared > 0);
-    INFO("gain " << gain << ": in gives peak " << scaled.outputPeak << ", out gives peak "
-                 << unscaled.outputPeak);
-    CHECK(scaled.outputPeak == Catch::Approx(gain * 0.5).epsilon(1e-6));
-    CHECK(unscaled.worst == 0.0);
+    for (auto const &[which, setup] : {std::pair{"in", withInput}, std::pair{"out", withOutput}})
+    {
+        auto const residue(mixResidue(channelOf(SWTest::renderChain(setup, bypassed, input), 0),
+                                      scaledInput, setup.fftSize));
+        INFO(which << " gain " << gain << ": worst " << residue.worst << " at " << residue.worstAt
+                   << ", output peak " << residue.outputPeak);
+        REQUIRE(residue.compared > 0);
+
+        // exact for the same reason Mix 0 is, the wet term being multiplied by zero
+        CHECK(residue.worst == 0.0);
+    }
+}
+
+TEST_CASE("Out scales the wet and the dry alike at every Mix", "[mix][issue-256]")
+{
+    constexpr float out{2.0f};
+    auto const mix(GENERATE(0.25f, 0.5f, 0.8f));
+
+    auto const input(sweep());
+    // an octave up, so the wet and the dry are nothing alike
+    SWTest::Slot const octaver[]{{SWTest::effectByStreamingName("Octaver"), {}}};
+
+    auto const renderAt([&](float const renderMix, float const renderOut) {
+        auto setup(setupFor(2048, 4));
+        setup.mix = renderMix;
+        setup.outputGain = renderOut;
+        return channelOf(SWTest::renderChain(setup, octaver, input), 0);
+    });
+
+    auto const wet(renderAt(1.0f, 1.0f));
+    auto const dry(renderAt(0.0f, 1.0f));
+    auto const mixed(renderAt(mix, out));
+    REQUIRE(mixed.size() == wet.size());
+
+    double worst{0}, worstOldLaw{0}, peak{0};
+    for (std::size_t frame(0); frame < mixed.size(); ++frame)
+    {
+        auto const expected(double{out} *
+                            (mix * double{wet[frame]} + (1 - mix) * double{dry[frame]}));
+        auto const oldLaw(double{out} * mix * wet[frame] + (1 - mix) * double{dry[frame]});
+        worst = std::max(worst, std::abs(mixed[frame] - expected));
+        worstOldLaw = std::max(worstOldLaw, std::abs(mixed[frame] - oldLaw));
+        peak = std::max(peak, std::abs(double{mixed[frame]}));
+    }
+
+    INFO("mix " << mix << ": worst " << worst << ", against the old law " << worstOldLaw
+                << ", peak " << peak);
+    REQUIRE(peak > 0.1);
+    CHECK(worst < 1e-5);
+    // or the comparison above could not tell the two laws apart
+    CHECK(worstOldLaw > 0.01);
 }
