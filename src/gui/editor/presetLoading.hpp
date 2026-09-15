@@ -28,6 +28,8 @@
 /// any more.
 #include "filesystem/import.h"
 
+#include <cstdint>
+
 namespace juce
 {
 class String;
@@ -43,6 +45,13 @@ namespace GUI
 
 class EditorHost;
 class SpectrumWorxEditor;
+
+/// \brief Who asked for a load, which decides where its problems go. \see issue #12
+enum struct LoadRequest : std::uint8_t
+{
+    user,   ///< picked from the browser: one box for everything wrong with it
+    restore ///< a session or an undo step: only a sample that did not load is shown
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -71,7 +80,7 @@ class SpectrumWorxEditor;
 
 /// \param pDawExtraState null for a preset the user opened; the session's own,
 /// for state a host restored. See SW::DawExtraState.
-bool loadPreset(EditorHost &, SpectrumWorxEditor *pEditor, fs::path const &presetFile,
+bool loadPreset(EditorHost &, SpectrumWorxEditor *pEditor, LoadRequest, fs::path const &presetFile,
                 bool ignoreExternalSample, juce::String *comment, char const *presetName,
                 DawExtraState const *pDawExtraState = nullptr);
 
@@ -81,7 +90,7 @@ bool loadPreset(EditorHost &, SpectrumWorxEditor *pEditor, fs::path const &prese
 /// the binary (factoryPresets.hpp) and have no file for the overload above to
 /// open. That one reads the file and calls this. It is also where session state
 /// comes from -- a `clap_istream` is not a file either.
-bool loadPreset(EditorHost &, SpectrumWorxEditor *pEditor, char *inMemoryPreset,
+bool loadPreset(EditorHost &, SpectrumWorxEditor *pEditor, LoadRequest, char *inMemoryPreset,
                 bool ignoreExternalSample, juce::String *comment, char const *presetName,
                 DawExtraState const *pDawExtraState = nullptr);
 

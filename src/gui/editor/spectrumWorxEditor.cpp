@@ -1373,7 +1373,13 @@ void SpectrumWorxEditor::updateSampleName()
 {
     auto const source(editorHost_.sideChainSource());
     if (source == SideChainSource::File)
-        return updateSampleName(LE::IO::pathToJuceString(editorHost_.currentSampleFile().stem()));
+    {
+        auto name(LE::IO::pathToJuceString(editorHost_.currentSampleFile().stem()));
+        // a patch's file that would not load keeps its name. \see issue #12
+        if (editorHost_.sampleNotLoaded())
+            name << " (not loaded)";
+        return updateSampleName(name);
+    }
     return updateSampleName(hostPortName(source, editorHost_.channelWidth()));
 }
 
@@ -1528,16 +1534,16 @@ bool SpectrumWorxEditor::loadPreset(fs::path const &presetFile, bool const ignor
                                     juce::String &comment, juce::String const &presetName)
 {
     auto const pPresetName(presetName.getCharPointer().getAddress());
-    return GUI::loadPreset(editorHost_, this, presetFile, ignoreExternalSample, &comment,
-                           pPresetName);
+    return GUI::loadPreset(editorHost_, this, LoadRequest::user, presetFile, ignoreExternalSample,
+                           &comment, pPresetName);
 }
 
 bool SpectrumWorxEditor::loadPreset(char *const inMemoryPreset, bool const ignoreExternalSample,
                                     juce::String &comment, juce::String const &presetName)
 {
     auto const pPresetName(presetName.getCharPointer().getAddress());
-    return GUI::loadPreset(editorHost_, this, inMemoryPreset, ignoreExternalSample, &comment,
-                           pPresetName);
+    return GUI::loadPreset(editorHost_, this, LoadRequest::user, inMemoryPreset,
+                           ignoreExternalSample, &comment, pPresetName);
 }
 
 void SpectrumWorxEditor::savePreset(fs::path const &presetFile, bool const ignoreExternalSample,

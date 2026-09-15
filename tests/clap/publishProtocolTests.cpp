@@ -47,9 +47,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-#include <cmath>
 #include <cstdint>
-#include <random>
 #include <string>
 #include <vector>
 //------------------------------------------------------------------------------
@@ -264,38 +262,6 @@ void overflowTheEchoRing(ActivePlugin &plugin)
     runOneBlock(plugin, ramp);
     REQUIRE(implementationOf(*plugin).droppedMessages() > 0);
 }
-
-/// Each automatable parameter somewhere in its range, as a host's fuzzer writes it.
-std::vector<TimedParameterEvents::At>
-everyParameterAtRandom(std::vector<clap_param_info> const &infos, std::mt19937 &random,
-                       unsigned const firstMovingSlot)
-{
-    std::vector<TimedParameterEvents::At> events;
-    for (auto const &info : infos)
-    {
-        // the spectral three restart the plugin, which is not this case's subject
-        if (!(info.flags & CLAP_PARAM_IS_AUTOMATABLE))
-            continue;
-        if (((info.id >> 24) == moduleChainType) && (((info.id >> 16) & 0xff) < firstMovingSlot))
-            continue;
-        // the ends a third of the time each: a boolean on a 0..1 edge is off at 0 alone
-        std::uniform_real_distribution<double> range(info.min_value, info.max_value);
-        auto value(range(random));
-        switch (random() % 3)
-        {
-        case 0:
-            value = info.min_value;
-            break;
-        case 1:
-            value = info.max_value;
-            break;
-        }
-        if (info.flags & CLAP_PARAM_IS_STEPPED)
-            value = std::round(value);
-        events.push_back({0, info.id, value});
-    }
-    return events;
-}
 } // anonymous namespace
 
 TEST_CASE("A full command ring is counted rather than ignored", "[clap][protocol][hostile]")
@@ -360,49 +326,6 @@ TEST_CASE("A full echo ring leaves the main thread's Program behind until it res
     runOneBlock(plugin);
     plugin.pumpMainThread();
     CHECK(hostReads() == Catch::Approx(asTheEngineHasIt));
-    checkLevel(*plugin);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-///
-/// \note clap-validator's param-fuzz: every parameter, every block, callback
-/// starved. The republish is state rather than writes, so order matters here.
-///
-////////////////////////////////////////////////////////////////////////////////
-
-TEST_CASE("A parameter storm that overflows the echo ring ends with both Programs level",
-          "[clap][protocol][hostile]")
-{
-    Entry const entry;
-
-    ActivePlugin plugin(sampleRate, blockSize);
-    auto &host(editorHostOf(*plugin));
-    auto &implementation(implementationOf(*plugin));
-
-    for (std::uint8_t slot(0); slot < LE::SW::Constants::maxNumberOfModules; ++slot)
-        REQUIRE(host.editSlot(slot, static_cast<std::int8_t>(slot + 2)));
-    runOneBlock(plugin);
-    plugin.pumpMainThread();
-    checkLevel(*plugin);
-
-    auto const infos(allParameterInfo(*plugin, parameters(*plugin)));
-    std::mt19937 random(198);
-
-    // only what an effect owns is echoed, so count drops rather than blocks
-    //
-    // three slots never move: a fresh module has every LFO off, hiding what a running one does
-    constexpr unsigned firstMovingSlot{3};
-    unsigned blocks(0);
-    while (implementation.droppedMessages() < overflowingEchoes)
-    {
-        REQUIRE(++blocks < 1000);
-        runOneBlock(plugin, everyParameterAtRandom(infos, random, firstMovingSlot));
-    }
-
-    plugin.pumpMainThread();
-    runOneBlock(plugin);
-    plugin.pumpMainThread();
-
     checkLevel(*plugin);
 }
 

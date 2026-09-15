@@ -492,14 +492,16 @@ audio thread owns would be reading the chain it is splicing.
 `GUI::loadPreset(*this, pEditor_, …)`. Three things go with that and are worth
 naming, because "that is the whole of it" was not quite true:
 
-- it opens a `GUI::UnattendedLoad` scope, which asserts that nothing raises a
-  modal box underneath it — nobody asked for this load and there may be no window
-  to answer one;
+- it passes `GUI::LoadRequest::restore`, so nothing wrong with the state raises a
+  box except the one thing a user can act on: an audio file that would not load,
+  and only when a window is open;
 - the load asks the host to re-read the parameters afterwards, deferred and
   coalesced, because every value has moved at once;
 - the preset may name an audio file, and loading one is synchronous. A file that
-  will not load clears the sample rather than leaving the previous one in place,
-  and reports a `PresetProblem` that `stateLoad` drops — there is nobody to tell.
+  will not load drops the previous sample and **keeps its own name**: the source
+  stays `File`, the engine falls back to the main input, the selector reads
+  "(not loaded)", and the next save writes the name again so the project finds
+  the file once it is back (issue #12).
 
 What it replaced: `SWX1` followed by 286 `(uint32 id, double value)` pairs, keyed
 on `SW::ParameterID` — which means "slot 3's 4th parameter" and never "Convolver's

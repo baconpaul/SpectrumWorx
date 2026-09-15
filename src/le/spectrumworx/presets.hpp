@@ -126,8 +126,8 @@ enum struct PresetProblem : std::uint8_t
     ///
     /// \note The user's business, and nameable, which is what makes it worth
     /// reporting: the file has a name, and finding it again is something only
-    /// they can do. The sample is cleared rather than left as whatever the
-    /// previous preset loaded (presetLoading.cpp).
+    /// they can do. The previous sample is dropped and the name kept, so the
+    /// session finds the file once it is back (presetLoading.cpp).
     ///
     ///   It raised a modal box of its own until 08.08.2026, from inside the
     /// load, which is how a host restoring a session came to be stopped by a
@@ -177,8 +177,8 @@ void reportPresetProblem(PresetProblem, std::string_view detail = {});
 /// before there is a window to put a dialog in front of.
 ///
 ///   So the default counts, and the caller decides. `GUI::loadPreset` raises one
-/// summary when a *user* opened something; `stateLoad` stays silent, a session
-/// restore being nobody's business. A test needs to install nothing to be quiet:
+/// summary when a *user* opened something; a restore mentions only a sample that
+/// did not load, and only with a window open. A test needs to install nothing to be quiet:
 /// before this, one that forgot leaked 809 `juce::AsyncUpdater`s.
 ///
 ////////////////////////////////////////////////////////////////////////////////
