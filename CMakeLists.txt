@@ -53,6 +53,13 @@ if (APPLE)
     enable_language(OBJCXX)
     set(CMAKE_OBJC_VISIBILITY_PRESET hidden)
     set(CMAKE_OBJCXX_VISIBILITY_PRESET hidden)
+
+    # AppleClang 21's libc++ #warns below macOS 11, which -Werror would make fatal
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang"
+            AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 21)
+        string(APPEND CMAKE_CXX_FLAGS " -Wno-error=#warnings")
+        string(APPEND CMAKE_OBJCXX_FLAGS " -Wno-error=#warnings")
+    endif ()
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
