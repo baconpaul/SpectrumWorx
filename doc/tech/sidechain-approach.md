@@ -79,14 +79,17 @@ same project rendered twice did not sound the same.
 plugin brought up while the transport is already rolling counts its first block
 as a start.
 
-### Two states that cannot occur
+### One state that is the patch's rather than the engine's
 
-- **`File` with no sample loaded.** Refused at both doors:
-  `SpectrumWorxCLAP::setSideChainSource()` leaves `Main` selected instead, and
-  `resolveSideChainSource()` does the same for a patch being loaded. So the
-  selector never shows a file that is not there. `runEngine()` still tests
-  `pSample_` rather than trusting it, because a source the engine cannot honour
-  should fall back rather than dereference null.
+**`File` with a name and no sample** is what a patch naming a file that will not
+load leaves (issue #12). The session keeps the name so the project finds the file
+once it is back, the selector says "(not loaded)", and `runEngine()` falls back to
+the main input because `pSample_` is null. `File` with no name at all is still
+refused: `SpectrumWorxCLAP::setSideChainSource()` leaves `Main` selected instead,
+and `resolveSideChainSource()` does the same for a patch being loaded.
+
+### A state that cannot occur
+
 - **A source and a sample the audio thread disagrees about.** They travel in one
   `ToEngine::SwapSample` message, so no block can be rendered with a new source
   and the sample the previous one named. Its `replacesSample` flag separates
@@ -162,7 +165,7 @@ Three things worth knowing about it:
   lock beside `Sidechain Source` shut names a file and gets none, so it
   migrates to `Input_mode`'s answer instead — which is what a user who asked not
   to be given somebody else's audio meant. A named file that will not decode is
-  reported and cleared, and lands in the same place.
+  reported and keeps its name, so it resolves to `File` as if it had loaded.
 - **Mono is not a source.** `Input_mode` 2 and 3 are the mono arrangements, and
   they say how many channels each source carries rather than which one is
   selected — hence the odd/even test. Mono itself is `how-mono-ports-work.md`,

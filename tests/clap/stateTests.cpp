@@ -32,6 +32,8 @@
 #include "core/modules/moduleDSPAndGUI.hpp"
 #include "gui/editor/presetLoading.hpp"
 #include "gui/editor/spectrumWorxEditor.hpp"
+#include "gui/gui.hpp" // setWarningPresenter
+#include "io/jucePath.hpp"
 
 #include "core/parameterID.hpp"
 #include "le/parameters/parametersUtilities.hpp"
@@ -405,6 +407,101 @@ std::vector<char> asBuffer(std::string const &text)
     buffer.push_back('\0');
     return buffer;
 }
+
+/// \brief A session whose side channel is \p sampleFile, spelled as the file holds it
+std::vector<char> sessionNaming(std::string const &sampleFile)
+{
+    OutStream saved;
+    {
+        Plugin const plugin(nullHost(), true /*active*/);
+        REQUIRE(plugin.editorHost().setNewSample(fs::path("Carrier.mp3")) == nullptr);
+        REQUIRE(plugin.state().save(&*plugin, &saved));
+    }
+
+    std::string text(saved.text());
+    auto const nameAt(text.find("Carrier.mp3"));
+    REQUIRE(nameAt != std::string::npos);
+    text.replace(nameAt, std::strlen("Carrier.mp3"), sampleFile);
+    return asBuffer(text);
+}
+
+/// \brief A session whose one module names an effect no build has
+std::vector<char> sessionWithAnUnknownEffect()
+{
+    constexpr std::int8_t effect{2};
+
+    OutStream saved;
+    {
+        Plugin const plugin;
+        REQUIRE(plugin.editorHost().editSlot(0, effect));
+        REQUIRE(plugin.state().save(&*plugin, &saved));
+    }
+
+    std::string text(saved.text());
+    auto const quoted('"' + std::string(LE::SW::Effects::effectStreamingName(effect)) + '"');
+    auto const nameAt(text.find(quoted));
+    INFO("state:\n" << text);
+    REQUIRE(nameAt != std::string::npos);
+    text.replace(nameAt, quoted.size(), "\"NoSuchEffect\"");
+    return asBuffer(text);
+}
+
+/// \brief Counts warning boxes in place of posting them, for as long as it lives
+class ScopedWarningCounter
+{
+  public:
+    ScopedWarningCounter() : previous_(LE::SW::GUI::setWarningPresenter(&count)) { seen() = {}; }
+    ~ScopedWarningCounter() { LE::SW::GUI::setWarningPresenter(previous_); }
+
+    ScopedWarningCounter(ScopedWarningCounter const &) = delete; // makes non-copyable
+    ScopedWarningCounter &operator=(ScopedWarningCounter const &) = delete;
+
+    unsigned int boxes() const { return seen().boxes; }
+    std::string const &lastMessage() const { return seen().lastMessage; }
+
+  private:
+    struct Seen
+    {
+        unsigned int boxes{0};
+        std::string lastMessage;
+    };
+
+    // the presenter is a plain function pointer
+    static Seen &seen()
+    {
+        static Seen instance;
+        return instance;
+    }
+
+    static void count(std::string_view, std::string_view const message)
+    {
+        ++seen().boxes;
+        seen().lastMessage = message;
+    }
+
+    LE::SW::GUI::WarningPresenter const previous_;
+}; // class ScopedWarningCounter
+
+/// \brief The plugin's own editor, open for as long as this lives
+class ScopedEditor
+{
+  public:
+    explicit ScopedEditor(clap_plugin const &plugin)
+        : plugin_(plugin),
+          pGUI_(static_cast<clap_plugin_gui const *>(plugin.get_extension(&plugin, CLAP_EXT_GUI)))
+    {
+        REQUIRE(pGUI_ != nullptr);
+        REQUIRE(pGUI_->create(&plugin_, CLAP_WINDOW_API_COCOA, false));
+    }
+    ~ScopedEditor() { pGUI_->destroy(&plugin_); }
+
+    ScopedEditor(ScopedEditor const &) = delete; // makes non-copyable
+    ScopedEditor &operator=(ScopedEditor const &) = delete;
+
+  private:
+    clap_plugin const &plugin_;
+    clap_plugin_gui const *const pGUI_;
+}; // class ScopedEditor
 
 //------------------------------------------------------------------------------
 } // anonymous namespace
@@ -1017,12 +1114,174 @@ TEST_CASE("A session naming a sample that will not load does not keep the previo
     REQUIRE(restored.state().load(&*restored, &absent));
 
     // Not Carrier.mp3, which is what the engine would still have been playing.
-    CHECK(restored.editorHost().currentSampleFile().empty());
+    CHECK(restored.editorHost().currentSampleFile().filename() != "Carrier.mp3");
     CHECK(restored.implementation().decodedSampleRate() == 0);
 
     OutStream resaved;
     REQUIRE(restored.state().save(&*restored, &resaved));
     CHECK(resaved.text().find("Carrier.mp3") == std::string::npos);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// A sample the session names and this machine cannot load. \see issue #12
+////////////////////////////////////////////////////////////////////////////////
+
+TEST_CASE("A session naming a sample that will not load keeps the name", "[clap][state][issue-12]")
+{
+    Entry const entry;
+
+    auto const session(sessionNaming("Missing.wav"));
+
+    Plugin const restored(nullHost(), true /*active*/);
+    InStream stream(session);
+    REQUIRE(restored.state().load(&*restored, &stream));
+
+    auto const &host(restored.editorHost());
+    CHECK(host.currentSampleFile().filename() == "Missing.wav");
+    CHECK(host.sampleNotLoaded());
+    CHECK(host.sideChainSource() == LE::SW::SideChainSource::File);
+    CHECK(restored.implementation().decodedSampleRate() == 0);
+
+    // so the project finds the file again once it is back
+    OutStream resaved;
+    REQUIRE(restored.state().save(&*restored, &resaved));
+    CHECK(resaved.text().find("Missing.wav") != std::string::npos);
+}
+
+TEST_CASE("A sample that did not load is not read again when the host activates",
+          "[clap][state][issue-12]")
+{
+    Entry const entry;
+
+    auto const session(sessionNaming("Missing.wav"));
+
+    Plugin restored; // inactive, as a host creates one
+    InStream stream(session);
+    REQUIRE(restored.state().load(&*restored, &stream));
+    REQUIRE(restored.editorHost().sampleNotLoaded());
+
+    // activate() re-reads a sample for the new rate, and asserts one that loaded once loads again
+    restored.activate();
+
+    CHECK(restored.editorHost().sampleNotLoaded());
+    CHECK(restored.editorHost().currentSampleFile().filename() == "Missing.wav");
+}
+
+TEST_CASE("A sample that did not load is read when the session is restored again",
+          "[clap][state][issue-12]")
+{
+    Entry const entry;
+
+    auto const directory(fs::path(SW_TEST_OUTPUT_DIR) / "sampleNotLoaded");
+    std::error_code error;
+    fs::create_directories(directory, error);
+    auto const returning(directory / "Returning.mp3");
+    fs::remove(returning, error);
+    REQUIRE_FALSE(fs::exists(returning, error));
+
+    auto const session(sessionNaming(LE::IO::pathToUTF8(returning)));
+
+    // inactive, so both rates setNewSample() compares are zero
+    Plugin restored;
+    {
+        InStream stream(session);
+        REQUIRE(restored.state().load(&*restored, &stream));
+    }
+    REQUIRE(restored.editorHost().sampleNotLoaded());
+
+    fs::copy_file(fs::path(SW_PRESET_DATA_DIR).parent_path() / "samples" / "Carrier.mp3", returning,
+                  error);
+    REQUIRE_FALSE(error);
+
+    {
+        InStream stream(session);
+        REQUIRE(restored.state().load(&*restored, &stream));
+    }
+
+    CHECK_FALSE(restored.editorHost().sampleNotLoaded());
+    CHECK(restored.editorHost().currentSampleFile().filename() == "Returning.mp3");
+}
+
+TEST_CASE("A restore with the editor open says in a box that its sample did not load",
+          "[clap][state][gui][issue-12]")
+{
+    Entry const entry;
+    juce::ScopedJuceInitialiser_GUI const juceIsUp;
+
+    auto const session(sessionNaming("Missing.wav"));
+
+    SWTest::TestHost host{{.gui = true}};
+    SWTest::ActivePlugin plugin(sampleRate, blockSize, host);
+    ScopedEditor const editor(*plugin);
+    ScopedWarningCounter const warnings;
+
+    InStream stream(session);
+    REQUIRE(stateOf(*plugin).load(&*plugin, &stream));
+
+    CHECK(warnings.boxes() == 1);
+    CHECK(warnings.lastMessage().find("Missing.wav") != std::string::npos);
+}
+
+TEST_CASE("A restore with no editor open raises no box for a sample that did not load",
+          "[clap][state][issue-12]")
+{
+    Entry const entry;
+
+    auto const session(sessionNaming("Missing.wav"));
+
+    SWTest::ActivePlugin plugin(sampleRate, blockSize);
+    ScopedWarningCounter const warnings;
+
+    InStream stream(session);
+    REQUIRE(stateOf(*plugin).load(&*plugin, &stream));
+
+    CHECK(warnings.boxes() == 0);
+    // the selector says it instead, whenever the window opens
+    CHECK(SWTest::editorHostOf(*plugin).sampleNotLoaded());
+}
+
+TEST_CASE("A restore with the editor open keeps its other load problems off the screen",
+          "[clap][state][gui][issue-12]")
+{
+    Entry const entry;
+    juce::ScopedJuceInitialiser_GUI const juceIsUp;
+
+    auto const session(sessionWithAnUnknownEffect());
+
+    SWTest::TestHost host{{.gui = true}};
+    SWTest::ActivePlugin plugin(sampleRate, blockSize, host);
+    ScopedEditor const editor(*plugin);
+    ScopedWarningCounter const warnings;
+
+    InStream stream(session);
+    REQUIRE(stateOf(*plugin).load(&*plugin, &stream));
+
+    CHECK(warnings.boxes() == 0);
+}
+
+TEST_CASE("A preset the user opens still reports its load problems in a box",
+          "[clap][state][gui][issue-12]")
+{
+    Entry const entry;
+    juce::ScopedJuceInitialiser_GUI const juceIsUp;
+
+    auto preset(sessionWithAnUnknownEffect());
+
+    SWTest::TestHost host{{.gui = true}};
+    SWTest::ActivePlugin plugin(sampleRate, blockSize, host);
+    ScopedEditor const editor(*plugin);
+    ScopedWarningCounter const warnings;
+
+    auto &editorHost(SWTest::editorHostOf(*plugin));
+    auto *const pEditor(static_cast<LE::SW::SpectrumWorxCLAP &>(editorHost).gui());
+    REQUIRE(pEditor != nullptr);
+
+    juce::String comment;
+    LE::SW::GUI::loadPreset(editorHost, pEditor, LE::SW::GUI::LoadRequest::user, preset.data(),
+                            false /*ignore external samples*/, &comment, "Unknown");
+
+    CHECK(warnings.boxes() == 1);
+    CHECK(warnings.lastMessage().find("NoSuchEffect") != std::string::npos);
 }
 
 TEST_CASE("Loading a sample marks the session dirty", "[clap][state]")
@@ -1709,8 +1968,8 @@ TEST_CASE("A preset load does not count as editing the preset", "[clap][state][p
     SWTest::ScopedProblemCounter const problems;
 
     juce::String comment;
-    REQUIRE(
-        LE::SW::GUI::loadPreset(editorHost, pEditor, presetData.get(), true, &comment, "Robokid"));
+    REQUIRE(LE::SW::GUI::loadPreset(editorHost, pEditor, LE::SW::GUI::LoadRequest::user,
+                                    presetData.get(), true, &comment, "Robokid"));
 
     /// \note What PresetBrowser::rememberLoadedPreset() does the moment the load
     /// returns: this is the preset now, and nobody has edited it.

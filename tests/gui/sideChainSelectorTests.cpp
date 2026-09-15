@@ -148,6 +148,24 @@ TEST_CASE("The two host ports are named for the width they carry", "[gui][side-c
     CHECK(std::string(Editor::hostPortName(SideChainSource::Host, 1)) == "Sidechain Input (Mono)");
 }
 
+// a session keeps the name of a file that would not load, so the box has to say so
+TEST_CASE("The side chain box says when its file did not load", "[gui][side-chain][issue-12]")
+{
+    SWTest::HostSideJuce const juce;
+    SWTest::Instance instance;
+    instance.openEditor(Editor::PanelPlacement::overlay);
+    auto &editor(instance.editor());
+
+    instance.nameSample("Missing.wav", true /*loaded*/);
+    editor.updateSampleName();
+    auto const loaded(rendered(editor));
+
+    instance.nameSample("Missing.wav", false /*loaded*/);
+    editor.updateSampleName();
+
+    CHECK(differingPixels(rendered(editor), loaded) > 0);
+}
+
 /// \note And that the box asks. The name is built from the host's width rather
 /// than held from whenever the source was last picked, so a layout that changes
 /// under an open editor is a box that re-reads.

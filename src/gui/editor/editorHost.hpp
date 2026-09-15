@@ -393,6 +393,12 @@ class EditorHost
     ////////////////////////////////////////////////////////////////////////////
     virtual char const *setNewSample(fs::path const &) = 0;
 
+    /// \brief Keeps a patch's file name when the file would not load. \see issue #12
+    virtual void setSampleNotLoaded(fs::path const &) {}
+
+    /// \brief Whether currentSampleFile() is a name with nothing loaded behind it
+    virtual bool sampleNotLoaded() const { return false; }
+
     ////////////////////////////////////////////////////////////////////////////
     ///
     /// \brief What feeds the side channel, which is the audio-file selector's

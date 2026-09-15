@@ -32,6 +32,7 @@
 #include <cstdlib>
 #include <optional>
 #include <string_view>
+#include <utility>
 #include "le/utility/span.hpp"
 //------------------------------------------------------------------------------
 #ifdef _WIN32
@@ -102,24 +103,8 @@ SkinLifetime::~SkinLifetime()
 
 namespace
 {
-/// \note A counter rather than a flag, so that a nested load is not a case worth
-/// being wrong about. `[main-thread]` throughout.
-unsigned int unattendedLoads{0};
-} // anonymous namespace
-
-UnattendedLoad::UnattendedLoad() { ++unattendedLoads; }
-UnattendedLoad::~UnattendedLoad() { --unattendedLoads; }
-bool UnattendedLoad::inProgress() { return unattendedLoads != 0; }
-
-void warningMessageBox(std::string_view const title, std::string_view const message,
-                       bool const /*canBlock*/)
+void showWarningAlert(std::string_view const title, std::string_view const message)
 {
-    // the invariant, and for now only asserted. \see UnattendedLoad
-    LE_ASSERT_MSG(!UnattendedLoad::inProgress(),
-                  "A modal box in front of a host restoring a session.");
-
-    //...mrmlj...canBlock no longer means anything and should come off the ~15
-    //...mrmlj...call sites once they are ported.
     JUCE_AUTORELEASEPOOL
     {
         // data(), not begin(): MSVC's std::string_view iterator is a class type
@@ -130,12 +115,25 @@ void warningMessageBox(std::string_view const title, std::string_view const mess
     }
 }
 
+WarningPresenter warningPresenter{&showWarningAlert};
+} // anonymous namespace
+
+WarningPresenter setWarningPresenter(WarningPresenter const presenter)
+{
+    return std::exchange(warningPresenter, presenter ? presenter : &showWarningAlert);
+}
+
+void warningMessageBox(std::string_view const title, std::string_view const message,
+                       bool const /*canBlock*/)
+{
+    //...mrmlj...canBlock no longer means anything and should come off the ~15
+    //...mrmlj...call sites once they are ported.
+    warningPresenter(title, message);
+}
+
 void warningMessageBox(std::string_view const title, std::string_view const message,
                        std::function<void()> onDismissed)
 {
-    LE_ASSERT_MSG(!UnattendedLoad::inProgress(),
-                  "A modal box in front of a host restoring a session.");
-
     JUCE_AUTORELEASEPOOL
     {
         juce::AlertWindow::showMessageBoxAsync(

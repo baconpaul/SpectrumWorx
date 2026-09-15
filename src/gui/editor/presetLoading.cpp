@@ -177,18 +177,6 @@ struct Loader
     /// writes: a session that ended up naming a file the user had loaded two
     /// presets ago.
     ///
-    ///   A named file that will not load lands in the same place for the same
-    /// reason, and is worse: the load is a no-op, so the engine keeps the old
-    /// sample and the session claims the new name. Cleared here rather than kept,
-    /// which is the honest answer -- this preset does not use that audio, and
-    /// nothing else the loader does leaves the previous preset's anything behind.
-    ///
-    /// \note And reported rather than shown. It used to raise a modal box from
-    /// inside the load, which is a dialog nobody asked for in front of a host
-    /// restoring a session. `PresetProblem` is where everything else wrong with a
-    /// preset goes, and the caller decides: `GUI::loadPreset` folds it into the
-    /// one summary a user who opened a preset gets, and `stateLoad` drops it.
-    ///
     ////////////////////////////////////////////////////////////////////////////
 
     void setSample(std::string_view const sampleFileName) const
@@ -221,9 +209,12 @@ struct Loader
         /// \note utf8ToPath(), not `fs::path( std::string )`: what a preset
         /// carries is UTF-8 and the latter decodes with the active code page on
         /// Windows. \see io/jucePath.hpp.
-        if (host.setNewSample(LE::IO::utf8ToPath(spelling)))
+        auto const file(LE::IO::utf8ToPath(spelling));
+
+        // the name is kept so the session finds the file once it is back. \see issue #12
+        if (host.setNewSample(file))
         {
-            host.setNewSample({});
+            host.setSampleNotLoaded(file);
             reportPresetProblem(PresetProblem::SampleNotLoaded, sampleFileName);
         }
 
@@ -336,8 +327,8 @@ struct Consumer
 /// \note The preset layer counts now rather than raising a message box per
 /// problem -- see PresetLoadReport. This is the caller that turns the count back
 /// into something a user sees, and it is deliberately *this* caller: a user opened
-/// a preset and is owed an answer. `SpectrumWorxCLAP::stateLoad` takes the same
-/// report and says nothing, a session restore being nobody's business.
+/// a preset and is owed an answer. A restore is told only about its sample.
+/// \see LoadRequest
 ///
 /// \note "Owed an answer" is not "owed a count". A missing parameter on its own
 /// says nothing to a user: the effect grew that parameter after the preset was
@@ -394,9 +385,10 @@ void reportToTheUser(PresetLoadReport const &report)
     GUI::warningMessageBox(MB_WARNING, message.toRawUTF8(), false);
 }
 
-bool loadPreset(EditorHost &host, SpectrumWorxEditor *const pEditor, char *const inMemoryPreset,
-                bool const ignoreExternalSample, juce::String *const comment,
-                char const *const presetName, DawExtraState const *const pDawExtraState)
+bool loadPreset(EditorHost &host, SpectrumWorxEditor *const pEditor, LoadRequest const request,
+                char *const inMemoryPreset, bool const ignoreExternalSample,
+                juce::String *const comment, char const *const presetName,
+                DawExtraState const *const pDawExtraState)
 {
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -526,23 +518,35 @@ bool loadPreset(EditorHost &host, SpectrumWorxEditor *const pEditor, char *const
     if (pEditor)
         pEditor->updateForGlobalParameterChange();
 
-    /// \note Only with a window open. With none this is a session being restored,
-    /// which nobody asked for and which may not even have a message thread yet.
+    // only with a window open: with none there may not be a message thread yet
+    auto const report(takePresetLoadReport());
     if (pEditor)
-        reportToTheUser(takePresetLoadReport());
+    {
+        if (request == LoadRequest::user)
+            reportToTheUser(report);
+        else if (host.sampleNotLoaded())
+        {
+            // a restore keeps the rest to itself, but a missing file is the user's to find
+            PresetLoadReport sampleOnly;
+            sampleOnly.samplesNotLoaded = 1;
+            sampleOnly.firstDetail = LE::IO::pathToUTF8(host.currentSampleFile());
+            reportToTheUser(sampleOnly);
+        }
+    }
 
     return succeeded;
 }
 
-bool loadPreset(EditorHost &host, SpectrumWorxEditor *const pEditor, fs::path const &presetFile,
-                bool const ignoreExternalSample, juce::String *const comment,
-                char const *const presetName, DawExtraState const *const pDawExtraState)
+bool loadPreset(EditorHost &host, SpectrumWorxEditor *const pEditor, LoadRequest const request,
+                fs::path const &presetFile, bool const ignoreExternalSample,
+                juce::String *const comment, char const *const presetName,
+                DawExtraState const *const pDawExtraState)
 {
     auto const presetData(readPresetFile(presetFile));
     if (!presetData)
         return false;
-    return loadPreset(host, pEditor, presetData.get(), ignoreExternalSample, comment, presetName,
-                      pDawExtraState);
+    return loadPreset(host, pEditor, request, presetData.get(), ignoreExternalSample, comment,
+                      presetName, pDawExtraState);
 }
 
 } // namespace LE::SW::GUI

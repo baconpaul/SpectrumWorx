@@ -214,8 +214,8 @@ class Instance final : public GUI::EditorHost
     ///
     /// \brief The side chain's source, held and handed back.
     ///
-    /// \note No sample loader under this harness, so `File` is not reachable
-    /// through it -- what the editor cases are about is that the selector *shows*
+    /// \note No sample loader under this harness, so `File` is reachable only
+    /// through nameSample() -- what the editor cases are about is that the selector *shows*
     /// the source and that picking one reaches the host. \see
     /// tests/external_audio/sampleFeedTests.cpp for what each source does to the
     /// audio.
@@ -329,8 +329,18 @@ class Instance final : public GUI::EditorHost
     std::vector<juce::Point<int>> announcedSizes;
     bool grantResizes{true};
 
-    fs::path currentSampleFile() const override { return {}; }
+    fs::path currentSampleFile() const override { return sampleFile_; }
     char const *setNewSample(fs::path const &) override { return nullptr; }
+    bool sampleNotLoaded() const override { return sampleNotLoaded_; }
+
+    // no decoder here, so a case says what a load would have left
+    void nameSample(fs::path const &file, bool const loaded)
+    {
+        sampleFile_ = file;
+        sampleNotLoaded_ = !loaded;
+        sideChainSource_ = SideChainSource::File;
+    }
+
     bool isSampleLoadInProgress() const override { return false; }
     void registerSampleLoadedListener(GUI::SpectrumWorxEditor &) override {}
     void deregisterSampleLoadedListener(GUI::SpectrumWorxEditor const &) override {}
@@ -366,6 +376,8 @@ class Instance final : public GUI::EditorHost
     Threading::ValueMailbox values_;
     std::unique_ptr<GUI::SpectrumWorxEditor> pEditor_;
     SideChainSource sideChainSource_{defaultSideChainSource};
+    fs::path sampleFile_;
+    bool sampleNotLoaded_{false};
     std::uint8_t channelWidth_{2};
     GUI::PanelState panelState_;
     mutable GUI::LoadedPreset loadedPreset_;

@@ -126,10 +126,10 @@ constexpr SideChainSource sideChainSourceFromLegacyInputMode(unsigned int const 
 /// \param recorded what the patch wrote, empty when it wrote nothing -- which is
 ///        every 2.x file and every 3.0 file older than 18.08.2026.
 /// \param legacyInputMode 2016's `Input_mode`, where the patch has one.
-/// \param haveSample whether a file ended up loaded. Not "whether the patch named
-///        one": a patch loaded with the browser's "Ignore external audio" on
-///        names one and gets none, and a named file that will not decode is
-///        cleared and reported.
+/// \param haveSample whether the side channel ended up naming a file. Not "whether
+///        the patch named one": a patch loaded with the browser's "Ignore external
+///        audio" on names one and gets none. A named file that will not decode
+///        still counts, its name kept for when it is back.
 ///
 /// \note **The migration is 2016's truth table, recovered exactly.** That table
 /// read as a bus setting crossed with "is a file loaded":
@@ -144,8 +144,7 @@ constexpr SideChainSource sideChainSourceFromLegacyInputMode(unsigned int const 
 /// migration each of them implemented separately would be a migration only one of
 /// them was testing.
 ///
-/// \note A `File` that cannot be honoured is not returned. Nothing downstream has
-/// to cope with a source naming a file that is not there -- \see the same rule in
+/// \note `File` with no name at all is not returned -- \see the same rule in
 /// `SpectrumWorxCLAP::setSideChainSource()`.
 ///
 ////////////////////////////////////////////////////////////////////////////////

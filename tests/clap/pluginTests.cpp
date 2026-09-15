@@ -2468,8 +2468,9 @@ TEST_CASE("A preset reaches the rack with no audio thread running", "[clap][pres
 
     auto const requestsBefore(editor->rackResyncRequests());
 
-    REQUIRE(LE::SW::GUI::loadPreset(host, editor.get(), presetData.get(),
-                                    true /*ignore external samples*/, nullptr, "Robokid"));
+    REQUIRE(LE::SW::GUI::loadPreset(host, editor.get(), LE::SW::GUI::LoadRequest::user,
+                                    presetData.get(), true /*ignore external samples*/, nullptr,
+                                    "Robokid"));
 
     // The main thread's chain is the preset's the moment the load returns...
     auto const modules(editor->moduleChain().size());
@@ -2587,8 +2588,9 @@ TEST_CASE("Loading preset after preset with the editor open", "[clap][presets][g
         ///
         ////////////////////////////////////////////////////////////////////
         auto const name(file.path().stem().string());
-        REQUIRE(LE::SW::GUI::loadPreset(host, editor.get(), presetData.get(),
-                                        true /*ignore external samples*/, nullptr, name.c_str()));
+        REQUIRE(LE::SW::GUI::loadPreset(host, editor.get(), LE::SW::GUI::LoadRequest::user,
+                                        presetData.get(), true /*ignore external samples*/, nullptr,
+                                        name.c_str()));
         ++loaded;
 
         /// \note The posted resync, run by hand: a headless test has no message

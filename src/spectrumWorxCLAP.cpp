@@ -294,10 +294,12 @@ bool SpectrumWorxCLAP::activate(double const sampleRate, std::uint32_t,
     // "Sample::load was given no rate", not "no sample loaded"
     //
     // before resume(), so the swap is the direct one rather than a queued command
-    if (!sampleFile_.empty() && (decodedSampleRate_ != static_cast<unsigned int>(sampleRate)))
+    //
+    // a name that never loaded is retried by the next load, not here
+    if (!sampleFile_.empty() && !sampleNotLoaded_ &&
+        (decodedSampleRate_ != static_cast<unsigned int>(sampleRate)))
     {
-        // no dialog, unlike the menu's load: a modal box in activate() stops
-        // the host mid-restore, and no user asked for this. \see issue #12
+        // no dialog: activate() is not a load anybody asked for
         [[maybe_unused]] auto const *const pErrorMessage(decodeAndPublishSample(sampleFile_));
         LE_ASSERT_MSG(!pErrorMessage, "A sample that loaded once did not load again.");
     }
@@ -1397,10 +1399,7 @@ void SpectrumWorxCLAP::runEngine(clap_process const *const process, std::uint32_
     // the decoded audio file, when that is what the patch selected: the three
     // sources are exclusive, so this is a selection rather than a precedence
     //
-    // pSample_ is tested rather than trusted. Nothing should be able to leave
-    // File selected with no sample loaded -- both the setter and the preset
-    // loader refuse it -- and a source the engine cannot honour falls back to
-    // the main input rather than to a null dereference
+    // File with no sample, a patch's file that would not load, falls back to main
     float const *sampleChannels[Sample::numberOfChannels];
     bool sideIsScratch(false);
 
@@ -2454,11 +2453,9 @@ UndoHistory::Record SpectrumWorxCLAP::applyUndoRecord(UndoHistory::Record const 
     std::vector<char> buffer(snapshot.state.begin(), snapshot.state.end());
     buffer.push_back('\0');
 
-    GUI::UnattendedLoad const unattended; // nobody to answer a dialog about a step
-
     auto const identity(loadedPresetState());
-    GUI::loadPreset(*this, pEditor_, buffer.data(), false /*ignoreExternalSample*/, nullptr,
-                    nullptr, &identity);
+    GUI::loadPreset(*this, pEditor_, GUI::LoadRequest::restore, buffer.data(),
+                    false /*ignoreExternalSample*/, nullptr, nullptr, &identity);
 
     // after the load, for the reason stateLoad() applies it after its own: the
     // load ends in presetChangeEnd(), which would call the restored preset
@@ -2546,11 +2543,8 @@ try
     if (!state)
         return false;
 
-    // nobody asked for this load, so nothing under it may stop to ask the user
-    GUI::UnattendedLoad const unattended;
-
-    // nor is it something to take back: the session arriving is where the user
-    // starts, not a step they took
+    // not something to take back: the session arriving is where the user starts,
+    // not a step they took
     UndoPause const paused(recordingUndoSteps_);
 
     // pEditor_ is null unless a window happens to be open, and the same call
@@ -2559,8 +2553,8 @@ try
     // ignoreExternalSample false: the browser's toggle is a question about
     // somebody else's preset, and this is the session's own state
     auto const dawExtraState(sessionState());
-    if (!GUI::loadPreset(*this, pEditor_, state->data(), false /*ignoreExternalSample*/, nullptr,
-                         nullptr, &dawExtraState))
+    if (!GUI::loadPreset(*this, pEditor_, GUI::LoadRequest::restore, state->data(),
+                         false /*ignoreExternalSample*/, nullptr, nullptr, &dawExtraState))
         return false;
 
     // the edited flag the block carried, applied now the load is over:
@@ -2972,7 +2966,9 @@ char const *SpectrumWorxCLAP::setNewSample(fs::path const &newSampleFile)
     // the rate is half the question, and the half that is easy to lose: a host
     // changing it makes activate() decode the same path again, through
     // decodeAndPublishSample() rather than through here
-    if (!newSampleFile.empty() && (newSampleFile == sampleFile_) &&
+    //
+    // unless it never loaded, when the file may be back by now
+    if (!newSampleFile.empty() && (newSampleFile == sampleFile_) && !sampleNotLoaded_ &&
         (decodedSampleRate_ == static_cast<unsigned int>(sampleRate_)))
         return nullptr;
 
@@ -3002,13 +2998,14 @@ char const *SpectrumWorxCLAP::setNewSample(fs::path const &newSampleFile)
 ////////////////////////////////////////////////////////////////////////////////
 
 void SpectrumWorxCLAP::publishSideChain(Sample *const pNewSample, bool const replacesSample,
-                                        SideChainSource const source)
+                                        SideChainSource const source, fs::path const &unloadedFile)
 {
     auto const recordWhatTheEngineHasNow([&] {
         if (replacesSample)
         {
-            sampleFile_ = pNewSample ? pNewSample->sampleFile() : fs::path();
+            sampleFile_ = pNewSample ? pNewSample->sampleFile() : unloadedFile;
             decodedSampleRate_ = pNewSample ? pNewSample->sampleRate() : 0;
+            sampleNotLoaded_ = !pNewSample && !unloadedFile.empty();
         }
         sideChainSourceMain_ = source;
     });
@@ -3036,6 +3033,13 @@ void SpectrumWorxCLAP::publishSideChain(Sample *const pNewSample, bool const rep
     delete pNewSample;
 }
 
+// the engine gets no sample, so File falls back to the main input. \see issue #12
+void SpectrumWorxCLAP::setSampleNotLoaded(fs::path const &sampleFile)
+{
+    LE_ASSERT(Threading::isMainThread() || !Threading::isAudioThread());
+    publishSideChain(nullptr, true, SideChainSource::File, sampleFile);
+}
+
 /// \note Loading a file *is* selecting it as the source, and clearing one selects
 /// the main input, so no file is ever loaded and unheard by accident. A user who
 /// wants the host's port with a file still loaded says so through
@@ -3058,9 +3062,9 @@ void SpectrumWorxCLAP::publishSample(Sample *const pNewSample)
 /// source contradicts. The cost is a second decode if a user switches back.
 ///
 /// \note `File` is the exception and clears nothing -- it is reached with a
-/// sample already published, from `Loader::setSideChain()` restoring a patch that
-/// names one. With no sample it is refused outright: the selector would show a
-/// file that is not there and the engine would hold a source it cannot honour.
+/// sample already published, or a name that would not load, from
+/// `Loader::setSideChain()` restoring a patch that names one. With no name at all
+/// it is refused outright.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 

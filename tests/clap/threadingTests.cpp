@@ -258,7 +258,8 @@ TEST_CASE("A preset that changes the FFT size while audio runs still gets its re
         /// \note No editor, so nothing is reported to a user and nothing draws --
         /// this is the load itself against a running engine, which is what a
         /// browser click with the transport rolling is underneath.
-        REQUIRE(LE::SW::GUI::loadPreset(editorHostOf(*plugin), nullptr, presetData.get(),
+        REQUIRE(LE::SW::GUI::loadPreset(editorHostOf(*plugin), nullptr,
+                                        LE::SW::GUI::LoadRequest::user, presetData.get(),
                                         true /*ignore external samples*/, nullptr, "Whistle"));
 
         /// \note The preset's parameters are queued, so the audio thread has to
@@ -317,8 +318,9 @@ TEST_CASE("A chain queued behind a restart is resized before it is played",
     auto presetData(LE::SW::readPresetFile(presetWithABiggerFFT()));
     REQUIRE(static_cast<bool>(presetData));
 
-    REQUIRE(LE::SW::GUI::loadPreset(editorHostOf(*plugin), nullptr, presetData.get(),
-                                    true /*ignore external samples*/, nullptr, "Whistle"));
+    REQUIRE(LE::SW::GUI::loadPreset(editorHostOf(*plugin), nullptr, LE::SW::GUI::LoadRequest::user,
+                                    presetData.get(), true /*ignore external samples*/, nullptr,
+                                    "Whistle"));
 
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -594,8 +596,9 @@ TEST_CASE("A preset's global parameters reach a running engine through the queue
 
     auto presetData(LE::SW::readPresetFile(presetWithABiggerFFT()));
     REQUIRE(static_cast<bool>(presetData));
-    REQUIRE(LE::SW::GUI::loadPreset(editorHostOf(*plugin), nullptr, presetData.get(),
-                                    true /*ignore external samples*/, nullptr, "Whistle"));
+    REQUIRE(LE::SW::GUI::loadPreset(editorHostOf(*plugin), nullptr, LE::SW::GUI::LoadRequest::user,
+                                    presetData.get(), true /*ignore external samples*/, nullptr,
+                                    "Whistle"));
 
     // Queued, not written: the audio thread has not been given a chance yet.
     CHECK_THAT(float(engine.parameters().get<OutputGain>()),

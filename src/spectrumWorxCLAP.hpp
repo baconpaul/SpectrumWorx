@@ -302,6 +302,8 @@ class SpectrumWorxCLAP final
 
     fs::path currentSampleFile() const override { return sampleFile_; }
     char const *setNewSample(fs::path const &) override;
+    void setSampleNotLoaded(fs::path const &) override;
+    bool sampleNotLoaded() const override { return sampleNotLoaded_; }
 
     SideChainSource sideChainSource() const override { return sideChainSourceMain_; }
     std::uint8_t channelWidth() const override { return channelWidth_; }
@@ -500,7 +502,9 @@ class SpectrumWorxCLAP final
     ///
     /// \note One message either way: a new sample with the source that goes with
     /// it, or a source on its own, leaving whatever sample is loaded alone.
-    void publishSideChain(Sample *pNewSample, bool replacesSample, SideChainSource);
+    /// \param unloadedFile the name kept when a file would not load
+    void publishSideChain(Sample *pNewSample, bool replacesSample, SideChainSource,
+                          fs::path const &unloadedFile = {});
     void publishSample(Sample *pNewSample);
 
     /// \brief Decodes \p sampleFile for the engine's current rate and installs
@@ -808,6 +812,8 @@ class SpectrumWorxCLAP final
     bool transportWasPlaying_{false};
     fs::path sampleFile_;
     unsigned int decodedSampleRate_{0};
+    // sampleFile_ is a patch's name for a file that would not load
+    bool sampleNotLoaded_{false};
 
     ////////////////////////////////////////////////////////////////////////////
     ///
