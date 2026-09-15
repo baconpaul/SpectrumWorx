@@ -11,6 +11,7 @@
 #include "moduleUI.hpp"
 
 #include "core/modules/moduleDSPAndGUI.hpp"
+#include "gui/accessibility/traversal.hpp"
 #include "gui/editor/spectrumWorxEditor.hpp"
 #include "gui/preferences.hpp"
 
@@ -38,9 +39,25 @@ ModuleLEDTextButton::ModuleLEDTextButton(juce::Component &parent, unsigned int c
     setName(control().name());
     //...mrmlj...for temporary test selection...
     setSize(moduleComboWidth, getHeight() + 4);
+    setClickingTogglesState(false);
 }
 
-void ModuleLEDTextButton::clicked() { moduleParameterChanged(); }
+void ModuleLEDTextButton::clicked()
+{
+    on_ = !on_;
+    repaint();
+    moduleParameterChanged();
+}
+
+void ModuleLEDTextButton::toggleFromKeyboard()
+{
+    if (isLFOEnabled())
+        return;
+    on_ = !on_;
+    repaint();
+    control().publishValue();
+    Accessibility::announceValueChange(*this);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -133,6 +150,51 @@ TriggerButton::TriggerButton(juce::Component &parent, unsigned int const x, unsi
 void TriggerButton::setValue(param_type const newValue)
 {
     setState(newValue ? buttonDown : buttonNormal);
+}
+
+std::unique_ptr<juce::AccessibilityHandler> TriggerButton::createAccessibilityHandler()
+{
+    Accessibility::ButtonAccess access;
+    access.title = [this] { return control().parameterMenuName(); };
+    access.press = [this] { fireFromKeyboard(); };
+    access.showMenu = [this] { showParameterMenuFromKeyboard(true); };
+    return Accessibility::makeButtonHandler(*this, std::move(access));
+}
+
+bool TriggerButton::keyPressed(juce::KeyPress const &key)
+{
+    using Accessibility::KeyEdit;
+    auto const edit(Accessibility::keyEditFor(key));
+    if (edit.action == KeyEdit::trigger)
+    {
+        fireFromKeyboard();
+        return true;
+    }
+    if (edit.opensMenu())
+    {
+        showParameterMenuFromKeyboard(true);
+        return true;
+    }
+    return false;
+}
+
+void TriggerButton::fireFromKeyboard()
+{
+    if (isLFOEnabled() || isDown())
+        return;
+
+    setState(buttonDown);
+    control().publishValue();
+
+    // long enough to see, and a release the engine hears as one
+    constexpr int heldMilliseconds{120};
+    juce::Timer::callAfterDelay(heldMilliseconds,
+                                [pThis = juce::Component::SafePointer<TriggerButton>(this)] {
+                                    if (!pThis)
+                                        return;
+                                    pThis->setState(buttonNormal);
+                                    pThis->control().publishValue();
+                                });
 }
 
 /// \note The artwork is square and holds a circle, and paintButton() centres it
@@ -351,6 +413,17 @@ void ModuleKnob::valueChanged() noexcept
 {
     LE_ASSERT(isMouseOverOrDragging());
     moduleParameterChanged();
+}
+
+// around juce::Slider's notification, whose valueChanged() asserts a mouse
+void ModuleKnob::applyAccessibleValue(double const value)
+{
+    if (isLFOEnabled())
+        return;
+    juce::Slider::setValue(value, juce::dontSendNotification);
+    control().publishValue();
+    repaint();
+    Accessibility::announceValueChange(*this);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -614,6 +687,12 @@ ModuleUI::ModuleUI(SpectrumWorxEditor &editor, LE::Utility::IntrusivePtr<SW::Mod
     setMouseClickGrabsKeyboardFocus(true);
     setWantsKeyboardFocus(true);
 
+    // a group a screen reader steps into; the tab key walks straight through
+    setFocusContainerType(FocusContainerType::focusContainer);
+    using TabOrder = SpectrumWorxEditor::TabOrder;
+    Accessibility::setTraversalOrder(bypass_, TabOrder::bypass);
+    Accessibility::setTraversalOrder(eject_, TabOrder::eject);
+
     //...mrmlj...for testing...
     //juce::Desktop::getInstance().getAnimator().animateComponent
     //(
@@ -645,6 +724,12 @@ ModuleUI::ModuleUI(SpectrumWorxEditor &editor, LE::Utility::IntrusivePtr<SW::Mod
     LE_ASSERT_MSG(getNumChildComponents() ==
                       (baseWidgets + module().numberOfEffectSpecificParameters()),
                   "Unexpected number of child widgets at end of ModuleUI constructor.");
+
+    // top to bottom, as they are laid out
+    for (std::uint8_t parameter(0); parameter < module().numberOfEffectSpecificParameters();
+         ++parameter)
+        Accessibility::setTraversalOrder(effectSpecificParameterControl(parameter).widget(),
+                                         TabOrder::stripControls + parameter);
 
     updateForEngineSetupChanges(editor_.engineSetup());
 
@@ -699,6 +784,28 @@ void ModuleUI::setUpForEffect(char const *const effectName, char const *const ef
     LE_ASSERT(description_.isEmpty());
     setName(effectName);
     description_ = effectDescription;
+    updateAccessibleTitles();
+}
+
+juce::String ModuleUI::accessibleName() const
+{
+    return "Module " + juce::String(slot_ + 1) + ": " + getName();
+}
+
+void ModuleUI::updateAccessibleTitles() { eject_.setTitle("Remove " + accessibleName()); }
+
+std::unique_ptr<juce::AccessibilityHandler> ModuleUI::createAccessibilityHandler()
+{
+    return Accessibility::makeGroupHandler(
+        *this, [this] { return accessibleName(); }, [this] { return description_; });
+}
+
+bool ModuleUI::keyPressed(juce::KeyPress const &key)
+{
+    if (!Accessibility::keyEditFor(key).opensMenu())
+        return false;
+    editor().showEffectMenuAt(localPointToGlobal(juce::Point<int>(width / 2, nameRule)));
+    return true;
 }
 
 /// \note `slot_` is assigned now and the pixels arrive over the next few frames.
@@ -712,6 +819,8 @@ void ModuleUI::moveToSlot(std::uint8_t const slotIndex)
     /// the chain is what is playing, so a strip has to know its own place
     /// without asking the chain.
     slot_ = slotIndex;
+    Accessibility::setTraversalOrder(*this, SpectrumWorxEditor::TabOrder::slot(slotIndex));
+    updateAccessibleTitles();
     std::uint16_t const myHorizontalOffset(horizontalOffset + slotIndex * (width + distance));
     moveTo(*this, myHorizontalOffset, verticalOffset);
 }

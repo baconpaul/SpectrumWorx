@@ -11,6 +11,7 @@
 #include "presetBrowser.hpp"
 
 #include "configuration/versionConfiguration.hpp"
+#include "gui/accessibility/traversal.hpp"
 #include "gui/editor/spectrumWorxEditor.hpp"
 #include "gui/preferences.hpp" // the byline a save writes
 #include "io/jucePath.hpp"
@@ -39,6 +40,32 @@ typedef juce::String::CharPointerType::CharType char_t;
 /// \note Compared whole, by `fs::path::extension()`.
 static char_t const presetExtension[] = _T( ".swp" );
 } // namespace
+
+class PresetBrowser::ListKeys final : public juce::KeyListener
+{
+  public:
+    explicit ListKeys(PresetBrowser &browser) : browser_(browser) {}
+
+  private:
+    // backspace too, which juce::ListBox only passes on with a row selected
+    bool keyPressed(juce::KeyPress const &key, juce::Component *) override
+    {
+        if (key.isKeyCode(juce::KeyPress::leftKey) || key.isKeyCode(juce::KeyPress::backspaceKey) ||
+            key.isKeyCode(juce::KeyPress::deleteKey))
+        {
+            browser_.goToParentFromKeyboard();
+            return true;
+        }
+        if (key.isKeyCode(juce::KeyPress::rightKey))
+        {
+            browser_.openFolder(browser_.listBox_.getLastRowSelected());
+            return true;
+        }
+        return false;
+    }
+
+    PresetBrowser &browser_;
+}; // class PresetBrowser::ListKeys
 
 PresetBrowser::PresetBrowser()
     : PanelBackground(Browser),
@@ -141,6 +168,71 @@ PresetBrowser::PresetBrowser()
 
     addToParentAndShow(*this, comment());
     addToParentAndShow(*this, listBox_);
+
+    setFocusContainerType(FocusContainerType::focusContainer);
+
+    browseArrow_.setTitle("Choose Preset Folder");
+    upFolder_.setTitle("Parent Folder");
+    userPresets_.setTitle("User Presets");
+    jogPrevious_.setTitle("Previous Preset");
+    jogNext_.setTitle("Next Preset");
+    listBox_.setTitle("Presets");
+    comment().setTitle("Preset Comment");
+    presetNameEditBox_.setTitle("Preset Name");
+
+    // the list first, being what the panel is for, then the row above it
+    int order(0);
+    for (juce::Component *const pControl : std::initializer_list<juce::Component *>{
+             &listBox_, &presetNameEditBox_, &upFolder_, &userPresets_, &jogPrevious_, &jogNext_,
+             &save_, &saveAs_, &delete_, &browseArrow_, &comment()})
+        Accessibility::setTraversalOrder(*pControl, ++order);
+
+    listKeys_ = std::make_unique<ListKeys>(*this);
+    listBox_.addKeyListener(listKeys_.get());
+}
+
+void PresetBrowser::focusList()
+{
+    if (listBox_.isShowing())
+        listBox_.grabKeyboardFocus();
+}
+
+std::unique_ptr<juce::AccessibilityHandler> PresetBrowser::createAccessibilityHandler()
+{
+    return Accessibility::makeGroupHandler(*this,
+                                           [this] { return "Preset Browser, " + locationLabel(); });
+}
+
+juce::String PresetBrowser::getNameForRow(int const row)
+{
+    if ((row < 0) || (row >= files_.size()))
+        return {};
+    auto const &item(this->item(static_cast<unsigned>(row)));
+    return item.isDirectory() ? item.name + " folder" : item.name;
+}
+
+void PresetBrowser::openFolder(int const row)
+{
+    if ((row < 0) || (row >= files_.size()) || !item(static_cast<unsigned>(row)).isDirectory())
+        return;
+
+    auto const &folder(item(static_cast<unsigned>(row)));
+    if (inFactory())
+        setFactoryBank(factoryBank_.isEmpty() ? folder.name : factoryBank_ + "/" + folder.name);
+    else
+        setNewFolder(currentDirectory_ / LE::IO::juceStringToPath(folder.name));
+
+    juce::AccessibilityHandler::postAnnouncement(
+        locationLabel(), juce::AccessibilityHandler::AnnouncementPriority::medium);
+}
+
+void PresetBrowser::goToParentFromKeyboard()
+{
+    if (atTopOfTree())
+        return;
+    goToParent();
+    juce::AccessibilityHandler::postAnnouncement(
+        locationLabel(), juce::AccessibilityHandler::AnnouncementPriority::medium);
 }
 
 PanelState &PresetBrowser::place()
@@ -422,10 +514,7 @@ void PresetBrowser::listBoxItemDoubleClicked(int const row, juce::MouseEvent con
     switch (item.kind)
     {
     case Item::Kind::Folder:
-        if (inFactory())
-            return setFactoryBank(factoryBank_.isEmpty() ? item.name
-                                                         : factoryBank_ + "/" + item.name);
-        return setNewFolder(currentDirectory_ / LE::IO::juceStringToPath(item.name));
+        return openFolder(row);
 
     case Item::Kind::Preset:
         // renaming is the double-click action on a preset, and a factory bank
@@ -473,9 +562,10 @@ void PresetBrowser::paintListBoxItem(int const rowNumber, juce::Graphics &graphi
                             juce::Justification::centredLeft, 1);
 }
 
-void PresetBrowser::deleteKeyPressed(int /*lastRowSelected*/) noexcept {}
+// backspace as well as delete; never deletes a preset, the Delete button does
+void PresetBrowser::deleteKeyPressed(int /*lastRowSelected*/) { goToParentFromKeyboard(); }
 
-void PresetBrowser::returnKeyPressed(int /*lastRowSelected*/) noexcept {}
+void PresetBrowser::returnKeyPressed(int const lastRowSelected) { openFolder(lastRowSelected); }
 
 void PresetBrowser::textEditorTextChanged(juce::TextEditor &editor)
 {
@@ -852,7 +942,9 @@ void PresetBrowser::buttonClicked(juce::Button *const pButton)
     // not want the buttons to do so automatically because this messes up our
     // other related logic).
     //                                        (27.05.2010.) (Domagoj Saric)
-    comment().moveKeyboardFocusToSibling(false);
+    // only when it has it: a button pressed from the keyboard keeps the keyboard
+    if (comment().hasKeyboardFocus(true))
+        comment().moveKeyboardFocusToSibling(false);
 }
 
 void PresetBrowser::showFilenameEditBox(juce::String const &presetName, unsigned int atRow)

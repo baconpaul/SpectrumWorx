@@ -243,9 +243,9 @@ AboutPage::Link::Link(char const *const text, char const *const flashText)
     : juce::Button(asText(text)), text_(text), flashText_(flashText)
 {
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
-    /// Nothing here takes typing, and a link that had grabbed focus would eat
-    /// the arrow keys a knob wants.
-    setWantsKeyboardFocus(false);
+    // the tab key reaches it; a click leaves the keyboard where it was
+    setWantsKeyboardFocus(true);
+    setMouseClickGrabsKeyboardFocus(false);
 }
 
 int AboutPage::Link::naturalWidth() const
@@ -325,7 +325,8 @@ AboutPage::IconLink::IconLink(int const index, char const *const label)
     : juce::Button(asText(label)), index_(index)
 {
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
-    setWantsKeyboardFocus(false);
+    setWantsKeyboardFocus(true);
+    setMouseClickGrabsKeyboardFocus(false);
 }
 
 juce::Rectangle<float> AboutPage::IconLink::spriteWindow() const
@@ -374,6 +375,30 @@ AboutPage::AboutPage() : PanelBackground(SettingsPage)
     /// IconIndex, so the index doubles as the array index for both.
     for (int i(0); i < numberOfIconLinks; ++i)
         addIconLink(static_cast<IconIndex>(i), Content::iconURLs[i], Content::iconLabels[i]);
+
+    // what paint() writes, read out
+    auto const textWidth(static_cast<int>(PanelPainter::width) - 2 * Layout::margin);
+
+    labels_[0] = std::make_unique<Accessibility::AccessibleLabel>([] {
+        juce::StringArray lines;
+        for (auto const &line : versionLines())
+            lines.add(line);
+        return lines.joinIntoString(", ");
+    });
+    labels_[0]->setBounds(Layout::margin, Layout::versionY, textWidth,
+                          Layout::versionLineCount * Layout::lineHeight);
+
+    labels_[1] = std::make_unique<Accessibility::AccessibleLabel>([] {
+        juce::StringArray names;
+        for (auto const &author : originalAuthors())
+            names.add(author);
+        return asText(Content::originalAuthorsHeading) + ": " + names.joinIntoString(", ");
+    });
+    labels_[1]->setBounds(Layout::margin, Layout::authorsHeadingY, textWidth,
+                          Layout::lineHeight * static_cast<int>(1 + originalAuthors().size()));
+
+    for (auto const &pLabel : labels_)
+        addAndMakeVisible(*pLabel);
 }
 
 /// Out of line: Link is only complete here. \see the note on links_.

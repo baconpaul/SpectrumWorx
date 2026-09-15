@@ -145,6 +145,9 @@ class ModuleKnob : public Knob, public ModuleControl<ModuleKnob>
 
     void paint(juce::Graphics &) override;
 
+  private: // Accessibility::SliderAccess
+    void applyAccessibleValue(double value) override;
+
   public:
     /// \brief The circle, not the widget: the margin the focus halo needs and
     /// the strip below it that carries the caption are the module's, not the
@@ -213,9 +216,26 @@ class ModuleLEDTextButton : public LEDTextButton, public ModuleControl<ModuleLED
   protected:
     ModuleLEDTextButton(juce::Component &parent, unsigned int x, unsigned int y);
 
+  public: // ModuleUI control traits
+    // not juce::Button's toggle state, which announces every step an LFO makes
+    value_type getValue() const { return on_; }
+    void setValue(param_type const newValue)
+    {
+        if (on_ == newValue)
+            return;
+        on_ = newValue;
+        repaint();
+    }
+
   private: // juce::Component overrides
     void mouseDown(juce::MouseEvent const &) override;
     void paintButton(juce::Graphics &, bool isMouseOverButton, bool isButtonDown) override;
+
+  private: // CapsuleButton
+    bool showsOn() const override { return on_; }
+    juce::String accessibleTitle() const override { return control().parameterMenuName(); }
+    void toggleFromKeyboard() override;
+    void openMenuFromKeyboard() override { showParameterMenuFromKeyboard(true); }
 
   private: // ParameterMenu
     /// \note \see TriggerButton::parameterAcceptsText(), which carries the reason
@@ -242,6 +262,8 @@ class ModuleLEDTextButton : public LEDTextButton, public ModuleControl<ModuleLED
 
   private:
     void clicked() override;
+
+    bool on_{false};
 }; // class ModuleLEDTextButton
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -297,9 +319,16 @@ class TriggerButton : public WidgetBase<juce::Button>, public ModuleControl<Trig
     /// a circle with its caption underneath and margin either side.
     bool isOnFace(juce::Point<int> position) const;
 
+  public:
+    std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
+
   private: // juce::Component overrides
     void mouseDown(juce::MouseEvent const &) override;
     void mouseUp(juce::MouseEvent const &) noexcept override;
+    bool keyPressed(juce::KeyPress const &) override;
+
+    /// a press and a release, as the mouse gives
+    void fireFromKeyboard();
 
   private: // ParameterMenu
     ////////////////////////////////////////////////////////////////////////////
@@ -365,6 +394,10 @@ class DiscreteParameter : public ComboBox, public ModuleControl<DiscreteParamete
     /// control. \see ModuleControlBase::isActive() and issue #139.
     bool showsAsSelected() const override { return control().isActive(); }
     bool showsAsHovered() const override { return control().isHovered(); }
+
+    juce::String accessibleTitle() const override { return control().parameterMenuName(); }
+    void openMenuFromKeyboard() override { showParameterMenuFromKeyboard(true); }
+    bool acceptsKeyboardEdits() const override { return !isLFOEnabled(); }
 
   protected: // ModuleControl interface.
     juce::String const &getTextFromValue(value_type const valueIndex) const
@@ -514,6 +547,11 @@ class ModuleUI final : public WidgetBase<>, private juce::Button::Listener
     ModuleControlBase &effectSpecificParameterControl(std::uint8_t parameterIndex);
     ModuleControlBase const &effectSpecificParameterControl(std::uint8_t parameterIndex) const;
 
+    /// "Module 1: Freeze", which is what the host's parameter names count
+    juce::String accessibleName() const;
+
+    std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
+
   private:
     friend class SpectrumWorxEditor;
     friend class SharedModuleControls; //...mrmlj...
@@ -522,6 +560,8 @@ class ModuleUI final : public WidgetBase<>, private juce::Button::Listener
     /// \brief A hand over a drag handle and the arrow everywhere else. \see
     /// isDragHandle().
     void updateCursorFor(juce::Point<int> position);
+
+    void updateAccessibleTitles();
 
   private: // JUCE Component overrides.
     void paint(juce::Graphics &) override;
@@ -540,6 +580,9 @@ class ModuleUI final : public WidgetBase<>, private juce::Button::Listener
     void focusGained(FocusChangeType) override;
     void focusLost(FocusChangeType) override;
     void focusOfChildComponentChanged(FocusChangeType) override;
+
+    /// the menu keys raise the effect menu, as the right button does
+    bool keyPressed(juce::KeyPress const &) override;
 
   private: // JUCE ButtonListener overrides.
     void buttonClicked(juce::Button *) override;
@@ -564,6 +607,10 @@ class ModuleUI final : public WidgetBase<>, private juce::Button::Listener
 
       private: // juce::Component overrides
         void mouseDown(juce::MouseEvent const &) override;
+
+      private: // CapsuleButton
+        juce::String accessibleTitle() const override { return parameterName(); }
+        void openMenuFromKeyboard() override { showParameterMenuFromKeyboard(true); }
 
       private: // ParameterMenu
         juce::Component &menuOwner() override { return *this; }

@@ -382,7 +382,8 @@ PaintedButton::PaintedButton(juce::Component &parent, juce::String const &text, 
 {
     setButtonText(text);
 
-    setWantsKeyboardFocus(false);
+    // the tab key reaches it, a click does not take the keyboard
+    setWantsKeyboardFocus(true);
     setMouseClickGrabsKeyboardFocus(false);
 
     setSize(width, height);
@@ -728,10 +729,68 @@ void ComboBox::showMenu(std::function<void(bool)> onValueChanged)
         {
             self->grabKeyboardFocus();
             self->repaint();
+            Accessibility::announceValueChange(*self);
         }
         if (onValueChanged)
             onValueChanged(valueChanged);
     });
+}
+
+std::unique_ptr<juce::AccessibilityHandler> ComboBox::createAccessibilityHandler()
+{
+    Accessibility::ButtonAccess access;
+    access.role = juce::AccessibilityRole::comboBox;
+    access.title = [this] { return accessibleTitle(); };
+    access.value = [this] { return hasValidSelection() ? getSelectedItemText() : juce::String(); };
+    access.press = [this] { openMenuFromKeyboard(); };
+    access.showMenu = access.press;
+    return Accessibility::makeButtonHandler(*this, std::move(access));
+}
+
+bool ComboBox::keyPressed(juce::KeyPress const &key)
+{
+    using Accessibility::KeyEdit;
+    auto const edit(Accessibility::keyEditFor(key));
+
+    if (edit.opensMenu() || (edit.action == KeyEdit::trigger))
+    {
+        openMenuFromKeyboard();
+        return true;
+    }
+
+    int rows(0);
+    switch (edit.action)
+    {
+    // down the list is the later value, as the wheel has it
+    case KeyEdit::increase:
+    case KeyEdit::next:
+        rows = +1;
+        break;
+    case KeyEdit::decrease:
+    case KeyEdit::previous:
+        rows = -1;
+        break;
+    case KeyEdit::toMaximum:
+        rows = static_cast<int>(numberOfItems());
+        break;
+    case KeyEdit::toMinimum:
+        rows = -static_cast<int>(numberOfItems());
+        break;
+    default:
+        return false;
+    }
+
+    if (!acceptsKeyboardEdits() || !hasValidSelection())
+        return true;
+
+    auto const row(rowReachedBy(rows));
+    if (row != getSelectedIndex())
+    {
+        setSelectedIndex(row);
+        selectionScrolled();
+        Accessibility::announceValueChange(*this);
+    }
+    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -845,13 +904,63 @@ CapsuleButton::CapsuleButton(juce::Component &parent, CapsuleStyle const &style,
                              int const height, bool const litWhenOn)
     : pStyle_(&style), litWhenOn_(litWhenOn)
 {
-    setWantsKeyboardFocus(false);
+    setWantsKeyboardFocus(true);
     setMouseClickGrabsKeyboardFocus(false);
 
     setSize(width, height);
     setClickingTogglesState(true);
 
     addToParentAndShow(parent, *this);
+}
+
+juce::String CapsuleButton::accessibleTitle() const
+{
+    return getTitle().isNotEmpty() ? getTitle() : getName();
+}
+
+void CapsuleButton::toggleFromKeyboard()
+{
+    setToggleState(!getToggleState(), juce::sendNotificationSync);
+}
+
+std::unique_ptr<juce::AccessibilityHandler> CapsuleButton::createAccessibilityHandler()
+{
+    Accessibility::ButtonAccess access;
+    access.role = juce::AccessibilityRole::toggleButton;
+    access.title = [this] { return accessibleTitle(); };
+    access.isOn = [this] { return showsOn(); };
+    access.press = [this] { toggleFromKeyboard(); };
+    access.showMenu = [this] { openMenuFromKeyboard(); };
+    return Accessibility::makeButtonHandler(*this, std::move(access));
+}
+
+bool CapsuleButton::keyPressed(juce::KeyPress const &key)
+{
+    using Accessibility::KeyEdit;
+    auto const edit(Accessibility::keyEditFor(key));
+
+    switch (edit.action)
+    {
+    case KeyEdit::trigger:
+        toggleFromKeyboard();
+        return true;
+    case KeyEdit::increase:
+    case KeyEdit::toMaximum:
+        if (!showsOn())
+            toggleFromKeyboard();
+        return true;
+    case KeyEdit::decrease:
+    case KeyEdit::toMinimum:
+        if (showsOn())
+            toggleFromKeyboard();
+        return true;
+    case KeyEdit::openMenu:
+    case KeyEdit::openEditor:
+        openMenuFromKeyboard();
+        return true;
+    default:
+        return false;
+    }
 }
 
 /// \note \see PointerFeedback, which is what every button in the editor dims by.
@@ -870,7 +979,7 @@ void CapsuleButton::paintCapsule(juce::Graphics &graphics, juce::Rectangle<int> 
         graphics.beginTransparencyLayer(opacity);
 
     CapsulePainter::paint(graphics, bounds.toFloat(), *pStyle_,
-                          (isButtonDown || getToggleState()) == litWhenOn_);
+                          (isButtonDown || showsOn()) == litWhenOn_);
 
     if (fade)
         graphics.endTransparencyLayer();
@@ -898,7 +1007,7 @@ ArrowButton::ArrowButton(juce::Component &parent, int const width, int const hei
                          bool const fadeFromBase, ColourMap::Name const tintWhenOver)
     : fadeFromBase_(fadeFromBase), tintWhenOver_(tintWhenOver)
 {
-    setWantsKeyboardFocus(false);
+    setWantsKeyboardFocus(true);
     setMouseClickGrabsKeyboardFocus(false);
 
     setSize(width, height);
@@ -923,7 +1032,7 @@ void ArrowButton::paintButton(juce::Graphics &graphics, bool const isMouseOverBu
 
 EjectButton::EjectButton(juce::Component &parent)
 {
-    setWantsKeyboardFocus(false);
+    setWantsKeyboardFocus(true);
     setMouseClickGrabsKeyboardFocus(false);
 
     setSize(EjectStyle::widgetWidth, EjectStyle::widgetHeight);
@@ -966,7 +1075,7 @@ int glyphWidgetWidth(GlyphButton::Glyph const glyph)
 GlyphButton::GlyphButton(juce::Component &parent, Glyph const glyph, bool const toggles)
     : glyph_(glyph)
 {
-    setWantsKeyboardFocus(false);
+    setWantsKeyboardFocus(true);
     setMouseClickGrabsKeyboardFocus(false);
 
     setSize(glyphWidgetWidth(glyph),
@@ -1057,6 +1166,9 @@ TextButton::TextButton(juce::Component &parent, unsigned int const x, unsigned i
     setBounds(x, y, juce::GlyphArrangement::getStringWidthInt(font, getName()), height);
 
     setClickingTogglesState(true);
+
+    setWantsKeyboardFocus(true);
+    setMouseClickGrabsKeyboardFocus(false);
 
     addToParentAndShow(parent, *this);
 }
@@ -1331,6 +1443,17 @@ class ParameterMenu::ValueTypein final : public juce::PopupMenu::CustomComponent
 
 void ParameterMenu::showParameterMenu(juce::MouseEvent const &event, bool const skipSetToDefault)
 {
+    showParameterMenuAt({event.x, event.y}, skipSetToDefault);
+}
+
+void ParameterMenu::showParameterMenuFromKeyboard(bool const skipSetToDefault)
+{
+    showParameterMenuAt(menuOwner().getLocalBounds().getCentre(), skipSetToDefault);
+}
+
+void ParameterMenu::showParameterMenuAt(juce::Point<int> const position,
+                                        bool const skipSetToDefault)
+{
     auto &widget(menuOwner());
 
     bool const editable(parameterEditable());
@@ -1373,7 +1496,7 @@ void ParameterMenu::showParameterMenu(juce::MouseEvent const &event, bool const 
                            .withParentComponent(&editor)
                            .withTargetComponent(&widget)
                            .withTargetScreenArea(widget.localAreaToGlobal(
-                               juce::Rectangle<int>(event.x, event.y, 1, 1))),
+                               juce::Rectangle<int>(position.x, position.y, 1, 1))),
                        [pWidget = juce::Component::SafePointer<juce::Component>(&widget)](int) {
                            if (pWidget && pWidget->getWantsKeyboardFocus() && pWidget->isShowing())
                                pWidget->grabKeyboardFocus();
@@ -1499,7 +1622,7 @@ EditorKnob::EditorKnob(SpectrumWorxEditor &parent, unsigned int const x, unsigne
     : Knob(parent.mainArea(), x, y, 0, 0), parameterIndex_(0)
 {
     setScrollWheelEnabled(true);
-    setWantsKeyboardFocus(false);
+    setWantsKeyboardFocus(true);
     setMouseClickGrabsKeyboardFocus(false);
 }
 
@@ -1674,9 +1797,11 @@ SpectrumWorxEditor &EditorKnob::editor() const { return SpectrumWorxEditor::from
 TitledComboBox::TitledComboBox(juce::Component &parent, unsigned int const x, unsigned int const y,
                                char const *const title)
     : ComboBox(parent, settingsComboFrame, settingsComboWidth, settingsComboHeight),
-      title_(title, 6, 0, getWidth() - 12, 20, juce::Justification::left)
+      titleText_(title), title_(title, 6, 0, getWidth() - 12, 20, juce::Justification::left)
 {
     TitledComboBox::setBounds(x, y, getWidth(), getHeight() + 23);
+    setWantsKeyboardFocus(true);
+    setMouseClickGrabsKeyboardFocus(false);
 }
 
 void TitledComboBox::paint(juce::Graphics &graphics)
@@ -1689,7 +1814,9 @@ void TitledComboBox::paint(juce::Graphics &graphics)
     title_.draw(graphics);
 }
 
-void TitledComboBox::mouseDown(juce::MouseEvent const &)
+void TitledComboBox::mouseDown(juce::MouseEvent const &) { openMenuFromKeyboard(); }
+
+void TitledComboBox::openMenuFromKeyboard()
 {
     ComboBox::showMenu(
         [self = juce::Component::SafePointer<TitledComboBox>(this)](bool const valueChanged) {
@@ -1722,6 +1849,7 @@ TitledTextBox::TitledTextBox(juce::Component &parent, unsigned int const x, unsi
     editor_.setJustification(juce::Justification::centred);
     editor_.setFont(Theme::singleton().labelFont());
     editor_.setInputRestrictions(maximumLength);
+    editor_.setTitle(title);
     editor_.setColour(juce::TextEditor::backgroundColourId,
                       ColourMap::getColour(ColourMap::Transparent));
     editor_.setColour(juce::TextEditor::textColourId, ColourMap::getColour(ColourMap::Text));

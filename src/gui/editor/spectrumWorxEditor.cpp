@@ -17,6 +17,7 @@
 #include "core/modules/moduleDSPAndGUI.hpp"
 #include "core/spectrumWorxCore.hpp"
 #include "core/threading/publish.hpp"
+#include "gui/accessibility/traversal.hpp"
 #include "gui/editor/editorHost.hpp"
 #include "gui/editor/presetLoading.hpp"
 #include "gui/editor/zoomedEditor.hpp"
@@ -120,7 +121,8 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost, PanelPlacement co
       undoButton_(mainArea_, true /*undo*/), redoButton_(mainArea_, false /*redo*/),
       panelButton_(mainArea_, "SETTINGS", 86, 36, false /*momentary*/,
                    PaintedButton::Glow::whenHovered),
-      ignoreExternalSample_(mainArea_, GlyphButton::Glyph::Lock, true /*toggles*/)
+      ignoreExternalSample_(mainArea_, GlyphButton::Glyph::Lock, true /*toggles*/),
+      focusDebugger_(*this)
 {
     using LE::Parameters::IndexOf;
     using namespace GlobalParameters;
@@ -173,6 +175,8 @@ SpectrumWorxEditor::SpectrumWorxEditor(EditorHost &editorHost, PanelPlacement co
     undoButton_.addListener(this);
     redoButton_.addListener(this);
     panelButton_.addListener(this);
+
+    setUpAccessibility();
 
     updatePanelControls();
 
@@ -311,6 +315,7 @@ void SpectrumWorxEditor::togglePresetBrowser(juce::Button const &button)
 
 void SpectrumWorxEditor::showPanel(juce::Component &panel)
 {
+    Accessibility::setTraversalOrder(panel, TabOrder::panel);
     addAndMakeVisible(panel);
     panel.toFront(false);
     layOutPanels();
@@ -512,6 +517,191 @@ void SpectrumWorxEditor::parentHierarchyChanged()
 {
     if (isShowing() || isOnDesktop())
         grabKeyboardFocus();
+}
+
+void SpectrumWorxEditor::setUpAccessibility()
+{
+    using Accessibility::setTraversalOrder;
+
+    setTitle("SpectrumWorx");
+    setFocusContainerType(FocusContainerType::keyboardFocusContainer);
+
+    setTraversalOrder(mainArea_, TabOrder::mainArea);
+    Accessibility::setPassThrough(mainArea_);
+
+    setTraversalOrder(in_, TabOrder::inputKnob);
+    setTraversalOrder(out_, TabOrder::outputKnob);
+    setTraversalOrder(mix_, TabOrder::mixKnob);
+
+    setTraversalOrder(sampleArea_, TabOrder::sideChain);
+    setTraversalOrder(ignoreExternalSample_, TabOrder::sideChain + 1);
+    ignoreExternalSample_.setTitle("Ignore external audio in presets");
+
+    setTraversalOrder(undoButton_, TabOrder::history);
+    setTraversalOrder(redoButton_, TabOrder::history + 1);
+    setTraversalOrder(panelButton_, TabOrder::history + 2);
+
+    moduleMenuButton_.setTitle("Add Module");
+
+    using namespace Constants::Layout;
+    struct HeaderLine
+    {
+        int top;
+        Accessibility::TextFunction text;
+    };
+    std::array<HeaderLine, 3> const lines{{
+        {static_cast<int>(moduleNameVerticalOffset),
+         [this] {
+             auto const &name(strings_[activeModuleName]);
+             return name.isEmpty() ? juce::String("No module selected") : "Module: " + name;
+         }},
+        {static_cast<int>(controlNameVerticalOffset),
+         [this] { return strings_[activeControlName]; }},
+        {static_cast<int>(controlValueVerticalOffset),
+         [this] { return strings_[activeControlValue]; }},
+    }};
+
+    for (std::size_t line(0); line < lines.size(); ++line)
+    {
+        auto &pLabel(headerLabels_[line]);
+        pLabel = std::make_unique<Accessibility::AccessibleLabel>(lines[line].text);
+        pLabel->setBounds(textBoxHorizontalOffset, lines[line].top, textBoxWidth, textBoxHeight);
+        setTraversalOrder(*pLabel, TabOrder::header + static_cast<int>(line));
+        mainArea_.addAndMakeVisible(*pLabel);
+    }
+}
+
+std::unique_ptr<juce::AccessibilityHandler> SpectrumWorxEditor::createAccessibilityHandler()
+{
+    return Accessibility::makeGroupHandler(*this, [] { return juce::String("SpectrumWorx"); });
+}
+
+std::unique_ptr<juce::ComponentTraverser> SpectrumWorxEditor::createKeyboardFocusTraverser()
+{
+    return std::make_unique<Accessibility::Traverser>(Accessibility::Traverser::Purpose::keyboard);
+}
+
+std::unique_ptr<juce::ComponentTraverser> SpectrumWorxEditor::createFocusTraverser()
+{
+    return std::make_unique<Accessibility::Traverser>(
+        Accessibility::Traverser::Purpose::screenReader);
+}
+
+bool SpectrumWorxEditor::keyPressed(juce::KeyPress const &key)
+{
+    auto const code(key.getKeyCode());
+    if (key.getModifiers().isCommandDown() && ((code == 'N') || (code == 'n')))
+    {
+        showNavigationMenu();
+        return true;
+    }
+    return false;
+}
+
+void SpectrumWorxEditor::setFocusDebuggerEnabled(bool const enabled)
+{
+    focusDebugger_.setEnabled(enabled);
+}
+
+bool SpectrumWorxEditor::focusDebuggerEnabled() const { return focusDebugger_.isEnabled(); }
+
+void SpectrumWorxEditor::showNavigationMenu()
+{
+    juce::Component::SafePointer<SpectrumWorxEditor> const pEditor(this);
+
+    // a menu outlives what it names, so every target is held weakly
+    auto const focusOn([pEditor](juce::Component &target) {
+        return [pEditor, pTarget = juce::Component::SafePointer<juce::Component>(&target)] {
+            if (pEditor && pTarget && pTarget->isShowing())
+                pTarget->grabKeyboardFocus();
+        };
+    });
+
+    juce::PopupMenu menu;
+    menu.addSectionHeader("Navigation");
+    menu.addSeparator();
+
+    menu.addItem("Preset Browser", [pEditor] {
+        if (!pEditor)
+            return;
+        pEditor->showPresetBrowser(true);
+        if (auto *const pBrowser = pEditor->presetBrowser())
+            pBrowser->focusList();
+    });
+    menu.addItem("Settings", [pEditor] {
+        if (!pEditor)
+            return;
+        pEditor->showSettings();
+        if (pEditor->settings_)
+            pEditor->settings_->focusCurrentTab();
+    });
+    menu.addSeparator();
+
+    menu.addItem(in_.accessibleName(), focusOn(in_));
+    menu.addItem(out_.accessibleName(), focusOn(out_));
+    menu.addItem(mix_.accessibleName(), focusOn(mix_));
+    menu.addSeparator();
+
+    for (std::uint8_t slot(0); slot < SW::Constants::maxNumberOfModules; ++slot)
+    {
+        auto *const pRegion(regionInRackSlot(slot));
+        if (!pRegion)
+            continue;
+
+        juce::PopupMenu strip;
+        strip.addItem(pRegion->getName(), focusOn(*pRegion));
+        strip.addSeparator();
+        auto const parameters(pRegion->module().numberOfEffectSpecificParameters());
+        for (std::uint8_t parameter(0); parameter < parameters; ++parameter)
+        {
+            auto &control(pRegion->effectSpecificParameterControl(parameter));
+            strip.addItem(control.name(), focusOn(control.widget()));
+        }
+        strip.addSeparator();
+        strip.addItem("Bypass", focusOn(pRegion->bypass_));
+        strip.addItem("Remove", focusOn(pRegion->eject_));
+        menu.addSubMenu(pRegion->accessibleName(), strip);
+    }
+    if (moduleMenuButton_.isVisible())
+        menu.addItem("Add Module", focusOn(moduleMenuButton_));
+
+    if (sharedModuleControls_ && sharedModuleControls_->isEnabled())
+    {
+        juce::PopupMenu shared;
+        shared.addItem("Gain", focusOn(sharedModuleControls_->gain()));
+        shared.addItem("Wet", focusOn(sharedModuleControls_->wet()));
+        shared.addItem("Frequency Range", focusOn(sharedModuleControls_->frequencyRange()));
+        menu.addSubMenu("Selected Module", shared);
+    }
+
+    if (lfoDisplay_ && lfoDisplay_->isEnabled())
+        menu.addItem(
+            "LFO for " +
+                static_cast<LFODisplay const &>(*lfoDisplay_).control().parameterMenuName(),
+            focusOn(lfoDisplay_->enableSwitch()));
+
+    menu.addSeparator();
+    menu.addItem("Sidechain Source", focusOn(sampleArea_));
+    if (undoButton_.isEnabled() || redoButton_.isEnabled())
+        menu.addItem("Undo and Redo", focusOn(undoButton_.isEnabled() ? undoButton_ : redoButton_));
+
+    menu.addSeparator();
+    menu.addItem("About SpectrumWorx", [pEditor] {
+        if (!pEditor)
+            return;
+        pEditor->showSettings(aboutPageIndex);
+        if (pEditor->settings_)
+            pEditor->settings_->focusCurrentTab();
+    });
+
+    menu.addSeparator();
+    menu.addItem("Focus Debugger", /*isEnabled*/ true, /*isTicked*/ focusDebuggerEnabled(),
+                 [pEditor] {
+                     if (pEditor)
+                         pEditor->setFocusDebuggerEnabled(!pEditor->focusDebuggerEnabled());
+                 });
+
+    menu.showMenuAsync(juce::PopupMenu::Options().withParentComponent(this));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1270,6 +1460,13 @@ void SpectrumWorxEditor::removeModule(ModuleUI &moduleUI)
         return;
     }
 
+    // the keyboard goes to whatever slides into the slot, or to the add button
+    if (moduleUI.hasFocus())
+    {
+        slotAwaitingFocus_ = slot;
+        focusAddButtonIfSlotEmpty_ = true;
+    }
+
     setModuleInSlot(slot, AutomatedModuleChain::noModule);
 
     // the host is told what was *asked for* rather than what the chain holds,
@@ -1428,6 +1625,8 @@ void SpectrumWorxEditor::moduleDeactivated()
         /// so that we can avoid the destruction+recreation in case the user is
         /// actually only activating a different module.
         ///                                   (17.01.2012.) (Domagoj Saric)
+        if (sharedModuleControls_->hasKeyboardFocus(true))
+            grabKeyboardFocus();
         sharedModuleControls_->setEnabled(false);
         GUI::postMessageToComponent(*this, [](GUI::SpectrumWorxEditor &editor) {
             auto &sharedModuleControls(editor.sharedModuleControls_);
@@ -1676,6 +1875,9 @@ void SpectrumWorxEditor::retireLFODisplay()
     /// \note See the note in the moduleDeactivated() member function.
     ///                                       (17.01.2012.) (Domagoj Saric)
     setDefaultFocusHandling();
+    // disabling hands the keyboard to the main area, which would pick a control
+    if (lfoDisplay_->hasKeyboardFocus(true))
+        grabKeyboardFocus();
     lfoDisplay_->setEnabled(false);
     /// \note We defer LFODisplay destruction so that we can avoid the
     /// destruction+recreation in case the user is actually only switching
@@ -2196,15 +2398,20 @@ void SpectrumWorxEditor::resyncModuleRack()
 
     if (slotAwaitingFocus_ != noSlotAwaitingFocus)
     {
-        if (auto *const pRegion = regionInRackSlot(slotAwaitingFocus_))
+        juce::Component *pTarget(regionInRackSlot(slotAwaitingFocus_));
+        if (!pTarget && focusAddButtonIfSlotEmpty_ && moduleMenuButton_.isVisible())
+            pTarget = &moduleMenuButton_;
+
+        if (pTarget)
         {
             slotAwaitingFocus_ = noSlotAwaitingFocus;
+            focusAddButtonIfSlotEmpty_ = false;
             // a component on no screen cannot take the keyboard, and
             // grabKeyboardFocus() says so with a jassert rather than by
             // declining -- which an offscreen render would hit. The slot is
             // cleared either way, so focus cannot jump to a stale choice later
-            if (pRegion->isShowing() || pRegion->isOnDesktop())
-                pRegion->grabKeyboardFocus();
+            if (pTarget->isShowing() || pTarget->isOnDesktop())
+                pTarget->grabKeyboardFocus();
         }
     }
 }
@@ -2562,7 +2769,7 @@ SpectrumWorxEditor::UndoButton::UndoButton(juce::Component &parent, bool const u
     : undo_(undoRatherThanRedo)
 {
     setButtonText(undo_ ? "Undo" : "Redo"); // what a screen reader reads
-    setWantsKeyboardFocus(false);
+    setWantsKeyboardFocus(true);
     setMouseClickGrabsKeyboardFocus(false);
     setSize(width, height);
     addToParentAndShow(parent, *this);
@@ -2612,6 +2819,7 @@ void SpectrumWorxEditor::UndoButton::paintButton(juce::Graphics &graphics, bool 
 void SpectrumWorxEditor::updatePanelControls()
 {
     panelButton_.setButtonText(settings_.has_value() ? "PRESETS" : "SETTINGS");
+    panelButton_.setTitle(settings_.has_value() ? "Show Presets" : "Show Settings");
 
     undoButton_.setEnabled(editorHost_.canUndo());
     redoButton_.setEnabled(editorHost_.canRedo());
@@ -2632,6 +2840,7 @@ void SpectrumWorxEditor::ModuleMenuButton::moveToSlot(std::uint8_t const slotInd
     // after the move, so that one coming back to a rack that filled up arrives
     // where it belongs rather than sliding in from where it was hidden
     setIsVisible(slotIndex < SW::Constants::maxNumberOfModules);
+    Accessibility::setTraversalOrder(*this, TabOrder::slot(slotIndex) + TabOrder::addModule);
 }
 
 void SpectrumWorxEditor::ModuleMenuButton::clicked()
@@ -2777,19 +2986,28 @@ SpectrumWorxEditor::LFODisplay::ComponentPtr const
 #undef LE_COMP_PTR
 
 SpectrumWorxEditor::LFODisplay::LFODisplay()
-    : switch_(*this), quarter_(*this, 93, " N "), triplet_(*this, 93 + 27 * 1, " T "),
-      dotted_(*this, 93 + 27 * 2 - 3, " D "), waveform_(*this), period_(*this),
-      phase_(*this, LE::Parameters::IndexOf<LFO::Parameters, LFO::Phase>::value), range_(*this),
-      pModuleControl_(nullptr)
+    : switch_(*this), quarter_(*this, 93, " N ", "LFO sync to notes"),
+      triplet_(*this, 93 + 27 * 1, " T ", "LFO sync to triplets"),
+      dotted_(*this, 93 + 27 * 2 - 3, " D ", "LFO sync to dotted notes"), waveform_(*this),
+      period_(*this), phase_(*this, LE::Parameters::IndexOf<LFO::Parameters, LFO::Phase>::value),
+      range_(*this), pModuleControl_(nullptr)
 {
+    // the tab key reaches them; a click still leaves the keyboard on the control
     for (auto const pComponent : componentsToDisableKeyboardGrabingFor)
     {
         juce::Component &component(this->*pComponent);
-        component.setWantsKeyboardFocus(false);
+        component.setWantsKeyboardFocus(true);
         component.setMouseClickGrabsKeyboardFocus(false);
     }
     this->setWantsKeyboardFocus(false);
     this->setMouseClickGrabsKeyboardFocus(false);
+
+    setFocusContainerType(FocusContainerType::focusContainer);
+    Accessibility::setTraversalOrder(*this, TabOrder::lfo);
+    int order(0);
+    for (juce::Component *const pComponent : std::initializer_list<juce::Component *>{
+             &switch_, &quarter_, &triplet_, &dotted_, &period_, &range_, &waveform_, &phase_})
+        Accessibility::setTraversalOrder(*pComponent, ++order);
 
     fillLFOWaveformsMenu(type_);
 
@@ -2827,6 +3045,15 @@ SpectrumWorxEditor::LFODisplay::LFODisplay()
 }
 
 SpectrumWorxEditor::LFODisplay::~LFODisplay() { editor().setDefaultFocusHandling(); }
+
+std::unique_ptr<juce::AccessibilityHandler>
+SpectrumWorxEditor::LFODisplay::createAccessibilityHandler()
+{
+    return Accessibility::makeGroupHandler(*this, [this] {
+        return pModuleControl_ ? "LFO for " + pModuleControl_->parameterMenuName()
+                               : juce::String("LFO");
+    });
+}
 
 void SpectrumWorxEditor::LFODisplay::setupForControl(ModuleControlBase &control,
                                                      double const minimum, double const maximum,
@@ -3472,6 +3699,54 @@ void SpectrumWorxEditor::LFODisplay::WaveformButton::mouseDown(juce::MouseEvent 
     return showParameterMenu(event, true);
 }
 
+std::unique_ptr<juce::AccessibilityHandler>
+SpectrumWorxEditor::LFODisplay::WaveformButton::createAccessibilityHandler()
+{
+    Accessibility::ButtonAccess access;
+    access.role = juce::AccessibilityRole::comboBox;
+    access.title = [this] { return accessibleName(); };
+    access.value = [this] { return parent_.type_.getSelectedItemText(); };
+    access.press = [this] { showParameterMenuFromKeyboard(true); };
+    access.showMenu = access.press;
+    return Accessibility::makeButtonHandler(*this, std::move(access));
+}
+
+bool SpectrumWorxEditor::LFODisplay::WaveformButton::keyPressed(juce::KeyPress const &key)
+{
+    using Accessibility::KeyEdit;
+    auto const edit(Accessibility::keyEditFor(key));
+    if (edit.opensMenu() || (edit.action == KeyEdit::trigger))
+    {
+        showParameterMenuFromKeyboard(true);
+        return true;
+    }
+
+    int step(0);
+    switch (edit.action)
+    {
+    case KeyEdit::increase:
+    case KeyEdit::next:
+        step = +1;
+        break;
+    case KeyEdit::decrease:
+    case KeyEdit::previous:
+        step = -1;
+        break;
+    default:
+        return false;
+    }
+
+    // the rows are the waveforms' IDs, as the menu's own entries have it
+    auto const &menu(parent_.type_);
+    auto const row(static_cast<int>(menu.getSelectedIndex()) + step);
+    if ((row >= 0) && (row < static_cast<int>(menu.numberOfItems())))
+    {
+        parent_.setWaveform(static_cast<unsigned int>(row));
+        Accessibility::announceValueChange(*this);
+    }
+    return true;
+}
+
 /// \note The list the left button drops, as menu rows: what a right press used
 /// to give was that list and nothing else, so the host had no way in.
 void SpectrumWorxEditor::LFODisplay::WaveformButton::addParameterValueEntries(juce::PopupMenu &menu)
@@ -3525,6 +3800,13 @@ void SpectrumWorxEditor::LFODisplay::ParameterSlider::mouseDrag(juce::MouseEvent
     if (event.mods.isPopupMenu())
         return;
     HorizontalSlider::mouseDrag(event);
+}
+
+// the drag notification is what opens and closes the host's gesture
+void SpectrumWorxEditor::LFODisplay::ParameterSlider::applyAccessibleValue(double const value)
+{
+    juce::Slider::ScopedDragNotification const gesture(*this);
+    setValue(value, juce::sendNotificationSync);
 }
 
 juce::String SpectrumWorxEditor::LFODisplay::ParameterSlider::parameterName() const
@@ -3650,6 +3932,39 @@ std::uint8_t SpectrumWorxEditor::LFODisplay::RangeSlider::lfoParameterIndex() co
                                 : IndexOf<LFO::Parameters, LFO::UpperBound>::value;
 }
 
+Accessibility::SliderAccess::Thumb
+SpectrumWorxEditor::LFODisplay::RangeSlider::keyboardThumb() const
+{
+    using LE::Parameters::IndexOf;
+    return (lfoParameterIndex() == IndexOf<LFO::Parameters, LFO::UpperBound>::value) ? Thumb::upper
+                                                                                     : Thumb::lower;
+}
+
+// the thumb is chosen as a press chooses it, by where it is
+void SpectrumWorxEditor::LFODisplay::RangeSlider::chooseKeyboardThumb(Thumb const thumb)
+{
+    if (thumb == keyboardThumb())
+        return;
+    notePressAt(getPositionOfValue((thumb == Thumb::upper) ? getMaxValue() : getMinValue()));
+    juce::AccessibilityHandler::postAnnouncement(
+        parameterName() + ", " + parameterValueText(),
+        juce::AccessibilityHandler::AnnouncementPriority::medium);
+}
+
+void SpectrumWorxEditor::LFODisplay::RangeSlider::applyAccessibleValue(double const value)
+{
+    auto const thumb(keyboardThumb());
+    {
+        juce::Slider::ScopedDragNotification const gesture(*this);
+        if (thumb == Thumb::upper)
+            setMaxValue(value, juce::sendNotificationSync, false);
+        else
+            setMinValue(value, juce::sendNotificationSync, false);
+    }
+    // the press position stays on the thumb it moved
+    notePressAt(getPositionOfValue((thumb == Thumb::upper) ? getMaxValue() : getMinValue()));
+}
+
 SpectrumWorxEditor::LFODisplay::Period::Period(LFODisplay &parent)
     : ParameterSlider(parent, LE::Parameters::IndexOf<LFO::Parameters, LFO::PeriodScale>::value),
       lastSyncType_(LFO::Free)
@@ -3663,6 +3978,20 @@ double SpectrumWorxEditor::LFODisplay::Period::snapValue(double const attemptedV
         static_cast<float>(attemptedValue), parent().lfo().syncTypes(), parent().lfoTiming()));
     lastSyncType_ = result.second;
     return result.first;
+}
+
+void SpectrumWorxEditor::LFODisplay::Period::applyAccessibleValue(double const value)
+{
+    auto target(snapValue(value, notDragging));
+    // a synced grid is coarser than the step asked for, so go at least one notch
+    if ((target == getValue()) && (value != getValue()))
+    {
+        auto const direction((value > getValue()) ? 1.0 : -1.0);
+        auto const length(getMaximum() - getMinimum());
+        for (int attempt(1); (attempt <= 100) && (target == getValue()); ++attempt)
+            target = snapValue(getValue() + direction * length * 0.01 * attempt, notDragging);
+    }
+    ParameterSlider::applyAccessibleValue(target);
 }
 
 double SpectrumWorxEditor::LFODisplay::Period::milliseconds() const
@@ -3696,10 +4025,12 @@ void SpectrumWorxEditor::LFODisplay::EnableSwitch::mouseDown(juce::MouseEvent co
 }
 
 SpectrumWorxEditor::LFODisplay::SyncButton::SyncButton(LFODisplay &parent, unsigned int const x,
-                                                       char const *const text)
+                                                       char const *const text,
+                                                       char const *const title)
     : TextButton(parent, x, 8, text),
       ParameterButtonMenu(parent, LE::Parameters::IndexOf<LFO::Parameters, LFO::SyncTypes>::value)
 {
+    setTitle(title);
 }
 
 void SpectrumWorxEditor::LFODisplay::SyncButton::mouseDown(juce::MouseEvent const &event)
@@ -3707,6 +4038,16 @@ void SpectrumWorxEditor::LFODisplay::SyncButton::mouseDown(juce::MouseEvent cons
     if (event.mods.isPopupMenu())
         return showParameterMenu(event, true);
     TextButton::mouseDown(event);
+}
+
+bool SpectrumWorxEditor::LFODisplay::SyncButton::keyPressed(juce::KeyPress const &key)
+{
+    if (Accessibility::keyEditFor(key).opensMenu())
+    {
+        showParameterMenuFromKeyboard(true);
+        return true;
+    }
+    return TextButton::keyPressed(key);
 }
 
 juce::String SpectrumWorxEditor::LFODisplay::ParameterButtonMenu::parameterName() const
@@ -3812,7 +4153,31 @@ void SpectrumWorxEditor::LFODisplay::ParameterButtonMenu::setParameterToDefault(
 SpectrumWorxEditor::SampleArea::SampleArea()
 {
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    setWantsKeyboardFocus(true);
+    setMouseClickGrabsKeyboardFocus(false);
     addToParentAndShow(editor().mainArea(), *this);
+}
+
+std::unique_ptr<juce::AccessibilityHandler>
+SpectrumWorxEditor::SampleArea::createAccessibilityHandler()
+{
+    Accessibility::ButtonAccess access;
+    access.role = juce::AccessibilityRole::comboBox;
+    access.title = [] { return juce::String("Sidechain Source"); };
+    access.value = [this] { return editor().string(currentSampleName); };
+    access.press = [this] { showSourceMenu(); };
+    access.showMenu = access.press;
+    return Accessibility::makeButtonHandler(*this, std::move(access));
+}
+
+bool SpectrumWorxEditor::SampleArea::keyPressed(juce::KeyPress const &key)
+{
+    using Accessibility::KeyEdit;
+    auto const edit(Accessibility::keyEditFor(key));
+    if (!edit.opensMenu() && (edit.action != KeyEdit::trigger))
+        return false;
+    showSourceMenu();
+    return true;
 }
 
 /// \note A menu rather than a file dialog outright, because the factory samples
@@ -3830,9 +4195,16 @@ void SpectrumWorxEditor::SampleArea::mouseUp(juce::MouseEvent const &event)
         editor.sideChainSourceSelected(SideChainSource::Main);
         return;
     }
-    if (!mouseButtons.isLeftButtonDown() || menu_.menuActive())
+    if (mouseButtons.isLeftButtonDown())
+        showSourceMenu();
+}
+
+void SpectrumWorxEditor::SampleArea::showSourceMenu()
+{
+    if (menu_.menuActive())
         return;
 
+    SpectrumWorxEditor &editor(this->editor());
     auto const factorySamples(Sample::factorySamples());
 
     enum : PopupMenu::ItemID
@@ -3941,6 +4313,32 @@ SpectrumWorxEditor::Settings::Settings() /// \throws std::bad_alloc Out of memor
     addTab("About", ColourMap::getColour(ColourMap::Transparent), &aboutPage_, false);
 
     LE_ASSERT(getNumTabs() == numberOfSettingsPages);
+
+    // the tabs, then whichever page is showing, each page top to bottom
+    using Accessibility::setTraversalOrder;
+    setTraversalOrder(getTabbedButtonBar(), 1);
+    for (juce::Component *const pPage :
+         std::initializer_list<juce::Component *>{&enginePage_, &interfacePage_, &aboutPage_})
+        setTraversalOrder(*pPage, 100);
+
+    int order(0);
+    for (juce::Component *const pControl : std::initializer_list<juce::Component *>{
+             &fftSize_.comboBox_, &overlapFactor_.comboBox_, &windowFunction_.comboBox_})
+        setTraversalOrder(*pControl, ++order);
+
+    order = 0;
+    auto &page(interfacePage_);
+    for (juce::Component *const pControl : std::initializer_list<juce::Component *>{
+             &page.zoom_, &page.palette_, &page.animation_, &page.showLFOAnimation_,
+             &page.previewLFOOnHover_, &page.hideCursorOnKnobDrag_, &page.author_})
+        setTraversalOrder(*pControl, ++order);
+}
+
+void SpectrumWorxEditor::Settings::focusCurrentTab()
+{
+    if (auto *const pTab = getTabbedButtonBar().getTabButton(getCurrentTabIndex()))
+        if (pTab->isShowing())
+            pTab->grabKeyboardFocus();
 }
 
 SpectrumWorxEditor::Settings::~Settings()
@@ -4038,7 +4436,24 @@ bool SpectrumWorxEditor::Settings::updateEngineInformation()
     return true;
 }
 
-SpectrumWorxEditor::Settings::EnginePage::EnginePage() : PanelBackground(SettingsPage) {}
+SpectrumWorxEditor::Settings::EnginePage::EnginePage() : PanelBackground(SettingsPage)
+{
+    std::array<juce::String const *, 5> const texts{&engineQuality_, &frequencyResolution_,
+                                                    &timeResolution_, &latency_, &busLayout_};
+
+    // where paint() writes them
+    auto const infoTextY(yMargin + yStep * 5 + 67);
+    auto const lineHeight(21);
+    for (std::size_t line(0); line < texts.size(); ++line)
+    {
+        auto &pLabel(lines_[line]);
+        pLabel = std::make_unique<Accessibility::AccessibleLabel>(
+            [pText = texts[line]] { return *pText; });
+        pLabel->setBounds(xMargin + 2, infoTextY + lineHeight * static_cast<int>(line), 213, 18);
+        Accessibility::setTraversalOrder(*pLabel, 10 + static_cast<int>(line));
+        addAndMakeVisible(*pLabel);
+    }
+}
 
 /// \note All four lines, and it answers whether any of them moved. They are held
 /// as strings and compared rather than rebuilt inside paint(), which is what lets
@@ -4239,6 +4654,8 @@ class SettingsTab : public juce::TabBarButton
     SettingsTab(juce::String const &tabName, juce::TabbedButtonBar &ownerBar)
         : TabBarButton(tabName, ownerBar)
     {
+        setWantsKeyboardFocus(true);
+        setMouseClickGrabsKeyboardFocus(false);
     }
 
   private:

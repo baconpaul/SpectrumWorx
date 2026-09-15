@@ -45,6 +45,11 @@ class PresetBrowser final : public PanelBackground,
     SpectrumWorxEditor &editor();
     SpectrumWorxEditor const &editor() const;
 
+    /// the keyboard onto the list
+    void focusList();
+
+    std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
+
   private: // JUCE Component overrides.
     void paint(juce::Graphics &) override;
 
@@ -80,9 +85,20 @@ class PresetBrowser final : public PanelBackground,
     void paintListBoxItem(int rowNumber, juce::Graphics &, int width, int height,
                           bool rowIsSelected) override;
     void listBoxItemDoubleClicked(int row, juce::MouseEvent const &) override;
-    void deleteKeyPressed(int lastRowSelected) noexcept override;
-    void returnKeyPressed(int lastRowSelected) noexcept override;
+    void deleteKeyPressed(int lastRowSelected) override;
+    void returnKeyPressed(int lastRowSelected) override;
     void selectedRowsChanged(int lastRowSelected) override;
+    juce::String getNameForRow(int row) override;
+
+    /// into \p row if it is a folder: return and the right arrow. \see issue #150
+    void openFolder(int row);
+
+    /// up a level, then says where the list now is
+    void goToParentFromKeyboard();
+
+    /// left and right, which juce::ListBox leaves alone
+    class ListKeys;
+    std::unique_ptr<ListKeys> listKeys_;
 
   private:
     ////////////////////////////////////////////////////////////////////////////
