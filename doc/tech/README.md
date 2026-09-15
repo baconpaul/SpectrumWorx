@@ -1,6 +1,6 @@
 # SpectrumWorx — the tech documents
 
-Ten documents, and every one of them describes the tree **as it is now** — how
+Eleven documents, and every one of them describes the tree **as it is now** — how
 something works, not what is left to do about it. Nothing here is a plan being
 executed or a record of how the port got where it is; that is in [`old/`](old/).
 
@@ -18,6 +18,7 @@ executed or a record of how the port got where it is; that is in [`old/`](old/).
 | [`how-mono-ports-work.md`](how-mono-ports-work.md) | Why every port carries the same channel count, why a layout that would leave them disagreeing is refused rather than rounded, and what auval and the VST3 validator see. |
 | [`midi-input.md`](midi-input.md) | The note port and both of its dialects, the two events that leave a key stuck if they are read as a press, and why the AU had to become an `aumf`. |
 | [`undo-redo.md`](undo-redo.md) | What can be taken back, the three shapes a step comes in and why one of them is not enough, and the seam between the plugin's history and the editor that no test reaches. |
+| [`accessibility.md`](accessibility.md) | What a screen reader is told about each control, the keys Six Sines shares, the tab order, and why nothing an LFO moves is announced. |
 
 ## What is left — the issue tracker
 

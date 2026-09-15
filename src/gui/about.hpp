@@ -90,6 +90,9 @@ class AboutPage final : public PanelBackground
     /// \see links_ above -- same reasoning, IconLink is defined in the .cpp too.
     std::array<std::unique_ptr<IconLink>, numberOfIconLinks> iconLinks_;
 
+    /// the version lines and the authors, read out
+    std::array<std::unique_ptr<Accessibility::AccessibleLabel>, 2> labels_;
+
     /// \brief Index of whichever icon the mouse is currently over, or -1.
     ///
     /// \note Set from IconLink::onHover (\see addIconLink) and read by paint(),

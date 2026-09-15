@@ -37,11 +37,28 @@ class SharedModuleControls : public WidgetBase<>
     class FrequencyRange final : public ModuleControlBase,
                                  public WidgetBase<juce::Slider>,
                                  public SliderWithSelectedThumb,
-                                 public ParameterMenu
+                                 public ParameterMenu,
+                                 public Accessibility::SliderAccess
     {
       public:
         explicit FrequencyRange(ModuleUI &selectedModule);
 
+        std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override
+        {
+            return createSliderHandler();
+        }
+
+      private: // Accessibility::SliderAccess
+        juce::Slider &accessibleSlider() override { return *this; }
+        ParameterMenu &accessibleParameter() override { return *this; }
+        Thumb keyboardThumb() const override;
+        void chooseKeyboardThumb(Thumb) override;
+        void applyAccessibleValue(double value) override;
+
+        // left and right choose a thumb, the rest move it
+        bool keyPressed(juce::KeyPress const &key) override { return handleAccessibleKey(key); }
+
+      public:
         /// \note Which thumb this control currently stands for -- set by hover
         /// as well as by dragging, which is why it is not
         /// juce::Slider::getThumbBeingDragged(). See selectedThumb_.
@@ -125,11 +142,12 @@ class SharedModuleControls : public WidgetBase<>
         /// selectedThumb_ names. \see ModuleControl<>
         juce::Component &menuOwner() override { return *this; }
 
-        juce::String parameterName() const override { return parameterMenuName(); }
-        juce::String parameterValueText() const override { return getValueText(); }
+        juce::String parameterName() const override;
+        juce::String parameterValueText() const override;
         ParameterID parameterID() const override { return parameterMenuID(); }
 
-        bool parameterEditable() const override { return !isLFOEnabled(); }
+        // no thumb, no parameter to ask the LFO of
+        bool parameterEditable() const override { return (selectedThumb_ > 0) && !isLFOEnabled(); }
 
         bool setParameterFromText(juce::String const &text) override
         {
@@ -251,6 +269,12 @@ class SharedModuleControls : public WidgetBase<>
     /// one of them is the answer for all of them.
     /// \see ModuleControlBase::pointsInto().
     bool pointsInto(ModuleUI const &region) const { return gain_.pointsInto(region); }
+
+    /// For the navigation menu.
+    juce::Component &gain() { return gain_; }
+    juce::Component &wet() { return wet_; }
+
+    std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
 
   private:
     SpectrumWorxEditor &editor();

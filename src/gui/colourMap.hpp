@@ -278,6 +278,9 @@ class ColourMap
         MIDIMonitorText,
         MIDIMonitorPlate,
 
+        /// the box over the focused component, a diagnostic as the MIDI monitor is
+        FocusDebugger,
+
         numberOfColours
     }; // enum Name
 

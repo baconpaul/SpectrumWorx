@@ -14,6 +14,7 @@
 #include "core/host_interop/parameters.hpp"
 #include "core/parameterID.hpp"
 #include "gui/about.hpp"
+#include "gui/accessibility/focusDebugger.hpp"
 #include "gui/gui.hpp"
 #include "gui/editor/auxiliaryComponents.hpp"
 #include "gui/editor/moduleMenuHolder.hpp"
@@ -168,6 +169,47 @@ class SpectrumWorxEditor final : private SkinLifetime,
     /// editor's size -- see the constructor.
     explicit SpectrumWorxEditor(EditorHost &, PanelPlacement = defaultPanelPlacement);
     ~SpectrumWorxEditor();
+
+    /// \brief Each part's place in the tab order. \see accessibility/traversal.hpp
+    struct TabOrder
+    {
+        static constexpr int panel{100};
+        static constexpr int mainArea{1000};
+
+        // within the main area
+        static constexpr int inputKnob{10};
+        static constexpr int outputKnob{11};
+        static constexpr int mixKnob{12};
+        static constexpr int firstStrip{100};
+        static constexpr int stripStep{100};
+        static constexpr int header{900};
+        static constexpr int sharedControls{1000};
+        static constexpr int lfo{1100};
+        static constexpr int sideChain{1200};
+        static constexpr int history{1300};
+
+        // within a strip's step, the add button standing in the slot it would fill
+        static constexpr int stripControls{10};
+        static constexpr int addModule{50};
+        static constexpr int bypass{90};
+        static constexpr int eject{95};
+
+        static constexpr int slot(std::uint8_t const slotIndex)
+        {
+            return firstStrip + slotIndex * stripStep;
+        }
+    };
+
+    std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
+    std::unique_ptr<juce::ComponentTraverser> createKeyboardFocusTraverser() override;
+    std::unique_ptr<juce::ComponentTraverser> createFocusTraverser() override;
+
+    /// \brief Everywhere the keyboard can be sent. Command-N, as in Six Sines.
+    void showNavigationMenu();
+
+    /// \brief The red box over whatever has the keyboard. \see FocusDebugger
+    void setFocusDebuggerEnabled(bool);
+    bool focusDebuggerEnabled() const;
 
   public:
     static SpectrumWorxEditor &fromChild(juce::Component const &);
@@ -580,6 +622,9 @@ class SpectrumWorxEditor final : private SkinLifetime,
     static constexpr std::uint8_t noSlotAwaitingFocus{0xFF};
     std::uint8_t slotAwaitingFocus_{noSlotAwaitingFocus};
 
+    /// a removal from the keyboard, which the add button may answer
+    bool focusAddButtonIfSlotEmpty_{false};
+
   public:
     /// \note Both resync the rack afterwards, because both are reached from the
     /// host's side as well as from this editor's -- `updateGUIForChangedModule`
@@ -706,6 +751,9 @@ class SpectrumWorxEditor final : private SkinLifetime,
 
   private:
     void parentHierarchyChanged() override;
+
+    /// command-N for the navigation menu, whatever has the keyboard
+    bool keyPressed(juce::KeyPress const &) override;
 
   private: // JUCE ButtonListener overrides.
     void buttonClicked(juce::Button *) override;
@@ -837,6 +885,9 @@ class SpectrumWorxEditor final : private SkinLifetime,
 
     void setDefaultFocusHandling();
 
+    /// titles, the tab order and the header's labels
+    void setUpAccessibility();
+
     static void togglePresetBrowser(juce::Button const &);
 
   private:
@@ -905,6 +956,11 @@ class SpectrumWorxEditor final : private SkinLifetime,
         ////////////////////////////////////////////////////////////////////////
 
         static juce::Rectangle<int> logoArea() { return {12, 290, 51, 63}; }
+
+        std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override
+        {
+            return Accessibility::makeIgnoredHandler(*this);
+        }
 
       private: // JUCE Component overrides.
         void paint(juce::Graphics &) override;
@@ -1142,11 +1198,17 @@ class SpectrumWorxEditor final : private SkinLifetime,
       public:
         SampleArea();
 
+        std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
+
       private: // JUCE Component overrides.
         void mouseUp(juce::MouseEvent const &) override;
+        bool keyPressed(juce::KeyPress const &) override;
 
       private:
         SpectrumWorxEditor &editor();
+
+        /// what a left press opens
+        void showSourceMenu();
 
         void browseForFile();
 
@@ -1173,11 +1235,27 @@ class SpectrumWorxEditor final : private SkinLifetime,
 
         /// \brief One of the LFO's own parameters, with the right button's menu
         /// on it -- the same four sections a knob raises. \see issue #93.
-        class ParameterSlider : public AsyncSlider, public ParameterMenu
+        class ParameterSlider : public AsyncSlider,
+                                public ParameterMenu,
+                                public Accessibility::SliderAccess
         {
           public:
             ParameterSlider(LFODisplay &parent, std::uint8_t lfoParameterIndex);
 
+            std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override
+            {
+                return createSliderHandler();
+            }
+
+          protected: // Accessibility::SliderAccess
+            juce::Slider &accessibleSlider() override { return *this; }
+            ParameterMenu &accessibleParameter() override { return *this; }
+            /// through the drag's own path, so it is one gesture the host hears
+            void applyAccessibleValue(double value) override;
+
+            bool keyPressed(juce::KeyPress const &key) override { return handleAccessibleKey(key); }
+
+          public:
             /// \name What this slider stands for
             ///
             /// \note Public for the reason ModuleControlBase's own four are:
@@ -1228,6 +1306,11 @@ class SpectrumWorxEditor final : private SkinLifetime,
 
           public:
             std::uint8_t lfoParameterIndex() const override;
+
+          private: // Accessibility::SliderAccess
+            Thumb keyboardThumb() const override;
+            void chooseKeyboardThumb(Thumb) override;
+            void applyAccessibleValue(double value) override;
         }; // class RangeSlider
 
         ////////////////////////////////////////////////////////////////////////
@@ -1283,6 +1366,10 @@ class SpectrumWorxEditor final : private SkinLifetime,
           private: // juce::Component overrides
             void mouseDown(juce::MouseEvent const &) override;
 
+          private: // CapsuleButton
+            juce::String accessibleTitle() const override { return accessibleName(); }
+            void openMenuFromKeyboard() override { showParameterMenuFromKeyboard(true); }
+
           private: // ParameterMenu
             juce::Component &menuOwner() override { return *this; }
         }; // class EnableSwitch
@@ -1291,10 +1378,12 @@ class SpectrumWorxEditor final : private SkinLifetime,
         class SyncButton final : public TextButton, public ParameterButtonMenu
         {
           public:
-            SyncButton(LFODisplay &parent, unsigned int x, char const *text);
+            /// \p title what a screen reader calls the letter
+            SyncButton(LFODisplay &parent, unsigned int x, char const *text, char const *title);
 
           private: // juce::Component overrides
             void mouseDown(juce::MouseEvent const &) override;
+            bool keyPressed(juce::KeyPress const &) override;
 
           private: // ParameterMenu
             juce::Component &menuOwner() override { return *this; }
@@ -1316,9 +1405,12 @@ class SpectrumWorxEditor final : private SkinLifetime,
           public:
             explicit WaveformButton(LFODisplay &parent);
 
+            std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
+
           private: // juce::Component overrides
             void mouseDown(juce::MouseEvent const &) override;
             void paintButton(juce::Graphics &, bool isMouseOver, bool isButtonDown) override;
+            bool keyPressed(juce::KeyPress const &) override;
 
           private: // ParameterMenu
             juce::Component &menuOwner() override { return *this; }
@@ -1344,6 +1436,10 @@ class SpectrumWorxEditor final : private SkinLifetime,
             friend class LFODisplay;
             double snapValue(double attemptedValue, DragMode) override;
 
+          private: // Accessibility::SliderAccess
+            // snapped as a drag is, juce::Slider::setValue() leaving that to drags
+            void applyAccessibleValue(double value) override;
+
           private:
             LFO::SyncType lastSyncType_;
         }; // class Period
@@ -1351,6 +1447,11 @@ class SpectrumWorxEditor final : private SkinLifetime,
       public:
         LFODisplay();
         ~LFODisplay();
+
+        std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
+
+        /// For the navigation menu.
+        juce::Component &enableSwitch() { return switch_; }
 
         void setupForControl(ModuleControlBase &, double minimum, double maximum, double interval);
 
@@ -1519,6 +1620,9 @@ class SpectrumWorxEditor final : private SkinLifetime,
         /// The Interface page's author box. \see issue #56.
         TitledTextBox &authorTextBox() { return interfacePage_.authorTextBox(); }
 
+        /// the keyboard onto the tab that is showing
+        void focusCurrentTab();
+
         ////////////////////////////////////////////////////////////////////////
         ///
         /// \brief Redraws the four engine information lines if what they say has
@@ -1613,6 +1717,9 @@ class SpectrumWorxEditor final : private SkinLifetime,
             juce::String timeResolution_;
             juce::String latency_;
             juce::String busLayout_;
+
+            /// the five lines, read out
+            std::array<std::unique_ptr<Accessibility::AccessibleLabel>, 5> lines_;
         }; // class EnginePage
 
         class InterfacePage : public PanelBackground
@@ -1813,6 +1920,11 @@ class SpectrumWorxEditor final : private SkinLifetime,
     std::array<std::unique_ptr<ModuleUI>, SW::Constants::maxNumberOfModules> moduleRegions_;
 
     std::array<juce::String, numberOfStrings> strings_;
+
+    /// the header's three lines, read out
+    std::array<std::unique_ptr<Accessibility::AccessibleLabel>, 3> headerLabels_;
+
+    Accessibility::FocusDebugger focusDebugger_;
 
 }; // class SpectrumWorxEditor
 

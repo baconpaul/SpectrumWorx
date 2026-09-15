@@ -11,6 +11,7 @@
 #include "auxiliaryComponents.hpp"
 
 #include "core/modules/moduleDSPAndGUI.hpp"
+#include "gui/accessibility/traversal.hpp"
 #include "spectrumWorxEditor.hpp"
 
 #include "le/math/math.hpp"
@@ -73,10 +74,24 @@ SharedModuleControls::SharedModuleControls(SpectrumWorxEditor &editor)
 
     addToParentAndShow(*this, frequencyRange_);
 
+    setFocusContainerType(FocusContainerType::focusContainer);
+    Accessibility::setTraversalOrder(*this, SpectrumWorxEditor::TabOrder::sharedControls);
+    Accessibility::setTraversalOrder(gain_, 1);
+    Accessibility::setTraversalOrder(wet_, 2);
+    Accessibility::setTraversalOrder(frequencyRange_, 3);
+
     setBounds(116, 120, 174, 119);
     addToParentAndShow(editor.mainArea(), *this);
 
     updateForEngineSetupChanges(editor.engineSetup());
+}
+
+std::unique_ptr<juce::AccessibilityHandler> SharedModuleControls::createAccessibilityHandler()
+{
+    return Accessibility::makeGroupHandler(*this, [this] {
+        auto const *const pModule(editor().selectedModule());
+        return pModule ? "Selected " + pModule->accessibleName() : juce::String("Selected Module");
+    });
 }
 
 void SharedModuleControls::updateForEngineSetupChanges(Engine::Setup const &setup)
@@ -236,9 +251,65 @@ ModuleControlBase &SharedModuleControls::FrequencyRange::stopControl()
     return *this;
 }
 
-void SharedModuleControls::FrequencyRange::focusGained(juce::Component::FocusChangeType)
+// a press chooses its own thumb; the keyboard arrives on the lower one
+void SharedModuleControls::FrequencyRange::focusGained(juce::Component::FocusChangeType const cause)
 {
+    if ((cause != focusChangedByMouseClick) && (selectedThumb_ == Constants::noThumb))
+    {
+        selectedThumb_ = Constants::startFrequencyThumbIndex;
+        repaint();
+    }
     reportActiveControl();
+}
+
+juce::String SharedModuleControls::FrequencyRange::parameterName() const
+{
+    if (selectedThumb_ == Constants::noThumb)
+        return editor().moduleParameterMenuName(module(), "Frequency Range");
+    return parameterMenuName();
+}
+
+// nothing to read with no thumb chosen: the value getters would read Bypass
+juce::String SharedModuleControls::FrequencyRange::parameterValueText() const
+{
+    if (selectedThumb_ == Constants::noThumb)
+        return {};
+    return getValueText();
+}
+
+Accessibility::SliderAccess::Thumb SharedModuleControls::FrequencyRange::keyboardThumb() const
+{
+    return (selectedThumb_ == Constants::stopFrequencyThumbIndex) ? Thumb::upper : Thumb::lower;
+}
+
+void SharedModuleControls::FrequencyRange::chooseKeyboardThumb(Thumb const thumb)
+{
+    int const chosen((thumb == Thumb::upper) ? Constants::stopFrequencyThumbIndex
+                                             : Constants::startFrequencyThumbIndex);
+    if (chosen == selectedThumb_)
+        return;
+
+    selectedThumb_ = chosen;
+    reportActiveControl();
+    repaint();
+    juce::AccessibilityHandler::postAnnouncement(
+        parameterName() + ", " + parameterValueText(),
+        juce::AccessibilityHandler::AnnouncementPriority::medium);
+}
+
+void SharedModuleControls::FrequencyRange::applyAccessibleValue(double const value)
+{
+    if (!parameterEditable() || !pointAtSelectedThumb())
+        return;
+
+    if (selectedThumb_ == Constants::startFrequencyThumbIndex)
+        juce::Slider::setMinValue(value, juce::dontSendNotification, false);
+    else
+        juce::Slider::setMaxValue(value, juce::dontSendNotification, false);
+
+    publishValue();
+    repaint();
+    Accessibility::announceValueChange(*this);
 }
 /// \note Nothing, for the reason the two knobs beside it give.
 void SharedModuleControls::FrequencyRange::focusLost(juce::Component::FocusChangeType) {}

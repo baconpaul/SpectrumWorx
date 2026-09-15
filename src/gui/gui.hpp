@@ -44,6 +44,7 @@
 #include "painters/knobPainter.hpp"
 #include "painters/panelPainter.hpp"
 
+#include "accessibility/handlers.hpp"
 #include "resources.hpp"
 #include "theme.hpp"
 
@@ -701,6 +702,20 @@ class ComboBox : public WidgetBase<>, public PopupMenuWithSelection
     void setSelectedID(unsigned int newSelectionID);
     void setSelectedIndex(unsigned int newSelectionIndex);
 
+    std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
+
+  protected:
+    /// what a screen reader calls the box
+    virtual juce::String accessibleTitle() const { return getName(); }
+
+    /// what the menu keys and a screen reader's press open
+    virtual void openMenuFromKeyboard() {}
+
+    /// whether the arrows may step the selection
+    virtual bool acceptsKeyboardEdits() const { return isEnabled(); }
+
+    bool keyPressed(juce::KeyPress const &) override;
+
   protected:
     /// \note \p height is the box's own, which for a TitledComboBox is not the
     /// widget's: that one is fifteen pixels taller and paints its title in the
@@ -835,14 +850,26 @@ class CapsuleButton : public WidgetBase<juce::Button>
     CapsuleButton(juce::Component &parent, CapsuleStyle const &, int width, int height,
                   bool litWhenOn = true);
 
+    std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
+
   protected:
     /// \brief Draws this button's capsule into \p bounds, at whatever the mouse
     /// has made of its opacity.
     void paintCapsule(juce::Graphics &, juce::Rectangle<int> bounds, bool isMouseOverButton,
                       bool isButtonDown);
 
+    /// whether it reads as on, for a button that keeps that state itself
+    virtual bool showsOn() const { return getToggleState(); }
+
+    virtual juce::String accessibleTitle() const;
+
+    /// the keyboard's press, as one whole edit
+    virtual void toggleFromKeyboard();
+    virtual void openMenuFromKeyboard() {}
+
   protected: // juce::Component overrides
     void paintButton(juce::Graphics &, bool isMouseOverButton, bool isButtonDown) override;
+    bool keyPressed(juce::KeyPress const &) override;
 
   private:
     CapsuleStyle const *pStyle_;
@@ -1050,6 +1077,27 @@ class ParameterMenu
     ////////////////////////////////////////////////////////////////////////////
     virtual bool parameterEditable() const { return true; }
 
+    /// \name The keyboard's and a screen reader's way in
+    ///@{
+    /// the same menu, over the middle of the widget
+    void showParameterMenuFromKeyboard(bool skipSetToDefault = false);
+
+    juce::String accessibleName() const { return parameterName(); }
+    juce::String accessibleValue() const { return parameterValueText(); }
+
+    /// \return false for text it cannot hold, or a parameter that takes no text
+    bool accessibleSetText(juce::String const &text)
+    {
+        return parameterEditable() && parameterAcceptsText() && setParameterFromText(text);
+    }
+
+    void accessibleResetToDefault()
+    {
+        if (parameterEditable())
+            setParameterToDefault();
+    }
+    ///@}
+
   protected:
     ~ParameterMenu() = default;
 
@@ -1103,6 +1151,9 @@ class ParameterMenu
   private:
     /// The type-in field, as a menu item. \see gui.cpp.
     class ValueTypein;
+
+    /// \p position in the widget's own coordinates
+    void showParameterMenuAt(juce::Point<int> position, bool skipSetToDefault);
 }; // class ParameterMenu
 
 /// \brief Shift-refines a drag by feeding juce::Slider a position rather than a
@@ -1163,8 +1214,18 @@ class HorizontalSlider : public juce::Slider
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-class Knob : public WidgetBase<juce::Slider>
+class Knob : public WidgetBase<juce::Slider>, public Accessibility::SliderAccess
 {
+  public:
+    std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override
+    {
+        return createSliderHandler();
+    }
+
+  private: // Accessibility::SliderAccess
+    juce::Slider &accessibleSlider() override { return *this; }
+    ParameterMenu &accessibleParameter() override { return parameterMenu(); }
+
   public:
     ////////////////////////////////////////////////////////////////////////////
     ///
@@ -1283,6 +1344,9 @@ class Knob : public WidgetBase<juce::Slider>
     ////////////////////////////////////////////////////////////////////////////
     void modifierKeysChanged(juce::ModifierKeys const &) override;
 
+    // all of them, juce::Slider's own arrows setting a value no host hears
+    bool keyPressed(juce::KeyPress const &key) override { return handleAccessibleKey(key); }
+
     void startedDragging() noexcept override;
     void stoppedDragging() noexcept override;
 
@@ -1340,6 +1404,10 @@ class EditorKnob final : public Knob, public ParameterMenu
     /// of its own so that a host records it as one edit rather than as a jump.
     void setParameterValue(double newValue);
 
+  private: // Accessibility::SliderAccess
+    // juce::Slider announces a synchronous change itself
+    void applyAccessibleValue(double const value) override { setParameterValue(value); }
+
   private:
     /// \note const, and still handing back a non-const editor: fromChild() takes
     /// a `Component const &` and answers the editor it belongs to, and the const
@@ -1368,7 +1436,11 @@ class TitledComboBox : public ComboBox
     /// \note The same call the menu's own callback makes.
     void selectionScrolled() override;
 
+    juce::String accessibleTitle() const override { return titleText_; }
+    void openMenuFromKeyboard() override;
+
   private:
+    juce::String const titleText_;
     DrawableText const title_;
 }; // class TitledComboBox
 
@@ -1423,6 +1495,13 @@ class TitledTextBox : public WidgetBase<>, private juce::TextEditor::Listener
     void edited();
     void commit();
     ///@}
+
+  public:
+    // the editor inside carries the title
+    std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override
+    {
+        return Accessibility::makeIgnoredHandler(*this);
+    }
 
   private: // juce::Component overrides
     // the rim follows the focus, which lands on the child rather than on this
